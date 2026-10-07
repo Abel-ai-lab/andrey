@@ -1,0 +1,137 @@
+[project]
+name = "andrey-core"       # import root is "andrey" (taken on PyPI)
+version = "0.1.0"         # must equal andrey.__version__ (scripts/check_dist.py)
+description = "Andrey, a very fast causal discovery package"
+dynamic = ["readme"]  # README.md, its image paths pinned to the release (fancy-pypi-readme below)
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+  "numpy>=1.26",             # uncapped; numba's numpy<2.5 pin stays in its extra
+  "scipy>=1.13",
+  "scikit-learn>=1.5",
+  "threadpoolctl>=3",        # single-thread BLAS keeps parallel GES bit-identical
+  "statsmodels>=0.14",       # VARMALiNGAM
+  "pandas>=2.2",             # andrey.data.load_sachs returns a DataFrame
+  "networkx>=3",             # GraphStructure conversion
+  "pydantic>=2",             # MethodSpec registry (andrey.spec)
+  "typer>=0.12",             # `andrey` CLI
+  "pyyaml>=6",               # `andrey run --config <file>`
+]
+
+[project.optional-dependencies]
+# CPU JIT for GES's reachability check, up to 64 variables.
+numba = ["numba>=0.61"]
+torch = ["torch>=2.2"]     # GPU primitives and CALM; the build (CPU/CUDA/ROCm) is picked at install
+data  = ["safetensors>=0.4"]  # andrey.data save/load
+viz   = ["matplotlib>=3.7", "pygraphviz>=2"]  # andrey.viz.mpl; Graphviz layouts
+all   = ["andrey-core[numba,torch,data,viz]"]
+
+[project.scripts]
+andrey = "andrey.cli:main"
+
+[project.urls]
+Homepage = "https://andrey.abel.ai"
+Documentation = "https://andrey.abel.ai/docs/"
+Source = "https://github.com/Abel-ai-lab/andrey"
+Issues = "https://github.com/Abel-ai-lab/andrey/issues"
+Changelog = "https://andrey.abel.ai/docs/changelog.html"
+
+[dependency-groups]                # not published
+# accessible-pygments: site code colors.
+dev = ["ruff", "ty", "pytest", "accessible-pygments"]
+# Notebooks install their own packages.
+demo = [
+    "andrey-core[numba,torch,viz]", "gradio==6.27.0", "causal-learn==0.1.4.8",
+    "gcastle==1.0.4", "lingam==1.12.2", "huggingface-hub>=1", "playwright",
+]
+docs = [
+    "sphinx>=7",
+    "pydata-sphinx-theme",
+    "myst-nb",
+    "sphinx-design",
+    "sphinxcontrib-katex",
+    "sphinxcontrib-typer",
+    "sphinx-autodoc-typehints",
+    "sphinx-copybutton",
+    "sphinx-autobuild",
+    "resvg-py",                    # renders the link-preview cards
+    "andrey-core[numba,viz]",
+    "ablog>=0.11.13",
+]
+
+# This repo only (not published): the lock uses the CPU torch build. For a GPU build, run
+# `uv pip install --reinstall --torch-backend=auto torch` after sync. See CONTRIBUTING.md.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true                    # torch only
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", extra = "torch" }]
+
+[build-system]
+requires = ["hatchling", "hatch-fancy-pypi-readme==25.1.0"]
+build-backend = "hatchling.build"
+
+# The package index's description is README.md, whose images live in the repository under
+# .github/readme/. The index cannot follow a relative path, so each one points at the release tag.
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(src|srcset)="(\.github/readme/[^"]+)"'
+replacement = '\1="https://raw.githubusercontent.com/Abel-ai-lab/andrey/v$HFPR_VERSION/\2"'
+
+# Wheel and sdist ship src/andrey plus hatchling's metadata files; scripts/check_dist.py fails on
+# anything else.
+[tool.hatch.build.targets.wheel]
+packages = ["src/andrey"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/andrey", "README.md"]  # README.md: the package description's source
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]  # "." for test helpers and QA tools
+
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.src]
+include = ["src/andrey", "tests/recovery/helpers", "qa/capture_baselines.py"]
+
+# Optional extras are not in the dev env; allow them unresolved only in the files that import them.
+[[tool.ty.overrides]]
+include = [
+    "src/andrey/core/backend.py",
+    "src/andrey/api/constraint.py",
+    "src/andrey/api/score.py",
+    "src/andrey/api/lingam.py",
+    "src/andrey/api/permutation.py",
+    "src/andrey/search/calm.py",
+]
+analysis = { allowed-unresolved-imports = ["torch", "torch.**", "numba", "numba.**"] }
+
+[[tool.ty.overrides]]
+include = ["src/andrey/viz/mpl.py"]
+analysis = { allowed-unresolved-imports = ["matplotlib", "matplotlib.**", "cycler"] }
+
+[[tool.ty.overrides]]
+include = ["src/andrey/viz/_graphviz.py"]
+analysis = { allowed-unresolved-imports = ["pygraphviz", "pygraphviz.**"] }
+
+[[tool.ty.overrides]]
+include = ["src/andrey/data/storage.py"]
+analysis = { allowed-unresolved-imports = ["safetensors", "safetensors.**"] }
+

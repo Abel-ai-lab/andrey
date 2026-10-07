@@ -1,0 +1,265 @@
+/* ============================================================================
+   ANDREY DOCS CHROME
+   ----------------------------------------------------------------------------
+   Maps pydata-sphinx-theme onto the package palette and sets what is not a
+   color (type, spacing, radii, motion). Every color is a `--andrey-*` token
+   that `conf.py` generates from `src/andrey/viz/theme.py` into
+   `andrey-tokens.css`. This file names no hex, so a palette edit in the
+   package propagates here with no second edit.
+
+   The result: a rendered graph and the page around it share one paper, ink,
+   and accent. See `DESIGN.md`.
+
+   pydata's structural light/dark grays stay in place wherever contrast safety
+   depends on them; only the brand-defining surfaces are overridden.
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/* ---------- type, spacing, motion (theme-agnostic) ---------- */
+:root {
+  --andrey-font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --andrey-font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Menlo", "Consolas", monospace;
+
+  --andrey-radius-sm: 6px;
+  --andrey-radius-md: 10px;
+  --andrey-radius-lg: 14px;
+
+  --andrey-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --andrey-dur: 160ms;
+}
+
+html {
+  --pst-font-family-base: var(--andrey-font-sans);
+  --pst-font-family-heading: var(--andrey-font-sans);
+  --pst-font-family-monospace: var(--andrey-font-mono);
+}
+
+/* ---------- palette mapping (both themes; the tokens themselves switch) ---------- */
+html[data-theme="light"],
+html[data-theme="dark"] {
+  /* accent: cobalt anchors chrome, hover, and selection, as it does in a rendered graph */
+  --pst-color-primary: var(--andrey-accent);
+  --pst-color-primary-highlight: var(--andrey-ramp-5);
+  --pst-color-secondary: var(--andrey-accent);
+  --pst-color-secondary-highlight: var(--andrey-ramp-5);
+  --pst-color-link: var(--andrey-accent);
+  --pst-color-link-hover: var(--andrey-ramp-5);
+  --pst-color-accent: var(--andrey-accent);
+  /* The `-bg` companions are literal hexes in pydata, so recoloring only the base would strand a
+     focused tab or an announcement bar on the theme's original magenta tint. */
+  --pst-color-primary-bg: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
+  --pst-color-secondary-bg: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
+  --pst-color-accent-bg: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
+  /* inline code takes the categorical purple, not the cobalt, so code never reads as a link */
+  --pst-color-inline-code: var(--andrey-categorical-5);
+
+  /* grounds: the page IS the figure's paper, so a `background=True` SVG composites seamlessly */
+  --pst-color-background: var(--andrey-paper);
+  --pst-color-on-background: var(--andrey-surface);
+  --pst-color-surface: var(--andrey-surface-2);
+  --pst-color-on-surface: var(--andrey-ink);
+  --pst-color-border: var(--andrey-line);
+
+  /* `--pst-color-heading` derives from this, so headings follow without a second override */
+  --pst-color-text-base: var(--andrey-ink);
+  --pst-color-text-muted: var(--andrey-muted);
+}
+
+/* pydata keeps the admonition states (info / warning / danger / success), the scroll target, and
+   the shadow alpha, base and `-bg` together. The palette's edge colors carry graph meaning (amber
+   is "orientation unknown"), which would misread as a UI state, and pydata's own set is
+   contrast-tested. */
+
+/* ---------- navigation ---------- */
+/* uppercase, tracked section labels: a quiet hierarchy cue that keeps the sidebar scannable */
+.bd-sidebar-primary .caption-text {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: var(--andrey-muted);
+}
+
+/* pydata sizes this column at 25% of the page, 352px at full width, mostly empty for our short
+   navigation. 18rem keeps the longest API name, andrey.multi_group_direct_lingam, on one line;
+   narrower, the theme's overflow-wrap cuts it mid-word. Below 960px the sidebar is a drawer. */
+@media (min-width: 960px) {
+  .bd-sidebar-primary {
+    max-width: 18rem;
+  }
+}
+
+.bd-header {
+  border-bottom: 1px solid var(--andrey-line);
+  box-shadow: none;
+}
+
+/* the wordmark at the height of the navbar's text, as on the homepage */
+.navbar-brand img.logo__image {
+  height: 1.6rem;
+  width: auto;
+}
+
+nav.bd-links li > a:hover {
+  text-decoration: none;
+  color: var(--andrey-accent);
+}
+
+/* the active page reads as a cobalt rail, matching how selection is drawn in a graph */
+nav.bd-links li.current > a {
+  border-left: 2px solid var(--andrey-accent);
+  padding-left: 0.6rem;
+  font-weight: 600;
+}
+
+/* ---------- code ---------- */
+div.highlight,
+pre {
+  border-radius: var(--andrey-radius-md);
+}
+
+/* The chip is `surface`, not `surface-2`: the purple on the darker chip measures 4.24:1, under
+   the 4.5:1 AA minimum for normal-size text. On `surface` it clears at 4.8:1, and a hairline keeps
+   the chip legible against the paper. */
+code.literal {
+  background: var(--andrey-surface);
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-sm);
+  padding: 0.1em 0.35em;
+}
+
+/* ---------- cards (sphinx-design) ---------- */
+.sd-card {
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
+  transition: border-color var(--andrey-dur) var(--andrey-ease),
+              transform var(--andrey-dur) var(--andrey-ease);
+}
+
+.sd-card:hover {
+  border-color: var(--andrey-accent);
+  transform: translateY(-2px);
+}
+
+.sd-card-title {
+  color: var(--andrey-ink);
+  font-weight: 600;
+}
+
+/* ---------- rendered structures ---------- */
+/* `andrey.viz.draw()` emits a fluid SVG (width="100%"); give it room and a matching frame so an
+   embedded graph reads as part of the page rather than a pasted image. */
+.andrey-figure,
+.sphx-glr-script-out svg,
+.output_html svg {
+  display: block;
+  width: 100%;
+  max-width: 46rem;
+  height: auto;
+  margin: 1.5rem auto;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+}
+
+/* A labeled row of renders (the light/dark two-up in the viz gallery): side by side on a wide
+   viewport, stacked on a narrow one, each captioned so a dark specimen on a light page reads as a
+   deliberate pair rather than a broken render. */
+.andrey-figure-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+  align-items: start;
+}
+
+.andrey-figure-pair figure {
+  margin: 0;
+}
+
+/* One extra selector level so these win over the single-figure rule above (equal specificity, so
+   source order alone would be fragile): fill the grid cell, and let the caption carry the spacing. */
+.andrey-figure-pair figure svg {
+  margin: 0;
+  max-width: 100%;
+}
+
+.andrey-figure-pair figcaption {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--andrey-muted);
+}
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .sd-card {
+    transition: none;
+  }
+
+  .sd-card:hover {
+    transform: none;
+  }
+}
+
+/* The release beside the wordmark (_templates/site-version.html), linking to the changelog: a flat
+   tag outlined like the site's cards and code windows. */
+.site-version {
+  align-self: center;
+  margin-left: 0.6rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 6px;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-version:hover {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-ink);
+}
+
+/* A notebook's download link sits to the right of its Open in Colab badge: a flat tag of the
+   badge's height, outlined like the release tag. */
+p:has(> a > img[alt="Open in Colab"]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+p:has(> a > img[alt="Open in Colab"]) a.download {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 0.45rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 3px;
+  color: var(--andrey-muted);
+  font-size: 0.72rem;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+p:has(> a > img[alt="Open in Colab"]) a.download code {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+p:has(> a > img[alt="Open in Colab"]) a.download:hover {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-ink);
+}

@@ -1,0 +1,373 @@
+/* "Why Andrey is fast": the scenes in the homepage's dialog, the launch post, and the guide.
+   Every color is an --andrey-* token generated from src/andrey/viz/theme.py, or derived from
+   one, so this file names no color value. Both lanes of a scene share one grid, so a station or a pile sits at the same place in
+   each. Motion runs only with no reduced-motion preference (why-fast.js). */
+
+.wf {
+  --wf-font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --wf-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --wf-graphite: var(--andrey-edge-directed);
+  /* Shadows and the backdrop use the theme's darkest ground: ink in light, paper in dark. */
+  --wf-shade: var(--andrey-ink);
+  font-family: var(--wf-font);
+  color: var(--andrey-ink);
+}
+html[data-theme="dark"] .wf { --wf-shade: var(--andrey-paper); }
+.wf-scene { margin: 0; padding: 0; }
+
+/* ---------- the stage: two lanes on one grid ---------- */
+.wf-stage {
+  container: wf-stage / inline-size;
+  position: relative;
+  padding: 6px 28px;
+  border-radius: 22px;
+  background: var(--andrey-surface);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--andrey-line) 70%, transparent),
+    0 18px 40px -24px color-mix(in srgb, var(--wf-shade) 35%, transparent);
+}
+.wf-lane {
+  display: grid;
+  grid-template-columns: 11.5rem minmax(0, 1fr) 6.5rem;
+  align-items: center;
+  column-gap: 20px;
+  padding: 12px 0;
+}
+.wf-lane + .wf-lane { border-top: 1px solid var(--andrey-line); }
+.wf .wf-who {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.wf .wf-who small {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--andrey-muted);
+}
+.wf-lane.andrey .wf-who { color: var(--andrey-accent); }
+.wf-lane.others .wf-who { color: var(--andrey-muted); font-weight: 500; }
+.wf-track { position: relative; height: 84px; }
+/* Each lane draws on a fixed 560 x 84 canvas, scaled to its track, so a scene keeps one
+   composition, and both lanes stay aligned, at any width. */
+.wf-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 560px;
+  height: 84px;
+  transform-origin: 0 0;
+}
+.wf .wf-count {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: end;
+  align-items: center;
+  column-gap: 8px;
+  text-align: right;
+  line-height: 1;
+}
+.wf-count b {
+  font-size: 2.1rem;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  color: var(--andrey-accent);
+}
+.wf-lane.others .wf-count b { color: var(--andrey-muted); font-weight: 500; }
+.wf-count small {
+  grid-column: 1 / -1;
+  margin-top: 5px;
+  font-size: 0.78rem;
+  color: var(--andrey-muted);
+}
+.wf-done {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--andrey-accent);
+  color: var(--andrey-surface);
+  opacity: 0;
+}
+.wf-lane.others .wf-done { background: var(--wf-graphite); }
+.wf-done svg { width: 13px; height: 13px; }
+
+/* ---------- what moves: edges under test, stations, matrices ---------- */
+.wf-edge {
+  position: absolute;
+  left: 0;
+  top: 32px;
+  width: 26px;
+  height: 12px;
+  color: var(--andrey-accent);
+  will-change: transform;
+}
+.wf-lane.others .wf-edge { color: var(--wf-graphite); }
+.wf-edge svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.wf-edge line { stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.wf-edge circle { fill: currentColor; }
+.wf-station {
+  position: absolute;
+  border-radius: 14px;
+  background: var(--andrey-surface-2);
+  box-shadow: inset 0 0 0 1px var(--andrey-line);
+}
+.wf-station.gate { border-radius: 4px; background: var(--andrey-line); box-shadow: none; }
+.wf-glow {
+  position: absolute;
+  inset: -5px;
+  border: 2px solid var(--andrey-accent);
+  border-radius: 18px;
+  opacity: 0;
+}
+.wf-station.gate .wf-glow { border-radius: 8px; }
+.wf-lane.others .wf-glow { border-color: var(--wf-graphite); }
+.wf-tag {
+  position: absolute;
+  top: 66px;
+  font-size: 0.72rem;
+  color: var(--andrey-muted);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.wf-cell { position: absolute; border-radius: 2.5px; background: var(--andrey-ramp-3); }
+.wf-cell.r1 { background: var(--andrey-ramp-1); }
+.wf-cell.r2 { background: var(--andrey-ramp-2); }
+.wf-cell.r3 { background: var(--andrey-ramp-3); }
+.wf-cell.r4 { background: var(--andrey-ramp-4); }
+.wf-cell.r5 { background: var(--andrey-ramp-5); }
+.wf-lane.others .wf-cell {
+  background: color-mix(in srgb, var(--wf-graphite) calc(var(--v) * 100%), transparent);
+}
+.wf-bar {
+  position: absolute;
+  left: 0;
+  width: 30px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--andrey-line);
+}
+.wf-bit {
+  position: absolute;
+  top: 35px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--andrey-accent);
+  opacity: 0;
+}
+.wf-lane.others .wf-bit { background: var(--wf-graphite); }
+
+.wf-after { display: flex; justify-content: flex-end; margin-top: 10px; }
+/* The replay button keeps its space while hidden, so showing it moves nothing. The theme hides
+   [hidden] with !important; this more specific rule wins over it. */
+.wf-replay[hidden] { display: grid !important; visibility: hidden; }
+.wf-replay {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+  cursor: pointer;
+}
+.wf-replay svg { width: 16px; height: 16px; }
+
+/* Screen readers get each scene's counts as a sentence. */
+.wf .wf-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- the homepage's pill and dialog ---------- */
+a.wf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 7px 7px 7px 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+  font: 500 1.06rem/1 "Inter", system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s var(--wf-ease, ease);
+}
+a.wf-pill:hover {
+  color: var(--andrey-ink);
+  background: color-mix(in srgb, var(--andrey-ink) 8%, var(--andrey-surface-2));
+}
+.wf-plus {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--andrey-accent);
+  color: var(--andrey-paper);
+}
+.wf-plus svg { width: 15px; height: 15px; }
+
+dialog.wf-dialog {
+  width: min(940px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 34px 40px 26px;
+  border: 0;
+  border-radius: 28px;
+  background: var(--andrey-paper);
+  box-shadow: 0 40px 120px -20px color-mix(in srgb, var(--wf-shade) 45%, transparent);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+dialog.wf-dialog::backdrop {
+  background: color-mix(in srgb, var(--wf-shade) 45%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+}
+.wf-top { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.wf .wf-top h2 {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.6vw, 2.2rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--andrey-ink);
+}
+.wf .wf-top p { margin: 0.4rem 0 0; font-size: 1rem; color: var(--andrey-muted); }
+.wf-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+  cursor: pointer;
+}
+.wf-close svg { width: 14px; height: 14px; }
+.wf-panels { margin-top: 26px; }
+.wf-caption { margin-top: 26px; min-height: 8.2em; }
+.wf .wf-caption h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--andrey-ink);
+}
+.wf .wf-caption p {
+  margin: 0.55rem 0 0;
+  max-width: 62ch;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--andrey-muted);
+}
+.wf-controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 8px; }
+.wf-dots {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--andrey-surface-2);
+}
+.wf-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-ink) 32%, transparent);
+  cursor: pointer;
+  overflow: hidden;
+  transition: width 0.5s var(--wf-ease);
+}
+.wf-dot::before { content: ""; position: absolute; inset: -12px -6px; }
+.wf-dot[aria-selected="true"] {
+  width: 44px;
+  background: color-mix(in srgb, var(--andrey-ink) 20%, transparent);
+}
+.wf-dot i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--andrey-ink);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.wf-play {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+  cursor: pointer;
+}
+.wf-play svg { grid-area: 1 / 1; width: 16px; height: 16px; opacity: 0; }
+.wf-play[data-state="playing"] .i-pause,
+.wf-play[data-state="paused"] .i-play,
+.wf-play[data-state="ended"] .i-replay { opacity: 1; }
+/* On the homepage the section's paragraph measure reaches the note too; centred, it stays readable. */
+.wf .wf-note {
+  margin: 18px auto 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--andrey-muted);
+}
+.wf-note a { color: var(--andrey-accent); }
+
+.wf button:focus-visible,
+.wf-pill:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 3px;
+}
+
+/* The launch post and the guide: each scene under the page's own heading. */
+.wf-scene[data-play="view"] { margin: 1.4rem 0 1.8rem; }
+
+/* A narrow stage (the launch post's column, a phone) stacks each lane: its name and count above,
+   its track across the full width below. */
+@container wf-stage (max-width: 700px) {
+  .wf-lane {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "who count" "track track";
+    row-gap: 6px;
+  }
+  .wf .wf-who { grid-area: who; }
+  .wf .wf-count { grid-area: count; }
+  .wf-track { grid-area: track; }
+  .wf-count b { font-size: 1.8rem; }
+}
+@media (max-width: 680px) {
+  .wf-stage { padding: 4px 16px; border-radius: 18px; }
+  dialog.wf-dialog { padding: 24px 18px 20px; border-radius: 24px; }
+  .wf-caption { min-height: 11em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wf-dot { transition: none; }
+}

@@ -1,0 +1,18 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+numpy>=1.26,<2.5
+scipy>=1.13
+scikit-learn>=1.5
+threadpoolctl>=3
+statsmodels>=0.14
+networkx>=3
+pydantic>=2
+typer>=0.12
+pyyaml>=6
+numba>=0.61
+matplotlib>=3.7
+gradio==6.27.0
+causal-learn==0.1.4.8
+gcastle==1.0.4
+# gCastle imports torch; the CPU index keeps CUDA wheels out.
+torch>=2.2
+lingam==1.12.2

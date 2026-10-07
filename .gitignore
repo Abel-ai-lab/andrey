@@ -1,0 +1,60 @@
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.ruff_cache/
+
+*.egg-info/
+build/
+dist/
+
+.venv*/
+venv/
+# The bench venv is built by benchmarks/start.sh, which pins competitor versions there.
+# Its lockfile is an artifact of that build, and travels with a batch's results, not the repo.
+benchmarks/uv.lock
+# The R package library benchmarks/start_r.sh builds for the R lane, beside the venv.
+benchmarks/.r-lib-bench/
+env/
+
+.vscode/
+.idea/
+*.swp
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+.env
+.envrc
+
+*.log
+*.out
+tmp/
+temp/
+.cache/
+
+# Local job scripts (e.g., SLURM submit scripts).
+jobs/
+
+outputs/
+
+.claude/*
+!.claude/CLAUDE.md
+!.claude/commands
+!.claude/skills
+
+
+docs/PR/
+
+# docs site: generated build artifacts (never committed, never shipped in the wheel)
+docs/_build/
+docs/_generated/
+docs/docs/examples/*.ipynb
+docs/docs/code/generated/
+docs/_static/andrey-tokens.css
+docs/_static/graph-comparison.html
+docs/_static/graph-types-*.html
+
+.ipynb_checkpoints/
+apps/live-discovery/brand/
+apps/live-discovery/data/

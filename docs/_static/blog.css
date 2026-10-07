@@ -1,0 +1,96 @@
+/* The blog: ABlog's post list, archive, and post card, and a post's cover and figures.
+   Colors are --andrey-* tokens. */
+
+/* The launch post's speedup panel, the homepage's own. */
+.bd-article .race {
+  margin: 2rem 0;
+}
+
+/* A post's cover, between its title and its byline (docs/conf.py, site/cards.py). */
+/* The theme pads a figure; a cover lines up with the text column instead. */
+.post-cover {
+  margin: 0.25rem 0 1.25rem;
+  padding: 0;
+}
+
+.post-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+
+/* Left-aligned under the cover, like the byline below it; the theme centres a caption. */
+.post-cover figcaption {
+  margin-top: 0.5rem;
+  text-align: left;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+}
+
+/* A post's authors and date, under its title. */
+.post-byline {
+  margin: -0.4rem 0 1.6rem;
+  color: var(--andrey-muted);
+  font-size: 0.95rem;
+}
+
+/* ABlog's post list: each post's title, its date under it, then its excerpt. */
+.postlist {
+  padding-left: 0;
+  list-style: none;
+}
+
+.postlist > li.ablog-post {
+  padding-block: 1.25rem;
+  border-top: 1px solid var(--andrey-line);
+}
+
+.ablog-post-title {
+  margin: 0 0 0.5rem;
+  color: var(--andrey-muted);
+  font-size: 0.9rem;
+}
+
+.ablog-post-title a {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--andrey-ink);
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ablog-post-title a:hover {
+  color: var(--andrey-accent);
+}
+
+/* A post and the blog's pages sit outside the documentation, so its breadcrumb would lead there. */
+.bd-breadcrumbs {
+  display: none;
+}
+
+.ablog-archive ul.ablog-archive,
+ul.ablog-archive {
+  padding-left: 0;
+  list-style: none;
+}
+
+.ablog-sidebar-item h2,
+.ablog-sidebar-item h3 {
+  margin-top: 0;
+  color: var(--andrey-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ablog-sidebar-item ul {
+  padding-left: 0;
+  list-style: none;
+}
+
+.ablog__postcard i.fa {
+  display: none;
+}

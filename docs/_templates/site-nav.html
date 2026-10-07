@@ -1,0 +1,19 @@
+{#- The site's sections, as pydata's navbar-nav draws its links: the current section is marked, and
+    aria-current goes only on the link to the page being read. -#}
+{%- set sections = [
+  ("docs/index", "Docs", pagename.startswith("docs/")
+    and not pagename.startswith(("docs/examples/", "docs/demos/")) and pagename != "docs/faq"),
+  ("docs/examples/index", "Examples", pagename.startswith("docs/examples/")),
+  ("docs/demos/index", "Demos", pagename.startswith("docs/demos/")),
+  ("blog/index", "Blog", pagename == "blog" or pagename.startswith("blog/")),
+  ("docs/faq", "FAQ", pagename == "docs/faq"),
+] %}
+<nav aria-label="{{ _('Site') }}">
+  <ul class="bd-navbar-elements navbar-nav">
+    {%- for doc, title, current in sections %}
+    <li class="nav-item{% if current %} current active{% endif %}">
+      <a class="nav-link nav-internal" href="{{ pathto(doc) }}"{% if pagename == doc %} aria-current="page"{% endif %}>{{ title }}</a>
+    </li>
+    {%- endfor %}
+  </ul>
+</nav>

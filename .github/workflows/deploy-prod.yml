@@ -1,0 +1,81 @@
+name: Deploy the production site
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing vX.Y.Z tag that resolves to the selected commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: andrey-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: >-
+      github.repository == 'Abel-ai-lab/andrey'
+      && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/ci.yml
+  docs:
+    if: >-
+      github.repository == 'Abel-ai-lab/andrey'
+      && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/docs.yml
+  request-build:
+    needs: [ci, docs]
+    if: >-
+      github.repository == 'Abel-ai-lab/andrey'
+      && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Queue the exact public release on the build server
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_PROD_URL }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+          COMMIT_SHA: "${{ github.sha }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_URL:?Missing DEPLOY_PROD_URL}"
+          : "${DEPLOY_USER:?Missing DEPLOY_USER}"
+          : "${DEPLOY_TOKEN:?Missing DEPLOY_TOKEN}"
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          host=${DEPLOY_URL#https://}
+          host=${host%%/*}
+          headers=$(mktemp)
+          trap 'rm -f "$headers"' EXIT
+          # Do not retry an ambiguous POST: the server may already have queued it.
+          status=$(curl --silent --show-error --fail \
+            --connect-timeout 10 --max-time 30 \
+            --user "$DEPLOY_USER:$DEPLOY_TOKEN" \
+            --dump-header "$headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "RELEASE_TAG=$RELEASE_TAG" \
+            --data-urlencode "COMMIT_SHA=$COMMIT_SHA" \
+            "$DEPLOY_URL")
+          queue=$(awk 'tolower($1) == "location:" {gsub("\r", "", $2); print $2}' "$headers")
+          item=${queue#"https://$host/queue/item/"}
+          if [[ "$status" != 201 || "$item" == "$queue" || ! "$item" =~ ^[0-9]+/$ ]]; then
+            echo 'The build server did not confirm the request. Check its queue before retrying.' >&2
+            exit 1
+          fi
+          {
+            echo '### Production deployment requested'
+            echo "Tag: \`$RELEASE_TAG\`"
+            echo "Commit: \`$COMMIT_SHA\`"
+            echo "Queue item: ${item%/}"
+            echo 'The deploy check on the commit reports the final result.'
+          } >> "$GITHUB_STEP_SUMMARY"

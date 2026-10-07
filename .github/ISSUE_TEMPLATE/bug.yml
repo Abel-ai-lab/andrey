@@ -1,0 +1,32 @@
+name: Bug report
+description: Andrey fails, returns a wrong graph, or runs much slower than expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The code you ran and what it printed, including the full error message.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: The result you expected, and why (a known graph, another package's output, an earlier version).
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Data
+      description: The data's shape and type, or a short script that generates data showing the problem.
+  - type: textarea
+    id: config
+    attributes:
+      label: Environment
+      description: The output of `andrey config --json`, which lists the Andrey and Python versions, the platform, and the installed extras.
+      render: json
+    validations:
+      required: true

@@ -1,0 +1,113 @@
+{
+  "generated": "2026-09-15",
+  "placeholder": true,
+  "headline": "Over 100x faster on PC, and faster on the other supported methods.",
+  "methods": [
+    {
+      "method": "PC",
+      "family": "constraint-based",
+      "comparator": "causal-learn",
+      "regime": "linear_gauss_er",
+      "hardware": "AMD EPYC 7713, 16 cores",
+      "build": "pre-release build, 21 August 2026",
+      "rows": [
+        {"d": 20, "seeds": 3, "andrey_s": 0.0075744, "comparator_s": 0.098386, "ratio": 14.567, "andrey_shd": 12, "comparator_shd": 12, "empty_shd": 20},
+        {"d": 50, "seeds": 3, "andrey_s": 0.023996, "comparator_s": 0.75289, "ratio": 31.032, "andrey_shd": 20, "comparator_shd": 20, "empty_shd": 50},
+        {"d": 100, "seeds": 3, "andrey_s": 0.060934, "comparator_s": 5.0142, "ratio": 78.985, "andrey_shd": 54, "comparator_shd": 54, "empty_shd": 100},
+        {"d": 200, "seeds": 3, "andrey_s": 0.22127, "comparator_s": 50.802, "ratio": 218.54, "andrey_shd": 133, "comparator_shd": 133, "empty_shd": 200},
+        {"d": 400, "seeds": 3, "andrey_s": 0.81665, "comparator_s": 617.17, "ratio": 941.05, "andrey_shd": 357, "comparator_shd": 357, "empty_shd": 400}
+      ]
+    },
+    {
+      "method": "PC",
+      "family": "constraint-based",
+      "comparator": "gCastle",
+      "regime": "linear_gauss_er",
+      "hardware": "AMD EPYC 7713, 16 cores",
+      "build": "pre-release build, 21 August 2026",
+      "rows": [
+        {"d": 20, "seeds": 3, "andrey_s": 0.0075744, "comparator_s": 0.092642, "ratio": 12.231, "andrey_shd": 12, "comparator_shd": 12, "empty_shd": 20},
+        {"d": 50, "seeds": 3, "andrey_s": 0.023996, "comparator_s": 0.67739, "ratio": 28.577, "andrey_shd": 20, "comparator_shd": 31, "empty_shd": 50},
+        {"d": 100, "seeds": 3, "andrey_s": 0.060934, "comparator_s": 2.8028, "ratio": 45.435, "andrey_shd": 54, "comparator_shd": 88, "empty_shd": 100},
+        {"d": 200, "seeds": 3, "andrey_s": 0.22127, "comparator_s": 16.219, "ratio": 69.89, "andrey_shd": 133, "comparator_shd": 256, "empty_shd": 200},
+        {"d": 400, "seeds": 2, "andrey_s": 0.81665, "comparator_s": 185.05, "ratio": 253.52, "andrey_shd": 357, "comparator_shd": 792.5, "empty_shd": 400}
+      ]
+    },
+    {
+      "method": "FCI",
+      "family": "constraint-based",
+      "comparator": "causal-learn",
+      "regime": "latent_gauss_er",
+      "hardware": "AMD EPYC 9534 / AMD EPYC 7713, 16 cores",
+      "build": "pre-release build, 1 September 2026",
+      "rows": [
+        {"d": 20, "seeds": 3, "andrey_s": 0.06111, "comparator_s": 0.0376, "ratio": 0.62, "andrey_shd": 29.0, "comparator_shd": 29.0, "empty_shd": 48.0},
+        {"d": 50, "seeds": 3, "andrey_s": 0.08934, "comparator_s": 0.2915, "ratio": 3.38, "andrey_shd": 42.0, "comparator_shd": 40.0, "empty_shd": 96.0},
+        {"d": 100, "seeds": 3, "andrey_s": 0.1712, "comparator_s": 1.425, "ratio": 7.52, "andrey_shd": 135.0, "comparator_shd": 134.0, "empty_shd": 216.0},
+        {"d": 200, "seeds": 3, "andrey_s": 0.8598, "comparator_s": 12.32, "ratio": 16.49, "andrey_shd": 391.0, "comparator_shd": 391.0, "empty_shd": 492.0},
+        {"d": 400, "seeds": 3, "andrey_s": 3.564, "comparator_s": 31.54, "ratio": 9.56, "andrey_shd": 836.0, "comparator_shd": 836.0, "empty_shd": 884.0},
+        {"d": 800, "seeds": 3, "andrey_s": 72.19, "comparator_s": 619.9, "ratio": 8.65, "andrey_shd": 2579.0, "comparator_shd": 2579.0, "empty_shd": 1772.0}
+      ]
+    },
+    {
+      "method": "GES",
+      "family": "score-based",
+      "comparator": "causal-learn",
+      "regime": "linear_gauss_er",
+      "hardware": "AMD EPYC 7713, 128 cores",
+      "build": "pre-release build, 31 August 2026",
+      "rows": [
+        {"d": 20, "seeds": 3, "andrey_s": 0.15423, "comparator_s": 0.44416, "ratio": 2.9418, "andrey_shd": 13, "comparator_shd": 13, "empty_shd": 20},
+        {"d": 50, "seeds": 3, "andrey_s": 1.846, "comparator_s": 5.9915, "ratio": 3.2457, "andrey_shd": 47, "comparator_shd": 47, "empty_shd": 50},
+        {"d": 100, "seeds": 3, "andrey_s": 10.591, "comparator_s": 48.275, "ratio": 3.9671, "andrey_shd": 88, "comparator_shd": 88, "empty_shd": 100},
+        {"d": 150, "seeds": 3, "andrey_s": 39.942, "comparator_s": 170.89, "ratio": 4.2784, "andrey_shd": 141, "comparator_shd": 141, "empty_shd": 150}
+      ]
+    },
+    {
+      "method": "BOSS",
+      "family": "permutation",
+      "comparator": "causal-learn",
+      "regime": "linear_gauss_er",
+      "hardware": "AMD EPYC 7713, 16 cores",
+      "build": "pre-release build, 1 September 2026",
+      "rows": [
+        {"d": 20, "seeds": 3, "andrey_s": 0.031337, "comparator_s": 0.096588, "ratio": 3.1723, "andrey_shd": 3, "comparator_shd": 3, "empty_shd": 20},
+        {"d": 50, "seeds": 3, "andrey_s": 0.17373, "comparator_s": 1.0229, "ratio": 5.7014, "andrey_shd": 0, "comparator_shd": 0, "empty_shd": 50},
+        {"d": 100, "seeds": 3, "andrey_s": 1.3148, "comparator_s": 6.7352, "ratio": 4.8563, "andrey_shd": 0, "comparator_shd": 0, "empty_shd": 100},
+        {"d": 200, "seeds": 3, "andrey_s": 6.733, "comparator_s": 37.064, "ratio": 5.6188, "andrey_shd": 12, "comparator_shd": 13, "empty_shd": 200},
+        {"d": 400, "seeds": 3, "andrey_s": 39.008, "comparator_s": 162.89, "ratio": 4.3105, "andrey_shd": 4, "comparator_shd": 12, "empty_shd": 400},
+        {"d": 800, "seeds": 3, "andrey_s": 291.98, "comparator_s": 1016.6, "ratio": 3.4231, "andrey_shd": 24, "comparator_shd": 58, "empty_shd": 800}
+      ]
+    },
+    {
+      "method": "GRaSP",
+      "family": "permutation",
+      "comparator": "causal-learn",
+      "regime": "linear_gauss_er",
+      "hardware": "AMD EPYC 7713, 16 cores",
+      "build": "pre-release build, 1 September 2026",
+      "rows": [
+        {"d": 20, "seeds": 3, "andrey_s": 0.036507, "comparator_s": 0.070591, "ratio": 2.0568, "andrey_shd": 3, "comparator_shd": 3, "empty_shd": 20},
+        {"d": 50, "seeds": 3, "andrey_s": 0.41701, "comparator_s": 0.77103, "ratio": 1.7915, "andrey_shd": 1, "comparator_shd": 1, "empty_shd": 50},
+        {"d": 100, "seeds": 3, "andrey_s": 2.834, "comparator_s": 4.3849, "ratio": 1.5472, "andrey_shd": 1, "comparator_shd": 1, "empty_shd": 100},
+        {"d": 200, "seeds": 3, "andrey_s": 40.083, "comparator_s": 55.875, "ratio": 1.394, "andrey_shd": 14, "comparator_shd": 14, "empty_shd": 200},
+        {"d": 400, "seeds": 3, "andrey_s": 1042.1, "comparator_s": 1166.1, "ratio": 1.4199, "andrey_shd": 0, "comparator_shd": 1, "empty_shd": 400}
+      ]
+    },
+    {
+      "method": "DirectLiNGAM",
+      "family": "functional",
+      "comparator": "lingam",
+      "regime": "lingam_sf",
+      "hardware": "AMD EPYC 7413, 16 cores",
+      "build": "pre-release build, 2 September 2026",
+      "rows": [
+        {"d": 20, "seeds": 3, "andrey_s": 0.13185, "comparator_s": 0.7028, "ratio": 5.3516, "andrey_shd": 0.66667, "comparator_shd": 0.66667, "empty_shd": 19},
+        {"d": 30, "seeds": 3, "andrey_s": 0.41217, "comparator_s": 2.377, "ratio": 5.7234, "andrey_shd": 5, "comparator_shd": 5, "empty_shd": 29},
+        {"d": 50, "seeds": 3, "andrey_s": 2.3031, "comparator_s": 12.288, "ratio": 5.4395, "andrey_shd": 5, "comparator_shd": 4.6667, "empty_shd": 49},
+        {"d": 100, "seeds": 3, "andrey_s": 37.687, "comparator_s": 135.6, "ratio": 3.5856, "andrey_shd": 6.6667, "comparator_shd": 6.3333, "empty_shd": 99},
+        {"d": 200, "seeds": 2, "andrey_s": 481.88, "comparator_s": null, "ratio": null, "andrey_shd": 14, "comparator_shd": null, "empty_shd": 199}
+      ]
+    }
+  ]
+}

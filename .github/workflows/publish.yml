@@ -1,0 +1,109 @@
+name: publish
+
+# Build, check, and publish andrey-core with PyPI trusted publishing (OIDC; no API token stored).
+# Each index needs a trusted publisher registered for this repository, this workflow file, and the
+# job's environment (`testpypi` or `pypi`); without one the upload fails.
+on:
+  workflow_dispatch:
+    inputs:
+      index:
+        description: Package index to publish to
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: PyPI publishes only from the tag v<version>
+        # The package description's images point at that tag (pyproject.toml, fancy-pypi-readme).
+        if: inputs.index == 'pypi'
+        run: |
+          version=$(uv run --no-project python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if [ "$GITHUB_REF" != "refs/tags/v$version" ]; then
+            echo "::error::Run this workflow from the tag v$version, not $GITHUB_REF."
+            exit 1
+          fi
+      - name: Build sdist and wheel
+        run: uv build
+      - name: Metadata, README render, and the packaging allowlist
+        run: |
+          uvx twine check --strict dist/*
+          uv run --no-project python scripts/check_dist.py dist --list --readme
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  install:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        artifact: ["*.whl", "*.tar.gz"]
+    steps:
+      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - name: Clean-venv install, import, and one fit
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install dist/${{ matrix.artifact }}
+          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None; assert u.find_spec('numba') is None; import numpy as np, andrey; print(andrey.__version__, andrey.pc(np.random.default_rng(0).standard_normal((500, 4))).structure.to_numpy())"
+
+  # The supported methods against known graphs, on the commit being published (qa/README.md).
+  quality-gate:
+    uses: ./.github/workflows/quality-gate.yml
+
+  publish-testpypi:
+    needs: [build, install, quality-gate]
+    if: ${{ inputs.index == 'testpypi' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/andrey-core
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    needs: [build, install, quality-gate]
+    if: ${{ inputs.index == 'pypi' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/andrey-core
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

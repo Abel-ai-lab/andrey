@@ -1,0 +1,57 @@
+name: Deploy the preview site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: andrey-preview
+  cancel-in-progress: true
+
+jobs:
+  request-build:
+    if: github.repository == 'Abel-ai-lab/andrey' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Queue the exact public commit on the build server
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_PREVIEW_URL }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          SOURCE_REF: "${{ github.ref_name }}"
+          COMMIT_SHA: "${{ github.sha }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_URL:?Missing DEPLOY_PREVIEW_URL}"
+          : "${DEPLOY_USER:?Missing DEPLOY_USER}"
+          : "${DEPLOY_TOKEN:?Missing DEPLOY_TOKEN}"
+          host=${DEPLOY_URL#https://}
+          host=${host%%/*}
+          headers=$(mktemp)
+          trap 'rm -f "$headers"' EXIT
+          # Do not retry an ambiguous POST: the server may already have queued it.
+          status=$(curl --silent --show-error --fail \
+            --connect-timeout 10 --max-time 30 \
+            --user "$DEPLOY_USER:$DEPLOY_TOKEN" \
+            --dump-header "$headers" --output /dev/null --write-out '%{http_code}' \
+            --data-urlencode "SOURCE_REF=$SOURCE_REF" \
+            --data-urlencode "COMMIT_SHA=$COMMIT_SHA" \
+            "$DEPLOY_URL")
+          queue=$(awk 'tolower($1) == "location:" {gsub("\r", "", $2); print $2}' "$headers")
+          item=${queue#"https://$host/queue/item/"}
+          if [[ "$status" != 201 || "$item" == "$queue" || ! "$item" =~ ^[0-9]+/$ ]]; then
+            echo 'The build server did not confirm the request. Check its queue before retrying.' >&2
+            exit 1
+          fi
+          {
+            echo '### Preview deployment requested'
+            echo "Commit: \`$COMMIT_SHA\`"
+            echo "Queue item: ${item%/}"
+            echo 'The deploy check on the commit reports the final result.'
+          } >> "$GITHUB_STEP_SUMMARY"

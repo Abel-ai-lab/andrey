@@ -1,0 +1,166 @@
+{#- The homepage: pydata's navbar, then the page's own sections. docs/conf.py fills `home` from
+    site/build.py (homepage_context); site/assets/site.css styles everything under .andrey-home. -#}
+{%- extends "layout.html" %}
+{%- block htmltitle %}<title>{{ home.title }}</title>{%- endblock htmltitle %}
+{%- block extrahead %}
+{{ super() }}
+{{ home.robots }}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap">
+<style>{{ home.style }}</style>
+{%- endblock extrahead %}
+{%- block content %}
+  <div id="pst-scroll-pixel-helper"></div>
+  {%- block search_dialog %}{{ super() }}{% endblock search_dialog %}
+  {%- if home.banner %}<div class="andrey-home">{{ home.banner }}</div>{% endif %}
+  {%- include "sections/announcement.html" %}
+  {%- block docs_navbar %}{{ super() }}{% endblock docs_navbar %}
+  {#- The navbar's links move into this drawer on a narrow screen. #}
+  <dialog id="pst-primary-sidebar-modal"></dialog>
+  <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+    {%- include "sections/sidebar-primary.html" %}
+  </div>
+<div class="andrey-home">
+<main id="main-content">
+  <section class="hero wrap" aria-labelledby="headline">
+    <div class="hero-intro">
+      <h1 id="headline">Causal discovery, fast.</h1>
+      <p class="claim">{{ home.claim }}{{ home.claim_note }}</p>
+      <p class="lede">
+        Andrey is a Python package for learning causal graphs from observational data, with PC,
+        FCI, GES, BOSS, GRaSP, the LiNGAM family, and more. CPU-parallel and GPU backends speed
+        up the methods that use them.
+      </p>
+      <div class="hero-actions">
+        <div class="install-line">
+          <code>uv add andrey-core</code>
+        </div>
+        {{ home.hero_chips }}
+      </div>
+    </div>
+    {{ home.race }}
+  </section>
+
+  <ul class="pillars wrap" aria-label="What Andrey offers">{{ home.pillars }}</ul>
+
+  <section class="section wrap" id="speed" aria-labelledby="speed-title">
+    <h2 id="speed-title">{{ home.speed_title }}</h2>
+    <p>{{ home.speed_intro }}</p>
+    <div class="speed-why">{{ home.why_fast }}</div>
+    {{ home.speed_chart }}
+  </section>
+
+  <section class="section wrap" id="accuracy" aria-labelledby="accuracy-title">
+    <h2 id="accuracy-title">{{ home.accuracy_title }}</h2>
+    <p>{{ home.quality_intro }}</p>
+    {{ home.quality_chart }}
+  </section>
+
+  <section class="section wrap" id="graphs" aria-labelledby="graphs-title">
+    <h2 id="graphs-title">One graph object from every method</h2>
+    <p>A method returns a <code>StructureOutput</code> whose <code>structure</code> is a
+      <code>GraphStructure</code>: the graph type, a mark at each end of every edge, and the
+      variable names. Draw it, convert it to NetworkX or a NumPy matrix, or compare it with
+      another method's graph, with the same code for every method. Time-series methods return a
+      graph over time lags.</p>
+    <div class="step">
+      <div>
+        <h3>Three methods, three answers</h3>
+        <p>The sprinkler network: season drives rain and the sprinkler, both wet the grass, and wet
+          grass is slippery. The methods agree on everything downstream of season, and differ on
+          the two edges out of it.</p>
+        <p><a href="docs/guides/graph-types.html">What each graph type claims</a></p>
+      </div>
+      <div>
+        <div class="window">
+          <div class="window-bar"><span class="window-title">interface.py</span></div>
+<div class="code-copy"><pre class="hl"><code>{{ home.interface_code }}</code></pre></div>
+        </div>
+        <div class="window">
+          <div class="window-bar"><span class="window-title">interface.py</span></div>
+<div class="code-copy"><pre class="output"><code>{{ home.interface_output }}</code></pre></div>
+        </div>
+      </div>
+    </div>
+    <div class="interface-figures">{{ home.interface_figures }}</div>
+  </section>
+
+  <section class="section wrap" id="agents" aria-labelledby="agents-title">
+    <h2 id="agents-title">Agent support, with a command line and a skill</h2>
+    <p>The <code>andrey</code> command never prompts and answers in JSON, and it describes every
+      method's parameters, so an agent can use it with no person watching.
+      <code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
+    {{ home.agent_demo }}
+    <p><a href="docs/code/index.html#command-line-interface">Command-line reference</a></p>
+  </section>
+  <section class="section wrap" id="start" aria-labelledby="start-title">
+    <h2 id="start-title">One function call from data to graph</h2>
+    <div class="step" id="example">
+      <div>
+        <h3>Recover a causal graph</h3>
+        <p>Sachs and colleagues measured 11 proteins and phospholipids in 853 human immune cells.
+          PC finds 8 of the 17 links in the known signalling network, and none outside it.</p>
+        <figure class="example-figure">
+          {{ home.example_figure }}
+          <figcaption>The recovered graph, drawn with <code>andrey.viz.draw</code>.</figcaption>
+        </figure>
+        <p><a href="docs/examples/index.html">More examples</a></p>
+      </div>
+      <div>
+        <div class="window">
+          <div class="window-bar"><span class="window-title">example.py</span></div>
+<div class="code-copy"><pre class="hl"><code>{{ home.example_code }}</code></pre></div>
+        </div>
+        <div class="window">
+          <div class="window-bar"><span class="window-title">example.py</span></div>
+<div class="code-copy"><pre class="output"><code>{{ home.example_output }}</code></pre></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section wrap" id="methods" aria-labelledby="methods-title">
+    <h2 id="methods-title">Methods for many kinds of data</h2>
+    <p>{{ home.methods_title }}. Every method name links to its API reference. An experimental
+      method has no published benchmark, and its API may change without deprecation.</p>
+    {{ home.methods }}
+  </section>
+
+
+  <section class="section wrap" id="compare" aria-labelledby="compare-title">
+    <h2 id="compare-title">One interface for every method, and a command line for agents</h2>
+    <p>What each package offers, read from its released code.{{ home.compare_note }} The speed and
+      accuracy sections measure the same packages on the same data.</p>
+    {{ home.comparison }}
+  </section>
+
+  <section class="band" id="docs" aria-labelledby="docs-title">
+    <div class="wrap">
+      <h2 id="docs-title">Documentation</h2>
+      <p>Guides, the graph model, and every method's parameters, with the benchmark tables and the
+        settings to rerun them.</p>
+      <ul class="docs-grid">{{ home.docs_grid }}</ul>
+    </div>
+  </section>
+</main>
+
+<aside class="footnotes" aria-label="Notes">
+  <ol class="wrap">{{ home.footnotes }}</ol>
+</aside>
+
+<footer class="site-footer wrap">
+  <a class="footer-abel" href="https://abel.ai/">{{ home.abel_mark }}Abel AI Lab</a>
+  <nav aria-label="Footer">
+    <a href="docs/">Documentation</a>
+    <a href="docs/benchmarks.html">Benchmarks</a>
+    <a href="docs/code/index.html">API reference</a>
+    <a href="docs/faq.html">FAQ</a>
+    <a href="docs/changelog.html">Changelog</a>
+    <a href="{{ report_bug_url }}">Report a bug</a>
+  </nav>
+</footer>
+</div>
+  {%- block scripts_end %}{{ super() }}{% endblock scripts_end %}
+{%- endblock content %}
+{%- block footer %}{% endblock footer %}

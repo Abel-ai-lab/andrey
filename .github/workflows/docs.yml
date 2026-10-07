@@ -1,0 +1,49 @@
+name: docs
+
+# Cheap PR-visible "the site still builds under -W" signal: homepage, blog, examples, and docs.
+# Autodoc couples docs to code, so an __all__ rename or docstring regression has no other signal.
+on:
+  pull_request:
+    # Draft PRs skip the build; ready_for_review runs it once the PR is marked ready.
+    # converted_to_draft starts a skipped run, and the concurrency group cancels one in progress.
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths: [docs/**, site/**, apps/**, benchmarks/published/**, src/andrey/**, examples/**, tests/unit/test_site.py, tests/unit/test_launch_material.py, tests/unit/test_examples_gallery.py, tests/unit/test_why_fast.py, tests/unit/test_compare_example.py, README.md, .github/readme/**, pyproject.toml, uv.lock, CONTRIBUTING.md, .github/workflows/docs.yml]
+  push:
+    branches: [main]
+    paths: [docs/**, site/**, apps/**, benchmarks/published/**, src/andrey/**, examples/**, tests/unit/test_site.py, tests/unit/test_launch_material.py, tests/unit/test_examples_gallery.py, tests/unit/test_why_fast.py, tests/unit/test_compare_example.py, README.md, .github/readme/**, pyproject.toml, uv.lock, CONTRIBUTING.md, .github/workflows/docs.yml]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: >-
+      github.repository_owner == 'Abel-ai-lab'
+      && (github.event_name != 'pull_request'
+      || (github.event.pull_request.head.repo.full_name == github.repository
+      && !github.event.pull_request.draft))
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Node
+        # Sphinx uses Node for KaTeX prerendering.
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+      - name: Set up Python
+        run: uv python install 3.13
+      - name: Sync docs group
+        run: uv sync --locked --group docs
+      - name: Site claims and sources (the template tests need the docs group's Jinja)
+        run: >-
+          uv run --group docs python -m pytest -q tests/unit/test_site.py
+          tests/unit/test_launch_material.py tests/unit/test_examples_gallery.py
+          tests/unit/test_why_fast.py tests/unit/test_compare_example.py
+      - name: Built-site checks (-W build, API coverage, no unicode math, built pages)
+        run: uv run --group docs python -m pytest -q docs/test_built_site.py

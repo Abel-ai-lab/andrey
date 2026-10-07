@@ -1,0 +1,55 @@
+line-length = 100
+indent-width = 4
+
+include = [
+    "src/**/*.py",
+    "tests/**/*.py",
+    "qa/**/*.py",
+    "benchmarks/**/*.py",
+    "apps/**/*.py",
+    "examples/**/*.ipynb",
+    "site/**/*.py",
+    "docs/**/*.py",
+]
+
+[lint]
+select = ["E", "F", "I", "D"]
+# D (NumPy docstrings) is enforced on the public method surface -- the `andrey.api` facades. The
+# internal packages, the recovery helpers, tests, and benchmarks keep their lighter docstring conventions
+# (see per-file-ignores). The public core API (andrey.core classes) is instead pinned by a pytest
+# drift guard (test_public_core_methods_document_their_parameters) -- ruff's D cannot check
+# Parameters-against-signature. Widening D to the rest of the public surface is a follow-up.
+
+[lint.isort]
+# First-party: the shipped `andrey`, the recovery helper package, the
+# `qa/` tools, and the standalone `benchmarks/` competitive harness package.
+known-first-party = ["andrey", "tests", "qa", "andrey_bench"]
+
+[lint.per-file-ignores]
+# D applies to the `andrey.api` facades only. Everything else keeps its existing docstring style:
+# the top-level modules (cli, __init__), the internal packages, the recovery helpers, tests, and benchmarks.
+"tests/**" = ["D"]
+"qa/**" = ["D"]
+# benchmarks/ additionally waives E501: the harness is deliberately heavy on long prose docstrings,
+# so line width catches nothing there. F/I/E4/E7 -- the rules that do catch defects -- still apply.
+"benchmarks/**" = ["D", "E501"]
+# No D rules here: a gallery example's docstring is its rendered title block (a reST heading, no
+# summary period), and `docs/`, `apps/`, and `site/` hold build code, not API surface.
+"examples/**" = ["D"]
+"apps/**" = ["D"]
+"docs/**" = ["D"]
+"site/**" = ["D"]
+# List the top-level modules explicitly: `src/andrey/*.py` would also match `src/andrey/api/**`
+# (the `*` crosses `/` in ruff's matcher) and silently disable D on the facades it should guard.
+"src/andrey/{cli,__init__}.py" = ["D"]
+"src/andrey/{constraint,core,irregular,latent,lingam,metrics,search,spec,temporal}/**" = ["D"]
+
+[lint.pydocstyle]
+# Pin the convention now; enable the D (missing-docstring) rules near release.
+convention = "numpy"
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false

@@ -1,0 +1,61 @@
+{
+  "causal-learn": "0.1.4.8",
+  "data": {
+    "labels": [
+      "sunlight",
+      "rain",
+      "irrigation",
+      "fertilizer",
+      "temperature",
+      "nitrogen",
+      "pests",
+      "moisture",
+      "growth",
+      "yield"
+    ],
+    "shape": [1000, 10],
+    "seed": 4,
+    "sha256": "21f4f5c8578f48043f5c70c7367bfa43d293159324ed0d64879fc5b041d5ee3f"
+  },
+  "graph_format": "causal-learn endpoint codes; row i, column j is the mark at variable i on its edge with j: -1 tail, 1 arrowhead, 2 circle, 0 no edge",
+  "methods": {
+    "PC": {
+      "parameters": {
+        "alpha": 0.05,
+        "indep_test": "fisherz",
+        "stable": true
+      },
+      "graph": [
+        [0, 0, 0, 0, -1, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, -1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, -1, 0, 0],
+        [0, 0, 0, 0, 0, -1, 0, 0, 0, 0],
+        [-1, 0, 0, 0, 0, 0, -1, -1, 0, 0],
+        [0, 0, 0, -1, 0, 0, 0, 0, -1, 0],
+        [0, 0, 0, 0, -1, 0, 0, 0, 0, -1],
+        [0, 1, 1, 0, 1, 0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 0, -1, 0, -1, 0, -1],
+        [0, 0, 0, 0, 0, 0, 1, 0, 1, 0]
+      ]
+    },
+    "GES": {
+      "parameters": {
+        "score_func": "local_score_BIC",
+        "maxP": 5,
+        "lambda_value": 0.5
+      },
+      "graph": [
+        [0, 0, 0, 0, -1, 0, 0, 0, -1, 0],
+        [0, 0, 0, 0, -1, 0, 0, -1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, -1, 0, 0],
+        [0, 0, 0, 0, 0, -1, 0, 0, 0, 0],
+        [-1, -1, 0, 0, 0, 0, -1, -1, 0, 0],
+        [0, 0, 0, -1, 0, 0, 0, 0, -1, 0],
+        [0, 0, 0, 0, -1, 0, 0, 0, 0, -1],
+        [0, 1, 1, 0, 1, 0, 0, 0, -1, 0],
+        [1, 0, 0, 0, 0, 1, 0, 1, 0, -1],
+        [0, 0, 0, 0, 0, 0, 1, 0, 1, 0]
+      ]
+    }
+  }
+}

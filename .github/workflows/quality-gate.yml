@@ -1,0 +1,28 @@
+name: quality-gate
+
+# The pre-publish quality gate: every supported method against data with a known graph
+# (`qa/README.md`). Every job that publishes to PyPI needs a job that calls this workflow, as
+# `tests/unit/test_release_gates.py` checks. It also runs on demand.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ANDREY_DEVICE: cpu
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Install the locked environment
+        run: uv sync --locked --python 3.12
+      - name: Supported methods against known graphs
+        run: uv run --no-sync python -m qa.quality_gate

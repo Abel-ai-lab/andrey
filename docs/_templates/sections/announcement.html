@@ -1,0 +1,8 @@
+{#- The alpha banner on every page: the theme's `announcement` option is the sentence, and the link to
+    the launch post is resolved per page, which a plain option string cannot do. -#}
+{%- if theme_announcement %}
+<aside class="bd-header-announcement d-print-none" aria-label="{{ _('Announcement') }}">
+  <div class="bd-header-announcement__content">{{ theme_announcement }}
+    <a href="{{ pathto('blog/introducing-andrey') }}">Read the launch post.</a></div>
+</aside>
+{%- endif %}

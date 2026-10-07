@@ -1,0 +1,59 @@
+{
+  "_about": "Recorded values for qa/quality_gate.py: `supported` gates the supported methods before a release.",
+  "supported": {
+    "_about": "Median SHD over each dataset's draws, against the known graph (endpoint SHD for FCI). A cell passes when its median is below the empty graph's and within the method's tolerance of its baseline, in either direction: a median better than the baseline by more than the tolerance also fails, so an intended improvement is recorded by a recapture. Recapture with `uv run python -m qa.quality_gate --capture` and review the diff.",
+    "tolerances": {
+      "PC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline independence decision to differ on another host."},
+      "FCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline independence decision to differ on another host."},
+      "GES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
+      "BOSS": {"median_shd": 1, "reason": "No graph changed on the linear_gauss_er cells when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
+      "GRaSP": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
+      "DirectLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline ordering decision to differ on another host."},
+      "ICA-LiNGAM": {"median_shd": 2, "reason": "FastICA's causal order can flip on rounding. Under a relative 1e-12 input perturbation the median at d = 50 moved by 1, and 4 of 100 draws changed. Two covers that with one to spare."}
+    },
+    "baselines": {
+      "PC": {
+        "linear_gauss_er_d20": {"median_shd": 4.5, "empty_median_shd": 20.0, "shd": [4, 12, 7, 1, 0, 2, 6, 5, 12, 0]},
+        "linear_gauss_er_d50": {"median_shd": 12.0, "empty_median_shd": 50.0, "shd": [13, 14, 23, 15, 11, 11, 13, 11, 6, 5]},
+        "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [2, 0, 3, 3, 2, 0, 3, 2, 3, 5]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
+      "FCI": {
+        "latent_gauss_er_d20": {"median_shd": 17.0, "empty_median_shd": 40.0, "shd": [9, 21, 19, 2, 19, 21, 13, 15, 29, 12]},
+        "latent_gauss_er_d50": {"median_shd": 36.0, "empty_median_shd": 105.0, "shd": [33, 38, 51, 36, 33, 36, 42, 37, 26, 22]},
+        "asia_gauss": {"median_shd": 3.5, "empty_median_shd": 16.0, "shd": [2, 0, 8, 5, 2, 0, 7, 2, 7, 9]},
+        "sachs": {"median_shd": 20.0, "empty_median_shd": 34.0, "shd": [20]}
+      },
+      "GES": {
+        "linear_gauss_er_d20": {"median_shd": 7.5, "empty_median_shd": 20.0, "shd": [10, 7, 8, 6, 0, 8, 10, 2, 26, 5]},
+        "linear_gauss_er_d50": {"median_shd": 15.5, "empty_median_shd": 50.0, "shd": [11, 20, 8, 14, 24, 10, 17, 10, 22, 26]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [9, 0, 0, 0, 0, 0, 1, 0, 0, 0]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
+      "BOSS": {
+        "linear_gauss_er_d20": {"median_shd": 4.0, "empty_median_shd": 20.0, "shd": [5, 7, 2, 6, 0, 7, 0, 15, 3, 2]},
+        "linear_gauss_er_d50": {"median_shd": 9.5, "empty_median_shd": 50.0, "shd": [9, 8, 7, 24, 13, 10, 20, 8, 9, 12]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 0, 0, 0, 1, 0, 1, 0, 0, 0]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
+      "GRaSP": {
+        "linear_gauss_er_d20": {"median_shd": 3.0, "empty_median_shd": 20.0, "shd": [5, 7, 3, 4, 0, 8, 0, 2, 3, 2]},
+        "linear_gauss_er_d50": {"median_shd": 14.0, "empty_median_shd": 50.0, "shd": [10, 18, 7, 18, 20, 8, 22, 9, 7, 22]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 0, 0, 0, 1, 0, 1, 0, 0, 0]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
+      "DirectLiNGAM": {
+        "lingam_sf_d20": {"median_shd": 0.0, "empty_median_shd": 19.0, "shd": [0, 0, 1, 1, 0, 0, 1, 0, 0, 0]},
+        "lingam_sf_d50": {"median_shd": 1.0, "empty_median_shd": 49.0, "shd": [1, 1, 2, 0, 1, 0, 1, 2, 1, 2]},
+        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [9, 1, 0, 0, 1, 1, 0, 0, 0, 0]},
+        "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
+      },
+      "ICA-LiNGAM": {
+        "lingam_sf_d20": {"median_shd": 1.0, "empty_median_shd": 19.0, "shd": [0, 0, 1, 1, 0, 9, 16, 6, 0, 5]},
+        "lingam_sf_d50": {"median_shd": 10.0, "empty_median_shd": 49.0, "shd": [10, 5, 7, 10, 94, 98, 53, 4, 8, 20]},
+        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 1, 0, 0, 0, 0, 0]},
+        "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
+      }
+    }
+  }
+}

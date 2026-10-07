@@ -1,0 +1,169 @@
+name: ci
+
+# CPU validation on GitHub-hosted Ubuntu unless vars.CI_RUNNER names another runner.
+# Coverage and runner selection: docs/docs/ci.md.
+
+on:
+  pull_request:
+    # Draft PRs skip every job; ready_for_review runs them once the PR is marked ready.
+    # converted_to_draft starts a skipped run, and the concurrency group cancels one in progress.
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANDREY_DEVICE: cpu
+  OMP_NUM_THREADS: 1
+  OPENBLAS_NUM_THREADS: 1
+  MKL_NUM_THREADS: 1
+  NUMEXPR_NUM_THREADS: 1
+
+jobs:
+  lint:
+    if: >-
+      github.repository_owner == 'Abel-ai-lab'
+      && (github.event_name != 'pull_request'
+      || (github.event.pull_request.head.repo.full_name == github.repository
+      && !github.event.pull_request.draft))
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read   # paths-filter reads the PR file list
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Which paths changed
+        id: filter
+        # Only a pull request has a file list to filter. Skipped leaves the output empty, which reads
+        # as false.
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v4
+        with:
+          # Recovery tests self-check the quality gate; unit tests use QA helpers.
+          filters: |
+            code:
+              - 'src/**'
+              - 'tests/**'
+              - 'qa/quality_gate.py'
+              - 'qa/quality_baselines.json'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'README.md'
+              - 'LICENSE'
+              - 'scripts/check_dist.py'
+              - '.github/workflows/ci.yml'
+      - name: Ruff (lint + format check)
+        run: |
+          uvx ruff check .
+          uvx ruff format --check .
+      - name: Sync the dev group
+        run: uv sync --group dev
+      - name: ty (type check)
+        run: uv run --no-sync ty check src/andrey tests/recovery/helpers qa/capture_baselines.py
+
+  checks:
+    needs: lint
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync the dev group
+        run: uv sync --group dev
+      - name: Unit tests collect without extras
+        # A module-level import of an optional dependency fails here, not in a contributor's checkout.
+        run: uv run --no-sync python -m pytest --collect-only -qq tests/unit
+      - name: Ground-truth recovery and recorded-output regression
+        run: uv run --no-sync python -m pytest tests/recovery tests/metrics -q
+      - name: Benchmark endpoint conversion
+        # Needs only numpy; the rest of benchmarks/tests needs the harness environment.
+        run: uv run --no-sync python -m pytest benchmarks/tests/test_causal_learn_convert.py -q
+
+  # 3.11 and 3.14 bracket the supported range
+  build-install:
+    needs: lint
+    if: >-
+      github.event_name != 'pull_request'
+      || needs.lint.outputs.code == 'true'
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Build wheel + sdist, check contents, clean-venv install/import
+        # The torch-free/numba-free asserts are the point: both live behind extras, so a stray
+        # top-level import in the shipped package fails here. check_dist lists both artifacts and
+        # fails on any file outside the packaging allowlist.
+        run: |
+          uv build
+          uv venv --python ${{ matrix.python-version }}
+          uvx twine check --strict dist/*
+          uv run --no-project python scripts/check_dist.py dist --list
+          uv pip install dist/*.whl
+          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None, 'core must be torch-free'; assert u.find_spec('numba') is None, 'core must be numba-free ([numba] extra)'; import andrey, numpy; print('andrey', andrey.__version__, '| numpy', numpy.__version__)"
+          uv run --no-project python -c "import numpy as np, andrey; print(andrey.pc(np.random.default_rng(0).standard_normal((500, 4))).structure.to_numpy())"
+          uv pip install numba
+          uv run --no-project python -c "import numba; print('numba', numba.__version__)"
+
+  # On-device kernels need GPU hardware; cross-platform.yml covers macOS and Windows (docs/docs/ci.md).
+  extras:
+    needs: lint
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Correctness suites, all extras - recovery, determinism, JIT kernels
+        run: |
+          uv sync --all-extras --python ${{ matrix.python-version }}
+          uv run --no-sync python -c "import torch, numba; print('torch', torch.__version__, '| numba', numba.__version__)"
+          uv run --no-sync python -m pytest tests -q -rs --durations=15
+
+  # The single required check. `build-install` is path-filtered, so a PR touching only
+  # unfiltered paths skips it, and a skipped check never reports a conclusion - leaving a required
+  # one pending forever. This job runs on every non-draft event and turns "passed or skipped" into
+  # one green context.
+  ci-gate:
+    needs: [lint, checks, build-install, extras]
+    if: always() && !github.event.pull_request.draft
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    steps:
+      - name: Every gated job passed or was skipped
+        run: |
+          for r in '${{ needs.lint.result }}' \
+                   '${{ needs.checks.result }}' \
+                   '${{ needs.build-install.result }}' \
+                   '${{ needs.extras.result }}'; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "a gated job reported: $r"; exit 1 ;;
+            esac
+          done

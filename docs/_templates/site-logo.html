@@ -1,0 +1,6 @@
+{#- The wordmark leads to the homepage, the site root. -#}
+{%- set home = pathto('', 1) %}
+<a class="navbar-brand logo" href="{{ home or './' }}" aria-label="Andrey home">
+  <img src="{{ pathto('_static/wordmark-light.svg', 1) }}" class="logo__image only-light" alt="Andrey"/>
+  <img src="{{ pathto('_static/wordmark-dark.svg', 1) }}" class="logo__image only-dark pst-js-only" alt="Andrey"/>
+</a>

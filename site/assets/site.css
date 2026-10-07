@@ -1,0 +1,1396 @@
+/* The homepage. It shares the docs' navbar and stylesheets, so every rule here is scoped to
+   .andrey-home, the homepage's own content, and the base rules restate what the theme sets on bare
+   elements. Every color is an --andrey-* token generated from src/andrey/viz/theme.py, so this file
+   names no hex. Motion runs only with no reduced-motion preference, and every element is visible
+   before it starts. The timing comparison and the charts are in figures.css. */
+
+.andrey-home {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --measure: 66ch;
+  --page: 82rem;
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+  /* Two faint washes around the hero card, so it sits in the page rather than on it. */
+  background:
+    radial-gradient(56rem 36rem at 50% 22rem, color-mix(in srgb, var(--andrey-accent) 12%, transparent), transparent 70%),
+    radial-gradient(40rem 30rem at 88% 38rem, color-mix(in srgb, var(--andrey-ground-amber) 9%, transparent), transparent 70%),
+    var(--andrey-paper);
+  background-repeat: no-repeat;
+  color: var(--andrey-ink);
+  font: 400 1.0625rem/1.6 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.andrey-home a {
+  color: var(--andrey-accent);
+  text-decoration-thickness: auto;
+  text-underline-offset: 0.2em;
+}
+
+.andrey-home a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.andrey-home :focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.andrey-home code {
+  color: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  font-weight: inherit;
+}
+
+.andrey-home h1,
+.andrey-home h2,
+.andrey-home h3 {
+  font-weight: 600;
+  line-height: inherit;
+  text-wrap: balance;
+}
+
+/* The theme's rules for bare elements, restated as the browser's defaults. :where() keeps them
+   weaker than any class rule, here or in figures.css; they win only against the theme's own. */
+:where(.andrey-home) p {
+  margin-block: 1em;
+}
+
+:where(.andrey-home) figure {
+  padding: 0;
+}
+
+:where(.andrey-home) figure figcaption {
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  text-align: start;
+}
+
+:where(.andrey-home) sup {
+  position: static;
+  vertical-align: super;
+}
+
+:where(.andrey-home) pre {
+  clear: none;
+}
+
+:where(.andrey-home) table {
+  margin-inline: 0;
+}
+
+:where(.andrey-home) svg {
+  vertical-align: baseline;
+}
+
+/* The theme gives the class "mark" a highlighter's background. */
+.andrey-home td.mark {
+  background: none;
+}
+
+.andrey-home .wrap {
+  max-width: var(--page);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+
+.andrey-home .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.andrey-home .placeholder-banner {
+  margin: 0;
+  padding: 0.6rem var(--gutter);
+  border-bottom: 1px solid var(--andrey-line);
+  background: var(--andrey-surface-2);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* ---------- hero ---------- */
+/* The hero is a card on the link-preview cards' stipple ground (site/grain.py), in both themes:
+   gradients draw the navy-to-cobalt tone, and two repeating speck tiles, faded in by masks, draw the
+   cobalt specks from the top left and the amber ones at the bottom right. A darker ellipse behind the
+   text column keeps the light type readable, and grows on narrow screens. The --andrey-ground-* tones
+   are the same in both themes. */
+.andrey-home .hero {
+  --andrey-ink: var(--andrey-ground-ink);
+  --andrey-muted: var(--andrey-ground-muted);
+  --andrey-line: color-mix(in srgb, var(--andrey-ground-ink) 26%, transparent);
+  --andrey-surface: color-mix(in srgb, var(--andrey-ground-ink) 8%, transparent);
+  --andrey-surface-2: color-mix(in srgb, var(--andrey-ground-ink) 14%, transparent);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  align-items: center;
+  gap: clamp(2rem, 4vw, 3.5rem);
+  width: calc(100% - 2 * var(--gutter));
+  max-width: calc(var(--page) - 2 * var(--gutter));
+  margin-block: 1.25rem 2rem;
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  overflow: hidden;
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      circle at 18% 8%,
+      color-mix(in srgb, var(--andrey-ground-cobalt) 80%, var(--andrey-ground-navy)) 0,
+      transparent 62%
+    ),
+    radial-gradient(circle at 54% 48%, color-mix(in srgb, var(--andrey-ground-cobalt) 30%, transparent), transparent 58%),
+    radial-gradient(circle at 100% 105%, color-mix(in srgb, var(--andrey-ground-amber) 35%, transparent), transparent 42%),
+    var(--andrey-ground-navy);
+  color: var(--andrey-ink);
+}
+
+/* The card's edge: a cobalt glow spreads from it in dark mode, and a navy shadow of the same shape
+   in light mode, which lowers the contrast at the card's edge. */
+html[data-theme="dark"] .andrey-home .hero {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--andrey-ground-cobalt-light) 18%, transparent),
+    0 0 60px 6px color-mix(in srgb, var(--andrey-ground-cobalt) 40%, transparent),
+    0 0 160px 40px color-mix(in srgb, var(--andrey-ground-cobalt) 22%, transparent),
+    60px 80px 200px 20px color-mix(in srgb, var(--andrey-ground-amber) 12%, transparent);
+}
+
+html[data-theme="light"] .andrey-home .hero {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--andrey-ground-navy) 10%, transparent),
+    0 12px 60px 6px color-mix(in srgb, var(--andrey-ground-navy) 30%, transparent),
+    0 30px 160px 40px color-mix(in srgb, var(--andrey-ground-navy) 16%, transparent);
+}
+
+.andrey-home .hero::before,
+.andrey-home .hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* A mask reads only alpha, so the navy here only sets how much of each tile shows. */
+.andrey-home .hero::before {
+  --fade: radial-gradient(
+    circle at 18% 8%,
+    var(--andrey-ground-navy) 0,
+    color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent) 40%,
+    transparent 78%
+  );
+  background: url("grain-noise.png") 0 0 / 128px, url("grain-cobalt.png") 0 0 / 128px;
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
+}
+
+.andrey-home .hero::after {
+  --fade: radial-gradient(
+    circle at 100% 108%,
+    var(--andrey-ground-navy) 0,
+    color-mix(in srgb, var(--andrey-ground-navy) 50%, transparent) 22%,
+    transparent 46%
+  );
+  background: url("grain-amber.png") 64px 64px / 128px;
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
+}
+
+/* The darker ellipse behind the text column: under the amber specks, over the cobalt ones. */
+.andrey-home .hero-intro {
+  position: relative;
+}
+
+.andrey-home .hero-intro::before {
+  content: "";
+  position: absolute;
+  inset: -18% -14%;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse closest-side,
+    color-mix(in srgb, var(--andrey-ground-navy) 72%, transparent),
+    color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent) 60%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+.andrey-home .hero .lede {
+  color: var(--andrey-muted);
+}
+
+.andrey-home .hero .install-line {
+  border-color: color-mix(in srgb, var(--andrey-ground-ink) 32%, transparent);
+  background: color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
+}
+
+/* Cobalt in both themes: the dark theme's lighter accent is too pale under the light type. */
+.andrey-home .hero .chip--primary {
+  border-color: color-mix(in srgb, var(--andrey-ground-ink) 35%, transparent);
+  background: var(--andrey-ground-cobalt);
+  color: var(--andrey-ground-ink);
+}
+
+/* The speedup panel as frosted glass over the ground; without backdrop-filter it is flat navy. */
+.andrey-home .hero .race {
+  border-color: color-mix(in srgb, var(--andrey-ground-ink) 28%, transparent);
+  background: color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent), inset 0 1px 0 color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+
+.andrey-home .hero .race-choice:checked + label {
+  border-color: color-mix(in srgb, var(--andrey-ground-ink) 60%, transparent);
+  background: color-mix(in srgb, var(--andrey-ground-ink) 20%, transparent);
+  color: var(--andrey-ground-ink);
+}
+
+/* One line of header, the buttons, then the bars: no times and no notes. The bars do not replay.
+   Where the header does not fit on one line, the link moves under the title. */
+.andrey-home .race--speedup .race-head {
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+}
+
+.andrey-home .race--speedup .race-title {
+  max-width: none;
+  white-space: nowrap;
+}
+
+.andrey-home .race--speedup .race-link {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.andrey-home .race--speedup .race-sizes {
+  justify-content: flex-start;
+}
+
+.andrey-home .hero a {
+  color: var(--andrey-ground-ink);
+}
+
+/* The accent ring is too faint on the dark ground; the ground's light ink stands out. */
+.andrey-home .hero :focus-visible,
+.andrey-home .hero .race-choice:focus-visible + label {
+  outline-color: var(--andrey-ground-ink);
+}
+
+/* Readers who ask for more contrast get the light type on plain navy, without the specks. */
+@media (prefers-contrast: more) {
+  .andrey-home .hero {
+    background: var(--andrey-ground-navy);
+  }
+
+  .andrey-home .hero::before,
+  .andrey-home .hero::after,
+  .andrey-home .hero-intro::before {
+    display: none;
+  }
+}
+
+.andrey-home .hero h1 {
+  max-width: 20ch;
+  margin: 0;
+  font-size: clamp(2.25rem, 3.7vw, 3.4rem);
+  line-height: 1.09;
+  letter-spacing: -0.045em;
+}
+
+.andrey-home .claim {
+  max-width: 36ch;
+  margin: 1.25rem 0 0;
+  font-size: clamp(1.05rem, 1.5vw, 1.2rem);
+  font-weight: 600;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.andrey-home .lede {
+  max-width: 47ch;
+  margin: 0.9rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 1.125rem;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.andrey-home .install-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.75rem;
+  padding: 0.5rem 0.55rem 0.5rem 1rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 6px;
+  background: var(--andrey-surface);
+}
+
+.andrey-home .install-line code::before {
+  content: "$ ";
+  color: var(--andrey-muted);
+}
+
+/* The small copy button every code block on the site has (sphinx-copybutton), placed and shown as
+   in the docs: at a block's corner while the pointer is over it, or always without a pointer. */
+.andrey-home .code-copy {
+  position: relative;
+}
+
+.andrey-home button.copybtn {
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background-color: var(--andrey-surface-2);
+  color: var(--andrey-muted);
+}
+
+.andrey-home button.copybtn:hover:not(.success) {
+  background-color: var(--andrey-line);
+  color: var(--andrey-ink);
+}
+
+.andrey-home .code-copy:hover button.copybtn,
+.andrey-home button.copybtn:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .andrey-home button.copybtn {
+    opacity: 1;
+  }
+}
+
+/* The copy button's own tooltip opens to its left, over the command it copies. The pointer's
+   tooltip already names the button and a check mark confirms the copy, so it stays hidden. */
+.andrey-home .copybtn.o-tooltip--left::after {
+  content: none;
+}
+
+/* A copy turns the icon into a tick, in the palette's green, for the two seconds sphinx-copybutton
+   keeps it. */
+.andrey-home button.copybtn.success {
+  color: var(--andrey-categorical-3);
+}
+
+.andrey-home .install-line button.copybtn.success {
+  color: var(--andrey-ground-green);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .andrey-home button.copybtn.success svg {
+    animation: copy-tick 180ms ease-out both;
+  }
+}
+
+@keyframes copy-tick {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* The install line's button stays in its row and in view. */
+.andrey-home .install-line button.copybtn {
+  position: relative;
+  inset: auto;
+  flex: none;
+  opacity: 1;
+}
+
+/* ---------- pillars: four claims; "+" turns a card over to its details ---------- */
+.andrey-home .pillars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin-block: 0 clamp(2.5rem, 6vw, 4rem);
+  list-style: none;
+}
+
+/* The details open inside a <details> element's content box, whose own radius is 0, so the card's
+   radius reaches them as a variable; `inherit` would give them square corners. */
+.andrey-home .pillar {
+  --pillar-radius: 16px;
+  position: relative;
+  height: 100%;
+  min-height: 15rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--pillar-radius);
+  background: var(--andrey-surface);
+}
+
+.andrey-home .pillar-face {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: 100%;
+  padding: 1.4rem 1.4rem 3.5rem;
+  border-radius: calc(var(--pillar-radius) - 1px);
+  cursor: pointer;
+  list-style: none;
+}
+
+.andrey-home .pillar-face::-webkit-details-marker {
+  display: none;
+}
+
+.andrey-home .pillar-icon {
+  color: var(--andrey-accent);
+}
+
+.andrey-home .pillar-icon .icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke-width: 1.6;
+}
+
+.andrey-home .pillar-claim {
+  color: var(--andrey-ink);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.andrey-home .pillar-claim em {
+  color: var(--andrey-accent);
+  font-style: normal;
+}
+
+/* The round "+" in the corner; open, it turns into a close mark. */
+.andrey-home .pillar-toggle {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 2;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--andrey-surface-2);
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.andrey-home .pillar-toggle::before,
+.andrey-home .pillar-toggle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.8rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--andrey-ink);
+  transform: translate(-50%, -50%);
+}
+
+.andrey-home .pillar-toggle::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.andrey-home .pillar-face:hover .pillar-toggle {
+  background: var(--andrey-line);
+}
+
+.andrey-home .pillar[open] .pillar-toggle {
+  transform: rotate(45deg);
+}
+
+/* The details cover the card at its own size; on a card too narrow for them, they scroll inside it
+   rather than spill past its edge. */
+.andrey-home .pillar-more {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.25rem 1.25rem 3.5rem;
+  overflow-y: auto;
+  border-radius: calc(var(--pillar-radius) - 1px);
+  background: var(--andrey-surface);
+  color: var(--andrey-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.andrey-home .pillar-more p {
+  margin: 0;
+}
+
+.andrey-home .pillar-more a {
+  font-weight: 500;
+}
+
+.andrey-home .pillar-face:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 3px;
+}
+
+/* ---------- sections ---------- */
+.andrey-home .eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--andrey-accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.andrey-home .section > p.eyebrow {
+  color: var(--andrey-accent);
+}
+.andrey-home .section {
+  padding-block: clamp(3rem, 8vw, 5.5rem);
+  border-top: 1px solid var(--andrey-line);
+}
+
+.andrey-home .section h2 {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 2.7vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.andrey-home .section h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+}
+
+.andrey-home .section p {
+  max-width: var(--measure);
+}
+
+.andrey-home .section > p {
+  color: var(--andrey-muted);
+}
+
+/* The pill that opens "Why Andrey is fast" (site/assets/why-fast.css). */
+.andrey-home .speed-why {
+  margin: 1.6rem 0 2.2rem;
+}
+
+.andrey-home .section > h2 + p {
+  max-width: 57ch;
+  margin-top: 0;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+/* ---------- one graph interface ---------- */
+.andrey-home .interface-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1.5rem clamp(1.5rem, 4vw, 3rem);
+  margin-top: 2.25rem;
+}
+
+.andrey-home .interface-figure {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 10px;
+  background: var(--andrey-surface);
+}
+
+.andrey-home .interface-figure svg {
+  display: block;
+  align-self: center;
+  width: 100%;
+  height: auto;
+  max-height: 16rem;
+}
+
+.andrey-home .interface-figure figcaption {
+  color: var(--andrey-muted);
+  font-size: 0.88rem;
+}
+
+/* ---------- compared with other packages ---------- */
+.andrey-home .compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.andrey-home .compare th,
+.andrey-home .compare td {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--andrey-line);
+}
+
+.andrey-home .compare thead th {
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.andrey-home .compare thead th:nth-child(2),
+.andrey-home .compare td:nth-child(2) {
+  background: var(--andrey-surface);
+}
+
+.andrey-home .compare tbody th[scope="row"] {
+  font-weight: 400;
+  text-align: left;
+}
+
+.andrey-home .compare .compare-group th {
+  padding-top: 1.4rem;
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.andrey-home .compare .mark {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.andrey-home .compare .mark .icon {
+  vertical-align: -0.2em;
+}
+
+.andrey-home .mark--yes {
+  color: var(--andrey-accent);
+}
+
+.andrey-home .mark--part,
+.andrey-home .mark--no {
+  color: var(--andrey-muted);
+}
+
+.andrey-home .compare sup {
+  margin-left: 0.15rem;
+  font-size: 0.72rem;
+}
+
+/* ---------- footnotes: every note on the page, together at its foot ---------- */
+.andrey-home .fn-ref {
+  margin-left: 0.1em;
+  font-size: 0.65em;
+  font-weight: 500;
+  line-height: 0;
+}
+
+.andrey-home .fn-ref a {
+  text-decoration: none;
+}
+
+.andrey-home .footnotes {
+  padding-block: clamp(2rem, 5vw, 3rem);
+  border-top: 1px solid var(--andrey-line);
+  color: var(--andrey-muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.andrey-home .footnotes ol {
+  display: grid;
+  gap: 0.6rem;
+  margin-block: 0;
+  padding-left: calc(var(--gutter) + 1.25rem);
+}
+
+.andrey-home .footnotes li:target {
+  color: var(--andrey-ink);
+}
+
+.andrey-home .footnotes ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.andrey-home .fn-back {
+  text-decoration: none;
+}
+
+.andrey-home .compare-hint {
+  display: none;
+  margin: 1rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+}
+
+/* On a phone the packages scroll sideways; each feature's name stays in view. */
+@media (max-width: 44rem) {
+  .andrey-home .compare-hint {
+    display: block;
+  }
+
+  .andrey-home .compare {
+    min-width: 34rem;
+    font-size: 0.88rem;
+  }
+
+  .andrey-home .compare th,
+.andrey-home .compare td {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .andrey-home .compare tbody th[scope="row"],
+.andrey-home .compare thead td {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 10rem;
+    min-width: 10rem;
+    background: var(--andrey-paper);
+  }
+}
+
+.andrey-home .compare-notes {
+  max-width: var(--measure);
+  margin: 1rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--andrey-muted);
+  font-size: 0.9rem;
+}
+
+/* ---------- documentation ---------- */
+/* The one panel on the page: the docs are the thing to read next, so they do not look like
+   another run of body text. */
+/* The install line and the one next step share a row, and stack on a phone. */
+.andrey-home .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.andrey-home .hero-actions .install-line {
+  margin-top: 0;
+}
+
+.andrey-home .hero-actions .chip {
+  padding-inline: 1.1rem;
+}
+
+.andrey-home .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 10px;
+  background: var(--andrey-surface);
+  color: var(--andrey-ink);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.andrey-home .chip:hover {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-accent);
+}
+
+.andrey-home .chip--primary {
+  border-color: var(--andrey-accent);
+  background: var(--andrey-accent);
+  color: var(--andrey-surface);
+}
+
+.andrey-home .chip--primary:hover {
+  border-color: var(--andrey-ramp-5);
+  background: var(--andrey-ramp-5);
+  color: var(--andrey-surface);
+}
+
+/* The documentation band: the one section on a raised ground, so it reads as the next step
+   rather than more body text. */
+.andrey-home .band {
+  padding-block: clamp(3rem, 8vw, 5.5rem);
+  border-top: 1px solid var(--andrey-line);
+  background: var(--andrey-surface-2);
+}
+
+.andrey-home .docs-grid li {
+  padding-top: 1rem;
+  border-top: 2px solid var(--andrey-line);
+}
+
+.andrey-home .band h2 {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 2.7vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.andrey-home .band > .wrap > p {
+  max-width: var(--measure);
+  color: var(--andrey-muted);
+}
+
+.andrey-home .docs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1.5rem clamp(1.5rem, 3vw, 2.5rem);
+  margin: 2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.andrey-home .doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--andrey-ink);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.andrey-home .doc-link:hover {
+  color: var(--andrey-accent);
+  text-decoration: underline;
+}
+
+.andrey-home .doc-link .icon {
+  color: var(--andrey-accent);
+}
+
+.andrey-home .docs-grid span {
+  display: block;
+  margin-top: 0.6rem;
+  color: var(--andrey-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.andrey-home .icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: none;
+}
+
+/* ---------- methods ---------- */
+.andrey-home .methods {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 2.25rem clamp(2rem, 4vw, 3.5rem);
+  margin-top: 2.25rem;
+}
+
+.andrey-home .method-family {
+  padding-top: 0.9rem;
+  border-top: 2px solid var(--andrey-line);
+}
+
+.andrey-home .method-family h3 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.andrey-home .method-family ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.andrey-home .method {
+  padding-block: 0.85rem;
+  border-top: 1px solid var(--andrey-line);
+}
+
+/* A name too long to share the line with its output kind moves the kind to the next line. */
+.andrey-home .method-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.andrey-home .method-name {
+  color: var(--andrey-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.andrey-home .method-name:hover {
+  color: var(--andrey-accent);
+  text-decoration: underline;
+}
+
+.andrey-home .method-kind {
+  flex: none;
+  margin-left: auto;
+  padding: 0.05rem 0.55rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.andrey-home .section .method-what {
+  margin: 0.2rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+/* A benchmarked method carries a seal beside its name; hovering or focusing it shows why. */
+.andrey-home .method-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.andrey-home .method-bench {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.andrey-home .method-seal {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.andrey-home .method-seal polygon {
+  fill: var(--andrey-accent);
+  stroke: var(--andrey-accent);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.andrey-home .method-seal polyline {
+  fill: none;
+  stroke: var(--andrey-surface);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.andrey-home .method-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 5;
+  width: max-content;
+  max-width: 16rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--andrey-ink);
+  color: var(--andrey-paper);
+  font: 400 0.8rem/1.45 var(--font-sans);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 0.15s var(--ease),
+    transform 0.15s var(--ease);
+}
+
+.andrey-home .method-bench:hover .method-tip,
+.andrey-home .method-bench:focus-visible .method-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.andrey-home .method-status {
+  margin-right: 0.15rem;
+  color: var(--andrey-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ---------- agents: the steps in a row, then the session beside its graph ---------- */
+.andrey-home .agent-demo {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+/* The terminal and the graph share a row's height, so neither leaves a gap under it. */
+.andrey-home .agent-run {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.andrey-home .term {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--andrey-line);
+  border-radius: 14px;
+  background: var(--andrey-surface);
+}
+
+/* A window bar (figures.css) with Replay at its right. */
+.andrey-home .term-bar {
+  min-height: 2.4rem;
+  padding: 0.35rem 0.6rem 0.35rem 1rem;
+}
+
+.andrey-home .term-replay {
+  grid-column: 3;
+  justify-self: end;
+  padding: 0.15rem 0.7rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--andrey-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.andrey-home .term-replay:focus-visible,
+.andrey-home .term-body:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+
+.andrey-home .term-body {
+  padding: 1rem 1.1rem 1.2rem;
+  font: 400 0.82rem/1.6 var(--font-mono);
+}
+
+.andrey-home .frame + .frame {
+  margin-top: 1.1rem;
+}
+
+/* A long line wraps inside the terminal, its continuation indented past the prompt. */
+.andrey-home .cmd,
+.andrey-home .ln {
+  padding-left: 2ch;
+  text-indent: -2ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.andrey-home .cmd {
+  font-weight: 500;
+}
+
+.andrey-home .prompt {
+  color: var(--andrey-accent);
+}
+
+.andrey-home .out {
+  margin-top: 0.25rem;
+}
+
+.andrey-home .ln {
+  display: block;
+  min-height: 1.6em;
+}
+
+.andrey-home .elide {
+  color: var(--andrey-muted);
+  font-style: italic;
+}
+
+.andrey-home .exit {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--andrey-muted);
+  font-size: 0.72rem;
+}
+
+.andrey-home .agent-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: agent-step;
+}
+
+.andrey-home .agent-step {
+  padding: 0.8rem 1rem 0.85rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 12px;
+  background: var(--andrey-surface);
+  counter-increment: agent-step;
+}
+
+.andrey-home .agent-step b {
+  display: block;
+  font-weight: 600;
+}
+
+.andrey-home .agent-step b::before {
+  content: counter(agent-step);
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background: var(--andrey-accent);
+  color: var(--andrey-paper);
+  font-size: 0.75rem;
+}
+
+.andrey-home .agent-step p {
+  margin: 0.2rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.andrey-home .agent-graph {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 12px;
+  background: var(--andrey-surface);
+}
+
+.andrey-home .agent-graph svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 16rem;
+}
+
+.andrey-home .agent-graph figcaption {
+  margin-top: 0.3rem;
+  color: var(--andrey-muted);
+  font-size: 0.78rem;
+}
+
+/* The replay (figures.js): later frames keep their place while hidden, so nothing moves, and
+   the graph shows its nodes until the run's JSON arrives, then its edges. */
+.andrey-home .agent-demo.is-playing .frame.is-later {
+  visibility: hidden;
+}
+
+.andrey-home .agent-demo.is-playing .agent-graph line,
+.andrey-home .agent-demo.is-playing .agent-graph polygon {
+  transition: opacity 0.6s;
+}
+
+.andrey-home .agent-demo.is-playing .agent-graph.is-later line,
+.andrey-home .agent-demo.is-playing .agent-graph.is-later polygon {
+  opacity: 0.08;
+}
+
+.andrey-home .agent-demo.is-playing .agent-step {
+  opacity: 0.45;
+  transition: opacity 0.3s, border-color 0.3s;
+}
+
+.andrey-home .agent-demo.is-playing .agent-step.is-on {
+  border-color: var(--andrey-accent);
+  opacity: 1;
+}
+
+.andrey-home .untyped {
+  visibility: hidden;
+}
+
+.andrey-home .agent-demo.is-playing .is-typing .ln,
+.andrey-home .agent-demo.is-playing .is-typing .exit {
+  opacity: 0;
+}
+
+.andrey-home .agent-demo.is-playing .ln {
+  transition: opacity 0.2s calc(var(--i) * 45ms);
+}
+
+@media (max-width: 56rem) {
+  .andrey-home .agent-steps,
+  .andrey-home .agent-run {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- get started ---------- */
+.andrey-home .step {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: start;
+  gap: 1.5rem clamp(2rem, 5vw, 4.5rem);
+  margin-top: 2.25rem;
+}
+
+.andrey-home .step + .step {
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+}
+
+.andrey-home pre {
+  margin: 0;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  border: 1px solid var(--andrey-line);
+  border-radius: 10px;
+  background: var(--andrey-surface-2);
+  font: 400 0.88rem/1.65 var(--font-mono);
+}
+
+.andrey-home pre code {
+  font-size: inherit;
+}
+
+/* Code keeps its lines and scrolls; printed output wraps, as a terminal's does. */
+.andrey-home pre.output {
+  border: 1px solid var(--andrey-line);
+  background: var(--andrey-surface);
+  color: var(--andrey-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A code block in a window: the window draws the frame. */
+.andrey-home .window pre {
+  border: 0;
+  border-radius: 0;
+}
+
+.andrey-home .window + .window {
+  margin-top: 0.75rem;
+}
+
+.andrey-home .example-figure {
+  margin: 1.5rem 0 0;
+}
+
+.andrey-home .example-figure svg {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  height: auto;
+}
+
+.andrey-home .example-figure figcaption {
+  margin-top: 0.5rem;
+  color: var(--andrey-muted);
+  font-size: 0.88rem;
+}
+
+/* ---------- footer ---------- */
+.andrey-home .site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding-block: 2.5rem 3rem;
+  border-top: 1px solid var(--andrey-line);
+  color: var(--andrey-muted);
+  font-size: 0.9rem;
+}
+
+/* Abel's mark and name, one link. The mark takes the text's color. */
+.andrey-home .footer-abel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--andrey-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.andrey-home .footer-abel:hover {
+  color: var(--andrey-accent);
+}
+
+.andrey-home .abel-mark {
+  width: auto;
+  height: 1.15rem;
+}
+
+.andrey-home .site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 44rem) {
+  .andrey-home .step,
+.andrey-home .docs-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 64rem) {
+  /* The text column spans the card here, over the lighter top left, so its band grows. */
+  .andrey-home .hero-intro::before {
+    inset: -8% -12%;
+    background: radial-gradient(
+      ellipse closest-side,
+      color-mix(in srgb, var(--andrey-ground-navy) 80%, transparent),
+      color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent) 65%,
+      transparent
+    );
+  }
+
+  .andrey-home .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.5rem;
+  }
+
+  .andrey-home .hero h1 {
+    max-width: 24ch;
+    font-size: clamp(2.25rem, 6vw, 3.5rem);
+  }
+
+  .andrey-home .lede {
+    max-width: 58ch;
+  }
+
+}
+
+@media (max-width: 30rem) {
+  .andrey-home .hero {
+    gap: 1.75rem;
+    padding-top: 1.5rem;
+  }
+
+  .andrey-home .claim {
+    margin-top: 1rem;
+  }
+
+  .andrey-home .lede {
+    margin-top: 0.7rem;
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .andrey-home .hero-actions {
+    margin-top: 1.25rem;
+  }
+
+  .andrey-home .hero-actions .install-line {
+    flex: 1 1 100%;
+  }
+
+  .andrey-home .install-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-left: 0.75rem;
+    font-size: 0.85rem;
+  }
+}
+

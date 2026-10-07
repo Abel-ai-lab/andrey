@@ -1,0 +1,81 @@
+/* Graph guides share andrey.viz's endpoint shapes and generated palette tokens. */
+.graph-explorer, .graph-figure {
+  margin: 1.75rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+  background: var(--andrey-paper);
+  color: var(--andrey-ink);
+}
+.graph-explorer [hidden] { display: none !important; }
+.graph-controls { margin: 0; padding: 0 0 1rem; border: 0; }
+.graph-controls legend { font-size: .85rem; font-weight: 600; }
+.graph-controls label { position: relative; display: inline-block; margin: .3rem .1rem 0 0; }
+.graph-controls input { position: absolute; opacity: 0; }
+.graph-controls span {
+  display: block;
+  padding: .4rem .55rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-sm);
+  font: .82rem var(--andrey-font-mono);
+  cursor: pointer;
+}
+.graph-controls input:checked + span {
+  border-color: var(--andrey-accent);
+  background: var(--andrey-surface-2);
+  color: var(--andrey-accent);
+}
+.graph-controls input:focus-visible + span, .graph-matrix td:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 3px;
+}
+.graph-pair, .graph-figure-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 1.25rem;
+}
+.graph-pair { border-block: 1px solid var(--andrey-line); padding: .5rem 0; }
+.graph-pair.graph-linked { border-color: var(--andrey-accent); }
+.graph-pair p { margin: .4rem 0; font-size: .85rem; }
+.graph-pair .graph-kind { font: .8rem var(--andrey-font-mono); color: var(--andrey-muted); }
+.graph-pair svg, .graph-figure svg { display: block; width: 100%; height: auto; }
+.graph-encodings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.graph-encoding { padding: 1rem .75rem; border-bottom: 1px solid var(--andrey-line); }
+.graph-encoding:nth-child(odd) { border-right: 1px solid var(--andrey-line); }
+.graph-encoding h3 { margin: 0 0 .6rem; font-size: .95rem; }
+.graph-encoding:first-child h3 { color: var(--andrey-accent); }
+.graph-matrix { margin: .5rem auto; border-collapse: separate; border-spacing: 3px; }
+.graph-matrix caption {
+  caption-side: bottom;
+  text-align: center;
+  color: var(--andrey-muted);
+  font: .72rem/1.5 var(--andrey-font-sans);
+}
+.graph-matrix th, .graph-matrix td {
+  min-width: 2rem;
+  height: 2rem;
+  text-align: center;
+  padding: .15rem .35rem;
+  font: .85rem var(--andrey-font-mono);
+}
+.graph-matrix th { color: var(--andrey-muted); }
+.graph-matrix td[data-row] { background: var(--andrey-surface-2); border-radius: 3px; }
+.graph-matrix td.graph-linked { box-shadow: inset 0 0 0 2px var(--andrey-accent); }
+.graph-note, .graph-help, .graph-unavailable { font-size: .78rem; line-height: 1.6; }
+.graph-note { margin: .5rem 0 0; color: var(--andrey-muted); }
+.graph-help { margin: 1rem 0 0; color: var(--andrey-muted); }
+.graph-unavailable { min-height: 7rem; display: grid; place-content: center; text-align: center; }
+.graph-figure figcaption { font-size: .85rem; }
+.graph-figure figcaption strong { display: block; margin-bottom: .25rem; color: var(--andrey-accent); }
+@media (max-width: 540px) {
+  .graph-explorer, .graph-figure { padding: .85rem; }
+  .graph-pair, .graph-figure-body { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+  .graph-pair svg, .graph-figure svg { max-width: 340px; margin: 0 auto; }
+  .graph-encoding { padding: .8rem .3rem; }
+}
+@media print {
+  .graph-controls, .graph-help { display: none !important; }
+  .graph-explorer [data-example][hidden] { display: block !important; }
+  .graph-example, .graph-figure { break-inside: avoid; }
+}

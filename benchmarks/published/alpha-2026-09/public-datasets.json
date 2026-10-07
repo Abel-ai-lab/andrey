@@ -1,0 +1,1584 @@
+{
+ "generated": "2026-09-25",
+ "packages": {
+  "Andrey": "0.1.0",
+  "causal-learn": "0.1.4.8",
+  "gCastle": "1.0.4",
+  "lingam": "1.12.2"
+ },
+ "environments": {
+  "Andrey": "Python 3.14, NumPy 2.4.6",
+  "causal-learn, gCastle, lingam": "Python 3.13, NumPy 2.5.2"
+ },
+ "hardware": "16 cores of a shared AMD EPYC 9555 machine; fits ran in parallel, one per core; one BLAS thread per fit",
+ "timing": "seconds per fit after one warm-up fit on ASIA for imports and first-call costs: median of 20 fits on Sachs, 3 on ASIA and ALARM, 1 on HEPAR2 and ANDES; each fit's process stopped after 1,800 s of wall time per timed fit plus 300 s for imports and the warm-up fit, 2,100 s on HEPAR2 and ANDES",
+ "settings": {
+  "PC, FCI": "Fisher-z, alpha 0.05",
+  "GES": "Andrey lambda_value 1.0 (causal-learn 0.5 on its scale), max parents d/2; gCastle BIC with no penalty setting",
+  "BOSS, GRaSP": "Andrey lambda_value 1.0 (causal-learn 0.5), search seed 0; GRaSP depth 3",
+  "DirectLiNGAM": "pairwise likelihood",
+  "ICA-LiNGAM": "FastICA, seed 0, 1,000 iterations",
+  "scoring": "PC, GES, BOSS, GRaSP against the truth's CPDAG; FCI by endpoint SHD against its PAG; LiNGAM methods against the DAG",
+  "bic": "total BIC under Andrey's lambda_value 1.0 (equal to causal-learn's 0.5); lower is better"
+ },
+ "datasets": [
+  {
+   "dataset": "sachs",
+   "data": "measured",
+   "n": 853,
+   "d": 11,
+   "arcs": 17,
+   "seeds": [
+    0
+   ],
+   "methods": [
+    {
+     "method": "PC",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.0006684,
+       "shd": 11,
+       "empty_shd": 17
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.004199,
+       "shd": 11,
+       "empty_shd": 17
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.007105,
+       "shd": 11,
+       "empty_shd": 17
+      }
+     ]
+    },
+    {
+     "method": "FCI",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.0006298,
+       "shd": 20,
+       "empty_shd": 34
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.004487,
+       "shd": 20,
+       "empty_shd": 34
+      }
+     ]
+    },
+    {
+     "method": "GES",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.008658,
+       "shd": 11,
+       "empty_shd": 17
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.02035,
+       "shd": 11,
+       "empty_shd": 17
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.2578,
+       "shd": 11,
+       "empty_shd": 17
+      }
+     ]
+    },
+    {
+     "method": "BOSS",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.002222,
+       "shd": 11,
+       "empty_shd": 17
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.005052,
+       "shd": 11,
+       "empty_shd": 17
+      }
+     ]
+    },
+    {
+     "method": "GRaSP",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.002895,
+       "shd": 11,
+       "empty_shd": 17
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.005955,
+       "shd": 11,
+       "empty_shd": 17
+      }
+     ]
+    },
+    {
+     "method": "DirectLiNGAM",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.02057,
+       "shd": 14,
+       "empty_shd": 17
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.06077,
+       "shd": 14,
+       "empty_shd": 17
+      },
+      {
+       "package": "lingam",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.06636,
+       "shd": 14,
+       "empty_shd": 17
+      }
+     ]
+    },
+    {
+     "method": "ICA-LiNGAM",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.01314,
+       "shd": 14,
+       "empty_shd": 17
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.01442,
+       "shd": 14,
+       "empty_shd": 17
+      },
+      {
+       "package": "lingam",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.02115,
+       "shd": 14,
+       "empty_shd": 17
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "dataset": "asia",
+   "data": "simulated, linear-Gaussian, standardised",
+   "n": 1000,
+   "d": 8,
+   "arcs": 8,
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "methods": [
+    {
+     "method": "PC",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.002045,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.001455,
+       "shd": 3,
+       "empty_shd": 8
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.001614,
+       "shd": 3,
+       "empty_shd": 8
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.007749,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.006746,
+       "shd": 3,
+       "empty_shd": 8
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.007242,
+       "shd": 3,
+       "empty_shd": 8
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.009833,
+       "shd": 1,
+       "empty_shd": 8
+      },
+      {
+       "package": "gCastle",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.008884,
+       "shd": 6,
+       "empty_shd": 8
+      },
+      {
+       "package": "gCastle",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.009659,
+       "shd": 1,
+       "empty_shd": 8
+      }
+     ]
+    },
+    {
+     "method": "FCI",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.001971,
+       "shd": 0,
+       "empty_shd": 16
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.001424,
+       "shd": 4,
+       "empty_shd": 16
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.001533,
+       "shd": 7,
+       "empty_shd": 16
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.009171,
+       "shd": 0,
+       "empty_shd": 16
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.007846,
+       "shd": 4,
+       "empty_shd": 16
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.007696,
+       "shd": 7,
+       "empty_shd": 16
+      }
+     ]
+    },
+    {
+     "method": "GES",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.00568,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.005735,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.005935,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.01266,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.01284,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.01259,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.08353,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "gCastle",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.08598,
+       "shd": 0,
+       "empty_shd": 8
+      },
+      {
+       "package": "gCastle",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.08926,
+       "shd": 0,
+       "empty_shd": 8
+      }
+     ]
+    },
+    {
+     "method": "BOSS",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.003912,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -12664.1
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.003649,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -9361.5
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.003684,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -13344.3
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.005408,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -12664.1
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.005417,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -9361.5
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.005182,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -13344.3
+      }
+     ]
+    },
+    {
+     "method": "GRaSP",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.002221,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -12664.1
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.002235,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -9361.5
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.002813,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -13344.3
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.003632,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -12664.1
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.003759,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -9361.5
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.004294,
+       "shd": 0,
+       "empty_shd": 8,
+       "bic": -13344.3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "dataset": "alarm",
+   "data": "simulated, linear-Gaussian, standardised",
+   "n": 1000,
+   "d": 37,
+   "arcs": 46,
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "methods": [
+    {
+     "method": "PC",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.01159,
+       "shd": 25,
+       "empty_shd": 46
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.01081,
+       "shd": 24,
+       "empty_shd": 46
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.01184,
+       "shd": 19,
+       "empty_shd": 46
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.2798,
+       "shd": 25,
+       "empty_shd": 46
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.2679,
+       "shd": 24,
+       "empty_shd": 46
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.2884,
+       "shd": 19,
+       "empty_shd": 46
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.2553,
+       "shd": 30,
+       "empty_shd": 46
+      },
+      {
+       "package": "gCastle",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.2844,
+       "shd": 29,
+       "empty_shd": 46
+      },
+      {
+       "package": "gCastle",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.3188,
+       "shd": 35,
+       "empty_shd": 46
+      }
+     ]
+    },
+    {
+     "method": "FCI",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.0178,
+       "shd": 53,
+       "empty_shd": 92
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.01871,
+       "shd": 39,
+       "empty_shd": 92
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.01811,
+       "shd": 34,
+       "empty_shd": 92
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.2737,
+       "shd": 53,
+       "empty_shd": 92
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.2743,
+       "shd": 39,
+       "empty_shd": 92
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.2859,
+       "shd": 34,
+       "empty_shd": 92
+      }
+     ]
+    },
+    {
+     "method": "GES",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.4651,
+       "shd": 19,
+       "empty_shd": 46
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.5006,
+       "shd": 20,
+       "empty_shd": 46
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.5118,
+       "shd": 37,
+       "empty_shd": 46
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 1.463,
+       "shd": 19,
+       "empty_shd": 46
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 2.264,
+       "shd": 20,
+       "empty_shd": 46
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 2.378,
+       "shd": 37,
+       "empty_shd": 46
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 50.04,
+       "shd": 23,
+       "empty_shd": 46
+      },
+      {
+       "package": "gCastle",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 50.76,
+       "shd": 28,
+       "empty_shd": 46
+      },
+      {
+       "package": "gCastle",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 55.59,
+       "shd": 41,
+       "empty_shd": 46
+      }
+     ]
+    },
+    {
+     "method": "BOSS",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.247,
+       "shd": 24,
+       "empty_shd": 46,
+       "bic": -68682.5
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.1481,
+       "shd": 42,
+       "empty_shd": 46,
+       "bic": -59461.2
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.1505,
+       "shd": 52,
+       "empty_shd": 46,
+       "bic": -61774.9
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.6828,
+       "shd": 45,
+       "empty_shd": 46,
+       "bic": -68625.1
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.6466,
+       "shd": 43,
+       "empty_shd": 46,
+       "bic": -59461.0
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.6469,
+       "shd": 53,
+       "empty_shd": 46,
+       "bic": -61775.3
+      }
+     ]
+    },
+    {
+     "method": "GRaSP",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.1178,
+       "shd": 31,
+       "empty_shd": 46,
+       "bic": -68644.2
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.1165,
+       "shd": 33,
+       "empty_shd": 46,
+       "bic": -59461.7
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.09749,
+       "shd": 16,
+       "empty_shd": 46,
+       "bic": -61838.7
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.4598,
+       "shd": 31,
+       "empty_shd": 46,
+       "bic": -68644.2
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.4586,
+       "shd": 33,
+       "empty_shd": 46,
+       "bic": -59461.7
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.3793,
+       "shd": 16,
+       "empty_shd": 46,
+       "bic": -61838.7
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "dataset": "hepar2",
+   "data": "simulated, linear-Gaussian, standardised",
+   "n": 1000,
+   "d": 70,
+   "arcs": 123,
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "methods": [
+    {
+     "method": "PC",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.1048,
+       "shd": 126,
+       "empty_shd": 123
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.1693,
+       "shd": 105,
+       "empty_shd": 123
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.1684,
+       "shd": 108,
+       "empty_shd": 123
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 3.747,
+       "shd": 126,
+       "empty_shd": 123
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 4.24,
+       "shd": 105,
+       "empty_shd": 123
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 4.833,
+       "shd": 108,
+       "empty_shd": 123
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 5.65,
+       "shd": 126,
+       "empty_shd": 123
+      },
+      {
+       "package": "gCastle",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 3.387,
+       "shd": 121,
+       "empty_shd": 123
+      },
+      {
+       "package": "gCastle",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 4.847,
+       "shd": 122,
+       "empty_shd": 123
+      }
+     ]
+    },
+    {
+     "method": "FCI",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.2571,
+       "shd": 234,
+       "empty_shd": 246
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.5013,
+       "shd": 193,
+       "empty_shd": 246
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.1967,
+       "shd": 206,
+       "empty_shd": 246
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 3.637,
+       "shd": 234,
+       "empty_shd": 246
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 4.795,
+       "shd": 193,
+       "empty_shd": 246
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 4.194,
+       "shd": 206,
+       "empty_shd": 246
+      }
+     ]
+    },
+    {
+     "method": "GES",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 6.481,
+       "shd": 143,
+       "empty_shd": 123
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 3.796,
+       "shd": 71,
+       "empty_shd": 123
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 7.514,
+       "shd": 109,
+       "empty_shd": 123
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 123,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 123,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 123,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 123,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "gCastle",
+       "seed": 1,
+       "status": "failed",
+       "note": "ValueError: The PDAG does not admit any extension.",
+       "seconds": null,
+       "shd": null
+      },
+      {
+       "package": "gCastle",
+       "seed": 2,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 123,
+       "note": "did not finish in 1,800 s"
+      }
+     ]
+    },
+    {
+     "method": "BOSS",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.7616,
+       "shd": 24,
+       "empty_shd": 123,
+       "bic": -197086.5
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.7709,
+       "shd": 27,
+       "empty_shd": 123,
+       "bic": -204369.5
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.7987,
+       "shd": 26,
+       "empty_shd": 123,
+       "bic": -214669.2
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 3.564,
+       "shd": 24,
+       "empty_shd": 123,
+       "bic": -197086.5
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 4.084,
+       "shd": 27,
+       "empty_shd": 123,
+       "bic": -204369.5
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 4.5,
+       "shd": 27,
+       "empty_shd": 123,
+       "bic": -214670.1
+      }
+     ]
+    },
+    {
+     "method": "GRaSP",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 1.599,
+       "shd": 85,
+       "empty_shd": 123,
+       "bic": -196939.0
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 1.289,
+       "shd": 75,
+       "empty_shd": 123,
+       "bic": -204313.6
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 1.208,
+       "shd": 84,
+       "empty_shd": 123,
+       "bic": -214583.3
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 7.456,
+       "shd": 85,
+       "empty_shd": 123,
+       "bic": -196939.0
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 6.526,
+       "shd": 75,
+       "empty_shd": 123,
+       "bic": -204313.6
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 6.202,
+       "shd": 84,
+       "empty_shd": 123,
+       "bic": -214583.3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "dataset": "andes",
+   "data": "simulated, linear-Gaussian, standardised",
+   "n": 1000,
+   "d": 223,
+   "arcs": 338,
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "methods": [
+    {
+     "method": "PC",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.414,
+       "shd": 372,
+       "empty_shd": 338
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.4073,
+       "shd": 372,
+       "empty_shd": 338
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 1.997,
+       "shd": 381,
+       "empty_shd": 338
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 245.5,
+       "shd": 372,
+       "empty_shd": 338
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 302.8,
+       "shd": 372,
+       "empty_shd": 338
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 273.6,
+       "shd": 381,
+       "empty_shd": 338
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 14.93,
+       "shd": 482,
+       "empty_shd": 338
+      },
+      {
+       "package": "gCastle",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 13.95,
+       "shd": 449,
+       "empty_shd": 338
+      },
+      {
+       "package": "gCastle",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 11.47,
+       "shd": 438,
+       "empty_shd": 338
+      }
+     ]
+    },
+    {
+     "method": "FCI",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 0.6442,
+       "shd": 710,
+       "empty_shd": 676
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 0.677,
+       "shd": 696,
+       "empty_shd": 676
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 0.9575,
+       "shd": 663,
+       "empty_shd": 676
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 36.04,
+       "shd": 710,
+       "empty_shd": 676
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 39.91,
+       "shd": 696,
+       "empty_shd": 676
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 41.57,
+       "shd": 663,
+       "empty_shd": 676
+      }
+     ]
+    },
+    {
+     "method": "GES",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 404.9,
+       "shd": 810,
+       "empty_shd": 338
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 374.9,
+       "shd": 612,
+       "empty_shd": 338
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 313.7,
+       "shd": 477,
+       "empty_shd": 338
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 338,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 338,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 338,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "gCastle",
+       "seed": 0,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 338,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "gCastle",
+       "seed": 1,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 338,
+       "note": "did not finish in 1,800 s"
+      },
+      {
+       "package": "gCastle",
+       "seed": 2,
+       "status": "capped",
+       "seconds": null,
+       "shd": null,
+       "empty_shd": 338,
+       "note": "did not finish in 1,800 s"
+      }
+     ]
+    },
+    {
+     "method": "BOSS",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 36.24,
+       "shd": 187,
+       "empty_shd": 338,
+       "bic": -1059382.6
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 74.17,
+       "shd": 762,
+       "empty_shd": 338,
+       "bic": -1468342.4
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 51.61,
+       "shd": 506,
+       "empty_shd": 338,
+       "bic": -1537239.5
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 200.7,
+       "shd": 186,
+       "empty_shd": 338,
+       "bic": -1059381.6
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 391.3,
+       "shd": 601,
+       "empty_shd": 338,
+       "bic": -1440100.8
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 274.0,
+       "shd": 457,
+       "empty_shd": 338,
+       "bic": -1472939.7
+      }
+     ]
+    },
+    {
+     "method": "GRaSP",
+     "fits": [
+      {
+       "package": "Andrey",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 41.42,
+       "shd": 415,
+       "empty_shd": 338,
+       "bic": -1056236.2
+      },
+      {
+       "package": "Andrey",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 46.83,
+       "shd": 471,
+       "empty_shd": 338,
+       "bic": -1481616.5
+      },
+      {
+       "package": "Andrey",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 27.07,
+       "shd": 484,
+       "empty_shd": 338,
+       "bic": -1566877.6
+      },
+      {
+       "package": "causal-learn",
+       "seed": 0,
+       "status": "ok",
+       "seconds": 175.7,
+       "shd": 381,
+       "empty_shd": 338,
+       "bic": -1056180.2
+      },
+      {
+       "package": "causal-learn",
+       "seed": 1,
+       "status": "ok",
+       "seconds": 141.5,
+       "shd": 805,
+       "empty_shd": 338,
+       "bic": -1427532.0
+      },
+      {
+       "package": "causal-learn",
+       "seed": 2,
+       "status": "ok",
+       "seconds": 57.85,
+       "shd": 666,
+       "empty_shd": 338,
+       "bic": -1477966.3
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

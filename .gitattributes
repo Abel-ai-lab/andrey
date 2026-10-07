@@ -1,0 +1,5 @@
+# Lockfiles are generated — collapse in PR diffs, drop from GitHub language stats.
+uv.lock linguist-generated
+
+# Interactive design artifacts are generated HTML — collapse in diffs, drop from language stats.
+*.html linguist-generated

@@ -1,0 +1,19 @@
+[project]
+name = "andrey-bench"
+version = "0.0.0"
+description = "Standalone competitive benchmark harness for andrey. NOT part of the andrey package."
+requires-python = ">=3.10"
+# The competitor packages and an editable andrey are installed by ./start.sh into a dedicated
+# venv (.venv-bench), never into the andrey dev .venv. These are the harness's own tooling deps.
+dependencies = [
+  "numpy>=2",
+  "pandas",    # records -> runs.parquet
+  "pyarrow",   # runs.parquet
+  "psutil",    # thread-count evidence
+]
+
+[tool.uv]
+package = false    # a runnable harness, not a distributable package
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

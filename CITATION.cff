@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use Andrey in your work, please cite it."
+title: "Andrey: A very fast causal discovery package"
+type: software
+authors:
+  - name: Abel AI Lab
+version: 0.1.0
+license: Apache-2.0
+url: "https://andrey.abel.ai"
+repository-code: "https://github.com/Abel-ai-lab/andrey"

@@ -1,0 +1,21 @@
+name: Feature request
+description: A method, an option, or a data format Andrey should support.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to do
+      description: The task, and what stops you doing it with Andrey today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help
+      description: For a method, the paper or an implementation that defines it; for an option, how you would call it.
+  - type: input
+    id: size
+    attributes:
+      label: Data size
+      description: Typical numbers of samples and variables, if speed matters.

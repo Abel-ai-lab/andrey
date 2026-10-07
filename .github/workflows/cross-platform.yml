@@ -1,0 +1,143 @@
+name: cross-platform
+
+# On macOS and Windows: installs the core wheel and runs the CLI and small fits. On macOS, also runs
+# the unit tests with torch on the CPU. Runs on demand and on pull requests that change this file;
+# see docs/docs/ci.md.
+on:
+  pull_request:
+    paths: [.github/workflows/cross-platform.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install-smoke:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ["3.11", "3.14"]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Build the wheel
+        run: uv build --wheel
+      - name: Install into a clean environment and import
+        # torch and numba live behind extras, so the core wheel must not pull them in.
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install dist/*.whl
+          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None, 'core must be torch-free'; assert u.find_spec('numba') is None, 'core must be numba-free'; import andrey, numpy, platform; print('andrey', andrey.__version__, '| numpy', numpy.__version__, '|', platform.platform())"
+      - name: CLI help and configuration
+        run: |
+          uv run --no-project andrey --help
+          uv run --no-project andrey config
+          uv run --no-project andrey run pc --help --json > pc-help.json
+          uv run --no-project python -c "import json; assert json.load(open('pc-help.json'))['method']['name'] == 'pc'"
+      - name: Fit PC and GES through the Python API
+        # a -> c <- b, c -> d: both methods orient every edge. The CSV is written in text mode, so
+        # it has CRLF line endings on Windows.
+        run: |
+          uv run --no-project python - <<'EOF'
+          import numpy as np, andrey
+          rng = np.random.default_rng(0)
+          a, b = rng.standard_normal((2, 300))
+          c = a + b + rng.standard_normal(300)
+          d = c + rng.standard_normal(300)
+          x = np.column_stack([a, b, c, d])
+          truth = [(0, 2, "directed"), (1, 2, "directed"), (2, 3, "directed")]
+          for fit in (andrey.pc, andrey.ges):
+              edges = fit(x).structure.oriented_edges(index=True)
+              print(fit.__name__, edges)
+              assert edges == truth, edges
+          with open("smoke.csv", "w", encoding="utf-8") as fh:
+              fh.write("a,b,c,d\n")
+              fh.writelines(",".join(map(repr, row)) + "\n" for row in x.tolist())
+          EOF
+      - name: Fit PC and GES through andrey run on the CSV
+        run: |
+          uv run --no-project andrey run pc --data smoke.csv -o pc.json
+          uv run --no-project andrey run ges --data smoke.csv > ges.json
+          uv run --no-project python - <<'EOF'
+          import json
+          truth = [(0, 2, "directed"), (1, 2, "directed"), (2, 3, "directed")]
+          for name in ("pc", "ges"):
+              with open(f"{name}.json", encoding="utf-8") as fh:
+                  structure = json.load(fh)["structure"]
+              edges = [(e["source"], e["target"], e["type"]) for e in structure["edges"]]
+              print(name, structure["labels"], edges)
+              assert structure["labels"] == ["a", "b", "c", "d"], structure["labels"]
+              assert edges == truth, edges
+          EOF
+      - name: GES with two worker processes
+        # The start method differs by OS (spawn on Windows); the script records the one used.
+        env:
+          ANDREY_NUM_WORKERS: "2"
+          ANDREY_GES_PARALLEL_MIN_WORK: "0"
+        run: |
+          cat > workers.py <<'EOF'
+          import concurrent.futures as cf
+
+          started = []
+
+
+          class Recorder(cf.ProcessPoolExecutor):
+              def __init__(self, *args, mp_context=None, **kwargs):
+                  started.append(mp_context.get_start_method() if mp_context else "default")
+                  super().__init__(*args, mp_context=mp_context, **kwargs)
+
+
+          cf.ProcessPoolExecutor = Recorder  # before andrey imports the name
+
+          if __name__ == "__main__":
+              import numpy as np, andrey
+
+              x = np.loadtxt("smoke.csv", delimiter=",", skiprows=1)
+              edges = andrey.ges(x).structure.oriented_edges(index=True)
+              print(edges, "| worker start methods:", started)
+              assert started, "no worker process started"
+              assert edges == [(0, 2, "directed"), (1, 2, "directed"), (2, 3, "directed")], edges
+          EOF
+          uv run --no-project python workers.py
+          uv run --no-project andrey run ges --data smoke.csv > ges-workers.json
+          uv run --no-project python -c "import json; a, b = (json.load(open(p))['structure'] for p in ('ges.json', 'ges-workers.json')); assert a == b, (a, b)"
+
+  unit-tests:
+    # The unit suite with the torch extra on the CPU: torch's results must equal numpy's and repeat
+    # exactly. Windows joins once its Linux-only tests are fixed.
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest]
+        python-version: ["3.12"]
+    defaults:
+      run:
+        shell: bash
+    env:
+      ANDREY_DEVICE: cpu  # the CPU float64 path; never MPS
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Sync with the torch and data extras
+        run: uv sync --locked --extra torch --extra data --python ${{ matrix.python-version }}
+      - name: torch imports
+        # Without torch the torch-path tests skip, and the job would pass with torch broken.
+        run: uv run --no-sync python -c "import torch, andrey; print('torch', torch.__version__); print(andrey.describe().as_dict())"
+      - name: Unit tests
+        run: uv run --no-sync python -m pytest tests/unit -q -rs

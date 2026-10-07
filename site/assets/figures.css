@@ -1,0 +1,727 @@
+/* The timing comparison, the speed charts, the accuracy figures, and the code windows: on the
+   homepage, in the launch post, and in the benchmark explorer. Every color is an --andrey-* token generated from
+   src/andrey/viz/theme.py, so this file names no hex. Motion runs only with no reduced-motion
+   preference, and every element is visible before it starts. */
+
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ---------- windows ---------- */
+/* Code, its output, and the agent session sit in macOS windows: close, minimize, and zoom at the
+   left of a title bar, in the palette's red, amber, and green, and the file or command in the
+   middle. The output's window carries its file's name. In a post, a code block with a caption is
+   a window, its caption the title, and one with the class "window" is a window with no title. */
+/* The post's selectors match the theme's, so this sheet, loaded after it, wins. */
+.window,
+div.literal-block-wrapper {
+  overflow: hidden;
+  border: 1px solid var(--andrey-line);
+  border-radius: 12px;
+  background: var(--andrey-surface);
+}
+
+.window-bar,
+div.literal-block-wrapper > div.code-block-caption {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: 2.2rem;
+  margin: 0;
+  padding: 0 0.8rem;
+  border: 0;
+  border-bottom: 1px solid var(--andrey-line);
+  background: var(--andrey-surface);
+  color: var(--andrey-muted);
+  font: 400 0.78rem/1.2 var(--font-sans);
+  text-align: center;
+}
+
+.window-bar::before,
+div.literal-block-wrapper > div.code-block-caption::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--andrey-categorical-4);
+  box-shadow:
+    20px 0 0 var(--andrey-categorical-2),
+    40px 0 0 var(--andrey-categorical-3);
+}
+
+/* The bar of a window with no title: the three buttons, drawn at the same places. */
+div[class*="highlight-"].window::before {
+  content: "";
+  display: block;
+  height: 2.2rem;
+  border-bottom: 1px solid var(--andrey-line);
+  background:
+    radial-gradient(circle at calc(0.8rem + 6px) 50%, var(--andrey-categorical-4) 6px, transparent 6.5px),
+    radial-gradient(circle at calc(0.8rem + 26px) 50%, var(--andrey-categorical-2) 6px, transparent 6.5px),
+    radial-gradient(circle at calc(0.8rem + 46px) 50%, var(--andrey-categorical-3) 6px, transparent 6.5px),
+    var(--andrey-surface);
+}
+
+div.literal-block-wrapper div.highlight,
+div.literal-block-wrapper pre,
+div[class*="highlight-"].window div.highlight,
+div[class*="highlight-"].window pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+/* ---------- timing comparison ---------- */
+/* Recorded times share a linear scale and clock. Full bar footprints and values stay visible
+   throughout playback. The small minimum width keeps the fastest results legible. */
+.race {
+  min-width: 0;
+  margin: 0;
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+  border: 1px solid var(--andrey-line);
+  border-radius: 12px;
+  background: var(--andrey-surface);
+}
+
+.race-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  text-align: start;
+}
+
+.race-title {
+  display: block;
+  max-width: 24ch;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.race-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+  padding: 0 0 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--andrey-line);
+}
+
+.race-sizes legend {
+  float: left;
+  width: auto;
+  margin: 0 auto 0 0;
+  line-height: inherit;
+  padding: 0.45rem 0.5rem 0.45rem 0;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+}
+
+/* The radio stays focusable; its label is the visible control. */
+.race-choice {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.race-choice + label {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--andrey-surface);
+  border-radius: 5px;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.race-choice + label:hover {
+  background: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+}
+
+.race-choice:checked + label {
+  border-color: var(--andrey-accent);
+  background: var(--andrey-surface);
+  color: var(--andrey-accent);
+}
+
+.race-choice:focus-visible + label {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+
+.race-row {
+  padding-block: 0.8rem;
+}
+
+.race-name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.race-name small {
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.race-track {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.race-bar {
+  flex: none;
+  width: max(16px, calc((100% - 6.5rem) * var(--f)));
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-muted) 12%, transparent);
+}
+
+/* Each fill runs along a gradient: pale to deeper grey for the other packages, and the accent
+   to a lighter tint of it for Andrey. */
+.race-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--andrey-muted) 30%, transparent),
+    color-mix(in srgb, var(--andrey-muted) 75%, transparent)
+  );
+  transform-origin: left center;
+}
+
+.race-row--andrey .race-bar {
+  background: color-mix(in srgb, var(--andrey-accent) 28%, transparent);
+}
+
+.race-row--andrey .race-fill {
+  background: linear-gradient(
+    90deg,
+    var(--andrey-accent),
+    color-mix(in oklab, var(--andrey-accent), white 45%)
+  );
+}
+
+.race-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.race-finish {
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--andrey-muted);
+  border-radius: 50%;
+  background: var(--andrey-muted);
+}
+
+.race-row--andrey .race-finish {
+  border-color: var(--andrey-accent);
+  background: var(--andrey-accent);
+}
+
+.race-tag {
+  justify-self: start;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+  cursor: help;
+}
+
+.race-reason {
+  display: block;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.race-note {
+  margin: 1rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--andrey-line);
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* A newly selected size restarts the shared clock. Both values and bar footprints stay put. */
+  .race-fill {
+    animation: race-fill var(--dur) linear 300ms both;
+  }
+
+  .race-finish {
+    animation: race-finish var(--dur) step-end 300ms both,
+      race-arrive 400ms var(--ease) calc(var(--dur) + 300ms) both;
+  }
+
+  /* The speedup panel has no clock: each bar grows to its speedup, one row after another. */
+  .race--speedup .race-fill {
+    animation: race-fill 900ms var(--ease) calc(200ms + var(--i, 0) * 140ms) both;
+  }
+
+  .race-choice + label {
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+}
+
+@keyframes race-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes race-finish {
+  from { background: var(--andrey-surface); }
+}
+
+@keyframes race-arrive {
+  from { transform: scale(1); }
+  40% { transform: scale(1.5); }
+  to { transform: scale(1); }
+}
+
+
+/* ---------- speed chart: one dot per problem size, on a log scale ---------- */
+
+.speed-notes {
+  max-width: var(--measure);
+  margin: 1.75rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--andrey-muted);
+}
+
+.speed-notes li + li {
+  margin-top: 0.4rem;
+}
+
+.speed-table {
+  margin-top: 1.75rem;
+}
+
+.speed-table summary {
+  color: var(--andrey-accent);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Positioned, so the screen-reader text in a cell scrolls with the table instead of widening the
+   page. */
+.table-scroll {
+  position: relative;
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.speed-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.speed-table th,
+.speed-table td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--andrey-line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.speed-table thead th {
+  color: var(--andrey-muted);
+  font-weight: 500;
+}
+
+.speed-table tbody th {
+  padding-top: 1.1rem;
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+}
+
+.speed-table tbody th strong {
+  font-weight: 600;
+}
+
+.generated {
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+}
+
+/* ---------- speed: one chart per method, time against size, up and to the left is better ---- */
+.tchart {
+  margin: 0;
+  padding: 1.1rem 1.1rem 0.6rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 14px;
+  background: var(--andrey-surface);
+}
+
+.tchart figcaption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  text-align: start;
+}
+
+.tchart-name strong {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.tchart-name span,
+.tchart-up {
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+}
+
+.tchart-up {
+  white-space: nowrap;
+}
+
+.tchart-up b {
+  color: var(--andrey-accent);
+  font-size: 1.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* The legend names every line; text keeps the text colors, the swatch carries identity. */
+.tc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.4rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 0.82rem;
+}
+
+.tc-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tc-key i {
+  width: 1.1rem;
+  border-top: 2px solid var(--andrey-muted);
+}
+
+.tc-key.tc-andrey i {
+  border-top-color: var(--andrey-accent);
+}
+
+.tc-key.tc-other-1 i {
+  border-top-style: dashed;
+}
+
+.tchart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 0.4rem;
+  overflow: visible;
+}
+
+.tchart svg text {
+  fill: var(--andrey-muted);
+  font: 500 9px var(--font-sans);
+}
+
+.tc-grid {
+  stroke: var(--andrey-line);
+  stroke-width: 1;
+}
+
+.tc-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.tc-line.tc-andrey {
+  stroke: var(--andrey-accent);
+}
+
+.tc-line.tc-other {
+  stroke: var(--andrey-muted);
+}
+
+.tc-line.tc-other-1 {
+  stroke-dasharray: 4 3;
+}
+
+.tc-point {
+  stroke: var(--andrey-surface);
+  stroke-width: 2;
+}
+
+.tc-point.tc-andrey {
+  fill: var(--andrey-accent);
+}
+
+.tc-point.tc-other {
+  fill: var(--andrey-muted);
+}
+
+.tc-point.is-open {
+  fill: var(--andrey-surface);
+}
+
+.tc-point.is-open.tc-andrey {
+  stroke: var(--andrey-accent);
+}
+
+.tc-point.is-open.tc-other {
+  stroke: var(--andrey-muted);
+}
+
+/* The charts ride a belt that slides left in a loop and fades at both edges. It pauses under the
+   pointer or keyboard focus; with reduced motion it stands still and scrolls by hand. */
+.tc-belt {
+  margin-top: 2rem;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, black 5%, black 95%, transparent);
+}
+
+.tc-track,
+.tc-copy {
+  display: flex;
+  gap: 1rem;
+}
+
+.tc-track {
+  position: relative;
+  width: max-content;
+  animation: tc-belt calc(var(--n) * 7s) linear infinite;
+}
+
+/* Driven by the page script: the belt can be dragged, and vertical page scrolling still works. */
+.tc-belt.is-driven {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.tc-belt.is-driven .tc-track {
+  animation: none;
+}
+
+.tc-belt.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.tc-track .tchart {
+  flex: none;
+  width: min(21rem, 82vw);
+}
+
+.tc-belt:hover .tc-track,
+.tc-belt:focus-within .tc-track {
+  animation-play-state: paused;
+}
+
+@keyframes tc-belt {
+  to {
+    transform: translateX(calc(-50% - 0.5rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-belt {
+    overflow-x: auto;
+    mask-image: none;
+  }
+
+  .tc-track {
+    animation: none;
+  }
+
+  .tc-copy {
+    display: none;
+  }
+}
+
+/* ---------- accuracy: a card per speed chart, one row per size and package ---------- */
+/* Every card has the same columns, so the rows line up across cards on the belt. Text is ink, not
+   muted, and the bars and dots are the accent, for contrast in both themes. */
+.tc-track .tchart.rtable {
+  width: min(24rem, 86vw);
+}
+
+.rtable figcaption {
+  display: block;
+}
+
+.rt-name {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.rt-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+
+.rt-score b {
+  flex: none;
+  color: var(--andrey-accent);
+  font-size: 1.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.rt-score span {
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.rt-grid {
+  display: grid;
+  grid-template-columns: 4.3rem 6.2rem 1fr 5.4rem;
+  align-items: center;
+  margin: 0.9rem 0 0.5rem;
+  color: var(--andrey-ink);
+  font-size: 0.82rem;
+}
+
+.rt-grid > span {
+  padding: 0.34rem 0.5rem 0.34rem 0;
+  border-top: 1px solid var(--andrey-line);
+}
+
+.rt-grid > .rt-h {
+  min-width: 0;
+  padding-bottom: 0.45rem;
+  border-top: 0;
+  color: var(--andrey-muted);
+  font-size: 0.74rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.rt-grid > .rt-d {
+  padding-right: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* A size's second package shares the size's cell, so no line runs through it. */
+.rt-grid > .rt-d:empty {
+  border-top-color: transparent;
+}
+
+.rt-who,
+.rt-v {
+  white-space: nowrap;
+}
+
+.rt-v {
+  font-weight: 600;
+}
+
+.rt-track {
+  position: relative;
+  align-self: stretch;
+}
+
+.rt-bar,
+.rt-dot {
+  position: absolute;
+  left: 0;
+  background: var(--andrey-accent);
+}
+
+.rt-bar {
+  top: calc(50% - 4px);
+  width: calc(var(--f) * 0.92);
+  min-width: 10px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.rt-dot {
+  top: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 64rem) {
+  .race-title {
+    max-width: none;
+  }
+}
+
+@media (max-width: 30rem) {
+  .race {
+    padding: 1rem;
+  }
+
+  .race-title {
+    font-size: 1.1rem;
+  }
+
+  .race-sizes legend {
+    float: none;
+    margin-bottom: 0.25rem;
+  }
+}
+
+@supports not selector(:has(a)) {
+  .race-sizes {
+    display: none;
+  }
+
+  .race-panel + .race-panel {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--andrey-line);
+  }
+}
