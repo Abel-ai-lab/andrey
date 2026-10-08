@@ -281,11 +281,6 @@ def readme_banner(quality: int = BANNER_QUALITY) -> str:
 COVER_W, COVER_H = 1600, 640
 # 60 leaves about 40 KB under MAX_BYTES on both covers; 65 leaves 7 KB on the graph. No banding.
 COVER_QUALITY = 60
-# The pair cover: Kolmogorov bottom left, turned to level his eyes, and Markov bottom right, with
-# each head's eye midpoint and crown in its file's pixels.
-KOLMOGOROV = BRAND / "andrey-kolmogorov.png", (416.8, 290.1), 18.7
-MARKOV = BRAND / "andrey-markov.png", (264.5, 295.5), 29.9
-KOLMOGOROV_TURN = 9.0
 # The graph cover: a n d r e y as a W of white nodes, each edge directed, with a dashed amber
 # two-headed arc from a to y.
 LETTERS = {"a": (450, 183), "n": (600, 457), "d": (730, 269), "r": (870, 269), "e": (1000, 457)}
@@ -297,25 +292,6 @@ def _png_href(image: Image.Image) -> str:
     buffer = io.BytesIO()
     image.save(buffer, "PNG")
     return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
-
-
-def _pair(width: int, height: int) -> Image.Image:
-    """Kolmogorov and Markov as navy line screens, heads matched in size and eye height."""
-    (k_path, k_eye, k_crown), (m_path, m_eye, m_crown) = KOLMOGOROV, MARKOV
-    kolmogorov = grain.Portrait(
-        Image.open(k_path), k_eye, k_crown, turn=KOLMOGOROV_TURN, floor=0.25, gamma=1.0, fade=0.12
-    )
-    markov = grain.Portrait(Image.open(m_path), m_eye, m_crown)
-    return grain.pair(width, height, kolmogorov, markov)
-
-
-def pair_cover_svg() -> str:
-    """The pair cover, with no text: the post's title sits above it on the page."""
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{COVER_W}" height="{COVER_H}">'
-        f'<image href="{_png_href(_pair(COVER_W, COVER_H))}" width="{COVER_W}" height="{COVER_H}"/>'
-        "</svg>"
-    )
 
 
 def _marker(name: str, colour: str) -> str:
@@ -369,6 +345,8 @@ def graph_cover_svg() -> str:
     )
 
 
+# The pair cover is a stored JPEG, drawn once from portraits kept outside the repository.
+PAIR_COVER = BRAND / "cover-pair.jpg"
 COVERS = {
     "pair": "portraits of Andrey Kolmogorov and Andrey Markov",
     "graph": "the letters of Andrey as a graph",
@@ -376,10 +354,13 @@ COVERS = {
 
 
 def cover_jpeg(kind: str, quality: int = COVER_QUALITY) -> bytes:
-    """A post's cover as a JPEG: ``kind`` is ``pair`` or ``graph``, the default."""
+    """A post's cover as a JPEG: ``kind`` is ``pair`` or ``graph``, the default. The pair cover is
+    stored, so ``quality`` applies to the graph cover only."""
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
-    return _jpeg(pair_cover_svg() if kind == "pair" else graph_cover_svg(), quality)
+    if kind == "pair":
+        return PAIR_COVER.read_bytes()
+    return _jpeg(graph_cover_svg(), quality)
 
 
 def cover_alt(kind: str) -> str:
