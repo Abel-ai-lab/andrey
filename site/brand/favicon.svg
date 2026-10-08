@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-115 -1570 1650 1650"><path fill="#3b5bdb" d="M13 0H297L419 -356H997L1116 0H1407L877 -1490H545ZM493 -573 565 -783C610 -920 655 -1063 711 -1251C767 -1063 811 -920 855 -783L925 -573Z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-280 -1830 2200 2200">
+<defs>
+<linearGradient id="ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b5bdb"/><stop offset="1" stop-color="#121d5e"/></linearGradient>
+<path id="a" fill="#ffffff" d="M13 0H297L419 -356H997L1116 0H1407L877 -1490H545ZM493 -573 565 -783C610 -920 655 -1063 711 -1251C767 -1063 811 -920 855 -783L925 -573Z"/>
+<filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="51 0"/></filter>
+<linearGradient id="fade" gradientUnits="userSpaceOnUse" x1="700" y1="0" x2="1748" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity="0"/><stop offset="0.35" stop-color="#ffffff"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+<mask id="trail"><rect x="700" y="-1700" width="1048" height="1900" fill="url(#fade)"/></mask>
+</defs>
+<rect x="-280" y="-1830" width="2200" height="2200" rx="460" fill="url(#ground)"/>
+<g transform="translate(200 -745) skewX(-11) translate(0 745)">
+<g mask="url(#trail)"><g filter="url(#blur)"><use href="#a" x="55" opacity="0.40"/><use href="#a" x="109" opacity="0.32"/><use href="#a" x="164" opacity="0.24"/><use href="#a" x="218" opacity="0.18"/><use href="#a" x="273" opacity="0.11"/><use href="#a" x="328" opacity="0.06"/></g></g>
+<use href="#a"/>
+</g>
+</svg>

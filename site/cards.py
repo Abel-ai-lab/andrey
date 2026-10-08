@@ -30,16 +30,20 @@ _spec.loader.exec_module(grain)
 W, H = 1200, 630
 MAX_BYTES = 300 * 1024  # WhatsApp is widely reported to skip preview images above about 300 KB
 QUALITY = 75  # about 20 KB under MAX_BYTES at 75, 11 KB at 76, 1 KB at 77. No banding at 75.
-# The title's sizes: two lines at 76 px, else three at 64 px, each line no wider than the band.
-TITLE_FITS = ((76, 2), (64, 3))
+# The title's sizes: two lines at 92 px, else three at 72 px, each line no wider than the band.
+# LinkedIn shows a card at 480 px wide, where 92 px becomes about 37.
+TITLE_FITS = ((92, 2), (72, 3))
 TITLE_WIDTH = 1040
 # The accent word (``ACCENT`` on the homepage's card and the README banner) is drawn at rest, as the
 # homepage's motion ends: amber, slanted like Inter's italic, and sharp, with the trace of its
 # letters on its right: copies of the word behind it, each further right and fainter, blurred
-# sideways and fading out in a space of their own before the next word. ROOM is that space and
-# BLUR the sideways blur, in font sizes; TRACE is the copies' opacities, nearest first.
+# sideways and fading out by TRAIL past its end, inside the space before the next word. ROOM is
+# the space added after the word, which keeps the gaps on its two sides even (the slant leans it
+# toward the previous word); TRAIL and BLUR are in font sizes too; TRACE is the copies' opacities,
+# nearest first.
 SLANT = 11
-ROOM = 0.2
+ROOM = 0.04
+TRAIL = 0.2
 BLUR = 0.06
 TRACE = (0.5, 0.4, 0.3, 0.22, 0.14, 0.08)
 
@@ -103,13 +107,13 @@ def _credit() -> str:
     """The Andrey wordmark, and under it, small, "by" and the Abel logotype."""
     wordmark = BRAND / "wordmark-light.svg"
     logo = BRAND / "abel-logo-white.svg"
-    wy = H - 132
-    by = _width("by", 17, "Regular")
-    x0 = (W - (by + 8 + _scaled_width(logo, 17))) / 2
+    wy = H - 146
+    by = _width("by", 20, "Regular")
+    x0 = (W - (by + 9 + _scaled_width(logo, 20))) / 2
     return (
-        _placed(wordmark, (W - _scaled_width(wordmark, 44)) / 2, wy, 44)
-        + f'<text x="{x0:.1f}" y="{wy + 76:.1f}" font-family="Inter" font-size="17" '
-        'fill="#ffffff" opacity="0.72">by</text>' + _placed(logo, x0 + by + 8, wy + 62, 17, 0.72)
+        _placed(wordmark, (W - _scaled_width(wordmark, 52)) / 2, wy, 52)
+        + f'<text x="{x0:.1f}" y="{wy + 88:.1f}" font-family="Inter" font-size="20" '
+        'fill="#ffffff" opacity="0.72">by</text>' + _placed(logo, x0 + by + 9, wy + 71, 20, 0.72)
     )
 
 
@@ -123,21 +127,21 @@ def _text(word: str, x: float, y: float, size: int, fill: str, extra: str = "") 
 def _accent(word: str, x: float, y: float, size: int, key: str) -> tuple[str, str]:
     """``word`` in amber at (``x``, ``y``), slanted, with its trace after it: its defs and its
     drawing."""
-    width, room = _width(word, size, "SemiBold"), size * ROOM
+    width, trail = _width(word, size, "SemiBold"), size * TRAIL
     defs = (
         _text(word, x, y, size, grain.AMBER, f' id="{key}"')
         # The trace shows at half strength across the word, at full near its end, and fades out
-        # by the end of the space after it.
+        # by the end of its reach.
         + f'<linearGradient id="{key}-fade" gradientUnits="userSpaceOnUse" x1="{x:.1f}" '
-        f'x2="{x + width + room:.1f}" y1="0" y2="0"><stop offset="0" stop-color="#ffffff" '
+        f'x2="{x + width + trail:.1f}" y1="0" y2="0"><stop offset="0" stop-color="#ffffff" '
         'stop-opacity="0.5"/><stop offset="0.65" stop-color="#ffffff"/>'
         '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>'
-        f'<mask id="{key}-trace"><rect x="{x:.1f}" y="{y - size:.1f}" width="{width + room:.1f}" '
+        f'<mask id="{key}-trace"><rect x="{x:.1f}" y="{y - size:.1f}" width="{width + trail:.1f}" '
         f'height="{size * 2}" fill="url(#{key}-fade)"/></mask>'
         f'<filter id="{key}-blur" x="-50%" y="-50%" width="200%" height="200%">'
         f'<feGaussianBlur stdDeviation="{size * BLUR:.1f} 0"/></filter>'
     )
-    step = room / len(TRACE)
+    step = trail / len(TRACE)
     copies = "".join(
         f'<use href="#{key}" x="{(k + 1) * step:.1f}" opacity="{alpha}"/>'
         for k, alpha in enumerate(TRACE)
@@ -160,7 +164,7 @@ def _title(lines: list[str], size: int, middles: list[float], centre: float, acc
         rooms = [size * ROOM if accent and word == accent else 0 for word in words]
         x = centre - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
         for i, (word, width, room) in enumerate(zip(words, widths, rooms, strict=True)):
-            if room:
+            if accent and word == accent:
                 more, drawn = _accent(word, x, y, size, f"accent-{row}-{i}")
                 defs.append(more)
                 drawing.append(drawn)
@@ -183,7 +187,7 @@ def card_svg(title: str, accent: str = "") -> str:
     # Darker bands behind the title and the wordmark keep the white type readable.
     bands = (
         grain.Band(600, middle, 520, 70 + 45 * (len(lines) - 1)),
-        grain.Band(600, 545, 200, 55),
+        grain.Band(600, 540, 220, 62),
     )
     buffer = io.BytesIO()
     grain.stipple(W, H, bands).save(buffer, "PNG")
