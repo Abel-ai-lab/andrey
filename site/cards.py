@@ -1,7 +1,7 @@
 """Link-preview cards (Open Graph, Twitter): 1200 x 630 JPEGs drawn at build time.
 
-Each card is the stipple ground (``grain.py``), the title, a one-line subtitle, the Andrey
-wordmark, and "by" with the Abel logotype under it. It shows no version: the page a card opens
+Each card is the stipple ground (``grain.py``), the title, the Andrey wordmark, and "by" with the
+Abel logotype under it. It shows no version: the page a card opens
 does. ``card_svg`` builds the image as SVG; ``card_jpeg`` renders it and compresses it under the
 size WhatsApp still previews.
 """
@@ -33,13 +33,15 @@ QUALITY = 75  # about 20 KB under MAX_BYTES at 75, 11 KB at 76, 1 KB at 77. No b
 # The title's sizes: two lines at 76 px, else three at 64 px, each line no wider than the band.
 TITLE_FITS = ((76, 2), (64, 3))
 TITLE_WIDTH = 1040
-SUBTITLE_SIZE = 34
-SUBTITLE = "{lead} than other popular packages"
-
-
-def subtitle(lead: str) -> str:
-    """The speed claim's lead (``site/build.py``'s ``speed_claim``), against other packages."""
-    return SUBTITLE.format(lead=lead)
+# The accent word (``ACCENT`` on the homepage's card and the README banner) is drawn at rest, as the
+# homepage's motion ends: amber, slanted like Inter's italic, and sharp, with the trace of its
+# letters on its right: copies of the word behind it, each further right and fainter, blurred
+# sideways and fading out in a space of their own before the next word. ROOM is that space and
+# BLUR the sideways blur, in font sizes; TRACE is the copies' opacities, nearest first.
+SLANT = 11
+ROOM = 0.2
+BLUR = 0.06
+TRACE = (0.5, 0.4, 0.3, 0.22, 0.14, 0.08)
 
 
 def _width(text: str, size: int, weight: str) -> float:
@@ -111,18 +113,76 @@ def _credit() -> str:
     )
 
 
-def card_svg(title: str, subtitle: str) -> str:
-    """The card as SVG: ``title`` on up to three lines, and ``subtitle`` under it.
+def _text(word: str, x: float, y: float, size: int, fill: str, extra: str = "") -> str:
+    return (
+        f'<text x="{x:.1f}" y="{y:.1f}" dominant-baseline="middle" font-family="Inter" '
+        f'font-weight="600" font-size="{size}" fill="{fill}"{extra}>{html.escape(word)}</text>'
+    )
+
+
+def _accent(word: str, x: float, y: float, size: int, key: str) -> tuple[str, str]:
+    """``word`` in amber at (``x``, ``y``), slanted, with its trace after it: its defs and its
+    drawing."""
+    width, room = _width(word, size, "SemiBold"), size * ROOM
+    defs = (
+        _text(word, x, y, size, grain.AMBER, f' id="{key}"')
+        # The trace shows at half strength across the word, at full near its end, and fades out
+        # by the end of the space after it.
+        + f'<linearGradient id="{key}-fade" gradientUnits="userSpaceOnUse" x1="{x:.1f}" '
+        f'x2="{x + width + room:.1f}" y1="0" y2="0"><stop offset="0" stop-color="#ffffff" '
+        'stop-opacity="0.5"/><stop offset="0.65" stop-color="#ffffff"/>'
+        '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>'
+        f'<mask id="{key}-trace"><rect x="{x:.1f}" y="{y - size:.1f}" width="{width + room:.1f}" '
+        f'height="{size * 2}" fill="url(#{key}-fade)"/></mask>'
+        f'<filter id="{key}-blur" x="-50%" y="-50%" width="200%" height="200%">'
+        f'<feGaussianBlur stdDeviation="{size * BLUR:.1f} 0"/></filter>'
+    )
+    step = room / len(TRACE)
+    copies = "".join(
+        f'<use href="#{key}" x="{(k + 1) * step:.1f}" opacity="{alpha}"/>'
+        for k, alpha in enumerate(TRACE)
+    )
+    slant = f"translate({x:.1f} {y:.1f}) skewX(-{SLANT}) translate({-x:.1f} {-y:.1f})"
+    return defs, (
+        f'<g transform="{slant}"><g mask="url(#{key}-trace)"><g filter="url(#{key}-blur)">'
+        f'{copies}</g></g><use href="#{key}"/></g>'
+    )
+
+
+def _title(lines: list[str], size: int, middles: list[float], centre: float, accent: str) -> str:
+    """``lines`` in white, each centred on ``centre`` at its middle in ``middles``; each word equal
+    to ``accent`` drawn as the accent, with its trace's space added after it."""
+    space = _width(" ", size, "SemiBold")
+    defs, drawing = [], []
+    for row, (line, y) in enumerate(zip(lines, middles, strict=True)):
+        words = line.split(" ")
+        widths = [_width(word, size, "SemiBold") for word in words]
+        rooms = [size * ROOM if accent and word == accent else 0 for word in words]
+        x = centre - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
+        for i, (word, width, room) in enumerate(zip(words, widths, rooms, strict=True)):
+            if room:
+                more, drawn = _accent(word, x, y, size, f"accent-{row}-{i}")
+                defs.append(more)
+                drawing.append(drawn)
+            else:
+                drawing.append(_text(word, x, y, size, "#ffffff"))
+            x += width + space + room
+    return f"<defs>{''.join(defs)}</defs>{''.join(drawing)}"
+
+
+def card_svg(title: str, accent: str = "") -> str:
+    """The card as SVG: ``title`` on up to three lines, each word equal to ``accent`` drawn as the
+    accent.
 
     Raises ``ValueError`` when the title does not fit, rather than dropping any of it.
     """
     size, lines = _title_lines(title)
     lead = size * 1.18
-    top = H / 2 - 40 - (len(lines) - 1) * lead / 2
-    below = top + (len(lines) - 1) * lead + size * 0.95
-    # Darker bands behind the title block and the wordmark keep the white type readable.
+    middle = H / 2 - 30
+    top = middle - (len(lines) - 1) * lead / 2
+    # Darker bands behind the title and the wordmark keep the white type readable.
     bands = (
-        grain.Band(600, (top + below) / 2 - 11, 520, 95 + 45 * (len(lines) - 1)),
+        grain.Band(600, middle, 520, 70 + 45 * (len(lines) - 1)),
         grain.Band(600, 545, 200, 55),
     )
     buffer = io.BytesIO()
@@ -131,17 +191,7 @@ def card_svg(title: str, subtitle: str) -> str:
         f'<image href="data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}" '
         f'width="{W}" height="{H}"/>'
     )
-    text = "".join(
-        f'<text x="{W // 2}" y="{top + i * lead:.0f}" text-anchor="middle" '
-        'dominant-baseline="middle" font-family="Inter" font-weight="600" '
-        f'font-size="{size}" fill="#ffffff">{html.escape(line)}</text>'
-        for i, line in enumerate(lines)
-    )
-    text += (
-        f'<text x="{W // 2}" y="{below:.0f}" text-anchor="middle" dominant-baseline="middle" '
-        f'font-family="Inter" font-size="{SUBTITLE_SIZE}" fill="{andrey.viz.LIGHT.ramp[0]}">'
-        f"{html.escape(subtitle)}</text>"
-    )
+    text = _title(lines, size, [top + i * lead for i in range(len(lines))], W / 2, accent)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}">'
         f"{ground}{text}{_credit()}</svg>"
@@ -168,9 +218,9 @@ def _jpeg(svg: str, quality: int) -> bytes:
     return out.getvalue()
 
 
-def card_jpeg(title: str, subtitle: str, quality: int = QUALITY) -> bytes:
+def card_jpeg(title: str, accent: str = "", quality: int = QUALITY) -> bytes:
     """The card as a JPEG."""
-    return _jpeg(card_svg(title, subtitle), quality)
+    return _jpeg(card_svg(title, accent), quality)
 
 
 BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at twice that
@@ -179,6 +229,7 @@ BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at
 BANNER_RADIUS = 27
 BANNER_QUALITY = 65  # its base64 inside the SVG is about 290 KB, under MAX_BYTES
 TAGLINE = "A very fast causal discovery package"
+ACCENT = "fast"  # the tagline's word drawn as the accent, on the homepage's card and the banner
 
 
 def banner_svg() -> str:
@@ -197,8 +248,7 @@ def banner_svg() -> str:
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{BANNER_W}" height="{BANNER_H}">{ground}'
         + _placed(wordmark, (BANNER_W - _scaled_width(wordmark, 104)) / 2, 118, 104)
-        + f'<text x="{BANNER_W / 2}" y="292" text-anchor="middle" font-family="Inter" '
-        f'font-weight="600" font-size="46" fill="#ffffff">{TAGLINE}</text>'
+        + _title([TAGLINE], 46, [276], BANNER_W / 2, ACCENT)
         + f'<text x="{x0:.1f}" y="370" font-family="Inter" font-size="22" fill="#ffffff" '
         'opacity="0.72">by</text>' + _placed(logo, x0 + by + 10, 352, 22, 0.72) + "</svg>"
     )

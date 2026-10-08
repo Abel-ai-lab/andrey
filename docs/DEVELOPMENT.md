@@ -73,8 +73,7 @@ ABlog builds the blog from [`blog/`](blog/index.md): the post list at `/blog/`, 
 pages, and an Atom feed at `/blog/atom.xml`. A post is a MyST page whose front matter sets
 `blogpost: true`, its `author`, and its `date`. A post without a date is a draft, which the post
 list leaves out. A dated post is published in every build, even before its date, so a future date
-does not keep a post private. An optional `card_subtitle` replaces the subtitle on the post's
-link-preview card, which is otherwise the headline speed claim.
+does not keep a post private.
 
 A post's numbers come from the summary: sentences use MyST substitutions such as `{{ slow_fit }}`,
 and figures are raw HTML blocks that `conf.py` writes to `_generated/blog/` from `site/build.py`

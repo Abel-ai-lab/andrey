@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import types
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
@@ -402,11 +403,9 @@ def test_placeholder_numbers_are_refused_wherever_the_file_sits(tmp_path, monkey
 
 def test_the_headline_is_the_slogan_and_the_claim_drops_what_it_says(placeholder_page):
     # The heading says "causal discovery", so the claim under it leaves those words out.
-    assert re.search(
-        r'<h1 id="headline">Causal discovery, fast\.</h1>\s*'
-        r'<p class="claim">Over 100x faster on PC, and faster on the other supported methods\.<',
-        placeholder_page,
-    )
+    found = re.search(r'<h1 id="headline">(.*?)</h1>\s*<p class="claim">([^<]*)<', placeholder_page)
+    assert re.sub(r"<[^>]+>", "", found[1]) == "Causal discovery, fast."
+    assert found[2] == "Over 100x faster on PC, and faster on the other supported methods."
 
 
 def test_the_page_title_is_the_one_line_description(placeholder_page):
@@ -855,15 +854,25 @@ def cards():
     return module
 
 
-def test_the_card_shows_its_title_and_subtitle_and_no_version(cards):
-    subtitle = cards.subtitle(
-        build.speed_claim(build.load_summary(PLACEHOLDER, placeholder=True))[0]
-    )
-    svg = cards.card_svg("Causal discovery, fast.", subtitle)
+def test_the_card_shows_its_title_with_the_accent_word_and_no_version(cards):
+    svg = cards.card_svg(cards.TAGLINE, cards.ACCENT)
     # A card opens the page it previews, and every page's navbar shows the version.
     assert andrey.__version__ not in svg
-    assert ">Causal discovery, fast.</text>" in svg
-    assert f">{subtitle}</text>" in svg and subtitle.startswith("Over ")
+    assert " ".join(word for word, _ in _title_words(svg)) == cards.TAGLINE
+    amber = [word for word, fill in _title_words(svg) if fill == cards.grain.AMBER]
+    assert amber == [cards.ACCENT]
+    plain = cards.card_svg(cards.TAGLINE)
+    assert {fill for _, fill in _title_words(plain)} == {"#ffffff"}
+
+
+SVG = "{http://www.w3.org/2000/svg}"
+
+
+def _title_words(svg: str) -> list[tuple[str, str]]:
+    """The title's words in reading order, each with its fill."""
+    words = [t for t in ET.fromstring(svg).iter(f"{SVG}text") if t.get("font-weight") == "600"]
+    words.sort(key=lambda t: (round(float(t.get("y"))), float(t.get("x"))))
+    return [(t.text, t.get("fill")) for t in words]
 
 
 def test_a_card_is_a_small_jpeg_the_size_platforms_crop_to(cards):
@@ -872,7 +881,7 @@ def test_a_card_is_a_small_jpeg_the_size_platforms_crop_to(cards):
     from PIL import Image
 
     pytest.importorskip("resvg_py")  # the docs group's renderer; CI's extras jobs lack it
-    data = cards.card_jpeg("Introducing Andrey", "A subtitle")
+    data = cards.card_jpeg("Introducing Andrey")
     with Image.open(io.BytesIO(data)) as image:
         assert (image.format, image.size) == ("JPEG", (1200, 630))
     assert len(data) <= cards.MAX_BYTES == 300 * 1024
@@ -880,13 +889,10 @@ def test_a_card_is_a_small_jpeg_the_size_platforms_crop_to(cards):
 
 def test_a_long_card_title_keeps_every_word_or_fails(cards):
     title = "Learning causal graphs from observational data with hidden confounders"
-    svg = cards.card_svg(title, "A subtitle")
-    sizes = "|".join(str(size) for size, _ in cards.TITLE_FITS)
-    line = rf'font-size="(?:{sizes})" fill="#ffffff">([^<]+)</text>'
-    drawn = " ".join(re.findall(line, svg))
-    assert drawn == title
+    svg = cards.card_svg(title)
+    assert " ".join(word for word, _ in _title_words(svg)) == title
     with pytest.raises(ValueError, match="needs more than 3 lines"):
-        cards.card_svg("word " * 60, "A subtitle")
+        cards.card_svg("word " * 60)
 
 
 def test_the_card_ground_is_the_same_on_every_build(cards):

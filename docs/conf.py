@@ -318,11 +318,9 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
         _write(
             GENERATED / "why-fast" / f"{scene['key']}.html", why_fast.fragment(scene["key"]) + "\n"
         )
-    # The link-preview card shared by the homepage and every page that is not a post; its subtitle
-    # is the headline speed claim, which a post can replace with a `card_subtitle` of its own.
+    # The link-preview card shared by the homepage and every page that is not a post.
     site.fastest(summary)
-    app.andrey_card_subtitle = cards.subtitle(site.speed_claim(summary)[0])
-    home_card = cards.card_jpeg(cards.TAGLINE, app.andrey_card_subtitle)
+    home_card = cards.card_jpeg(cards.TAGLINE, cards.ACCENT)
     _write_bytes(GENERATED / "extra" / HOME_PREVIEW, home_card)
     # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
     for name, tile in cards.grain.hero_tiles():
@@ -389,8 +387,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         image = f"assets/preview/{pagename.removeprefix('blog/')}.jpg"
         target = pathlib.Path(app.outdir) / image
         target.parent.mkdir(parents=True, exist_ok=True)
-        subtitle = (context.get("meta") or {}).get("card_subtitle", app.andrey_card_subtitle)
-        target.write_bytes(cards.card_jpeg(title, subtitle))
+        target.write_bytes(cards.card_jpeg(title))
     image = SITE_URL + image
     tags = {
         "description": description,
