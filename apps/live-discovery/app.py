@@ -8,7 +8,7 @@ from html import escape
 from pathlib import Path
 
 import gradio as gr
-from data import explore_preset, fingerprint, new_seed, preset, read_csv
+from data import explore_preset, fingerprint, new_seed, preset, read_csv, upload_path
 from learn import HOST_SCRIPT, drawing, dsep_html, estimate_and_truth, iframe, preset_dag
 from results import measure, results_html, status_text
 from runners import PACKAGES
@@ -78,7 +78,7 @@ def explore(pool, method, upload, seed):
         raise gr.Error("Choose a listed method.")
     try:
         if upload:
-            observations, labels = read_csv(upload)
+            observations, labels = read_csv(upload_path(upload))
             truth = None
         else:
             observations, truth, description, seed = explore_preset(method, seed)

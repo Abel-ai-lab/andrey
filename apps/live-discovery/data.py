@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import os
 import secrets
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -114,6 +116,17 @@ def explore_preset(method, seed):
 def fingerprint(data):
     """Identify the exact observations shared by all race participants."""
     return hashlib.sha256(np.ascontiguousarray(data).tobytes()).hexdigest()[:12]
+
+
+def upload_path(path):
+    """``path`` with links resolved, which must lie inside Gradio's upload folder: the demo reads an
+    uploaded file only from where Gradio saved it."""
+    folder = os.environ.get("GRADIO_TEMP_DIR") or os.path.join(tempfile.gettempdir(), "gradio")
+    root = os.path.realpath(folder)
+    real = os.path.realpath(path)
+    if not real.startswith(root + os.sep):
+        raise ValueError("Upload a .csv file with a header row.")
+    return real
 
 
 def read_csv(path):
