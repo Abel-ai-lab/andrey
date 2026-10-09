@@ -24,6 +24,10 @@ env:
   MKL_NUM_THREADS: 1
   NUMEXPR_NUM_THREADS: 1
 
+# Jobs that need more (lint's PR file list) say so themselves.
+permissions:
+  contents: read
+
 jobs:
   lint:
     if: >-
