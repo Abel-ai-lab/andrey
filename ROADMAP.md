@@ -6,10 +6,11 @@ support for agents. This roadmap lays out the planned work, in order.
 Missing a method or a feature you need? Open a
 [feature request](https://github.com/Abel-ai-lab/andrey/issues/new/choose).
 
-## 1. More methods
+## 1. Every major causal discovery method, benchmarked
 
 More causal discovery methods, including more for time series, and support for discrete and mixed
-data, so the methods take more than continuous data.
+data, so the methods take more than continuous data. Each one becomes supported once its
+benchmarks are published.
 
 ## 2. Local causal discovery
 
