@@ -26,11 +26,7 @@ def _check_panel(X_list: list[np.ndarray]) -> tuple[list[np.ndarray], int, int, 
 
     Each returned array is a single time point transposed to ``(n_features, n_samples)``.
     """
-    if len(X_list) < 2:
-        raise ValueError("X_list must contain at least two time points")
     first = np.asarray(X_list[0], dtype=np.float64)
-    if first.ndim != 2:
-        raise ValueError("each time point must be a 2-D (n_samples, n_features) array")
     n_samples, n_features = first.shape
     transposed = []
     for X in X_list:

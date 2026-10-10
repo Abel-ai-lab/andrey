@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 import andrey.viz as viz
-from andrey.core.structure import ARROW, CIRCLE, LATENT, TAIL, GraphStructure
+from andrey.core.structure import ARROW, CIRCLE, LATENT, TAIL, GraphStructure, TemporalStructure
 from andrey.viz import classify_edge
 
 
@@ -483,3 +483,20 @@ def test_a_fixed_canvas_keeps_the_layout_proportions() -> None:
         minidom.parseString(viz.draw(_chain(2), positions=row, width=300, height=300))
     )
     assert {y for _, y in centers} == {150.0}  # centered, not stretched
+
+
+@pytest.mark.parametrize(
+    ("marks", "kind", "message"),
+    [((TAIL, ARROW), "foo", "kind"), ((9, 9), "dag", "marks"), ((0, ARROW), "pag", "marks")],
+)
+def test_classify_edge_rejects_unknown_input(marks, kind, message):
+    with pytest.raises(ValueError, match=message):
+        classify_edge(*marks, kind)
+
+
+@pytest.mark.parametrize("render", [viz.draw, viz.layout])
+def test_a_temporal_structure_is_drawn_one_graph_at_a_time(render):
+    empty = GraphStructure.from_numpy(np.zeros((2, 2), int))
+    temporal = TemporalStructure.from_lag_graphs([empty, empty])
+    with pytest.raises(TypeError, match=r"lag\(k\).*summary_graph\(\)"):
+        render(temporal)

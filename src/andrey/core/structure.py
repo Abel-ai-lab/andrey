@@ -40,6 +40,7 @@ OBSERVED = 0
 LATENT = 1
 
 Kind = Literal["dag", "cpdag", "pag", "digraph"]
+KINDS: tuple[Kind, ...] = ("dag", "cpdag", "pag", "digraph")
 
 # Structured dtype for the derived edge-list view (one row per edge, ``i <= j``).
 EDGE_DTYPE = np.dtype([("i", "i4"), ("j", "i4"), ("mark_i", "i1"), ("mark_j", "i1")])
@@ -240,8 +241,9 @@ class GraphStructure(Structure):
         labels : tuple[str, ...] or None, default=None
             Node names, one per node; ``None`` numbers the nodes from 0.
         allow_self_loops : bool, default=False
-            Accept nonzero diagonal cells. A self-loop ``M[i, i] = 2`` is a variable's effect on
-            its own future, in the graph for a positive lag of a ``TemporalStructure``.
+            Accept self-loops on the diagonal. A self-loop ``M[i, i] = 2`` is a variable's effect
+            on its own future, in the graph for a positive lag of a ``TemporalStructure``; ``2`` is
+            the only self-loop mark.
         node_types : np.ndarray of shape (n,) or None, default=None
             ``0`` for an observed node and ``1`` for a latent one (``andrey.core.OBSERVED``,
             ``LATENT``); ``None`` when every node is observed.
@@ -254,16 +256,26 @@ class GraphStructure(Structure):
         Raises
         ------
         ValueError
-            If ``M`` is not square, has a nonzero diagonal without ``allow_self_loops``, holds a
-            value outside ``0..3``, has a mark in ``M[i, j]`` but not in ``M[j, i]``, ``labels``
-            does not have ``n`` entries, or ``node_types`` is not shape ``(n,)``.
+            If ``kind`` is not one of the four kinds, ``M`` is not square, has a nonzero diagonal
+            without ``allow_self_loops`` or a diagonal value other than ``0`` or ``2`` with it,
+            holds a value outside ``0..3``, has a mark in ``M[i, j]`` but not in ``M[j, i]``,
+            ``labels`` does not have ``n`` entries, or ``node_types`` is not shape ``(n,)``.
         """
+        if kind is not None and kind not in KINDS:
+            raise ValueError(f"kind must be one of {KINDS} or None, got {kind!r}")
         M = np.asarray(M)
         if M.ndim != 2 or M.shape[0] != M.shape[1]:
             raise ValueError(f"expected a square (n, n) matrix, got shape {M.shape}")
         n = M.shape[0]
         if not allow_self_loops and M.size and np.diagonal(M).any():
             raise ValueError("endpoint matrix must have a zero diagonal (no self-loops)")
+        loops = np.diagonal(M) if M.size else np.zeros(0)
+        bad = np.flatnonzero((loops != NULL) & (loops != ARROW))
+        if bad.size:
+            i = int(bad[0])
+            raise ValueError(
+                f"a self-loop is marked {ARROW} (arrowhead), got M[{i}, {i}]={M[i, i]}"
+            )
         if (M < 0).any() or (M > CIRCLE).any():
             raise ValueError(f"endpoint marks must be in 0..{CIRCLE}, got other values")
         if not np.array_equal(M != 0, M.T != 0):
@@ -988,6 +1000,12 @@ class TemporalStructure(Structure):
             raise ValueError("from_time_lag_graphs requires a non-empty (time, lag) grid")
         n = int(rows[0][0].n_nodes)
         n_lags = len(rows[0])
+        for t, row in enumerate(rows):
+            if len(row) != n_lags:
+                raise ValueError(
+                    f"time_graphs row {t} has {len(row)} graphs, but row 0 has {n_lags}; every "
+                    "row needs one graph per lag"
+                )
         if lags is None:
             lag_indices = tuple(range(n_lags))
         else:
@@ -1235,14 +1253,33 @@ class SummaryGraph(GraphStructure):
     ``kind="digraph"``: ``i -> j`` means ``X_i`` affects ``X_j`` at one or more lags, so ``i -> j``
     at one lag and ``j -> i`` at another form a 2-cycle, and a variable's effect on its own future
     is a self-loop. ``lags_of(i, j)`` and ``edge_lags`` give the lags behind each edge. Every
-    ``GraphStructure`` view applies. ``StructureOutput.save`` raises ``TypeError`` for a
-    ``SummaryGraph``; save the ``TemporalStructure`` and call ``summary_graph()`` again after
-    loading.
+    ``GraphStructure`` view applies. ``from_numpy``, ``from_edges``, and ``from_networkx`` raise
+    ``TypeError``, because a plain graph carries no lags; build a plain graph with
+    ``GraphStructure``'s. ``StructureOutput.save`` raises ``TypeError`` for a ``SummaryGraph``;
+    save the ``TemporalStructure`` and call ``summary_graph()`` again after loading.
     """
 
     # Per directed edge ``(i, j, lags)``, sorted by ``(i, j)``; ``lags`` is the sorted, unique tuple
     # of lag values at which ``i -> j`` appears (a self-loop when ``i == j``).
     _edge_lags: tuple[tuple[int, int, tuple[int, ...]], ...] = ()
+
+    @classmethod
+    def _from_csr(
+        cls,
+        n_nodes: int,
+        indptr: np.ndarray,
+        indices: np.ndarray,
+        marks: np.ndarray,
+        *,
+        kind: Kind,
+        labels: tuple[str, ...] | None = None,
+        node_types: np.ndarray | None = None,
+    ) -> GraphStructure:
+        """Refuse the ``from_*`` constructors, which all build through this one."""
+        raise TypeError(
+            "a SummaryGraph comes from TemporalStructure.summary_graph(); for a plain graph, use "
+            "GraphStructure.from_numpy, from_edges, or from_networkx"
+        )
 
     def __post_init__(self) -> None:
         # Explicit parent call: zero-arg super() breaks under @dataclass(slots=True). GraphStructure

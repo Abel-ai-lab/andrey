@@ -5,6 +5,26 @@ All notable changes to Andrey are listed here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the major version is 0, Andrey is
 in alpha, and any minor release may change the API.
 
+## [Unreleased]
+
+### Added
+
+- `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
+  search stops there.
+
+### Fixed
+
+- Every method checks its data before the fit. Data with one dimension, fewer than 2 rows, `NaN` or
+  infinity, or a constant column raises a `ValueError` that names the argument, instead of an error
+  from NumPy or scikit-learn or a graph from data no method can use.
+- A single column gives a one-node graph in every method, and `cdnod` with one domain gives the PC
+  graph.
+- Settings outside their range raise an error naming them: `n_lags`, `order`, `max_iter`, and
+  `gin`'s `alpha` and `labels`.
+- `GraphStructure.from_numpy` rejects an unknown `kind` and a self-loop not marked as an arrowhead,
+  and `andrey.viz.draw` points a `TemporalStructure` to `lag(k)` or `summary_graph()`.
+- `calm` no longer suggests a CUDA GPU, which it does not use.
+
 ## [0.1.0] - 2026-10-08
 
 First alpha release.
@@ -30,4 +50,5 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Abel-ai-lab/andrey/releases/tag/v0.1.0

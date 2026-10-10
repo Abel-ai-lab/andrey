@@ -7,6 +7,7 @@ import pytest
 
 from andrey.core import (
     ARROW,
+    EDGE_DTYPE,
     GraphStructure,
     StructureOutput,
     SummaryGraph,
@@ -178,3 +179,16 @@ def test_serialization_is_rejected_as_a_derived_projection(tmp_path):
     tp = tmp_path / "temporal.json"
     StructureOutput.new(t).save(tp)
     assert StructureOutput.load(tp).structure.summary_graph() == t.summary_graph()
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: SummaryGraph.from_numpy(np.array([[0, TAIL], [ARROW, 0]]), kind="digraph"),
+        lambda: SummaryGraph.from_edges(np.zeros(0, dtype=EDGE_DTYPE), n_nodes=2),
+        lambda: SummaryGraph.from_networkx(pytest.importorskip("networkx").DiGraph([(0, 1)])),
+    ],
+)
+def test_a_summary_graph_comes_only_from_a_temporal_structure(build):
+    with pytest.raises(TypeError, match=r"summary_graph\(\)"):
+        build()

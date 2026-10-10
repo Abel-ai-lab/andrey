@@ -136,8 +136,6 @@ def ges(
     if score_func != "local_score_BIC":
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use 'local_score_BIC'")
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
     n = X.shape[1]
     max_parents = n / 2 if maxP is None else maxP
     score = BICScore(X, lambda_value=lambda_value)

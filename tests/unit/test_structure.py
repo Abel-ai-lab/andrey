@@ -632,3 +632,25 @@ def test_self_loop_round_trips_through_inverses():
     g = GraphStructure.from_numpy(M, kind="dag", allow_self_loops=True)
     assert np.array_equal(GraphStructure.from_edges(g.to_edges(), n_nodes=3).to_numpy(), M)
     assert np.array_equal(GraphStructure.from_networkx(g.to_networkx()).to_numpy(), M)
+
+
+def test_from_numpy_rejects_an_unknown_kind():
+    with pytest.raises(ValueError, match="kind must be one of"):
+        GraphStructure.from_numpy(np.array([[0, TAIL], [ARROW, 0]]), kind="foo")
+
+
+@pytest.mark.parametrize("mark", [TAIL, CIRCLE])
+def test_a_self_loop_is_marked_with_an_arrowhead(mark):
+    with pytest.raises(ValueError, match="self-loop is marked 2"):
+        GraphStructure.from_numpy(np.diag([mark, 0]), kind="digraph", allow_self_loops=True)
+
+
+def test_a_self_loop_reads_the_same_in_the_lag_graph_and_the_summary():
+    empty = GraphStructure.from_numpy(np.zeros((2, 2), int))
+    loop = GraphStructure.from_numpy(np.diag([ARROW, 0]), kind="digraph", allow_self_loops=True)
+    summary = TemporalStructure.from_lag_graphs([empty, loop]).summary_graph()
+    assert (
+        loop.oriented_edges(index=True)
+        == summary.oriented_edges(index=True)
+        == [(0, 0, "directed")]
+    )

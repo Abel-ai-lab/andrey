@@ -186,7 +186,7 @@ def test_from_time_lag_graphs_defaults_and_validation():
         TemporalStructure.from_time_lag_graphs(grid, times=[3, 1, 2])
     with pytest.raises(ValueError, match="shape"):
         TemporalStructure.from_time_lag_graphs(grid, time_weights=np.zeros((3, 2, 3, 3)))
-    with pytest.raises(ValueError, match="lag graphs|row width"):  # a ragged row
+    with pytest.raises(ValueError, match="time_graphs row 1 has 1 graphs, but row 0 has 2"):
         TemporalStructure.from_time_lag_graphs([grid[0], grid[1][:1], grid[2]])
 
 

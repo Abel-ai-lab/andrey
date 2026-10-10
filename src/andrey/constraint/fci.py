@@ -42,10 +42,6 @@ def fci(
     Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
-    if not 0 < alpha < 1:
-        raise ValueError(f"alpha must lie in the open interval (0, 1), got {alpha}")
 
     _validate_collider_rule(collider_rule)
     test = make_indep_test(indep_test, X)

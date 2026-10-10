@@ -19,6 +19,7 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
+from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
 # ``_EPS_IMPROVE`` (the strict-improvement floor) and ``_KEY_DP`` (the tie-break quantization
@@ -226,7 +227,8 @@ def hc(
     max_iter : int
         Maximum number of accepted edge moves (default 200). The cap bounds
         the ascent so a large, dense problem does not overfit the recovered graph with spurious
-        edges; small or sparse problems reach the local optimum first and never hit it.
+        edges; small or sparse problems reach the local optimum first and never hit it. Taking
+        ``max_iter`` moves warns with ``SearchLimitWarning``.
 
     Returns
     -------
@@ -238,8 +240,6 @@ def hc(
             f"unsupported score_func {score_func!r}; use 'local_score_BIC_from_cov'"
         )
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
     d = X.shape[1]
 
     score = BICScore(X, lambda_value=lambda_value)
@@ -256,13 +256,21 @@ def hc(
         if workers > 1 and d > 1:
             from andrey.search import _parallel_hc  # local import breaks the import cycle
 
-            _parallel_hc.run_hc(adj_int, parents_of, delta, d, max_iter, workers=workers)
+            moves = _parallel_hc.run_hc(adj_int, parents_of, delta, d, max_iter, workers=workers)
         else:
+            moves = 0
             for _ in range(max_iter):
                 move, _ = _best_move(adj_int, parents_of, delta, d, delta_cache)
                 if move is None:
                     break
                 _apply_move(adj_int, parents_of, move)
+                moves += 1
+    if moves == max_iter:
+        warn_once(
+            f"hc stopped at its limit of max_iter={max_iter} moves; a longer search may find a "
+            "better graph, so raise max_iter",
+            SearchLimitWarning,
+        )
 
     # Emit the discovered DAG as an unsigned endpoint-mark matrix (u -> v: TAIL at u, ARROW at v),
     # then reduce it to the CPDAG of its equivalence class.

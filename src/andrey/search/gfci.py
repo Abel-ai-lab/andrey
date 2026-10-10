@@ -40,10 +40,6 @@ def gfci(
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation."""
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
-    if not 0 < alpha < 1:
-        raise ValueError(f"alpha must lie in the open interval (0, 1), got {alpha}")
 
     _validate_collider_rule(collider_rule)
     cpdag_structure, _score = ges(X, score_func=score_func, lambda_value=lambda_value)

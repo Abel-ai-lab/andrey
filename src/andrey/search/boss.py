@@ -240,8 +240,6 @@ def boss(
     See :func:`andrey.boss` for the score tolerance.
     """
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
     p = X.shape[1]
     if p == 0:
         return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0

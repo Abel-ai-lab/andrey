@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ._adapt import column_labels
+from ._adapt import column_labels, data_matrix, open_unit_interval
 from ._experimental import warn_experimental
 from ._irregular import _adapt_pnl
 
@@ -45,8 +45,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``data`` is not a numeric ``(n_samples, 2)`` matrix, if ``alpha`` is not in
-        ``(0, 1)``, or if a DataFrame's column names repeat.
+        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
 
     Warns
     -----
@@ -105,11 +104,13 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     warn_experimental("pnl")
     from andrey.irregular.pnl import pnl as _native
 
-    X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2 or X.shape[1] != 2:
-        raise ValueError(f"pnl expects an (n_samples, 2) table of two variables, got {X.shape}")
-    if alpha is not None and not 0 < alpha < 1:
-        raise ValueError(f"alpha must be in (0, 1) or None, got {alpha}")
+    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
+        raise ValueError(
+            f"pnl expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
+        )
+    X = data_matrix(data)
+    if alpha is not None:
+        alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     pval_forward, pval_backward = _native(X[:, 0], X[:, 1])
     return _adapt_pnl(pval_forward, pval_backward, alpha=alpha, labels=labels)

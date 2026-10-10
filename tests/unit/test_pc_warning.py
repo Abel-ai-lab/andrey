@@ -33,7 +33,7 @@ def oracle(monkeypatch):
 
 
 def test_warning_preserves_queries_and_output_and_occurs_once_per_process(monkeypatch, oracle):
-    data = np.zeros((20, 6))
+    data = np.random.default_rng(0).standard_normal((20, 6))
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         baseline = andrey.pc(data, indep_test="warning-test")
@@ -63,7 +63,7 @@ def test_threshold_counts_shared_subsets_once(monkeypatch, oracle, threshold, ex
     monkeypatch.setattr(pc_module, "_EXPENSIVE_PASS_TESTS", threshold)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        andrey.pc(np.zeros((20, 6)), indep_test="warning-test")
+        andrey.pc(np.random.default_rng(0).standard_normal((20, 6)), indep_test="warning-test")
     assert len(caught) == expected
     assert sum(len(cond) == 2 for _, _, cond in oracle.queries) == 90
 
@@ -73,7 +73,9 @@ def test_many_variables_pruned_early_do_not_warn(monkeypatch, oracle):
     oracle.pvalue = 1.0
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        result = andrey.pc(np.zeros((20, 200)), indep_test="warning-test")
+        result = andrey.pc(
+            np.random.default_rng(0).standard_normal((20, 200)), indep_test="warning-test"
+        )
     assert not caught
     assert not np.any(result.structure.to_numpy())
 
@@ -81,7 +83,7 @@ def test_many_variables_pruned_early_do_not_warn(monkeypatch, oracle):
 @pytest.mark.parametrize("method", ["fci", "cdnod"])
 def test_warning_is_specific_to_pc(monkeypatch, oracle, method):
     monkeypatch.setattr(pc_module, "_EXPENSIVE_PASS_TESTS", 1)
-    data = np.zeros((20, 6))
+    data = np.random.default_rng(0).standard_normal((20, 6))
     kwargs = {"c_indx": np.arange(20)} if method == "cdnod" else {}
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")

@@ -11,9 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
-
-from andrey.api._adapt import column_labels, json_safe, structure_output
+from andrey.api._adapt import column_labels, data_matrix, json_safe, structure_output
 from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
@@ -64,8 +62,7 @@ def boss(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``.
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, if ``lambda_value``
-        is negative or non-finite, or if a DataFrame's column names repeat.
+        If ``lambda_value`` is negative or non-finite.
 
     See Also
     --------
@@ -125,7 +122,7 @@ def boss(
 
     if score_func != "local_score_BIC_from_cov":
         raise NotImplementedError(f"BOSS supports 'local_score_BIC_from_cov', not {score_func!r}")
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
     labels = column_labels(data)
     cpdag, score = _boss(X, lambda_value=lambda_value, random_state=resolve_seed(seed))
     metadata = {"algorithm": "BOSS", "score": json_safe(score)}
@@ -178,8 +175,7 @@ def grasp(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``, or ``depth`` is not ``3``.
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, if ``lambda_value``
-        is negative or non-finite, or if a DataFrame's column names repeat.
+        If ``lambda_value`` is negative or non-finite.
 
     See Also
     --------
@@ -245,7 +241,7 @@ def grasp(
         raise NotImplementedError(f"GRaSP supports 'local_score_BIC_from_cov', not {score_func!r}")
     if depth != 3:
         raise NotImplementedError(f"GRaSP supports depth=3, not {depth!r}")
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
     labels = column_labels(data)
     cpdag, score = _grasp(X, lambda_value=lambda_value, random_state=resolve_seed(seed))
     metadata = {"algorithm": "GRaSP", "score": json_safe(score)}

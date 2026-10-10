@@ -21,28 +21,16 @@ import numpy as np
 from andrey.core import ARROW, TAIL, GraphStructure, StructureOutput
 from andrey.core.ci import FisherZ
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.warning_policy import PerformanceWarning, warn_once
 
 
 def _require_torch():
-    """Import torch or raise a clear error naming the optional extra (torch is not a core dep).
-
-    Warns when torch has no CUDA device: the continuous optimizer then runs on CPU, which is correct
-    but can be slow on larger graphs.
-    """
+    """Import torch or raise a clear error naming the optional extra (torch is not a core dep)."""
     try:
         import torch
     except ImportError as exc:  # pragma: no cover - exercised only without the extra
         raise ImportError(
-            "andrey CALM's continuous optimiser is built on torch (it runs on CPU or GPU); "
-            "install the '[torch]' extra"
+            "andrey CALM's continuous optimiser is built on torch; install the '[torch]' extra"
         ) from exc
-    if not torch.cuda.is_available():
-        warn_once(
-            "CALM's torch optimiser is running on CPU; this is correct but can be slow on larger "
-            "graphs, where a CUDA GPU is much faster.",
-            PerformanceWarning,
-        )
     return torch
 
 

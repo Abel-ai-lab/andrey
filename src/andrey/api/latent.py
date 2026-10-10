@@ -11,9 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
-
-from andrey.api._adapt import column_labels
+from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
 from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
@@ -37,9 +35,9 @@ def gin(
     data : array-like of shape (n_samples, n_variables)
         Observed indicator data, one row per sample. Coerced to ``float64``.
     alpha : float, default=0.05
-        Significance level of the pooled independence test that finds the clusters: a group of
-        variables forms a cluster when the test's p-value is at least ``alpha``, so larger values
-        give fewer clusters.
+        Significance level of the pooled independence test that finds the clusters, in
+        ``(0, 1)``: a group of variables forms a cluster when the test's p-value is at least
+        ``alpha``, so larger values give fewer clusters.
     labels : tuple of str or None, default=None
         Optional names for the observed variables, one per column. Defaults to a DataFrame's
         column names, else ``X1..Xn``. Latents are auto-named ``L1..Lm``.
@@ -60,10 +58,8 @@ def gin(
     Raises
     ------
     ValueError
-        If ``labels`` does not give one name per column of ``data``, or if a DataFrame's column
-        names repeat.
-    numpy.linalg.LinAlgError
-        If ``data`` holds ``NaN`` / ``inf``.
+        If ``alpha`` is not in ``(0, 1)``, or if ``labels`` does not give one name per column of
+        ``data``.
 
     Warns
     -----
@@ -95,5 +91,11 @@ def gin(
     warn_experimental("gin")
     from andrey.latent.gin import gin_structure
 
+    X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
+    if labels is not None and len(labels) != X.shape[1]:
+        raise ValueError(
+            f"labels must name each of the {X.shape[1]} columns of data, got {len(labels)} names"
+        )
     names = labels if labels is not None else column_labels(data)
-    return gin_structure(np.asarray(data, dtype=np.float64), alpha=alpha, labels=names)
+    return gin_structure(X, alpha=alpha, labels=names)

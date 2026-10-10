@@ -17,6 +17,65 @@ if TYPE_CHECKING:
     from andrey.core.output import JSONValue
 
 
+def data_matrix(data: npt.ArrayLike, *, name: str = "data") -> np.ndarray:
+    """Return ``data`` as a float64 ``(n_samples, n_features)`` matrix, checked before a fit.
+
+    Raises ``ValueError``, naming ``name``, when the values are not numeric, the array is not 2-D,
+    it has fewer than 2 rows, it holds ``NaN`` or ``inf``, or a column is constant: no method can
+    estimate a variance or a dependence from such data.
+    """
+    try:
+        X = np.asarray(data, dtype=np.float64)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{name} must hold numbers: {error}") from error
+    if X.ndim != 2:
+        hint = "; for one variable, reshape it with .reshape(-1, 1)" if X.ndim == 1 else ""
+        raise ValueError(
+            f"{name} must be a 2-D (n_samples, n_features) matrix, got shape {X.shape}{hint}"
+        )
+    if X.shape[0] < 2:
+        raise ValueError(f"{name} needs at least 2 rows (samples), got {X.shape[0]}")
+    bad = np.argwhere(~np.isfinite(X))
+    if bad.size:
+        row, col = (int(k) for k in bad[0])
+        cells = "1 cell" if len(bad) == 1 else f"{len(bad)} cells, the first"
+        raise ValueError(
+            f"{name} holds NaN or inf in {cells} at row {row}, column {col}; drop or impute "
+            "them before the fit"
+        )
+    constant = np.flatnonzero(np.ptp(X, axis=0) == 0)
+    if constant.size:
+        j = int(constant[0])
+        names = getattr(data, "columns", None)
+        column = repr(str(list(names)[j])) if names is not None else str(j)
+        raise ValueError(f"{name} column {column} is constant; drop it before the fit")
+    return X
+
+
+def int_in_range(value: object, name: str, low: int, high: int | None = None) -> int:
+    """Return ``value`` as an ``int`` from ``low`` to ``high`` inclusive; ``high=None`` has no top.
+
+    Raises ``TypeError`` for a non-integer (``bool`` included) and ``ValueError`` outside the range,
+    each naming ``name``.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, np.integer)):
+        raise TypeError(f"{name} must be an int, got {type(value).__name__}")
+    if value < low or (high is not None and value > high):
+        accepted = f"at least {low}" if high is None else f"from {low} to {high}"
+        raise ValueError(f"{name} must be an int {accepted}, got {value}")
+    return int(value)
+
+
+def open_unit_interval(value: float, name: str) -> float:
+    """Return ``value`` as a ``float`` in the open interval ``(0, 1)``.
+
+    Raises ``ValueError``, naming ``name``, outside it.
+    """
+    if not 0 < value < 1:
+        raise ValueError(f"{name} must lie in the open interval (0, 1), got {value}")
+    return float(value)
+
+
 def dag_from_adjacency(adjacency: npt.ArrayLike) -> GraphStructure:
     """Build a ``dag`` structure from an adjacency where any ``A[i, j]`` != 0 is edge ``i -> j``.
 

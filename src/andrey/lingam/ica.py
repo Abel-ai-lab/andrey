@@ -69,6 +69,8 @@ def ica_lingam(
     """
     X = np.asarray(X, dtype=np.float64)
     seed = resolve_seed(random_state)
+    if X.shape[1] == 1:
+        return [0], np.zeros((1, 1))  # one variable: nothing to order, no edge to weigh
 
     ica = FastICA(max_iter=max_iter, random_state=seed)
     ica.fit(X)

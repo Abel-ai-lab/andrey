@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.api._adapt import column_labels, structure_output
+from andrey.api._adapt import column_labels, data_matrix, open_unit_interval, structure_output
 from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
@@ -49,9 +49,8 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     NotImplementedError
         If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``data`` is not a 2-D numeric matrix, holds ``NaN`` / ``inf``, has too few samples for
-        a test, or has a singular correlation matrix; if ``alpha`` is not in ``(0, 1)``; or if a
-        DataFrame's column names repeat.
+        If ``data`` has too few samples for a test or a singular correlation matrix, or if
+        ``alpha`` is not in ``(0, 1)``.
 
     Warns
     -----
@@ -116,7 +115,8 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     """
     from andrey.constraint.pc import pc as _pc
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     return structure_output(
         _pc(X, alpha=alpha, indep_test=indep_test), labels=labels, metadata={"algorithm": "PC"}
@@ -166,9 +166,8 @@ def fci(
     NotImplementedError
         If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``data`` is not a 2-D numeric matrix, holds ``NaN`` / ``inf``, has too few samples for
-        a test, or has a singular correlation matrix; if ``alpha`` is not in ``(0, 1)``; if
-        ``collider_rule`` is not a supported choice; or if a DataFrame's column names repeat.
+        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
+        is not in ``(0, 1)``, or if ``collider_rule`` is not a supported choice.
 
     See Also
     --------
@@ -231,7 +230,8 @@ def fci(
     """
     from andrey.constraint.fci import fci as _fci
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     return structure_output(
         _fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule),
@@ -291,9 +291,8 @@ def gfci(
         If ``score_func`` is not ``"local_score_BIC"``, or ``indep_test`` names no available
         test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, if ``alpha`` is not
-        in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if ``collider_rule`` is not
-        a supported choice, or if a DataFrame's column names repeat.
+        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, or if
+        ``collider_rule`` is not a supported choice.
 
     Warns
     -----
@@ -338,7 +337,8 @@ def gfci(
     warn_experimental("gfci")
     from andrey.search.gfci import gfci as _gfci
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     pag = _gfci(
         X,
@@ -373,7 +373,8 @@ def cdnod(
     c_indx : array-like of shape (n_samples,) or (n_samples, 1)
         Domain or context index of each row of ``data``, such as ``0`` and ``1`` for two domains, or
         the time step for data that drift over time. Coerced to ``float64``. See Notes for more
-        than two domains.
+        than two domains. When every row has the same value, the data come from one domain, and
+        the result equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     indep_test : {"fisherz"}, default="fisherz"
@@ -391,9 +392,8 @@ def cdnod(
     NotImplementedError
         If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``data`` is not a 2-D numeric matrix, if ``c_indx`` does not hold one value per row of
-        ``data``, if either holds ``NaN`` / ``inf``, if ``data`` has too few rows for a test, if
-        ``alpha`` is not in ``(0, 1)``, or if a DataFrame's column names repeat.
+        If ``c_indx`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
+        ``data`` has too few rows for a test, or if ``alpha`` is not in ``(0, 1)``.
 
     Warns
     -----
@@ -432,7 +432,8 @@ def cdnod(
     warn_experimental("cdnod")
     from andrey.constraint.cdnod import cdnod as _cdnod
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     c = np.asarray(c_indx, dtype=np.float64)
     cpdag = _cdnod(X, c, alpha=alpha, indep_test=indep_test)

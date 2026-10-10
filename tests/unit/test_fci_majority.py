@@ -83,7 +83,9 @@ def test_majority_has_no_conditioning_size_cap():
 @pytest.mark.parametrize("engine", ["fci", "gfci"])
 def test_public_collider_rule_validation(engine):
     with pytest.raises(ValueError, match="collider_rule"):
-        getattr(andrey, engine)(np.ones((8, 2)), collider_rule="conservative")
+        getattr(andrey, engine)(
+            np.random.default_rng(0).standard_normal((8, 2)), collider_rule="conservative"
+        )
 
 
 @pytest.mark.parametrize("engine", ["fci", "gfci"])
