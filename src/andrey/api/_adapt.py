@@ -109,8 +109,7 @@ def json_safe(value: object) -> JSONValue:
     if isinstance(value, (float, np.floating)):
         return float(value)
     if isinstance(value, np.ndarray):
-        # ndarray.tolist() overloads need a static dtype; correct at runtime for any array.
-        return [json_safe(v) for v in value.tolist()]  # ty: ignore[no-matching-overload]
+        return [json_safe(v) for v in value.tolist()]
     if isinstance(value, Mapping):
         return {str(k): json_safe(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
