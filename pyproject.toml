@@ -49,8 +49,8 @@ Changelog = "https://andrey.abel.ai/docs/changelog.html"
 dev = ["ruff", "ty", "pytest", "accessible-pygments"]
 # Notebooks install their own packages.
 demo = [
-    "andrey-core[numba,torch,viz]", "gradio==6.27.0", "causal-learn==0.1.4.8",
-    "gcastle==1.0.4", "lingam==1.12.2", "huggingface-hub>=1", "playwright",
+    "andrey-core[numba,torch,viz]", "gradio==6.29.1", "causal-learn==0.1.4.8",
+    "gcastle==1.0.4", "lingam==1.13.0", "huggingface-hub>=1", "playwright",
 ]
 docs = [
     "sphinx>=7",
