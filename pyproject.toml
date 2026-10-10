@@ -47,11 +47,7 @@ Changelog = "https://andrey.abel.ai/docs/changelog.html"
 [dependency-groups]                # not published
 # accessible-pygments: site code colors.
 dev = ["ruff", "ty", "pytest", "accessible-pygments"]
-# Notebooks install their own packages.
-demo = [
-    "andrey-core[numba,torch,viz]", "gradio==6.27.0", "causal-learn==0.1.4.8",
-    "gcastle==1.0.4", "lingam==1.12.2", "huggingface-hub>=1", "playwright",
-]
+# Notebooks and the demo apps install their own packages.
 docs = [
     "sphinx>=7",
     "pydata-sphinx-theme",
