@@ -62,9 +62,7 @@ def boss(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, if ``lambda_value`` is negative or non-finite, or if a DataFrame's column
-        names repeat.
+        If ``lambda_value`` is negative or non-finite.
 
     See Also
     --------
@@ -177,9 +175,7 @@ def grasp(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``, or ``depth`` is not ``3``.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, if ``lambda_value`` is negative or non-finite, or if a DataFrame's column
-        names repeat.
+        If ``lambda_value`` is negative or non-finite.
 
     See Also
     --------

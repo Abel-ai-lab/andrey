@@ -58,9 +58,8 @@ def gin(
     Raises
     ------
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf``
-        or a constant column, if ``alpha`` is not in ``(0, 1)``, if ``labels`` does not give one
-        name per column of ``data``, or if a DataFrame's column names repeat.
+        If ``alpha`` is not in ``(0, 1)``, or if ``labels`` does not give one name per column of
+        ``data``.
 
     Warns
     -----

@@ -56,9 +56,7 @@ def ges(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC"``.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, if ``lambda_value`` is negative or non-finite, or if a DataFrame's column
-        names repeat.
+        If ``lambda_value`` is negative or non-finite.
 
     See Also
     --------
@@ -143,9 +141,7 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, if ``lambda_value`` is negative or non-finite, or if a DataFrame's column
-        names repeat.
+        If ``lambda_value`` is negative or non-finite.
 
     Warns
     -----
@@ -220,9 +216,7 @@ def hc(
     TypeError
         If ``max_iter`` is not an int.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, if ``lambda_value`` is negative or non-finite, if ``max_iter`` is less
-        than ``1``, or if a DataFrame's column names repeat.
+        If ``lambda_value`` is negative or non-finite, or if ``max_iter`` is less than ``1``.
 
     Warns
     -----
@@ -290,9 +284,7 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     Raises
     ------
     ValueError
-        If ``search_method`` is not ``"astar"`` or ``"dp"``, if ``data`` is not a 2-D numeric matrix
-        with at least 2 rows, or holds ``NaN`` / ``inf`` or a constant column, or if a DataFrame's
-        column names repeat.
+        If ``search_method`` is not ``"astar"`` or ``"dp"``.
 
     Warns
     -----
@@ -379,9 +371,6 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         If the ``[torch]`` extra is not installed.
     TypeError
         If ``params`` holds a name the solver does not accept.
-    ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, or if a DataFrame's column names repeat.
 
     Warns
     -----

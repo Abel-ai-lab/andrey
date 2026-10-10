@@ -74,9 +74,7 @@ def varma_lingam(
         If ``order`` is not a pair of ints.
     ValueError
         If ``criterion`` is not one of ``"aic"``, ``"bic"``, ``"hqic"``, or ``None``, if ``order``
-        holds a negative count or is ``(0, 0)``, if ``data`` is not a 2-D numeric matrix with at
-        least 2 rows and 2 columns or holds ``NaN`` / ``inf`` or a constant column, or if a
-        DataFrame's column names repeat.
+        holds a negative count or is ``(0, 0)``, or if ``data`` has fewer than 2 columns.
 
     Warns
     -----
@@ -165,9 +163,7 @@ def longitudinal_lingam(
         If ``n_lags`` is not an int.
     ValueError
         If ``data_list`` has fewer than two time points, if ``n_lags`` is outside its range, if
-        the per-time arrays are not all 2-D numeric matrices of the same shape with at least 2
-        rows, if one holds ``NaN`` / ``inf`` or a constant column, or if the DataFrames' column
-        names differ or repeat.
+        the per-time arrays differ in shape, or if the DataFrames' column names differ.
 
     Warns
     -----

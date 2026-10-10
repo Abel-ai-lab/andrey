@@ -82,9 +82,6 @@ def direct_lingam(
     ------
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
-    ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, or if a DataFrame's column names repeat.
 
     See Also
     --------
@@ -178,9 +175,8 @@ def ica_lingam(
     TypeError
         If ``max_iter`` is not an int.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, if ``max_iter`` is less than ``1``, if ``random_state`` is outside ``0``
-        to ``2**32 - 1``, or if a DataFrame's column names repeat.
+        If ``max_iter`` is less than ``1``, or if ``random_state`` is outside ``0`` to
+        ``2**32 - 1``.
 
     Warns
     -----
@@ -267,9 +263,8 @@ def multi_group_direct_lingam(
     Raises
     ------
     ValueError
-        If fewer than two groups are given, if the groups disagree on the variable count or on their
-        column names, if any matrix is not 2-D numeric with at least 2 rows, or holds ``NaN`` /
-        ``inf`` or a constant column, or if a DataFrame's column names repeat.
+        If fewer than two groups are given, or if the groups disagree on the variable count or on
+        their column names.
 
     Warns
     -----

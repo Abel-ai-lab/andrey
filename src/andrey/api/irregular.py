@@ -45,9 +45,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``data`` is not a numeric ``(n_samples, 2)`` matrix with at least 2 rows, holds
-        ``NaN`` / ``inf`` or a constant column, if ``alpha`` is not in ``(0, 1)``, or if a
-        DataFrame's column names repeat.
+        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
 
     Warns
     -----

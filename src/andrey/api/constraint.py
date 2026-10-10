@@ -49,9 +49,8 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     NotImplementedError
         If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``data`` is not a 2-D numeric matrix, holds ``NaN`` / ``inf`` or a constant column, has
-        too few samples for a test, or has a singular correlation matrix; if ``alpha`` is not in
-        ``(0, 1)``; or if a DataFrame's column names repeat.
+        If ``data`` has too few samples for a test or a singular correlation matrix, or if
+        ``alpha`` is not in ``(0, 1)``.
 
     Warns
     -----
@@ -166,10 +165,8 @@ def fci(
     NotImplementedError
         If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``data`` is not a 2-D numeric matrix, holds ``NaN`` / ``inf`` or a constant column, has
-        too few samples for a test, or has a singular correlation matrix; if ``alpha`` is not in
-        ``(0, 1)``; if ``collider_rule`` is not a supported choice; or if a DataFrame's column names
-        repeat.
+        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
+        is not in ``(0, 1)``, or if ``collider_rule`` is not a supported choice.
 
     See Also
     --------
@@ -292,10 +289,8 @@ def gfci(
         If ``score_func`` is not ``"local_score_BIC"``, or ``indep_test`` names no available
         test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
-        a constant column, if ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or
-        non-finite, if ``collider_rule`` is not a supported choice, or if a DataFrame's column names
-        repeat.
+        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, or if
+        ``collider_rule`` is not a supported choice.
 
     Warns
     -----
@@ -394,10 +389,8 @@ def cdnod(
     NotImplementedError
         If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``data`` is not a 2-D numeric matrix, if ``c_indx`` does not hold one value per row of
-        ``data``, if either holds ``NaN`` / ``inf``, if ``data`` has a constant column, if ``data``
-        has too few rows for a test, if ``alpha`` is not in ``(0, 1)``, or if a DataFrame's column
-        names repeat.
+        If ``c_indx`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
+        ``data`` has too few rows for a test, or if ``alpha`` is not in ``(0, 1)``.
 
     Warns
     -----
