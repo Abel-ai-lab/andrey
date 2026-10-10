@@ -23,7 +23,15 @@ from collections.abc import Iterable, Mapping
 
 import numpy as np
 
-from andrey.core.structure import ARROW, CIRCLE, LATENT, TAIL, GraphStructure
+from andrey.core.structure import (
+    ARROW,
+    CIRCLE,
+    KINDS,
+    LATENT,
+    TAIL,
+    GraphStructure,
+    TemporalStructure,
+)
 
 from . import _graphviz, _layout, _svg
 from ._graphviz import to_graphviz
@@ -103,6 +111,12 @@ def classify_edge(mark_i: int, mark_j: int, kind: str) -> str:
         ``digraph``), ``"twocycle"`` (``<->`` in a ``digraph``: two directed edges), or
         ``"partial"`` (an edge with a circle end: ``o->``, ``-o``, or ``o-o``).
 
+    Raises
+    ------
+    ValueError
+        If a mark is not ``TAIL``, ``ARROW``, or ``CIRCLE``, or ``kind`` is not one of the four
+        kinds.
+
     Notes
     -----
     ``ARROW``/``ARROW`` is kind-relative: a ``bidirected`` edge (latent confounder) under a PAG, a
@@ -118,16 +132,33 @@ def classify_edge(mark_i: int, mark_j: int, kind: str) -> str:
     >>> classify_edge(ARROW, ARROW, "pag"), classify_edge(ARROW, ARROW, "digraph")
     ('bidirected', 'twocycle')
     """
+    if kind not in KINDS:
+        raise ValueError(f"kind must be one of {KINDS}, got {kind!r}")
     marks = {int(mark_i), int(mark_j)}
+    if not marks <= {TAIL, ARROW, CIRCLE}:
+        raise ValueError(
+            f"marks must be TAIL ({TAIL}), ARROW ({ARROW}), or CIRCLE ({CIRCLE}), "
+            f"got ({mark_i}, {mark_j})"
+        )
     if marks == {TAIL, ARROW}:
         return "directed"
     if int(mark_i) == TAIL and int(mark_j) == TAIL:
         return "undirected"
     if int(mark_i) == ARROW and int(mark_j) == ARROW:
         return "twocycle" if kind == "digraph" else "bidirected"
-    if CIRCLE in marks:
-        return "partial"
-    return "directed"
+    return "partial"
+
+
+def _require_graph(structure: object) -> None:
+    """Raise ``TypeError`` unless ``structure`` is one graph; a temporal result names its views."""
+    if isinstance(structure, GraphStructure):
+        return
+    if isinstance(structure, TemporalStructure):
+        raise TypeError(
+            "a TemporalStructure holds one graph per lag; draw one of them with "
+            "structure.lag(k), or all lags merged with structure.summary_graph()"
+        )
+    raise TypeError(f"expected a GraphStructure, got {type(structure).__name__}")
 
 
 def _endpoints(structure: GraphStructure) -> list[tuple[int, int, int, int, str]]:
@@ -186,6 +217,8 @@ def layout(
 
     Raises
     ------
+    TypeError
+        If ``structure`` is not a ``GraphStructure``, such as a ``TemporalStructure``.
     ValueError
         If ``engine`` is not one of the above, or the built-in layout is given ``options``.
     ImportError
@@ -200,6 +233,7 @@ def layout(
     >>> andrey.viz.layout(GraphStructure.from_numpy(M, kind="dag"), engine="builtin")
     {0: (0.0, 0.5), 1: (1.0, 0.5)}
     """
+    _require_graph(structure)
     if engine not in ENGINES:
         raise ValueError(f"engine must be one of {', '.join(ENGINES)}, not {engine!r}.")
     if engine == "auto":
@@ -271,6 +305,8 @@ def draw(
 
     Raises
     ------
+    TypeError
+        If ``structure`` is not a ``GraphStructure``, such as a ``TemporalStructure``.
     ValueError
         If ``positions`` misses a node or places one outside the unit square, ``engine`` is
         unknown, or ``highlight`` names a pair ``(i, j)`` with ``i == j`` or no edge between
@@ -291,6 +327,7 @@ def draw(
     >>> svg.startswith("<svg")
     True
     """
+    _require_graph(structure)
     n = int(structure.n_nodes)
     labels = list(structure.labels) if structure.labels is not None else [str(i) for i in range(n)]
     node_types = structure.node_types

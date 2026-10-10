@@ -42,11 +42,19 @@ def cdnod(
             f"c_indx must hold one value per row of data, as shape ({X.shape[0]},) or "
             f"({X.shape[0]}, 1); got shape {context.shape}"
         )
+    if not np.isfinite(context).all():
+        raise ValueError("c_indx contains NaN or inf")
     context = context.reshape(-1, 1)
     d = X.shape[1]
-    augmented = np.concatenate([X, context], axis=1)
-    skeleton, sepsets = _discover_skeleton(augmented, alpha, indep_test)
-    pdag = _orient_with_context(skeleton, sepsets, context=d)
+    if np.ptp(context) == 0:
+        # One domain: no change to detect, and a constant has no correlation to test, so the
+        # search runs on ``data`` alone and gives PC's graph.
+        skeleton, sepsets = _discover_skeleton(X, alpha, indep_test)
+        pdag = _orient_with_context(skeleton, sepsets, context=None)
+    else:
+        augmented = np.concatenate([X, context], axis=1)
+        skeleton, sepsets = _discover_skeleton(augmented, alpha, indep_test)
+        pdag = _orient_with_context(skeleton, sepsets, context=d)
     completed = meek(pdag)
     return to_structure(completed[:d, :d], kind="cpdag")
 
@@ -55,7 +63,7 @@ def _orient_with_context(
     skeleton: np.ndarray,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     *,
-    context: int,
+    context: int | None,
 ) -> np.ndarray:
     """Orient the augmented skeleton: context edges outward, then unshielded colliders.
 
@@ -63,12 +71,14 @@ def _orient_with_context(
     context is a source in every triple it touches. Unshielded colliders are then oriented with the
     prioritize-existing rule (``uc_priority=2``): a collider ``x -> y <- z`` is oriented only when
     ``y`` is absent from the separating set of ``x`` and ``z`` and neither ``y -> x`` nor ``y -> z``
-    is already directed, so the context orientations survive.
+    is already directed, so the context orientations survive. ``context=None`` orients colliders
+    only, for a skeleton without a context node.
     """
     n = skeleton.shape[0]
     pdag = np.where(skeleton != NULL, np.int8(TAIL), np.int8(NULL))
     np.fill_diagonal(pdag, np.int8(NULL))
-    for neighbour in np.nonzero(skeleton[context] != NULL)[0].tolist():
+    neighbours = [] if context is None else np.nonzero(skeleton[context] != NULL)[0].tolist()
+    for neighbour in neighbours:
         pdag[context, neighbour], pdag[neighbour, context] = TAIL, ARROW
     for y in range(n):
         nbrs = np.nonzero(skeleton[y] != NULL)[0].tolist()

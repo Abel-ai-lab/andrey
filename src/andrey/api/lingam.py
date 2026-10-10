@@ -20,7 +20,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.api._adapt import column_labels, dag_from_adjacency, shared_labels, structure_output
+from andrey.api._adapt import (
+    column_labels,
+    dag_from_adjacency,
+    data_matrix,
+    int_in_range,
+    shared_labels,
+    structure_output,
+)
 from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
@@ -76,8 +83,8 @@ def direct_lingam(
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, or if a DataFrame's
-        column names repeat.
+        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
+        a constant column, or if a DataFrame's column names repeat.
 
     See Also
     --------
@@ -121,12 +128,8 @@ def direct_lingam(
     """
     from andrey.lingam.direct import direct_lingam as _native
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
     labels = column_labels(data)
-    if X.ndim != 2:
-        raise ValueError(
-            f"direct_lingam expects a 2-D (n_samples, n_variables) matrix, got {X.ndim}-D"
-        )
     order, B = _native(X, measure=measure)
     weighted = _canonical_weights(B)
     return structure_output(
@@ -172,10 +175,12 @@ def ica_lingam(
     ------
     RuntimeError
         If no causal order can be read from the FastICA result.
+    TypeError
+        If ``max_iter`` is not an int.
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, if ``max_iter`` is
-        less than ``1``, if ``random_state`` is outside ``0`` to ``2**32 - 1``, or if a
-        DataFrame's column names repeat.
+        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
+        a constant column, if ``max_iter`` is less than ``1``, if ``random_state`` is outside ``0``
+        to ``2**32 - 1``, or if a DataFrame's column names repeat.
 
     Warns
     -----
@@ -216,7 +221,8 @@ def ica_lingam(
     """
     from andrey.lingam.ica import ica_lingam as _native
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
+    max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     order, B = _native(X, random_state=random_state, max_iter=max_iter)
     weighted = _canonical_weights(B)
@@ -261,9 +267,9 @@ def multi_group_direct_lingam(
     Raises
     ------
     ValueError
-        If fewer than two groups are given, if the groups disagree on the variable count or on
-        their column names, if any matrix is not 2-D numeric or holds ``NaN`` / ``inf``, or if a
-        DataFrame's column names repeat.
+        If fewer than two groups are given, if the groups disagree on the variable count or on their
+        column names, if any matrix is not 2-D numeric with at least 2 rows, or holds ``NaN`` /
+        ``inf`` or a constant column, or if a DataFrame's column names repeat.
 
     Warns
     -----
@@ -292,7 +298,12 @@ def multi_group_direct_lingam(
     warn_experimental("multi_group_direct_lingam")
     from andrey.lingam.multi_group import multi_group_direct_lingam as _native
 
-    groups = [np.asarray(X, dtype=np.float64) for X in data_groups]
+    groups = [data_matrix(X, name=f"data_groups[{k}]") for k, X in enumerate(data_groups)]
+    if len(groups) < 2:
+        raise ValueError(f"data_groups must hold at least two datasets, got {len(groups)}")
+    if len({X.shape[1] for X in groups}) > 1:
+        widths = [X.shape[1] for X in groups]
+        raise ValueError(f"every dataset in data_groups needs the same columns, got {widths}")
     labels = shared_labels(column_labels(X) for X in data_groups)
     order, adjacency_matrices = _native(groups)  # one shared order + a per-group weighted adjacency
     n_groups = len(groups)

@@ -10,9 +10,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
-import numpy as np
-
-from ._adapt import column_labels, shared_labels, with_labels
+from ._adapt import column_labels, data_matrix, int_in_range, shared_labels, with_labels
 from ._experimental import warn_experimental
 from ._temporal import _adapt_longitudinal_lingam, _adapt_varma_lingam
 
@@ -44,7 +42,8 @@ def varma_lingam(
         A multivariate time series, one row per time step. Coerced to ``float64``. A DataFrame's
         column names become the structure's ``labels``.
     order : tuple of int, default=(1, 1)
-        The ``(p, q)`` autoregressive and moving-average lag counts.
+        The ``(p, q)`` autoregressive and moving-average lag counts, each at least ``0`` and not
+        both ``0``.
     criterion : {"aic", "bic", "hqic"} or None, default=None
         Order-selection criterion. When set, ``(p, q)`` is chosen by that information criterion
         over ``0 <= p <= order[0]`` and ``0 <= q <= order[1]``, excluding ``(0, 0)``; ``None``
@@ -71,10 +70,13 @@ def varma_lingam(
 
     Raises
     ------
+    TypeError
+        If ``order`` is not a pair of ints.
     ValueError
         If ``criterion`` is not one of ``"aic"``, ``"bic"``, ``"hqic"``, or ``None``, if ``order``
-        is ``(0, 0)``, if ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, or if
-        a DataFrame's column names repeat.
+        holds a negative count or is ``(0, 0)``, if ``data`` is not a 2-D numeric matrix with at
+        least 2 rows and 2 columns or holds ``NaN`` / ``inf`` or a constant column, or if a
+        DataFrame's column names repeat.
 
     Warns
     -----
@@ -104,7 +106,14 @@ def varma_lingam(
     warn_experimental("varma_lingam")
     from andrey.temporal.varma import varma_lingam as _native
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
+    if X.shape[1] < 2:
+        raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
+    if not isinstance(order, (tuple, list)) or len(order) != 2:
+        raise TypeError(f"order must be a (p, q) pair of ints, got {order!r}")
+    order = (int_in_range(order[0], "order[0]", 0), int_in_range(order[1], "order[1]", 0))
+    if order == (0, 0):
+        raise ValueError("order must have p or q above 0, got (0, 0)")
     labels = column_labels(data)
     causal_order, psis, omegas = _native(
         X, order=order, criterion=criterion, prune=prune, structural_ma=structural_ma
@@ -130,7 +139,8 @@ def longitudinal_lingam(
         ``float64``. DataFrames must name their columns alike; the names become the structure's
         ``labels``.
     n_lags : int, default=1
-        Number of past time points regressed out before the instantaneous fit.
+        Number of past time points regressed out before the instantaneous fit, from ``1`` to the
+        number of time points minus one.
     measure : {"pwling"}, default="pwling"
         DirectLiNGAM pairwise independence measure for the instantaneous fit.
 
@@ -151,9 +161,13 @@ def longitudinal_lingam(
     ------
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
+    TypeError
+        If ``n_lags`` is not an int.
     ValueError
-        If ``data_list`` has fewer than two time points, if the per-time arrays are not all 2-D
-        with the same shape, or if the DataFrames' column names differ or repeat.
+        If ``data_list`` has fewer than two time points, if ``n_lags`` is outside its range, if
+        the per-time arrays are not all 2-D numeric matrices of the same shape with at least 2
+        rows, if one holds ``NaN`` / ``inf`` or a constant column, or if the DataFrames' column
+        names differ or repeat.
 
     Warns
     -----
@@ -180,7 +194,10 @@ def longitudinal_lingam(
     warn_experimental("longitudinal_lingam")
     from andrey.temporal.longitudinal import LongitudinalLiNGAM
 
-    panel = [np.asarray(X, dtype=np.float64) for X in data_list]
+    panel = [data_matrix(X, name=f"data_list[{t}]") for t, X in enumerate(data_list)]
+    if len(panel) < 2:
+        raise ValueError(f"data_list must hold at least two time points, got {len(panel)}")
+    n_lags = int_in_range(n_lags, "n_lags", 1, len(panel) - 1)
     labels = shared_labels(column_labels(X) for X in data_list)
     model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure).fit(panel)
     return with_labels(_adapt_longitudinal_lingam(model), labels)

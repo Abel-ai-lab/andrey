@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import importlib.util
 import json
 import os
 import subprocess
@@ -19,7 +18,7 @@ from andrey.cli import main
 from andrey.core import backend, ci, warning_policy
 
 pc_module = importlib.import_module("andrey.constraint.pc")
-calm_module = importlib.import_module("andrey.search.calm")
+hc_module = importlib.import_module("andrey.search.hc")
 
 
 class _AlwaysDependent:
@@ -40,14 +39,8 @@ def _backend_fallback(monkeypatch):
 def _pc_expensive_pass(monkeypatch):
     monkeypatch.setitem(ci._CI_REGISTRY, "always-dependent", _AlwaysDependent)
     monkeypatch.setattr(pc_module, "_EXPENSIVE_PASS_TESTS", 90)  # size 2 on six nodes is 90 tests
-    data = np.zeros((20, 6))
+    data = np.random.default_rng(0).standard_normal((20, 6))
     return lambda: andrey.pc(data, indep_test="always-dependent")
-
-
-def _calm_on_cpu(monkeypatch):
-    torch = pytest.importorskip("torch")
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    return calm_module._require_torch
 
 
 def _default_pool_cutoff(monkeypatch):
@@ -69,12 +62,17 @@ def _experimental(monkeypatch):
     return lambda: andrey.hc(data)
 
 
+def _search_limit(monkeypatch):
+    data = np.cumsum(np.random.default_rng(0).standard_normal((200, 4)), axis=1)  # a chain
+    return lambda: hc_module.hc(data, max_iter=1)  # the search itself: no experimental warning
+
+
 TRIGGERS = {
     "backend fallback": (_backend_fallback, andrey.BackendFallbackWarning),
     "PC expensive pass": (_pc_expensive_pass, andrey.PerformanceWarning),
-    "CALM on CPU": (_calm_on_cpu, andrey.PerformanceWarning),
     "default pool cutoff": (_default_pool_cutoff, andrey.PerformanceWarning),
     "experimental method": (_experimental, andrey.ExperimentalWarning),
+    "search limit": (_search_limit, andrey.SearchLimitWarning),
 }
 
 
@@ -107,10 +105,7 @@ def test_an_error_filter_on_the_category_fails_every_call(name, monkeypatch):
 
 
 def test_ignoring_the_base_class_silences_every_warning(monkeypatch):
-    has_torch = importlib.util.find_spec("torch") is not None
-    calls = [
-        make(monkeypatch) for make, _ in TRIGGERS.values() if has_torch or make is not _calm_on_cpu
-    ]
+    calls = [make(monkeypatch) for make, _ in TRIGGERS.values()]
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         warnings.simplefilter("ignore", andrey.AndreyWarning)
@@ -202,3 +197,13 @@ def test_a_forked_child_can_warn_while_another_thread_held_the_lock():
         release.set()
         holder.join()
     assert os.waitstatus_to_exitcode(status) == 0
+
+
+def test_calm_does_not_warn_about_the_device(monkeypatch):
+    torch = pytest.importorskip("torch")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    data = np.random.default_rng(0).standard_normal((50, 3))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        andrey.calm(data, seed=0)
+    assert not [w for w in _andrey_warnings(caught) if w.category is andrey.PerformanceWarning]

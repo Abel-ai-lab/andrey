@@ -143,8 +143,10 @@ def run_hc(
     max_iter: int,
     *,
     workers: int,
-) -> None:
+) -> int:
     """Run the greedy HC move loop with per-pass parallelism, mutating ``adj_int``/``parents_of``.
+
+    Returns the number of moves applied, ``max_iter`` when the loop stopped at its limit.
 
     Below the gate a pass scans the whole move range in-process (the same scan as serial, proven
     bit-identical by the decomposition tests); above it the pass fans out to one lazily-created
@@ -161,6 +163,7 @@ def run_hc(
     fan_out = workers > 1 and _estimate_work(d) > w_min
     lazy = _LazyWorkerSet(delta.score_obj, d, workers)
     cache: dict = {}  # the in-process (below-gate) memo; workers hold their own
+    moves = 0
     try:
         for _ in range(max_iter):
             if fan_out:
@@ -172,5 +175,7 @@ def run_hc(
             if best is None:
                 break
             _apply_move(adj_int, parents_of, best[4])
+            moves += 1
     finally:
         lazy.close()
+    return moves

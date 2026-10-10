@@ -12,9 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
-
-from andrey.api._adapt import column_labels, json_safe, structure_output
+from andrey.api._adapt import column_labels, data_matrix, int_in_range, json_safe, structure_output
 from andrey.api._experimental import warn_experimental
 from andrey.core import backend
 from andrey.core.seeding import resolve_seed
@@ -58,8 +56,9 @@ def ges(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC"``.
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, if ``lambda_value``
-        is negative or non-finite, or if a DataFrame's column names repeat.
+        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
+        a constant column, if ``lambda_value`` is negative or non-finite, or if a DataFrame's column
+        names repeat.
 
     See Also
     --------
@@ -107,7 +106,7 @@ def ges(
     """
     from andrey.search.ges import ges as _ges
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
     labels = column_labels(data)
     cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value)
     return structure_output(
@@ -144,8 +143,9 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, if ``lambda_value``
-        is negative or non-finite, or if a DataFrame's column names repeat.
+        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
+        a constant column, if ``lambda_value`` is negative or non-finite, or if a DataFrame's column
+        names repeat.
 
     Warns
     -----
@@ -171,7 +171,7 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     warn_experimental("gies")
     from andrey.search.gies import gies as _gies
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
     labels = column_labels(data)
     cpdag, score = _gies(X, lambda_value=lambda_value)
     metadata = {"algorithm": "GIES", "score": json_safe(score)}
@@ -179,7 +179,11 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
 
 
 def hc(
-    data: npt.ArrayLike, *, score_func: str = "local_score_BIC_from_cov", lambda_value: float = 1.0
+    data: npt.ArrayLike,
+    *,
+    score_func: str = "local_score_BIC_from_cov",
+    lambda_value: float = 1.0,
+    max_iter: int = 200,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with hill-climbing search.
 
@@ -197,6 +201,9 @@ def hc(
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+    max_iter : int, default=200
+        Most moves the search takes, at least ``1``. Each move adds at most one edge, so the result
+        has at most ``max_iter`` edges.
 
     Returns
     -------
@@ -210,20 +217,26 @@ def hc(
     ------
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+    TypeError
+        If ``max_iter`` is not an int.
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, if ``lambda_value``
-        is negative or non-finite, or if a DataFrame's column names repeat.
+        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
+        a constant column, if ``lambda_value`` is negative or non-finite, if ``max_iter`` is less
+        than ``1``, or if a DataFrame's column names repeat.
 
     Warns
     -----
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+    SearchLimitWarning
+        When the search takes ``max_iter`` moves: it stopped at the limit, and a larger
+        ``max_iter`` may find a better graph.
 
     Notes
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
-    after 200 moves. Each move adds at most one edge, so the result has at most 200 edges.
+    after ``max_iter`` moves.
 
     References
     ----------
@@ -245,9 +258,10 @@ def hc(
     warn_experimental("hc")
     from andrey.search.hc import hc as _hc
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
+    max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
-    cpdag, score = _hc(X, score_func=score_func, lambda_value=lambda_value)
+    cpdag, score = _hc(X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter)
     metadata = {"algorithm": "HC", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -276,8 +290,9 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     Raises
     ------
     ValueError
-        If ``search_method`` is not ``"astar"`` or ``"dp"``, if ``data`` is not a 2-D numeric
-        matrix, or if a DataFrame's column names repeat.
+        If ``search_method`` is not ``"astar"`` or ``"dp"``, if ``data`` is not a 2-D numeric matrix
+        with at least 2 rows, or holds ``NaN`` / ``inf`` or a constant column, or if a DataFrame's
+        column names repeat.
 
     Warns
     -----
@@ -306,7 +321,7 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     warn_experimental("exact_search")
     from andrey.search.exact import exact_search as _exact
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
     labels = column_labels(data)
     dag = _exact(X, search_method=search_method)
     return structure_output(dag, labels=labels, metadata={"algorithm": "ExactSearch"})
@@ -365,16 +380,14 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     TypeError
         If ``params`` holds a name the solver does not accept.
     ValueError
-        If ``data`` is not a 2-D numeric matrix or holds ``NaN`` / ``inf``, or if a DataFrame's
-        column names repeat.
+        If ``data`` is not a 2-D numeric matrix with at least 2 rows, or holds ``NaN`` / ``inf`` or
+        a constant column, or if a DataFrame's column names repeat.
 
     Warns
     -----
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
-    PerformanceWarning
-        Once per process when torch has no CUDA device, so the optimizer runs on CPU.
 
     References
     ----------
@@ -398,7 +411,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         raise ImportError("andrey.calm needs torch for its continuous optimiser; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
-    X = np.asarray(data, dtype=np.float64)
+    X = data_matrix(data)
     labels = column_labels(data)
     used_seed = resolve_seed(seed)  # CALM uses this seed for torch.
     result = _calm(X, seed=used_seed, **params)

@@ -18,6 +18,10 @@ exceptions: `cdnod` also takes a domain index, `longitudinal_lingam` takes a lis
 `multi_group_direct_lingam` takes a list of datasets and returns one result per dataset. Each
 method is either supported or experimental; `andrey list` prints the status.
 
+Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
+least 2 rows, no `NaN` or infinity, and no constant column. Other data raises a `ValueError` that
+names the argument and, for a bad cell, its row and column. A single column gives a one-node graph.
+
 ### Supported methods
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
@@ -119,8 +123,9 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | Category | When |
 |---|---|
 | {py:class}`~andrey.ExperimentalWarning` | The first call of an experimental method. |
-| {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests, or CALM without a CUDA device. |
+| {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
+| {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` took `max_iter` moves. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -154,6 +159,7 @@ name.
    ExperimentalWarning
    PerformanceWarning
    BackendFallbackWarning
+   SearchLimitWarning
 ```
 
 ## Datasets

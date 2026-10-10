@@ -152,7 +152,9 @@ class BICScore:
             )
         if not np.isfinite(data).all():
             raise ValueError("data contains NaN or Inf; cannot compute BIC scores")
-        self._init(stats.cov(data, rowvar=False), data.shape[0], lambda_value, cache_size)
+        # np.cov of a single column is a 0-d variance; keep the (1, 1) matrix the score reads.
+        cov = np.atleast_2d(stats.cov(data, rowvar=False))
+        self._init(cov, data.shape[0], lambda_value, cache_size)
 
     @classmethod
     def from_cov(

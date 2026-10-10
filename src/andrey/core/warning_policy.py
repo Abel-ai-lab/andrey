@@ -33,12 +33,19 @@ class ExperimentalWarning(AndreyWarning):
 class PerformanceWarning(AndreyWarning):
     """A call that will run correctly but slowly.
 
-    PC warns before a pass of ten million or more tests, and ``calm`` warns without a CUDA device.
+    PC warns before a pass of ten million or more tests.
     """
 
 
 class BackendFallbackWarning(AndreyWarning):
     """A requested compute backend is unavailable, so the call runs on another one."""
+
+
+class SearchLimitWarning(AndreyWarning):
+    """A search stopped at its move limit, so a longer search might find a better graph.
+
+    ``hc`` warns when it takes ``max_iter`` moves.
+    """
 
 
 def warn_once(message: str, category: type[AndreyWarning]) -> None:
