@@ -151,6 +151,7 @@ andrey --skill                       # a guide an agent loads as a skill
 - [Launch post](https://andrey.abel.ai/blog/introducing-andrey.html),
   [FAQ](https://andrey.abel.ai/docs/faq.html), and
   [changelog](https://andrey.abel.ai/docs/changelog.html).
+- [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, in order.
 
 Andrey is in alpha: the API may change between releases, so pin the version you use. Linux is fully
 tested; macOS and Windows install and run on the CPU, but the full test suite and the GPU speedups

@@ -134,9 +134,9 @@ row names the nodes) or a `.npy` file.
 
 ### Does it handle discrete or mixed data?
 
-Not yet. Every method assumes continuous data: PC and FCI test independence with Fisher's z; GES,
-BOSS, and GRaSP score with the linear-Gaussian BIC; and the LiNGAM methods assume continuous
-non-Gaussian noise.
+Not yet; it is part of stage 1 of the [roadmap](roadmap.md). Every method assumes continuous data:
+PC and FCI test independence with Fisher's z; GES, BOSS, and GRaSP score with the linear-Gaussian
+BIC; and the LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
@@ -171,6 +171,12 @@ Andrey is in alpha: any release may change the API, including the supported meth
 version you depend on, and read the [changelog](changelog.md) before upgrading. The public API is
 what the [API reference](code/index.md) documents; names that start with an underscore are private
 and can change in any release.
+
+### What is planned next?
+
+The [roadmap](roadmap.md) lists the planned work in order, starting with every major causal
+discovery method, benchmarked. The [roadmap issue](https://github.com/Abel-ai-lab/andrey/issues/1)
+on GitHub tracks the progress of each stage.
 
 ### What is the license?
 
