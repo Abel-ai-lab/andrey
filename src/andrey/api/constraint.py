@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.api._adapt import column_labels, data_matrix, structure_output
+from andrey.api._adapt import column_labels, data_matrix, open_unit_interval, structure_output
 from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
@@ -116,6 +116,7 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     from andrey.constraint.pc import pc as _pc
 
     X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     return structure_output(
         _pc(X, alpha=alpha, indep_test=indep_test), labels=labels, metadata={"algorithm": "PC"}
@@ -230,6 +231,7 @@ def fci(
     from andrey.constraint.fci import fci as _fci
 
     X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     return structure_output(
         _fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule),
@@ -336,6 +338,7 @@ def gfci(
     from andrey.search.gfci import gfci as _gfci
 
     X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     pag = _gfci(
         X,
@@ -430,6 +433,7 @@ def cdnod(
     from andrey.constraint.cdnod import cdnod as _cdnod
 
     X = data_matrix(data)
+    alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     c = np.asarray(c_indx, dtype=np.float64)
     cpdag = _cdnod(X, c, alpha=alpha, indep_test=indep_test)

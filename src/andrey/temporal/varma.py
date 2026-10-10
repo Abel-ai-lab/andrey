@@ -52,8 +52,6 @@ def varma_lingam(
     ``structural_ma=False`` uses ``(I - B0) Theta_j``.
     """
     X = np.asarray(X, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"X must be 2-D (n_samples, n), got shape {X.shape}")
 
     if criterion is None:
         p, q = int(order[0]), int(order[1])

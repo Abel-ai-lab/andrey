@@ -31,10 +31,6 @@ def cdnod(
     ``n_features`` data variables. Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
     """
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
-    if not 0 < alpha < 1:
-        raise ValueError(f"alpha must lie in the open interval (0, 1), got {alpha}")
     context = np.asarray(c_indx, dtype=np.float64)
     # One value per row: a wider index reshaped to a column would pair rows with the wrong values.
     if context.shape not in ((X.shape[0],), (X.shape[0], 1)):

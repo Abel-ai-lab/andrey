@@ -66,6 +66,16 @@ def int_in_range(value: object, name: str, low: int, high: int | None = None) ->
     return int(value)
 
 
+def open_unit_interval(value: float, name: str) -> float:
+    """Return ``value`` as a ``float`` in the open interval ``(0, 1)``.
+
+    Raises ``ValueError``, naming ``name``, outside it.
+    """
+    if not 0 < value < 1:
+        raise ValueError(f"{name} must lie in the open interval (0, 1), got {value}")
+    return float(value)
+
+
 def dag_from_adjacency(adjacency: npt.ArrayLike) -> GraphStructure:
     """Build a ``dag`` structure from an adjacency where any ``A[i, j]`` != 0 is edge ``i -> j``.
 

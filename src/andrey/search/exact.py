@@ -229,8 +229,6 @@ def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStru
         The BIC-optimal DAG, edge ``i -> j`` when ``i`` is an optimal parent of ``j``.
     """
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_vars) array, got ndim={X.ndim}")
     if search_method not in ("astar", "dp"):
         raise ValueError(f"unknown search method {search_method!r}; use 'astar' or 'dp'")
     n_vars = X.shape[1]

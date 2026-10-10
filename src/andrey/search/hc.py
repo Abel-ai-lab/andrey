@@ -240,8 +240,6 @@ def hc(
             f"unsupported score_func {score_func!r}; use 'local_score_BIC_from_cov'"
         )
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
     d = X.shape[1]
 
     score = BICScore(X, lambda_value=lambda_value)

@@ -396,8 +396,6 @@ def grasp(
         ``local_score_BIC_from_cov`` values; lower is better).
     """
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
     n_features = X.shape[1]
     if n_features <= 1:  # no candidate parents -- the CPDAG is the edgeless graph
         empty = np.zeros((n_features, n_features), dtype=np.int8)

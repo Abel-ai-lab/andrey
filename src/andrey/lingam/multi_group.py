@@ -27,23 +27,8 @@ def multi_group_direct_lingam(
     adjacency for ``x_i = sum_j B_g[i, j] x_j`` (so ``B_g[i, j]`` weights edge ``j -> i``). Requires
     ``len(X_list) >= 2`` arrays with matching ``n_features``.
     """
-    if not isinstance(X_list, list):
-        raise ValueError("X_list must be a list.")
-    if len(X_list) < 2:
-        raise ValueError("X_list must be a list containing at least two items")
-
     groups = [np.asarray(X, dtype=np.float64) for X in X_list]
-    for X in groups:
-        if X.ndim != 2:
-            raise ValueError(
-                f"each group must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}"
-            )
-        if not np.isfinite(X).all():
-            raise ValueError("group data contains NaN or Inf")
     n_features = groups[0].shape[1]
-    for X in groups:
-        if X.shape[1] != n_features:
-            raise ValueError("X_list must be a list with the same number of features")
 
     order = _find_shared_causal_order(groups, n_features)
     adjacency_matrices = [adjacency.estimate(X, order) for X in groups]

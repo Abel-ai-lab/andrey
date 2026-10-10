@@ -48,10 +48,6 @@ def pc(
     firing (``step="meek"``, with the fields :func:`~andrey.core.orient.meek` records).
     """
     X = np.asarray(data, dtype=np.float64)
-    if X.ndim != 2:
-        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={X.ndim}")
-    if not 0 < alpha < 1:
-        raise ValueError(f"alpha must lie in the open interval (0, 1), got {alpha}")
     skeleton, sepsets = _discover_skeleton(X, alpha, indep_test, warn_expensive=True, _trace=_trace)
     pdag = _orient_colliders_prioritize_existing(skeleton, sepsets, _trace=_trace)
     if _trace is None:

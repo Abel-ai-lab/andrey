@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from andrey.api._adapt import column_labels, data_matrix
+from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
 from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
@@ -92,8 +92,7 @@ def gin(
     from andrey.latent.gin import gin_structure
 
     X = data_matrix(data)
-    if not 0 < alpha < 1:
-        raise ValueError(f"alpha must lie in the open interval (0, 1), got {alpha}")
+    alpha = open_unit_interval(alpha, "alpha")
     if labels is not None and len(labels) != X.shape[1]:
         raise ValueError(
             f"labels must name each of the {X.shape[1]} columns of data, got {len(labels)} names"
