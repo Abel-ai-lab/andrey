@@ -15,10 +15,14 @@ Examples gallery. Notebooks live in `examples/`. None of these ship in the wheel
 ## Run locally
 
 ```shell
-uv sync --group docs --group demo
-uv run --group docs --group demo python apps/build_assets.py
-uv run --group demo python apps/live-discovery/app.py
+uv sync --group docs
+uv run --group docs --with-requirements apps/live-discovery/requirements.txt python apps/build_assets.py
+uv run --with-requirements apps/live-discovery/requirements.txt python apps/live-discovery/app.py
 ```
+
+The apps' packages are listed in `live-discovery/requirements.txt`, which the hosted app also
+installs. uv adds them in a temporary environment on top of the project's, so they stay out of
+`uv.lock`.
 
 The app uses the homepage's chart renderer and
 `benchmarks/published/alpha-2026-09/summary.json`. Generated files go in the ignored
@@ -47,7 +51,7 @@ SHA-256 of the data it was made on; the build refuses it once the dataset change
 with causal-learn installed:
 
 ```shell
-uv run --group docs --group demo python apps/compare.py --record
+uv run --group docs --with-requirements apps/live-discovery/requirements.txt python apps/compare.py --record
 ```
 
 ## README benchmark block
@@ -69,7 +73,8 @@ recording is not linked.
 ## Checks
 
 ```shell
-uv run --group docs --group demo pytest tests/unit/test_demo_safeguards.py \
+uv run --group docs --with-requirements apps/live-discovery/requirements.txt pytest \
+  tests/unit/test_demo_safeguards.py \
   tests/unit/test_meek_trace.py tests/unit/test_pc_trace.py tests/unit/test_launch_material.py \
   tests/unit/test_compare_example.py
 uv run --group docs python -m pytest docs/test_built_site.py
