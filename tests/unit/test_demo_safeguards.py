@@ -432,3 +432,19 @@ def test_compute_lock_serializes_visitors():
         for job in jobs:
             job.result()
     assert peak == 1
+
+
+def test_uploads_are_read_only_from_the_upload_folder(tmp_path, monkeypatch):
+    folder = tmp_path / "uploads"
+    folder.mkdir()
+    monkeypatch.setenv("GRADIO_TEMP_DIR", str(folder))
+    inside = folder / "data.csv"
+    inside.write_text("a,b,c\n1,2,3\n")
+    assert data.upload_path(inside) == str(inside.resolve())
+    outside = tmp_path / "elsewhere.csv"
+    outside.write_text("a,b,c\n1,2,3\n")
+    link = folder / "link.csv"
+    link.symlink_to(outside)
+    for path in (outside, link, folder / ".." / "elsewhere.csv"):
+        with pytest.raises(ValueError):
+            data.upload_path(path)
