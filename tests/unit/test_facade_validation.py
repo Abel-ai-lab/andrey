@@ -101,6 +101,12 @@ def test_one_column_gives_a_one_node_graph(method):
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("method", ["pc", "ges", "hc", "xges"])
+def test_no_columns_give_an_empty_graph(method):
+    assert SINGLE[method](_data(d=0)).structure.n_nodes == 0
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_varma_lingam_needs_two_variables():
     with pytest.raises(ValueError, match="data needs at least 2 columns"):
         andrey.varma_lingam(_data(d=1))

@@ -459,7 +459,7 @@ class _AddDeltas:
 
     def __init__(self, score: BICScore, d: int) -> None:
         self.score = score
-        self.cap = max(1024, _ADD_DELTAS_BYTES // (8 * d))
+        self.cap = max(1024, _ADD_DELTAS_BYTES // (8 * max(d, 1)))
         self.cache: OrderedDict[tuple[int, frozenset[int]], np.ndarray] = OrderedDict()
 
     def __call__(self, y: int, E: frozenset[int]) -> np.ndarray:
