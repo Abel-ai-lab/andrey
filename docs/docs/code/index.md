@@ -20,7 +20,9 @@ method is either supported or experimental; `andrey list` prints the status.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column
-names. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
+names. The categorical settings, `indep_test="chisq"` or `"gsq"` and
+`score_func="local_score_BDeu"`, also need whole numbers, each distinct value of a column one
+category. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
 column. A single column gives a one-node graph.
 
 ### Supported methods

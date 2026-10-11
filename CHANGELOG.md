@@ -15,6 +15,10 @@ in alpha, and any minor release may change the API.
   `bottom_up_parce_lingam` leaves the variables whose order such a cause hides unordered.
 - `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
   search stops there.
+- Categorical data: `pc`, `fci`, `gfci`, and `cdnod` take `indep_test="chisq"` and `"gsq"`, the
+  chi-square and G-square tests, and `ges`, `gfci`, and `hc` take
+  `score_func="local_score_BDeu"`. `andrey.data.sample_discrete` samples a discrete network with
+  its true graph.
 
 ### Fixed
 

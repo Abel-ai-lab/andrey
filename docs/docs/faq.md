@@ -134,9 +134,11 @@ row names the nodes) or a `.npy` file.
 
 ### Does it handle discrete or mixed data?
 
-Not yet; it is part of stage 1 of the [roadmap](roadmap.md). Every method assumes continuous data:
-PC and FCI test independence with Fisher's z; GES, BOSS, and GRaSP score with the linear-Gaussian
-BIC; and the LiNGAM methods assume continuous non-Gaussian noise.
+Discrete data, yes: code each category as a whole number. PC, FCI, GFCI, and CDNOD test
+independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, and hill
+climbing score it with `score_func="local_score_BDeu"`. Mixed data is not supported yet; it is part
+of stage 1 of the [roadmap](roadmap.md). The other methods assume continuous data: BOSS and GRaSP
+score with the linear-Gaussian BIC, and the LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
