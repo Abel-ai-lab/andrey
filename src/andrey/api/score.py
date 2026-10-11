@@ -268,7 +268,7 @@ def tabu(
     lambda_value: float = 1.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
-    max_iter: int = 200,
+    max_iter: int | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with tabu search.
 
@@ -294,9 +294,10 @@ def tabu(
     max_tabu : int or None, default=None
         Non-improving moves the search may take without finding a better DAG, from ``1`` to
         ``tabu_length``. ``None`` uses ``tabu_length``.
-    max_iter : int, default=200
-        Most moves the search takes, improving or not, at least ``1``. Each move adds at most one
-        edge, so the result has at most ``max_iter`` edges.
+    max_iter : int or None, default=None
+        Most moves the search takes, improving or not, at least ``1``; ``None`` sets no limit. The
+        search ends without one: each run of non-improving moves is at most ``max_tabu`` long, and
+        each new best DAG scores strictly lower.
 
     Returns
     -------
@@ -311,10 +312,10 @@ def tabu(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``.
     TypeError
-        If ``tabu_length``, ``max_tabu``, or ``max_iter`` is not an int.
+        If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or ``max_iter`` is less
-        than ``1``, or if ``max_tabu`` is outside ``1..tabu_length``.
+        If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
+        less than ``1``, or if ``max_tabu`` is outside ``1..tabu_length``.
 
     Warns
     -----
@@ -322,7 +323,7 @@ def tabu(
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
     SearchLimitWarning
-        When the search takes ``max_iter`` moves: it stopped at the limit, and a larger
+        When the search takes a given ``max_iter`` moves: it stopped at the limit, and a larger
         ``max_iter`` may find a better graph.
 
     Notes
@@ -333,17 +334,13 @@ def tabu(
     Otherwise, if it has taken ``max_tabu`` non-improving moves since the best score last improved,
     the search stops; if not, it takes the best non-improving move, which leaves the score
     unchanged or worse. The search also stops when every legal move leads into the list, or after
-    ``max_iter`` moves.
+    ``max_iter`` moves when it is set.
 
     Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
     moves break as they do for :func:`andrey.hc`. Above ``ANDREY_HC_PARALLEL_MIN_WORK``, the
     search runs its passes on hill climbing's worker pool, and the result does not depend on the
     worker count.
-
-    bnlearn's ``tabu`` [3]_ documents ``max.tabu`` with this meaning, but version 5.2.1 stops after
-    ``tabu`` non-improving moves whatever ``max.tabu`` is; the two agree when they are equal, as at
-    the defaults.
 
     References
     ----------
@@ -373,7 +370,7 @@ def tabu(
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
     )
-    max_iter = int_in_range(max_iter, "max_iter", 1)
+    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     cpdag, score = _tabu(
         X,

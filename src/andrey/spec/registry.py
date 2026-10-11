@@ -295,9 +295,10 @@ _add(
             ParamSpec(
                 name="max_iter",
                 type="int",
-                default=200,
-                doc="Most moves the search takes, improving or not, at least 1; reaching it warns "
-                "with SearchLimitWarning.",
+                default=None,
+                doc="Most moves the search takes, improving or not, at least 1; null sets no limit "
+                "(the search still ends). Reaching a set limit warns with SearchLimitWarning.",
+                nullable=True,
             ),
         ),
         references=("Glover 1986", "Russell & Norvig 2009", "Scutari 2010"),

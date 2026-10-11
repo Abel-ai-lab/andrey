@@ -67,7 +67,7 @@ class _Scanner:
 
 
 def _search(
-    score: BICScore, d: int, tabu_length: int, max_tabu: int, max_iter: int, workers: int
+    score: BICScore, d: int, tabu_length: int, max_tabu: int, max_iter: int | None, workers: int
 ) -> tuple[StructureKey, int]:
     """Run tabu search from the empty graph; return the best DAG's structure key and moves taken.
 
@@ -76,7 +76,7 @@ def _search(
     non-improving moves since the last new best; otherwise it counts one more and takes the best
     move that does not lead into the list, which leaves the score unchanged or worse. A new best
     score, lower by more than ``_EPS_IMPROVE``, resets the count. The search also stops when every
-    legal move leads into the list, or after ``max_iter`` moves.
+    legal move leads into the list, or after ``max_iter`` moves unless it is ``None``.
     """
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
@@ -88,7 +88,7 @@ def _search(
     moves = 0
     scanner = _Scanner(DeltaBICScore(score), d, workers)
     try:
-        while moves < max_iter:
+        while max_iter is None or moves < max_iter:
             recent.append(tuple(adj_int))
             tabu = frozenset(recent)
             found = scanner.best(adj_int, parents_of, -_EPS_IMPROVE, tabu)
@@ -120,7 +120,7 @@ def tabu(
     lambda_value: float = 1.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
-    max_iter: int = 200,
+    max_iter: int | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by tabu search over the linear-Gaussian BIC score.
 
@@ -137,9 +137,9 @@ def tabu(
     max_tabu : int or None
         Non-improving moves allowed without a new best score before the search stops, at most
         ``tabu_length``; ``None`` means ``tabu_length``.
-    max_iter : int
-        Maximum number of moves, improving or not. Taking ``max_iter`` moves warns with
-        ``SearchLimitWarning``.
+    max_iter : int or None
+        Maximum number of moves, improving or not; ``None`` sets no limit. Taking ``max_iter`` moves
+        warns with ``SearchLimitWarning``.
 
     Returns
     -------
@@ -164,7 +164,7 @@ def tabu(
         best_key, moves = _search(
             score, d, tabu_length, max_tabu, max_iter, workers=backend.worker_count()
         )
-    if moves == max_iter:
+    if max_iter is not None and moves == max_iter:
         warn_once(
             f"tabu stopped at its limit of max_iter={max_iter} moves; a longer search may find a "
             "better graph, so raise max_iter",

@@ -9,6 +9,8 @@ local optimum and tabu search reaches the true equivalence class.
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -114,3 +116,13 @@ def test_tabu_is_deterministic_across_runs_and_worker_counts(monkeypatch):
         assert np.array_equal(pooled.structure.to_numpy(), serial.structure.to_numpy())
         assert pooled.metadata["score"] == serial.metadata["score"]
     assert len(pools) == 2  # one worker set per fit, kept across its passes
+
+
+def test_tabu_sets_no_move_limit_by_default():
+    # 200 variables need over 400 moves: a limit of 200 stops the search, the default does not.
+    x = data.sample_scm(d=200, n=2000, seed=0, density=2.0).data
+    with pytest.warns(andrey.SearchLimitWarning):
+        andrey.tabu(x, max_iter=200)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.SearchLimitWarning)
+        andrey.tabu(x)
