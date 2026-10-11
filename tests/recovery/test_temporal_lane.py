@@ -88,6 +88,23 @@ def test_granger_recovery():
     harness.assert_baseline("Granger", {"coeff": coeff, "adj": coeff != 0}, case="var_4v_stable")
 
 
+@pytest.mark.parametrize("workers", [1, 3])
+def test_granger_equals_lassocv_on_each_variable(workers):
+    """Each row is scikit-learn's ``LassoCV`` on the lagged design, bit for bit, on any workers."""
+    from sklearn.linear_model import LassoCV
+    from threadpoolctl import threadpool_limits
+
+    import andrey
+
+    data = datagen.generate("var_4v_stable")
+    n, d = data.shape
+    design = np.hstack([data[2 - k : n - k] for k in (1, 2)])
+    with threadpool_limits(limits=1):
+        expected = np.vstack([LassoCV(cv=5).fit(design, data[2:, i]).coef_ for i in range(d)])
+    with andrey.config(num_workers=workers):
+        assert np.array_equal(granger_lasso(data), expected)
+
+
 def test_var_lingam_output_contract():
     order, adj = var_lingam(datagen.generate("var_4v_stable"))
     assert list(order) == [0, 1, 2, 3] and np.asarray(adj).shape == (2, 4, 4)

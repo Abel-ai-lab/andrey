@@ -129,7 +129,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
-| Granger (lasso) | Andrey, causal-learn |
+| Granger (lasso) | Andrey (serial, parallel), causal-learn |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -246,8 +246,9 @@ $ANDREY_BENCH_PYTHON benchmarks/granger_var.py --out outputs/granger-smoke --smo
 A lagged edge is a nonzero coefficient at lags 1 to `maxlag`. `precision`, `recall`, and `f1`
 score every lagged edge; `cross_precision`, `cross_recall`, and `cross_f1` leave out each
 variable's edges from its own past, which every true series holds. The summary prints their means
-per `d` and solution, the median wall time, and `agree`, the share of series on which the two
-solutions return the same lagged edges.
+per `d` and solution, the median wall time, and `agree`, the share of series on which every
+solution returns the same lagged edges. Andrey runs twice: serially, and with its per-variable fits
+on `--cores` threads (`andrey.granger.numpy.parallel`); both return the same coefficients.
 
 Each fit is one JSON line in `records.jsonl`, with its coefficients. A resumed run skips the fits
 already recorded, and a rescore recomputes the scores without fitting anything:

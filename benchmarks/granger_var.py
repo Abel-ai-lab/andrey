@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Benchmark lasso Granger causality on CPU: Andrey against causal-learn.
 
-Runs Andrey's ``granger`` and causal-learn's ``Granger.granger_lasso`` on vector-autoregressive
+Runs Andrey's ``granger``, serially and on worker threads, and causal-learn's
+``Granger.granger_lasso`` on vector-autoregressive
 time series with known lagged edges: ``x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + e_t`` with Gaussian
 noise and no instantaneous effects, drawn by ``andrey.data`` (:func:`sample`). Every variable keeps
 its own lags, and each other variable enters a lag with probability ``LAG_DEGREE / (d - 1)``. The
@@ -34,11 +35,11 @@ from andrey.data.functional import var
 from andrey.data.graphs import erdos_renyi
 from andrey.data.noise import gaussian
 from andrey.data.scm import SCM
-from andrey_bench.adapters.andrey_granger import AndreyGranger
+from andrey_bench.adapters.andrey_granger import andrey_granger_adapters
 from andrey_bench.adapters.causal_learn_granger import CausalLearnGranger
 from andrey_bench.runner import available_cores, run_task, split_cores
 
-LANE = [AndreyGranger(), CausalLearnGranger()]
+LANE = [*andrey_granger_adapters(), CausalLearnGranger()]
 
 #: Lags of the true process; the solutions fit ``maxlag`` lags, the same number by default.
 LAGS = 2
@@ -299,8 +300,8 @@ def _summarize(records: list[dict]) -> None:
     """Print, per rung and solution, the finished fits, their median time, and mean scores.
 
     ``f1`` scores every lagged edge, ``cross f1`` the edges between two different variables.
-    ``agree`` is the share of series, among those both solutions finished, on which they return
-    the same lagged edges.
+    ``agree`` is the share of series, among those every solution finished, on which they all
+    return the same lagged edges.
     """
     if not records:
         return

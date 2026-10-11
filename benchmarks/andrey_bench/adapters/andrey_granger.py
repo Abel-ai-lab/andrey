@@ -3,16 +3,22 @@
 Wraps ``andrey.granger``, the cross-validated lasso fit of each variable on the past ``maxlag`` steps
 of every variable. The fit returns the coefficients in causal-learn's ``granger_lasso`` layout, a
 ``(d, d * maxlag)`` matrix whose ``[i, j + d * (k - 1)]`` entry weights ``x_j(t - k)`` in ``x_i(t)``,
-so both solutions are scored from the same encoding.
+so every solution is scored from the same encoding. The serial variant fits the variables one at
+a time; the parallel variant fits them on ``ANDREY_NUM_WORKERS`` threads.
 """
 
 from __future__ import annotations
 
+import os
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 import numpy as np
 
 _DEFAULTS = {"maxlag": 2, "cv": 5}
+# Worker count for the parallel variant when `ANDREY_NUM_WORKERS` is unset or unreadable. An explicit
+# 1 is kept: the runner pins the core budget there, and the record reports it.
+_PARALLEL_FALLBACK_WORKERS = 2
 
 
 def _andrey_version() -> str:
@@ -27,17 +33,26 @@ def _andrey_version() -> str:
         return getattr(andrey, "__version__", "unknown")
 
 
+def _parallel_workers() -> int:
+    try:
+        n = int(os.environ.get("ANDREY_NUM_WORKERS", "").strip())
+    except ValueError:
+        return _PARALLEL_FALLBACK_WORKERS
+    return n if n == -1 or n >= 1 else _PARALLEL_FALLBACK_WORKERS
+
+
+@dataclass(frozen=True)
 class AndreyGranger:
-    """Solution adapter for Andrey's lasso Granger causality.
+    """Solution adapter for Andrey's lasso Granger causality in one execution mode.
 
     Satisfies :class:`andrey_bench.contracts.SolutionAdapter`.
     """
 
     name: str = "andrey.granger.numpy"
+    mode: str = "serial"
     package: str = "andrey"
     package_version: str = _andrey_version()
     backend: str = "numpy"
-    mode: str = "serial"
     algorithm: str = "granger"
     output_type: str = "temporal"
 
@@ -58,7 +73,9 @@ class AndreyGranger:
         """Run Andrey Granger; return the ``(d, d * maxlag)`` coefficients. The only timed region."""
         import andrey
 
-        out = andrey.granger(np.asarray(data, dtype=np.float64), **{**_DEFAULTS, **params})
+        workers = 1 if self.mode == "serial" else _parallel_workers()
+        with andrey.config(num_workers=workers):
+            out = andrey.granger(np.asarray(data, dtype=np.float64), **{**_DEFAULTS, **params})
         # lag_weights[k][j, i] weights x_j(t - k - 1) -> x_i(t); the layout wants it at [i, j + d*k]
         return np.concatenate([w.T for w in out.structure.lag_weights], axis=1)
 
@@ -68,3 +85,11 @@ class AndreyGranger:
 
         d = native.shape[0]
         return _adapt_granger(native, d, native.shape[1] // d).structure
+
+
+def andrey_granger_adapters() -> list[AndreyGranger]:
+    """The serial and the parallel variant."""
+    return [
+        AndreyGranger(),
+        AndreyGranger(name="andrey.granger.numpy.parallel", mode="parallel"),
+    ]

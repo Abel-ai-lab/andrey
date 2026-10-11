@@ -253,7 +253,8 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     any variable; the coefficients are converted back to the data's units. Cross-validation chooses
     the penalty that predicts best, which often keeps small coefficients on lags with no effect:
     judge the edges by the size of their weights. The folds are consecutive blocks of time steps,
-    and the fit is deterministic.
+    and the fit is deterministic. With ``andrey.config(num_workers=k)``, the regressions run on
+    ``k`` threads and return the same coefficients.
 
     The penalty is the plain lasso of Arnold et al. [2]_. Shojaie and Michailidis [3]_ propose a
     truncating lasso penalty that also selects the lag order; it is not implemented here.

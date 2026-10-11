@@ -1,6 +1,6 @@
 """The Granger adapters, the series they run on, and the lagged-edge scores.
 
-Both adapters return the coefficients in one layout, so a lagged edge reads the same from either
+Every adapter returns the coefficients in one layout, so a lagged edge reads the same from either
 package. The scores are checked on small stacks whose answer is known.
 """
 
@@ -13,14 +13,15 @@ import granger_var
 import numpy as np
 import pytest
 
-from andrey_bench.adapters.andrey_granger import AndreyGranger
+from andrey_bench.adapters.andrey_granger import andrey_granger_adapters
 from andrey_bench.adapters.causal_learn_granger import CausalLearnGranger
 
-ADAPTERS = [AndreyGranger(), CausalLearnGranger()]
+SERIAL, PARALLEL = andrey_granger_adapters()
+ADAPTERS = [SERIAL, PARALLEL, CausalLearnGranger()]
 
 
 def test_both_packages_report_one_method_the_same_way() -> None:
-    andrey_adapter, other = ADAPTERS
+    andrey_adapter, other = SERIAL, ADAPTERS[-1]
     for field in ("algorithm", "output_type", "mode"):
         assert getattr(andrey_adapter, field) == getattr(other, field), field
     assert andrey_adapter.params() == other.params()
@@ -43,11 +44,19 @@ def series() -> tuple[np.ndarray, np.ndarray]:
 def test_both_packages_return_the_same_coefficients_on_standardized_data(series) -> None:
     data, _ = series
     natives = []
-    for adapter in ADAPTERS:
+    for adapter in (SERIAL, ADAPTERS[-1]):
         adapter.setup()
         natives.append(np.asarray(adapter.fit(data, {"maxlag": 2})))
     assert natives[0].shape == (4, 8)
     np.testing.assert_allclose(natives[0], natives[1], atol=1e-8)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_the_parallel_variant_returns_the_serial_coefficients(series, monkeypatch) -> None:
+    data, _ = series
+    monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
+    assert PARALLEL.mode == "parallel" and SERIAL.mode == "serial"
+    assert np.array_equal(PARALLEL.fit(data, {"maxlag": 2}), SERIAL.fit(data, {"maxlag": 2}))
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
