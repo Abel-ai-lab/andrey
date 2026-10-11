@@ -8,7 +8,7 @@ the larger p-value is the inferred cause.
 
 The regression is scikit-learn's ``GaussianProcessRegressor`` with its L-BFGS-B hyperparameter
 search; only the gradient that search follows is computed here, from the inverse kernel matrix of
-the Cholesky factor, in about half the time.
+the Cholesky factor.
 
 References
 ----------
