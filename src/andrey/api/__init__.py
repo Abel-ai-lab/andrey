@@ -17,7 +17,7 @@ from .irregular import bottom_up_parce_lingam, camuv, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
 from .permutation import boss, grasp
-from .score import calm, exact_search, ges, gies, hc
+from .score import calm, exact_search, ges, gies, hc, xges
 from .temporal import longitudinal_lingam, varma_lingam
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     # score-based
     "ges",
     "gies",
+    "xges",
     "hc",
     "exact_search",
     "calm",

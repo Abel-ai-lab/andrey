@@ -421,7 +421,16 @@ def test_seeded_run_reports_resolved_seed(capsys, csv_path):
 
 @pytest.mark.parametrize(
     "name",
-    ["pc", "direct_lingam", "varma_lingam", "gin", "rcd", "camuv", "bottom_up_parce_lingam"],
+    [
+        "pc",
+        "xges",
+        "direct_lingam",
+        "varma_lingam",
+        "gin",
+        "rcd",
+        "camuv",
+        "bottom_up_parce_lingam",
+    ],
 )
 def test_output_envelope_matches_spec(name, capsys, csv_path, nongaussian_path):
     """The result envelope reflects the method's OutputSpec claims (kind / ordering / weighted)."""

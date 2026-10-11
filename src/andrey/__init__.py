@@ -28,6 +28,7 @@ from .api import (
     pnl,
     rcd,
     varma_lingam,
+    xges,
 )
 from .core import GraphStructure, Structure, StructureOutput, SummaryGraph, TemporalStructure
 from .core.backend import config, describe
@@ -67,6 +68,7 @@ __all__ = [
     "cdnod",
     "ges",
     "gies",
+    "xges",
     "hc",
     "exact_search",
     "calm",
