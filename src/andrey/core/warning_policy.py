@@ -48,13 +48,6 @@ class SearchLimitWarning(AndreyWarning):
     """
 
 
-class ScoreWarning(AndreyWarning):
-    """A fit returned a score that is not finite, so the score cannot rank graphs.
-
-    ``xges`` warns when the BIC of its result is ``nan`` or ``-inf``, as on rank-deficient data.
-    """
-
-
 def warn_once(message: str, category: type[AndreyWarning]) -> None:
     """Warn with ``message`` the first time this process sees it, at the caller's line."""
     key = (category, message)

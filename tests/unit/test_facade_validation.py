@@ -6,13 +6,10 @@ Direct Python calls (not the CLI, which validates inputs of its own) must not le
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 
 import andrey
-from andrey.core import warning_policy
 
 
 def test_direct_lingam_rejects_non_2d():
@@ -248,25 +245,3 @@ def test_cdnod_rejects_nan_in_c_indx():
 def test_xges_rejects_a_bad_setting(setting, value, error):
     with pytest.raises(error, match=setting):
         andrey.xges(_data(), **{setting: value})
-
-
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-@pytest.mark.parametrize(
-    "x",
-    [_data(n=5, d=10), _with(_data(), (slice(None), 2), _data()[:, 0])],
-    ids=["no more rows than columns", "a duplicate column"],
-)
-def test_xges_warns_when_its_score_is_not_finite(x, monkeypatch):
-    monkeypatch.setattr(warning_policy, "_warned", set())
-    with pytest.warns(andrey.ScoreWarning):
-        out = andrey.xges(x)
-    assert not np.isfinite(out.metadata["score"])
-
-
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-def test_xges_does_not_warn_on_full_rank_data(monkeypatch):
-    monkeypatch.setattr(warning_policy, "_warned", set())
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", andrey.ScoreWarning)
-        out = andrey.xges(_data())
-    assert np.isfinite(out.metadata["score"])
