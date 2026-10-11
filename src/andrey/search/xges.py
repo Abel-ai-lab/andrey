@@ -81,6 +81,19 @@ def _change_kind(old: int, new: int) -> int:
     return _UNORIENT if new == _UNDIRECTED else _REVERSE
 
 
+_MASK64 = (1 << 64) - 1
+
+
+def _edge_key(a: int, b: int, state: int) -> int:
+    """A 128-bit key of the pair ``(a, b)`` in ``state``; the XOR of a graph's keys fingerprints it.
+
+    Tuple hashes of ints do not depend on ``PYTHONHASHSEED``, so the keys are the same every run.
+    """
+    if state == _NONE:
+        return 0
+    return (hash((a, b, state)) & _MASK64) | (hash((state, b, a)) & _MASK64) << 64
+
+
 class _Changes(dict):
     """The net change of each pair since the last :meth:`clear`: ``{(a, b): [old, new]}``, a < b.
 
@@ -95,6 +108,12 @@ class _Changes(dict):
             del self[(a, b)]
         else:
             entry[1] = new
+
+    def rekey(self, fingerprint: int) -> int:
+        """A graph's ``fingerprint`` (the XOR of its :func:`_edge_key`) after these changes."""
+        for (a, b), (old, new) in self.items():
+            fingerprint ^= _edge_key(a, b, old) ^ _edge_key(a, b, new)
+        return fingerprint
 
 
 class _Graph:
@@ -179,6 +198,59 @@ class _Graph:
             for y in self.ne[x]:
                 adj[x, y] = TAIL
         return adj
+
+
+def _extension_parents(
+    pa: list[set[int]], ne: list[set[int]], nodes: Iterable[int]
+) -> dict[int, set[int]]:
+    """Each node's parents in a consistent DAG extension of the CPDAG that the graph alone picks.
+
+    Covers the chain components (nodes joined by undirected edges) of ``nodes``. Each component is
+    oriented along a maximum cardinality search from its lowest node, ties to the lowest node. A
+    chain component is chordal, so each node's earlier neighbors form a clique and the orientation
+    adds no v-structure; nodes in other components keep their parents.
+    """
+    out: dict[int, set[int]] = {}
+    for root in nodes:
+        if root in out:
+            continue
+        if not ne[root]:
+            out[root] = pa[root]
+            continue
+        component, stack = {root}, [root]
+        while stack:
+            for u in ne[stack.pop()] - component:
+                component.add(u)
+                stack.append(u)
+        weight = dict.fromkeys(component, 0)
+        heap = [(0, v) for v in component]
+        heapq.heapify(heap)
+        rank: dict[int, int] = {}
+        while heap:
+            w, v = heapq.heappop(heap)
+            if v in rank or -w != weight[v]:
+                continue
+            rank[v] = len(rank)
+            for u in ne[v]:
+                if u not in rank:
+                    weight[u] += 1
+                    heapq.heappush(heap, (-weight[u], u))
+        for v in component:
+            out[v] = pa[v] | {u for u in ne[v] if rank[u] < rank[v]}
+    return out
+
+
+def _extension_scores(
+    pa: list[set[int]], ne: list[set[int]], nodes: Iterable[int], score: BICScore
+) -> dict[int, float]:
+    """The memoized local score of each node :func:`_extension_parents` covers.
+
+    The sum over all nodes is the CPDAG's total score. Unlike a sum of the search's deltas it does
+    not depend on the moves that reached the graph, even where a singular parent set makes the Schur
+    update and two full scores disagree.
+    """
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return {v: score.score(v, tuple(ps)) for v, ps in _extension_parents(pa, ne, nodes).items()}
 
 
 # ---- local CPDAG completion ---------------------------------------------------------------------
@@ -416,19 +488,19 @@ class _Search:
         self.d = d
         self.g = _Graph(d)
         self.paths: PathMap = defaultdict(set)
-        self.total = 0.0
+        self.fingerprint = 0  # the XOR of _edge_key over the edges of g
         self.inserts: list[tuple] = []
         self.reverses: list[tuple] = []
         self.deletes: list[tuple] = []
         self.seq = count()
 
     def branch(self) -> _Search:
-        """A copy of the graph and path records, with empty queues and the same scores."""
+        """A copy of the graph and path records, with empty queues and the same score cache."""
         out = _Search.__new__(_Search)
         out.add_deltas, out.d, out.seq = self.add_deltas, self.d, self.seq
         out.g = self.g.copy()
         out.paths = defaultdict(set, {k: set(v) for k, v in self.paths.items()})
-        out.total = self.total
+        out.fingerprint = self.fingerprint
         out.inserts, out.reverses, out.deletes = [], [], []
         return out
 
@@ -685,27 +757,39 @@ class _Search:
     # -- XGES-0 and the extended search ---------------------------------------------------------
 
     def xges0(self) -> None:
-        """Apply the best improving Delete, else Reverse, else Insert, until none is left."""
+        """Apply the best improving Delete, else Reverse, else Insert, until none is left.
+
+        A move back to a graph this run has visited is undone and dropped. On a singular parent set
+        the Schur update and two full scores can disagree, so each move of a cycle can look
+        improving; skipping revisits ends the run on any data.
+        """
         g, paths = self.g, self.paths
         log = _Changes()
+        seen = {self.fingerprint}
         while self.deletes or self.reverses or self.inserts:
             log.clear()
             if self.deletes:
-                delta, _, x, y, C, E = heapq.heappop(self.deletes)
+                _, _, x, y, C, E = heapq.heappop(self.deletes)
                 if not _delete_valid(g, x, y, C, E):
                     continue
                 _apply_delete(g, x, y, C, log)
             elif self.reverses:
-                delta, _, x, y, T, E, pa_x = heapq.heappop(self.reverses)
+                _, _, x, y, T, E, pa_x = heapq.heappop(self.reverses)
                 if g.pa[x] != pa_x or not _insert_valid(g, x, y, T, E, paths, reverse=True):
                     continue
                 _apply_reverse(g, x, y, T, log)
             else:
-                delta, _, x, y, T, E = heapq.heappop(self.inserts)
+                _, _, x, y, T, E = heapq.heappop(self.inserts)
                 if not _insert_valid(g, x, y, T, E, paths):
                     continue
                 _apply_insert(g, x, y, T, log)
-            self.total += delta
+            fingerprint = log.rekey(self.fingerprint)
+            if fingerprint in seen:
+                for (a, b), (old, _new) in log.items():
+                    g.set_state(a, b, old)
+                continue
+            seen.add(fingerprint)
+            self.fingerprint = fingerprint
             self.update(log)
 
     def extend(self, n_samples: int) -> None:
@@ -713,9 +797,16 @@ class _Search:
 
         Deletes are tried best first. After a branch is kept, the remaining Deletes of the earlier
         graph are still tried where they apply; the Deletes are listed again once they run out, and
-        the search stops when a fresh list is exhausted with no branch kept.
+        the search stops when a fresh list is exhausted with no branch kept. Branches are compared
+        by the sum of :func:`_extension_scores`, a function of the graph, so every kept branch
+        lowers it and no graph is kept twice. A branch rescores only the chain components of the
+        nodes whose parents or neighbors it changed; the other nodes keep their extension parents.
         """
         tolerance = _ACCEPT_PER_SAMPLE * n_samples
+        score = self.add_deltas.score
+        scores = _extension_scores(self.g.pa, self.g.ne, range(self.d), score)
+        local = [scores[v] for v in range(self.d)]
+        total = sum(local)
         pending: list[tuple] = []
         fresh = False
         while pending or not fresh:
@@ -726,18 +817,25 @@ class _Search:
                 if not pending:
                     return
                 fresh = True
-            delta, _, x, y, C, E = heapq.heappop(pending)
+            _, _, x, y, C, E = heapq.heappop(pending)
             if not _delete_valid(self.g, x, y, C, E):
                 continue
             trial = self.branch()
             log = _Changes()
             _apply_delete(trial.g, x, y, C, log)
-            trial.total += delta
             trial.g.forbidden.add((x, y))
+            trial.fingerprint = log.rekey(trial.fingerprint)
             trial.update(log)
             trial.xges0()
-            if trial.total < self.total - tolerance:
-                self.g, self.paths, self.total = trial.g, trial.paths, trial.total
+            g, h = self.g, trial.g
+            changed = [v for v in range(self.d) if h.pa[v] != g.pa[v] or h.ne[v] != g.ne[v]]
+            trial_local = local.copy()
+            for v, value in _extension_scores(h.pa, h.ne, changed, score).items():
+                trial_local[v] = value
+            trial_total = sum(trial_local)
+            if trial_total < total - tolerance:
+                self.g, self.paths, self.fingerprint = h, trial.paths, trial.fingerprint
+                local, total = trial_local, trial_total
                 fresh = False
 
 
@@ -817,10 +915,9 @@ def _all_reverses(adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, in
     return out
 
 
-def _best(candidates: list[tuple]) -> tuple | None:
-    """The improving candidate with the lowest delta (the first found among equals), if any."""
-    improving = [c for c in candidates if c[0] < -_EPS_IMPROVE]
-    return min(improving, key=lambda c: c[0]) if improving else None
+def _improving(candidates: list[tuple]) -> list[tuple]:
+    """The improving candidates, lowest delta first (in the order found among equals)."""
+    return sorted((c for c in candidates if c[0] < -_EPS_IMPROVE), key=lambda c: c[0])
 
 
 def _delete_marks(adj: np.ndarray, x: int, y: int, C: frozenset[int]) -> np.ndarray:
@@ -832,39 +929,56 @@ def _delete_marks(adj: np.ndarray, x: int, y: int, C: frozenset[int]) -> np.ndar
     return _reform_cpdag(adj)
 
 
-def _rescan_xges0(
-    adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]], total: float
-) -> tuple[np.ndarray, float]:
-    """XGES-0 with every operator rescanned after each move."""
+def _insert_marks(adj: np.ndarray, x: int, y: int, T: frozenset[int]) -> np.ndarray:
+    """Apply Insert ``x -> y`` with ``T`` to a copy of a mark matrix and re-form the CPDAG."""
+    adj = adj.copy()
+    ops.apply_insert(adj, x, y, T)
+    return _reform_cpdag(adj)
+
+
+def _rescan_moves(
+    adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]], reach: Callable
+) -> Iterable[np.ndarray]:
+    """The graphs XGES-0's improving moves on ``adj`` lead to, in the order it tries them."""
+    for _, x, y, C, _E in _improving(_all_deletes(adj, score)):
+        yield _delete_marks(adj, x, y, C)
+    for _, x, y, T in _improving(_all_reverses(adj, score, forbidden)):
+        cut = adj.copy()
+        cut[x, y] = cut[y, x] = NULL
+        yield _insert_marks(cut, x, y, T)
+    for _, x, y, T in _improving(_all_inserts(adj, score, forbidden, reach(adj))):
+        yield _insert_marks(adj, x, y, T)
+
+
+def _rescan_xges0(adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]]) -> np.ndarray:
+    """XGES-0 with every operator rescanned after each move, skipping moves to visited graphs."""
     build_state = _reach_factory(adj.shape[0])
+    seen = {adj.tobytes()}
     while True:
-        best = _best(_all_deletes(adj, score))
-        if best is not None:
-            delta, x, y, C, _E = best
-            adj = _delete_marks(adj, x, y, C)
-            total += delta
-            continue
-        best = _best(_all_reverses(adj, score, forbidden))
-        if best is None:
-            best = _best(_all_inserts(adj, score, forbidden, build_state(adj)))
-            if best is None:
-                return adj, total
+        for moved in _rescan_moves(adj, score, forbidden, build_state):
+            if moved.tobytes() not in seen:
+                seen.add(moved.tobytes())
+                adj = moved
+                break
         else:
-            adj = adj.copy()
-            adj[best[1], best[2]] = adj[best[2], best[1]] = NULL
-        delta, x, y, T = best
-        adj = adj.copy()
-        ops.apply_insert(adj, x, y, T)
-        adj = _reform_cpdag(adj)
-        total += delta
+            return adj
+
+
+def _marks_total(adj: np.ndarray, score: BICScore) -> float:
+    """The total of :func:`_extension_scores` for a CPDAG given as a mark matrix."""
+    d = adj.shape[0]
+    sets = [_sets(adj, v) for v in range(d)]
+    scores = _extension_scores([s[0] for s in sets], [s[1] for s in sets], range(d), score)
+    return sum(scores[v] for v in range(d))
 
 
 def _rescan_search(score: BICScore, d: int, extended: bool) -> np.ndarray:
     """XGES with every operator rescanned and the CPDAG re-formed globally after each move."""
-    adj, total = _rescan_xges0(np.zeros((d, d), dtype=np.int8), score, set(), 0.0)
+    adj = _rescan_xges0(np.zeros((d, d), dtype=np.int8), score, set())
     if not extended:
         return adj
     tolerance = _ACCEPT_PER_SAMPLE * score.n
+    total = _marks_total(adj, score)
     forbidden: set[tuple[int, int]] = set()
     pending: list[tuple] = []
     fresh = False
@@ -874,16 +988,15 @@ def _rescan_search(score: BICScore, d: int, extended: bool) -> np.ndarray:
             if not pending:
                 break
             fresh = True
-        delta, x, y, C, E = pending.pop(0)
+        _, x, y, C, E = pending.pop(0)
         pa_y, ne_y, _ = _sets(adj, y)
         ad_x = set(ops.adjacent(adj, x).tolist())
         valid = (x in pa_y or x in ne_y) and C <= ne_y & ad_x and E == C | pa_y | {x}
         if not (valid and ops.is_clique(adj, C)):
             continue
         trial_forbidden = forbidden | {(x, y)}
-        trial, trial_total = _rescan_xges0(
-            _delete_marks(adj, x, y, C), score, trial_forbidden, total + delta
-        )
+        trial = _rescan_xges0(_delete_marks(adj, x, y, C), score, trial_forbidden)
+        trial_total = _marks_total(trial, score)
         if trial_total < total - tolerance:
             adj, total, forbidden = trial, trial_total, trial_forbidden
             fresh = False

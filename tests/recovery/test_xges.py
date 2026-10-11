@@ -9,14 +9,22 @@ return the graph the rescanning reference path in ``andrey.search.xges`` returns
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+
 import numpy as np
 import pytest
 
 import andrey
 import andrey.data as data
 from andrey.api._adapt import dag_from_adjacency
+from andrey.core import ARROW, TAIL
 from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
+from andrey.core.score import BICScore
 from andrey.metrics import shd, to_cpdag
+from andrey.search.ges import _recompute_objective
+from andrey.search.xges import _extension_parents, _marks_total, _sets
 from andrey.search.xges import xges as xges_search
 from tests.recovery.helpers import datagen
 
@@ -162,3 +170,76 @@ def test_lambda_value_is_the_penalty_ges_uses():
         xges = andrey.xges(ds.data, lambda_value=lam, extended_search=False)
         assert shd(ges.structure, xges.structure) == 0
         assert xges.metadata["score"] == pytest.approx(ges.metadata["score"], rel=1e-12)
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_branches_are_scored_on_a_member_of_the_class(seed):
+    """The extended search compares branches by the BIC of one DAG it picks from each CPDAG. That
+    DAG must belong to the CPDAG's class, so its BIC is the class's BIC."""
+    ds = _er_sample(15, 1.5 + seed % 3, 500, seed)
+    cpdag = from_structure(to_cpdag(ds.graph))
+    sets = [_sets(cpdag, v) for v in range(15)]
+    parents = _extension_parents([s[0] for s in sets], [s[1] for s in sets], range(15))
+    dag = np.zeros_like(cpdag)
+    for v, ps in parents.items():
+        for u in ps:
+            dag[u, v], dag[v, u] = TAIL, ARROW
+    assert np.array_equal(dag2cpdag(dag), cpdag)
+    score = BICScore(ds.data)
+    assert _marks_total(cpdag, score) == pytest.approx(_recompute_objective(cpdag, score, 15))
+
+
+def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
+    """Data with exactly collinear columns, with the ``lambda_value`` and ``extended_search``."""
+    cases = {}
+    for name, (n, d, seed, column, weights) in {
+        "x5 = x2 + x3": (200, 10, 0, 5, {2: 1.0, 3: 1.0}),
+        "x7 = 2 x2 - x3 + x4": (500, 8, 2, 7, {2: 2.0, 3: -1.0, 4: 1.0}),
+        "x5 = x2 + x3, d=20": (1000, 20, 1, 5, {2: 1.0, 3: 1.0}),
+    }.items():
+        x = np.random.default_rng(seed).standard_normal((n, d))
+        x[:, column] = sum(w * x[:, j] for j, w in weights.items())
+        cases[name] = (x, 1.0, True)
+    cases["x5 = x2 + x3, lambda 2"] = (cases["x5 = x2 + x3"][0], 2.0, True)
+    rng = np.random.default_rng(6)
+    x = rng.standard_normal((300, 6))
+    cases["one-hot block"] = (np.column_stack([x, np.eye(3)[rng.integers(0, 3, 300)]]), 1.0, True)
+    rng = np.random.default_rng(26)
+    hot = np.eye(3)[rng.integers(0, 3, 300)]
+    x = rng.standard_normal((300, 5))
+    x[:, 0] += hot @ np.array([1.0, -1.0, 0.5])
+    x[:, 1] += x[:, 0]
+    cases["one-hot block, XGES-0"] = (np.column_stack([x, hot]), 1.0, False)
+    return cases
+
+
+_FIT_EACH = """
+import json, sys
+import numpy as np
+from andrey.search.xges import xges
+for path, lambda_value, extended_search in json.loads(sys.argv[1]):
+    xges(np.load(path), lambda_value=lambda_value, extended_search=extended_search)
+    print(path, flush=True)
+"""
+
+
+def test_the_search_ends_on_rank_deficient_data(tmp_path):
+    """Collinear columns make parent sets singular, where the Schur update and two full scores
+    disagree and a cycle of moves can each look improving. Every search must still end; a child
+    process runs the fits so that one that does not is stopped."""
+    runs = []
+    for name, (x, lambda_value, extended_search) in _rank_deficient().items():
+        path = tmp_path / f"{len(runs)}.npy"
+        np.save(path, x)
+        runs.append((str(path), lambda_value, extended_search, name))
+    try:
+        subprocess.run(
+            [sys.executable, "-c", _FIT_EACH, json.dumps([r[:3] for r in runs])],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as stopped:
+        done = len((stopped.stdout or b"").splitlines())
+        pytest.fail(f"no result within 60 s for {runs[done][3]!r}")
