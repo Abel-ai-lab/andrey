@@ -103,7 +103,7 @@ def ladder_keys(
 ) -> list[DatasetKey]:
     """One dataset per ``(d, density, seed)`` on :data:`SLICE`, of `n` rows, else ``10 * d``."""
     return [
-        DatasetKey(**SLICE, density=density, d=d, n=n or 10 * d, seed=seed)
+        DatasetKey(**SLICE, density=density, d=d, n=10 * d if n is None else n, seed=seed)
         for d in ladder
         for density in densities
         for seed in range(seeds)
@@ -259,6 +259,8 @@ def main(argv: list[str] | None = None) -> int:
     ):
         if value < least:
             p.error(f"{flag} must be at least {least}, got {value}")
+    if args.n is not None and args.n < 1:
+        p.error(f"--n must be at least 1, got {args.n}")
     if not (math.isfinite(args.lambda_value) and args.lambda_value >= 0):
         p.error(f"--lambda-value must be finite and non-negative, got {args.lambda_value}")
     if any(not density > 0 for density in args.densities):

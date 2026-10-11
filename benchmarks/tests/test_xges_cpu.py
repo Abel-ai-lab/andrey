@@ -128,6 +128,7 @@ def test_an_unknown_solution_name_stops_the_run(capsys: pytest.CaptureFixture) -
         ("--seeds", "0"),
         ("--repeats", "0"),
         ("--warmup", "-1"),
+        ("--n", "0"),
         ("--lambda-value", "-1"),
         ("--densities", "0"),
     ],
