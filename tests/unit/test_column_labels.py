@@ -27,7 +27,8 @@ def inputs(spec, frames) -> list:
     args = []
     for inp in spec.data.inputs:
         if inp.kind == "matrix":
-            args.append(frames[0][COLUMNS[:2]] if spec.name == "pnl" else frames[0])  # a pair
+            pair = spec.family == "pairwise"
+            args.append(frames[0][COLUMNS[:2]] if pair else frames[0])
         elif inp.kind == "panel":
             args.append(frames)
         elif inp.kind == "context":
@@ -55,8 +56,8 @@ def test_dataframe_columns_become_labels(spec):
     out = getattr(andrey, spec.name)(*inputs(spec, [frame(0), frame(1), frame(2)]))
     for result in out if isinstance(out, list) else [out]:
         for graph in graphs(result.structure):
-            # GIN appends its latents after the observed columns; PNL takes the first two.
-            columns = COLUMNS[:2] if spec.name == "pnl" else COLUMNS
+            # GIN appends its latents after the observed columns; a pairwise test takes two.
+            columns = COLUMNS[:2] if spec.family == "pairwise" else COLUMNS
             assert graph.labels[: len(columns)] == tuple(columns)
             assert graph.labels == result.structure.labels
 
