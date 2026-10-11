@@ -4,9 +4,9 @@ This module supplies picklable worker functions and a work estimate for parallel
 pass scans legal add/remove/reverse moves and applies the best improvement before the next pass.
 Tabu search (:mod:`andrey.search.tabu`) runs its passes on the same workers and work gate.
 
-A move ``u -> v`` belongs to the worker owning its head ``v`` (see :func:`hc._scan_moves`). Fixed
-target partitions cover every move and retain Schur-delta caches across passes. The total-order
-``(delta, u, v, op_rank)`` reduction matches the serial :func:`hc._best_move` regardless of
+A move ``u -> v`` belongs to the worker owning its head ``v`` (see :class:`hc.MoveScanner`). Fixed
+target partitions cover every move and each worker keeps its scanner, with its deltas, across
+passes. The total-order ``(delta, u, v, op_rank)`` reduction matches the serial scan regardless of
 partitioning or worker assignment.
 """
 
@@ -20,22 +20,20 @@ from andrey.core.score_delta import DeltaBICScore
 from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search._parallel import _EPS_IMPROVE
-from andrey.search.hc import ScannedMove, StructureKey, _reachability, _scan_moves
+from andrey.search.hc import MoveScanner, ScannedMove, StructureKey
 
 reduce_best = par.reduce_best  # re-exported so callers/tests reach it here
 _pick_context = par.pick_context  # patchable seam (mirrors GES) for the spawn-context parity test
 
-# Each pass scans d * (d - 1) moves, mostly memo hits after warmup. Below this threshold,
-# a pass runs in-process because IPC costs exceed the savings from HC's cheap scan.
+# Each pass scans d * (d - 1) moves, mostly with deltas kept from earlier passes. Below this
+# threshold, a pass runs in-process because IPC costs exceed the savings from HC's cheap scan.
 # ANDREY_HC_PARALLEL_MIN_WORK overrides it; 0 forces workers for serial/parallel equality tests.
 # The default sits between the cutoffs for one fit per process and for many; `andrey calibrate`
 # measures the latter.
 _DEFAULT_MIN_WORK = 30_000
 
-# _init_worker installs state once; Schur-delta and derived-score caches persist across passes.
-_WORKER_DELTA: DeltaBICScore | None = None
-_WORKER_CACHE: dict | None = None
-_WORKER_D: int = 0
+# _init_worker installs state once; the scanner and its Schur-delta caches persist across passes.
+_WORKER_SCANNER: MoveScanner | None = None
 _WORKER_TOKEN: object = None
 _WORKER_BLAS: object = None  # a held threadpoolctl controller, caps this worker's BLAS to 1 thread
 
@@ -50,16 +48,15 @@ def _init_worker(
     ``cov`` bytes -- so every worker feeds identical bytes into the delta and is bit-identical to
     serial. ``n_samples`` is the observation count the BIC penalty uses; ``n_vars`` the node count.
     """
-    global _WORKER_DELTA, _WORKER_CACHE, _WORKER_D, _WORKER_TOKEN, _WORKER_BLAS
+    global _WORKER_SCANNER, _WORKER_TOKEN, _WORKER_BLAS
     from threadpoolctl import threadpool_limits
 
     from andrey.core import backend as _backend
 
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
     _backend.config.backend = "numpy"
-    _WORKER_DELTA = DeltaBICScore(BICScore.from_cov(cov, n_samples, lambda_value=lambda_value))
-    _WORKER_CACHE = {}
-    _WORKER_D = n_vars
+    delta = DeltaBICScore(BICScore.from_cov(cov, n_samples, lambda_value=lambda_value))
+    _WORKER_SCANNER = MoveScanner(delta, n_vars)
     _WORKER_TOKEN = run_token
 
 
@@ -71,28 +68,15 @@ def _scan_task(
     floor: float = -_EPS_IMPROVE,
     tabu: frozenset[StructureKey] | None = None,
 ) -> ScannedMove | None:
-    """Worker side of one chunk: rebuild reachability, scan the chunk's moves, return the best.
+    """Worker side of one chunk: the best move whose head is in ``targets``.
 
-    ``floor`` and ``tabu`` pass through to :func:`hc._scan_moves`; tabu search sets them, and hill
-    climbing keeps the defaults.
+    ``floor`` and ``tabu`` pass through to :meth:`hc.MoveScanner.best`; tabu search sets them, and
+    hill climbing keeps the defaults.
     """
     if run_token != _WORKER_TOKEN:
         raise RuntimeError("HC worker pool reused across runs (cov/token mismatch)")
-    assert _WORKER_DELTA is not None  # _init_worker runs before any task
-    assert _WORKER_CACHE is not None
-    d = _WORKER_D
-    reach = _reachability(adj_int, d)
-    return _scan_moves(
-        targets,
-        adj_int,
-        parents_of,
-        _WORKER_DELTA,
-        d,
-        reach,
-        _WORKER_CACHE,
-        floor=floor,
-        tabu=tabu,
-    )
+    assert _WORKER_SCANNER is not None  # _init_worker runs before any task
+    return _WORKER_SCANNER.best(adj_int, parents_of, targets=targets, floor=floor, tabu=tabu)
 
 
 def _min_work() -> int:
@@ -183,7 +167,7 @@ def run_hc(
         calibrate.warn_default_cutoff("hc", w_min)
     fan_out = workers > 1 and _estimate_work(d) > w_min
     lazy = _LazyWorkerSet(delta.score_obj, d, workers)
-    cache: dict = {}  # the in-process (below-gate) memo; workers hold their own
+    scanner = MoveScanner(delta, d)  # the in-process (below-gate) scan; workers hold their own
     moves = 0
     try:
         for _ in range(max_iter):
@@ -191,8 +175,7 @@ def run_hc(
                 wset = lazy.get()
                 best = reduce_best(wset.dispatch(_scan_task, adj_int, parents_of, lazy.token))
             else:
-                reach = _reachability(adj_int, d)
-                best = _scan_moves(range(d), adj_int, parents_of, delta, d, reach, cache)
+                best = scanner.best(adj_int, parents_of)
             if best is None:
                 break
             _apply_move(adj_int, parents_of, best[4])

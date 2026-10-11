@@ -1,7 +1,7 @@
 """Tabu search over DAGs, the engine behind :func:`andrey.tabu`.
 
 The algorithm, its settings, and its references are described on :func:`andrey.tabu`; ``_search``
-runs it. Moves are scanned by :func:`andrey.search.hc._scan_moves` and, above hill climbing's work
+runs it. Moves are scanned by :class:`andrey.search.hc.MoveScanner` and, above hill climbing's work
 gate, by its worker set (:mod:`andrey.search._parallel_hc`), so tabu search breaks ties as hill
 climbing does and gives the same result with any worker count. The best DAG visited is converted
 to its CPDAG and reported with its total BIC (lower is better).
@@ -13,7 +13,6 @@ import math
 from collections import deque
 
 import numpy as np
-from threadpoolctl import threadpool_limits
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
@@ -23,7 +22,7 @@ from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search import _parallel_hc as phc
 from andrey.search import calibrate
 from andrey.search._parallel import _EPS_IMPROVE
-from andrey.search.hc import ScannedMove, StructureKey, _apply_move, _reachability, _scan_moves
+from andrey.search.hc import MoveScanner, ScannedMove, StructureKey, _apply_move
 
 __all__ = ["tabu"]
 
@@ -33,13 +32,11 @@ class _Scanner:
 
     Tabu search shares hill climbing's gate (``ANDREY_HC_PARALLEL_MIN_WORK``) and worker set: one
     pass scans the same moves. The worker set is created on first use and kept for every pass, so
-    the workers' delta caches persist.
+    the workers' deltas persist.
     """
 
     def __init__(self, delta: DeltaBICScore, d: int, workers: int) -> None:
-        self._delta = delta
-        self._d = d
-        self._cache: dict = {}  # the in-process memo; workers hold their own
+        self._scanner = MoveScanner(delta, d)  # the in-process scan; workers hold their own
         workers = max(1, min(workers, d))
         w_min = phc._min_work()
         work = phc._estimate_work(d)
@@ -63,19 +60,7 @@ class _Scanner:
                 phc._scan_task, adj_int, parents_of, self._lazy.token, floor, tabu
             )
             return phc.reduce_best(results)
-        d = self._d
-        reach = _reachability(adj_int, d)
-        return _scan_moves(
-            range(d),
-            adj_int,
-            parents_of,
-            self._delta,
-            d,
-            reach,
-            self._cache,
-            floor=floor,
-            tabu=tabu,
-        )
+        return self._scanner.best(adj_int, parents_of, floor=floor, tabu=tabu)
 
     def close(self) -> None:
         self._lazy.close()
@@ -175,7 +160,7 @@ def tabu(
 
     # Pin BLAS to one thread so the Schur updates are thread-count-reproducible and equal to the
     # (1-thread) workers, as hill climbing does.
-    with threadpool_limits(limits=1):
+    with backend.one_blas_thread():
         best_key, moves = _search(
             score, d, tabu_length, max_tabu, max_iter, workers=backend.worker_count()
         )

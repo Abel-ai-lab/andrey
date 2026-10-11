@@ -98,6 +98,20 @@ def test_num_workers_resolution(monkeypatch):
         andrey.config.num_workers = -2
 
 
+def test_one_blas_thread_limits_then_restores():
+    from threadpoolctl import threadpool_info, threadpool_limits
+
+    def blas_threads() -> list[int]:
+        return [pool["num_threads"] for pool in threadpool_info() if pool["user_api"] == "blas"]
+
+    with threadpool_limits(limits=2, user_api="blas"):
+        assert blas_threads() and set(blas_threads()) == {2}
+        for _ in range(2):  # the second call reuses the libraries found by the first
+            with backend.one_blas_thread():
+                assert set(blas_threads()) == {1}
+            assert set(blas_threads()) == {2}
+
+
 def test_bad_backend_value_raises():
     with pytest.raises(ValueError, match="backend"):
         andrey.config.backend = "quantum"

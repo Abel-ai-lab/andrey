@@ -19,6 +19,11 @@ in alpha, and any minor release may change the API.
   and returns the best DAG it visits, as a CPDAG. With the same settings its BIC score is never
   worse than `hc`'s.
 
+### Changed
+
+- `hc` gives the same graphs in less time: a step recomputes only the score changes its last move
+  made. A fit on 200 variables takes about a sixth of the time it did.
+
 ### Fixed
 
 - Every method checks its data before the fit. Data with one dimension, fewer than 2 rows, `NaN` or

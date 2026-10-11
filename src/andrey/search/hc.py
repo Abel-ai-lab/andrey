@@ -2,7 +2,8 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.hc`.
 
-Each candidate move is scored by the Schur-complement delta of :mod:`andrey.core.score_delta`.
+Each candidate move is scored by the Schur-complement delta of :mod:`andrey.core.score_delta`;
+:class:`MoveScanner` keeps the deltas between passes and computes only those a move made new.
 The move budget also regularizes: greedy ascent adds the strongest edges first, so stopping early
 keeps noise-fitting edges out of large, dense graphs. The DAG is converted to its CPDAG for output;
 the reported objective is the DAG's total BIC, lower is better.
@@ -10,10 +11,9 @@ the reported objective is the DAG's total BIC, lower is better.
 
 from __future__ import annotations
 
-from collections.abc import Container, Sequence
+from collections.abc import Collection, Sequence
 
 import numpy as np
-from threadpoolctl import threadpool_limits
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
@@ -41,48 +41,56 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 __all__ = ["hc"]
 
 
-def _reachability(adj_int: list[int], d: int) -> list[int]:
-    """Transitive-descendant bitsets: ``out[u]`` has bit ``v`` set iff a directed path ``u ~> v``.
+def _closure(adj_int: list[int], d: int) -> tuple[list[int], list[int]]:
+    """Descendant bitsets of each node: all, and those a path of two or more edges reaches.
 
     ``adj_int[u]`` is the out-neighbor bitset of ``u`` (bit ``v`` set iff the edge ``u -> v``
-    exists). One breadth-first bit-expansion per source over the current DAG.
+    exists). One pass over the DAG in reverse topological order.
     """
-    out = [0] * d
-    for src in range(d):
-        reach = 0
-        frontier = adj_int[src]
-        while frontier:
-            reach |= frontier
-            nxt = 0
-            bits = frontier
-            while bits:
-                lsb = bits & -bits
-                nxt |= adj_int[lsb.bit_length() - 1]
-                bits ^= lsb
-            frontier = nxt & ~reach
-        out[src] = reach
-    return out
+    indegree = [0] * d
+    for row in adj_int:
+        while row:
+            lsb = row & -row
+            indegree[lsb.bit_length() - 1] += 1
+            row ^= lsb
+    order: list[int] = []
+    stack = [u for u in range(d) if not indegree[u]]
+    while stack:
+        u = stack.pop()
+        order.append(u)
+        row = adj_int[u]
+        while row:
+            lsb = row & -row
+            c = lsb.bit_length() - 1
+            indegree[c] -= 1
+            if not indegree[c]:
+                stack.append(c)
+            row ^= lsb
+    reach = [0] * d
+    deep = [0] * d
+    for u in reversed(order):
+        below = 0
+        row = adj_int[u]
+        while row:
+            lsb = row & -row
+            below |= reach[lsb.bit_length() - 1]
+            row ^= lsb
+        deep[u] = below
+        reach[u] = adj_int[u] | below
+    return reach, deep
 
 
-def _reverse_stays_acyclic(adj_int: list[int], reach: list[int], u: int, v: int) -> bool:
-    """True when reversing ``u -> v`` to ``v -> u`` keeps the graph acyclic.
-
-    The reversal closes a cycle iff ``u`` still reaches ``v`` through some child other than ``v``
-    itself; excluding the edge being removed, no remaining child of ``u`` may reach ``v``.
-    """
-    target = 1 << v
-    children = adj_int[u] & ~target
-    while children:
-        lsb = children & -children
-        if reach[lsb.bit_length() - 1] & target:
-            return False
-        children ^= lsb
-    return True
+def _bit_matrix(rows: list[int], d: int) -> np.ndarray:
+    """Boolean matrix of bitset rows: ``out[i, j]`` is bit ``j`` of ``rows[i]``."""
+    width = (d + 7) // 8
+    raw = np.frombuffer(b"".join(r.to_bytes(width, "little") for r in rows), dtype=np.uint8)
+    bits = np.unpackbits(raw.reshape(len(rows), width), axis=1, bitorder="little")
+    return bits[:, :d].astype(bool)
 
 
 # A scanned candidate: (delta, u, v, op_rank, (op, u, v)). op_rank orders the ops that share a
 # ``(u, v)`` (remove 0 < reverse 1; add is 0 and never coexists with remove), so ``key = r[:4]``
-# reproduces serial's "first encountered in (u, v, op) order" tie-break as a strict total order.
+# is a strict total order over the moves of a pass.
 ScannedMove = tuple[float, int, int, int, tuple[str, int, int]]
 
 # A DAG's identity for a tabu list: its out-neighbor bitset rows, ``tuple(adj_int)``.
@@ -102,116 +110,140 @@ def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
     return tuple(rows)
 
 
-def _allowed(adj_int: list[int], move: tuple[str, int, int], tabu: Container | None) -> bool:
-    """True unless ``move`` leads to a structure in ``tabu``; ``None`` allows every move."""
-    return tabu is None or _key_after(adj_int, move) not in tabu
+_ADD, _REMOVE = 0, 1  # first index of MoveScanner's delta tables
 
 
-def _scan_moves(
-    targets: Sequence[int],
-    adj_int: list[int],
-    parents_of: dict[int, list[int]],
-    delta: DeltaBICScore,
-    d: int,
-    reach: list[int],
-    cache: dict[tuple[int, tuple[int, ...], str, int], float],
-    *,
-    floor: float = -_EPS_IMPROVE,
-    tabu: Container | None = None,
-) -> ScannedMove | None:
-    """The best move with ``delta < floor`` whose HEAD ``v`` is in ``targets``.
+class MoveScanner:
+    """The best single-edge move of a pass, rescoring only the targets whose parents changed.
 
-    Moves are keyed ``(delta, u, v, op_rank)``. The default ``floor`` admits improving moves only;
-    ``floor=inf`` admits every legal move. A move whose resulting structure key is in ``tabu`` is
-    skipped. The key is built only for a move that beats the running best, so the check costs
-    nothing when no tabu list is given.
+    The delta of adding or removing ``u`` at target ``v`` depends only on ``v``'s parent set, so it
+    is kept in a table, ``(op, u, v)``, whose column ``v`` belongs to ``v``'s current parents.
+    When those change, the column is put aside under ``(v, parents)`` and the one for the new
+    parents is brought back or started empty; a column is never discarded, so a delta is computed
+    at most once per run. Each pass computes only the deltas its legal moves need that the table
+    does not hold, in the order the moves are visited (``u``, then ``v``; a remove before the add
+    that completes its reverse). That order matters: the Schur delta reads a residual cache that
+    earlier deltas write, so the order fixes every value to the last bit. Legality, admission, and
+    the tie-break run on whole arrays.
 
-    A move ``u -> v`` is owned by the chunk that owns its head ``v``, so partitioning ``targets`` is
-    an exact partition of the move space. Selection is a strict total order over the admitted
-    moves, so it is decomposable and visitation-order-independent -- the parallel reduce over
-    per-chunk bests reproduces the whole-range scan exactly. A running ``best - EPS`` comparison
-    would be order-dependent when two deltas differ by less than ``EPS``; the total-order key
-    resolves exact symmetries.
-
-    Each delta comes from the Schur-complement update, memoized in ``cache`` by
-    ``(target, parents-of-target, op, moved)``; reversing ``u -> v`` decomposes into an add of ``v``
-    to ``u``'s parents plus a remove of ``u`` from ``v``'s (additive deltas, independent targets).
+    A move ``u -> v`` belongs to the scan whose ``targets`` hold its head ``v``, so partitioning the
+    targets partitions the moves (:mod:`andrey.search._parallel_hc`). Reversing ``u -> v`` sums an
+    add of ``v`` at target ``u`` and a remove of ``u`` at target ``v``.
     """
-    pa = [tuple(parents_of[i]) for i in range(d)]  # each node's parent tuple, built once per scan
-    inv_n = 1.0 / delta.score_obj.n  # key on delta/n: noise and signal scale with n (see _KEY_DP)
-    best: ScannedMove | None = None
-    for u in range(d):
-        row = adj_int[u]
-        u_bit = 1 << u
-        pa_u = pa[u]
-        for v in targets:
-            if u == v:
+
+    def __init__(self, delta: DeltaBICScore, d: int) -> None:
+        self._delta = delta
+        self._d = d
+        self._inv_n = 1.0 / delta.score_obj.n  # key on delta/n: noise and signal scale with n
+        self._value = np.full((2, d, d), np.nan)
+        self._known = np.zeros((2, d, d), dtype=bool)
+        self._parents: list[tuple[int, ...] | None] = [None] * d  # what column v belongs to
+        self._shelf: dict[tuple[int, tuple[int, ...]], tuple[np.ndarray, np.ndarray]] = {}
+        self._last: tuple | None = None  # the last DAG scanned, and its _moves
+
+    def _sync(self, pa: list[tuple[int, ...]]) -> None:
+        """Point each column at its target's current parents."""
+        for v in range(self._d):
+            old = self._parents[v]
+            if old == pa[v]:
                 continue
-            v_bit = 1 << v
-            pa_v = pa[v]
-            if row & v_bit:  # edge u -> v exists
-                d_rem = _cached_delta(cache, delta, v, pa_v, u, "remove")
-                if d_rem < floor:
-                    cand = (round(d_rem * inv_n, _KEY_DP), u, v, 0, ("remove", u, v))
-                    if (best is None or cand[:4] < best[:4]) and _allowed(adj_int, cand[4], tabu):
-                        best = cand
-                if _reverse_stays_acyclic(adj_int, reach, u, v):
-                    d_rev = _cached_delta(cache, delta, u, pa_u, v, "add") + d_rem
-                    if d_rev < floor:
-                        cand = (round(d_rev * inv_n, _KEY_DP), u, v, 1, ("reverse", u, v))
-                        if (best is None or cand[:4] < best[:4]) and _allowed(
-                            adj_int, cand[4], tabu
-                        ):
-                            best = cand
-            elif not (adj_int[v] & u_bit):  # neither u -> v nor v -> u; add is legal iff acyclic
-                if not (reach[v] & u_bit):
-                    d_add = _cached_delta(cache, delta, v, pa_v, u, "add")
-                    if d_add < floor:
-                        cand = (round(d_add * inv_n, _KEY_DP), u, v, 0, ("add", u, v))
-                        if (best is None or cand[:4] < best[:4]) and _allowed(
-                            adj_int, cand[4], tabu
-                        ):
-                            best = cand
-    return best
+            if old is not None:
+                self._shelf[(v, old)] = (self._value[:, :, v].copy(), self._known[:, :, v].copy())
+            got = self._shelf.pop((v, pa[v]), None)
+            if got is None:
+                self._value[:, :, v] = np.nan
+                self._known[:, :, v] = False
+            else:
+                self._value[:, :, v], self._known[:, :, v] = got
+            self._parents[v] = pa[v]
 
+    def _fill(self, k: int, u: int, v: int, pa_v: tuple[int, ...]) -> None:
+        self._value[k, u, v] = self._delta.delta(v, pa_v, u, "add" if k == _ADD else "remove")
+        self._known[k, u, v] = True
 
-def _best_move(
-    adj_int: list[int],
-    parents_of: dict[int, list[int]],
-    delta: DeltaBICScore,
-    d: int,
-    cache: dict[tuple[int, tuple[int, ...], str, int], float],
-) -> tuple[tuple[str, int, int] | None, float]:
-    """Scan every legal single-edge move; return the most-improving ``(move, delta)``.
+    def best(
+        self,
+        adj_int: list[int],
+        parents_of: dict[int, list[int]],
+        *,
+        targets: Sequence[int] | None = None,
+        floor: float = -_EPS_IMPROVE,
+        tabu: Collection[StructureKey] | None = None,
+    ) -> ScannedMove | None:
+        """The best legal move with delta below ``floor`` whose head is in ``targets``.
 
-    The whole-range instance of :func:`_scan_moves`; returns ``(None, 0.0)`` when nothing improves.
-    """
-    reach = _reachability(adj_int, d)
-    best = _scan_moves(range(d), adj_int, parents_of, delta, d, reach, cache)
-    if best is None:
-        return None, 0.0
-    return best[4], best[0]
+        ``targets`` defaults to every node. Moves are keyed ``(delta / n_samples rounded to
+        _KEY_DP places, u, v, op_rank)``, a strict total order, so the best of a partition's
+        bests is the best overall. The default ``floor`` admits improving moves only; ``floor=inf``
+        admits every legal move. A move that leads to a structure in ``tabu`` is skipped.
+        """
+        key = (tuple(adj_int), None if targets is None else tuple(targets))
+        if self._last is None or self._last[0] != key:  # tabu search scans a DAG twice
+            self._last = (key, *self._moves(adj_int, parents_of, targets))
+        _, edge, single, rev = self._last
+        single = np.where(single < floor, single, np.inf)
+        rev = np.where(rev < floor, rev, np.inf)
+        while True:  # the best move, unless it leads into the tabu list; then the next best
+            best = self._pick(single, rev, edge)
+            if best is None or tabu is None or _key_after(adj_int, best[4]) not in tabu:
+                return best
+            (rev if best[3] else single)[best[1], best[2]] = np.inf
 
+    def _moves(
+        self, adj_int: list[int], parents_of: dict[int, list[int]], targets: Sequence[int] | None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """The edge matrix, then the add-or-remove and the reverse deltas, ``inf`` where illegal."""
+        d = self._d
+        pa = [tuple(parents_of[i]) for i in range(d)]
+        self._sync(pa)
+        if targets is None:
+            head = np.ones(d, dtype=bool)
+        else:
+            head = np.zeros(d, dtype=bool)
+            head[list(targets)] = True
+        reach, deep = _closure(adj_int, d)
+        bits = _bit_matrix(adj_int + reach + deep, d)
+        edge, reaches, deep_reach = bits[:d], bits[d : 2 * d], bits[2 * d :]
+        free = ~(edge | edge.T)
+        np.fill_diagonal(free, False)
+        add_ok = free & ~reaches.T & head  # u -> v closes a cycle iff v reaches u
+        rem_ok = edge & head
+        rev_ok = rem_ok & ~deep_reach  # ... iff u reaches v other than by the edge itself
 
-def _cached_delta(
-    cache: dict[tuple[int, tuple[int, ...], str, int], float],
-    delta: DeltaBICScore,
-    v: int,
-    pa_v: tuple[int, ...],
-    u: int,
-    op: str,
-) -> float:
-    """Return the Schur delta for ``op``-ing ``u`` at target ``v`` with parents ``pa_v``, memoized.
+        known_add, known_rem = self._known
+        first = np.flatnonzero((rem_ok & ~known_rem) | (add_ok & ~known_add))
+        second = np.flatnonzero(rev_ok & ~known_add.T)
+        for k in np.sort(np.concatenate((first * 2, second * 2 + 1))).tolist():
+            u, v = divmod(k >> 1, d)
+            if k & 1:  # the add that completes reversing u -> v: v joins u's parents
+                self._fill(_ADD, v, u, pa[u])
+            else:
+                self._fill(_REMOVE if edge[u, v] else _ADD, u, v, pa[v])
 
-    The value is a pure function of the key, so a hit returns the same float the scalar delta would
-    recompute; the reverse move reuses its remove-side component through the same cache.
-    """
-    key = (v, pa_v, op, u)
-    val = cache.get(key)
-    if val is None:
-        val = delta.delta(v, pa_v, u, op)
-        cache[key] = val
-    return val
+        add, rem = self._value
+        with np.errstate(invalid="ignore"):  # a degenerate column's deltas may be infinite
+            rev = add.T + rem
+        single = np.where(rem_ok | add_ok, np.where(edge, rem, add), np.inf)
+        return edge, single, np.where(rev_ok, rev, np.inf)
+
+    def _pick(self, single: np.ndarray, rev: np.ndarray, edge: np.ndarray) -> ScannedMove | None:
+        """The move with the lowest key among the finite entries of ``single`` and ``rev``."""
+        low = min(single.min(), rev.min()) * self._inv_n
+        if low == np.inf:
+            return None
+        # Rounding is monotone, so the moves that round to the lowest key lie within one grid step
+        # of the lowest unrounded value; the exact key is computed for those few.
+        near = low + 2 * 10.0**-_KEY_DP
+        d = self._d
+        best: ScannedMove | None = None
+        for rank, table in ((0, single), (1, rev)):
+            for i in np.flatnonzero(table * self._inv_n <= near).tolist():
+                u, v = divmod(i, d)
+                op = "reverse" if rank else ("remove" if edge[u, v] else "add")
+                cand = (round(float(table[u, v]) * self._inv_n, _KEY_DP), u, v, rank, (op, u, v))
+                if best is None or cand[:4] < best[:4]:
+                    best = cand
+        return best
 
 
 def _apply_move(
@@ -280,23 +312,23 @@ def hc(
 
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
-    delta_cache: dict[tuple[int, tuple[int, ...], str, int], float] = {}
 
     # Pin BLAS to one thread for the delta loops so the Schur updates are thread-count-reproducible
     # and equal to the (1-thread) parallel workers; above the work threshold the pass fans out.
-    with threadpool_limits(limits=1):
+    with backend.one_blas_thread():
         workers = backend.worker_count()
         if workers > 1 and d > 1:
             from andrey.search import _parallel_hc  # local import breaks the import cycle
 
             moves = _parallel_hc.run_hc(adj_int, parents_of, delta, d, max_iter, workers=workers)
         else:
+            scanner = MoveScanner(delta, d)
             moves = 0
             for _ in range(max_iter):
-                move, _ = _best_move(adj_int, parents_of, delta, d, delta_cache)
-                if move is None:
+                best = scanner.best(adj_int, parents_of)
+                if best is None:
                     break
-                _apply_move(adj_int, parents_of, move)
+                _apply_move(adj_int, parents_of, best[4])
                 moves += 1
     if moves == max_iter:
         warn_once(
