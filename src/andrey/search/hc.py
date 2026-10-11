@@ -228,7 +228,7 @@ class MoveScanner:
 
     def _pick(self, single: np.ndarray, rev: np.ndarray, edge: np.ndarray) -> ScannedMove | None:
         """The move with the lowest key among the finite entries of ``single`` and ``rev``."""
-        low = min(single.min(), rev.min()) * self._inv_n
+        low = min(single.min(initial=np.inf), rev.min(initial=np.inf)) * self._inv_n
         if low == np.inf:
             return None
         # Rounding is monotone, so the moves that round to the lowest key lie within one grid step

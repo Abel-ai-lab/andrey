@@ -101,15 +101,20 @@ def test_num_workers_resolution(monkeypatch):
 def test_one_blas_thread_limits_then_restores():
     from threadpoolctl import threadpool_info, threadpool_limits
 
-    def blas_threads() -> list[int]:
-        return [pool["num_threads"] for pool in threadpool_info() if pool["user_api"] == "blas"]
+    # The libraries loaded at the first call; one loaded later, as by another test, is not limited.
+    known = {pool["filepath"] for pool in backend._thread_pools().info()}
 
-    with threadpool_limits(limits=2, user_api="blas"):
-        assert blas_threads() and set(blas_threads()) == {2}
+    def pools() -> list[int]:
+        return [pool["num_threads"] for pool in threadpool_info() if pool["filepath"] in known]
+
+    if not pools():
+        pytest.skip("threadpoolctl finds no thread pool in this process")
+    with threadpool_limits(limits=2):  # an ambient limit the block must change and restore
+        ambient = pools()
         for _ in range(2):  # the second call reuses the libraries found by the first
             with backend.one_blas_thread():
-                assert set(blas_threads()) == {1}
-            assert set(blas_threads()) == {2}
+                assert set(pools()) == {1}
+            assert pools() == ambient
 
 
 def test_bad_backend_value_raises():

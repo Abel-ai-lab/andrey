@@ -17,7 +17,8 @@ import pytest
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
-from andrey.search.hc import MoveScanner, _apply_move, _key_after
+from andrey.search.hc import MoveScanner, _apply_move, _key_after, hc
+from andrey.search.tabu import tabu
 
 
 def _reference_scan(targets, adj_int, parents_of, delta, d, memo, floor, tabu):
@@ -117,3 +118,9 @@ def test_scanner_picks_as_full_rescan(seed: int, targets: list[int] | None) -> N
         elif move is not None:
             _apply_move(adj_int, parents_of, move[4])
     assert sum(len(p) for p in parents_of.values()) > 0
+
+
+@pytest.mark.parametrize("search", [hc, tabu])
+def test_no_columns_give_an_empty_graph(search) -> None:
+    graph, _ = search(np.zeros((10, 0)))
+    assert graph.to_numpy().shape == (0, 0)
