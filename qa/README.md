@@ -14,7 +14,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 ## FCI column order
 
 FCI and GFCI depend on column order. `column_order.py` measures how much, for the column-order
-sentence on the benchmarks page. It fits both methods on 237 latent-confounded models
+sentence in the 0.1.0 benchmark report. It fits both methods on 237 latent-confounded models
 (Erdos-Renyi and scale-free graphs with one hidden confounder, 6-12 nodes, 500-5000 samples, seeds
 0-9), refits each on three seeded column orders, maps the answers back, and counts the relabelings
 that change any endpoint mark. It is a measurement with no passing threshold: permutation equality

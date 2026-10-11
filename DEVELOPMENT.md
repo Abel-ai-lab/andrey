@@ -156,9 +156,9 @@ precedence tuple if it participates in layered selection.
 A new method ships as experimental. It becomes supported once it passes every step below.
 `tests/unit/test_spec_registry.py` checks most of them and names what is missing: a recovery test
 for an experimental method; for a supported one, a recorded output, a place in the quality gate, a
-section on the benchmarks page, a row in the published summary, an example notebook, and its entry
+section in a benchmark report, a row in a published summary, an example notebook, and its entry
 under "Supported methods" in the API reference. Review checks the rest: device parity and the
-benchmarks page's "Reproduce" table.
+report's "Reproduce" table.
 
 | Step | Where | When it runs | Required for |
 |---|---|---|---|
