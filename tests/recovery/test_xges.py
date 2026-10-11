@@ -24,7 +24,7 @@ from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.core.score import BICScore
 from andrey.metrics import shd, to_cpdag
 from andrey.search.ges import _recompute_objective
-from andrey.search.xges import _extension_parents, _marks_total, _sets
+from andrey.search.xges import _UNDIRECTED, _edge_key, _extension_parents, _marks_total, _sets
 from andrey.search.xges import xges as xges_search
 from tests.recovery.helpers import datagen
 
@@ -187,6 +187,41 @@ def test_branches_are_scored_on_a_member_of_the_class(seed):
     assert np.array_equal(dag2cpdag(dag), cpdag)
     score = BICScore(ds.data)
     assert _marks_total(cpdag, score) == pytest.approx(_recompute_objective(cpdag, score, 15))
+
+
+def _colliding_pairs(pairs: int) -> list[int]:
+    """Indices ``j`` whose undirected edges ``2j -- 2j+1`` have edge keys that XOR to zero.
+
+    Among more 128-bit keys than bits some subset XORs to zero; Gaussian elimination over GF(2)
+    returns the first such subset, no proper part of which XORs to zero.
+    """
+    basis: dict[int, tuple[int, int]] = {}  # leading bit -> (key combination, the indices in it)
+    for j in range(pairs):
+        key, used = _edge_key(2 * j, 2 * j + 1, _UNDIRECTED), 1 << j
+        while key:
+            top = key.bit_length() - 1
+            if top not in basis:
+                basis[top] = (key, used)
+                break
+            key, used = key ^ basis[top][0], used ^ basis[top][1]
+        else:
+            return [i for i in range(pairs) if used >> i & 1]
+    raise AssertionError("no subset of the edge keys XORs to zero")
+
+
+@pytest.mark.parametrize("extended_search", [True, False])
+def test_a_fingerprint_collision_does_not_undo_a_move(extended_search):
+    """The search looks up visited graphs by a fingerprint, the XOR of per-edge keys, which
+    distinct graphs can share. The columns are exactly uncorrelated except within the pairs whose
+    edge keys XOR to zero: each of those edges improves the score, and the last one inserted gives
+    the graph the empty graph's fingerprint."""
+    pairs = _colliding_pairs(129)
+    z = np.random.default_rng(0).standard_normal((512, 258))
+    x = np.linalg.qr(z - z.mean(axis=0))[0] * np.sqrt(512)
+    x[:, [2 * j + 1 for j in pairs]] += x[:, [2 * j for j in pairs]]
+    marks = from_structure(xges_search(x, extended_search=extended_search)[0])
+    edges = {(int(a), int(b)) for a, b in zip(*np.nonzero(np.triu(marks)), strict=True)}
+    assert edges == {(2 * j, 2 * j + 1) for j in pairs}
 
 
 def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:

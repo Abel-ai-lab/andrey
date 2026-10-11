@@ -87,6 +87,7 @@ _MASK64 = (1 << 64) - 1
 def _edge_key(a: int, b: int, state: int) -> int:
     """A 128-bit key of the pair ``(a, b)`` in ``state``; the XOR of a graph's keys fingerprints it.
 
+    Equal graphs have equal fingerprints, but XOR is linear, so distinct graphs can share one.
     Tuple hashes of ints do not depend on ``PYTHONHASHSEED``, so the keys are the same every run.
     """
     if state == _NONE:
@@ -114,6 +115,15 @@ class _Changes(dict):
         for (a, b), (old, new) in self.items():
             fingerprint ^= _edge_key(a, b, old) ^ _edge_key(a, b, new)
         return fingerprint
+
+
+def _returns(moves: Iterable[_Changes]) -> bool:
+    """Whether ``moves``, applied in turn, leave every pair in its state before the first."""
+    net = _Changes()
+    for move in moves:
+        for (a, b), (old, new) in move.items():
+            net.record(a, b, old, new)
+    return all(old == new for old, new in net.values())
 
 
 class _Graph:
@@ -761,13 +771,14 @@ class _Search:
 
         A move back to a graph this run has visited is undone and dropped. On a singular parent set
         the Schur update and two full scores can disagree, so each move of a cycle can look
-        improving; skipping revisits ends the run on any data.
+        improving; skipping revisits ends the run on any data. A visited graph with the move's
+        fingerprint is a revisit only when the moves made since it, and this one, cancel out.
         """
         g, paths = self.g, self.paths
-        log = _Changes()
-        seen = {self.fingerprint}
+        moves: list[_Changes] = []
+        visits = {self.fingerprint: [0]}  # fingerprint -> len(moves) at each graph with it
         while self.deletes or self.reverses or self.inserts:
-            log.clear()
+            log = _Changes()
             if self.deletes:
                 _, _, x, y, C, E = heapq.heappop(self.deletes)
                 if not _delete_valid(g, x, y, C, E):
@@ -784,11 +795,12 @@ class _Search:
                     continue
                 _apply_insert(g, x, y, T, log)
             fingerprint = log.rekey(self.fingerprint)
-            if fingerprint in seen:
+            if any(_returns(chain(moves[k:], [log])) for k in visits.get(fingerprint, ())):
                 for (a, b), (old, _new) in log.items():
                     g.set_state(a, b, old)
                 continue
-            seen.add(fingerprint)
+            moves.append(log)
+            visits.setdefault(fingerprint, []).append(len(moves))
             self.fingerprint = fingerprint
             self.update(log)
 
