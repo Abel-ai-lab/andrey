@@ -8,8 +8,8 @@ directed lag adjacency (a zero coefficient means no Granger cause at that lag).
 
 Each target's fit is scikit-learn's ``LassoCV(cv=cv)`` with its defaults, computed step for step.
 Every target shares the design, so the folds' centered designs and Gram matrices are computed once
-for all of them; the targets run on the configured worker threads (the coordinate descent releases
-the GIL), and BLAS is pinned to one thread so the result does not depend on the thread count.
+for all of them. The targets run on the configured worker threads (the coordinate descent releases
+the GIL), each with one BLAS thread.
 
 References
 ----------
@@ -123,17 +123,16 @@ def granger_lasso(data: np.ndarray, *, maxlag: int = 2, cv: int = 5) -> np.ndarr
     targets = data[maxlag:]
     design = np.hstack([data[maxlag - k : n_samples - k] for k in range(1, maxlag + 1)])
     design.setflags(write=False)
+    column_mean = np.average(design, axis=0)
+    folds = [_fold(design, train, test) for train, test in KFold(cv).split(design)]
+
+    def fit(i: int) -> np.ndarray:
+        return _fit_target(design, column_mean, folds, np.ascontiguousarray(targets[:, i]))
+
     workers = min(backend.worker_count(), d)
-    with _blas().limit(limits=1):
-        column_mean = np.average(design, axis=0)
-        folds = [_fold(design, train, test) for train, test in KFold(cv).split(design)]
-
-        def fit(i: int) -> np.ndarray:
-            return _fit_target(design, column_mean, folds, np.ascontiguousarray(targets[:, i]))
-
-        if workers <= 1:
-            rows = [fit(i) for i in range(d)]
-        else:
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                rows = list(pool.map(fit, range(d)))
+    if workers <= 1:
+        rows = [fit(i) for i in range(d)]
+    else:  # one BLAS thread per worker thread, so they do not oversubscribe the cores
+        with _blas().limit(limits=1), ThreadPoolExecutor(max_workers=workers) as pool:
+            rows = list(pool.map(fit, range(d)))
     return np.asarray(rows, dtype=np.float64).reshape(d, d * maxlag)
