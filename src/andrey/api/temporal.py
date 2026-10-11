@@ -290,6 +290,9 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     spread = (X / peak).std(axis=0)  # data_matrix rejects a constant column
     coeff = granger_lasso((X / peak - (X / peak).mean(axis=0)) / spread, maxlag=maxlag, cv=cv)
     scale = spread * peak
-    # coeff[i, j + d*k] weights standardized x_j(t-k-1) in standardized x_i(t): rescale to units
-    coeff *= scale[:, None] / np.tile(scale, maxlag)[None, :]
+    # coeff[i, j + d*k] weights standardized x_j(t-k-1) in standardized x_i(t): rescale to units.
+    # Units far apart can overflow the ratio; a zero weight stays zero rather than becoming NaN.
+    with np.errstate(over="ignore", invalid="ignore"):
+        ratio = scale[:, None] / np.tile(scale, maxlag)[None, :]
+        coeff = np.where(coeff == 0, 0.0, coeff * ratio)
     return with_labels(_adapt_granger(coeff, X.shape[1], maxlag), column_labels(data))

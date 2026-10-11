@@ -124,6 +124,20 @@ def test_granger_finds_the_planted_lagged_edges_as_the_largest_weights(var_lag2_
     assert np.abs(weights[truth == 0]).max() < 0.1
 
 
+def test_granger_keeps_absent_edges_absent_when_units_are_far_apart():
+    from andrey.api.temporal import granger
+
+    # Columns in units 1e-200 and 1e200 with no lag-one dependence: the unit ratio overflows.
+    x = np.column_stack(
+        (
+            1e-200 * np.resize([0.0, 1.0, 0.0, -1.0], 17),
+            1e200 * np.resize([0, 0, 1, 0, 0, 0, -1, 0.0], 17),
+        )
+    )
+    weights = granger(x, maxlag=1, cv=2).structure.lag_weights
+    assert not np.isnan(weights).any()
+
+
 # 1e-200: the squared deviations of that column would underflow to zero.
 @pytest.mark.parametrize("scale", [[100.0, 0.01, 7.0], [1e-200, 1.0, 7.0]])
 def test_granger_does_not_depend_on_the_units(var_lag2_fit, scale):
