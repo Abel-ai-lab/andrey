@@ -39,7 +39,7 @@ def scan_conditioning_sets(
 ) -> bool:
     """Test every size-``size`` subset of ``candidates`` as a conditioning set for ``(a, b)``.
 
-    Each subset whose Fisher-Z p-value exceeds ``alpha`` (``a`` conditionally independent of ``b``
+    Each subset whose p-value exceeds ``alpha`` (``a`` conditionally independent of ``b``
     given the subset) is unioned into ``separating`` in place. Returns whether any subset separated
     the pair. There is no early exit: the whole subset space is scanned so ``separating``
     accumulates the union over every separating set, exactly as the scalar loop it replaces did.
