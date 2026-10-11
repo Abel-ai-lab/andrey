@@ -1,4 +1,5 @@
-"""The XGES campaign: Andrey's adapter, the package's XGES-0 arm, and the BIC columns.
+"""The XGES campaign: Andrey's adapter, the package's arm without the extended search, and the BIC
+columns.
 
 The campaign compares graphs by their BIC, so its claims rest on three facts checked here: every
 arm searches under the one penalty, the ``bic`` column is the score Andrey's search reports for its
@@ -28,7 +29,7 @@ XGES_PYTHON = Path(runner.BENCH_ROOT) / ".venv-xges" / "bin" / "python"
 #: The Andrey arms and the floor: what a tiny run measures without the package's environment.
 ANDREY_ARMS = [
     "andrey.xges.numpy",
-    "andrey.xges0.numpy",
+    "andrey.xges.numpy.no_extended_search",
     "andrey.ges.numpy.serial.uncapped",
     "baseline.empty",
 ]
@@ -36,13 +37,13 @@ TINY = ["--ladder", "8", "--densities", "2", "4", "--seeds", "1", "--warmup", "0
 
 
 def _dataset() -> np.ndarray:
-    """A dense linear-Gaussian sample on which XGES and XGES-0 return different graphs."""
+    """A dense linear-Gaussian sample on which the extended search changes the graph."""
     key = driver.ladder_keys([8], [4.0], 1)[0]
     data, _marks, _kind = datasets.generate_one(key)
     return data
 
 
-def test_the_test_dataset_separates_xges_from_xges0() -> None:
+def test_the_test_dataset_separates_the_extended_search_from_the_base_search() -> None:
     """Otherwise an arm that ignored ``extended_search`` would pass the comparisons below."""
     data = _dataset()
     graphs = [
@@ -56,14 +57,15 @@ def test_the_test_dataset_separates_xges_from_xges0() -> None:
 
 
 def test_the_andrey_adapter_reports_one_search_per_name() -> None:
-    xges, xges0 = AndreyXGES(), AndreyXGES(name="andrey.xges0.numpy", extended_search=False)
-    for adapter in (xges, xges0):
+    extended = AndreyXGES()
+    base = AndreyXGES(name="andrey.xges.numpy.no_extended_search", extended_search=False)
+    for adapter in (extended, base):
         assert isinstance(adapter, SolutionAdapter)
         assert (adapter.package, adapter.backend, adapter.mode) == ("andrey", "numpy", "serial")
         assert adapter.output_type == "cpdag"
         assert adapter.params()["max_parents"] is None
-    assert xges.params()["extended_search"] is True
-    assert xges0.params()["extended_search"] is False
+    assert extended.params()["extended_search"] is True
+    assert base.params()["extended_search"] is False
     assert AndreyXGES(lambda_value=2.0).params()["lambda_value"] == 2.0
 
 
@@ -78,11 +80,11 @@ def test_the_andrey_fit_is_the_public_xges(extended_search: bool, lambda_value: 
     assert adapter.to_structure(marks).kind == "cpdag"
 
 
-def test_the_package_adapter_runs_xges0_as_its_own_arm() -> None:
+def test_the_package_adapter_runs_no_extended_search_as_its_own_arm() -> None:
     assert XgesGES().params()["extended_search"] is True
-    xges0 = xges_adapter(name="xges.xges0", extended_search=False)
-    assert xges0.params()["extended_search"] is False
-    assert xges0.name == "xges.xges0"
+    base = xges_adapter(name="xges.xges.no_extended_search", extended_search=False)
+    assert base.params()["extended_search"] is False
+    assert base.name == "xges.xges.no_extended_search"
 
 
 # --- the field -----------------------------------------------------------------------------------
@@ -92,9 +94,9 @@ def test_every_arm_searches_under_the_campaign_penalty_with_no_parent_cap() -> N
     field = {a.name: a for a in driver.solutions(2.0)}
     assert list(field) == [
         "andrey.xges.numpy",
-        "andrey.xges0.numpy",
+        "andrey.xges.numpy.no_extended_search",
         "xges.xges",
-        "xges.xges0",
+        "xges.xges.no_extended_search",
         "andrey.ges.numpy.serial.uncapped",
         "baseline.empty",
     ]
@@ -106,7 +108,7 @@ def test_every_arm_searches_under_the_campaign_penalty_with_no_parent_cap() -> N
         assert params.get("lambda_value", params.get("alpha")) == 2.0, name
         assert params["max_parents"] is None, name
         if "xges" in name:
-            assert params["extended_search"] is ("xges0" not in name), name
+            assert params["extended_search"] is ("no_extended_search" not in name), name
 
 
 def test_two_densities_are_two_datasets_at_ten_rows_per_node() -> None:
@@ -118,7 +120,7 @@ def test_two_densities_are_two_datasets_at_ten_rows_per_node() -> None:
 
 def test_an_unknown_solution_name_stops_the_run(capsys: pytest.CaptureFixture) -> None:
     with pytest.raises(SystemExit):
-        driver.main(["--out", "unused", "--solutions", "andrey.xges.numpy", "xges.xges00"])
+        driver.main(["--out", "unused", "--solutions", "andrey.xges.numpy", "xges.xges.extended"])
     assert "unknown solutions" in capsys.readouterr().err
 
 

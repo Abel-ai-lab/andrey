@@ -1,9 +1,9 @@
 """Andrey XGES benchmark adapter.
 
 Wraps ``andrey.search.xges.xges``, the search behind ``andrey.xges``. ``extended_search=False`` is
-XGES-0, the search without the extended phase, so the one class covers both arms. ``lambda_value``
-is the xges package's ``alpha``: the two scores differ by a factor of ``-2`` and by terms that cancel
-in every move, so equal values search under equal penalties.
+XGES without the extended search, so the one class covers both arms. ``lambda_value`` is the xges
+package's ``alpha``: the two scores differ by a factor of ``-2`` and by terms that cancel in every
+move, so equal values search under equal penalties.
 
 **One BLAS thread.** The search runs inside ``threadpool_limits(limits=1)`` so that every score,
 and every tie between moves, is reproducible. The record's ``threads`` is the budget the runner
@@ -27,7 +27,7 @@ _SCORE_FUNC = "local_score_BIC"
 
 @dataclass(frozen=True)
 class AndreyXGES:
-    """Benchmark adapter for Andrey's XGES, or XGES-0 with ``extended_search=False``.
+    """Benchmark adapter for Andrey's XGES; ``extended_search=False`` drops the extended search.
 
     Satisfies :class:`andrey_bench.contracts.SolutionAdapter`. Each search setting needs a
     ``name`` of its own, because ``params`` are excluded from ``run_id``.

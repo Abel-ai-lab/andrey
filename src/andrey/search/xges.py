@@ -2,11 +2,11 @@
 :func:`andrey.xges`.
 
 XGES searches the CPDAGs that GES searches, with GES's Insert and Delete operators and the Reverse
-operator of GES's turning phase, but interleaves them. Each step applies the best improving Delete
-if there is one, else the best improving Reverse, else the best improving Insert, and the search
-stops when no operator improves the score (XGES-0). The extended search then forces each Delete of
-the converged CPDAG in turn, forbids re-inserting the deleted edge, reruns XGES-0 from there, and
-keeps the result when its score is lower.
+operator of GES's turning phase, but interleaves them. The base search applies the best improving
+Delete if there is one, else the best improving Reverse, else the best improving Insert, and stops
+when no operator improves the score. The extended search then forces each Delete of the converged
+CPDAG in turn, forbids re-inserting the deleted edge, reruns the base search from there, and keeps
+the result when its score is lower.
 
 :class:`_Search` keeps every candidate operator in a priority queue per operator type. A popped
 operator is checked against the current CPDAG and dropped when it no longer applies; after a move,
@@ -774,9 +774,9 @@ class _Search:
             if x != y:
                 self.find_reverse(y, x)
 
-    # -- XGES-0 and the extended search ---------------------------------------------------------
+    # -- The base search and the extended search ------------------------------------------------
 
-    def xges0(self) -> None:
+    def base_search(self) -> None:
         """Apply the best improving Delete, else Reverse, else Insert, until none is left.
 
         A move back to a graph this run has visited is undone and dropped. On a singular parent set
@@ -817,8 +817,8 @@ class _Search:
             self.update(log)
 
     def extend(self, n_samples: int) -> float:
-        """Force each Delete of the converged graph, rerun XGES-0, keep a lower score, and return
-        the final graph's total of :func:`_extension_scores`.
+        """Force each Delete of the converged graph, rerun the base search, keep a lower score, and
+        return the final graph's total of :func:`_extension_scores`.
 
         Deletes are tried best first. After a branch is kept, the remaining Deletes of the earlier
         graph are still tried where they apply; the Deletes are listed again once they run out, and
@@ -854,7 +854,7 @@ class _Search:
             trial.g.forbidden.add((x, y))
             trial.fingerprint = log.rekey(trial.fingerprint)
             trial.update(log)
-            trial.xges0()
+            trial.base_search()
             g, h = self.g, trial.g
             changed = [v for v in range(self.d) if h.pa[v] != g.pa[v] or h.ne[v] != g.ne[v]]
             trial_local = local.copy()
@@ -968,7 +968,7 @@ def _insert_marks(adj: np.ndarray, x: int, y: int, T: frozenset[int]) -> np.ndar
 def _rescan_moves(
     adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]], reach: Callable
 ) -> Iterable[np.ndarray]:
-    """The graphs XGES-0's improving moves on ``adj`` lead to, in the order it tries them."""
+    """The graphs the base search's improving moves on ``adj`` lead to, in the order it tries."""
     for _, x, y, C, _E in _improving(_all_deletes(adj, score)):
         yield _delete_marks(adj, x, y, C)
     for _, x, y, T in _improving(_all_reverses(adj, score, forbidden)):
@@ -979,8 +979,10 @@ def _rescan_moves(
         yield _insert_marks(adj, x, y, T)
 
 
-def _rescan_xges0(adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]]) -> np.ndarray:
-    """XGES-0 with every operator rescanned after each move, skipping moves to visited graphs."""
+def _rescan_base_search(
+    adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]]
+) -> np.ndarray:
+    """The base search with every operator rescanned after each move, skipping visited graphs."""
     build_state = _reach_factory(adj.shape[0])
     seen = {adj.tobytes()}
     while True:
@@ -1003,7 +1005,7 @@ def _marks_total(adj: np.ndarray, score: BICScore) -> float:
 
 def _rescan_search(score: BICScore, d: int, extended: bool) -> np.ndarray:
     """XGES with every operator rescanned and the CPDAG re-formed globally after each move."""
-    adj = _rescan_xges0(np.zeros((d, d), dtype=np.int8), score, set())
+    adj = _rescan_base_search(np.zeros((d, d), dtype=np.int8), score, set())
     if not extended:
         return adj
     tolerance = _ACCEPT_PER_SAMPLE * score.n
@@ -1026,7 +1028,7 @@ def _rescan_search(score: BICScore, d: int, extended: bool) -> np.ndarray:
         if not (valid and ops.is_clique(adj, C)):
             continue
         trial_forbidden = forbidden | {(x, y)}
-        trial = _rescan_xges0(_delete_marks(adj, x, y, C), score, trial_forbidden)
+        trial = _rescan_base_search(_delete_marks(adj, x, y, C), score, trial_forbidden)
         trial_total = _marks_total(trial, score)
         if trial_total < total - tolerance:
             adj, total, forbidden = trial, trial_total, trial_forbidden
@@ -1053,7 +1055,7 @@ def xges(
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
     extended_search : bool
-        Run the extended search after XGES-0 (XGES); ``False`` stops at XGES-0.
+        Run the extended search after the base search; ``False`` stops after the base search.
     _rescan : bool
         Private test lever: rescan every operator after each move instead of updating the queues.
 
@@ -1074,7 +1076,7 @@ def xges(
         else:
             search = _Search(score, d)
             search.inserts_on_empty_graph()
-            search.xges0()
+            search.base_search()
             if extended_search:
                 search.extend(X.shape[0])
             adj = search.g.marks()

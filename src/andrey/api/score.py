@@ -192,9 +192,10 @@ def xges(
     """Learn a CPDAG from observational data with extremely greedy equivalence search (XGES).
 
     XGES searches the equivalence classes that GES searches, with GES's moves and BIC score, but
-    applies them in a different order [1]_. At each step it deletes an edge if that improves the
-    score, otherwise it reverses one, otherwise it adds one. It then retries deleting each edge of
-    the result. On linear-Gaussian data it often finds a graph with a better score than GES.
+    applies them in a different order [1]_. The base search deletes an edge if that improves the
+    score, otherwise reverses one, otherwise adds one, until no move improves the score. The
+    extended search then retries deleting each edge of the result. On linear-Gaussian data it often
+    finds a graph with a better score than GES.
 
     Parameters
     ----------
@@ -207,18 +208,17 @@ def xges(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
     extended_search : bool, default=True
-        After the greedy search converges, delete each edge in turn, forbid adding it back, search
-        again, and keep any result with a better score. ``False`` returns the converged graph
-        (XGES-0), which is faster.
+        Run the extended search after the base search: delete each edge in turn, forbid adding it
+        back, rerun the base search, and keep any result with a better score. ``False`` returns the
+        base search's graph (XGES without the extended search), which is faster.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"XGES"``, or ``"XGES-0"`` without the extended search, and ``metadata["score"]`` the BIC
-        score of the result, computed as for :func:`andrey.ges`; lower is better. Directed marks
-        (``->``) are oriented edges, undirected (``--``) the ones the equivalence class leaves
-        open.
+        ``"XGES"`` and ``metadata["score"]`` the BIC score of the result, computed as for
+        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
@@ -283,7 +283,7 @@ def xges(
     cpdag, score = _xges(
         X, score_func=score_func, lambda_value=lambda_value, extended_search=extended_search
     )
-    metadata = {"algorithm": "XGES" if extended_search else "XGES-0", "score": json_safe(score)}
+    metadata = {"algorithm": "XGES", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 

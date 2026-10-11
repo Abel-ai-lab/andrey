@@ -80,7 +80,7 @@ def test_output_contract():
     assert out.structure.kind == "cpdag"
     assert out.metadata["algorithm"] == "XGES"
     assert np.isfinite(out.metadata["score"])
-    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "XGES-0"
+    assert andrey.xges(x, extended_search=False).metadata["algorithm"] == "XGES"
 
 
 # ---- ground truth --------------------------------------------------------------------------------
@@ -131,15 +131,16 @@ def test_beats_ges_on_denser_graphs(dense_fits):
 
 
 def test_extended_search_never_scores_worse(dense_fits):
-    """XGES keeps a branch only when it lowers the score, so it ends at or below XGES-0."""
-    for _truth, _ges, xges, xges0 in dense_fits:
-        assert xges.metadata["score"] <= xges0.metadata["score"]
+    """The extended search keeps a branch only when it lowers the score, so the extended result ends
+    at or below the base search's."""
+    for _truth, _ges, xges, base in dense_fits:
+        assert xges.metadata["score"] <= base.metadata["score"]
 
 
 def test_returns_a_cpdag(dense_fits):
     """Each result is the CPDAG of its own equivalence class."""
-    for _truth, _ges, xges, xges0 in dense_fits:
-        for out in (xges, xges0):
+    for _truth, _ges, xges, base in dense_fits:
+        for out in (xges, base):
             marks = from_structure(out.structure)
             assert np.array_equal(dag2cpdag(pdag2dag(marks)), marks)
 
@@ -170,8 +171,8 @@ def test_repeat_runs_are_identical():
 
 
 def test_lambda_value_is_the_penalty_ges_uses():
-    """At the same lambda_value, XGES-0 and GES search the same score: on a graph both recover,
-    the reported scores agree."""
+    """At the same lambda_value, XGES without the extended search and GES search the same score: on
+    a graph both recover, the reported scores agree."""
     ds = _sparse(0)
     for lam in (1.0, 2.0):
         ges = andrey.ges(ds.data, lambda_value=lam)
@@ -212,12 +213,12 @@ def test_the_extended_search_scores_the_graph_it_returns(seed):
     search = _Search(score, x.shape[1])
     with threadpool_limits(limits=1):
         search.inserts_on_empty_graph()
-        search.xges0()
-        xges0_total = _marks_total(search.g.marks(), score)
+        search.base_search()
+        base_total = _marks_total(search.g.marks(), score)
         total = search.extend(x.shape[0])
     marks = search.g.marks()
     assert np.array_equal(marks, from_structure(xges_search(x)[0]))
-    assert total < xges0_total
+    assert total < base_total
     assert total == _marks_total(marks, score)
     assert np.array_equal(dag2cpdag(_extension_dag(marks)), marks)
 
@@ -259,19 +260,19 @@ def test_a_fingerprint_collision_does_not_undo_a_move(extended_search):
 
 @pytest.mark.parametrize(("n", "d"), [(8, 12), (12, 20)], ids=["-inf", "nan"])
 def test_no_branch_is_tried_when_the_score_is_not_finite(n, d, monkeypatch):
-    """With fewer rows than columns, parent sets fit some columns exactly and XGES-0's total is
-    -inf or nan. No branch can score below that, so the extended search tries none and returns
-    XGES-0's graph."""
+    """With fewer rows than columns, parent sets fit some columns exactly and the base search's
+    total is -inf or nan. No branch can score below that, so the extended search tries none and
+    returns the base search's graph."""
     x = np.random.default_rng(0).standard_normal((n, d))
     branches = []
     branch = _Search.branch
     monkeypatch.setattr(_Search, "branch", lambda self: branches.append(1) or branch(self))
     with np.errstate(divide="ignore", invalid="ignore"):
         xges_graph, xges_score = xges_search(x)
-        xges0_graph, _ = xges_search(x, extended_search=False)
+        base_graph, _ = xges_search(x, extended_search=False)
     assert not np.isfinite(xges_score)
     assert branches == []
-    assert np.array_equal(from_structure(xges_graph), from_structure(xges0_graph))
+    assert np.array_equal(from_structure(xges_graph), from_structure(base_graph))
 
 
 def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
@@ -294,7 +295,7 @@ def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
     x = rng.standard_normal((300, 5))
     x[:, 0] += hot @ np.array([1.0, -1.0, 0.5])
     x[:, 1] += x[:, 0]
-    cases["one-hot block, XGES-0"] = (np.column_stack([x, hot]), 1.0, False)
+    cases["one-hot block, no extended search"] = (np.column_stack([x, hot]), 1.0, False)
     return cases
 
 

@@ -120,7 +120,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | method | solutions |
 |---|---|
 | GES | Andrey (numpy/serial, numpy/parallel, numba/serial), causal-learn, gCastle, pcalg |
-| XGES (GES family) | Andrey (XGES, XGES-0), xges (XGES, XGES-0) |
+| XGES (GES family) | Andrey and xges, each with and without the extended search |
 | HC | Andrey (serial, parallel), bnlearn (`hc`, `tabu`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
@@ -225,14 +225,15 @@ CAM-UV results.
 
 ### XGES
 
-`xges_cpu.py` compares Andrey's `xges` with the xges package, each as XGES and as XGES-0 (the search
-without its extended phase), with Andrey's `ges` and the empty-graph baseline. The data are
+`xges_cpu.py` compares Andrey's `xges` with the xges package, each with and without the extended
+search (the arms `andrey.xges.numpy`, `andrey.xges.numpy.no_extended_search`, `xges.xges`, and
+`xges.xges.no_extended_search`), with Andrey's `ges` and the empty-graph baseline. The data are
 linear-Gaussian and standardized, on Erdos-Renyi graphs of average degree 2 and 4, with `10 * d`
 rows. XGES gains most over GES on the denser graphs. Every arm searches under one BIC weight: the
-package scores in log-likelihood units, -0.5 times Andrey's deviance plus terms that cancel in
-every move, so its `alpha` is Andrey's `lambda_value`. No arm caps the
-parents of a node: XGES has no cap, and the GES arm lifts the adapter's usual cap of 4, as
-`andrey.ges` does. `params` records the settings.
+package scores in log-likelihood units, -0.5 times Andrey's deviance plus terms that cancel in every
+move, so its `alpha` is Andrey's `lambda_value`. No arm caps the parents of a node: XGES has no cap,
+and the GES arm lifts the adapter's usual cap of 4, as `andrey.ges` does. `params` records the
+settings.
 
 Each record's `shd` is against the true CPDAG. After each rung the driver adds two columns from the
 graphs in `structures/`: `bic`, the BIC of the returned graph under Andrey's `BICScore` at the
@@ -573,8 +574,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
-- `xges_cpu.py` - compares Andrey's XGES and XGES-0 with the xges package's, and with Andrey GES,
-  by time, SHD, and BIC under one scorer.
+- `xges_cpu.py` - compares Andrey's XGES, with and without the extended search, with the xges
+  package's and with Andrey GES, by time, SHD, and BIC under one scorer.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.

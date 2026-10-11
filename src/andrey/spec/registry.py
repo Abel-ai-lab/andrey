@@ -252,8 +252,9 @@ _add(
                 name="extended_search",
                 type="bool",
                 default=True,
-                doc="After the greedy search converges, delete each edge in turn, search again, "
-                "and keep a better result. false returns the converged graph (XGES-0).",
+                doc="Run the extended search: after the greedy search converges, delete each edge "
+                "in turn, forbid adding it back, search again, and keep a better result. "
+                "false returns the converged graph.",
             ),
         ),
         references=("Nazaret & Blei 2024",),

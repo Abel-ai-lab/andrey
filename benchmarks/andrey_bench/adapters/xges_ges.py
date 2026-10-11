@@ -49,7 +49,7 @@ DEFAULT_ALPHA = 1.0
 #: What ``pip install xges`` searches under, which is twice the penalty Andrey ships.
 SHIPPED_ALPHA = 2.0
 
-#: The default search settings. ``extended_search=False`` is XGES-0, the paper's ablation, and an
+#: The default search settings. ``extended_search=False`` is XGES without the extended search, an
 #: arm of its own; ``use_fast_numba=False`` would be the pure-Python scorer.
 DEFAULT_EXTENDED_SEARCH = True
 DEFAULT_USE_FAST_NUMBA = True

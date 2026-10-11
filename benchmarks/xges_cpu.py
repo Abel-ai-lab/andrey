@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Benchmark XGES on CPU: Andrey's against the xges package, with Andrey GES.
 
-Runs XGES and XGES-0 (no extended search) from both packages, Andrey GES, and the empty graph on
-linear-Gaussian data over Erdos-Renyi graphs at two average degrees. XGES gains most over GES on
+Runs XGES with and without the extended search from both packages, Andrey GES, and the empty graph
+on linear-Gaussian data over Erdos-Renyi graphs at two average degrees. XGES gains most over GES on
 denser graphs, so the default densities are 2 and 4. ``n`` is ``10 * d`` unless ``--n`` fixes it.
 
 Every arm searches under one penalty, ``--lambda-value``. The package's ``alpha`` is Andrey's
@@ -83,9 +83,15 @@ def solutions(lambda_value: float) -> list:
     """
     return [
         AndreyXGES(name="andrey.xges.numpy", lambda_value=lambda_value),
-        AndreyXGES(name="andrey.xges0.numpy", extended_search=False, lambda_value=lambda_value),
+        AndreyXGES(
+            name="andrey.xges.numpy.no_extended_search",
+            extended_search=False,
+            lambda_value=lambda_value,
+        ),
         xges_adapter(alpha=lambda_value, name="xges.xges"),
-        xges_adapter(alpha=lambda_value, name="xges.xges0", extended_search=False),
+        xges_adapter(
+            alpha=lambda_value, name="xges.xges.no_extended_search", extended_search=False
+        ),
         AndreyGES(
             name="andrey.ges.numpy.serial.uncapped",
             backend="numpy",

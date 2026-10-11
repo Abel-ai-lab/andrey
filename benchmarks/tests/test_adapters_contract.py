@@ -62,7 +62,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     *andrey_direct_lingam_adapters(),
     AndreyICALiNGAM(),
     AndreyXGES(),
-    AndreyXGES(name="andrey.xges0.numpy", extended_search=False),
+    AndreyXGES(name="andrey.xges.numpy.no_extended_search", extended_search=False),
     CausalLearnGES(),
     CausalLearnPC(),
     CausalLearnFCI(),
@@ -138,7 +138,7 @@ DEFERRED_MODULES = {
     "andrey.direct_lingam.torch-cuda": "andrey.lingam.direct",
     "andrey.ica_lingam.numpy": "andrey.lingam.ica",
     "andrey.xges.numpy": "andrey.search.xges",
-    "andrey.xges0.numpy": "andrey.search.xges",
+    "andrey.xges.numpy.no_extended_search": "andrey.search.xges",
     "causal-learn.boss": "causallearn.search.PermutationBased.BOSS",
     "causal-learn.grasp": "causallearn.search.PermutationBased.GRaSP",
 }
