@@ -27,8 +27,8 @@ column. A single column gives a one-node graph.
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
-workload: the [benchmarks page](../benchmarks.md) shows where a method scores worse than the empty
-graph, as ICA-LiNGAM does at the benchmarks' sample size.
+workload: the [0.1.0 benchmarks](../benchmarks/0.1.0.md#large-graphs) show where a method scores
+worse than the empty graph, as ICA-LiNGAM does at their sample size.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -79,8 +79,8 @@ in a process.
 
 A method becomes supported once it has:
 
-- a benchmark campaign compared with another package, in the published summary and with a section
-  on the benchmarks page;
+- a benchmark campaign compared with another package, in a published summary and with a section
+  in its release's [benchmark report](../benchmarks.md);
 - recovery baselines in `tests/recovery/baselines/`;
 - a place in the release quality gate, `qa/quality_gate.py`;
 - an example notebook.

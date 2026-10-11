@@ -79,6 +79,14 @@ A post belongs to the release in its `version` front matter, and later builds le
 release rendered it: its numbers are typed text, and every file it includes (a figure, code, or
 output) is stored under `blog/<version>/`.
 
+## The benchmark reports
+
+[`docs/benchmarks.md`](docs/benchmarks.md) lists one report per release, newest first, at the
+address the README and the homepage link. A report is `docs/benchmarks/<release>.md`, and the
+summary its numbers come from is `benchmarks/published/<label>/summary.json`, which the report
+links. Like a post, a released report and its summary never change: their numbers are typed text,
+and new measurements go into the next release's report.
+
 ## The Examples and Demos galleries
 
 [`docs/examples/index.md`](docs/examples/index.md) is a gallery of notebook cards.
@@ -170,6 +178,7 @@ To check external links: `uv run --group docs sphinx-build -b linkcheck docs doc
 | Wordmark (Inter outlines, light and dark ink) and its generator | `site/brand/`, `site/wordmark.py` |
 | Palette as CSS custom properties | `docs/palette_css.py` |
 | Blog posts and the post list | `docs/blog/` |
+| Benchmark reports and their list | `docs/docs/benchmarks/`, `docs/docs/benchmarks.md` |
 | Docs landing page and section index | `docs/docs/index.md` |
 | API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/code/index.md` |
 | Guides (getting started, contributing) | `docs/docs/guides/` |

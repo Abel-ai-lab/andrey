@@ -299,7 +299,7 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 FCI and GFCI depend on column order, GES was more accurate with a stronger penalty on the large
 sparse benchmark graphs, and PC and FCI are practical to roughly 1,000 variables. See
-[Known limits](../benchmarks.md#known-limits).
+[Known limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 

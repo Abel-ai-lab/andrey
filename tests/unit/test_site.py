@@ -1002,8 +1002,9 @@ def test_the_published_summary_gives_every_paired_ratio():
             assert (row["ratio"] is not None) == timed, (method["method"], method["comparator"])
 
 
-def test_no_speed_cell_is_withheld_in_the_report_or_the_readme():
-    for page in (ROOT / "docs" / "docs" / "benchmarks.md", ROOT / "README.md"):
+def test_no_speed_cell_is_withheld_in_the_reports_or_the_readme():
+    reports = sorted((ROOT / "docs" / "docs" / "benchmarks").glob("*.md"))
+    for page in (*reports, ROOT / "docs" / "docs" / "benchmarks.md", ROOT / "README.md"):
         text = page.read_text(encoding="utf-8").lower()
         assert "no claim" not in text and "no speed claim" not in text, page.name
 

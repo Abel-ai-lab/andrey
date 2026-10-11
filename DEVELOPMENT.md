@@ -262,15 +262,16 @@ difference and its cause. The fit records stay outside the repository.
 
 One pull request switches the method from experimental to supported, because the checks tie these
 changes together: the quality gate must cover exactly the supported methods, and the published
-summary must list exactly them, so any one of the changes below without the others fails. The pull
-request makes:
+summaries together must list exactly them, so any one of the changes below without the others
+fails. The pull request makes:
 
 - `status="supported"` in its `MethodSpec`, with the `warn_experimental` call and the docstring's
   `ExperimentalWarning` entry removed;
 - the method under "Supported methods" in `docs/docs/code/index.md`;
-- its row in the published summary, `benchmarks/published/<release>/summary.json`, generated from
-  the campaign's records;
-- a section for it on `docs/docs/benchmarks.md`, with its driver in the "Reproduce" table;
+- its rows in the summary of the release that publishes its benchmark,
+  `benchmarks/published/<label>/summary.json`, generated from the campaign's records;
+- a section for it in that release's report, `docs/docs/benchmarks/<release>.md`, with its driver
+  in the "Reproduce" table; `docs/docs/benchmarks.md` lists the reports, newest first;
 - an example notebook in `examples/` that calls it;
 - the quality-gate and recorded-output entries from steps 2 and 4.
 

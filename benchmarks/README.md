@@ -2,14 +2,22 @@
 
 Compare Andrey with other causal discovery packages and older Andrey builds.
 
-## Published alpha measurements
+## Published measurements
 
-The [site's benchmark tables](../docs/docs/benchmarks.md) summarize the alpha campaigns;
-[`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) holds one row per
-comparison and size. The summary is generated from the recorded fits; those records and the script
-that writes it are kept outside this repository. To rerun a comparison, use its driver with the
-builds, versions, and settings the site lists under
-[Reproduce](../docs/docs/benchmarks.md#reproduce).
+The site has a [benchmark report](../docs/docs/benchmarks.md) per release, and each report has its
+own folder under `published/` with the summary its numbers come from:
+
+| Release | Report | Summary |
+|---|---|---|
+| 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
+| 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |
+
+A summary holds one row per comparison and size. It is generated from the recorded fits; those
+records and the script that writes it are kept outside this repository. A released report and its
+folder do not change: new measurements go into the next release's report and folder. To rerun a
+comparison, use its driver with the builds, versions, and settings its report lists under
+Reproduce ([0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
+[0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
 
 ## Comparison packages
 
