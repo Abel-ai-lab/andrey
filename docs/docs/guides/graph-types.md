@@ -81,7 +81,11 @@ assumptions. The circle at `X` leaves that endpoint unresolved. This does not es
 effect from `X` to `Y`. A bidirected edge `X <-> Y` indicates a relation through hidden causes;
 it is not a directed feedback loop and does not identify a particular hidden variable.
 
-FCI and GFCI return `kind="pag"`. A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
+FCI and GFCI return `kind="pag"`. RCD, CAM-UV, and BottomUpParceLiNGAM use the same marks without
+the equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that RCD or CAM-UV
+links through a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves
+unordered, which holds the variables a hidden common cause confounds and their observed ancestors.
+A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
 
 ```python
 pag = GraphStructure.from_numpy(
@@ -150,7 +154,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `gin` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `hc`, `boss`, `grasp` |
-| `pag` | `fci`, `gfci` |
+| `pag` | `fci`, `gfci`, `rcd`, `camuv`, `bottom_up_parce_lingam` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam` |
 
 `multi_group_direct_lingam` returns a list of results, one per group. GIN includes explicit latent

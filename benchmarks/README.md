@@ -128,6 +128,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | GRaSP | Andrey, causal-learn |
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
+| RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -147,6 +148,80 @@ Every estimate is scored against the observed PAG, including the empty graph's C
 built untimed in the parent, once per dataset. Its cost grows about 8x per doubling of `d`. A DAG or
 CPDAG estimate is scored as a PAG without canonicalization. Its tails and undirected edges count
 against the PAG's circles. Use PAG methods and the empty graph on these datasets.
+
+### Hidden-confounder methods
+
+`confounded_cpu.py` compares Andrey's `rcd`, `bottom_up_parce_lingam`, and `camuv` with lingam's
+`RCD`, `BottomUpParceLiNGAM`, and `CAMUV`, with the empty-graph baseline. It holds three methods in
+one file because they answer the same question: which variables share a hidden common cause. RCD and
+BottomUpParceLiNGAM run on `latent_lingam_er`, linear with uniform noise. CAM-UV runs on
+`latent_anm_er`, nonlinear with Gaussian additive noise. Both regimes use an Erdos-Renyi graph and
+hide one node in five, at least one, as in [Hidden confounders](#hidden-confounders); `d` includes
+the hidden nodes. Both packages run each method with the same settings, listed in `params`.
+
+The defaults are 2000 rows, `d` of 5, 10, and 15, five seeds, one repeat without warm-up, and
+`--cap-wall-s` of 1800. A fit that reaches the cap is a `timeout` record with no scores. lingam's
+CAM-UV needs pygam 0.12 or newer; older releases fail with current scipy, and its fits end in
+`error` records. A smoke run covers every solution on one small dataset per regime:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/confounded_cpu.py --out outputs/confounded-smoke --smoke
+```
+
+Every estimate is a PAG and gets the observed-PAG scores of the FCI runs, but those do not rank
+these methods: RCD and CAM-UV use their functional assumptions to mark `<->` where the observed PAG
+has `o-o`, so the PAG scores count a correct `<->` as an error and BottomUpParceLiNGAM's `o-o` as a
+match. Read two other scores instead.
+
+The directed edges are scored against two targets. `directed_projection_*` uses the latent
+projection, observed `i -> j` when a directed path runs from `i` to `j` through hidden nodes only,
+less the edges whose endpoints share a hidden cause: RCD and BottomUpParceLiNGAM estimate these,
+and mark a pair with a hidden cause instead of orienting it. `directed_direct_*` uses the edges
+between two observed nodes with no unobserved path between them, which CAM-UV estimates: it marks
+a pair with such a path as unresolved instead. Each holds `n_true`, `precision`, `recall`, `f1`,
+and `errors`, the edges in one set and not the other (a reversed edge counts twice);
+`directed_n_est` counts the estimate's edges.
+
+A fit also names the pairs it attributes to a hidden common cause: the `<->` edges for RCD and
+CAM-UV, which match `metadata["confounded_pairs"]` of Andrey's result, and the `o-o` edges for
+BottomUpParceLiNGAM. BottomUpParceLiNGAM's `o-o` edges join every pair of the one block of variables
+it leaves unordered: the confounded variables, their observed ancestors, and any other confounded
+pairs. Pairs in the block that share no cause count against its precision, and edges among the
+block's variables stay unoriented, which caps its directed recall. Read its pair recall, the share
+of true pairs it leaves unordered. `confounded_n_est` counts the pairs, and three sets of true pairs
+score them:
+
+| columns | true pairs |
+|---|---|
+| `confounded_hidden_cause_*` | the observed pairs that one hidden node reaches through hidden nodes only |
+| `confounded_unobserved_path_*` | the pairs joined by an unobserved causal path (one that enters an endpoint from a hidden parent) or an unobserved backdoor path (one that enters both from hidden parents), as CAM-UV defines them |
+| `confounded_pag_*` | the observed pairs joined by `<->` in the observed PAG |
+
+Each set has `n_true`, `precision`, `recall`, and `f1`. Score RCD and BottomUpParceLiNGAM on
+`directed_projection_*` and `confounded_hidden_cause_*`: both mark a pair that shares a hidden
+cause, even when one node is the other's parent. Compare each method across the two packages, not
+RCD with BottomUpParceLiNGAM, whose block caps its scores as described above. Compare CAM-UV on
+`directed_direct_*` and `confounded_unobserved_path_*`: it marks every pair with an unobserved path
+as unresolved, even when one node is the other's parent, and its direct edges are the rest. The
+driver's summary prints these. A PAG keeps `<->` only where conditional independences fix both
+arrowheads, so `confounded_pag_*` has nothing to find on nearly every dataset at `d = 5`. A ratio
+with no denominator is `NaN` rather than 1: report how many datasets define it, and read the
+`n_true` columns beside the scores. The `confounder_*` columns from `andrey.metrics` score empty
+against empty as 1 and do not see the `o-o` pairs of BottomUpParceLiNGAM.
+
+The driver adds these columns to the record parts after each rung, from the estimates stored in
+`structures/`. A resumed run scores only the units it measures, so a part scored by an older scorer
+keeps its columns. A rescore recomputes every part's columns without fitting anything; pass the
+first run's flags:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/confounded_cpu.py --out outputs/confounded-cpu --rescore
+```
+
+The two CAM-UV implementations differ inside, so the same settings can give different decisions:
+Andrey regresses with spline features and least squares where lingam fits pygam's `LinearGAM`, and
+their HSIC tests use different kernel bandwidths and null approximations. Report this beside the
+CAM-UV results.
 
 ### Where the clock starts
 
@@ -449,6 +524,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.
 - `lingam_cpu.py` - compares DirectLiNGAM and ICA-LiNGAM with causal-learn on CPU.
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
+- `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
+  hidden confounders.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.

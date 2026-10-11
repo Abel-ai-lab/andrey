@@ -56,13 +56,16 @@ SINGLE = {
     "ica_lingam": andrey.ica_lingam,
     "varma_lingam": andrey.varma_lingam,
     "gin": andrey.gin,
+    "rcd": andrey.rcd,
+    "camuv": andrey.camuv,
+    "bottom_up_parce_lingam": andrey.bottom_up_parce_lingam,
 }
 
 # Data no method can fit, and what the error must say about it.
 UNUSABLE = {
     "1-D": (lambda x: x[:, 0], r"data must be a 2-D"),
-    "one row": (lambda x: x[:1], r"data needs at least 2 rows"),
-    "no rows": (lambda x: x[:0], r"data needs at least 2 rows"),
+    "one row": (lambda x: x[:1], r"data needs at least \d+ rows"),
+    "no rows": (lambda x: x[:0], r"data needs at least \d+ rows"),
     "NaN": (lambda x: _with(x, (3, 2), np.nan), r"data .*row 3, column 2"),
     "inf": (lambda x: _with(x, (5, 0), np.inf), r"data .*row 5, column 0"),
     "constant column": (lambda x: _with(x, (slice(None), 1), 3.0), r"data column 1 is constant"),
@@ -153,6 +156,28 @@ def test_varma_lingam_checks_order(order, error):
 def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
     with pytest.raises(ValueError, match="alpha"):
         andrey.gin(_data(d=4), alpha=alpha)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("fit", "setting", "value", "error"),
+    [
+        *[(andrey.rcd, "max_explanatory_vars", bad, ValueError) for bad in (0, -1)],
+        *[(andrey.camuv, "max_explanatory_vars", bad, ValueError) for bad in (1, 0, -1)],
+        (andrey.rcd, "max_explanatory_vars", 1.5, TypeError),
+        (andrey.camuv, "max_explanatory_vars", 1.5, TypeError),
+        *[
+            (andrey.rcd, level, bad, ValueError)
+            for level in ("cor_alpha", "ind_alpha", "shapiro_alpha")
+            for bad in (0.0, 1.0, 2.0)
+        ],
+        *[(andrey.camuv, "alpha", bad, ValueError) for bad in (0.0, 1.0, 2.0)],
+        *[(andrey.bottom_up_parce_lingam, "alpha", bad, ValueError) for bad in (0.0, 1.0, 2.0)],
+    ],
+)
+def test_hidden_confounder_methods_reject_a_bad_setting(fit, setting, value, error):
+    with pytest.raises(error, match=setting):
+        fit(_data(), **{setting: value})
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

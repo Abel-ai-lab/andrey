@@ -72,6 +72,9 @@ in a process.
    longitudinal_lingam
    pnl
    gin
+   rcd
+   camuv
+   bottom_up_parce_lingam
 ```
 
 A method becomes supported once it has:

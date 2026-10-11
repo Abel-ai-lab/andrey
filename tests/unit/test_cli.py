@@ -30,7 +30,7 @@ def csv_path(tmp_path):
 @pytest.fixture
 def nongaussian_path(tmp_path):
     rng = np.random.default_rng(1)
-    n = 300
+    n = 1000
     u = rng.uniform(-1, 1, size=(n, 3)) ** 3
     x0 = u[:, 0]
     x1 = 1.2 * x0 + u[:, 1]
@@ -419,12 +419,16 @@ def test_seeded_run_reports_resolved_seed(capsys, csv_path):
     assert env["run"]["seed"] == 0  # no --seed -> ANDREY_SEED default, resolved (not null)
 
 
-@pytest.mark.parametrize("name", ["pc", "direct_lingam", "varma_lingam", "gin"])
+@pytest.mark.parametrize(
+    "name",
+    ["pc", "direct_lingam", "varma_lingam", "gin", "rcd", "camuv", "bottom_up_parce_lingam"],
+)
 def test_output_envelope_matches_spec(name, capsys, csv_path, nongaussian_path):
     """The result envelope reflects the method's OutputSpec claims (kind / ordering / weighted)."""
     from andrey.spec import get_spec
 
-    data = str(nongaussian_path if name in ("direct_lingam", "gin") else csv_path)
+    non_gaussian = ("direct_lingam", "gin", "rcd", "camuv", "bottom_up_parce_lingam")
+    data = str(nongaussian_path if name in non_gaussian else csv_path)
     code, out, _ = _run(["run", name, "--data", data], capsys)
     env = json.loads(out)
     spec = get_spec(name)

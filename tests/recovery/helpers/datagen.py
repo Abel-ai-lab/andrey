@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import hashlib
+from itertools import combinations
 
 import numpy as np
 
@@ -132,6 +133,42 @@ def _confounded_sem(
     return X_full[:, list(observed)]
 
 
+def _confounded_anm(
+    seed: int, n_samples: int, noise_scale: float, observed: list[int]
+) -> np.ndarray:
+    """Nonlinear additive-noise SEM over ``h, x0, x1, x2, x3``, returning only ``observed`` columns.
+
+    The hidden ``h`` is uniform on ``(-1, 1)`` and drives ``x0 = sin(3h) + n`` and
+    ``x1 = cos(3h) + n``: an odd and an even function of ``h``, so neither variable is an additive
+    function of the other. Then ``x2 = x1**2 + n`` and ``x3 = tanh(2 x0) + n``. Each ``n`` is an
+    independent uniform draw on ``(-noise_scale, noise_scale)``. Column indices in ``observed``
+    count ``h`` as column 0.
+
+    ``sin``, ``cos``, and ``tanh`` use numpy kernels chosen from the host's CPU features, so the
+    last bits of the output, and its input hash, can differ by machine; no baseline pins this case.
+    """
+    rng = np.random.default_rng(seed)
+    h = rng.uniform(-1.0, 1.0, size=n_samples)
+    n = rng.uniform(-noise_scale, noise_scale, size=(n_samples, 4))
+    x0 = np.sin(3.0 * h) + n[:, 0]
+    x1 = np.cos(3.0 * h) + n[:, 1]
+    x2 = x1 * x1 + n[:, 2]
+    x3 = np.tanh(2.0 * x0) + n[:, 3]
+    return np.column_stack([h, x0, x1, x2, x3])[:, list(observed)]
+
+
+# Full order h, x0, x1, x2, x3 (``weights[j][i]`` is the coefficient of ``i`` in ``j``). A strong
+# hidden effect (1.5 against unit-range noise) leaves a trace in the pair's residuals that the
+# independence tests detect at 2000 rows.
+_FORK_WEIGHTS = [
+    [0.0, 0.0, 0.0, 0.0, 0.0],  # h  (latent)
+    [1.5, 0.0, 0.0, 0.0, 0.0],  # x0 <- h
+    [1.5, 0.0, 0.0, 0.0, 0.0],  # x1 <- h
+    [0.0, 0.0, 0.6, 0.0, 0.0],  # x2 <- x1
+    [0.0, 0.6, 0.0, 0.0, 0.0],  # x3 <- x0
+]
+
+
 # Case registry: each entry fully determines a reproducible input matrix.
 CASES: dict[str, dict] = {
     # Non-Gaussian linear SEM (uniform noise) - DirectLiNGAM's assumption.
@@ -211,8 +248,52 @@ CASES: dict[str, dict] = {
         "x_range": 1.0,
         "noise_scale": 0.3,
     },
+    # Linear non-Gaussian SEM whose hidden confounder h drives two observed variables that share no
+    # direct edge: h -> x0, h -> x1, x0 -> x3, x1 -> x2 (h is column 0 of the full order and is
+    # dropped). The confounded pair is (x0, x1); x2 and x3 each descend from one member of it. RCD
+    # and BottomUpParceLiNGAM.
+    "confounded_fork_4v": {
+        "model": "confounded",
+        "noise": "uniform",
+        "seed": 20240617,
+        "n_samples": 2000,
+        "observed": [1, 2, 3, 4],
+        "weights": _FORK_WEIGHTS,
+    },
+    # The same SEM with h kept as a column: no variable is hidden, so no pair is confounded.
+    "fork_5v_observed": {
+        "model": "confounded",
+        "noise": "uniform",
+        "seed": 20240617,
+        "n_samples": 2000,
+        "observed": [0, 1, 2, 3, 4],
+        "weights": _FORK_WEIGHTS,
+    },
+    # The fork graph with nonlinear additive-noise mechanisms (see ``_confounded_anm``) - CAM-UV.
+    # ``edges`` and ``confounded_pairs`` index the observed columns.
+    "confounded_fork_4v_anm": {
+        "model": "confounded_anm",
+        "seed": 20240618,
+        "n_samples": 1000,
+        "noise_scale": 0.3,
+        "observed": [1, 2, 3, 4],
+        "edges": [(0, 3), (1, 2)],
+        "confounded_pairs": [(0, 1)],
+    },
+    # The same nonlinear SEM with h kept as a column: no variable is hidden.
+    "fork_5v_anm_observed": {
+        "model": "confounded_anm",
+        "seed": 20240618,
+        "n_samples": 1000,
+        "noise_scale": 0.3,
+        "observed": [0, 1, 2, 3, 4],
+        "edges": [(0, 1), (0, 2), (1, 4), (2, 3)],
+        "confounded_pairs": [],
+    },
     # Linear non-Gaussian SEM with a hidden confounder (column 0 dropped) -
-    # CAM-UV, RCD, BottomUpParceLiNGAM. Full order: h, x0..x5; h confounds x1,x2.
+    # CAM-UV, RCD, BottomUpParceLiNGAM. Full order: h, x0..x5; h drives x1 and x2, which also share
+    # the direct edge x1 -> x2. A method marks that pair or orients the edge depending on its
+    # tests' power, so tests on this case check output shape and CAM-UV's parent sets.
     "confounded_6v": {
         "model": "confounded",
         "noise": "uniform",
@@ -266,23 +347,25 @@ GROUP_CASES: dict[str, dict] = {
 }
 
 
-def generate(case_id: str) -> np.ndarray:
+def generate(case_id: str, *, replicate: int = 0) -> np.ndarray:
     """Return the input matrix for ``case_id`` (reproducible from its seed).
 
-    Dispatches on the case's ``"model"`` key (default ``"linear_sem"``).
+    Dispatches on the case's ``"model"`` key (default ``"linear_sem"``). ``replicate`` shifts the
+    seed to draw another sample of the same SEM; replicate 0 is the pinned input.
     """
     spec = CASES[case_id]
+    seed = spec["seed"] + replicate
     model = spec.get("model", "linear_sem")
     if model == "linear_sem":
         return _linear_sem(
-            seed=spec["seed"],
+            seed=seed,
             n_samples=spec["n_samples"],
             weights=spec["weights"],
             noise=spec["noise"],
         )
     if model == "var":
         return _var_process(
-            seed=spec["seed"],
+            seed=seed,
             n_samples=spec["n_samples"],
             B0=spec["B0"],
             A1=spec["A1"],
@@ -291,7 +374,7 @@ def generate(case_id: str) -> np.ndarray:
         )
     if model == "varma":
         return _varma_process(
-            seed=spec["seed"],
+            seed=seed,
             n_samples=spec["n_samples"],
             B0=spec["B0"],
             A1=spec["A1"],
@@ -301,20 +384,51 @@ def generate(case_id: str) -> np.ndarray:
         )
     if model == "anm":
         return _anm_pair(
-            seed=spec["seed"],
+            seed=seed,
             n_samples=spec["n_samples"],
             x_range=spec["x_range"],
             noise_scale=spec["noise_scale"],
         )
     if model == "confounded":
         return _confounded_sem(
-            seed=spec["seed"],
+            seed=seed,
             n_samples=spec["n_samples"],
             weights=spec["weights"],
             noise=spec["noise"],
             observed=spec["observed"],
         )
+    if model == "confounded_anm":
+        return _confounded_anm(
+            seed=seed,
+            n_samples=spec["n_samples"],
+            noise_scale=spec["noise_scale"],
+            observed=spec["observed"],
+        )
     raise ValueError(f"unknown case model: {model!r}")
+
+
+def planted_structure(case_id: str) -> tuple[set[tuple[int, int]], set[tuple[int, int]]]:
+    """Return ``(edges, confounded_pairs)`` of a hidden-confounder case, over its observed columns.
+
+    ``edges`` holds ``(i, j)`` for each direct cause ``i -> j`` between observed columns, and
+    ``confounded_pairs`` each ``(i, j)``, ``i < j``, of non-adjacent observed columns with a shared
+    hidden parent. Indices count positions in the generated matrix. A linear case derives both from
+    its weights; a nonlinear case lists them.
+    """
+    spec = CASES[case_id]
+    if spec["model"] == "confounded_anm":
+        return {tuple(e) for e in spec["edges"]}, {tuple(p) for p in spec["confounded_pairs"]}
+    B = np.asarray(spec["weights"])  # B[j, i] != 0 is the edge i -> j over the full order
+    observed = list(spec["observed"])
+    hidden = [c for c in range(B.shape[0]) if c not in observed]
+    position = {column: k for k, column in enumerate(observed)}
+    edges = {(position[i], position[j]) for i in observed for j in observed if B[j, i] != 0}
+    confounded = {
+        (position[a], position[b])
+        for a, b in combinations(observed, 2)
+        if B[a, b] == 0 and B[b, a] == 0 and any(B[a, h] != 0 and B[b, h] != 0 for h in hidden)
+    }
+    return edges, confounded
 
 
 def generate_groups(case_id: str) -> list[np.ndarray]:
