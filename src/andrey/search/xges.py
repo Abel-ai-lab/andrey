@@ -35,6 +35,7 @@ Equivalence Classes of Directed Acyclic Graphs. https://jmlr.org/papers/v13/haus
 from __future__ import annotations
 
 import heapq
+from array import array
 from collections import OrderedDict, defaultdict, deque
 from collections.abc import Callable, Iterable
 from itertools import chain, count
@@ -117,13 +118,32 @@ class _Changes(dict):
         return fingerprint
 
 
-def _returns(moves: Iterable[_Changes]) -> bool:
-    """Whether ``moves``, applied in turn, leave every pair in its state before the first."""
-    net = _Changes()
-    for move in moves:
-        for (a, b), (old, new) in move.items():
+class _History:
+    """The net pair changes of each accepted move, in order, in flat arrays of 10 bytes a change."""
+
+    def __init__(self) -> None:
+        self.a, self.b = array("i"), array("i")
+        self.old, self.new = array("b"), array("b")
+
+    def __len__(self) -> int:
+        return len(self.a)
+
+    def append(self, log: _Changes) -> None:
+        for (a, b), (old, new) in log.items():
+            self.a.append(a)
+            self.b.append(b)
+            self.old.append(old)
+            self.new.append(new)
+
+    def returns(self, start: int, log: _Changes) -> bool:
+        """Whether the changes from ``start`` on, then ``log``, leave every pair as at ``start``."""
+        net = _Changes()
+        since = zip(self.a[start:], self.b[start:], self.old[start:], self.new[start:])
+        for a, b, old, new in since:
             net.record(a, b, old, new)
-    return all(old == new for old, new in net.values())
+        for (a, b), (old, new) in log.items():
+            net.record(a, b, old, new)
+        return all(old == new for old, new in net.values())
 
 
 class _Graph:
@@ -775,8 +795,8 @@ class _Search:
         fingerprint is a revisit only when the moves made since it, and this one, cancel out.
         """
         g, paths = self.g, self.paths
-        moves: list[_Changes] = []
-        visits = {self.fingerprint: [0]}  # fingerprint -> len(moves) at each graph with it
+        history = _History()
+        visits = {self.fingerprint: [0]}  # fingerprint -> len(history) at each graph with it
         while self.deletes or self.reverses or self.inserts:
             log = _Changes()
             if self.deletes:
@@ -795,12 +815,12 @@ class _Search:
                     continue
                 _apply_insert(g, x, y, T, log)
             fingerprint = log.rekey(self.fingerprint)
-            if any(_returns(chain(moves[k:], [log])) for k in visits.get(fingerprint, ())):
+            if any(history.returns(k, log) for k in visits.get(fingerprint, ())):
                 for (a, b), (old, _new) in log.items():
                     g.set_state(a, b, old)
                 continue
-            moves.append(log)
-            visits.setdefault(fingerprint, []).append(len(moves))
+            history.append(log)
+            visits.setdefault(fingerprint, []).append(len(history))
             self.fingerprint = fingerprint
             self.update(log)
 
