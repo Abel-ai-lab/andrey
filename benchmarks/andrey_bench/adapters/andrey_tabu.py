@@ -30,7 +30,8 @@ import numpy as np
 from andrey_bench.adapters.andrey_hc import _andrey_version, _parallel_workers
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
-#: Deviance units, matching bnlearn's `bic-g` at `k = log(n)/2`.
+#: Deviance units, bnlearn's `bic-g` at `k = log(n)/2` up to its residual variance, which
+#: divides by n - p - 1 where Andrey divides by n: an O(p^2 / n) difference per node.
 _DEFAULT_LAMBDA = 1.0
 #: bnlearn's defaults: a tabu list of 10 DAGs, and 10 non-improving moves without a new best.
 _DEFAULT_TABU_LENGTH = 10

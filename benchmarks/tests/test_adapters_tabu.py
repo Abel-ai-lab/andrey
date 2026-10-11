@@ -1,7 +1,7 @@
 """The tabu-search adapters and the BIC the tabu campaign scores every fit with.
 
-Andrey's and bnlearn's tabu adapters must run one search: the same score, tabu list, and stopping
-rule. The campaign's ``bic`` must be the score Andrey's searches report, the same for every DAG of
+Andrey's and bnlearn's tabu adapters must run the same search: the same penalty, tabu list, and
+stopping rule (bnlearn's Gaussian likelihood differs from Andrey's by an O(p^2 / n) term per node). The campaign's ``bic`` must be the score Andrey's searches report, the same for every DAG of
 an equivalence class, so a DAG row and a CPDAG row compare on it.
 """
 

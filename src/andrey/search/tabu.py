@@ -134,7 +134,7 @@ def tabu(
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
     tabu_length: int = 10,
-    max_tabu: int = 10,
+    max_tabu: int | None = None,
     max_iter: int = 200,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by tabu search over the linear-Gaussian BIC score.
@@ -149,8 +149,9 @@ def tabu(
         Weight on the BIC complexity term of the deviance the search minimizes.
     tabu_length : int
         Number of recently visited DAGs a move may not return to.
-    max_tabu : int
-        Non-improving moves allowed without a new best score before the search stops.
+    max_tabu : int or None
+        Non-improving moves allowed without a new best score before the search stops, at most
+        ``tabu_length``; ``None`` means ``tabu_length``.
     max_iter : int
         Maximum number of moves, improving or not. Taking ``max_iter`` moves warns with
         ``SearchLimitWarning``.
@@ -164,6 +165,10 @@ def tabu(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use 'local_score_BIC_from_cov'"
         )
+    if max_tabu is None:
+        max_tabu = tabu_length
+    if not 1 <= max_tabu <= tabu_length:
+        raise ValueError(f"max_tabu must lie in [1, tabu_length={tabu_length}], got {max_tabu}")
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
     score = BICScore(X, lambda_value=lambda_value)
