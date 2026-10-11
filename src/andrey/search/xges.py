@@ -744,6 +744,11 @@ class _Search:
 # ---- the rescanning reference -------------------------------------------------------------------
 
 
+def _local(score: BICScore, v: int, parents: Iterable[int]) -> float:
+    """The local score of ``v`` given a parent set."""
+    return score.score(v, sorted(parents))
+
+
 def _sets(adj: np.ndarray, v: int) -> tuple[set[int], set[int], set[int]]:
     """Parents, undirected neighbors, and adjacent nodes of ``v`` in a mark matrix."""
     return (
@@ -763,7 +768,7 @@ def _all_deletes(adj: np.ndarray, score: BICScore) -> list[tuple]:
             for _, H in ops.clique_residuals(adj, h0):
                 C = frozenset(h0) - set(H)
                 E = frozenset(C | pa_y | {x})
-                delta = score.score(y, E - {x}) - score.score(y, E)
+                delta = _local(score, y, E - {x}) - _local(score, y, E)
                 out.append((delta, x, y, C, E))
     return out
 
@@ -785,7 +790,7 @@ def _all_inserts(
                 if reachable(y, x, na | set(T)):
                     continue
                 E = pa_y | na | set(T)
-                out.append((score.score(y, E | {x}) - score.score(y, E), x, y, frozenset(T)))
+                out.append((_local(score, y, E | {x}) - _local(score, y, E), x, y, frozenset(T)))
     return out
 
 
@@ -802,12 +807,12 @@ def _all_reverses(adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, in
             succ = ops.tail_successor_lists(cut)
             pa_y, ne_y, _ = _sets(adj, y)
             na = ne_y & ad_x
-            drop = score.score(x, pa_x - {y}) - score.score(x, pa_x)
+            drop = _local(score, x, pa_x - {y}) - _local(score, x, pa_x)
             for _, T in ops.clique_extensions(adj, na, sorted(ne_y - ad_x)):
                 if not ops.blocks_semi_directed_paths(succ, y, x, na | set(T) | ne_x):
                     continue
                 E = pa_y | na | set(T)
-                delta = score.score(y, E | {x}) - score.score(y, E) + drop
+                delta = _local(score, y, E | {x}) - _local(score, y, E) + drop
                 out.append((delta, x, y, frozenset(T)))
     return out
 

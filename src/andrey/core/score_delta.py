@@ -18,7 +18,7 @@ within ``1e-9`` of the exact difference. :func:`local_score_bic_delta` scores on
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any
 from weakref import WeakKeyDictionary
 
@@ -740,7 +740,7 @@ def delta_many_with_base(
 def add_deltas(
     score_obj: BICScore,
     i: int,
-    base_parents: Sequence[int],
+    base_parents: Iterable[int],
     *,
     cond_threshold: float = _COND_THRESHOLD,
 ) -> np.ndarray:
