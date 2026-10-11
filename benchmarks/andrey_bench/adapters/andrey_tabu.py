@@ -1,7 +1,7 @@
 """Andrey tabu-search adapters for greedy score-based search.
 
 Tabu search is hill climbing that keeps going past a local optimum: when no move improves the score
-it takes the least worsening move, never returning to one of the `tabu_length` DAGs it visited
+it takes the best non-improving move, never returning to one of the `tabu_length` DAGs it visited
 last, and it returns the best DAG it visited. bnlearn's `tabu` is the counterpart; Andrey's `hc`
 measures what the extra search buys.
 
@@ -12,7 +12,7 @@ and `arrowhead_f1`.
 Three settings keep the pair on the same search:
 
 * `tabu_length=10` and `max_tabu=10` are bnlearn's `tabu` and `max.tabu` defaults. bnlearn 5.2.1
-  stops after `tabu` worsening moves whatever `max.tabu` is, so the two must stay equal for the
+  stops after `tabu` non-improving moves whatever `max.tabu` is, so the two must stay equal for the
   pair to stop by the same rule.
 * `max_iter` caps all moves, improving or not, so the shipped 200 binds on smaller graphs than it
   does for `hc`. bnlearn's `max.iter` is unbounded, so this is set high enough never to bind and the
@@ -32,7 +32,7 @@ from andrey_bench.adapters.andrey_hc import _andrey_version, _parallel_workers
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
 #: Deviance units, matching bnlearn's `bic-g` at `k = log(n)/2`.
 _DEFAULT_LAMBDA = 1.0
-#: bnlearn's defaults: a tabu list of 10 DAGs, and 10 worsening moves without a new best.
+#: bnlearn's defaults: a tabu list of 10 DAGs, and 10 non-improving moves without a new best.
 _DEFAULT_TABU_LENGTH = 10
 _DEFAULT_MAX_TABU = 10
 #: High enough never to bind: the search stops by the tabu rule. The shipped default is 200.

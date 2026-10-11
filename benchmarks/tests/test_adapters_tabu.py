@@ -35,7 +35,7 @@ def _bic(adapter, x: np.ndarray) -> float:
 
 
 def test_the_tabu_pair_runs_one_search() -> None:
-    """Same BIC units and the same list; bnlearn 5.2.1 stops after `tabu` worsening moves whatever
+    """Same BIC units and the same list; bnlearn 5.2.1 stops after `tabu` non-improving moves whatever
     `max.tabu` is, so Andrey's `max_tabu` must equal it too."""
     theirs = BnlearnTabu().params()
     for adapter in andrey_tabu_adapters():

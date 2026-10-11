@@ -87,11 +87,11 @@ def _search(
     """Run tabu search from the empty graph; return the best DAG's structure key and moves taken.
 
     Each step puts the current DAG in the tabu list, then takes the best improving move that does
-    not lead into the list. Without one, the search stops if ``max_tabu`` worsening moves have
-    been taken since the last new best; otherwise it counts one more and takes the least worsening
-    move that does not lead into the list. A new best score, lower by more than ``_EPS_IMPROVE``,
-    resets the count. The search also stops when every legal move leads into the list, or after
-    ``max_iter`` moves.
+    not lead into the list. Without one, the search stops if it has taken ``max_tabu``
+    non-improving moves since the last new best; otherwise it counts one more and takes the best
+    move that does not lead into the list, which leaves the score unchanged or worse. A new best
+    score, lower by more than ``_EPS_IMPROVE``, resets the count. The search also stops when every
+    legal move leads into the list, or after ``max_iter`` moves.
     """
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
@@ -150,7 +150,7 @@ def tabu(
     tabu_length : int
         Number of recently visited DAGs a move may not return to.
     max_tabu : int
-        Worsening moves allowed without a new best score before the search stops.
+        Non-improving moves allowed without a new best score before the search stops.
     max_iter : int
         Maximum number of moves, improving or not. Taking ``max_iter`` moves warns with
         ``SearchLimitWarning``.

@@ -274,9 +274,9 @@ def tabu(
 
     Tabu search is hill climbing that can leave a local optimum [1]_ [2]_ [3]_. Each move adds,
     removes, or reverses the edge that most improves a covariance-based BIC, as in
-    :func:`andrey.hc`. Where no move improves it, the search takes the move that worsens it least,
-    and it never moves back to one of the DAGs it visited most recently. It returns the CPDAG of
-    the best-scoring DAG it visited.
+    :func:`andrey.hc`. Where no move improves it, the search still takes the best move, one that
+    leaves the score unchanged or worse, and it never moves back to one of the DAGs it visited
+    most recently. It returns the CPDAG of the best-scoring DAG it visited.
 
     Parameters
     ----------
@@ -292,8 +292,8 @@ def tabu(
         Length of the tabu list: the number of most recently visited DAGs a move may not lead to.
         At least ``1``.
     max_tabu : int or None, default=None
-        Moves that worsen the score the search may take without finding a better DAG, from ``1``
-        to ``tabu_length``. ``None`` uses ``tabu_length``.
+        Non-improving moves the search may take without finding a better DAG, from ``1`` to
+        ``tabu_length``. ``None`` uses ``tabu_length``.
     max_iter : int, default=200
         Most moves the search takes, improving or not, at least ``1``. Each move adds at most one
         edge, so the result has at most ``max_iter`` edges.
@@ -330,9 +330,10 @@ def tabu(
     The search starts from the empty graph. Each step first adds the current DAG to the tabu list,
     which keeps the last ``tabu_length`` DAGs visited. It then takes the move with the best score
     change among those that lead to a DAG outside the list: an improving move when one exists.
-    Otherwise, if ``max_tabu`` worsening moves have been taken since the best score last
-    improved, the search stops; if not, it takes the move that worsens the score least. The search
-    also stops when every legal move leads into the list, or after ``max_iter`` moves.
+    Otherwise, if it has taken ``max_tabu`` non-improving moves since the best score last improved,
+    the search stops; if not, it takes the best non-improving move, which leaves the score
+    unchanged or worse. The search also stops when every legal move leads into the list, or after
+    ``max_iter`` moves.
 
     Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
@@ -341,8 +342,8 @@ def tabu(
     worker count.
 
     bnlearn's ``tabu`` [3]_ documents ``max.tabu`` with this meaning, but version 5.2.1 stops after
-    ``tabu`` worsening moves whatever ``max.tabu`` is; the two agree when they are equal, as at the
-    defaults.
+    ``tabu`` non-improving moves whatever ``max.tabu`` is; the two agree when they are equal, as at
+    the defaults.
 
     References
     ----------

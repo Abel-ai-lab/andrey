@@ -95,7 +95,7 @@ def test_longer_searches_never_score_worse():
 
 
 def test_tabu_is_deterministic_across_runs_and_worker_counts(monkeypatch):
-    """The worker pool reproduces the in-process search exactly, worsening moves included."""
+    """The worker pool reproduces the in-process search exactly, non-improving moves included."""
     x = _er_sample(10, 9).data
     serial = andrey.tabu(x)
     assert np.array_equal(andrey.tabu(x).structure.to_numpy(), serial.structure.to_numpy())

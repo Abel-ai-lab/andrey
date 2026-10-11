@@ -257,10 +257,10 @@ _add(
     MethodSpec(
         name="tabu",
         family="score",
-        summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the least "
-        "worsening move, never returning to a recently visited DAG, and keeps the best DAG seen. "
-        "With the same settings its BIC score is never worse than hc's. Returns the CPDAG of that "
-        "DAG and its score.",
+        summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the best "
+        "non-improving move, never returning to a recently visited DAG, and keeps the best DAG "
+        "seen. With the same settings its BIC score is never worse than hc's. Returns the CPDAG "
+        "of that DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -288,8 +288,8 @@ _add(
                 name="max_tabu",
                 type="int",
                 default=None,
-                doc="Worsening moves allowed without a better DAG before the search stops, from 1 "
-                "to tabu_length. null uses tabu_length.",
+                doc="Non-improving moves allowed without a better DAG before the search stops, "
+                "from 1 to tabu_length. null uses tabu_length.",
                 nullable=True,
             ),
             ParamSpec(
