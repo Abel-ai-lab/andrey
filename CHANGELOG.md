@@ -21,9 +21,7 @@ in alpha, and any minor release may change the API.
 
 ### Changed
 
-- `hc` gives the same graphs in less time: a step recomputes only the score changes its last move
-  made, and checks only its best candidates for cycles. A fit on 200 variables runs about 60 times
-  faster.
+- `hc` gives the same graphs in less time: a fit on 200 variables runs about 60 times faster.
 
 ### Fixed
 
