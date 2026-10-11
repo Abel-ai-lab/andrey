@@ -457,11 +457,16 @@ class _Search:
         """
         g = self.g
         ne_y = g.ne[y]
-        sources = set(range(self.d)) - g.ad[y] - {y} if only_x is None else {only_x}
         # A source adjacent to no neighbor of y has NA empty and T ranging over the cliques in
         # Ne(y), so those sources share their (T, E) pairs and are scored as one array.
-        near = [x for x in sources if not ne_y.isdisjoint(g.ad[x])]
-        far = np.array(sorted(sources.difference(near)), dtype=np.intp)
+        if only_x is not None:
+            near = set() if ne_y.isdisjoint(g.ad[only_x]) else {only_x}
+            far = np.array([] if near else [only_x], dtype=np.intp)
+        else:
+            near = set().union(*(g.ad[z] for z in ne_y)) - g.ad[y] - {y}
+            outside = np.ones(self.d, dtype=bool)
+            outside[list(near | g.ad[y] | {y})] = False
+            far = np.flatnonzero(outside)
         if far.size:
             for T, E in self.subsets(sorted(ne_y), set(), frozenset(g.pa[y])):
                 deltas = self.add_deltas(y, E)[far]
