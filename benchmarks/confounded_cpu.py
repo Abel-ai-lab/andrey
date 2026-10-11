@@ -8,9 +8,10 @@ nonlinear with Gaussian additive noise. Every solution is serial, and both packa
 with the same settings.
 
 ``d`` includes hidden nodes: one node in five is hidden, at least one, so each rung has
-``d - latents`` data columns. Every estimate is scored against the PAG of the observed nodes. Each
-fit also gets the pairs it attributes to a hidden common cause, scored against two sets of true
-pairs. A timeout is a timeout: it has no scores.
+``d - latents`` data columns. Every estimate is scored against the PAG of the observed nodes, its
+directed edges against the latent projection and the direct edges, and the pairs it attributes to
+a hidden common cause against four sets of true pairs (:data:`scoring.CONFOUNDED_TARGETS`);
+:data:`TARGETS` names the ones each method estimates. A timeout is a timeout: it has no scores.
 
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/confounded_cpu.py \\
         --out outputs/confounded-cpu --cap-mem-mb 32000
@@ -118,12 +119,12 @@ def add_pair_scores(
     truth: tuple[str, GraphStructure] | None = None
     for part in sorted(records_dir.glob("*.parquet")):
         frame = pd.read_parquet(part)
-        if rescore:
-            frame = frame.drop(
-                columns=[c for c in frame.columns if c.startswith(("confounded_", "directed_"))]
-            )
-        elif set(SCORE_COLUMNS) <= set(frame.columns):
+        if not rescore and set(SCORE_COLUMNS) <= set(frame.columns):
             continue
+        # Every score column goes, including names an older scorer wrote.
+        frame = frame.drop(
+            columns=[c for c in frame.columns if c.startswith(("confounded_", "directed_"))]
+        )
         rows = []
         for record in frame.itertuples():
             estimate = rundir.read_structure(out, record.run_id) if record.status == "ok" else None
@@ -131,6 +132,11 @@ def add_pair_scores(
                 rows.append({})
                 continue
             if truth is None or truth[0] != record.dataset_id:
+                if record.dataset_id not in keys:
+                    raise SystemExit(
+                        f"{part.name}: dataset {record.dataset_id} is not in this run's ladder; "
+                        "pass the first run's flags"
+                    )
                 key = keys[record.dataset_id]
                 _, marks = datasets.load(store, key)
                 truth = (
@@ -145,7 +151,6 @@ def add_pair_scores(
                 scoring.confounded_pair_scores(estimate, truth[1], CONFOUNDED_MARK[record.name])
                 | scoring.directed_edge_scores(estimate, truth[1])
             )
-        frame = frame.drop(columns=[c for c in SCORE_COLUMNS if c in frame.columns])
         scores = pd.DataFrame(rows, index=frame.index, columns=list(SCORE_COLUMNS)).astype(float)
         scratch = part.with_name(f".{part.name}.tmp")
         pd.concat([frame, scores], axis=1).to_parquet(scratch, index=False)
@@ -231,14 +236,18 @@ def main(argv: list[str] | None = None) -> int:
         "machine_id": args.machine_id,
     }
     # Reads run_meta.json before writing it, so --resume has something to check against.
-    records_dir = rundir.start_run(out, run_meta, resume=args.resume or args.rescore)
     if args.rescore:
+        # Fits nothing, so the run's STATUS.json and sittings stay as the fitting runs left them.
+        records_dir = out / rundir.RECORDS_DIRNAME
+        if not any(records_dir.glob("*.parquet")):
+            raise SystemExit(f"--rescore: {records_dir} holds no records")
         add_pair_scores(out, records_dir, keys, rescore=True)
         table = rundir.assemble(records_dir)
         table.to_parquet(out / "runs.parquet", index=False)
         _log(f"rescored    : {len(table)} rows  -> {out / 'runs.parquet'}")
         _summarize(table)
         return 0
+    records_dir = rundir.start_run(out, run_meta, resume=args.resume)
     prov = rundir.provenance_once(out, timestamp=datetime.now(timezone.utc).isoformat())
 
     _log(f"=== Hidden-confounder methods, Andrey and lingam -> {out} ===")

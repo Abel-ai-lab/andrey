@@ -275,7 +275,7 @@ def camuv(
     warn_experimental("camuv")
     from andrey.irregular.camuv import camuv as _native
 
-    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
+    X = data_matrix(data, min_rows=6)  # as rcd: HSIC on fewer rows decides nothing
     alpha = open_unit_interval(alpha, "alpha")
     max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 2)
     parents, confounded = _native(X, alpha=alpha, max_explanatory_vars=max_explanatory_vars)
