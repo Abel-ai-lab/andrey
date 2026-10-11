@@ -96,14 +96,21 @@ def _log(msg: str = "") -> None:
     print(msg, flush=True)
 
 
-def add_pair_scores(out: Path, records_dir: Path, keys: Mapping[str, DatasetKey]) -> None:
-    """Add the confounded-pair columns to every part file that lacks them.
+#: The columns :func:`add_pair_scores` adds to each record.
+SCORE_COLUMNS = (*scoring.CONFOUNDED_COLUMNS, *scoring.DIRECTED_COLUMNS)
+
+
+def add_pair_scores(
+    out: Path, records_dir: Path, keys: Mapping[str, DatasetKey], rescore: bool = False
+) -> None:
+    """Add the confounded-pair and directed-edge columns to every part file that lacks them.
 
     `keys` maps each ``dataset_id`` of the run to its :class:`DatasetKey`. Each fit's stored
     estimate is read back and scored with :func:`scoring.confounded_pair_scores`, using the edge
-    marks its solution declares. A fit with no estimate has ``NaN`` in every column. The rewrite is
-    atomic, and a part that already has the columns is left alone, so a resumed run scores only the
-    units it measured.
+    marks its solution declares, and with :func:`scoring.directed_edge_scores`. A fit with no
+    estimate has ``NaN`` in every column. The rewrite is atomic, and a part that already has the
+    columns is left alone, so a resumed run scores only the units it measured; `rescore` replaces
+    every part's ``confounded_*`` and ``directed_*`` columns instead.
     """
     store = datasets.store_dir(out)
     kinds = datasets.load_registry(store)["keys"]
@@ -111,7 +118,11 @@ def add_pair_scores(out: Path, records_dir: Path, keys: Mapping[str, DatasetKey]
     truth: tuple[str, GraphStructure] | None = None
     for part in sorted(records_dir.glob("*.parquet")):
         frame = pd.read_parquet(part)
-        if scoring.CONFOUNDED_COLUMNS[0] in frame.columns:
+        if rescore:
+            frame = frame.drop(
+                columns=[c for c in frame.columns if c.startswith(("confounded_", "directed_"))]
+            )
+        elif set(SCORE_COLUMNS) <= set(frame.columns):
             continue
         rows = []
         for record in frame.itertuples():
@@ -132,10 +143,10 @@ def add_pair_scores(out: Path, records_dir: Path, keys: Mapping[str, DatasetKey]
                 )
             rows.append(
                 scoring.confounded_pair_scores(estimate, truth[1], CONFOUNDED_MARK[record.name])
+                | scoring.directed_edge_scores(estimate, truth[1])
             )
-        scores = pd.DataFrame(
-            rows, index=frame.index, columns=list(scoring.CONFOUNDED_COLUMNS)
-        ).astype(float)
+        frame = frame.drop(columns=[c for c in SCORE_COLUMNS if c in frame.columns])
+        scores = pd.DataFrame(rows, index=frame.index, columns=list(SCORE_COLUMNS)).astype(float)
         scratch = part.with_name(f".{part.name}.tmp")
         pd.concat([frame, scores], axis=1).to_parquet(scratch, index=False)
         os.replace(scratch, part)
@@ -181,6 +192,12 @@ def main(argv: list[str] | None = None) -> int:
         help="continue the run already in --out: skip units whose records are on disk. Requires "
         "the same run_meta.json, so pass the flags the first run was given",
     )
+    p.add_argument(
+        "--rescore",
+        action="store_true",
+        help="fit nothing: recompute the score columns of the run already in --out and rewrite "
+        "runs.parquet. Takes the first run's flags, as --resume does",
+    )
     args = p.parse_args(argv)
     if args.smoke:
         vars(args).update(SMOKE)
@@ -214,7 +231,14 @@ def main(argv: list[str] | None = None) -> int:
         "machine_id": args.machine_id,
     }
     # Reads run_meta.json before writing it, so --resume has something to check against.
-    records_dir = rundir.start_run(out, run_meta, resume=args.resume)
+    records_dir = rundir.start_run(out, run_meta, resume=args.resume or args.rescore)
+    if args.rescore:
+        add_pair_scores(out, records_dir, keys, rescore=True)
+        table = rundir.assemble(records_dir)
+        table.to_parquet(out / "runs.parquet", index=False)
+        _log(f"rescored    : {len(table)} rows  -> {out / 'runs.parquet'}")
+        _summarize(table)
+        return 0
     prov = rundir.provenance_once(out, timestamp=datetime.now(timezone.utc).isoformat())
 
     _log(f"=== Hidden-confounder methods, Andrey and lingam -> {out} ===")
@@ -285,25 +309,25 @@ def main(argv: list[str] | None = None) -> int:
 def _summarize(table: pd.DataFrame) -> None:
     """Print, per regime, solution, and rung, the fits that finished, with their medians and means.
 
-    Wall time and SHD are medians over the finished fits. The F1 columns are means over the fits
-    where F1 is defined, so ``nan`` marks a rung where every fit had nothing to find and claimed
-    nothing. The ``true`` columns are the mean number of true pairs per target.
+    Wall time and the directed-edge errors are medians over the finished fits. The F1 columns are
+    means over the fits where F1 is defined, so ``nan`` marks a rung where every fit had nothing to
+    find and claimed nothing: ``f1 dir`` for the directed edges of the latent projection, ``f1
+    pair`` for the non-adjacent hidden-cause pairs, with ``pairs`` their mean count.
     """
     if table.empty:
         return
     _log("")
     _log(
-        f"{'regime':10s} {'solution':30s} {'d':>3s} {'ok/all':>7s} {'wall_s':>8s} {'shd':>6s} "
-        f"{'f1 pag':>7s} {'f1 cause':>9s} {'true pag':>9s} {'true cause':>10s}"
+        f"{'regime':10s} {'solution':30s} {'d':>3s} {'ok/all':>7s} {'wall_s':>8s} "
+        f"{'dir err':>7s} {'f1 dir':>7s} {'f1 pair':>7s} {'pairs':>6s}"
     )
     for (regime, name, d), rows in table.groupby(["functional", "name", "d"], sort=True):
         ok = rows[rows["status"] == "ok"]
         _log(
             f"{regime:10s} {name:30s} {d:3d} {len(ok):3d}/{len(rows):<3d} "
-            f"{ok['wall_s'].median():8.3g} {ok['shd'].median():6.3g} "
-            f"{ok['confounded_pag_f1'].mean():7.3f} {ok['confounded_hidden_cause_f1'].mean():9.3f} "
-            f"{ok['confounded_pag_n_true'].mean():9.2f} "
-            f"{ok['confounded_hidden_cause_n_true'].mean():10.2f}"
+            f"{ok['wall_s'].median():8.3g} {ok['directed_errors'].median():7.3g} "
+            f"{ok['directed_f1'].mean():7.3f} {ok['confounded_nonadjacent_f1'].mean():7.3f} "
+            f"{ok['confounded_nonadjacent_n_true'].mean():6.2f}"
         )
 
 

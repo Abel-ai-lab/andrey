@@ -28,6 +28,8 @@ from andrey_bench.adapters.lingam_rcd import LingamRCD
 from andrey_bench.scoring import (
     CONFOUNDED_COLUMNS,
     confounded_pair_scores,
+    directed_edge_scores,
+    projected_directed,
     true_confounded_pairs,
 )
 
@@ -186,13 +188,33 @@ def test_a_hidden_cause_reaches_through_hidden_nodes_only() -> None:
     assert true_confounded_pairs(truth, "hidden_cause") == {(0, 1)}
 
 
+def test_nonadjacent_drops_a_hidden_cause_pair_with_a_direct_edge() -> None:
+    # Hidden 3 causes 0, 1, and 2, and 0 -> 1: RCD and CAM-UV cannot claim (0, 1).
+    truth = _dag([(3, 0), (3, 1), (3, 2), (0, 1)], d=4, hidden=(3,))
+    assert true_confounded_pairs(truth, "hidden_cause") == {(0, 1), (0, 2), (1, 2)}
+    assert true_confounded_pairs(truth, "nonadjacent") == {(0, 2), (1, 2)}
+
+
+def test_directed_edges_are_scored_against_the_latent_projection() -> None:
+    # 0 -> hidden 3 -> 1 projects to 0 -> 1; 0 -> 2 stays. The estimate has 0 -> 1 and 1 -> 2.
+    truth = _dag([(0, 3), (3, 1), (0, 2)], d=4, hidden=(3,))
+    assert projected_directed(truth) == {(0, 1), (0, 2)}
+    marks = np.zeros((3, 3), dtype=np.int8)
+    for i, j in ((0, 1), (1, 2)):
+        marks[i, j], marks[j, i] = _TAIL, _ARROW
+    scores = directed_edge_scores(GraphStructure.from_numpy(marks, kind="pag"), truth)
+    assert scores["directed_n_est"] == scores["directed_n_true"] == 2
+    assert scores["directed_precision"] == scores["directed_recall"] == scores["directed_f1"] == 0.5
+    assert scores["directed_errors"] == 2
+
+
 def test_a_perfect_claim_scores_one_for_either_mark() -> None:
     truth = _dag([(4, 0), (4, 1), (2, 0), (3, 1)], d=5, hidden=(4,))
     for mark, marks in (("bidirected", _ARROW), ("circle", _CIRCLE)):
         scores = confounded_pair_scores(_pag([(0, 1)], 4, marks), truth, mark)
         assert tuple(scores) == CONFOUNDED_COLUMNS
         assert scores["confounded_n_est"] == 1
-        for target in ("pag", "hidden_cause"):
+        for target in ("pag", "hidden_cause", "nonadjacent"):
             assert scores[f"confounded_{target}_n_true"] == 1
             assert [scores[f"confounded_{target}_{s}"] for s in ("precision", "recall", "f1")] == [
                 1.0,

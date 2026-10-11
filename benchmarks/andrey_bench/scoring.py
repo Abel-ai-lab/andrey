@@ -82,8 +82,11 @@ CONFOUNDED_MARKS = {"bidirected": _ARROW, "circle": _CIRCLE}
 #: What counts as a true confounded pair. ``pag``: the observed pairs joined by ``<->`` in the
 #: observed PAG. A PAG keeps ``<->`` only where conditional independences fix both arrowheads, so a
 #: sparse graph has few. ``hidden_cause``: the observed pairs reached from one hidden node by
-#: directed paths that pass through hidden nodes only.
-CONFOUNDED_TARGETS = ("pag", "hidden_cause")
+#: directed paths that pass through hidden nodes only. ``nonadjacent``: the ``hidden_cause`` pairs
+#: with no directed edge between them in the latent projection (:func:`projected_directed`). RCD and
+#: CAM-UV, in both packages, never claim a pair where one variable is the other's parent, so
+#: ``nonadjacent`` is the set they can reach; BottomUpParceLiNGAM can also mark an adjacent pair.
+CONFOUNDED_TARGETS = ("pag", "hidden_cause", "nonadjacent")
 
 #: The columns :func:`confounded_pair_scores` returns, in order: the number of estimated pairs, then
 #: per target the number of true pairs, precision, recall, and F1.
@@ -121,6 +124,27 @@ def _hidden_cause_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
     return pairs
 
 
+def projected_directed(truth: GraphStructure) -> set[tuple[int, int]]:
+    """Return the directed edges ``(i, j)`` of the latent projection of a DAG `truth`.
+
+    Observed ``i -> j`` holds when a directed path runs from ``i`` to ``j`` with every node between
+    them hidden, a direct edge included.
+    """
+    directed = _directed_adjacency(truth).astype(bool)
+    hidden = np.asarray(truth.node_types) == LATENT
+    edges: set[tuple[int, int]] = set()
+    for source in np.flatnonzero(~hidden):
+        seen, stack = {int(source)}, [int(source)]
+        while stack:
+            for child in map(int, np.flatnonzero(directed[stack.pop()])):
+                if not hidden[child]:
+                    edges.add((int(source), child))
+                elif child not in seen:
+                    seen.add(child)
+                    stack.append(child)
+    return edges
+
+
 def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, int]]:
     """Return the true confounded pairs ``i < j`` of a DAG `truth` with hidden nodes.
 
@@ -131,6 +155,9 @@ def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, 
         return _marked_pairs(np.asarray(_pag_of(truth).to_numpy()), _ARROW)
     if target == "hidden_cause":
         return _hidden_cause_pairs(truth)
+    if target == "nonadjacent":
+        adjacent = {tuple(sorted(edge)) for edge in projected_directed(truth)}
+        return _hidden_cause_pairs(truth) - adjacent
     raise ValueError(f"unknown target {target!r}; known: {list(CONFOUNDED_TARGETS)}")
 
 
@@ -155,6 +182,41 @@ def confounded_pair_scores(
         both = len(claimed) + len(true)
         scores[f"confounded_{target}_f1"] = 2 * hits / both if both else np.nan
     return scores
+
+
+#: The columns :func:`directed_edge_scores` returns, in order.
+DIRECTED_COLUMNS = (
+    "directed_n_est",
+    "directed_n_true",
+    "directed_precision",
+    "directed_recall",
+    "directed_f1",
+    "directed_errors",
+)
+
+
+def directed_edge_scores(estimate: GraphStructure, truth: GraphStructure) -> dict[str, float]:
+    """Score the estimate's directed edges against the latent projection's directed edges.
+
+    A hidden-confounder method claims ``i -> j`` only for a direct cause, so its directed edges are
+    scored against :func:`projected_directed`, apart from its confounded pairs. ``directed_errors``
+    counts the edges in one set and not the other; a reversed edge counts twice. Ratios with no
+    denominator are ``NaN``, as in :func:`confounded_pair_scores`.
+    """
+    claimed = {
+        (int(i), int(j)) for i, j in zip(*np.nonzero(_directed_adjacency(estimate)), strict=True)
+    }
+    true = projected_directed(truth)
+    hits = len(claimed & true)
+    both = len(claimed) + len(true)
+    return {
+        "directed_n_est": len(claimed),
+        "directed_n_true": len(true),
+        "directed_precision": hits / len(claimed) if claimed else np.nan,
+        "directed_recall": hits / len(true) if true else np.nan,
+        "directed_f1": 2 * hits / both if both else np.nan,
+        "directed_errors": len(claimed ^ true),
+    }
 
 
 def sortability(data: np.ndarray, truth: GraphStructure) -> dict[str, float]:
