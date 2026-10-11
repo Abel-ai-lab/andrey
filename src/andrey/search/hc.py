@@ -2,8 +2,8 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.hc`.
 
-Each candidate move is scored by the Schur-complement delta of :mod:`andrey.core.score_delta`;
-:class:`MoveScanner` keeps the deltas between passes and computes only those a move made new.
+Candidate moves are scored by the Schur-complement deltas of :mod:`andrey.core.score_delta`;
+:class:`MoveScanner` keeps them between passes and recomputes only the targets a move changed.
 The move budget also regularizes: greedy ascent adds the strongest edges first, so stopping early
 keeps noise-fitting edges out of large, dense graphs. The DAG is converted to its CPDAG for output;
 the reported objective is the DAG's total BIC, lower is better.
@@ -12,13 +12,15 @@ the reported objective is the DAG's total BIC, lower is better.
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
+from itertools import compress
+from operator import ne
 
 import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore
+from andrey.core.score_delta import DeltaBICScore, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
@@ -26,26 +28,23 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 # decimals) are shared with GES via ``search._parallel`` so the two learners break near-ties by the
 # same rule. A move is a candidate only when its raw delta clears ``-_EPS_IMPROVE`` (above float64
 # Schur-delta noise, below the smallest real improvement); the comparison key quantizes the
-# *normalized* delta ``delta / n_samples`` to ``_KEY_DP`` places. The incremental Schur delta is NOT
-# bit-pure -- two mathematically-equal moves (add x->y vs y->x, from different cov submatrices)
-# differ, and one scorer's chained residual cache rounds a query differently from another's -- so
-# serial (one scorer) and the parallel workers (one each) would break such near-ties inconsistently
-# on a raw key. The cross-scorer noise is NOT flat: delta = n_samples * (log R_new - log R_old)
-# (score_delta.py), so it scales as ~n_samples * cond(cov) * eps, as does the signal (a real BIC
-# improvement); keying on delta/n makes the grid track the signal, so after normalization the
-# residual is ~cond*eps, which _KEY_DP=9 clears for cond up to ~1e5 (all non-degenerate data),
-# independent of n. It is a mitigation, not a proof -- a normalized delta within ULP of a grid line,
-# or conditioning near the fast path's own ~6-digit limit, could still round two ways. The objective
-# is recomputed from the final structure (not accumulated), so this never touches the reported
-# score, and delta/n is monotone in delta, so non-tied move order is unchanged.
+# *normalized* delta ``delta / n_samples`` to ``_KEY_DP`` places. Two mathematically equal moves
+# (add x->y vs y->x, from different cov submatrices) differ in their last bits, so the key, not the
+# raw delta, decides between them, and the tie goes to the lower ``(u, v, op_rank)``. The noise
+# scales as ~n_samples * cond(cov) * eps, as does the signal (a real BIC improvement); keying on
+# delta/n makes the grid track the signal, so after normalization the residual is ~cond*eps, which
+# _KEY_DP=9 clears for cond up to ~1e5 (all non-degenerate data), independent of n. It is a
+# mitigation, not a proof -- a normalized delta within ULP of a grid line could still round either
+# way. The objective is recomputed from the final structure (not accumulated), so this never touches
+# the reported score, and delta/n is monotone in delta, so non-tied move order is unchanged.
 __all__ = ["hc"]
 
 
-def _closure(adj_int: list[int], d: int) -> tuple[list[int], list[int]]:
-    """Descendant bitsets of each node: all, and those a path of two or more edges reaches.
+def _descendants(adj_int: list[int], d: int) -> list[int]:
+    """Descendant bitsets of each node, by one pass over the DAG in reverse topological order.
 
     ``adj_int[u]`` is the out-neighbor bitset of ``u`` (bit ``v`` set iff the edge ``u -> v``
-    exists). One pass over the DAG in reverse topological order.
+    exists).
     """
     indegree = [0] * d
     for row in adj_int:
@@ -67,25 +66,14 @@ def _closure(adj_int: list[int], d: int) -> tuple[list[int], list[int]]:
                 stack.append(c)
             row ^= lsb
     reach = [0] * d
-    deep = [0] * d
     for u in reversed(order):
-        below = 0
-        row = adj_int[u]
+        below = row = adj_int[u]
         while row:
             lsb = row & -row
             below |= reach[lsb.bit_length() - 1]
             row ^= lsb
-        deep[u] = below
-        reach[u] = adj_int[u] | below
-    return reach, deep
-
-
-def _bit_matrix(rows: list[int], d: int) -> np.ndarray:
-    """Boolean matrix of bitset rows: ``out[i, j]`` is bit ``j`` of ``rows[i]``."""
-    width = (d + 7) // 8
-    raw = np.frombuffer(b"".join(r.to_bytes(width, "little") for r in rows), dtype=np.uint8)
-    bits = np.unpackbits(raw.reshape(len(rows), width), axis=1, bitorder="little")
-    return bits[:, :d].astype(bool)
+        reach[u] = below
+    return reach
 
 
 # A scanned candidate: (delta, u, v, op_rank, (op, u, v)). op_rank orders the ops that share a
@@ -110,21 +98,27 @@ def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
     return tuple(rows)
 
 
-_ADD, _REMOVE = 0, 1  # first index of MoveScanner's delta tables
-
-
 class MoveScanner:
-    """The best single-edge move of a pass, rescoring only the targets whose parents changed.
+    """The best single-edge move of a pass, from delta tables kept between passes.
 
-    The delta of adding or removing ``u`` at target ``v`` depends only on ``v``'s parent set, so it
-    is kept in a table, ``(op, u, v)``, whose column ``v`` belongs to ``v``'s current parents.
-    When those change, the column is put aside under ``(v, parents)`` and the one for the new
-    parents is brought back or started empty; a column is never discarded, so a delta is computed
-    at most once per run. Each pass computes only the deltas its legal moves need that the table
-    does not hold, in the order the moves are visited (``u``, then ``v``; a remove before the add
-    that completes its reverse). That order matters: the Schur delta reads a residual cache that
-    earlier deltas write, so the order fixes every value to the last bit. Legality, admission, and
-    the tie-break run on whole arrays.
+    The delta of adding or removing ``u`` at target ``v`` depends only on ``v``'s parent set, so the
+    tables ``add[v, u]`` and ``rem[v, u]`` hold row ``v`` for ``v``'s current parents. A pass
+    recomputes the rows of the targets whose parents changed, each in one vectorized Schur step
+    (:func:`~andrey.core.score_delta.add_deltas`, :func:`~andrey.core.score_delta.remove_deltas`).
+    A delta depends on its target and parent set alone, so every scanner computes the same value.
+
+    ``single[v, u]`` is the add or remove delta of ``u -> v``, ``inf`` when ``v -> u`` exists
+    (moving it is a reverse) or when ``v`` reaches ``u`` (adding it closes a cycle), and ``low[v]``
+    is the minimum of row ``v``. Reverses are scored over the edge list. Reversing a covered edge
+    ``u -> v`` (``pa(v) = pa(u) + u``) leads to a Markov equivalent DAG of equal score, so its delta
+    is exactly zero rather than the rounding noise of two Schur deltas, which can exceed
+    ``_EPS_IMPROVE`` and turn a no-op into an improvement.
+
+    ``reach[x, y]`` holds whether ``x`` reaches ``y``; it is extended on each added edge and
+    recomputed when an edge goes, and then every row whose target reaches fewer nodes is rebuilt. An
+    added edge can only make more adds close a cycle, so a row stays valid until its lowest add is
+    found to close one; then the row drops every node its target now reaches. A pass therefore
+    checks for cycles only its lowest candidates.
 
     A move ``u -> v`` belongs to the scan whose ``targets`` hold its head ``v``, so partitioning the
     targets partitions the moves (:mod:`andrey.search._parallel_hc`). Reversing ``u -> v`` sums an
@@ -132,34 +126,24 @@ class MoveScanner:
     """
 
     def __init__(self, delta: DeltaBICScore, d: int) -> None:
-        self._delta = delta
+        self._score = delta.score_obj
+        self._cond = delta.cond_threshold
         self._d = d
-        self._inv_n = 1.0 / delta.score_obj.n  # key on delta/n: noise and signal scale with n
-        self._value = np.full((2, d, d), np.nan)
-        self._known = np.zeros((2, d, d), dtype=bool)
-        self._parents: list[tuple[int, ...] | None] = [None] * d  # what column v belongs to
-        self._shelf: dict[tuple[int, tuple[int, ...]], tuple[np.ndarray, np.ndarray]] = {}
-        self._last: tuple | None = None  # the last DAG scanned, and its _moves
-
-    def _sync(self, pa: list[tuple[int, ...]]) -> None:
-        """Point each column at its target's current parents."""
-        for v in range(self._d):
-            old = self._parents[v]
-            if old == pa[v]:
-                continue
-            if old is not None:
-                self._shelf[(v, old)] = (self._value[:, :, v].copy(), self._known[:, :, v].copy())
-            got = self._shelf.pop((v, pa[v]), None)
-            if got is None:
-                self._value[:, :, v] = np.nan
-                self._known[:, :, v] = False
-            else:
-                self._value[:, :, v], self._known[:, :, v] = got
-            self._parents[v] = pa[v]
-
-    def _fill(self, k: int, u: int, v: int, pa_v: tuple[int, ...]) -> None:
-        self._value[k, u, v] = self._delta.delta(v, pa_v, u, "add" if k == _ADD else "remove")
-        self._known[k, u, v] = True
+        self._inv_n = 1.0 / self._score.n  # key on delta/n: noise and signal scale with n
+        self._add = np.full((d, d), np.inf)
+        self._rem = np.full((d, d), np.inf)
+        self._parent = np.zeros((d, d), dtype=bool)  # [v, u]: the edge u -> v exists
+        self._single = np.full((d, d), np.inf)
+        self._low = np.full(d, np.inf)
+        self._tails = np.zeros(0, dtype=np.intp)  # the edge list, tails[i] -> heads[i]
+        self._heads = np.zeros(0, dtype=np.intp)
+        self._cyclic = np.zeros(0, dtype=bool)  # reversing edge i was found to close a cycle
+        self._reach = np.zeros((d, d), dtype=bool)
+        self._adj: list[int] | None = None  # the DAG the tables describe
+        # Ids of parent sets: u -> v is covered iff set_of[v] == set_with[u], the id of pa(u) + u.
+        self._ids: dict[tuple[int, ...], int] = {}
+        self._set_of = np.zeros(d, dtype=np.intp)
+        self._set_with = np.zeros(d, dtype=np.intp)
 
     def best(
         self,
@@ -177,73 +161,176 @@ class MoveScanner:
         bests is the best overall. The default ``floor`` admits improving moves only; ``floor=inf``
         admits every legal move. A move that leads to a structure in ``tabu`` is skipped.
         """
-        key = (tuple(adj_int), None if targets is None else tuple(targets))
-        if self._last is None or self._last[0] != key:  # tabu search scans a DAG twice
-            self._last = (key, *self._moves(adj_int, parents_of, targets))
-        _, edge, single, rev = self._last
-        single = np.where(single < floor, single, np.inf)
-        rev = np.where(rev < floor, rev, np.inf)
-        while True:  # the best move, unless it leads into the tabu list; then the next best
-            best = self._pick(single, rev, edge)
-            if best is None or tabu is None or _key_after(adj_int, best[4]) not in tabu:
-                return best
-            (rev if best[3] else single)[best[1], best[2]] = np.inf
-
-    def _moves(
-        self, adj_int: list[int], parents_of: dict[int, list[int]], targets: Sequence[int] | None
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """The edge matrix, then the add-or-remove and the reverse deltas, ``inf`` where illegal."""
-        d = self._d
-        pa = [tuple(parents_of[i]) for i in range(d)]
-        self._sync(pa)
-        if targets is None:
-            head = np.ones(d, dtype=bool)
-        else:
-            head = np.zeros(d, dtype=bool)
+        if self._d < 2:
+            return None
+        self._sync(adj_int, parents_of)
+        low = self._low.copy()
+        edges = np.arange(self._tails.size)
+        if targets is not None:
+            head = np.zeros(self._d, dtype=bool)
             head[list(targets)] = True
-        reach, deep = _closure(adj_int, d)
-        bits = _bit_matrix(adj_int + reach + deep, d)
-        edge, reaches, deep_reach = bits[:d], bits[d : 2 * d], bits[2 * d :]
-        free = ~(edge | edge.T)
-        np.fill_diagonal(free, False)
-        add_ok = free & ~reaches.T & head  # u -> v closes a cycle iff v reaches u
-        rem_ok = edge & head
-        rev_ok = rem_ok & ~deep_reach  # ... iff u reaches v other than by the edge itself
+            low[~head] = np.inf
+            edges = edges[head[self._heads]]
+        tails, heads = self._tails[edges], self._heads[edges]
+        with np.errstate(invalid="ignore"):  # a degenerate row's deltas may be infinite
+            rev = self._add[tails, heads] + self._rem[heads, tails]
+        rev[self._set_of[heads] == self._set_with[tails]] = 0.0
+        rev[np.isnan(rev) | self._cyclic[edges]] = np.inf
+        held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
+        try:
+            while True:  # the best move, unless it leads into the tabu list; then the next best
+                best = self._pick(low, rev, edges, floor)
+                if best is None or tabu is None or _key_after(adj_int, best[4]) not in tabu:
+                    return best
+                _, u, v, rank, _ = best
+                if rank:
+                    rev[(tails == u) & (heads == v)] = np.inf
+                else:
+                    held.append((v, u, float(self._single[v, u])))
+                    self._single[v, u] = np.inf
+                    self._low[v] = low[v] = self._single[v].min()
+        finally:
+            for v, u, value in reversed(held):
+                self._single[v, u] = value
+                self._low[v] = self._single[v].min()
 
-        known_add, known_rem = self._known
-        first = np.flatnonzero((rem_ok & ~known_rem) | (add_ok & ~known_add))
-        second = np.flatnonzero(rev_ok & ~known_add.T)
-        for k in np.sort(np.concatenate((first * 2, second * 2 + 1))).tolist():
-            u, v = divmod(k >> 1, d)
-            if k & 1:  # the add that completes reversing u -> v: v joins u's parents
-                self._fill(_ADD, v, u, pa[u])
-            else:
-                self._fill(_REMOVE if edge[u, v] else _ADD, u, v, pa[v])
+    def _sync(self, adj_int: list[int], parents_of: dict[int, list[int]]) -> None:
+        """Bring the tables, the edge list, and ``reach`` up to ``adj_int``."""
+        old = self._adj
+        if old == adj_int:
+            return
+        d = self._d
+        first = old is None
+        old = [0] * d if old is None else old
+        gained: list[tuple[int, int]] = []
+        lost: list[tuple[int, int]] = []
+        for u in range(d) if first else compress(range(d), map(ne, adj_int, old)):
+            gained += [(u, v) for v in _bits(adj_int[u] & ~old[u])]
+            lost += [(u, v) for v in _bits(old[u] & ~adj_int[u])]
+        for u, v in gained:
+            self._parent[v, u] = True
+        for u, v in lost:
+            self._parent[v, u] = False
+        for v in range(d) if first else {v for _, v in gained + lost}:
+            pa = parents_of[v]
+            self._add[v] = add_deltas(self._score, v, pa, cond_threshold=self._cond)
+            self._rem[v] = remove_deltas(self._score, v, pa, cond_threshold=self._cond)
+            ids = self._ids
+            self._set_of[v] = ids.setdefault(tuple(pa), len(ids))
+            self._set_with[v] = ids.setdefault(tuple(sorted([*pa, v])), len(ids))
+        reach = self._reach
+        rows = set(range(d)) if first else {x for pair in gained + lost for x in pair}
+        if first or lost:
+            new = _bit_matrix(_descendants(adj_int, d), d)
+            rows.update(np.flatnonzero((new != reach).any(axis=1)).tolist())
+            self._reach = reach = new
+            keep = np.ones(self._tails.size, dtype=bool)
+            for a, b in lost:
+                keep &= (self._tails != a) | (self._heads != b)
+            self._tails, self._heads = self._tails[keep], self._heads[keep]
+            self._cyclic = np.zeros(self._tails.size, dtype=bool)
+        else:
+            for a, b in gained:
+                if not reach[a, b]:  # a now reaches b, and so does every node that reaches a
+                    above = reach[:, a].copy()
+                    above[a] = True
+                    below = reach[b].copy()
+                    below[b] = True
+                    reach[above] |= below
+        pairs = np.array(gained, dtype=np.intp).reshape(-1, 2)
+        self._tails = np.concatenate((self._tails, pairs[:, 0]))
+        self._heads = np.concatenate((self._heads, pairs[:, 1]))
+        self._cyclic = np.concatenate((self._cyclic, np.zeros(len(gained), dtype=bool)))
+        for v in rows:
+            row = np.where(self._parent[v], self._rem[v], self._add[v])
+            row[self._parent[:, v] | reach[v] | np.isnan(row)] = np.inf
+            self._single[v] = row
+            self._low[v] = row.min()
+        self._adj = list(adj_int)
 
-        add, rem = self._value
-        with np.errstate(invalid="ignore"):  # a degenerate column's deltas may be infinite
-            rev = add.T + rem
-        single = np.where(rem_ok | add_ok, np.where(edge, rem, add), np.inf)
-        return edge, single, np.where(rev_ok, rev, np.inf)
+    def _drop_reached(self, v: int, low: np.ndarray) -> None:
+        """Drop from row ``v`` every add that closes a cycle now, and update its minimum."""
+        self._single[v, self._reach[v]] = np.inf
+        self._low[v] = low[v] = self._single[v].min()
 
-    def _pick(self, single: np.ndarray, rev: np.ndarray, edge: np.ndarray) -> ScannedMove | None:
-        """The move with the lowest key among the finite entries of ``single`` and ``rev``."""
-        low = min(single.min(initial=np.inf), rev.min(initial=np.inf)) * self._inv_n
-        if low == np.inf:
+    def _reverse_ok(self, u: int, v: int) -> bool:
+        """Whether reversing ``u -> v`` keeps the graph acyclic: ``u`` reaches ``v`` only by it."""
+        return not self._reach[self._parent[:, u], v].any()  # no child of u reaches v
+
+    def _pick(
+        self, low: np.ndarray, rev: np.ndarray, edges: np.ndarray, floor: float
+    ) -> ScannedMove | None:
+        """The legal move with the lowest key among those below ``floor``.
+
+        ``rev`` scores reversing the edges ``edges``. A row whose candidate closes a cycle drops
+        every such add, and a reverse that closes one is marked, until an edge goes.
+        """
+        single, parent, reach = self._single, self._parent, self._reach
+        tails, heads = self._tails[edges], self._heads[edges]
+        lowest = np.inf
+        while True:  # the lowest legal single move below floor
+            v = int(np.argmin(low))
+            if not low[v] < floor:
+                break
+            u = int(np.argmin(single[v]))
+            if not reach[v, u]:  # a remove, or an add that closes no cycle
+                lowest = float(low[v])
+                break
+            self._drop_reached(v, low)
+        while rev.size:  # a legal reverse below both
+            i = int(np.argmin(rev))
+            if not rev[i] < min(lowest, floor):
+                break
+            if self._reverse_ok(int(tails[i]), int(heads[i])):
+                lowest = float(rev[i])
+                break
+            rev[i] = np.inf
+            self._cyclic[edges[i]] = True
+        if not lowest < floor:
             return None
         # Rounding is monotone, so the moves that round to the lowest key lie within one grid step
         # of the lowest unrounded value; the exact key is computed for those few.
-        near = low + 2 * 10.0**-_KEY_DP
-        d = self._d
+        inv_n = self._inv_n
+        near = lowest * inv_n + 2 * 10.0**-_KEY_DP
+        found: list[tuple[float, int, int, int, str]] = []
+        for v in np.flatnonzero(low * inv_n <= near).tolist():
+            us = np.flatnonzero(single[v] * inv_n <= near).tolist()
+            if reach[v, us].any():
+                self._drop_reached(v, low)
+                us = np.flatnonzero(single[v] * inv_n <= near).tolist()
+            found += [
+                (float(single[v, u]), u, v, 0, "remove" if parent[v, u] else "add") for u in us
+            ]
+        for i in np.flatnonzero(rev * inv_n <= near).tolist():
+            u, v = int(tails[i]), int(heads[i])
+            if self._reverse_ok(u, v):
+                found.append((float(rev[i]), u, v, 1, "reverse"))
         best: ScannedMove | None = None
-        for rank, table in ((0, single), (1, rev)):
-            for i in np.flatnonzero(table * self._inv_n <= near).tolist():
-                u, v = divmod(i, d)
-                op = "reverse" if rank else ("remove" if edge[u, v] else "add")
-                cand = (round(float(table[u, v]) * self._inv_n, _KEY_DP), u, v, rank, (op, u, v))
+        for value, u, v, rank, op in found:
+            if value < floor:
+                cand = (round(value * inv_n, _KEY_DP), u, v, rank, (op, u, v))
                 if best is None or cand[:4] < best[:4]:
                     best = cand
         return best
+
+
+def _bit_matrix(rows: list[int], d: int) -> np.ndarray:
+    """Boolean matrix of bitset rows: ``out[i, j]`` is bit ``j`` of ``rows[i]``."""
+    width = (d + 7) // 8
+    raw = np.frombuffer(b"".join(r.to_bytes(width, "little") for r in rows), dtype=np.uint8)
+    return np.unpackbits(raw.reshape(len(rows), width), axis=1, count=d, bitorder="little").view(
+        bool
+    )
+
+
+def _bits(row: int) -> list[int]:
+    """The positions of the set bits of ``row``, lowest first."""
+    out = []
+    while row:
+        lsb = row & -row
+        out.append(lsb.bit_length() - 1)
+        row ^= lsb
+    return out
 
 
 def _apply_move(
