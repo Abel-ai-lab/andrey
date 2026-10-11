@@ -24,7 +24,14 @@ from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.core.score import BICScore
 from andrey.metrics import shd, to_cpdag
 from andrey.search.ges import _recompute_objective
-from andrey.search.xges import _UNDIRECTED, _edge_key, _extension_parents, _marks_total, _sets
+from andrey.search.xges import (
+    _UNDIRECTED,
+    _edge_key,
+    _extension_parents,
+    _marks_total,
+    _Search,
+    _sets,
+)
 from andrey.search.xges import xges as xges_search
 from tests.recovery.helpers import datagen
 
@@ -222,6 +229,23 @@ def test_a_fingerprint_collision_does_not_undo_a_move(extended_search):
     marks = from_structure(xges_search(x, extended_search=extended_search)[0])
     edges = {(int(a), int(b)) for a, b in zip(*np.nonzero(np.triu(marks)), strict=True)}
     assert edges == {(2 * j, 2 * j + 1) for j in pairs}
+
+
+@pytest.mark.parametrize(("n", "d"), [(8, 12), (12, 20)], ids=["-inf", "nan"])
+def test_no_branch_is_tried_when_the_score_is_not_finite(n, d, monkeypatch):
+    """With fewer rows than columns, parent sets fit some columns exactly and XGES-0's total is
+    -inf or nan. No branch can score below that, so the extended search tries none and returns
+    XGES-0's graph."""
+    x = np.random.default_rng(0).standard_normal((n, d))
+    branches = []
+    branch = _Search.branch
+    monkeypatch.setattr(_Search, "branch", lambda self: branches.append(1) or branch(self))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        xges_graph, xges_score = xges_search(x)
+        xges0_graph, _ = xges_search(x, extended_search=False)
+    assert not np.isfinite(xges_score)
+    assert branches == []
+    assert np.array_equal(from_structure(xges_graph), from_structure(xges0_graph))
 
 
 def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
