@@ -2,6 +2,7 @@
 
 This module supplies picklable worker functions and a work estimate for parallel dispatch. Each
 pass scans legal add/remove/reverse moves and applies the best improvement before the next pass.
+Tabu search (:mod:`andrey.search.tabu`) runs its passes on the same workers and work gate.
 
 A move ``u -> v`` belongs to the worker owning its head ``v`` (see :func:`hc._scan_moves`). Fixed
 target partitions cover every move and retain Schur-delta caches across passes. The total-order
@@ -18,7 +19,8 @@ from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search import _parallel as par
 from andrey.search import calibrate
-from andrey.search.hc import ScannedMove, _reachability, _scan_moves
+from andrey.search._parallel import _EPS_IMPROVE
+from andrey.search.hc import ScannedMove, StructureKey, _reachability, _scan_moves
 
 reduce_best = par.reduce_best  # re-exported so callers/tests reach it here
 _pick_context = par.pick_context  # patchable seam (mirrors GES) for the spawn-context parity test
@@ -62,16 +64,35 @@ def _init_worker(
 
 
 def _scan_task(
-    targets: list[int], adj_int: list[int], parents_of: dict[int, list[int]], run_token: object
+    targets: list[int],
+    adj_int: list[int],
+    parents_of: dict[int, list[int]],
+    run_token: object,
+    floor: float = -_EPS_IMPROVE,
+    tabu: frozenset[StructureKey] | None = None,
 ) -> ScannedMove | None:
-    """Worker side of one chunk: rebuild reachability, scan the chunk's moves, return the best."""
+    """Worker side of one chunk: rebuild reachability, scan the chunk's moves, return the best.
+
+    ``floor`` and ``tabu`` pass through to :func:`hc._scan_moves`; tabu search sets them, and hill
+    climbing keeps the defaults.
+    """
     if run_token != _WORKER_TOKEN:
         raise RuntimeError("HC worker pool reused across runs (cov/token mismatch)")
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     assert _WORKER_CACHE is not None
     d = _WORKER_D
     reach = _reachability(adj_int, d)
-    return _scan_moves(targets, adj_int, parents_of, _WORKER_DELTA, d, reach, _WORKER_CACHE)
+    return _scan_moves(
+        targets,
+        adj_int,
+        parents_of,
+        _WORKER_DELTA,
+        d,
+        reach,
+        _WORKER_CACHE,
+        floor=floor,
+        tabu=tabu,
+    )
 
 
 def _min_work() -> int:

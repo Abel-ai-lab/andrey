@@ -15,6 +15,9 @@ in alpha, and any minor release may change the API.
   `bottom_up_parce_lingam` leaves the variables whose order such a cause hides unordered.
 - `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
   search stops there.
+- An experimental method, `tabu`: tabu search, hill climbing that keeps going past a local optimum
+  and returns the best DAG it visits, as a CPDAG. With the same settings its BIC score is never
+  worse than `hc`'s.
 
 ### Fixed
 

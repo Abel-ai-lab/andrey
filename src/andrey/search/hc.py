@@ -10,7 +10,7 @@ the reported objective is the DAG's total BIC, lower is better.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Container, Sequence
 
 import numpy as np
 from threadpoolctl import threadpool_limits
@@ -85,6 +85,27 @@ def _reverse_stays_acyclic(adj_int: list[int], reach: list[int], u: int, v: int)
 # reproduces serial's "first encountered in (u, v, op) order" tie-break as a strict total order.
 ScannedMove = tuple[float, int, int, int, tuple[str, int, int]]
 
+# A DAG's identity for a tabu list: its out-neighbor bitset rows, ``tuple(adj_int)``.
+StructureKey = tuple[int, ...]
+
+
+def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
+    """The structure key of the DAG that ``move`` leads to; ``adj_int`` itself is unchanged."""
+    op, u, v = move
+    rows = list(adj_int)
+    if op == "add":
+        rows[u] |= 1 << v
+    else:  # remove, or reverse: u -> v goes, and reverse adds v -> u
+        rows[u] &= ~(1 << v)
+        if op == "reverse":
+            rows[v] |= 1 << u
+    return tuple(rows)
+
+
+def _allowed(adj_int: list[int], move: tuple[str, int, int], tabu: Container | None) -> bool:
+    """True unless ``move`` leads to a structure in ``tabu``; ``None`` allows every move."""
+    return tabu is None or _key_after(adj_int, move) not in tabu
+
 
 def _scan_moves(
     targets: Sequence[int],
@@ -94,15 +115,23 @@ def _scan_moves(
     d: int,
     reach: list[int],
     cache: dict[tuple[int, tuple[int, ...], str, int], float],
+    *,
+    floor: float = -_EPS_IMPROVE,
+    tabu: Container | None = None,
 ) -> ScannedMove | None:
-    """The best-improving move whose HEAD ``v`` is in ``targets``, keyed ``(delta, u, v, op_rank)``.
+    """The best move with ``delta < floor`` whose HEAD ``v`` is in ``targets``.
+
+    Moves are keyed ``(delta, u, v, op_rank)``. The default ``floor`` admits improving moves only;
+    ``floor=inf`` admits every legal move. A move whose resulting structure key is in ``tabu`` is
+    skipped. The key is built only for a move that beats the running best, so the check costs
+    nothing when no tabu list is given.
 
     A move ``u -> v`` is owned by the chunk that owns its head ``v``, so partitioning ``targets`` is
-    an exact partition of the move space. Selection is a strict total order over improving
-    (``delta < -EPS``) moves, so it is decomposable and visitation-order-independent -- the parallel
-    reduce over per-chunk bests reproduces the whole-range scan exactly. A running ``best - EPS``
-    comparison would be order-dependent when two deltas differ by less than ``EPS``; the total-order
-    key resolves exact symmetries.
+    an exact partition of the move space. Selection is a strict total order over the admitted
+    moves, so it is decomposable and visitation-order-independent -- the parallel reduce over
+    per-chunk bests reproduces the whole-range scan exactly. A running ``best - EPS`` comparison
+    would be order-dependent when two deltas differ by less than ``EPS``; the total-order key
+    resolves exact symmetries.
 
     Each delta comes from the Schur-complement update, memoized in ``cache`` by
     ``(target, parents-of-target, op, moved)``; reversing ``u -> v`` decomposes into an add of ``v``
@@ -122,22 +151,26 @@ def _scan_moves(
             pa_v = pa[v]
             if row & v_bit:  # edge u -> v exists
                 d_rem = _cached_delta(cache, delta, v, pa_v, u, "remove")
-                if d_rem < -_EPS_IMPROVE:
+                if d_rem < floor:
                     cand = (round(d_rem * inv_n, _KEY_DP), u, v, 0, ("remove", u, v))
-                    if best is None or cand[:4] < best[:4]:
+                    if (best is None or cand[:4] < best[:4]) and _allowed(adj_int, cand[4], tabu):
                         best = cand
                 if _reverse_stays_acyclic(adj_int, reach, u, v):
                     d_rev = _cached_delta(cache, delta, u, pa_u, v, "add") + d_rem
-                    if d_rev < -_EPS_IMPROVE:
+                    if d_rev < floor:
                         cand = (round(d_rev * inv_n, _KEY_DP), u, v, 1, ("reverse", u, v))
-                        if best is None or cand[:4] < best[:4]:
+                        if (best is None or cand[:4] < best[:4]) and _allowed(
+                            adj_int, cand[4], tabu
+                        ):
                             best = cand
             elif not (adj_int[v] & u_bit):  # neither u -> v nor v -> u; add is legal iff acyclic
                 if not (reach[v] & u_bit):
                     d_add = _cached_delta(cache, delta, v, pa_v, u, "add")
-                    if d_add < -_EPS_IMPROVE:
+                    if d_add < floor:
                         cand = (round(d_add * inv_n, _KEY_DP), u, v, 0, ("add", u, v))
-                        if best is None or cand[:4] < best[:4]:
+                        if (best is None or cand[:4] < best[:4]) and _allowed(
+                            adj_int, cand[4], tabu
+                        ):
                             best = cand
     return best
 

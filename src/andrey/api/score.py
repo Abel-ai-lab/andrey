@@ -1,7 +1,8 @@
 """Score-based facade adapters.
 
-``ges``, ``gies``, ``exact_search``, and ``hc`` use :mod:`andrey.core` for BIC scoring and
-orientation; ``hc`` uses the Schur delta-BIC. Reported objectives are stored in ``metadata``.
+``ges``, ``gies``, ``exact_search``, ``hc``, and ``tabu`` use :mod:`andrey.core` for BIC scoring
+and orientation; ``hc`` and ``tabu`` use the Schur delta-BIC. Reported objectives are stored in
+``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -257,6 +258,131 @@ def hc(
     labels = column_labels(data)
     cpdag, score = _hc(X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter)
     metadata = {"algorithm": "HC", "score": json_safe(score)}
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def tabu(
+    data: npt.ArrayLike,
+    *,
+    score_func: str = "local_score_BIC_from_cov",
+    lambda_value: float = 1.0,
+    tabu_length: int = 10,
+    max_tabu: int | None = None,
+    max_iter: int = 200,
+) -> StructureOutput:
+    """Learn a CPDAG from observational data with tabu search.
+
+    Tabu search is hill climbing that can leave a local optimum [1]_ [2]_ [3]_. Each move adds,
+    removes, or reverses the edge that most improves a covariance-based BIC, as in
+    :func:`andrey.hc`. Where no move improves it, the search takes the move that worsens it least,
+    and it never moves back to one of the DAGs it visited most recently. It returns the CPDAG of
+    the best-scoring DAG it visited.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
+        Local score objective; a covariance-based Gaussian BIC.
+    lambda_value : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+    tabu_length : int, default=10
+        Length of the tabu list: the number of most recently visited DAGs a move may not lead to.
+        At least ``1``.
+    max_tabu : int or None, default=None
+        Moves that worsen the score the search may take without finding a better DAG, from ``1``
+        to ``tabu_length``. ``None`` uses ``tabu_length``.
+    max_iter : int, default=200
+        Most moves the search takes, improving or not, at least ``1``. Each move adds at most one
+        edge, so the result has at most ``max_iter`` edges.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"Tabu"`` and ``metadata["score"]`` the BIC score of the best DAG found, computed as for
+        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
+        undirected (``--``) the ones the equivalence class leaves open.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+    TypeError
+        If ``tabu_length``, ``max_tabu``, or ``max_iter`` is not an int.
+    ValueError
+        If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or ``max_iter`` is less
+        than ``1``, or if ``max_tabu`` is outside ``1..tabu_length``.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+    SearchLimitWarning
+        When the search takes ``max_iter`` moves: it stopped at the limit, and a larger
+        ``max_iter`` may find a better graph.
+
+    Notes
+    -----
+    The search starts from the empty graph. Each step first adds the current DAG to the tabu list,
+    which keeps the last ``tabu_length`` DAGs visited. It then takes the move with the best score
+    change among those that lead to a DAG outside the list: an improving move when one exists.
+    Otherwise, if ``max_tabu`` worsening moves have been taken since the best score last
+    improved, the search stops; if not, it takes the move that worsens the score least. The search
+    also stops when every legal move leads into the list, or after ``max_iter`` moves.
+
+    Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
+    so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
+    moves break as they do for :func:`andrey.hc`. Above ``ANDREY_HC_PARALLEL_MIN_WORK``, the
+    search runs its passes on hill climbing's worker pool, and the result does not depend on the
+    worker count.
+
+    bnlearn's ``tabu`` [3]_ documents ``max.tabu`` with this meaning, but version 5.2.1 stops after
+    ``tabu`` worsening moves whatever ``max.tabu`` is; the two agree when they are equal, as at the
+    defaults.
+
+    References
+    ----------
+    .. [1] Glover, F. (1986). Future paths for integer programming and links to artificial
+       intelligence. Computers & Operations Research 13(5), 533-549.
+       https://doi.org/10.1016/0305-0548(86)90048-1
+    .. [2] Russell, S. J., and Norvig, P. (2009). Artificial Intelligence: A Modern Approach,
+       3rd edition. Prentice Hall.
+    .. [3] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
+       Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import tabu
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = x + 0.1 * rng.standard_normal(500)
+    >>> tabu(np.column_stack([x, y])).structure.kind
+    'cpdag'
+    """
+    warn_experimental("tabu")
+    from andrey.search.tabu import tabu as _tabu
+
+    X = data_matrix(data)
+    tabu_length = int_in_range(tabu_length, "tabu_length", 1)
+    max_tabu = int_in_range(
+        tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
+    )
+    max_iter = int_in_range(max_iter, "max_iter", 1)
+    labels = column_labels(data)
+    cpdag, score = _tabu(
+        X,
+        score_func=score_func,
+        lambda_value=lambda_value,
+        tabu_length=tabu_length,
+        max_tabu=max_tabu,
+        max_iter=max_iter,
+    )
+    metadata = {"algorithm": "Tabu", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 

@@ -255,6 +255,56 @@ _add(
 )
 _add(
     MethodSpec(
+        name="tabu",
+        family="score",
+        summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the least "
+        "worsening move, never returning to a recently visited DAG, and keeps the best DAG seen. "
+        "With the same settings its BIC score is never worse than hc's. Returns the CPDAG of that "
+        "DAG and its score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        params=(
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC_from_cov",
+                doc="Local score objective (covariance-based BIC).",
+                choices=("local_score_BIC_from_cov",),
+            ),
+            _LAMBDA_VALUE,
+            ParamSpec(
+                name="tabu_length",
+                type="int",
+                default=10,
+                doc="Length of the tabu list: how many recently visited DAGs a move may not lead "
+                "to, at least 1.",
+            ),
+            ParamSpec(
+                name="max_tabu",
+                type="int",
+                default=None,
+                doc="Worsening moves allowed without a better DAG before the search stops, from 1 "
+                "to tabu_length. null uses tabu_length.",
+                nullable=True,
+            ),
+            ParamSpec(
+                name="max_iter",
+                type="int",
+                default=200,
+                doc="Most moves the search takes, improving or not, at least 1; reaching it warns "
+                "with SearchLimitWarning.",
+            ),
+        ),
+        references=("Glover 1986", "Russell & Norvig 2009", "Scutari 2010"),
+    )
+)
+_add(
+    MethodSpec(
         name="exact_search",
         family="score",
         summary="Globally optimal BIC search over DAGs (A* or dynamic programming). Exact but "

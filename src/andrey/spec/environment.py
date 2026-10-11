@@ -41,8 +41,8 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer >= -1 (-1 = all usable cores)",
         default="1",
         effect=(
-            "Worker processes for GES, GIES, GFCI (its GES phase), and HC; `0` or `1` runs "
-            "serially. Separate from `ANDREY_BACKEND`, which picks the numeric code."
+            "Worker processes for GES, GIES, GFCI (its GES phase), HC, and tabu search; `0` or "
+            "`1` runs serially. Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",
     ),
@@ -65,9 +65,9 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer (estimated moves scanned per pass)",
         default=str(_HC_MIN_WORK),
         effect=(
-            "Crossover gate for parallel Hill-Climbing: a run fans out to the worker pool only "
-            "when its per-pass move-scan estimate (~d^2) exceeds this, else in-process. `0` always "
-            "uses the workers. No effect unless the worker count "
+            "Crossover gate for parallel Hill-Climbing and tabu search: a run fans out to the "
+            "worker pool only when its per-pass move-scan estimate (~d^2) exceeds this, else "
+            "in-process. `0` always uses the workers. No effect unless the worker count "
             "(`num_workers` / `ANDREY_NUM_WORKERS`) is above 1. A fit with more than one worker "
             "warns once on the default when a pass reaches a tenth of it; `andrey calibrate` "
             "measures a value for a process that runs many fits."

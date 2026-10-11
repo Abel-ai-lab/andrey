@@ -115,10 +115,10 @@ large enough to repay the transfer; correlation matrices move too when you set
 
 ### Can it use more CPU cores?
 
-GES, GIES, GFCI (in its GES phase), and hill climbing can spread each pass over worker processes:
-set `ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one. A script
-that does this must put its entry point under `if __name__ == "__main__":`, because starting the
-workers re-imports the script;
+GES, GIES, GFCI (in its GES phase), hill climbing, and tabu search can spread each pass over worker
+processes: set `ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one.
+A script that does this must put its entry point under `if __name__ == "__main__":`, because
+starting the workers re-imports the script;
 [Getting started](guides/getting-started.md#backends-and-parallelism) shows how. A pass uses the
 workers only above a work cutoff. GES's default suits one fit per process, and HC's sits between
 the values for one fit and for many; for a process that runs many fits, `andrey calibrate` measures

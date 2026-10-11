@@ -35,12 +35,12 @@ on the CPU. An operation without the requested backend uses its own default, wit
 
 ## Parallel search
 
-- `ANDREY_NUM_WORKERS`: the worker processes for GES, GIES, GFCI, and hill climbing. `1` (the
-  default) and `0` run serially; `-1` uses every usable core.
+- `ANDREY_NUM_WORKERS`: the worker processes for GES, GIES, GFCI, hill climbing, and tabu search.
+  `1` (the default) and `0` run serially; `-1` uses every usable core.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
-- `ANDREY_HC_PARALLEL_MIN_WORK`: the same for hill climbing, in moves scanned per pass. The default
-  is `30000`.
+- `ANDREY_HC_PARALLEL_MIN_WORK`: the same for hill climbing and tabu search, in moves scanned per
+  pass. The default is `30000`.
 
 Both cutoffs matter only with more than one worker. `andrey calibrate` measures them for your
 machine.

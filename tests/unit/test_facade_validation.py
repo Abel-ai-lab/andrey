@@ -48,6 +48,7 @@ SINGLE = {
     "ges": andrey.ges,
     "gies": andrey.gies,
     "hc": andrey.hc,
+    "tabu": andrey.tabu,
     "exact_search": andrey.exact_search,
     "calm": andrey.calm,
     "boss": andrey.boss,
@@ -193,6 +194,8 @@ def test_gin_labels_name_each_column():
         (andrey.hc, 0, ValueError),
         (andrey.hc, 2.5, TypeError),
         (andrey.hc, True, TypeError),
+        (andrey.tabu, 0, ValueError),
+        (andrey.tabu, 2.5, TypeError),
         (andrey.ica_lingam, 0, ValueError),
         (andrey.ica_lingam, 1.5, TypeError),
     ],
@@ -209,6 +212,33 @@ def test_hc_stops_at_max_iter_and_warns():
         out = andrey.hc(chain, max_iter=3)
     assert len(out.structure.oriented_edges()) == 3
     assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # finished before 200 moves
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("settings", "named", "error"),
+    [
+        ({"tabu_length": 0}, "tabu_length", ValueError),
+        ({"tabu_length": 2.5}, "tabu_length", TypeError),
+        ({"max_tabu": 0}, "max_tabu", ValueError),
+        ({"max_tabu": 11}, "max_tabu", ValueError),  # longer than the default tabu list
+        ({"tabu_length": 3, "max_tabu": 4}, "max_tabu", ValueError),
+        ({"max_tabu": True}, "max_tabu", TypeError),
+        ({"lambda_value": -1.0}, "lambda_value", ValueError),
+        ({"score_func": "local_score_BDeu"}, "score_func", NotImplementedError),
+    ],
+)
+def test_tabu_rejects_a_bad_setting(settings, named, error):
+    with pytest.raises(error, match=named):
+        andrey.tabu(_data(), **settings)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_tabu_stops_at_max_iter_and_warns():
+    chain = np.cumsum(np.random.default_rng(0).standard_normal((500, 8)), axis=1)
+    with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
+        out = andrey.tabu(chain, max_iter=3)
+    assert len(out.structure.oriented_edges()) == 3
 
 
 def test_cdnod_with_one_domain_gives_the_pc_graph():
