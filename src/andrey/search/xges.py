@@ -35,7 +35,7 @@ Equivalence Classes of Directed Acyclic Graphs. https://jmlr.org/papers/v13/haus
 from __future__ import annotations
 
 import heapq
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from collections.abc import Callable, Iterable
 from itertools import chain, count
 
@@ -45,6 +45,7 @@ from threadpoolctl import threadpool_limits
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
 from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
+from andrey.core.score_delta import add_deltas
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search.ges import _reach_factory, _recompute_objective, _reform_cpdag
@@ -374,6 +375,34 @@ def _delete_valid(g: _Graph, x: int, y: int, C: frozenset[int], E: frozenset[int
 # ---- the search ---------------------------------------------------------------------------------
 
 
+# Bytes the cached per-(target, parent set) score arrays may hold; each is one float per variable.
+_ADD_DELTAS_BYTES = 256 * 1024**2
+
+
+class _AddDeltas:
+    """Bounded LRU cache of :func:`~andrey.core.score_delta.add_deltas` per ``(y, E)``.
+
+    ``self(y, E)[x]`` is the score change of adding ``x`` to ``y``'s parents ``E``.
+    """
+
+    def __init__(self, score: BICScore, d: int) -> None:
+        self.score = score
+        self.cap = max(1024, _ADD_DELTAS_BYTES // (8 * d))
+        self.cache: OrderedDict[tuple[int, frozenset[int]], np.ndarray] = OrderedDict()
+
+    def __call__(self, y: int, E: frozenset[int]) -> np.ndarray:
+        key = (y, E)
+        deltas = self.cache.get(key)
+        if deltas is None:
+            deltas = add_deltas(self.score, y, E)
+            self.cache[key] = deltas
+            if len(self.cache) > self.cap:
+                self.cache.popitem(last=False)
+        else:
+            self.cache.move_to_end(key)
+        return deltas
+
+
 class _Search:
     """XGES over a :class:`_Graph`, with a priority queue per operator type.
 
@@ -383,7 +412,7 @@ class _Search:
     """
 
     def __init__(self, score: BICScore, d: int) -> None:
-        self.score = score
+        self.add_deltas = _AddDeltas(score, d)
         self.d = d
         self.g = _Graph(d)
         self.paths: PathMap = defaultdict(set)
@@ -394,9 +423,9 @@ class _Search:
         self.seq = count()
 
     def branch(self) -> _Search:
-        """A copy of the graph and path records, with empty queues and the same scorer."""
+        """A copy of the graph and path records, with empty queues and the same scores."""
         out = _Search.__new__(_Search)
-        out.score, out.d, out.seq = self.score, self.d, self.seq
+        out.add_deltas, out.d, out.seq = self.add_deltas, self.d, self.seq
         out.g = self.g.copy()
         out.paths = defaultdict(set, {k: set(v) for k, v in self.paths.items()})
         out.total = self.total
@@ -405,8 +434,19 @@ class _Search:
 
     # -- finding operators ----------------------------------------------------------------------
 
-    def insert_delta(self, x: int, y: int, E: frozenset[int]) -> float:
-        return self.score.score(y, E | {x}) - self.score.score(y, E)
+    def subsets(
+        self, t0: list[int], na: set[int], E: frozenset[int]
+    ) -> Iterable[tuple[frozenset[int], frozenset[int]]]:
+        """Each ``T`` in ``t0`` with ``na | T`` a clique, and the parent set ``E | T``."""
+        ad = self.g.ad
+        stack = [(frozenset(), 0, E)]
+        while stack:
+            T, start, E = stack.pop()
+            yield T, E
+            for i in range(start, len(t0)):
+                z = t0[i]
+                if T <= ad[z] and na <= ad[z]:
+                    stack.append((T | {z}, i + 1, E | {z}))
 
     def find_inserts_to_y(
         self, y: int, only_x: int | None = None, out: list[tuple] | None = None
@@ -416,27 +456,35 @@ class _Search:
         With ``out``, append every Insert from ``only_x`` to ``out`` instead, improving or not.
         """
         g = self.g
-        if only_x is None:
-            sources: Iterable[int] = set(range(self.d)) - g.ad[y] - {y}
-        else:
-            sources = (only_x,)
-        for x in sources:
-            na = g.ne[y] & g.ad[x]
+        ne_y = g.ne[y]
+        sources = set(range(self.d)) - g.ad[y] - {y} if only_x is None else {only_x}
+        # A source adjacent to no neighbor of y has NA empty and T ranging over the cliques in
+        # Ne(y), so those sources share their (T, E) pairs and are scored as one array.
+        near = [x for x in sources if not ne_y.isdisjoint(g.ad[x])]
+        far = np.array(sorted(sources.difference(near)), dtype=np.intp)
+        if far.size:
+            for T, E in self.subsets(sorted(ne_y), set(), frozenset(g.pa[y])):
+                deltas = self.add_deltas(y, E)[far]
+                if out is not None:
+                    out.extend((dl, x, y, T, E) for x, dl in zip(far.tolist(), deltas.tolist()))
+                    continue
+                keep = deltas < -_EPS_IMPROVE
+                for x, dl in zip(far[keep].tolist(), deltas[keep].tolist(), strict=True):
+                    heapq.heappush(self.inserts, (dl, next(self.seq), x, y, T, E))
+        for x in near:
+            na = ne_y & g.ad[x]
             if not g.is_clique(na):
                 continue
-            t0 = sorted(g.ne[y] - g.ad[x])
-            stack = [(frozenset(), 0, frozenset(na | g.pa[y]))]
-            while stack:
-                T, start, E = stack.pop()
-                delta = self.insert_delta(x, y, E)
+            for T, E in self.subsets(sorted(ne_y - g.ad[x]), na, frozenset(na | g.pa[y])):
+                delta = float(self.add_deltas(y, E)[x])
                 if out is not None:
                     out.append((delta, x, y, T, E))
                 elif delta < -_EPS_IMPROVE:
                     heapq.heappush(self.inserts, (delta, next(self.seq), x, y, T, E))
-                for i in range(start, len(t0)):
-                    z = t0[i]
-                    if T <= g.ad[z] and na <= g.ad[z]:
-                        stack.append((T | {z}, i + 1, E | {z}))
+
+    def drop_delta(self, y: int, E: frozenset[int], x: int) -> float:
+        """Score change of removing parent ``x`` of ``y`` from ``E``."""
+        return -float(self.add_deltas(y, E - {x})[x])
 
     def find_delete(self, y: int, x: int, out: list[tuple] | None = None) -> None:
         """Queue each improving Delete of the edge ``x -> y`` or ``x -- y``.
@@ -446,19 +494,12 @@ class _Search:
         g = self.g
         if y not in g.ch[x] and y not in g.ne[x]:
             return
-        na = sorted(g.ne[y] & g.ad[x])
-        stack = [(frozenset(), 0, frozenset(g.pa[y] | {x}))]
-        while stack:
-            C, start, E = stack.pop()
-            delta = self.score.score(y, E - {x}) - self.score.score(y, E)
+        for C, E in self.subsets(sorted(g.ne[y] & g.ad[x]), set(), frozenset(g.pa[y] | {x})):
+            delta = self.drop_delta(y, E, x)
             if out is not None:
                 heapq.heappush(out, (delta, next(self.seq), x, y, C, E))
             elif delta < -_EPS_IMPROVE:
                 heapq.heappush(self.deletes, (delta, next(self.seq), x, y, C, E))
-            for i in range(start, len(na)):
-                z = na[i]
-                if C <= g.ad[z]:
-                    stack.append((C | {z}, i + 1, E | {z}))
 
     def find_reverse(self, y: int, x: int) -> None:
         """Queue each improving Reverse of ``y -> x``."""
@@ -466,7 +507,7 @@ class _Search:
         if x not in g.ch[y]:
             return
         pa_x = frozenset(g.pa[x])
-        drop = self.score.score(x, pa_x - {y}) - self.score.score(x, pa_x)
+        drop = self.drop_delta(x, pa_x, y)
         inserts: list[tuple] = []
         self.find_inserts_to_y(y, x, inserts)
         for delta, _x, _y, T, E in inserts:
@@ -475,21 +516,15 @@ class _Search:
                 heapq.heappush(self.reverses, (delta, next(self.seq), x, y, T, E, pa_x))
 
     def inserts_on_empty_graph(self) -> None:
-        """Queue every improving single-edge Insert, scored from the covariance at once."""
-        cov, n = self.score.cov, self.score.n
-        diag = np.diag(cov)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            resid = diag[None, :] - cov * (cov / diag[:, None])  # [x, y]: R(y | x)
-            delta = n * (np.log(resid) - np.log(diag)[None, :]) + self.score.log_n * (
-                self.score.lambda_value
-            )
-        np.fill_diagonal(delta, np.inf)
+        """Queue every improving single-edge Insert."""
         empty: frozenset[int] = frozenset()
-        xs, ys = np.nonzero(delta < -_EPS_IMPROVE)
-        self.inserts = [
-            (float(delta[x, y]), next(self.seq), int(x), int(y), empty, empty)
-            for x, y in zip(xs.tolist(), ys.tolist(), strict=True)
-        ]
+        for y in range(self.d):
+            deltas = self.add_deltas(y, empty)
+            keep = np.nonzero(deltas < -_EPS_IMPROVE)[0]
+            self.inserts.extend(
+                (dl, next(self.seq), x, y, empty, empty)
+                for x, dl in zip(keep.tolist(), deltas[keep].tolist(), strict=True)
+            )
         heapq.heapify(self.inserts)
 
     # -- updating after a move ------------------------------------------------------------------

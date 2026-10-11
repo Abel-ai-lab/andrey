@@ -11,7 +11,8 @@ O(|S|^3) for two :func:`~andrey.core.score.local_score_bic` calls. With
 The delta is ``n * (log R_new - log R_old) +/- log_n * lambda`` (``+`` for an add). A near-singular
 ``cov[S,S]`` falls back to two full scores (:func:`_get_inv_with_cond`), so the fast path stays
 within ``1e-9`` of the exact difference. :func:`local_score_bic_delta` scores one move,
-:func:`score_many_with_base` many, and :class:`DeltaBICScore` keeps the caches a search reuses.
+:func:`score_many_with_base` many, :func:`add_deltas` every add to one base at once, and
+:class:`DeltaBICScore` keeps the caches a search reuses.
 """
 
 from __future__ import annotations
@@ -734,6 +735,69 @@ def delta_many_with_base(
             results[idx] = d
 
     return results
+
+
+def add_deltas(
+    score_obj: BICScore,
+    i: int,
+    base_parents: Sequence[int],
+    *,
+    cond_threshold: float = _COND_THRESHOLD,
+) -> np.ndarray:
+    """Return ``score(i, base + u) - score(i, base)`` for every variable ``u``, as one array.
+
+    The vector form of :func:`delta_many_with_base`'s ``add`` moves, for a search that scores every
+    candidate parent of ``i`` against one base: ``O(|base|^2 d)`` numpy work instead of a Python
+    loop over the candidates. It shares the conditioning-gated inverse cache and falls back to two
+    full scores where the Schur path is unavailable, as :func:`delta_many_with_base` does. Entries
+    for ``i`` itself and for the members of ``base`` are ``inf``.
+
+    Parameters
+    ----------
+    score_obj : BICScore
+        The base score supplying ``cov``, ``n``, ``log_n``, and ``lambda_value``.
+    i : int
+        Target node whose local score is differenced.
+    base_parents : sequence of int
+        The parent set every candidate is added to.
+    cond_threshold : float
+        Conditioning-gate threshold routing a near-singular base to the two-full-score fallback.
+    """
+    cov = score_obj.cov
+    cov_diag = score_obj._cov_diag
+    i = int(i)
+    S_sorted = tuple(sorted(int(p) for p in base_parents))
+    S_list = list(S_sorted)
+    exact: np.ndarray | None = None
+    if not S_list:
+        e = cov[i]
+        R_u = cov_diag
+    else:
+        inv_cov_cache = _delta_caches(score_obj)[0]
+        M, ill = _get_inv_with_cond(inv_cov_cache, S_sorted, cov, S_list, cond_threshold)
+        inv_cov_cache.move_to_end(S_sorted)
+        _evict_inv(inv_cov_cache)
+        if ill:
+            exact = np.ones(cov.shape[0], dtype=bool)
+            e = R_u = np.ones(cov.shape[0])
+        else:
+            cs = cov[S_list]
+            beta = M @ cs
+            e = cov[i] - cov[i, S_list] @ beta
+            R_u = cov_diag - np.einsum("ij,ij->j", cs, beta)
+    R_v = float(e[i]) if exact is None else 1.0  # e_ii is R(i | base)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        R_v_new = R_v - e * e / R_u
+        out = score_obj.n * (_log(R_v_new) - _log(R_v)) + score_obj.log_n * score_obj.lambda_value
+    if exact is None:
+        exact = ~((R_u > 0.0) & (R_v_new > 0.0) & np.isfinite(out)) | (not R_v > 0.0)
+    exact[i] = False
+    exact[S_list] = False
+    for u in np.nonzero(exact)[0].tolist():
+        out[u] = _delta_two_scores(score_obj, i, S_sorted, u, "add")
+    out[i] = np.inf
+    out[S_list] = np.inf
+    return out
 
 
 class DeltaBICScore:
