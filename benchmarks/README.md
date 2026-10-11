@@ -187,8 +187,9 @@ CAM-UV, which match `metadata["confounded_pairs"]` of Andrey's result, and the `
 BottomUpParceLiNGAM. BottomUpParceLiNGAM's `o-o` edges join every pair of the one block of variables
 it leaves unordered: the confounded variables, their observed ancestors, and any other confounded
 pairs. Pairs in the block that share no cause count against its precision, and edges among the
-block's variables stay unoriented, which caps its directed recall. Read its pair recall, the share of true pairs it
-leaves unordered. `confounded_n_est` counts the pairs, and three sets of true pairs score them:
+block's variables stay unoriented, which caps its directed recall. Read its pair recall, the share
+of true pairs it leaves unordered. `confounded_n_est` counts the pairs, and three sets of true pairs
+score them:
 
 | columns | true pairs |
 |---|---|
