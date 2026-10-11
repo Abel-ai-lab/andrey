@@ -36,7 +36,7 @@ if sys.version_info < (3, 11):
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-# Build-time output that is not a page: blog figures, example pages, thumbnails, the preview card.
+# Build-time output that is not a page: example pages, thumbnails, the preview card.
 GENERATED = HERE / "_generated"
 
 
@@ -49,7 +49,6 @@ def _module(name: str, path: pathlib.Path):  # noqa: ANN202 -- a module loaded f
 
 # The homepage's content generators, and the pages of the interactive examples.
 site = _module("andrey_site", ROOT / "site" / "build.py")
-why_fast = _module("andrey_why_fast", ROOT / "site" / "why_fast.py")
 cards = _module("andrey_cards", ROOT / "site" / "cards.py")
 sys.path.insert(0, str(ROOT / "apps"))
 sys.path.insert(0, str(ROOT / "apps" / "live-discovery"))
@@ -290,11 +289,11 @@ def _load_summary(app) -> dict:  # noqa: ANN001
         raise ConfigError(str(error)) from None
 
 
-def _release_text() -> dict[str, str]:
-    """The release and its method tiers, for the launch post and the FAQ."""
+def _methods_text() -> dict[str, str]:
+    """The method count and tiers, for the FAQ."""
     supported = [f"`{s.name}`" for s in list_specs() if s.status == "supported"]
     return {
-        "release": release,
+        "method_count": f"{len(list_specs())} methods",
         "n_supported": str(len(supported)),
         "n_experimental": str(len(list_specs()) - len(supported)),
         "supported_methods": ", ".join(supported[:-1]) + f", and {supported[-1]}",
@@ -302,22 +301,11 @@ def _release_text() -> dict[str, str]:
 
 
 def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its application objects
-    """Fill the homepage's context, and the launch post's numbers and figures, from the summary."""
+    """Fill the homepage's context from the summary, and the FAQ's method counts."""
     (GENERATED / "static").mkdir(parents=True, exist_ok=True)
     summary = _load_summary(app)
     app.andrey_home = site.homepage_context(summary, placeholder=config.andrey_placeholder)
-    # The launch post prints what its first fit prints, from the homepage's run of the example.
-    printed = html.unescape(app.andrey_home["example_output"])
-    _write(GENERATED / "blog" / "example-output.txt", printed)
-    text, figures = site.launch_post_context(summary)
-    config.myst_substitutions = {**config.myst_substitutions, **text, **_release_text()}
-    for name, figure in figures.items():
-        _write(GENERATED / "blog" / f"{name}.html", figure + "\n")
-    # The "Why Andrey is fast" scenes, shown under the post's headings.
-    for scene in why_fast.SCENES:
-        _write(
-            GENERATED / "why-fast" / f"{scene['key']}.html", why_fast.fragment(scene["key"]) + "\n"
-        )
+    config.myst_substitutions = {**config.myst_substitutions, **_methods_text()}
     # The link-preview card shared by the homepage and every page that is not a post.
     site.fastest(summary)
     home_card = cards.card_jpeg(cards.TAGLINE, cards.ACCENT)

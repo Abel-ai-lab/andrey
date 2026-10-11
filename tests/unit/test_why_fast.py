@@ -72,30 +72,9 @@ def test_dialog_has_one_tab_and_one_panel_per_scene():
     assert opener["data-wf-open"] == dialog["id"]
 
 
-def test_the_post_shows_every_scene():
-    guide = (ROOT / "docs" / "blog" / "why-andrey-is-fast.md").read_text()
-    shown = re.findall(r"\.\./_generated/why-fast/(\w+)\.html", guide)
-    assert shown == [s["key"] for s in SCENES]
-    for i, scene in enumerate(SCENES, 1):
-        assert f"## {i}. {scene['title']}" in guide
-
-
-# The plain titles, as on the homepage, and the technical term that opens each guide section.
-PLAIN = {
-    "Do many things at once": "Batch and parallelize",
-    "Never compute twice": "Cache and update incrementally",
-    "Skip what can't matter": "Prune the search early",
-    "Use the hardware you have": "Hardware-aware acceleration",
-}
-
-
-def test_every_page_names_the_ideas_plainly_and_the_guide_keeps_the_terms():
-    assert [s["title"] for s in SCENES] == list(PLAIN)
-    guide = (ROOT / "docs" / "blog" / "why-andrey-is-fast.md").read_text()
-    for i, (title, term) in enumerate(PLAIN.items(), 1):
-        assert f"## {i}. {title}\n\n**{term}.** " in guide
+def test_the_dialog_names_every_idea():
     dialog = why_fast["dialog"]()
-    assert all(why_fast["escape"](title) in dialog for title in PLAIN)
+    assert all(why_fast["escape"](s["title"]) in dialog for s in SCENES)
 
 
 def test_the_readme_gives_each_idea_in_one_line():
