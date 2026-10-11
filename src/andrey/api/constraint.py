@@ -107,7 +107,7 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     occurs in the data [2]_. Each configuration adds ``(r_x - 1) * (r_y - 1)`` degrees of freedom,
     counting only the values of ``x`` and ``y`` present in it [6]_; with none, the p-value is 1.
     A test needs several rows per cell of its table: with many categories or a large conditioning
-    set, most cells are empty, and the test is less likely to remove an edge.
+    set, most cells are empty, and the p-value is unreliable.
 
     References
     ----------
