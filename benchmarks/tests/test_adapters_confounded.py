@@ -218,6 +218,19 @@ def test_unobserved_path_adds_the_pairs_a_hidden_mediator_joins() -> None:
     assert true_confounded_pairs(truth, "unobserved_path") == {(0, 1), (0, 2), (1, 2)}
 
 
+def test_unobserved_paths_follow_camuvs_definitions() -> None:
+    # 0 -> 1 and 0 -> hidden 2 -> 1: the pair stays unresolved, so no direct edge is identifiable.
+    truth = _dag([(0, 1), (0, 2), (2, 1)], d=3, hidden=(2,))
+    assert true_confounded_pairs(truth, "unobserved_path") == {(0, 1)}
+    assert directed_edge_scores(_pag([], 2, _ARROW), truth)["directed_direct_n_true"] == 0
+    # 0 -> 1 -> hidden 3 -> 2: a causal path may pass observed nodes before its hidden last step.
+    truth = _dag([(0, 1), (1, 3), (3, 2)], d=4, hidden=(3,))
+    assert true_confounded_pairs(truth, "unobserved_path") == {(0, 2), (1, 2)}
+    # 0 <- hidden 3 <- 2 -> hidden 4 -> 1: a backdoor path through the observed ancestor 2.
+    truth = _dag([(3, 0), (2, 3), (2, 4), (4, 1)], d=5, hidden=(3, 4))
+    assert true_confounded_pairs(truth, "unobserved_path") == {(0, 1), (0, 2), (1, 2)}
+
+
 def test_a_perfect_claim_scores_one_for_either_mark() -> None:
     truth = _dag([(4, 0), (4, 1), (2, 0), (3, 1)], d=5, hidden=(4,))
     for mark, marks in (("bidirected", _ARROW), ("circle", _CIRCLE)):

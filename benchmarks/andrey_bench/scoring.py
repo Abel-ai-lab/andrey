@@ -86,10 +86,8 @@ CONFOUNDED_MARKS = {"bidirected": _ARROW, "circle": _CIRCLE}
 #: with no directed edge between them in the latent projection (:func:`projected_directed`). RCD and
 #: CAM-UV, in both packages, never claim a pair where one variable is the other's parent, so
 #: ``nonadjacent`` is the set they can reach; BottomUpParceLiNGAM can also mark an adjacent pair.
-#: ``unobserved_path``: CAM-UV's target. CAM-UV marks a pair joined by a hidden common cause or by a
-#: causal path through hidden nodes only, unless one is the other's direct parent: the
-#: ``hidden_cause`` pairs and the pairs :func:`projected_directed` links only through hidden nodes,
-#: less the pairs joined by a direct edge.
+#: ``unobserved_path``: CAM-UV's target, the pairs joined by an unobserved causal or backdoor path
+#: (:func:`unobserved_path_pairs`). CAM-UV marks these whether or not one is the other's parent.
 CONFOUNDED_TARGETS = ("pag", "hidden_cause", "nonadjacent", "unobserved_path")
 
 #: The columns :func:`confounded_pair_scores` returns, in order: the number of estimated pairs, then
@@ -149,11 +147,48 @@ def projected_directed(truth: GraphStructure) -> set[tuple[int, int]]:
     return edges
 
 
+def unobserved_path_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
+    """Return the observed pairs ``i < j`` of a DAG `truth` joined by an unobserved path.
+
+    CAM-UV's definitions (Maeda and Shimizu, 2021): an unobserved causal path from ``i`` to ``j`` is
+    a directed path that enters ``j`` from a hidden parent; an unobserved backdoor path enters both
+    ``i`` and ``j`` from hidden parents that share an ancestor (either may be that ancestor). Nodes
+    inside either path may be observed.
+    """
+    directed = _directed_adjacency(truth).astype(bool)
+    hidden = np.asarray(truth.node_types) == LATENT
+    reach = directed | np.eye(len(hidden), dtype=bool)  # reach[a, b]: a is b or an ancestor of b
+    for k in range(len(hidden)):
+        reach |= reach[:, [k]] & reach[[k], :]
+    hidden_parents = [np.flatnonzero(directed[:, v] & hidden) for v in range(len(hidden))]
+    observed = np.flatnonzero(~hidden)
+    pairs: set[tuple[int, int]] = set()
+    for i, j in combinations(map(int, observed), 2):
+        causal = any(reach[i, h] for h in hidden_parents[j]) or any(
+            reach[j, h] for h in hidden_parents[i]
+        )
+        backdoor = any(
+            (reach[:, a] & reach[:, b]).any() for a in hidden_parents[i] for b in hidden_parents[j]
+        )
+        if causal or backdoor:
+            pairs.add((i, j))
+    return pairs
+
+
 def direct_edges(truth: GraphStructure) -> set[tuple[int, int]]:
-    """Return the edges ``(i, j)`` of a DAG `truth` that join two observed nodes."""
+    """Return the edges ``(i, j)`` of a DAG `truth` that CAM-UV can identify as direct.
+
+    These join two observed nodes with no unobserved path between them (:func:`unobserved_path_pairs`):
+    CAM-UV marks a pair with such a path as unresolved even when one node is the other's parent.
+    """
     hidden = np.asarray(truth.node_types) == LATENT
     directed = _directed_adjacency(truth).astype(bool) & ~hidden[:, None] & ~hidden[None, :]
-    return {(int(i), int(j)) for i, j in zip(*np.nonzero(directed), strict=True)}
+    unresolved = unobserved_path_pairs(truth)
+    return {
+        (int(i), int(j))
+        for i, j in zip(*np.nonzero(directed), strict=True)
+        if (min(i, j), max(i, j)) not in unresolved
+    }
 
 
 def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, int]]:
@@ -170,9 +205,7 @@ def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, 
         adjacent = {tuple(sorted(edge)) for edge in projected_directed(truth)}
         return _hidden_cause_pairs(truth) - adjacent
     if target == "unobserved_path":
-        direct = {tuple(sorted(edge)) for edge in direct_edges(truth)}
-        mediated = {tuple(sorted(edge)) for edge in projected_directed(truth)} - direct
-        return (_hidden_cause_pairs(truth) | mediated) - direct
+        return unobserved_path_pairs(truth)
     raise ValueError(f"unknown target {target!r}; known: {list(CONFOUNDED_TARGETS)}")
 
 
@@ -201,8 +234,8 @@ def confounded_pair_scores(
 
 #: What counts as a true directed edge. ``projection``: the latent projection's edges
 #: (:func:`projected_directed`), what RCD and BottomUpParceLiNGAM estimate. ``direct``: the edges
-#: between two observed nodes (:func:`direct_edges`), what CAM-UV estimates; it marks a path through
-#: a hidden node as a pair instead.
+#: between two observed nodes with no unobserved path between them (:func:`direct_edges`), what
+#: CAM-UV estimates; it marks a pair with such a path as unresolved instead.
 DIRECTED_TARGETS = ("projection", "direct")
 
 #: The columns :func:`directed_edge_scores` returns, in order.
