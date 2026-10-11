@@ -56,9 +56,17 @@ def check_categories(values: np.ndarray, data: object, setting: str, *, name: st
     A setting that reads categories, such as ``indep_test="chisq"``, takes each distinct value of a
     column as one category, so a fractional value most likely means continuous data. ``setting``
     names the option in the message and ``data`` supplies column names. Raises ``ValueError``,
-    naming ``name``, ``setting``, and the first fractional cell; ``NaN`` and ``inf`` are left to
-    :func:`data_matrix`.
+    naming ``name``, ``setting``, and the first fractional cell, or the first code of ``2**53`` or
+    more in magnitude, where whole numbers stop being distinct as floats; ``NaN`` and ``inf`` are
+    left to :func:`data_matrix`.
     """
+    huge = np.argwhere(np.isfinite(values) & (np.abs(values) >= 2.0**53))
+    if huge.size:
+        cell = tuple(int(k) for k in huge[0])
+        raise ValueError(
+            f"{setting} reads {name} as categories, but {name} holds {float(values[cell])!r} at "
+            f"row {cell[0]}; codes of 2**53 or more in magnitude may merge, so recode them"
+        )
     fractional = np.argwhere(np.isfinite(values) & (values != np.round(values)))
     if fractional.size:
         cell = tuple(int(k) for k in fractional[0])

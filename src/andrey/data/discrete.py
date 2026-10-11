@@ -71,7 +71,10 @@ def sample_discrete(
     >>> ds.data.shape, ds.graph.kind
     ((200, 5), 'dag')
     """
-    low, high = (int(k) for k in categories)
+    whole = len(categories) == 2 and all(
+        isinstance(k, int | np.integer) and not isinstance(k, bool) for k in categories
+    )
+    low, high = (int(k) for k in categories) if whole else (0, 0)
     if not 2 <= low <= high:
         raise ValueError(
             f"categories must be (least, most) with 2 <= least <= most, got {categories}"

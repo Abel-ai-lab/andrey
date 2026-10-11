@@ -6,6 +6,8 @@ Direct Python calls (not the CLI, which validates inputs of its own) must not le
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 import pytest
 
@@ -233,9 +235,8 @@ CATEGORICAL = {
     ("cdnod", "indep_test", "gsq"): lambda x: andrey.cdnod(
         x, np.arange(len(x)) % 2, indep_test="gsq"
     ),
-    ("gfci", "indep_test", "chisq"): lambda x: andrey.gfci(x, indep_test="chisq"),
-    ("gfci", "score_func", "local_score_BDeu"): lambda x: andrey.gfci(
-        x, score_func="local_score_BDeu"
+    ("gfci", "indep_test", "chisq"): lambda x: andrey.gfci(
+        x, indep_test="chisq", score_func="local_score_BDeu"
     ),
     ("ges", "score_func", "local_score_BDeu"): lambda x: andrey.ges(
         x, score_func="local_score_BDeu"
@@ -257,6 +258,21 @@ def test_a_categorical_setting_rejects_a_fractional_value(setting):
     assert CATEGORICAL[setting](_categories()).structure.n_nodes == 3
 
 
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("score_func", "indep_test"), [("local_score_BDeu", "fisherz"), ("local_score_BIC", "chisq")]
+)
+def test_gfci_rejects_a_score_and_test_that_read_the_data_differently(score_func, indep_test):
+    with pytest.raises(ValueError, match="score and test must read the data alike"):
+        andrey.gfci(_categories(), score_func=score_func, indep_test=indep_test)
+
+
+@pytest.mark.parametrize("code", [2.0**53, -(2.0**60)])
+def test_a_categorical_setting_rejects_codes_too_large_to_stay_distinct(code):
+    with pytest.raises(ValueError, match=r"2\*\*53 or more"):
+        andrey.pc(_with(_categories(), (5, 0), code), indep_test="chisq")
+
+
 def test_a_categorical_error_names_the_dataframe_column():
     pd = pytest.importorskip("pandas")
     frame = pd.DataFrame(_with(_categories(), (4, 1), 2.25), columns=["a", "b", "c"])
@@ -265,7 +281,7 @@ def test_a_categorical_error_names_the_dataframe_column():
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-@pytest.mark.parametrize("fit", [andrey.ges, andrey.hc, andrey.gfci])
+@pytest.mark.parametrize("fit", [andrey.ges, andrey.hc, partial(andrey.gfci, indep_test="chisq")])
 def test_bdeu_still_checks_lambda_value(fit):
     """BDeu has no penalty weight, but a setting outside its range is an error under any score."""
     with pytest.raises(ValueError, match="lambda_value"):

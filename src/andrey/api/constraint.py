@@ -335,8 +335,9 @@ def gfci(
         If ``score_func`` names no available score, or ``indep_test`` no available test.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
-        ``collider_rule`` is not a supported choice, or, with a categorical score or test, if
-        ``data`` holds a value that is not a whole number.
+        ``collider_rule`` is not a supported choice, if one of ``score_func`` and ``indep_test`` is
+        categorical and the other is not, or, with categorical settings, if ``data`` holds a value
+        that is not a whole number.
 
     Warns
     -----
@@ -383,8 +384,13 @@ def gfci(
 
     X = data_matrix(data)
     alpha = open_unit_interval(alpha, "alpha")
-    if score_func == "local_score_BDeu":
-        check_categories(X, data, f"score_func={score_func!r}")
+    # Both phases read the same data, so the score and the test must agree on its type.
+    if (score_func == "local_score_BDeu") != (indep_test in DISCRETE_INDEP_TESTS):
+        raise ValueError(
+            "gfci's score and test must read the data alike: score_func='local_score_BDeu' with "
+            "indep_test 'chisq' or 'gsq' for categories, or a BIC score with 'fisherz'; got "
+            f"score_func={score_func!r}, indep_test={indep_test!r}"
+        )
     if indep_test in DISCRETE_INDEP_TESTS:
         check_categories(X, data, f"indep_test={indep_test!r}")
     labels = column_labels(data)

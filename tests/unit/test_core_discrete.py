@@ -181,3 +181,11 @@ def test_no_columns_is_one_configuration():
     codes, cards = categorical.encode(_codes())
     index, m = categorical.configurations(codes, cards, [])
     assert m == 1 and not index.any()
+
+
+@pytest.mark.parametrize("categories", [(2.9, 2.1), (2, 3.5), (True, 3), (3, 2), (1, 4), (2,)])
+def test_the_sampler_rejects_category_bounds_that_are_not_ordered_whole_numbers(categories):
+    from andrey.data import sample_discrete
+
+    with pytest.raises(ValueError, match="categories must be"):
+        sample_discrete(d=3, n=20, seed=0, categories=categories)

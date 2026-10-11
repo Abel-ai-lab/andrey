@@ -267,9 +267,10 @@ kind of result; `cdnod` also takes a domain index, and `multi_group_direct_linga
 {doc}`graph-types` explains which graph each one returns.
 
 For categorical data, code each category as a whole number and choose a categorical test or score:
-`andrey.pc(data, indep_test="chisq")` or `"gsq"`, the same `indep_test` for `fci`, `gfci`, and
-`cdnod`, and `andrey.ges(data, score_func="local_score_BDeu")`, also for `gfci` and `hc`. Each
-distinct value of a column is one category, so the codes need not start at 0.
+`andrey.pc(data, indep_test="chisq")` or `"gsq"`, the same `indep_test` for `fci` and `cdnod`, and
+`andrey.ges(data, score_func="local_score_BDeu")`, also for `hc`. `gfci` uses both, so it takes
+the pair: `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`. Each distinct
+value of a column is one category, so the codes need not start at 0.
 
 ## Backends and parallelism
 
