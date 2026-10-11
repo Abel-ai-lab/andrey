@@ -1,7 +1,7 @@
-"""Facades for the pairwise post-nonlinear (PNL) test and the hidden-confounder methods.
+"""Facades for the pairwise direction tests (ANM and PNL) and the hidden-confounder methods.
 
-PNL tests both directions in a two-column table. RCD, CAM-UV, and BottomUpParceLiNGAM return a PAG
-over the observed variables. RCD and CAM-UV list the pairs a hidden variable links in
+ANM and PNL test both directions in a two-column table. RCD, CAM-UV, and BottomUpParceLiNGAM
+return a PAG over the observed variables. RCD and CAM-UV list the pairs a hidden variable links in
 ``metadata["confounded_pairs"]``; BottomUpParceLiNGAM leaves the variables whose order such a
 cause hides unordered.
 """
@@ -14,12 +14,116 @@ import numpy as np
 
 from ._adapt import column_labels, data_matrix, int_in_range, open_unit_interval, with_labels
 from ._experimental import warn_experimental
-from ._irregular import _adapt_bottom_up_parce, _adapt_camuv, _adapt_pnl, _adapt_rcd
+from ._irregular import (
+    _adapt_anm,
+    _adapt_bottom_up_parce,
+    _adapt_camuv,
+    _adapt_pnl,
+    _adapt_rcd,
+)
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
+
+
+def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
+    """Test the direction of a variable pair with the additive noise model (ANM).
+
+    ANM [1]_ fits ``y = f(x) + e`` in each direction by Gaussian-process regression. An HSIC test
+    [2]_ checks whether the residual ``e`` is independent of the proposed cause, which holds only in
+    the causal direction. The two p-values determine the edge.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, 2)
+        The two variables, one per column: column 0 is ``x`` and column 1 is ``y``. Coerced to
+        ``float64``. A DataFrame's column names become the structure's ``labels``.
+    alpha : float or None, default=None
+        ``None`` chooses the direction with the larger p-value. A significance level such as
+        ``0.05`` draws an edge only when exactly one p-value exceeds it. See Notes.
+
+    Returns
+    -------
+    StructureOutput
+        Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
+        edge, or no edge. ``metadata["algorithm"]`` is ``"ANM"``; ``pval_forward`` is the
+        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``.
+
+    Raises
+    ------
+    ValueError
+        If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    With ``alpha=None``, the edge points in the direction with the larger p-value; equal values
+    give no edge. Unequal p-values therefore produce an edge even for unrelated variables or a
+    pair whose direction cannot be identified. Mooij et al. (2016) [3]_ use this rule to avoid
+    choosing a significance level and found it among the best methods in their benchmark.
+
+    With a significance level, a direction passes when its p-value exceeds ``alpha``:
+
+    - only ``x -> y`` passes: the edge ``x -> y``;
+    - only ``y -> x`` passes: the edge ``y -> x``;
+    - both pass: no edge, since neither direction is rejected;
+    - neither passes: no edge, since both directions are rejected.
+
+    Hoyer et al. (2008) [1]_ use a level of 0.02. Both p-values remain in ``metadata``.
+
+    The direction is identifiable when ``f`` is nonlinear or the noise is non-Gaussian; a linear
+    pair with Gaussian noise fits an additive noise model in both directions [1]_.
+
+    Each column is standardized to zero mean and unit variance first, so the result does not
+    depend on the units of either variable. The regression is a Gaussian process with a scaled RBF
+    kernel plus a white-noise term, its hyperparameters fitted by maximum marginal likelihood. The
+    HSIC test uses Gaussian kernels and a gamma approximation of its null distribution. The fit is
+    deterministic, and its time grows with the cube of ``n_samples``.
+
+    References
+    ----------
+    .. [1] Hoyer, P. O., Janzing, D., Mooij, J. M., Peters, J., and Scholkopf, B. (2008).
+       Nonlinear causal discovery with additive noise models. NeurIPS 21, 689-696.
+    .. [2] Gretton, A., Fukumizu, K., Teo, C. H., Song, L., Scholkopf, B., and Smola, A. J. (2008).
+       A kernel statistical test of independence. NeurIPS 20, 585-592.
+    .. [3] Mooij, J. M., Peters, J., Janzing, D., Zscheischler, J., and Scholkopf, B. (2016).
+       Distinguishing cause from effect using observational data: methods and benchmarks. JMLR
+       17(32), 1-102.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import anm
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.uniform(-1, 1, 300)
+    >>> y = x * x * x + 0.3 * rng.uniform(-1, 1, 300)
+    >>> out = anm(np.column_stack([x, y]))
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'directed')]
+    >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
+    True
+    """
+    warn_experimental("anm")
+    from andrey.irregular.anm import anm as _native
+
+    if np.ndim(data) != 2 or np.shape(data)[1] != 2:
+        raise ValueError(
+            f"anm expects an (n_samples, 2) table of two variables, got {np.shape(data)}"
+        )
+    X = data_matrix(data)
+    if alpha is not None:
+        alpha = open_unit_interval(alpha, "alpha")
+    labels = column_labels(data)
+    Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
+    pval_forward, pval_backward = _native(Z[:, 0], Z[:, 1])
+    return _adapt_anm(pval_forward, pval_backward, alpha=alpha, labels=labels)
 
 
 def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:

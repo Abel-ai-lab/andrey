@@ -132,3 +132,39 @@ def test_anm_resolves_the_planted_direction():
     assert out.structure.type == "graph"
     assert out.structure.oriented_edges() == [(0, 1, "directed")]
     assert set(out.metadata) == {"algorithm", "pval_forward", "pval_backward"}
+
+
+def test_anm_names_the_planted_direction_in_any_units_and_column_order():
+    import pandas as pd
+
+    from andrey.api.irregular import anm as anm_facade
+
+    planted = datagen.generate("anm_pair_cubic")
+    first = anm_facade(planted)
+    assert first.structure.oriented_edges() == [(0, 1, "directed")]
+    assert set(first.metadata) == {"algorithm", "pval_forward", "pval_backward"}
+    pvalues = (first.metadata["pval_forward"], first.metadata["pval_backward"])
+    for scale in (100.0, 0.01):
+        out = anm_facade(planted * np.array([scale, 1 / scale]))
+        assert np.allclose((out.metadata["pval_forward"], out.metadata["pval_backward"]), pvalues)
+    df = pd.DataFrame(planted, columns=["cause", "effect"])
+    for columns in (["cause", "effect"], ["effect", "cause"]):
+        edges = anm_facade(df[columns]).structure.oriented_edges()
+        assert edges == [("cause", "effect", "directed")]
+
+
+# The measured p-values are (0.057, 0.0), (0.818, 0.478), and (0.795, 0.785): the comparison rule
+# draws an edge between unrelated variables; the threshold rule draws one only for the planted pair.
+@pytest.mark.parametrize(
+    ("pair", "alpha", "edges"),
+    [
+        ("planted", 0.02, [(0, 1, "directed")]),
+        ("unrelated", None, [(0, 1, "directed")]),
+        ("unrelated", 0.05, []),
+        ("gaussian", 0.05, []),
+    ],
+)
+def test_anm_decision_rules_on_measured_pairs(pair, alpha, edges):
+    from andrey.api.irregular import anm as anm_facade
+
+    assert anm_facade(_pairs()[pair], alpha=alpha).structure.oriented_edges() == edges

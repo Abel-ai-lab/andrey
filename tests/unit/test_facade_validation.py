@@ -17,16 +17,24 @@ def test_direct_lingam_rejects_non_2d():
         andrey.direct_lingam(np.random.default_rng(0).standard_normal(100))
 
 
+#: The pairwise direction tests, which take a two-column table.
+PAIRWISE = [andrey.pnl, andrey.anm]
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 @pytest.mark.parametrize("shape", [(100,), (100, 1), (100, 3)])
-def test_pnl_rejects_anything_but_a_pair(shape):
+def test_pairwise_tests_reject_anything_but_a_pair(fit, shape):
     with pytest.raises(ValueError, match=r"\(n_samples, 2\)"):
-        andrey.pnl(np.random.default_rng(0).standard_normal(shape))
+        fit(np.random.default_rng(0).standard_normal(shape))
 
 
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 @pytest.mark.parametrize("alpha", [0.0, 1.0, -0.1])
-def test_pnl_rejects_an_alpha_outside_the_unit_interval(alpha):
+def test_pairwise_tests_reject_an_alpha_outside_the_unit_interval(fit, alpha):
     with pytest.raises(ValueError, match="alpha"):
-        andrey.pnl(np.random.default_rng(0).standard_normal((100, 2)), alpha=alpha)
+        fit(np.random.default_rng(0).standard_normal((100, 2)), alpha=alpha)
 
 
 def _data(n=60, d=3):
@@ -106,9 +114,12 @@ def test_varma_lingam_needs_two_variables():
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-def test_pnl_rejects_unusable_data():
+@pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
+def test_pairwise_tests_reject_unusable_data(fit):
     with pytest.raises(ValueError, match=r"data .*row 2, column 0"):
-        andrey.pnl(_with(_data(d=2), (2, 0), np.nan))
+        fit(_with(_data(d=2), (2, 0), np.nan))
+    with pytest.raises(ValueError, match=r"data column 1 is constant"):
+        fit(_with(_data(d=2), (slice(None), 1), 3.0))
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

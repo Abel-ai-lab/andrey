@@ -97,10 +97,16 @@ def _pairwise_output(
 
 
 def _adapt_anm(
-    pval_forward: Any, pval_backward: Any, *, alpha: float | None = None
+    pval_forward: Any,
+    pval_backward: Any,
+    *,
+    alpha: float | None = None,
+    labels: tuple[str, ...] | None = None,
 ) -> StructureOutput:
     """Convert ANM p-values to a two-node ``dag`` and metadata."""
-    return _pairwise_output(pval_forward, pval_backward, algorithm="ANM", alpha=alpha)
+    return _pairwise_output(
+        pval_forward, pval_backward, algorithm="ANM", alpha=alpha, labels=labels
+    )
 
 
 def _adapt_pnl(

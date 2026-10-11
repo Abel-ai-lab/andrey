@@ -14,7 +14,10 @@ models." NIPS 21, 2008.
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel, WhiteKernel
 
@@ -31,7 +34,11 @@ def _regress_residual(cause: np.ndarray, effect: np.ndarray) -> np.ndarray:
         0.1, (1e-10, 1e1)
     )
     regressor = GaussianProcessRegressor(kernel=kernel)
-    regressor.fit(cause, effect)
+    with warnings.catch_warnings():
+        # A hyperparameter reaches its bound when ``effect`` does not depend on ``cause``: the
+        # signal variance at its floor is then the right fit, not a failed one.
+        warnings.simplefilter("ignore", ConvergenceWarning)
+        regressor.fit(cause, effect)
     prediction = regressor.predict(cause).reshape(-1, 1)
     return effect - prediction
 

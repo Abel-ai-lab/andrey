@@ -13,7 +13,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 """
 
 from .constraint import cdnod, fci, gfci, pc
-from .irregular import bottom_up_parce_lingam, camuv, pnl, rcd
+from .irregular import anm, bottom_up_parce_lingam, camuv, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
 from .permutation import boss, grasp
@@ -43,6 +43,7 @@ __all__ = [
     "varma_lingam",
     "longitudinal_lingam",
     # irregular / pairwise family
+    "anm",
     "pnl",
     # latent-variable family
     "gin",

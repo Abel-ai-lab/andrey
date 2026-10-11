@@ -7,6 +7,7 @@ callables (``andrey.ges``, ...) are exposed with their facade wrappers.
 """
 
 from .api import (
+    anm,
     boss,
     bottom_up_parce_lingam,
     calm,
@@ -81,7 +82,8 @@ __all__ = [
     # Temporal family - one StructureOutput over a per-lag stack.
     "varma_lingam",
     "longitudinal_lingam",
-    # Pairwise direction test.
+    # Pairwise direction tests.
+    "anm",
     "pnl",
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
