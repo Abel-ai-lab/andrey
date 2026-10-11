@@ -64,12 +64,23 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "pnl_small_world": ("small_world", "pnl", "laplace", "standardized"),
     # Linear-Gaussian with hidden confounders; the key sets `latents` using LATENT_REGIMES.
     "latent_gauss_er": ("er", "linear", "gaussian", "standardized"),
+    # Linear with uniform noise and hidden confounders, where RCD and BottomUpParceLiNGAM are
+    # identifiable.
+    "latent_lingam_er": ("er", "linear", "uniform", "standardized"),
+    # Nonlinear additive noise with hidden confounders, where CAM-UV is identifiable.
+    "latent_anm_er": ("er", "anm", "gaussian", "standardized"),
 }
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
-#: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule, at ER
-#: density 3.0 instead of 2.0.
-LATENT_REGIMES: dict[str, int] = {"latent_gauss_er": 10}
+#: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
+#: ``latent_gauss_er``, at ER density 3.0 instead of 2.0.
+#:
+#: The two non-Gaussian regimes hide one node in five, so ``d = 5, 10, 15`` hide one, two, and three.
+#: Each hidden node has two or more children. The hidden node latest in causal order has no hidden
+#: child, so at least one hidden node has two observed children at every ``d``. A seed fails to
+#: generate when fewer nodes have two or more children than nodes to hide. That is about 3% of seeds
+#: at ``d = 10`` and ``d = 15``; seeds 0 to 28 all generate on that ladder.
+LATENT_REGIMES: dict[str, int] = {"latent_gauss_er": 10, "latent_lingam_er": 5, "latent_anm_er": 5}
 
 DEFAULT_REGIME = "linear_gauss_er"
 

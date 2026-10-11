@@ -128,6 +128,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | GRaSP | Andrey, causal-learn |
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
+| RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -147,6 +148,47 @@ Every estimate is scored against the observed PAG, including the empty graph's C
 built untimed in the parent, once per dataset. Its cost grows about 8x per doubling of `d`. A DAG or
 CPDAG estimate is scored as a PAG without canonicalization. Its tails and undirected edges count
 against the PAG's circles. Use PAG methods and the empty graph on these datasets.
+
+### Hidden-confounder methods
+
+`confounded_cpu.py` compares Andrey's `rcd`, `bottom_up_parce_lingam`, and `camuv` with lingam's
+`RCD`, `BottomUpParceLiNGAM`, and `CAMUV`, with the empty-graph baseline. It holds three methods in
+one file because they answer the same question: which variables share a hidden common cause. RCD and
+BottomUpParceLiNGAM run on `latent_lingam_er`, linear with uniform noise. CAM-UV runs on
+`latent_anm_er`, nonlinear with Gaussian additive noise. Both regimes use an Erdos-Renyi graph and
+hide one node in five, at least one, as in [Hidden confounders](#hidden-confounders); `d` includes
+the hidden nodes. Both packages run each method with the same settings, listed in `params`.
+
+The defaults are 2000 rows, `d` of 5, 10, and 15, five seeds, one repeat without warm-up, and
+`--cap-wall-s` of 1800. A fit that reaches the cap is a `timeout` record with no scores. lingam's
+CAM-UV needs pygam 0.12 or newer; older releases fail with current scipy, and its fits end in
+`error` records. A smoke run covers every solution on one small dataset per regime:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/confounded_cpu.py --out outputs/confounded-smoke --smoke
+```
+
+Every estimate is a PAG scored against the observed PAG, as in the FCI runs. A fit also names the
+pairs it attributes to a hidden common cause: the `<->` edges for RCD and CAM-UV, and the `o-o`
+edges for BottomUpParceLiNGAM, which leaves the order of such a pair open. They match
+`metadata["confounded_pairs"]` of Andrey's result. `confounded_n_est` counts them, and two sets of
+true pairs score them:
+
+| columns | true pairs |
+|---|---|
+| `confounded_pag_*` | the observed pairs joined by `<->` in the observed PAG |
+| `confounded_hidden_cause_*` | the observed pairs that one hidden node reaches through hidden nodes only |
+
+Each set has `n_true`, `precision`, `recall`, and `f1`. A PAG keeps `<->` only where conditional
+independences fix both arrowheads, so a sparse graph often has no such pair. A hidden common cause
+of two variables with no other link leaves them joined by `o-o`, and `confounded_pag_*` has nothing
+to find. At `d = 5` that covers nearly every dataset. A ratio with no denominator is `NaN` rather
+than 1: report how many datasets define it, and read the `n_true` columns beside the scores. The
+`confounder_*` columns from `andrey.metrics` score empty against empty as 1 and do not see the `o-o`
+pairs of BottomUpParceLiNGAM.
+
+The driver adds these columns to the record parts after each rung, from the estimates stored in
+`structures/`.
 
 ### Where the clock starts
 
@@ -449,6 +491,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.
 - `lingam_cpu.py` - compares DirectLiNGAM and ICA-LiNGAM with causal-learn on CPU.
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
+- `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
+  hidden confounders.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.

@@ -178,6 +178,21 @@ def rcd(
     ----------
     .. [1] Maeda, T. N., and Shimizu, S. (2020). RCD: Repetitive causal discovery of linear
        non-Gaussian acyclic models with latent confounders. AISTATS, PMLR 108, 735-745.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import andrey
+    >>> rng = np.random.default_rng(0)
+    >>> u = lambda: rng.uniform(-1, 1, 2000)
+    >>> h = u()  # hidden: a common cause of x0 and x1
+    >>> x0, x1 = 1.5 * h + u(), 1.5 * h + u()
+    >>> data = np.column_stack([x0, x1, x1 + u(), x0 + u()])
+    >>> out = andrey.rcd(data)
+    >>> out.metadata["confounded_pairs"]
+    [[0, 1]]
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'bidirected'), (0, 3, 'directed'), (1, 2, 'directed')]
     """
     warn_experimental("rcd")
     from andrey.irregular.rcd import fit_rcd
@@ -243,6 +258,21 @@ def camuv(
     ----------
     .. [1] Maeda, T. N., and Shimizu, S. (2021). Causal additive models with unobserved variables.
        UAI, PMLR 161, 97-106.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import andrey
+    >>> rng = np.random.default_rng(0)
+    >>> u = lambda: rng.uniform(-1, 1, 1000)
+    >>> h = u()  # hidden: a common cause of x0 and x1
+    >>> x0, x1 = np.sin(3 * h) + 0.3 * u(), np.cos(3 * h) + 0.3 * u()
+    >>> data = np.column_stack([x0, x1, np.tanh(2 * x1) + 0.3 * u(), np.tanh(2 * x0) + 0.3 * u()])
+    >>> out = andrey.camuv(data)
+    >>> out.metadata["confounded_pairs"]
+    [[0, 1]]
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'bidirected'), (0, 3, 'directed'), (1, 2, 'directed')]
     """
     warn_experimental("camuv")
     from andrey.irregular.camuv import camuv as _native
@@ -282,7 +312,7 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     Raises
     ------
     ValueError
-        If ``alpha`` is not in ``(0, 1)``.
+        If ``data`` has fewer than 4 rows, or if ``alpha`` is not in ``(0, 1)``.
 
     Warns
     -----
@@ -294,10 +324,25 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     ----------
     .. [1] Tashiro, T., Shimizu, S., Hyvarinen, A., and Washio, T. (2014). ParceLiNGAM: A causal
        ordering method robust against latent confounders. Neural Computation 26(1), 57-83.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import andrey
+    >>> rng = np.random.default_rng(0)
+    >>> u = lambda: rng.uniform(-1, 1, 2000)
+    >>> h = u()  # hidden: a common cause of x0 and x1
+    >>> x0, x1 = 1.5 * h + u(), 1.5 * h + u()
+    >>> data = np.column_stack([x0, x1, x1 + u(), x0 + u()])
+    >>> out = andrey.bottom_up_parce_lingam(data, alpha=0.01)
+    >>> out.metadata["confounded_pairs"]
+    [[0, 1]]
+    >>> out.structure.oriented_edges()
+    [(0, 1, 'circle'), (0, 3, 'directed'), (1, 2, 'directed')]
     """
     warn_experimental("bottom_up_parce_lingam")
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
 
-    X = data_matrix(data)
+    X = data_matrix(data, min_rows=4)  # its HSIC divides by (n - 2)(n - 3)
     model = _native(X, alpha=open_unit_interval(alpha, "alpha"))
     return with_labels(_adapt_bottom_up_parce(model), column_labels(data))

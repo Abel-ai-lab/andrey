@@ -17,12 +17,12 @@ if TYPE_CHECKING:
     from andrey.core.output import JSONValue
 
 
-def data_matrix(data: npt.ArrayLike, *, name: str = "data") -> np.ndarray:
+def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -> np.ndarray:
     """Return ``data`` as a float64 ``(n_samples, n_features)`` matrix, checked before a fit.
 
     Raises ``ValueError``, naming ``name``, when the values are not numeric, the array is not 2-D,
-    it has fewer than 2 rows, it holds ``NaN`` or ``inf``, or a column is constant: no method can
-    estimate a variance or a dependence from such data.
+    it has fewer than ``min_rows`` rows, it holds ``NaN`` or ``inf``, or a column is constant: no
+    method can estimate a variance or a dependence from such data.
     """
     try:
         X = np.asarray(data, dtype=np.float64)
@@ -33,8 +33,8 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data") -> np.ndarray:
         raise ValueError(
             f"{name} must be a 2-D (n_samples, n_features) matrix, got shape {X.shape}{hint}"
         )
-    if X.shape[0] < 2:
-        raise ValueError(f"{name} needs at least 2 rows (samples), got {X.shape[0]}")
+    if X.shape[0] < min_rows:
+        raise ValueError(f"{name} needs at least {min_rows} rows (samples), got {X.shape[0]}")
     bad = np.argwhere(~np.isfinite(X))
     if bad.size:
         row, col = (int(k) for k in bad[0])

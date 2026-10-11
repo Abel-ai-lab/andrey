@@ -1,10 +1,12 @@
-"""Quality and behavior checks for CAM-UV, RCD, and BottomUpParceLiNGAM.
+"""Quality and behavior checks for RCD, CAM-UV, and BottomUpParceLiNGAM.
 
-Fixed cases assert exact, deterministic answers against known SEMs. Random models check execution,
+Recovery tests run the public functions on SEMs where a hidden common cause drives two observed
+variables that share no direct edge. RCD and CAM-UV skip adjacent pairs, so a confounded pair with
+a direct edge (``confounded_6v``) cannot be reported by any correct method. The planted pair and
+the direct edges come from ``datagen.planted_structure``. Each case has a control with the same
+graph and the hidden variable observed, where no pair is confounded. Random models check execution,
 repeatability, and well-formed output; recovery rates are measured separately because they depend
 on sample size and regime.
-
-CAM-UV and BottomUpParceLiNGAM do not report the planted confounder in the fixed family.
 """
 
 from __future__ import annotations
@@ -12,12 +14,108 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+import andrey
 from tests.recovery.helpers import datagen
+
+pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 
 
 @pytest.fixture(autouse=True)
 def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANDREY_DEVICE", "numpy")
+
+
+# --- confounder recovery ----------------------------------------------------------------------
+#
+# Linear cases (2000 rows, uniform noise) serve RCD and BottomUpParceLiNGAM; the nonlinear
+# additive-noise cases (1000 rows) serve CAM-UV. Each test draws three independent samples of its
+# case (replicates 0-2).
+
+_REPLICATES = (0, 1, 2)
+_FORK = "confounded_fork_4v"
+_FORK_OBSERVED = "fork_5v_observed"
+_FORK_ANM = "confounded_fork_4v_anm"
+_FORK_ANM_OBSERVED = "fork_5v_anm_observed"
+
+
+def _assert_pairs_and_edges(out, case: str, mark: str, *, exact_edges: bool = True) -> None:
+    """Check ``out`` against the planted structure of ``case``.
+
+    The confounded pairs match in ``metadata`` and in the structure, where ``mark`` names the edge
+    kind the method draws for a pair, and no other kind of edge appears. The planted direct edges
+    are all present, and with ``exact_edges`` no other direct edge appears.
+    """
+    edges, pairs = datagen.planted_structure(case)
+    found = out.structure.oriented_edges()
+    assert out.metadata["confounded_pairs"] == [list(pair) for pair in sorted(pairs)]
+    assert {(i, j) for i, j, kind in found if kind == mark} == pairs
+    assert {kind for _i, _j, kind in found} <= {"directed", mark}
+    directed = {(i, j) for i, j, kind in found if kind == "directed"}
+    assert directed == edges if exact_edges else directed >= edges
+
+
+@pytest.mark.parametrize("replicate", _REPLICATES)
+def test_rcd_reports_the_confounded_pair(replicate):
+    out = andrey.rcd(datagen.generate(_FORK, replicate=replicate))
+    _assert_pairs_and_edges(out, _FORK, "bidirected")
+
+
+@pytest.mark.parametrize("replicate", _REPLICATES)
+def test_rcd_reports_no_pair_when_the_cause_is_observed(replicate):
+    out = andrey.rcd(datagen.generate(_FORK_OBSERVED, replicate=replicate))
+    _assert_pairs_and_edges(out, _FORK_OBSERVED, "bidirected")
+
+
+@pytest.mark.parametrize("replicate", _REPLICATES)
+def test_camuv_reports_the_confounded_pair(replicate):
+    out = andrey.camuv(datagen.generate(_FORK_ANM, replicate=replicate))
+    _assert_pairs_and_edges(out, _FORK_ANM, "bidirected")
+
+
+@pytest.mark.parametrize("replicate", _REPLICATES)
+def test_camuv_reports_no_pair_when_the_cause_is_observed(replicate):
+    out = andrey.camuv(datagen.generate(_FORK_ANM_OBSERVED, replicate=replicate))
+    _assert_pairs_and_edges(out, _FORK_ANM_OBSERVED, "bidirected")
+
+
+# BottomUpParceLiNGAM runs at alpha=0.01: at the default 0.1 its Bonferroni-corrected sink test
+# sometimes rejects a true sink by chance, which leaves extra variables unordered. Its adaptive
+# Lasso can add a weak direct edge, so the checks require the planted edges and not an exact set.
+
+
+@pytest.mark.parametrize("replicate", _REPLICATES)
+def test_bottom_up_parce_lingam_leaves_the_confounded_pair_unordered(replicate):
+    out = andrey.bottom_up_parce_lingam(datagen.generate(_FORK, replicate=replicate), alpha=0.01)
+    _assert_pairs_and_edges(out, _FORK, "circle", exact_edges=False)
+    _edges, pairs = datagen.planted_structure(_FORK)
+    unordered = [set(item) for item in out.metadata["causal_order"] if isinstance(item, list)]
+    assert unordered == [set(pair) for pair in sorted(pairs)]
+
+
+@pytest.mark.parametrize("replicate", _REPLICATES)
+def test_bottom_up_parce_lingam_orders_everything_when_the_cause_is_observed(replicate):
+    x = datagen.generate(_FORK_OBSERVED, replicate=replicate)
+    out = andrey.bottom_up_parce_lingam(x, alpha=0.01)
+    _assert_pairs_and_edges(out, _FORK_OBSERVED, "circle", exact_edges=False)
+    assert not any(isinstance(item, list) for item in out.metadata["causal_order"])
+
+
+def test_a_planted_pair_has_no_direct_edge():
+    """No planted pair is also a direct edge, so a method that skips adjacent pairs can find it."""
+    for case in (_FORK, _FORK_ANM):
+        edges, pairs = datagen.planted_structure(case)
+        assert pairs
+        assert all((i, j) not in edges and (j, i) not in edges for i, j in pairs)
+    assert not any(
+        datagen.planted_structure(case)[1] for case in (_FORK_OBSERVED, _FORK_ANM_OBSERVED)
+    )
+
+
+def test_confounded_6v_hides_its_pair_behind_a_direct_edge():
+    """``confounded_6v`` hides its confounded pair behind a direct edge, so no pair is planted."""
+    edges, pairs = datagen.planted_structure("confounded_6v")
+    assert (1, 2) in edges
+    assert not pairs
 
 
 # The observed parent sets exclude the latent row. The planted pair also has a direct edge, so
