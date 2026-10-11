@@ -100,9 +100,15 @@ def direct_lingam(
     When unmeasured common causes are plausible, use :func:`~andrey.fci`.
 
     **Cost.** Each step compares the remaining variables in pairs, so runtime grows quickly with the
-    number of variables. On the published benchmarks, a 200-variable fit took minutes on a CPU. With
-    the ``torch`` extra and a CUDA GPU, entropy computations move to the GPU once they are large
-    enough.
+    number of variables. With the ``torch`` extra and a CUDA GPU, entropy computations move to the
+    GPU once they are large enough.
+
+    **Feasibility.** Measured on simulated data from scale-free graphs with linear effects and
+    uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
+    stayed below the empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20
+    variables and 545 s at 200, on 16 CPU cores. At 300 variables a CPU run did not finish its
+    warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a fit took 528 s at 300
+    variables and 1,410 s at 400.
 
     References
     ----------
@@ -198,6 +204,13 @@ def ica_lingam(
     **Choosing random_state and max_iter.** Different values of ``random_state`` can give different
     orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
     converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
+
+    **Feasibility.** Measured on simulated data from scale-free graphs with linear effects and
+    uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
+    passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at
+    100. The median fit took 0.44 s at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's
+    protein-signalling data (853 rows, 11 variables), its errors were below the empty graph's (14
+    against 17).
 
     References
     ----------

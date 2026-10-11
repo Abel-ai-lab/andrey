@@ -403,6 +403,19 @@ def test_supported_method_has_an_example(name):
     assert name in called, f"{name}: no example notebook calls it; {GRADUATE}"
 
 
+@pytest.mark.parametrize("name", SUPPORTED)
+def test_supported_method_declares_its_feasibility(name):
+    """The docstring's Notes carry a **Feasibility.** paragraph: where the method was measured."""
+    doc = inspect.getdoc(getattr(andrey, name)) or ""
+    notes = re.search(
+        r"^Notes\n-{3,}\n(.*?)(?=^\S[^\n]*\n-{3,}\n|\Z)", doc, re.MULTILINE | re.DOTALL
+    )
+    assert notes, f"{name}: no Notes section; {GRADUATE}"
+    assert re.search(r"^\*\*Feasibility\.\*\* ", notes.group(1), re.MULTILINE), (
+        f"{name}: no **Feasibility.** paragraph in Notes; {GRADUATE}"
+    )
+
+
 @pytest.mark.parametrize("name", EXPERIMENTAL)
 def test_experimental_method_has_a_recovery_test(name):
     tests = (ROOT / "tests" / "recovery").glob("test_*.py")

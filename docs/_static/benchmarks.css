@@ -6,8 +6,9 @@
 }
 
 /* A report's cover: the homepage hero's navy ground lit cobalt from the top left, the same in both
-   themes, with the release in large light type. The extra `.sd-card` outranks the theme's
-   `.bd-content .sd-card .sd-card-header` ground and border. */
+   themes, with the release in large light type. With the extra `.sd-card` the selector ties the
+   theme's `.bd-content .sd-card .sd-card-header`; this file loads after the theme's styles, so its
+   ground and border win. */
 .benchmark-reports .sd-card .report-cover {
   display: flex;
   flex-direction: column;

@@ -170,8 +170,8 @@ def rcd(
     tests compare residuals, and a weak hidden cause leaves only a small trace in them.
 
     **Feasibility.** Measured on linear data with uniform noise, one node in five hidden, and 2,000
-    rows, from 4 to 24 observed variables: its directed edges had fewer errors than the empty
-    graph's at every size but 8 variables, where they had as many. A fit took about 2 s at 4
+    rows, from 4 to 24 observed variables: its median directed-edge errors were below the empty
+    graph's at every size but 8 variables, where they equaled it. A fit took about 2 s at 4
     variables and 18 s at 24, on two cores. Larger problems are untested; the work grows with the
     number of variables and with ``max_explanatory_vars``.
 
@@ -322,9 +322,10 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     than columns.
 
     **Feasibility.** Suited to a few variables. Measured on linear data with uniform noise, one node
-    in five hidden, and 2,000 rows: its directed edges had fewer errors than the empty graph's at 4
-    observed variables, and more at every size from 8 to 24. From 16 variables it left none of the
-    confounded pairs unordered. A fit took about 2 s at 4 variables and 96 s at 24, on two cores.
+    in five hidden, and 2,000 rows: its median directed-edge errors were below the empty graph's at
+    4 observed variables, and above it at every size from 8 to 24. From 16 variables it left none of
+    the confounded pairs unordered. A fit took about 2 s at 4 variables and 96 s at 24, on two
+    cores.
 
     References
     ----------
