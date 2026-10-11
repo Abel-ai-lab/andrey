@@ -6,18 +6,19 @@ Compare speed, accuracy, and the largest graph each search finishes on the same 
 Each job runs one lane. Their graph-size limits differ by an order of magnitude, so a shared
 ladder would miss larger GES sizes or exhaust its time limit on FCI timeouts:
 
-    --lane score  Andrey GES (3 builds) and HC (2), pcalg ges, bnlearn hc and tabu
+    --lane score  Andrey GES (3 builds), HC (2) and tabu (2), pcalg ges, bnlearn hc and tabu
     --lane pc     Andrey PC, pcalg pc, bnlearn pc.stable
     --lane fci    Andrey FCI, pcalg fci and rfci
 
-The score lane pairs `pcalg.ges` with Andrey GES and bnlearn hill climbers with Andrey HC.
+The score lane pairs `pcalg.ges` with Andrey GES, `bnlearn.hc` with Andrey HC, and
+`bnlearn.tabu` with Andrey tabu.
 Every lane measures `baseline.empty`.
 
 Before running R solutions, load the R modules and export `R_LIBS_USER` using the commands from
 `benchmarks/start_r.sh --env`. The driver starts R and records its environment before fitting;
 an invalid environment fails once, rather than per unit.
 
-`bnlearn.hc` and `bnlearn.tabu` return DAGs; GES, HC and PC return CPDAGs. Their `shd` units differ:
+`bnlearn.hc` and `bnlearn.tabu` return DAGs; GES, HC, tabu and PC return CPDAGs. Their `shd` units differ:
 compare a DAG row's `mec_shd` with a CPDAG row's `shd`.
 
 Use `--seed-start` for one job per seed. Keep the lane's full solution list in each task: ratios
@@ -44,6 +45,7 @@ from andrey_bench.adapters.andrey_fci import AndreyFCI
 from andrey_bench.adapters.andrey_ges import andrey_ges_adapters
 from andrey_bench.adapters.andrey_hc import andrey_hc_adapters
 from andrey_bench.adapters.andrey_pc import AndreyPC
+from andrey_bench.adapters.andrey_tabu import andrey_tabu_adapters
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
@@ -58,9 +60,10 @@ from andrey_bench.runner import available_cores
 
 
 def _score_solutions() -> list:
-    """Return paired GES and hill-climbing solutions in one lane for within-run ratios.
+    """Return paired GES, hill-climbing, and tabu solutions in one lane for within-run ratios.
 
-    Pair pcalg's `ges` with Andrey's GES, and bnlearn's `hc` and `tabu` with `andrey.hc`.
+    Pair pcalg's `ges` with Andrey's GES, bnlearn's `hc` with `andrey.hc`, and bnlearn's
+    `tabu` with `andrey.tabu`.
     Hill climbing changes one DAG edge at a time; GES searches CPDAG space over neighbor subsets.
     Include all Andrey GES builds to cover every backend. Allow for the `numba` reachability
     kernel's first-call compilation during warm-up in `--cap-wall-s`.
@@ -68,6 +71,7 @@ def _score_solutions() -> list:
     return [
         *andrey_ges_adapters(),
         *andrey_hc_adapters(),
+        *andrey_tabu_adapters(),
         PcalgGES(),
         BnlearnHC(),
         BnlearnTabu(),
@@ -86,10 +90,11 @@ LANES: dict[str, tuple] = {
 }
 
 #: Algorithm-specific parallel thresholds. GES and HC each read their own variable; assigning
-#: one to both algorithms would record an unused setting.
+#: one to both algorithms would record an unused setting. Tabu search reads HC's.
 WORK_GATE_ENV: dict[str, str] = {
     "ges": "ANDREY_GES_PARALLEL_MIN_WORK",
     "hc": "ANDREY_HC_PARALLEL_MIN_WORK",
+    "tabu": "ANDREY_HC_PARALLEL_MIN_WORK",
 }
 
 #: The canonical sparse slice: linear-Gaussian on Erdos-Renyi at average degree 2, where GES, PC and
@@ -219,9 +224,9 @@ def main(argv: list[str] | None = None) -> int:
         "--hc-min-work",
         type=int,
         default=None,
-        help="parallel work gate for andrey's parallel HC, in scanned moves per pass - a different "
-        "unit and a different environment variable from the GES gate. The shipped default has "
-        "never been measured on any host, so a campaign should declare one",
+        help="parallel work gate for andrey's parallel HC and tabu, in scanned moves per pass - a "
+        "different unit and a different environment variable from the GES gate. The shipped "
+        "default has never been measured on any host, so a campaign should declare one",
     )
     p.add_argument(
         "--machine-id",

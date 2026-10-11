@@ -37,7 +37,6 @@ def test_every_lane_pairs_andrey_against_another_package(lane: str) -> None:
 #: Searches without an Andrey implementation, with reasons. Measure quality and reach, but exclude
 #: speed ratios: comparing different methods would attribute method differences to implementations.
 UNIMPLEMENTED = {
-    "tabu": "bnlearn's tabu escapes a local optimum by accepting worse moves; andrey has none",
     "rfci": "RFCI skips FCI's possible-d-sep pass and may return a different PAG; andrey has none",
 }
 
@@ -107,7 +106,7 @@ def test_each_work_gate_reaches_only_the_solutions_that_read_it() -> None:
     }
     assert reached == {
         "ANDREY_GES_PARALLEL_MIN_WORK": {"andrey.ges.numpy.parallel"},
-        "ANDREY_HC_PARALLEL_MIN_WORK": {"andrey.hc.numpy.parallel"},
+        "ANDREY_HC_PARALLEL_MIN_WORK": {"andrey.hc.numpy.parallel", "andrey.tabu.numpy.parallel"},
     }
 
 
