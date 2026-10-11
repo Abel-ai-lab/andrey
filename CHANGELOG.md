@@ -11,7 +11,7 @@ in alpha, and any minor release may change the API.
 
 - Three experimental methods for data with hidden common causes: `rcd`, `camuv`, and
   `bottom_up_parce_lingam`. Each returns a PAG over the observed variables. `rcd` and `camuv`
-  list the pairs a hidden common cause affects in `metadata["confounded_pairs"]`;
+  list the pairs a hidden variable links in `metadata["confounded_pairs"]`;
   `bottom_up_parce_lingam` leaves the variables whose order such a cause hides unordered.
 - `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
   search stops there.

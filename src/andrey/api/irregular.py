@@ -1,7 +1,7 @@
 """Facades for the pairwise post-nonlinear (PNL) test and the hidden-confounder methods.
 
 PNL tests both directions in a two-column table. RCD, CAM-UV, and BottomUpParceLiNGAM return a PAG
-over the observed variables. RCD and CAM-UV list the pairs a hidden common cause affects in
+over the observed variables. RCD and CAM-UV list the pairs a hidden variable links in
 ``metadata["confounded_pairs"]``; BottomUpParceLiNGAM leaves the variables whose order such a
 cause hides unordered.
 """
@@ -324,7 +324,7 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     The search finds sinks from the bottom up and stops at the first variable it cannot separate,
     leaving it and every variable above it in one unordered block: the variables a hidden cause
     confounds, their observed ancestors, and any other confounded pairs. An ``o-o`` pair need not
-    share a cause, and edges into the block stay unoriented. The edge weights come
+    share a cause, and edges among the block's variables stay unoriented. The edge weights come
     from an adaptive-Lasso regression of each variable on those before it, which needs more rows
     than columns.
 

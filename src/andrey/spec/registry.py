@@ -655,10 +655,6 @@ _add(
 
 # --- hidden-confounder family: a PAG over the observed variables ---------------------------------
 
-_CONFOUNDED_OUTPUT_DOC = (
-    "PAG over the observed variables; metadata confounded_pairs lists the pairs a hidden common "
-    "cause affects."
-)
 
 _add(
     MethodSpec(
@@ -694,7 +690,13 @@ _add(
                 doc="Significance level of the Shapiro-Wilk non-Gaussianity tests.",
             ),
         ),
-        output=OutputSpec(structure_type="graph", graph_kind="pag", doc=_CONFOUNDED_OUTPUT_DOC),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            weighted=True,
+            doc="PAG over the observed variables; metadata confounded_pairs lists the <-> pairs, "
+            "which share a hidden common cause.",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="experimental",
@@ -725,7 +727,12 @@ _add(
                 "take longer.",
             ),
         ),
-        output=OutputSpec(structure_type="graph", graph_kind="pag", doc=_CONFOUNDED_OUTPUT_DOC),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="PAG over the observed variables; metadata confounded_pairs lists the <-> pairs, "
+            "joined by a causal path through a hidden variable or by hidden common causes.",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="experimental",
@@ -752,6 +759,7 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
+            weighted=True,
             doc="PAG over the observed variables; o-o joins the variables a hidden common "
             "cause leaves unordered, and metadata causal_order nests them.",
         ),

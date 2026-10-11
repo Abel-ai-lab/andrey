@@ -186,8 +186,8 @@ A fit also names the pairs it attributes to a hidden common cause: the `<->` edg
 CAM-UV, which match `metadata["confounded_pairs"]` of Andrey's result, and the `o-o` edges for
 BottomUpParceLiNGAM. BottomUpParceLiNGAM's `o-o` edges join every pair of the one block of variables
 it leaves unordered: the confounded variables, their observed ancestors, and any other confounded
-pairs. Pairs in the block that share no cause count against its precision, and edges into the block
-stay unoriented, which caps its directed recall. Read its pair recall, the share of true pairs it
+pairs. Pairs in the block that share no cause count against its precision, and edges among the
+block's variables stay unoriented, which caps its directed recall. Read its pair recall, the share of true pairs it
 leaves unordered. `confounded_n_est` counts the pairs, and three sets of true pairs score them:
 
 | columns | true pairs |
