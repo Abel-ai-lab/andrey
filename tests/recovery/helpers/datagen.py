@@ -292,8 +292,8 @@ CASES: dict[str, dict] = {
     },
     # Linear non-Gaussian SEM with a hidden confounder (column 0 dropped) -
     # CAM-UV, RCD, BottomUpParceLiNGAM. Full order: h, x0..x5; h drives x1 and x2, which also share
-    # the direct edge x1 -> x2. A method that skips adjacent pairs cannot report that pair as
-    # confounded, so tests on this case check output shape and CAM-UV's parent sets.
+    # the direct edge x1 -> x2. A method marks that pair or orients the edge depending on its
+    # tests' power, so tests on this case check output shape and CAM-UV's parent sets.
     "confounded_6v": {
         "model": "confounded",
         "noise": "uniform",

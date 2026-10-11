@@ -1,8 +1,8 @@
 """Quality and behavior checks for RCD, CAM-UV, and BottomUpParceLiNGAM.
 
 Recovery tests run the public functions on SEMs where a hidden common cause drives two observed
-variables that share no direct edge. RCD and CAM-UV skip adjacent pairs, so a confounded pair with
-a direct edge (``confounded_6v``) cannot be reported by any correct method. The planted pair and
+variables that share no direct edge. With a direct edge as well (``confounded_6v``), whether a
+method marks the pair or orients the edge depends on its tests' power. The planted pair and
 the direct edges come from ``datagen.planted_structure``. Each case has a control with the same
 graph and the hidden variable observed, where no pair is confounded. Random models check execution,
 repeatability, and well-formed output; recovery rates are measured separately because they depend
@@ -102,7 +102,7 @@ def test_bottom_up_parce_lingam_orders_everything_when_the_cause_is_observed(rep
 
 
 def test_a_planted_pair_has_no_direct_edge():
-    """No planted pair is also a direct edge, so a method that skips adjacent pairs can find it."""
+    """No planted pair is also a direct edge, so each method's answer for the pair is stable."""
     for case in (_FORK, _FORK_ANM):
         edges, pairs = datagen.planted_structure(case)
         assert pairs
@@ -119,9 +119,9 @@ def test_confounded_6v_hides_its_pair_behind_a_direct_edge():
     assert not pairs
 
 
-# The observed parent sets exclude the latent row. The planted pair also has a direct edge, so
-# methods that skip adjacent pairs cannot identify it as confounded. RCD flags the pair only when it
-# misses that edge, which makes a fixed confounder assertion unstable.
+# The observed parent sets exclude the latent row. The planted pair also has a direct edge, and a
+# method marks the pair or orients the edge depending on its tests' power, which makes a fixed
+# confounder assertion unstable.
 _CONFOUNDED_6V_PARENTS = [[], [], [1], [0], [2], [3, 4]]
 
 

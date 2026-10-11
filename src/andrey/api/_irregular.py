@@ -178,8 +178,8 @@ def _adapt_bottom_up_parce(model: Any) -> StructureOutput:
     ``causal_order_`` is nested (order-unknown vars nest as sub-lists) so it cannot be a flat
     ``ordering`` permutation -- it rides in ``metadata["causal_order"]`` as a JSON-safe nested list.
     ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN`` replaced by ``0.0``. The unordered
-    variables form one block, so an ``o-o`` pair need not share a hidden cause, and no
-    ``confounded_pairs`` are listed.
+    variables form one block, which also holds the confounded variables' observed ancestors, so an
+    ``o-o`` pair need not share a hidden cause, and no ``confounded_pairs`` are listed.
     """
     B = _adjacency(model)
     M = marks_from_signed(B, nan_mark="circle")

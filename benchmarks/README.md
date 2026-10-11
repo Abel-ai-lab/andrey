@@ -184,10 +184,11 @@ and `errors`, the edges in one set and not the other (a reversed edge counts twi
 
 A fit also names the pairs it attributes to a hidden common cause: the `<->` edges for RCD and
 CAM-UV, which match `metadata["confounded_pairs"]` of Andrey's result, and the `o-o` edges for
-BottomUpParceLiNGAM. BottomUpParceLiNGAM's `o-o` edges join every pair of the one block of
-variables it leaves unordered, so two pairs from different hidden causes share the block and its
-cross pairs count against its precision: read its recall, the share of true pairs it leaves
-unordered. `confounded_n_est` counts the pairs, and three sets of true pairs score them:
+BottomUpParceLiNGAM. BottomUpParceLiNGAM's `o-o` edges join every pair of the one block of variables
+it leaves unordered: the confounded variables, their observed ancestors, and any other confounded
+pairs. Pairs in the block that share no cause count against its precision, and edges into the block
+stay unoriented, which caps its directed recall. Read its pair recall, the share of true pairs it
+leaves unordered. `confounded_n_est` counts the pairs, and three sets of true pairs score them:
 
 | columns | true pairs |
 |---|---|
@@ -195,16 +196,17 @@ unordered. `confounded_n_est` counts the pairs, and three sets of true pairs sco
 | `confounded_unobserved_path_*` | the pairs joined by an unobserved causal path (one that enters an endpoint from a hidden parent) or an unobserved backdoor path (one that enters both from hidden parents), as CAM-UV defines them |
 | `confounded_pag_*` | the observed pairs joined by `<->` in the observed PAG |
 
-Each set has `n_true`, `precision`, `recall`, and `f1`. Compare RCD and BottomUpParceLiNGAM on
-`directed_projection_*` and `confounded_hidden_cause_*`: they mark a pair that shares a hidden
-cause, even when one node is the other's parent. Compare CAM-UV on `directed_direct_*` and
-`confounded_unobserved_path_*`: it marks every pair with an unobserved path as unresolved, even
-when one node is the other's parent, and its direct edges are the rest. The driver's summary prints
-these. A PAG keeps `<->` only where conditional independences fix both arrowheads, so
-`confounded_pag_*` has nothing to find on nearly every dataset at `d = 5`. A ratio with no
-denominator is `NaN` rather than 1: report how many datasets define it, and read the `n_true`
-columns beside the scores. The `confounder_*` columns from `andrey.metrics` score empty against
-empty as 1 and do not see the `o-o` pairs of BottomUpParceLiNGAM.
+Each set has `n_true`, `precision`, `recall`, and `f1`. Score RCD and BottomUpParceLiNGAM on
+`directed_projection_*` and `confounded_hidden_cause_*`: both mark a pair that shares a hidden
+cause, even when one node is the other's parent. Compare each method across the two packages, not
+RCD with BottomUpParceLiNGAM, whose block caps its scores as described above. Compare CAM-UV on
+`directed_direct_*` and `confounded_unobserved_path_*`: it marks every pair with an unobserved path
+as unresolved, even when one node is the other's parent, and its direct edges are the rest. The
+driver's summary prints these. A PAG keeps `<->` only where conditional independences fix both
+arrowheads, so `confounded_pag_*` has nothing to find on nearly every dataset at `d = 5`. A ratio
+with no denominator is `NaN` rather than 1: report how many datasets define it, and read the
+`n_true` columns beside the scores. The `confounder_*` columns from `andrey.metrics` score empty
+against empty as 1 and do not see the `o-o` pairs of BottomUpParceLiNGAM.
 
 The driver adds these columns to the record parts after each rung, from the estimates stored in
 `structures/`. A resumed run scores only the units it measures, so a part scored by an older scorer
