@@ -1,4 +1,4 @@
-"""Conditional-independence test substrate: the partial-correlation Fisher-Z test.
+"""Conditional-independence test substrate: Fisher-Z, chi-square, and G-square tests.
 
 The constraint-based discovery family (PC / FCI / CDNOD) consumes a conditional-independence test
 through the :class:`CITest` contract: an object constructed once over the data and called as
@@ -12,6 +12,18 @@ partial correlation and skip the matrix inversion entirely; larger sets invert t
 submatrix. numpy float64 is the oracle. A query is canonicalized (``x``, ``y`` ordered, the
 conditioning set sorted unique) so its p-value does not depend on argument order, and nothing is
 memoized: a test object holds the correlation matrix and the sample size, whatever it is asked.
+
+:class:`ChiSquare` implements the Pearson chi-square and G-square tests on category codes: one
+contingency table of ``x`` and ``y`` per observed configuration of the conditioning set.
+
+References
+----------
+Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search, 2nd ed.
+MIT Press.
+
+Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian
+network structure learning algorithm. Machine Learning 65(1), 31-78.
+https://doi.org/10.1007/s10994-006-6889-7
 """
 
 from __future__ import annotations
@@ -21,9 +33,9 @@ from collections.abc import Callable, Iterable
 from typing import Protocol, cast, runtime_checkable
 
 import numpy as np
-from scipy.special import ndtr
+from scipy.special import chdtrc, ndtr
 
-from . import stats
+from . import categorical, stats
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
@@ -237,12 +249,105 @@ class FisherZ:
         return self._corr, self._n
 
 
-# The indep_test registry: a name maps to a factory building a :class:`CITest` over the data.
-# Fisher-Z is the only shipped test; the constraint facades resolve their ``indep_test`` argument
-# through :func:`make_indep_test`, and :func:`register_indep_test` lets a downstream test or plugin
-# add another under the same Protocol -- the generality this registry exposes.
-SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz",)
-_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {"fisherz": FisherZ}
+# A joint table of at most this many cells is counted densely; a larger one counts only the cells
+# that occur, so memory stays proportional to the rows whatever the cardinalities.
+_DENSE_CELLS = 1 << 20
+
+
+class ChiSquare:
+    """Pearson chi-square or G-square test of conditional independence on category codes.
+
+    ``__init__`` re-encodes each column to the codes ``0..k-1`` (see
+    :func:`~andrey.core.categorical.encode`), so any finite values work, each distinct value of a
+    column one category. Each call counts the joint table of ``x`` and ``y`` in every configuration
+    of ``condition_set`` that occurs in the data, and compares it with the table expected under
+    independence within that configuration, ``n_sx * n_sy / n_s``. The statistic is Pearson's
+    ``sum (O - E)**2 / E`` or, with ``g_square``, ``2 * sum O * log(O / E)``, summed over the
+    configurations [1]_ [2]_.
+
+    The degrees of freedom are ``(r_x - 1) * (r_y - 1)`` summed over the configurations, where
+    ``r_x`` and ``r_y`` count the values of ``x`` and ``y`` present in that configuration, so a
+    value absent there adds no degree of freedom [2]_. With zero degrees of freedom the p-value is
+    ``1``; otherwise it is the chi-square survival function of the statistic.
+
+    Queries are canonicalized as :class:`FisherZ`'s are, and nothing is memoized.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n_samples, n_features)
+        Finite values; each distinct value of a column is one category.
+    g_square : bool, default=False
+        Use the G-square (likelihood-ratio) statistic instead of Pearson's chi-square.
+
+    References
+    ----------
+    .. [1] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd ed. MIT Press.
+    .. [2] Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing
+       Bayesian network structure learning algorithm. Machine Learning 65(1), 31-78.
+    """
+
+    def __init__(self, data: np.ndarray, *, g_square: bool = False) -> None:
+        arr = np.asarray(data)
+        if arr.ndim != 2:
+            raise ValueError(
+                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
+            )
+        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
+            raise ValueError("data contains NaN or Inf; cannot run a chi-square test")
+        self._n: int = arr.shape[0]
+        self._codes, self._cardinalities = categorical.encode(arr)
+        self._g_square = bool(g_square)
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
+
+        ``condition_set`` is canonicalized to sorted unique ints; ``x`` and ``y`` are ordered so the
+        p-value is independent of argument order. A larger p-value means more independence.
+        """
+        x_int, y_int, cond = _canonical(x, y, condition_set)
+        codes = self._codes
+        kx = int(self._cardinalities[x_int])
+        ky = int(self._cardinalities[y_int])
+        layer, m = categorical.configurations(codes, self._cardinalities, cond)
+        xs = layer * kx + codes[:, x_int]  # (configuration, x) cell of each row
+        ys = layer * ky + codes[:, y_int]
+        n_sx = np.bincount(xs, minlength=m * kx).reshape(m, kx)
+        n_sy = np.bincount(ys, minlength=m * ky).reshape(m, ky)
+        n_s = n_sx.sum(axis=1)
+        cells = xs * ky + codes[:, y_int]
+        if m * kx * ky <= _DENSE_CELLS:
+            table = np.bincount(cells, minlength=m * kx * ky)
+            occupied = np.flatnonzero(table)
+            observed = table[occupied]
+        else:
+            occupied, observed = np.unique(cells, return_counts=True)
+        s, rest = np.divmod(occupied, kx * ky)
+        sx, sy = np.divmod(rest, ky)
+        expected = n_sx[s, sx] * n_sy[s, sy] / n_s[s]
+        if self._g_square:
+            statistic = 2.0 * float(np.sum(observed * np.log(observed / expected)))
+        else:
+            # Each configuration's expected counts sum to its observed ones, so Pearson's sum over
+            # every cell, empty ones included, equals this sum over the occupied cells.
+            statistic = float(np.sum(observed * (observed / expected))) - float(self._n)
+        dof = int(np.sum(((n_sx > 0).sum(axis=1) - 1) * ((n_sy > 0).sum(axis=1) - 1)))
+        if dof == 0:
+            return 1.0
+        return float(chdtrc(dof, max(statistic, 0.0)))
+
+
+# The indep_test registry: a name maps to a factory building a :class:`CITest` over the data. The
+# constraint facades resolve their ``indep_test`` argument through :func:`make_indep_test`, and
+# :func:`register_indep_test` lets a downstream test or plugin add another under the same Protocol.
+# The discrete tests read category codes; the facades check those before a fit.
+SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz", "chisq", "gsq")
+DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
+_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {
+    "fisherz": FisherZ,
+    "chisq": ChiSquare,
+    "gsq": lambda data: ChiSquare(data, g_square=True),
+}
 
 
 def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> None:

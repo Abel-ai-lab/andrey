@@ -6,6 +6,7 @@ The algorithm, its settings, and its references are described on :func:`andrey.p
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from contextlib import nullcontext
 from itertools import combinations
 from math import comb
 
@@ -165,7 +166,8 @@ def _discover_skeleton(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    parallel = workers > 1 and callable(getattr(test, "to_seed", None)) and _trace is None
+    seedable = callable(getattr(test, "to_seed", None))
+    parallel = workers > 1 and seedable and _trace is None
     pool = SkeletonWorkerPool(test, workers) if parallel else None
     try:
         size = 0
@@ -202,9 +204,10 @@ def _discover_skeleton(
                 if pool is not None:
                     removals = pool.scan(pairs, adj != NULL, size, alpha)
                 else:
-                    # Pin BLAS to one thread: the conditioning-submatrix inversions then match the
-                    # (1-thread) parallel skeleton workers regardless of the host thread count.
-                    with threadpool_limits(limits=1):
+                    # Pin BLAS to one thread for a test the workers can run: its conditioning-
+                    # submatrix inversions then match the (1-thread) parallel skeleton workers
+                    # regardless of the host thread count. The chi-square tests call no BLAS.
+                    with threadpool_limits(limits=1) if seedable else nullcontext():
                         removals = scan_pairs(test, pairs, neighbours, size, alpha, _trace)
                 for x, y, separating in removals:
                     remove.append((x, y))

@@ -12,6 +12,8 @@ The delta is ``n * (log R_new - log R_old) +/- log_n * lambda`` (``+`` for an ad
 ``cov[S,S]`` falls back to two full scores (:func:`_get_inv_with_cond`), so the fast path stays
 within ``1e-9`` of the exact difference. :func:`local_score_bic_delta` scores one move,
 :func:`score_many_with_base` many, and :class:`DeltaBICScore` keeps the caches a search reuses.
+:class:`FullScoreDelta` differences two full local scores of any :class:`~andrey.core.score.Score`,
+for a score with no rank-one update, such as BDeu.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ from weakref import WeakKeyDictionary
 
 import numpy as np
 
-from .score import BICScore, local_score_bic
+from .score import BDeuScore, BICScore, Score, local_score_bic
 
 # Conditioning threshold for the Schur fast path. The Schur identity loses ~log10(cond) digits;
 # at cond=1e10 the residual keeps ~6 digits in float64, well above HC's 1e-9 strict-improvement
@@ -556,7 +558,7 @@ def score_many_with_base(
 
 
 def _delta_two_scores(
-    score_obj: BICScore, i: int, S_base_sorted: tuple[int, ...], u: int, op: str
+    score_obj: Score, i: int, S_base_sorted: tuple[int, ...], u: int, op: str
 ) -> float:
     """Raw delta ``score(i, base +/- u) - score(i, base)`` from two memoized full scores.
 
@@ -799,3 +801,31 @@ class DeltaBICScore:
         return delta_many_with_base(
             self.score_obj, i, base_parents, deltas, cond_threshold=self.cond_threshold
         )
+
+
+class FullScoreDelta:
+    """Move deltas from two full local scores, with the surface of :class:`DeltaBICScore`.
+
+    Every delta is ``score(v, S +/- u) - score(v, S)`` from two memoized :meth:`Score.score` calls.
+    GES's reference arm uses it on BIC, and GES and hill climbing use it on scores with no Schur
+    update, such as :class:`~andrey.core.score.BDeuScore`.
+
+    Parameters
+    ----------
+    score : BICScore or BDeuScore
+        The local score; HC also reads its sample count, ``score.n``.
+    """
+
+    def __init__(self, score: BICScore | BDeuScore) -> None:
+        self.score_obj = score
+
+    def delta(self, v: int, S_old_sorted: tuple[int, ...], u: int, op: str) -> float:
+        """Return ``score(v, S_new) - score(v, S_old)`` for a single ``add``/``remove`` of ``u``."""
+        return _delta_two_scores(self.score_obj, int(v), tuple(S_old_sorted), u, op)
+
+    def delta_many_with_base(
+        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+    ) -> list[float]:
+        """Return RAW deltas ``[score(i, base +/- u_k) - score(i, base)]`` for single moves."""
+        base = tuple(sorted(int(p) for p in base_parents))
+        return [_delta_two_scores(self.score_obj, int(i), base, u, op) for op, u in deltas]

@@ -1,7 +1,8 @@
 """Score-based facade adapters.
 
 ``ges``, ``gies``, ``exact_search``, and ``hc`` use :mod:`andrey.core` for BIC scoring and
-orientation; ``hc`` uses the Schur delta-BIC. Reported objectives are stored in ``metadata``.
+orientation; ``hc`` uses the Schur delta-BIC. ``ges`` and ``hc`` also score categorical data with
+BDeu. Reported objectives are stored in ``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -12,7 +13,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from andrey.api._adapt import column_labels, data_matrix, int_in_range, json_safe, structure_output
+from andrey.api._adapt import (
+    check_categories,
+    column_labels,
+    data_matrix,
+    int_in_range,
+    json_safe,
+    structure_output,
+)
 from andrey.api._experimental import warn_experimental
 from andrey.core import backend
 from andrey.core.seeding import resolve_seed
@@ -29,34 +37,40 @@ def ges(
     """Learn a CPDAG from observational data with greedy equivalence search (GES).
 
     GES searches CPDAGs, which represent equivalence classes of graphs. It adds edges while they
-    improve BIC (Bayesian information criterion), then removes edges in a backward sweep [1]_.
+    improve a score, the BIC (Bayesian information criterion) by default, then removes edges in a
+    backward sweep [1]_.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC"}, default="local_score_BIC"
-        Local score objective. Only the Gaussian BIC score is supported.
+    score_func : {"local_score_BIC", "local_score_BDeu"}, default="local_score_BIC"
+        Local score objective. ``"local_score_BIC"`` is the linear-Gaussian BIC, for continuous
+        data. ``"local_score_BDeu"`` is the BDeu score [3]_ for categorical data, coded by whole
+        numbers; see Notes.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative. BDeu ignores
+        it.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GES"`` and ``metadata["score"]`` the BIC score of the result, the sum over variables
-        of ``n * log(residual variance) + lambda_value * log(n) * n_parents``; lower is better.
-        Directed marks (``->``) are oriented edges, undirected (``--``) the ones the equivalence
-        class leaves open.
+        ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it
+        is the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
+        n_parents``; for BDeu, minus the log of the structure prior times the marginal
+        likelihood. Directed marks (``->``) are oriented edges, undirected (``--``) the ones the
+        equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC"``.
+        If ``score_func`` names no available score.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or, with ``"local_score_BDeu"``, if
+        ``data`` holds a value that is not a whole number.
 
     See Also
     --------
@@ -65,9 +79,10 @@ def ges(
 
     Notes
     -----
-    **When to use it.** GES suits continuous data with no unmeasured common causes. Its BIC score
-    assumes that each variable depends linearly on its causes with Gaussian noise. In that setting
-    it is a fast, accurate default. It returns the equivalence class.
+    **When to use it.** GES suits data with no unmeasured common causes. Its default BIC score
+    assumes continuous data, where each variable depends linearly on its causes with Gaussian
+    noise; in that setting it is a fast, accurate default. For categorical data, use
+    ``"local_score_BDeu"``. It returns the equivalence class.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -81,6 +96,14 @@ def ges(
     **How it works.** In the forward phase, a variable with more than ``n_variables / 2`` parents
     gets no new edges. The backward phase has no cap.
 
+    **Categorical data.** ``"local_score_BDeu"`` takes each distinct value of a column as one
+    category, so the codes need not start at 0 or be consecutive. It scores a variable given its
+    parents by the marginal likelihood of its counts in each parent configuration, under a
+    Dirichlet prior with an equivalent sample size of 1 spread evenly over the cells [3]_. A
+    structure prior with one expected parent per variable multiplies it, from three variables up.
+    Equivalent graphs score the same, as GES requires. Moves are scored in this process, without
+    the worker processes the BIC search can use.
+
     References
     ----------
     .. [1] Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3,
@@ -89,6 +112,8 @@ def ges(
        and more: the Fast Greedy Equivalence Search algorithm for learning high-dimensional
        graphical causal models, with an application to functional magnetic resonance images.
        International Journal of Data Science and Analytics 3(2), 121-129.
+    .. [3] Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks:
+       the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
 
     Examples
     --------
@@ -101,10 +126,21 @@ def ges(
     >>> z = x + y + 0.5 * rng.standard_normal(500)
     >>> ges(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
+
+    On categorical data, with BDeu:
+
+    >>> a = rng.integers(0, 2, 2000)
+    >>> b = rng.integers(0, 2, 2000)
+    >>> c = np.where(rng.random(2000) < 0.8, a + b, rng.integers(0, 3, 2000))
+    >>> data = pd.DataFrame({"a": a, "b": b, "c": c})
+    >>> ges(data, score_func="local_score_BDeu").structure.oriented_edges()
+    [('a', 'c', 'directed'), ('b', 'c', 'directed')]
     """
     from andrey.search.ges import ges as _ges
 
     X = data_matrix(data)
+    if score_func == "local_score_BDeu":
+        check_categories(X, data, f"score_func={score_func!r}")
     labels = column_labels(data)
     cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value)
     return structure_output(
@@ -184,19 +220,22 @@ def hc(
     """Learn a CPDAG from observational data with hill-climbing search.
 
     Hill-climbing is a lightweight greedy baseline [1]_ [2]_. It repeatedly adds, removes, or
-    reverses the edge that most improves a covariance-based delta-BIC, then converts the DAG to its
-    Markov equivalence class.
+    reverses the edge that most improves the score, a covariance-based delta-BIC by default, then
+    converts the DAG to its Markov equivalence class.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Local score objective; a covariance-based Gaussian BIC.
+    score_func : {"local_score_BIC_from_cov", "local_score_BDeu"}
+        Local score objective, by default ``"local_score_BIC_from_cov"``, a covariance-based
+        Gaussian BIC for continuous data; ``"local_score_BDeu"`` is the BDeu score for
+        categorical data, coded by whole numbers, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative. BDeu ignores
+        it.
     max_iter : int, default=200
         Most moves the search takes, at least ``1``. Each move adds at most one edge, so the result
         has at most ``max_iter`` edges.
@@ -205,18 +244,19 @@ def hc(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"HC"`` and ``metadata["score"]`` the BIC score of the DAG found, computed as for
+        ``"HC"`` and ``metadata["score"]`` the score of the DAG found, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
         undirected (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+        If ``score_func`` names no available score.
     TypeError
         If ``max_iter`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if ``max_iter`` is less than ``1``.
+        If ``lambda_value`` is negative or non-finite, if ``max_iter`` is less than ``1``, or, with
+        ``"local_score_BDeu"``, if ``data`` holds a value that is not a whole number.
 
     Warns
     -----
@@ -230,7 +270,8 @@ def hc(
     Notes
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
-    after ``max_iter`` moves.
+    after ``max_iter`` moves. BDeu moves are scored in this process, without the worker processes
+    the BIC search can use.
 
     References
     ----------
@@ -254,6 +295,8 @@ def hc(
 
     X = data_matrix(data)
     max_iter = int_in_range(max_iter, "max_iter", 1)
+    if score_func == "local_score_BDeu":
+        check_categories(X, data, f"score_func={score_func!r}")
     labels = column_labels(data)
     cpdag, score = _hc(X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter)
     metadata = {"algorithm": "HC", "score": json_safe(score)}

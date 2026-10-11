@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterator, Mapping
+from contextlib import nullcontext
 from itertools import combinations, islice
 
 import numpy as np
@@ -90,7 +91,8 @@ def _fast_adjacency_search(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    parallel = workers > 1 and callable(getattr(test, "to_seed", None))
+    seedable = callable(getattr(test, "to_seed", None))
+    parallel = workers > 1 and seedable
     pool = SkeletonWorkerPool(test, workers) if parallel else None
     try:
         size = -1
@@ -122,9 +124,10 @@ def _fast_adjacency_search(
                 if pool is not None:
                     removals = pool.scan(pairs, support.copy(), size, alpha)
                 else:
-                    # Pin BLAS to one thread: the conditioning-submatrix inversions then match the
-                    # (1-thread) parallel skeleton workers regardless of the host thread count.
-                    with threadpool_limits(limits=1):
+                    # Pin BLAS to one thread for a test the workers can run: its conditioning-
+                    # submatrix inversions then match the (1-thread) parallel skeleton workers
+                    # regardless of the host thread count. The chi-square tests call no BLAS.
+                    with threadpool_limits(limits=1) if seedable else nullcontext():
                         removals = scan_pairs(test, pairs, neighbours, size, alpha)
                 for x, y, separating in removals:
                     remove.append((x, y))

@@ -1,7 +1,9 @@
 """Constraint-based facade adapters.
 
-The underlying searches use :mod:`andrey.core` for Fisher-Z tests and orientation. ``pc`` and
-``cdnod`` produce CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with BIC scoring.
+The underlying searches use :mod:`andrey.core` for the conditional-independence tests (Fisher-Z on
+continuous data, chi-square and G-square on categorical data) and orientation. ``pc`` and
+``cdnod`` produce CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with BIC or BDeu
+scoring.
 """
 
 from __future__ import annotations
@@ -10,8 +12,15 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.api._adapt import column_labels, data_matrix, open_unit_interval, structure_output
+from andrey.api._adapt import (
+    check_categories,
+    column_labels,
+    data_matrix,
+    open_unit_interval,
+    structure_output,
+)
 from andrey.api._experimental import warn_experimental
+from andrey.core.ci import DISCRETE_INDEP_TESTS
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -34,8 +43,10 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "chisq", "gsq"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` tests partial correlation (Fisher's z), for
+        continuous data. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the
+        likelihood ratio) test categorical data, coded by whole numbers; see Notes.
 
     Returns
     -------
@@ -47,10 +58,11 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
-        If ``data`` has too few samples for a test or a singular correlation matrix, or if
-        ``alpha`` is not in ``(0, 1)``.
+        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
+        is not in ``(0, 1)``, or, with ``"chisq"`` or ``"gsq"``, if ``data`` holds a value that is
+        not a whole number.
 
     Warns
     -----
@@ -65,10 +77,11 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
 
     Notes
     -----
-    **When to use it.** PC suits continuous data with no unmeasured common causes. Its Fisher-Z test
-    assumes that each variable depends linearly on its causes with roughly Gaussian noise. It is
-    fastest on sparse graphs, where every variable has few neighbors [5]_. An undirected edge
-    (``--``) is one the data cannot orient.
+    **When to use it.** PC suits data with no unmeasured common causes. Its default Fisher-Z test
+    assumes continuous data, where each variable depends linearly on its causes with roughly
+    Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``. It is fastest on sparse
+    graphs, where every variable has few neighbors [5]_. An undirected edge (``--``) is one the
+    data cannot orient.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -88,6 +101,14 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     sample size, and the largest remaining neighborhood. Runtime grows combinatorially with
     neighborhood size, so sparse graphs with more variables can still be feasible.
 
+    **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
+    category, so the codes need not start at 0 or be consecutive. A test compares the counts of
+    ``x`` and ``y`` with independence within each configuration of the conditioning set that
+    occurs in the data [2]_. Each configuration adds ``(r_x - 1) * (r_y - 1)`` degrees of freedom,
+    counting only the values of ``x`` and ``y`` present in it [6]_; with none, the p-value is 1.
+    A test needs several rows per cell of its table: with many categories or a large conditioning
+    set, most cells are empty, and the test is less likely to remove an edge.
+
     References
     ----------
     .. [1] Spirtes, P., and Glymour, C. (1991). An algorithm for fast recovery of sparse causal
@@ -100,6 +121,8 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
        UAI, 403-410.
     .. [5] Kalisch, M., and Buhlmann, P. (2007). Estimating high-dimensional directed acyclic graphs
        with the PC-algorithm. JMLR 8, 613-636.
+    .. [6] Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing
+       Bayesian network structure learning algorithm. Machine Learning 65(1), 31-78.
 
     Examples
     --------
@@ -112,11 +135,22 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     >>> z = x + y + 0.5 * rng.standard_normal(500)
     >>> pc(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
+
+    On categorical data, with a chi-square test:
+
+    >>> a = rng.integers(0, 2, 2000)
+    >>> b = rng.integers(0, 2, 2000)
+    >>> c = np.where(rng.random(2000) < 0.8, a + b, rng.integers(0, 3, 2000))
+    >>> data = pd.DataFrame({"a": a, "b": b, "c": c})
+    >>> pc(data, indep_test="chisq").structure.oriented_edges()
+    [('a', 'c', 'directed'), ('b', 'c', 'directed')]
     """
     from andrey.constraint.pc import pc as _pc
 
     X = data_matrix(data)
     alpha = open_unit_interval(alpha, "alpha")
+    if indep_test in DISCRETE_INDEP_TESTS:
+        check_categories(X, data, f"indep_test={indep_test!r}")
     labels = column_labels(data)
     return structure_output(
         _pc(X, alpha=alpha, indep_test=indep_test), labels=labels, metadata={"algorithm": "PC"}
@@ -144,8 +178,10 @@ def fci(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "chisq", "gsq"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` tests partial correlation (Fisher's z), for
+        continuous data. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the
+        likelihood ratio) test categorical data, coded by whole numbers; see Notes.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -164,10 +200,11 @@ def fci(
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
-        is not in ``(0, 1)``, or if ``collider_rule`` is not a supported choice.
+        is not in ``(0, 1)``, if ``collider_rule`` is not a supported choice, or, with
+        ``"chisq"`` or ``"gsq"``, if ``data`` holds a value that is not a whole number.
 
     See Also
     --------
@@ -175,10 +212,11 @@ def fci(
 
     Notes
     -----
-    **When to use it.** FCI suits continuous data that may be affected by unmeasured common causes
-    or sample selection. Its Fisher-Z test assumes linear effects with roughly Gaussian noise.
-    Its PAG claims less than PC's CPDAG: an arrowhead at a node rules out that node causing the
-    node at the edge's other end, and a circle leaves the mark open.
+    **When to use it.** FCI suits data that may be affected by unmeasured common causes or sample
+    selection. Its default Fisher-Z test assumes continuous data with linear effects and roughly
+    Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, which read the data as
+    :func:`~andrey.pc` describes. Its PAG claims less than PC's CPDAG: an arrowhead at a node rules
+    out that node causing the node at the edge's other end, and a circle leaves the mark open.
 
     **When not to.** When every common cause is measured, :func:`~andrey.pc` orients more of the
     graph with fewer tests. FCI's possible-d-separation step runs tests PC does not.
@@ -232,6 +270,8 @@ def fci(
 
     X = data_matrix(data)
     alpha = open_unit_interval(alpha, "alpha")
+    if indep_test in DISCRETE_INDEP_TESTS:
+        check_categories(X, data, f"indep_test={indep_test!r}")
     labels = column_labels(data)
     return structure_output(
         _fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule),
@@ -251,7 +291,7 @@ def gfci(
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
-    GFCI [1]_ builds a skeleton with BIC-scored GES, then applies FCI orientation to account for
+    GFCI [1]_ builds a skeleton with score-based GES, then applies FCI orientation to account for
     possible latent confounding. Its scored skeleton is usually more accurate than FCI's test-only
     one.
 
@@ -260,14 +300,18 @@ def gfci(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC"}, default="local_score_BIC"
-        Local score driving the GES skeleton phase.
+    score_func : {"local_score_BIC", "local_score_BDeu"}, default="local_score_BIC"
+        Local score driving the GES skeleton phase: the linear-Gaussian BIC, or BDeu for
+        categorical data, coded by whole numbers, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test for the FCI phase. Only Fisher-Z (Gaussian partial
-        correlation) is supported.
+        BDeu ignores it.
+    indep_test : {"fisherz", "chisq", "gsq"}, default="fisherz"
+        Conditional-independence test for the FCI phase. ``"fisherz"`` tests partial correlation
+        (Fisher's z), for continuous data. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        (G-square, the likelihood ratio) test categorical data, coded by whole numbers, as for
+        :func:`~andrey.pc`.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
@@ -288,11 +332,11 @@ def gfci(
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC"``, or ``indep_test`` names no available
-        test; ``"fisherz"`` is the only one built in.
+        If ``score_func`` names no available score, or ``indep_test`` no available test.
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, or if
-        ``collider_rule`` is not a supported choice.
+        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
+        ``collider_rule`` is not a supported choice, or, with a categorical score or test, if
+        ``data`` holds a value that is not a whole number.
 
     Warns
     -----
@@ -339,6 +383,10 @@ def gfci(
 
     X = data_matrix(data)
     alpha = open_unit_interval(alpha, "alpha")
+    if score_func == "local_score_BDeu":
+        check_categories(X, data, f"score_func={score_func!r}")
+    if indep_test in DISCRETE_INDEP_TESTS:
+        check_categories(X, data, f"indep_test={indep_test!r}")
     labels = column_labels(data)
     pag = _gfci(
         X,
@@ -372,13 +420,16 @@ def cdnod(
         become the structure's ``labels``.
     c_indx : array-like of shape (n_samples,) or (n_samples, 1)
         Domain or context index of each row of ``data``, such as ``0`` and ``1`` for two domains, or
-        the time step for data that drift over time. Coerced to ``float64``. See Notes for more
-        than two domains. When every row has the same value, the data come from one domain, and
-        the result equals :func:`~andrey.pc`'s.
+        the time step for data that drift over time. Coerced to ``float64``; whole numbers with
+        ``"chisq"`` or ``"gsq"``. See Notes for more than two domains. When every row has the same
+        value, the data come from one domain, and the result equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "chisq", "gsq"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` tests partial correlation (Fisher's z), for
+        continuous data. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the
+        likelihood ratio) test categorical data, coded by whole numbers, as for
+        :func:`~andrey.pc`; see Notes for the index.
 
     Returns
     -------
@@ -390,10 +441,12 @@ def cdnod(
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
         If ``c_indx`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
-        ``data`` has too few rows for a test, or if ``alpha`` is not in ``(0, 1)``.
+        ``data`` has too few rows for a test, if ``alpha`` is not in ``(0, 1)``, or, with
+        ``"chisq"`` or ``"gsq"``, if ``data`` or ``c_indx`` holds a value that is not a whole
+        number.
 
     Warns
     -----
@@ -410,7 +463,8 @@ def cdnod(
     Fisher-Z tests the index as a number, by linear correlation, so it finds a shift only when the
     shift follows the index's values. With two domains the coding does not matter. With three
     domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go undetected, and recoding the
-    domains can change the result.
+    domains can change the result. ``"chisq"`` and ``"gsq"`` take each index value as a category,
+    so they find a shift in any domain, whatever the coding.
 
     References
     ----------
@@ -436,5 +490,8 @@ def cdnod(
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     c = np.asarray(c_indx, dtype=np.float64)
+    if indep_test in DISCRETE_INDEP_TESTS:
+        check_categories(X, data, f"indep_test={indep_test!r}")
+        check_categories(c, None, f"indep_test={indep_test!r}", name="c_indx")
     cpdag = _cdnod(X, c, alpha=alpha, indep_test=indep_test)
     return structure_output(cpdag, labels=labels, metadata={"algorithm": "CDNOD"})

@@ -9,6 +9,8 @@ and JSON schema render.
 from __future__ import annotations
 
 from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.search.ges import GES_SCORES
+from andrey.search.hc import HC_SCORES
 
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
@@ -28,7 +30,9 @@ _INDEP_TEST = ParamSpec(
     name="indep_test",
     type="str",
     default="fisherz",
-    doc="Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.",
+    doc="Conditional-independence test: fisherz = partial correlation (Fisher's z), for continuous "
+    "data; chisq = Pearson's chi-square and gsq = G-square, for categorical data coded by whole "
+    "numbers.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _COLLIDER_RULE = ParamSpec(
@@ -46,7 +50,7 @@ _LAMBDA_VALUE = ParamSpec(
     type="float",
     default=1.0,
     doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values give sparser "
-    "graphs; 1.0 is the standard BIC.",
+    "graphs; 1.0 is the standard BIC. BDeu ignores it.",
 )
 _SEED = ParamSpec(
     name="seed",
@@ -134,8 +138,9 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score for the GES phase.",
-                choices=("local_score_BIC",),
+                doc="Local score for the GES phase: local_score_BIC = linear-Gaussian BIC; "
+                "local_score_BDeu = BDeu, for categorical data coded by whole numbers.",
+                choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
             _INDEP_TEST,
@@ -194,8 +199,9 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score objective.",
-                choices=("local_score_BIC",),
+                doc="Local score objective: local_score_BIC = linear-Gaussian BIC; "
+                "local_score_BDeu = BDeu, for categorical data coded by whole numbers.",
+                choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
         ),
@@ -238,8 +244,9 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC_from_cov",
-                doc="Local score objective (covariance-based BIC).",
-                choices=("local_score_BIC_from_cov",),
+                doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+                "local_score_BDeu = BDeu, for categorical data coded by whole numbers.",
+                choices=HC_SCORES,
             ),
             _LAMBDA_VALUE,
             ParamSpec(

@@ -45,11 +45,36 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
         )
     constant = np.flatnonzero(np.ptp(X, axis=0) == 0)
     if constant.size:
-        j = int(constant[0])
-        names = getattr(data, "columns", None)
-        column = repr(str(list(names)[j])) if names is not None else str(j)
+        column = _column_name(data, int(constant[0]))
         raise ValueError(f"{name} column {column} is constant; drop it before the fit")
     return X
+
+
+def check_categories(values: np.ndarray, data: object, setting: str, *, name: str = "data") -> None:
+    """Check that ``values`` holds whole numbers only, the codes of a categorical setting.
+
+    A setting that reads categories, such as ``indep_test="chisq"``, takes each distinct value of a
+    column as one category, so a fractional value most likely means continuous data. ``setting``
+    names the option in the message and ``data`` supplies column names. Raises ``ValueError``,
+    naming ``name``, ``setting``, and the first fractional cell; ``NaN`` and ``inf`` are left to
+    :func:`data_matrix`.
+    """
+    fractional = np.argwhere(np.isfinite(values) & (values != np.round(values)))
+    if fractional.size:
+        cell = tuple(int(k) for k in fractional[0])
+        where = f"row {cell[0]}"
+        if len(cell) > 1:
+            where += f", column {_column_name(data, cell[1])}"
+        raise ValueError(
+            f"{setting} reads {name} as categories coded by whole numbers, but {name} holds "
+            f"{float(values[cell])!r} at {where}; code each category as a whole number"
+        )
+
+
+def _column_name(data: object, j: int) -> str:
+    """Column ``j``'s name as quoted text for a DataFrame, else its index."""
+    names = getattr(data, "columns", None)
+    return repr(str(list(names)[j])) if names is not None else str(j)
 
 
 def int_in_range(value: object, name: str, low: int, high: int | None = None) -> int:

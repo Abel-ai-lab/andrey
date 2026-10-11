@@ -2,10 +2,11 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.hc`.
 
-Each candidate move is scored by the Schur-complement delta of :mod:`andrey.core.score_delta`.
+Under BIC each candidate move is scored by the Schur-complement delta of
+:mod:`andrey.core.score_delta`; under BDeu by differencing two full local scores, in this process.
 The move budget also regularizes: greedy ascent adds the strongest edges first, so stopping early
 keeps noise-fitting edges out of large, dense graphs. The DAG is converted to its CPDAG for output;
-the reported objective is the DAG's total BIC, lower is better.
+the reported objective is the DAG's total score, lower is better.
 """
 
 from __future__ import annotations
@@ -17,8 +18,8 @@ from threadpoolctl import threadpool_limits
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore
+from andrey.core.score import BDeuScore, BICScore
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
@@ -39,6 +40,9 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 # is recomputed from the final structure (not accumulated), so this never touches the reported
 # score, and delta/n is monotone in delta, so non-tied move order is unchanged.
 __all__ = ["hc"]
+
+#: The local scores :func:`hc` accepts.
+HC_SCORES: tuple[str, ...] = ("local_score_BIC_from_cov", "local_score_BDeu")
 
 
 def _reachability(adj_int: list[int], d: int) -> list[int]:
@@ -90,7 +94,7 @@ def _scan_moves(
     targets: Sequence[int],
     adj_int: list[int],
     parents_of: dict[int, list[int]],
-    delta: DeltaBICScore,
+    delta: DeltaBICScore | FullScoreDelta,
     d: int,
     reach: list[int],
     cache: dict[tuple[int, tuple[int, ...], str, int], float],
@@ -145,7 +149,7 @@ def _scan_moves(
 def _best_move(
     adj_int: list[int],
     parents_of: dict[int, list[int]],
-    delta: DeltaBICScore,
+    delta: DeltaBICScore | FullScoreDelta,
     d: int,
     cache: dict[tuple[int, tuple[int, ...], str, int], float],
 ) -> tuple[tuple[str, int, int] | None, float]:
@@ -162,7 +166,7 @@ def _best_move(
 
 def _cached_delta(
     cache: dict[tuple[int, tuple[int, ...], str, int], float],
-    delta: DeltaBICScore,
+    delta: DeltaBICScore | FullScoreDelta,
     v: int,
     pa_v: tuple[int, ...],
     u: int,
@@ -209,21 +213,23 @@ def hc(
     lambda_value: float = 1.0,
     max_iter: int = 200,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Hill-Climbing over the linear-Gaussian BIC score.
+    """Discover a CPDAG by Hill-Climbing over the BIC or BDeu score.
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
-    BIC or ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its CPDAG. Returns
-    the CPDAG and the DAG's total BIC objective (lower is better), the sum of the final per-node
-    local scores.
+    score or ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its CPDAG.
+    Returns the CPDAG and the DAG's total objective (lower is better), the sum of the final
+    per-node local scores. BDeu moves are scanned in this process; BIC passes fan out to workers
+    above the work threshold.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score; ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC) is supported.
+        Local score: ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC) or ``"local_score_BDeu"``
+        (BDeu on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors).
     lambda_value : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     max_iter : int
         Maximum number of accepted edge moves (default 200). The cap bounds
         the ascent so a large, dense problem does not overfit the recovered graph with spurious
@@ -233,17 +239,21 @@ def hc(
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and the total BIC score of the discovered DAG.
+        The CPDAG (``kind="cpdag"``) and the total score of the discovered DAG.
     """
-    if score_func != "local_score_BIC_from_cov":
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use 'local_score_BIC_from_cov'"
-        )
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
 
-    score = BICScore(X, lambda_value=lambda_value)
-    delta = DeltaBICScore(score)
+    score: BICScore | BDeuScore
+    delta: DeltaBICScore | FullScoreDelta
+    if score_func == "local_score_BIC_from_cov":
+        score = BICScore(X, lambda_value=lambda_value)
+        delta = DeltaBICScore(score)
+    elif score_func == "local_score_BDeu":
+        score = BDeuScore(X)
+        delta = FullScoreDelta(score)
+    else:
+        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
 
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
@@ -253,7 +263,8 @@ def hc(
     # and equal to the (1-thread) parallel workers; above the work threshold the pass fans out.
     with threadpool_limits(limits=1):
         workers = backend.worker_count()
-        if workers > 1 and d > 1:
+        # The pooled workers rebuild a Schur scorer from the covariance, so only BIC fans out.
+        if workers > 1 and d > 1 and isinstance(delta, DeltaBICScore):
             from andrey.search import _parallel_hc  # local import breaks the import cycle
 
             moves = _parallel_hc.run_hc(adj_int, parents_of, delta, d, max_iter, workers=workers)

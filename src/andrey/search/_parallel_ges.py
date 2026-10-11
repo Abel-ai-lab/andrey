@@ -21,8 +21,8 @@ from typing import Protocol
 import numpy as np
 
 from andrey.core import env
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore, _delta_two_scores
+from andrey.core.score import BDeuScore, BICScore
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
@@ -58,8 +58,9 @@ def reduce_best(
 class DeltaEngine(Protocol):
     """A move scorer: raw local-score deltas for single add/remove moves off a shared base.
 
-    Satisfied by the PURE Schur :class:`~andrey.core.score_delta.DeltaBICScore` (production) and by
-    :class:`_FullScoreDelta` (the two-full-score reference the quality gate pairs against).
+    Satisfied by the PURE Schur :class:`~andrey.core.score_delta.DeltaBICScore` (BIC) and by
+    :class:`~andrey.core.score_delta.FullScoreDelta`, which differences two full scores: BIC's
+    reference arm, which the quality gate pairs against the Schur path, and BDeu.
     """
 
     def delta_many_with_base(
@@ -71,24 +72,6 @@ class DeltaEngine(Protocol):
 
 # Per-graph-state neighborhood precompute shared by every chunk of a pass.
 NeighbourState = tuple[list[set[int]], list[np.ndarray], list[set[int]]]
-
-
-class _FullScoreDelta:
-    """Reference delta engine: every delta from two full ``BICScore.score`` calls (the GES oracle).
-
-    Exposes the same ``delta_many_with_base`` surface as :class:`DeltaBICScore` but never takes the
-    Schur fast path, reproducing GES's exact two-full-score differencing. It is the
-    ``_full_scores=True`` arm the quality gate pairs the Schur path against.
-    """
-
-    def __init__(self, score: BICScore) -> None:
-        self.score_obj = score
-
-    def delta_many_with_base(
-        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
-    ) -> list[float]:
-        base = tuple(sorted(int(p) for p in base_parents))
-        return [_delta_two_scores(self.score_obj, int(i), base, u, op) for op, u in deltas]
 
 
 def neighbourhood_state(adj: np.ndarray, n: int) -> NeighbourState:
@@ -422,7 +405,7 @@ class _LazyWorkerSet:
 
 def run_ges(
     adj: np.ndarray,
-    score: BICScore,
+    score: BICScore | BDeuScore,
     n: int,
     max_parents: float | None,
     *,
@@ -438,16 +421,23 @@ def run_ges(
     Either way the reduce keys on ``(stable_key(delta, n), x, y, index)``, so the selected CPDAG is
     partition-invariant. Returns only the CPDAG; ``ges()`` recomputes the objective from it.
     ``full_scores`` swaps the in-process PURE Schur engine for the two-full-score reference (the
-    quality gate's ``_full_scores`` arm); pooled workers only ever run Schur, so the reference arm
-    is held in-process and never fans out.
+    quality gate's ``_full_scores`` arm); pooled workers only ever run Schur on BIC, so the
+    reference arm, like any score other than :class:`~andrey.core.score.BICScore` (BDeu), is held
+    in-process and never fans out.
     """
     workers = max(1, min(workers, n))
     w_min = _min_work()
-    # Warn once a pass comes near the default cutoff (the pool never runs the full-score arm).
-    warn = workers > 1 and not full_scores and calibrate.cutoff_is_default("ges")
+    engine: DeltaEngine
+    lazy: _LazyWorkerSet | None
+    if isinstance(score, BICScore) and not full_scores:
+        engine = DeltaBICScore(score)
+        lazy = _LazyWorkerSet(score, n, workers)
+    else:
+        engine = FullScoreDelta(score)
+        lazy = None
+    # Warn once a pass comes near the default cutoff (only a pass that can fan out).
+    warn = workers > 1 and lazy is not None and calibrate.cutoff_is_default("ges")
     build_state = _reach_factory(n)
-    engine: DeltaEngine = _FullScoreDelta(score) if full_scores else DeltaBICScore(score)
-    lazy = _LazyWorkerSet(score, n, workers)
     try:
         while True:  # forward phase
             state = neighbourhood_state(adj, n)
@@ -455,10 +445,10 @@ def run_ges(
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
                 warn = False
-            # The full-score reference arm never fans out: pooled workers always run the Schur
-            # engine, so routing it to the workers would silently swap the two-full-score reference
+            # The full-score engine never fans out: pooled workers always run the Schur engine on
+            # BIC, so routing it to the workers would silently swap the two-full-score reference
             # for Schur. It stays in-process, keeping the quality gate's reference pure.
-            if workers > 1 and sum(work) > w_min and not full_scores:
+            if lazy is not None and workers > 1 and sum(work) > w_min:
                 # Each worker scans its own fixed target partition (stable assignment); reduce keys
                 # on the global order, so this is bit-identical to the whole-range serial scan.
                 wset = lazy.get()
@@ -478,7 +468,7 @@ def run_ges(
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
                 warn = False
-            if workers > 1 and sum(work) > w_min and not full_scores:  # reference arm stays serial
+            if lazy is not None and workers > 1 and sum(work) > w_min:  # full scores stay serial
                 wset = lazy.get()
                 best = reduce_best(wset.dispatch(_backward_task, adj, lazy.token))
             else:
@@ -489,5 +479,6 @@ def run_ges(
             ops.apply_delete(adj, x, y, H)
             adj = _reform_cpdag(adj)
     finally:
-        lazy.close()
+        if lazy is not None:
+            lazy.close()
     return adj

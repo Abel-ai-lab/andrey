@@ -1,8 +1,8 @@
-"""Greedy Equivalence Search over the linear-Gaussian BIC, the engine behind :func:`andrey.ges`.
+"""Greedy Equivalence Search over a decomposable score, the engine behind :func:`andrey.ges`.
 
-Each candidate is scored by differencing two full local scores; the running total is the objective
-returned alongside the CPDAG. The algorithm, its settings, and its reference are described on
-:func:`andrey.ges`.
+The linear-Gaussian BIC scores each candidate by its Schur delta; the discrete BDeu differences two
+full local scores. The objective returned alongside the CPDAG is recomputed from it. The algorithm,
+its settings, and its reference are described on :func:`andrey.ges`.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from threadpoolctl import threadpool_limits
 
 from andrey.core import GraphStructure, _bitset, backend
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
-from andrey.core.score import BICScore, Score
+from andrey.core.score import BDeuScore, BICScore, Score
 from andrey.search import operators as ops
 
 
@@ -82,15 +82,19 @@ def _reach_factory(n: int):
 
 
 def _recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
-    """Total BIC of the discovered CPDAG: ``sum_v score(v, Pa_v)`` over a consistent DAG extension.
+    """Total score of the CPDAG found: ``sum_v score(v, Pa_v)`` over a consistent DAG extension.
 
     The objective is recomputed from the final structure rather than accumulated from the search's
     Schur deltas, so it is independent of the (non-bit-pure) delta arithmetic and identical for
     serial and parallel runs on the same CPDAG. Any consistent extension gives the same total (BIC
-    is score-equivalent), so ``pdag2dag``'s choice of representative is immaterial.
+    and BDeu are score-equivalent), so ``pdag2dag``'s choice of representative is immaterial.
     """
     dag = pdag2dag(adj)
     return float(sum(score.score(v, ops.parents(dag, v).tolist()) for v in range(n)))
+
+
+#: The local scores :func:`ges` accepts.
+GES_SCORES: tuple[str, ...] = ("local_score_BIC", "local_score_BDeu")
 
 
 def ges(
@@ -101,25 +105,26 @@ def ges(
     maxP: float | None = None,
     _full_scores: bool = False,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Greedy Equivalence Search over the linear-Gaussian BIC score.
+    """Discover a CPDAG by Greedy Equivalence Search over the BIC or BDeu score.
 
     Runs the forward (Insert) then backward (Delete) greedy phases from the empty graph, re-forming
-    the CPDAG after every accepted move, then returns the discovered CPDAG and its total BIC
-    objective (lower is better). Each candidate move is scored by the Schur delta-BIC; the
-    returned objective is recomputed from the final CPDAG (``sum_v score(v, Pa_v)``), so it is
-    independent of the delta arithmetic and identical for serial and parallel runs. Serial and
-    parallel are the same decomposition: ``ges()`` always routes through
-    :func:`~andrey.search._parallel_ges.run_ges`, which fans out only above the fixed work
-    threshold.
+    the CPDAG after every accepted move, then returns the discovered CPDAG and its total objective
+    (lower is better). Under BIC each candidate move is scored by the Schur delta-BIC; under BDeu
+    by differencing two full local scores, in this process. The returned objective is recomputed
+    from the final CPDAG (``sum_v score(v, Pa_v)``), so it is independent of the delta arithmetic
+    and identical for serial and parallel runs. Serial and parallel are the same decomposition:
+    ``ges()`` always routes through :func:`~andrey.search._parallel_ges.run_ges`, which fans out
+    BIC passes only above the fixed work threshold.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score; ``"local_score_BIC"`` (linear-Gaussian BIC) is supported.
+        Local score: ``"local_score_BIC"`` (linear-Gaussian BIC) or ``"local_score_BDeu"`` (BDeu
+        on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors).
     lambda_value : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     maxP : float or None
         Maximum directed-parent count a node may already hold to remain an eligible Insert target in
         the forward phase; ``None`` defaults to ``n_features / 2``. The backward phase is uncapped.
@@ -131,14 +136,18 @@ def ges(
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and its total BIC score.
+        The CPDAG (``kind="cpdag"``) and its total score.
     """
-    if score_func != "local_score_BIC":
-        raise NotImplementedError(f"unsupported score_func {score_func!r}; use 'local_score_BIC'")
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
     max_parents = n / 2 if maxP is None else maxP
-    score = BICScore(X, lambda_value=lambda_value)
+    score: BICScore | BDeuScore
+    if score_func == "local_score_BIC":
+        score = BICScore(X, lambda_value=lambda_value)
+    elif score_func == "local_score_BDeu":
+        score = BDeuScore(X)
+    else:
+        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {GES_SCORES}")
 
     adj = np.zeros((n, n), dtype=np.int8)
     # Local import breaks the ges <-> _parallel_ges cycle.

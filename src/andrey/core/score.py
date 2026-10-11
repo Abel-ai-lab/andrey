@@ -1,4 +1,4 @@
-"""BIC scoring substrate for linear-Gaussian structure search.
+"""Scoring substrate for structure search: the linear-Gaussian BIC and the discrete BDeu.
 
 The negative local BIC score (lower is better; proportional to ``-2 * BIC``) for a target node
 given a parent set, evaluated from the sample covariance. Uses the linear-Gaussian BIC closed
@@ -6,11 +6,16 @@ form, branching on parent-set size for the scalar fast paths.
 
 :func:`local_score_bic` is the pure per-node primitive; :class:`BICScore` precomputes the covariance
 once and memoizes scores behind the :class:`Score` protocol that structure-search engines consume.
+:class:`BDeuScore` scores category codes with the negative log BDeu marginal likelihood behind the
+same protocol.
 
 References
 ----------
 Schwarz (1978). Estimating the Dimension of a Model. Annals of Statistics 6(2):461-464.
 https://doi.org/10.1214/aos/1176344136
+
+Heckerman, Geiger & Chickering (1995). Learning Bayesian networks: the combination of knowledge
+and statistical data. Machine Learning 20(3):197-243. https://doi.org/10.1007/BF00994016
 """
 
 from __future__ import annotations
@@ -20,8 +25,9 @@ from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 import numpy as np
+from scipy.special import gammaln
 
-from . import stats
+from . import categorical, stats
 
 
 def local_score_bic(
@@ -228,4 +234,109 @@ class BICScore:
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
         """Return the negative local BIC scores for many parent sets, in request order."""
+        return [self.score(node, parents) for parents in parent_sets]
+
+
+class BDeuScore:
+    """Negative local BDeu score over category codes.
+
+    The score of ``node`` given ``parents`` is minus the log of the structure prior times the BDeu
+    marginal likelihood [1]_, so lower is better as for :class:`BICScore`. With ``r`` the node's
+    categories, ``q`` the product of its parents' categories, ``N_ij`` the rows in parent
+    configuration ``j``, and ``N_ijk`` those of them where the node takes value ``k``, the log
+    marginal likelihood is
+
+    ``sum_j [lgamma(a / q) - lgamma(N_ij + a / q)
+    + sum_k (lgamma(N_ijk + a / (r q)) - lgamma(a / (r q)))]``
+
+    with ``a`` the ``sample_prior`` (the equivalent sample size). A configuration or cell no row
+    falls in adds zero, so only the occurring ones are summed. The structure prior gives each of
+    the other ``d - 1`` variables probability ``p = structure_prior / (d - 1)`` of being a parent:
+    ``k log p + (d - 1 - k) log(1 - p)`` for ``k`` parents. It depends only on the number of edges,
+    so the score stays score-equivalent; it is left out when ``p`` is not below ``1``, which with
+    the default happens only for two or fewer variables.
+
+    ``__init__`` re-encodes each column to the codes ``0..r-1`` (see
+    :func:`~andrey.core.categorical.encode`), each distinct value one category. Scores are memoized
+    by ``(node, sorted parents)``.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, d)
+        Finite values; each distinct value of a column is one category.
+    sample_prior : float, default=1.0
+        The equivalent sample size ``a`` of the Dirichlet prior; positive.
+    structure_prior : float, default=1.0
+        The expected number of parents per variable under the structure prior; positive.
+    cache_size : int or None, default=1_000_000
+        Memoization cache bound; ``None`` is unbounded.
+
+    References
+    ----------
+    .. [1] Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks:
+       the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
+    """
+
+    def __init__(
+        self,
+        data: np.ndarray,
+        *,
+        sample_prior: float = 1.0,
+        structure_prior: float = 1.0,
+        cache_size: int | None = 1_000_000,
+    ) -> None:
+        arr = np.asarray(data)
+        if arr.ndim != 2:
+            raise ValueError(
+                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
+            )
+        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
+            raise ValueError("data contains NaN or Inf; cannot compute BDeu scores")
+        for name, value in (("sample_prior", sample_prior), ("structure_prior", structure_prior)):
+            if not (np.isfinite(value) and value > 0):
+                raise ValueError(f"{name} must be finite and positive, got {value}")
+        self.n: int = arr.shape[0]
+        self.sample_prior = float(sample_prior)
+        self.structure_prior = float(structure_prior)
+        self._codes, self._cardinalities = categorical.encode(arr)
+        others = arr.shape[1] - 1
+        p = self.structure_prior / others if others > 0 else 1.0
+        # Per-parent and per-non-parent log prior, or none when p is not a probability below 1.
+        self._prior = (float(np.log(p)), float(np.log1p(-p)), others) if p < 1.0 else None
+        self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
+
+    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
+        codes = self._codes
+        r = int(self._cardinalities[node])
+        q = float(np.prod([float(self._cardinalities[p]) for p in parents]))
+        config, m = categorical.configurations(codes, self._cardinalities, parents)
+        counts = np.bincount(config * r + codes[:, node], minlength=m * r).reshape(m, r)
+        n_ij = counts.sum(axis=1)
+        n_ijk = counts[counts > 0]
+        a_j = self.sample_prior / q
+        a_jk = a_j / r
+        log_likelihood = (
+            m * float(gammaln(a_j))
+            - float(np.sum(gammaln(n_ij + a_j)))
+            + float(np.sum(gammaln(n_ijk + a_jk)))
+            - n_ijk.size * float(gammaln(a_jk))
+        )
+        log_prior = 0.0
+        if self._prior is not None:
+            log_p, log_not_p, others = self._prior
+            k = len(parents)
+            log_prior = k * log_p + (others - k) * log_not_p
+        return -(log_likelihood + log_prior)
+
+    def score(self, node: int, parents: Sequence[int]) -> float:
+        """Return the memoized negative local BDeu score for ``node`` given ``parents``.
+
+        The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
+        the lookup.
+        """
+        key = tuple(sorted(int(p) for p in parents))
+        return self._score_key(int(node), key)
+
+    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
+        """Return the negative local BDeu scores for many parent sets, in request order."""
         return [self.score(node, parents) for parents in parent_sets]
