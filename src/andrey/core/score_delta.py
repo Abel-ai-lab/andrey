@@ -98,8 +98,9 @@ def _get_inv_with_cond(
         except np.linalg.LinAlgError:
             inv_cov_cache[S_sorted] = _ILL
             return None, True
-        XX_norm = float(np.linalg.norm(XX, np.inf))
-        M_norm = float(np.linalg.norm(M_candidate, np.inf))
+        # Infinity norms (largest absolute row sum), as np.linalg.norm(., np.inf) computes them.
+        XX_norm = float(np.abs(XX).sum(axis=1).max())
+        M_norm = float(np.abs(M_candidate).sum(axis=1).max())
         if XX_norm * M_norm > cond_threshold:
             inv_cov_cache[S_sorted] = _ILL
             return None, True
@@ -764,39 +765,39 @@ def add_deltas(
         Conditioning-gate threshold routing a near-singular base to the two-full-score fallback.
     """
     cov = score_obj.cov
-    cov_diag = score_obj._cov_diag
     i = int(i)
-    S_sorted = tuple(sorted(int(p) for p in base_parents))
+    S_sorted = tuple(sorted(base_parents))
     S_list = list(S_sorted)
-    exact: np.ndarray | None = None
     if not S_list:
         e = cov[i]
-        R_u = cov_diag
+        R_u = score_obj._cov_diag
     else:
         inv_cov_cache = _delta_caches(score_obj)[0]
         M, ill = _get_inv_with_cond(inv_cov_cache, S_sorted, cov, S_list, cond_threshold)
         inv_cov_cache.move_to_end(S_sorted)
         _evict_inv(inv_cov_cache)
         if ill:
-            exact = np.ones(cov.shape[0], dtype=bool)
-            e = R_u = np.ones(cov.shape[0])
-        else:
-            cs = cov[S_list]
-            beta = M @ cs
-            e = cov[i] - cov[i, S_list] @ beta
-            R_u = cov_diag - np.einsum("ij,ij->j", cs, beta)
-    R_v = float(e[i]) if exact is None else 1.0  # e_ii is R(i | base)
+            out = np.full(cov.shape[0], np.inf)
+            for u in range(cov.shape[0]):
+                if u != i and u not in S_sorted:
+                    out[u] = _delta_two_scores(score_obj, i, S_sorted, u, "add")
+            return out
+        cs = cov[S_list]
+        beta = M @ cs
+        e = cov[i] - cov[i, S_list] @ beta
+        R_u = score_obj._cov_diag - np.einsum("ij,ij->j", cs, beta)
+    R_v = float(e[i])  # e_ii is R(i | base)
+    penalty = score_obj.log_n * score_obj.lambda_value
     with np.errstate(divide="ignore", invalid="ignore"):
         R_v_new = R_v - e * e / R_u
-        out = score_obj.n * (_log(R_v_new) - _log(R_v)) + score_obj.log_n * score_obj.lambda_value
-    if exact is None:
-        exact = ~((R_u > 0.0) & (R_v_new > 0.0) & np.isfinite(out)) | (not R_v > 0.0)
-    exact[i] = False
-    exact[S_list] = False
-    for u in np.nonzero(exact)[0].tolist():
-        out[u] = _delta_two_scores(score_obj, i, S_sorted, u, "add")
+        out = score_obj.n * (_log(R_v_new) - _log(R_v)) + penalty
+    # A finite delta implies positive R(i | base) and R(i | base + u), so only R_u is checked.
+    exact = np.flatnonzero(~((R_u > 0.0) & np.isfinite(out))).tolist()
     out[i] = np.inf
     out[S_list] = np.inf
+    for u in exact:
+        if u != i and u not in S_sorted:
+            out[u] = _delta_two_scores(score_obj, i, S_sorted, u, "add")
     return out
 
 

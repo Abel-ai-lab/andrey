@@ -17,7 +17,10 @@ rescanned from :mod:`andrey.search.operators` after each move and the CPDAG re-f
 tests compare the two.
 
 Scores are deltas of the deviance :class:`~andrey.core.score.BICScore` minimizes, so a move improves
-when its delta is negative. The package scores in log-likelihood units, ``-0.5`` times Andrey's
+when its delta is negative. Insert deltas come from :func:`~andrey.core.score_delta.add_deltas`,
+which scores every candidate parent of a target against one parent set at once. A Delete, and the
+parent a Reverse removes, need one delta each: the difference of two memoized local scores, as in
+the rescanning reference. The package scores in log-likelihood units, ``-0.5`` times Andrey's
 plus terms that cancel in every delta, so its ``alpha`` is Andrey's ``lambda_value``.
 
 References
@@ -37,10 +40,11 @@ from __future__ import annotations
 import heapq
 from collections import OrderedDict, defaultdict, deque
 from collections.abc import Callable, Iterable
+from functools import cache
 from itertools import chain, count
 
 import numpy as np
-from threadpoolctl import threadpool_limits
+from threadpoolctl import ThreadpoolController
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
 from andrey.core.orient import to_structure
@@ -457,6 +461,16 @@ def _delete_valid(g: _Graph, x: int, y: int, C: frozenset[int], E: frozenset[int
 # ---- the search ---------------------------------------------------------------------------------
 
 
+@cache
+def _blas() -> ThreadpoolController:
+    """The thread pools of the native libraries loaded at the first search.
+
+    Building a controller stats every mapped library file, tens of milliseconds on a network file
+    system, so it is built once. The search calls only NumPy's BLAS, loaded with NumPy itself.
+    """
+    return ThreadpoolController()
+
+
 # Bytes the cached per-(target, parent set) score arrays may hold; each is one float per variable.
 _ADD_DELTAS_BYTES = 256 * 1024**2
 
@@ -539,25 +553,21 @@ class _Search:
         """
         g = self.g
         ne_y = g.ne[y]
-        # A source adjacent to no neighbor of y has NA empty and T ranging over the cliques in
-        # Ne(y), so those sources share their (T, E) pairs and are scored as one array.
         if only_x is not None:
-            near = set() if ne_y.isdisjoint(g.ad[only_x]) else {only_x}
-            far = np.array([] if near else [only_x], dtype=np.intp)
+            near = {only_x}
         else:
+            # A source adjacent to no neighbor of y has NA empty and T ranging over the cliques in
+            # Ne(y), so those sources share their (T, E) pairs and are scored as one array.
             near = set().union(*(g.ad[z] for z in ne_y)) - g.ad[y] - {y}
             outside = np.ones(self.d, dtype=bool)
             outside[list(near | g.ad[y] | {y})] = False
             far = np.flatnonzero(outside)
-        if far.size:
-            for T, E in self.subsets(sorted(ne_y), set(), frozenset(g.pa[y])):
-                deltas = self.add_deltas(y, E)[far]
-                if out is not None:
-                    out.extend((dl, x, y, T, E) for x, dl in zip(far.tolist(), deltas.tolist()))
-                    continue
-                keep = deltas < -_EPS_IMPROVE
-                for x, dl in zip(far[keep].tolist(), deltas[keep].tolist(), strict=True):
-                    heapq.heappush(self.inserts, (dl, next(self.seq), x, y, T, E))
+            if far.size:
+                for T, E in self.subsets(sorted(ne_y), set(), frozenset(g.pa[y])):
+                    deltas = self.add_deltas(y, E)[far]
+                    keep = deltas < -_EPS_IMPROVE
+                    for x, dl in zip(far[keep].tolist(), deltas[keep].tolist(), strict=True):
+                        heapq.heappush(self.inserts, (dl, next(self.seq), x, y, T, E))
         for x in near:
             na = ne_y & g.ad[x]
             if not g.is_clique(na):
@@ -570,8 +580,9 @@ class _Search:
                     heapq.heappush(self.inserts, (delta, next(self.seq), x, y, T, E))
 
     def drop_delta(self, y: int, E: frozenset[int], x: int) -> float:
-        """Score change of removing parent ``x`` of ``y`` from ``E``."""
-        return -float(self.add_deltas(y, E - {x})[x])
+        """Score change of removing parent ``x`` of ``y`` from ``E``, from two memoized scores."""
+        score = self.add_deltas.score
+        return _local(score, y, E - {x}) - _local(score, y, E)
 
     def find_delete(self, y: int, x: int, out: list[tuple] | None = None) -> None:
         """Queue each improving Delete of the edge ``x -> y`` or ``x -- y``.
@@ -1059,7 +1070,7 @@ def xges(
     d = X.shape[1]
     score = BICScore(X, lambda_value=lambda_value)
     # One BLAS thread keeps every score, and so every tie between moves, reproducible.
-    with threadpool_limits(limits=1):
+    with _blas().limit(limits=1):
         if _rescan:
             adj = _rescan_search(score, d, extended_search)
         else:
