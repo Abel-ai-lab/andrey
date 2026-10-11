@@ -15,6 +15,7 @@ import sys
 
 import numpy as np
 import pytest
+from threadpoolctl import threadpool_limits
 
 import andrey
 import andrey.data as data
@@ -179,21 +180,46 @@ def test_lambda_value_is_the_penalty_ges_uses():
         assert xges.metadata["score"] == pytest.approx(ges.metadata["score"], rel=1e-12)
 
 
+def _extension_dag(cpdag: np.ndarray) -> np.ndarray:
+    """The DAG whose BIC the extended search scores for ``cpdag``, as a mark matrix."""
+    d = cpdag.shape[0]
+    sets = [_sets(cpdag, v) for v in range(d)]
+    dag = np.zeros_like(cpdag)
+    for v, ps in _extension_parents([s[0] for s in sets], [s[1] for s in sets], range(d)).items():
+        for u in ps:
+            dag[u, v], dag[v, u] = TAIL, ARROW
+    return dag
+
+
 @pytest.mark.parametrize("seed", range(6))
 def test_branches_are_scored_on_a_member_of_the_class(seed):
     """The extended search compares branches by the BIC of one DAG it picks from each CPDAG. That
     DAG must belong to the CPDAG's class, so its BIC is the class's BIC."""
     ds = _er_sample(15, 1.5 + seed % 3, 500, seed)
     cpdag = from_structure(to_cpdag(ds.graph))
-    sets = [_sets(cpdag, v) for v in range(15)]
-    parents = _extension_parents([s[0] for s in sets], [s[1] for s in sets], range(15))
-    dag = np.zeros_like(cpdag)
-    for v, ps in parents.items():
-        for u in ps:
-            dag[u, v], dag[v, u] = TAIL, ARROW
-    assert np.array_equal(dag2cpdag(dag), cpdag)
+    assert np.array_equal(dag2cpdag(_extension_dag(cpdag)), cpdag)
     score = BICScore(ds.data)
     assert _marks_total(cpdag, score) == pytest.approx(_recompute_objective(cpdag, score, 15))
+
+
+@pytest.mark.parametrize("seed", [0, 4])
+def test_the_extended_search_scores_the_graph_it_returns(seed):
+    """The extended search keeps a running total, rescoring only the nodes a kept branch changed.
+    On the returned graph it must equal the total over the whole graph, scored on a DAG in that
+    graph's class. On seeds 0 and 4 the search keeps branches."""
+    x = _dense(seed).data
+    score = BICScore(x)
+    search = _Search(score, x.shape[1])
+    with threadpool_limits(limits=1):
+        search.inserts_on_empty_graph()
+        search.xges0()
+        xges0_total = _marks_total(search.g.marks(), score)
+        total = search.extend(x.shape[0])
+    marks = search.g.marks()
+    assert np.array_equal(marks, from_structure(xges_search(x)[0]))
+    assert total < xges0_total
+    assert total == _marks_total(marks, score)
+    assert np.array_equal(dag2cpdag(_extension_dag(marks)), marks)
 
 
 def _colliding_pairs(pairs: int) -> list[int]:

@@ -804,8 +804,9 @@ class _Search:
             self.fingerprint = fingerprint
             self.update(log)
 
-    def extend(self, n_samples: int) -> None:
-        """Force each Delete of the converged graph, rerun XGES-0, and keep a lower score.
+    def extend(self, n_samples: int) -> float:
+        """Force each Delete of the converged graph, rerun XGES-0, keep a lower score, and return
+        the final graph's total of :func:`_extension_scores`.
 
         Deletes are tried best first. After a branch is kept, the remaining Deletes of the earlier
         graph are still tried where they apply; the Deletes are listed again once they run out, and
@@ -821,7 +822,7 @@ class _Search:
         local = [scores[v] for v in range(self.d)]
         total = sum(local)
         if np.isnan(total) or total == -np.inf:
-            return
+            return total
         pending: list[tuple] = []
         fresh = False
         while pending or not fresh:
@@ -830,7 +831,7 @@ class _Search:
                     for x in self.g.pa[y] | self.g.ne[y]:
                         self.find_delete(y, x, pending)
                 if not pending:
-                    return
+                    return total
                 fresh = True
             _, _, x, y, C, E = heapq.heappop(pending)
             if not _delete_valid(self.g, x, y, C, E):
@@ -852,6 +853,7 @@ class _Search:
                 self.g, self.paths, self.fingerprint = h, trial.paths, trial.fingerprint
                 local, total = trial_local, trial_total
                 fresh = False
+        return total
 
 
 # ---- the rescanning reference -------------------------------------------------------------------
