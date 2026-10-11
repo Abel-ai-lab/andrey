@@ -173,25 +173,31 @@ these methods: RCD and CAM-UV use their functional assumptions to mark `<->` whe
 has `o-o`, so the PAG scores count a correct `<->` as an error and BottomUpParceLiNGAM's `o-o` as a
 match. Read two other scores instead.
 
-The directed edges are scored against the latent projection: observed `i -> j` when a directed path
-runs from `i` to `j` through hidden nodes only. The `directed_*` columns hold `n_est`, `n_true`,
-`precision`, `recall`, `f1`, and `errors`, the edges in one set and not the other (a reversed edge
-counts twice).
+The directed edges are scored against two targets. `directed_projection_*` uses the latent
+projection: observed `i -> j` when a directed path runs from `i` to `j` through hidden nodes only,
+which RCD and BottomUpParceLiNGAM estimate. `directed_direct_*` uses the edges between two observed
+nodes, which CAM-UV estimates: it marks a path through a hidden node as a pair instead. Each holds
+`n_true`, `precision`, `recall`, `f1`, and `errors`, the edges in one set and not the other (a
+reversed edge counts twice); `directed_n_est` counts the estimate's edges.
 
 A fit also names the pairs it attributes to a hidden common cause: the `<->` edges for RCD and
 CAM-UV, and the `o-o` edges for BottomUpParceLiNGAM, which leaves the order of such a pair open.
 They match `metadata["confounded_pairs"]` of Andrey's result. `confounded_n_est` counts them, and
-three sets of true pairs score them:
+four sets of true pairs score them:
 
 | columns | true pairs |
 |---|---|
 | `confounded_nonadjacent_*` | the `hidden_cause` pairs with no directed edge between them in the latent projection |
+| `confounded_unobserved_path_*` | the `hidden_cause` pairs and the pairs a causal path through hidden nodes only joins, less the pairs joined by a direct edge |
 | `confounded_hidden_cause_*` | the observed pairs that one hidden node reaches through hidden nodes only |
 | `confounded_pag_*` | the observed pairs joined by `<->` in the observed PAG |
 
-Each set has `n_true`, `precision`, `recall`, and `f1`. RCD and CAM-UV, in both packages, never
-claim a pair where one variable is the other's parent, so `confounded_nonadjacent_*` is the set they
-can reach and the one to compare; BottomUpParceLiNGAM can also mark an adjacent pair. A PAG keeps
+Each set has `n_true`, `precision`, `recall`, and `f1`. Compare RCD and BottomUpParceLiNGAM on
+`directed_projection_*` and `confounded_nonadjacent_*`: RCD, in both packages, never claims a pair
+where one variable is the other's parent, and BottomUpParceLiNGAM can also mark an adjacent pair.
+Compare CAM-UV on `directed_direct_*` and `confounded_unobserved_path_*`: it marks a pair joined by
+a hidden common cause or by a causal path through hidden nodes, unless one is the other's direct
+parent. The driver's summary prints these. A PAG keeps
 `<->` only where conditional independences fix both arrowheads, so `confounded_pag_*` has nothing to
 find on nearly every dataset at `d = 5`. A ratio with no denominator is `NaN` rather than 1: report
 how many datasets define it, and read the `n_true` columns beside the scores. The `confounder_*`

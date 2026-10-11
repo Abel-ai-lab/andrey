@@ -160,8 +160,8 @@ def rcd(
     TypeError
         If ``max_explanatory_vars`` is not an int.
     ValueError
-        If ``max_explanatory_vars`` is less than 1, or if a significance level is not in
-        ``(0, 1)``.
+        If ``data`` has fewer than 6 rows, if ``max_explanatory_vars`` is less than 1, or if a
+        significance level is not in ``(0, 1)``.
 
     Warns
     -----
@@ -195,7 +195,7 @@ def rcd(
     warn_experimental("rcd")
     from andrey.irregular.rcd import fit_rcd
 
-    X = data_matrix(data)
+    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
     max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
     model = fit_rcd(
         X,
@@ -240,7 +240,8 @@ def camuv(
     TypeError
         If ``max_explanatory_vars`` is not an int.
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, or if ``max_explanatory_vars`` is less than 2.
+        If ``data`` has fewer than 6 rows, if ``alpha`` is not in ``(0, 1)``, or if
+        ``max_explanatory_vars`` is less than 2.
 
     Warns
     -----
@@ -274,7 +275,7 @@ def camuv(
     warn_experimental("camuv")
     from andrey.irregular.camuv import camuv as _native
 
-    X = data_matrix(data)
+    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
     alpha = open_unit_interval(alpha, "alpha")
     max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 2)
     parents, confounded = _native(X, alpha=alpha, max_explanatory_vars=max_explanatory_vars)
@@ -309,7 +310,7 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     Raises
     ------
     ValueError
-        If ``data`` has fewer than 4 rows, or if ``alpha`` is not in ``(0, 1)``.
+        If ``data`` has fewer than 6 rows, or if ``alpha`` is not in ``(0, 1)``.
 
     Warns
     -----
@@ -338,6 +339,6 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     warn_experimental("bottom_up_parce_lingam")
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
 
-    X = data_matrix(data, min_rows=4)  # its HSIC divides by (n - 2)(n - 3)
+    X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
     model = _native(X, alpha=open_unit_interval(alpha, "alpha"))
     return with_labels(_adapt_bottom_up_parce(model), column_labels(data))

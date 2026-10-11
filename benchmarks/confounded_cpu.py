@@ -306,13 +306,19 @@ def main(argv: list[str] | None = None) -> int:
     return 1 if errors else 0
 
 
+#: The directed-edge and pair targets each regime's methods estimate, read by :func:`_summarize`:
+#: RCD and BottomUpParceLiNGAM estimate the latent projection, and CAM-UV direct edges plus the pairs
+#: an unobserved path joins.
+TARGETS = {"linear": ("projection", "nonadjacent"), "anm": ("direct", "unobserved_path")}
+
+
 def _summarize(table: pd.DataFrame) -> None:
     """Print, per regime, solution, and rung, the fits that finished, with their medians and means.
 
-    Wall time and the directed-edge errors are medians over the finished fits. The F1 columns are
-    means over the fits where F1 is defined, so ``nan`` marks a rung where every fit had nothing to
-    find and claimed nothing: ``f1 dir`` for the directed edges of the latent projection, ``f1
-    pair`` for the non-adjacent hidden-cause pairs, with ``pairs`` their mean count.
+    Each regime reads the targets its methods estimate (:data:`TARGETS`). Wall time and the
+    directed-edge errors are medians over the finished fits. The F1 columns are means over the fits
+    where F1 is defined, so ``nan`` marks a rung where every fit had nothing to find and claimed
+    nothing; ``pairs`` is the mean number of true pairs.
     """
     if table.empty:
         return
@@ -323,11 +329,12 @@ def _summarize(table: pd.DataFrame) -> None:
     )
     for (regime, name, d), rows in table.groupby(["functional", "name", "d"], sort=True):
         ok = rows[rows["status"] == "ok"]
+        edges, pairs = TARGETS[regime]
         _log(
             f"{regime:10s} {name:30s} {d:3d} {len(ok):3d}/{len(rows):<3d} "
-            f"{ok['wall_s'].median():8.3g} {ok['directed_errors'].median():7.3g} "
-            f"{ok['directed_f1'].mean():7.3f} {ok['confounded_nonadjacent_f1'].mean():7.3f} "
-            f"{ok['confounded_nonadjacent_n_true'].mean():6.2f}"
+            f"{ok['wall_s'].median():8.3g} {ok[f'directed_{edges}_errors'].median():7.3g} "
+            f"{ok[f'directed_{edges}_f1'].mean():7.3f} {ok[f'confounded_{pairs}_f1'].mean():7.3f} "
+            f"{ok[f'confounded_{pairs}_n_true'].mean():6.2f}"
         )
 
 

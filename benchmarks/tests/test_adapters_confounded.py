@@ -203,9 +203,19 @@ def test_directed_edges_are_scored_against_the_latent_projection() -> None:
     for i, j in ((0, 1), (1, 2)):
         marks[i, j], marks[j, i] = _TAIL, _ARROW
     scores = directed_edge_scores(GraphStructure.from_numpy(marks, kind="pag"), truth)
-    assert scores["directed_n_est"] == scores["directed_n_true"] == 2
-    assert scores["directed_precision"] == scores["directed_recall"] == scores["directed_f1"] == 0.5
-    assert scores["directed_errors"] == 2
+    assert scores["directed_n_est"] == scores["directed_projection_n_true"] == 2
+    assert [scores[f"directed_projection_{s}"] for s in ("precision", "recall", "f1")] == [0.5] * 3
+    assert scores["directed_projection_errors"] == 2
+    # Only 0 -> 2 joins two observed nodes directly: the estimate's 0 -> 1 is CAM-UV's error.
+    assert scores["directed_direct_n_true"] == 1
+    assert scores["directed_direct_errors"] == 3
+
+
+def test_unobserved_path_adds_the_pairs_a_hidden_mediator_joins() -> None:
+    # 0 -> hidden 3 -> 1 and 3 -> 2: CAM-UV marks (0, 1), (0, 2), and (1, 2).
+    truth = _dag([(0, 3), (3, 1), (3, 2)], d=4, hidden=(3,))
+    assert true_confounded_pairs(truth, "nonadjacent") == {(1, 2)}
+    assert true_confounded_pairs(truth, "unobserved_path") == {(0, 1), (0, 2), (1, 2)}
 
 
 def test_a_perfect_claim_scores_one_for_either_mark() -> None:
