@@ -919,7 +919,8 @@ def test_the_hero_grain_is_small_and_the_same_on_every_build(cards):
 def test_the_homepage_and_docs_css_name_no_colour(cards):
     # Every color is a generated token, so a palette edit reaches the hero and the chip too.
     sheets = ("site.css", "figures.css", "why-fast.css")
-    for path in [*(f"site/assets/{name}" for name in sheets), "docs/_static/andrey.css"]:
+    docs = ("docs/_static/andrey.css", "docs/_static/benchmarks.css")
+    for path in [*(f"site/assets/{name}" for name in sheets), *docs]:
         rules = re.sub(r"/\*.*?\*/", "", (ROOT / path).read_text(), flags=re.S)
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(", rules), path
     tokens = cards.grain.ground_tokens()

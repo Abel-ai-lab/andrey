@@ -1,0 +1,89 @@
+/* The Benchmarks page: one card per release report. Colors are --andrey-* tokens. */
+
+/* The grid's edges line up with the text column. */
+.benchmark-reports {
+  padding-inline: 0;
+}
+
+/* A report's cover: the homepage hero's navy ground lit cobalt from the top left, the same in both
+   themes, with the release in large light type. The extra `.sd-card` outranks the theme's
+   `.bd-content .sd-card .sd-card-header` ground and border. */
+.benchmark-reports .sd-card .report-cover {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+  min-height: 10rem;
+  padding: 1.25rem 1.5rem 1.4rem;
+  border: 0;
+  border-radius: calc(var(--andrey-radius-lg) - 1px) calc(var(--andrey-radius-lg) - 1px) 0 0;
+  background:
+    radial-gradient(
+      circle at 14% 0%,
+      color-mix(in srgb, var(--andrey-ground-cobalt) 80%, var(--andrey-ground-navy)) 0,
+      transparent 70%
+    ),
+    var(--andrey-ground-navy);
+  color: var(--andrey-ground-ink);
+  transition: filter var(--andrey-dur) var(--andrey-ease);
+}
+
+.benchmark-reports .sd-card:hover .report-cover {
+  filter: brightness(1.12);
+}
+
+.benchmark-reports .report-cover p {
+  margin: 0;
+}
+
+/* The label, tracked capitals like the sidebar's section names. */
+.benchmark-reports .report-cover p:first-child {
+  color: var(--andrey-ground-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* The release. */
+.benchmark-reports .report-cover p:last-child {
+  font-size: 3rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.benchmark-reports .sd-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.1rem 1.5rem 1.25rem;
+}
+
+.benchmark-reports .sd-card-title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.benchmark-reports .sd-card-body p {
+  margin: 0;
+  color: var(--andrey-muted);
+  font-size: 0.92rem;
+}
+
+/* The badge sits at the bottom, so the dates line up across a row. */
+.benchmark-reports .sd-card-body p:last-child {
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+
+.benchmark-reports .sd-badge {
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .benchmark-reports .sd-card .report-cover {
+    transition: none;
+  }
+}
