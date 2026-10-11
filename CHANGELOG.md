@@ -3,8 +3,8 @@
 All notable changes to Andrey are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the major version is 0, Andrey is
-in alpha, and any minor release may change the API. Each release lists its highlights and breaking
-changes first, then the other changes by kind, each with its pull request.
+in alpha, and any minor release may change the API. From 0.2.0, a release opens with two sections
+Keep a Changelog does not define, Highlights and Breaking, and each change names its pull request.
 
 ## [Unreleased]
 

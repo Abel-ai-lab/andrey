@@ -351,13 +351,16 @@ def test_fork_reset_frees_a_held_dispatch_lock():
 
 
 def test_one_blas_thread_limits_inside_and_restores_after():
-    from threadpoolctl import threadpool_info
+    from threadpoolctl import threadpool_info, threadpool_limits
 
     def counts():
         return [lib["num_threads"] for lib in threadpool_info()]
 
+    if not threadpool_info():
+        pytest.skip("no thread pool that threadpoolctl can control")
     backend._thread_pools.cache_clear()  # pools loaded by earlier tests are found again
-    before = counts()
-    with backend.one_blas_thread():
-        assert set(counts()) <= {1}
-    assert counts() == before
+    with threadpool_limits(limits=2):  # a count other than 1, set after the pools were found
+        before = counts()
+        with backend.one_blas_thread():
+            assert set(counts()) == {1}
+        assert counts() == before
