@@ -10,7 +10,7 @@ with the same settings.
 ``d`` includes hidden nodes: one node in five is hidden, at least one, so each rung has
 ``d - latents`` data columns. Every estimate is scored against the PAG of the observed nodes, its
 directed edges against the latent projection and the direct edges, and the pairs it attributes to
-a hidden common cause against four sets of true pairs (:data:`scoring.CONFOUNDED_TARGETS`);
+a hidden common cause against three sets of true pairs (:data:`scoring.CONFOUNDED_TARGETS`);
 :data:`TARGETS` names the ones each method estimates. A timeout is a timeout: it has no scores.
 
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/confounded_cpu.py \\
@@ -318,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
 #: The directed-edge and pair targets each regime's methods estimate, read by :func:`_summarize`:
 #: RCD and BottomUpParceLiNGAM estimate the latent projection, and CAM-UV direct edges plus the pairs
 #: an unobserved path joins.
-TARGETS = {"linear": ("projection", "nonadjacent"), "anm": ("direct", "unobserved_path")}
+TARGETS = {"linear": ("projection", "hidden_cause"), "anm": ("direct", "unobserved_path")}
 
 
 def _summarize(table: pd.DataFrame) -> None:

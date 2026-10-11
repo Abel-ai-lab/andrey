@@ -82,13 +82,11 @@ CONFOUNDED_MARKS = {"bidirected": _ARROW, "circle": _CIRCLE}
 #: What counts as a true confounded pair. ``pag``: the observed pairs joined by ``<->`` in the
 #: observed PAG. A PAG keeps ``<->`` only where conditional independences fix both arrowheads, so a
 #: sparse graph has few. ``hidden_cause``: the observed pairs reached from one hidden node by
-#: directed paths that pass through hidden nodes only. ``nonadjacent``: the ``hidden_cause`` pairs
-#: with no directed edge between them in the latent projection (:func:`projected_directed`). RCD and
-#: CAM-UV, in both packages, never claim a pair where one variable is the other's parent, so
-#: ``nonadjacent`` is the set they can reach; BottomUpParceLiNGAM can also mark an adjacent pair.
+#: directed paths that pass through hidden nodes only, the target of RCD and BottomUpParceLiNGAM.
 #: ``unobserved_path``: CAM-UV's target, the pairs joined by an unobserved causal or backdoor path
-#: (:func:`unobserved_path_pairs`). CAM-UV marks these whether or not one is the other's parent.
-CONFOUNDED_TARGETS = ("pag", "hidden_cause", "nonadjacent", "unobserved_path")
+#: (:func:`unobserved_path_pairs`). Each method marks its pairs whether or not one node is the
+#: other's parent.
+CONFOUNDED_TARGETS = ("pag", "hidden_cause", "unobserved_path")
 
 #: The columns :func:`confounded_pair_scores` returns, in order: the number of estimated pairs, then
 #: per target the number of true pairs, precision, recall, and F1.
@@ -201,9 +199,6 @@ def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, 
         return _marked_pairs(np.asarray(_pag_of(truth).to_numpy()), _ARROW)
     if target == "hidden_cause":
         return _hidden_cause_pairs(truth)
-    if target == "nonadjacent":
-        adjacent = {tuple(sorted(edge)) for edge in projected_directed(truth)}
-        return _hidden_cause_pairs(truth) - adjacent
     if target == "unobserved_path":
         return unobserved_path_pairs(truth)
     raise ValueError(f"unknown target {target!r}; known: {list(CONFOUNDED_TARGETS)}")
@@ -233,7 +228,8 @@ def confounded_pair_scores(
 
 
 #: What counts as a true directed edge. ``projection``: the latent projection's edges
-#: (:func:`projected_directed`), what RCD and BottomUpParceLiNGAM estimate. ``direct``: the edges
+#: (:func:`projected_directed`) whose endpoints share no hidden cause, what RCD and
+#: BottomUpParceLiNGAM estimate; a pair with a hidden cause is marked, not oriented. ``direct``: the edges
 #: between two observed nodes with no unobserved path between them (:func:`direct_edges`), what
 #: CAM-UV estimates; it marks a pair with such a path as unresolved instead.
 DIRECTED_TARGETS = ("projection", "direct")
@@ -260,10 +256,9 @@ def directed_edge_scores(estimate: GraphStructure, truth: GraphStructure) -> dic
     adjacency = _directed_adjacency(estimate)
     claimed = {(int(i), int(j)) for i, j in zip(*np.nonzero(adjacency), strict=True)}
     scores: dict[str, float] = {"directed_n_est": len(claimed)}
-    for target, true in (
-        ("projection", projected_directed(truth)),
-        ("direct", direct_edges(truth)),
-    ):
+    confounded = _hidden_cause_pairs(truth)
+    projection = {e for e in projected_directed(truth) if tuple(sorted(e)) not in confounded}
+    for target, true in (("projection", projection), ("direct", direct_edges(truth))):
         hits = len(claimed & true)
         both = len(claimed) + len(true)
         scores[f"directed_{target}_n_true"] = len(true)
