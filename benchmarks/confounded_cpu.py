@@ -327,14 +327,15 @@ def _summarize(table: pd.DataFrame) -> None:
     Each regime reads the targets its methods estimate (:data:`TARGETS`). Wall time and the
     directed-edge errors are medians over the finished fits. The F1 columns are means over the fits
     where F1 is defined, so ``nan`` marks a rung where every fit had nothing to find and claimed
-    nothing; ``pairs`` is the mean number of true pairs.
+    nothing; ``rec pair`` is the pair recall, the score to read for BottomUpParceLiNGAM, and
+    ``pairs`` the mean number of true pairs.
     """
     if table.empty:
         return
     _log("")
     _log(
         f"{'regime':10s} {'solution':30s} {'d':>3s} {'ok/all':>7s} {'wall_s':>8s} "
-        f"{'dir err':>7s} {'f1 dir':>7s} {'f1 pair':>7s} {'pairs':>6s}"
+        f"{'dir err':>7s} {'f1 dir':>7s} {'f1 pair':>7s} {'rec pair':>8s} {'pairs':>6s}"
     )
     for (regime, name, d), rows in table.groupby(["functional", "name", "d"], sort=True):
         ok = rows[rows["status"] == "ok"]
@@ -343,6 +344,7 @@ def _summarize(table: pd.DataFrame) -> None:
             f"{regime:10s} {name:30s} {d:3d} {len(ok):3d}/{len(rows):<3d} "
             f"{ok['wall_s'].median():8.3g} {ok[f'directed_{edges}_errors'].median():7.3g} "
             f"{ok[f'directed_{edges}_f1'].mean():7.3f} {ok[f'confounded_{pairs}_f1'].mean():7.3f} "
+            f"{ok[f'confounded_{pairs}_recall'].mean():8.3f} "
             f"{ok[f'confounded_{pairs}_n_true'].mean():6.2f}"
         )
 

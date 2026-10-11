@@ -177,15 +177,17 @@ def _adapt_bottom_up_parce(model: Any) -> StructureOutput:
     A symmetric ``NaN`` block is an order-unknown pair and becomes a circle ``pag`` edge. The
     ``causal_order_`` is nested (order-unknown vars nest as sub-lists) so it cannot be a flat
     ``ordering`` permutation -- it rides in ``metadata["causal_order"]`` as a JSON-safe nested list.
-    ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN`` replaced by ``0.0``. The ``NaN``
-    pairs, whose order a hidden common cause leaves unresolved, ride in
-    ``metadata["confounded_pairs"]`` as sorted ``[i, j]`` lists.
+    ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN`` replaced by ``0.0``. The unordered
+    variables form one block, so an ``o-o`` pair need not share a hidden cause, and no
+    ``confounded_pairs`` are listed.
     """
     B = _adjacency(model)
     M = marks_from_signed(B, nan_mark="circle")
     structure = GraphStructure.from_numpy(M, kind="pag")
-    metadata: dict[str, Any] = {"confounded_pairs": _nan_pairs(B)}
+    metadata: dict[str, Any] = {}
     order = getattr(model, "causal_order_", None)
     if order is not None:
         metadata["causal_order"] = order  # json_safe (via structure_output) coerces the nesting
-    return structure_output(structure, weighted_adjacency=_nan_to_zero(B).T, metadata=metadata)
+    return structure_output(
+        structure, weighted_adjacency=_nan_to_zero(B).T, metadata=metadata or None
+    )

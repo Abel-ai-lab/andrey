@@ -183,9 +183,11 @@ and `errors`, the edges in one set and not the other (a reversed edge counts twi
 `directed_n_est` counts the estimate's edges.
 
 A fit also names the pairs it attributes to a hidden common cause: the `<->` edges for RCD and
-CAM-UV, and the `o-o` edges for BottomUpParceLiNGAM, which leaves the order of such a pair open.
-They match `metadata["confounded_pairs"]` of Andrey's result. `confounded_n_est` counts them, and
-three sets of true pairs score them:
+CAM-UV, which match `metadata["confounded_pairs"]` of Andrey's result, and the `o-o` edges for
+BottomUpParceLiNGAM. BottomUpParceLiNGAM's `o-o` edges join every pair of the one block of
+variables it leaves unordered, so two pairs from different hidden causes share the block and its
+cross pairs count against its precision: read its recall, the share of true pairs it leaves
+unordered. `confounded_n_est` counts the pairs, and three sets of true pairs score them:
 
 | columns | true pairs |
 |---|---|

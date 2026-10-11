@@ -1,8 +1,9 @@
 """Facades for the pairwise post-nonlinear (PNL) test and the hidden-confounder methods.
 
 PNL tests both directions in a two-column table. RCD, CAM-UV, and BottomUpParceLiNGAM return a PAG
-over the observed variables, and list the pairs a hidden common cause affects in
-``metadata["confounded_pairs"]``.
+over the observed variables. RCD and CAM-UV list the pairs a hidden common cause affects in
+``metadata["confounded_pairs"]``; BottomUpParceLiNGAM leaves the variables whose order such a
+cause hides unordered.
 """
 
 from __future__ import annotations
@@ -302,21 +303,28 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
-        ``i o-o j`` for a pair whose order a hidden common cause leaves unresolved.
-        ``metadata["confounded_pairs"]`` lists the ``o-o`` pairs as sorted ``[i, j]`` lists, and
-        ``metadata["causal_order"]`` the order, with unordered variables nested in one list.
-        ``weighted_adjacency`` holds the edge coefficients.
+        ``i o-o j`` between variables whose order a hidden common cause leaves unresolved.
+        ``metadata["causal_order"]`` gives the order, with the unordered variables nested in one
+        list; ``weighted_adjacency`` holds the edge coefficients.
 
     Raises
     ------
     ValueError
-        If ``data`` has fewer than 6 rows, or if ``alpha`` is not in ``(0, 1)``.
+        If ``data`` has fewer than 6 rows or no more rows than columns, or if ``alpha`` is not in
+        ``(0, 1)``.
 
     Warns
     -----
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    All the variables left unordered form one block, so two ``o-o`` pairs from different hidden
+    causes share the block: an ``o-o`` pair need not share a cause itself. The edge weights come
+    from an adaptive-Lasso regression of each variable on those before it, which needs more rows
+    than columns.
 
     References
     ----------
@@ -333,12 +341,16 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     >>> x0, x1 = 1.5 * h + u(), 1.5 * h + u()
     >>> data = np.column_stack([x0, x1, x1 + u(), x0 + u()])
     >>> out = andrey.bottom_up_parce_lingam(data, alpha=0.01)
-    >>> out.metadata["confounded_pairs"]
-    [[0, 1]]
+    >>> out.metadata["causal_order"]
+    [[0, 1], 2, 3]
     """
     warn_experimental("bottom_up_parce_lingam")
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
 
     X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
+    if X.shape[0] <= X.shape[1]:
+        raise ValueError(
+            f"data needs more rows than columns, got {X.shape[0]} rows and {X.shape[1]} columns"
+        )
     model = _native(X, alpha=open_unit_interval(alpha, "alpha"))
     return with_labels(_adapt_bottom_up_parce(model), column_labels(data))

@@ -41,13 +41,14 @@ _FORK_ANM_OBSERVED = "fork_5v_anm_observed"
 def _assert_pairs_and_edges(out, case: str, mark: str, *, exact_edges: bool = True) -> None:
     """Check ``out`` against the planted structure of ``case``.
 
-    The confounded pairs match in ``metadata`` and in the structure, where ``mark`` names the edge
-    kind the method draws for a pair, and no other kind of edge appears. The planted direct edges
+    The confounded pairs match the structure's ``mark`` edges, and ``metadata`` where the method
+    lists them; no other kind of edge appears. The planted direct edges
     are all present, and with ``exact_edges`` no other direct edge appears.
     """
     edges, pairs = datagen.planted_structure(case)
     found = out.structure.oriented_edges()
-    assert out.metadata["confounded_pairs"] == [list(pair) for pair in sorted(pairs)]
+    if mark == "bidirected":  # BottomUpParceLiNGAM lists no pairs: its o-o block is unordered
+        assert out.metadata["confounded_pairs"] == [list(pair) for pair in sorted(pairs)]
     assert {(i, j) for i, j, kind in found if kind == mark} == pairs
     assert {kind for _i, _j, kind in found} <= {"directed", mark}
     directed = {(i, j) for i, j, kind in found if kind == "directed"}

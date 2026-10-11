@@ -749,7 +749,12 @@ _add(
                 "Bonferroni-corrected across the remaining variables.",
             ),
         ),
-        output=OutputSpec(structure_type="graph", graph_kind="pag", doc=_CONFOUNDED_OUTPUT_DOC),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="PAG over the observed variables; o-o joins the variables a hidden common "
+            "cause leaves unordered, and metadata causal_order nests them.",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="experimental",
