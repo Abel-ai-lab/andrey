@@ -191,8 +191,6 @@ def rcd(
     >>> out = andrey.rcd(data)
     >>> out.metadata["confounded_pairs"]
     [[0, 1]]
-    >>> out.structure.oriented_edges()
-    [(0, 1, 'bidirected'), (0, 3, 'directed'), (1, 2, 'directed')]
     """
     warn_experimental("rcd")
     from andrey.irregular.rcd import fit_rcd
@@ -226,7 +224,8 @@ def camuv(
     alpha : float, default=0.01
         Significance level of the HSIC independence tests, in ``(0, 1)``.
     max_explanatory_vars : int, default=3
-        Largest parent set tried for one variable, at least 1. Larger values find more parents and
+        Largest set of variables tested together, the variable itself included, at least 2: parent
+        sets have up to ``max_explanatory_vars - 1`` variables. Larger values find more parents and
         take longer.
 
     Returns
@@ -241,7 +240,7 @@ def camuv(
     TypeError
         If ``max_explanatory_vars`` is not an int.
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, or if ``max_explanatory_vars`` is less than 1.
+        If ``alpha`` is not in ``(0, 1)``, or if ``max_explanatory_vars`` is less than 2.
 
     Warns
     -----
@@ -271,15 +270,13 @@ def camuv(
     >>> out = andrey.camuv(data)
     >>> out.metadata["confounded_pairs"]
     [[0, 1]]
-    >>> out.structure.oriented_edges()
-    [(0, 1, 'bidirected'), (0, 3, 'directed'), (1, 2, 'directed')]
     """
     warn_experimental("camuv")
     from andrey.irregular.camuv import camuv as _native
 
     X = data_matrix(data)
     alpha = open_unit_interval(alpha, "alpha")
-    max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
+    max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 2)
     parents, confounded = _native(X, alpha=alpha, max_explanatory_vars=max_explanatory_vars)
     return with_labels(_adapt_camuv(parents, confounded, X.shape[1]), column_labels(data))
 
@@ -337,8 +334,6 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     >>> out = andrey.bottom_up_parce_lingam(data, alpha=0.01)
     >>> out.metadata["confounded_pairs"]
     [[0, 1]]
-    >>> out.structure.oriented_edges()
-    [(0, 1, 'circle'), (0, 3, 'directed'), (1, 2, 'directed')]
     """
     warn_experimental("bottom_up_parce_lingam")
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native

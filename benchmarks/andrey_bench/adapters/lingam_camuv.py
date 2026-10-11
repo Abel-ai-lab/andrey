@@ -15,7 +15,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
-# `num_explanatory_vals` is the largest parent set tried, which Andrey calls `max_explanatory_vars`.
+# `num_explanatory_vals` is the largest subset tested, the variable itself included; Andrey calls
+# it `max_explanatory_vars`.
 _DEFAULTS = {"alpha": 0.01, "num_explanatory_vals": 3}
 
 

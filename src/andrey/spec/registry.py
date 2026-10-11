@@ -659,7 +659,6 @@ _CONFOUNDED_OUTPUT_DOC = (
     "PAG over the observed variables; metadata confounded_pairs lists the pairs a hidden common "
     "cause affects."
 )
-_MAX_EXPLANATORY_DOC = "at least 1; larger values find more {} and take longer."
 
 _add(
     MethodSpec(
@@ -673,8 +672,8 @@ _add(
                 name="max_explanatory_vars",
                 type="int",
                 default=2,
-                doc="Most variables regressed out together in an ancestor test; "
-                + _MAX_EXPLANATORY_DOC.format("ancestors"),
+                doc="Most variables regressed out together in an ancestor test, at least 1; "
+                "larger values find more ancestors and take longer.",
             ),
             ParamSpec(
                 name="cor_alpha",
@@ -721,8 +720,9 @@ _add(
                 name="max_explanatory_vars",
                 type="int",
                 default=3,
-                doc="Largest parent set tried for one variable; "
-                + _MAX_EXPLANATORY_DOC.format("parents"),
+                doc="Largest set of variables tested together, the variable itself included, "
+                "at least 2 (parent sets up to one fewer); larger values find more parents and "
+                "take longer.",
             ),
         ),
         output=OutputSpec(structure_type="graph", graph_kind="pag", doc=_CONFOUNDED_OUTPUT_DOC),

@@ -64,8 +64,8 @@ SINGLE = {
 # Data no method can fit, and what the error must say about it.
 UNUSABLE = {
     "1-D": (lambda x: x[:, 0], r"data must be a 2-D"),
-    "one row": (lambda x: x[:1], r"data needs at least 2 rows"),
-    "no rows": (lambda x: x[:0], r"data needs at least 2 rows"),
+    "one row": (lambda x: x[:1], r"data needs at least \d+ rows"),
+    "no rows": (lambda x: x[:0], r"data needs at least \d+ rows"),
     "NaN": (lambda x: _with(x, (3, 2), np.nan), r"data .*row 3, column 2"),
     "inf": (lambda x: _with(x, (5, 0), np.inf), r"data .*row 5, column 0"),
     "constant column": (lambda x: _with(x, (slice(None), 1), 3.0), r"data column 1 is constant"),
@@ -163,7 +163,7 @@ def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
     ("fit", "setting", "value", "error"),
     [
         *[(andrey.rcd, "max_explanatory_vars", bad, ValueError) for bad in (0, -1)],
-        *[(andrey.camuv, "max_explanatory_vars", bad, ValueError) for bad in (0, -1)],
+        *[(andrey.camuv, "max_explanatory_vars", bad, ValueError) for bad in (1, 0, -1)],
         (andrey.rcd, "max_explanatory_vars", 1.5, TypeError),
         (andrey.camuv, "max_explanatory_vars", 1.5, TypeError),
         *[

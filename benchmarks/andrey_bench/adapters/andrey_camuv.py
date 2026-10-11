@@ -53,7 +53,7 @@ class AndreyCAMUV:
         from andrey.irregular.camuv import camuv  # noqa: F401
 
     def params(self) -> dict[str, Any]:
-        """Return the HSIC significance level and the largest parent set tried."""
+        """Return the HSIC significance level and the largest subset tested, child included."""
         return dict(_DEFAULTS)
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
