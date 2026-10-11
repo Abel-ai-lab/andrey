@@ -18,7 +18,7 @@ from threadpoolctl import threadpool_limits
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BDeuScore, BICScore
+from andrey.core.score import BDeuScore, BICScore, penalty_weight
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
@@ -250,6 +250,7 @@ def hc(
         score = BICScore(X, lambda_value=lambda_value)
         delta = DeltaBICScore(score)
     elif score_func == "local_score_BDeu":
+        penalty_weight(lambda_value)  # BDeu has no penalty, but the setting keeps its range
         score = BDeuScore(X)
         delta = FullScoreDelta(score)
     else:

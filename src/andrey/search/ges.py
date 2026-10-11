@@ -12,7 +12,7 @@ from threadpoolctl import threadpool_limits
 
 from andrey.core import GraphStructure, _bitset, backend
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
-from andrey.core.score import BDeuScore, BICScore, Score
+from andrey.core.score import BDeuScore, BICScore, Score, penalty_weight
 from andrey.search import operators as ops
 
 
@@ -145,6 +145,7 @@ def ges(
     if score_func == "local_score_BIC":
         score = BICScore(X, lambda_value=lambda_value)
     elif score_func == "local_score_BDeu":
+        penalty_weight(lambda_value)  # BDeu has no penalty, but the setting keeps its range
         score = BDeuScore(X)
     else:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {GES_SCORES}")

@@ -157,6 +157,32 @@ def _confounded_anm(
     return np.column_stack([h, x0, x1, x2, x3])[:, list(observed)]
 
 
+def _categorical_bn(
+    seed: int,
+    n_samples: int,
+    cardinalities: list[int],
+    parents: dict[int, list[int]],
+    strength: float,
+) -> np.ndarray:
+    """Categorical network filled in column order, with whole-number codes ``0..k-1``.
+
+    A root is uniform over its ``k`` categories. A child equals the sum of its parents' codes,
+    capped at ``k - 1``, with probability ``strength``, and is uniform otherwise. The capped sum
+    rises with every parent, so each parent changes the child's distribution on its own.
+    """
+    rng = np.random.default_rng(seed)
+    X = np.zeros((n_samples, len(cardinalities)), dtype=np.int64)
+    for j, k in enumerate(cardinalities):
+        uniform = rng.integers(0, k, n_samples)
+        pa = parents.get(j, [])
+        if not pa:
+            X[:, j] = uniform
+            continue
+        rule = np.minimum(X[:, pa].sum(axis=1), k - 1)
+        X[:, j] = np.where(rng.random(n_samples) < strength, rule, uniform)
+    return X.astype(np.float64)
+
+
 # Full order h, x0, x1, x2, x3 (``weights[j][i]`` is the coefficient of ``i`` in ``j``). A strong
 # hidden effect (1.5 against unit-range noise) leaves a trace in the pair's residuals that the
 # independence tests detect at 2000 rows.
@@ -310,6 +336,25 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.0, 0.4, 0.3, 0.0],  # x5 <- x3, x4
         ],
     },
+    # Categorical network x0 -> x2 <- x1, x2 -> x3 -> x4 - the chi-square and G-square tests and
+    # the BDeu score. Meek's rules orient every edge of the CPDAG from the collider at x2.
+    "discrete_5v": {
+        "model": "categorical",
+        "seed": 20240619,
+        "n_samples": 2000,
+        "cardinalities": [2, 3, 3, 2, 3],
+        "parents": {2: [0, 1], 3: [2], 4: [3]},
+        "strength": 0.8,
+    },
+    # Independent categorical columns: the degenerate case, no edges.
+    "discrete_independent_4v": {
+        "model": "categorical",
+        "seed": 20240620,
+        "n_samples": 2000,
+        "cardinalities": [2, 3, 4, 2],
+        "parents": {},
+        "strength": 0.0,
+    },
 }
 
 
@@ -403,6 +448,14 @@ def generate(case_id: str, *, replicate: int = 0) -> np.ndarray:
             n_samples=spec["n_samples"],
             noise_scale=spec["noise_scale"],
             observed=spec["observed"],
+        )
+    if model == "categorical":
+        return _categorical_bn(
+            seed=seed,
+            n_samples=spec["n_samples"],
+            cardinalities=spec["cardinalities"],
+            parents=spec["parents"],
+            strength=spec["strength"],
         )
     raise ValueError(f"unknown case model: {model!r}")
 

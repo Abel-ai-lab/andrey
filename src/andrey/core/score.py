@@ -112,6 +112,18 @@ def local_score_bic(
     return float(n * H + log_n * n_parents * lambda_value)
 
 
+def penalty_weight(lambda_value: float) -> float:
+    """Return the BIC penalty weight ``lambda_value`` as a float, checked to be finite and >= 0.
+
+    Raises ``ValueError`` naming ``lambda_value`` otherwise. The searches check it under BDeu too,
+    which ignores it, so a setting is valid or not whatever the score.
+    """
+    value = float(lambda_value)
+    if not np.isfinite(value) or value < 0.0:
+        raise ValueError(f"lambda_value must be finite and non-negative, got {value}")
+    return value
+
+
 def _solve(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Solve ``a @ x = b``, falling back to the pseudo-inverse when ``a`` is singular."""
     try:
@@ -202,9 +214,7 @@ class BICScore:
         return obj
 
     def _init(self, cov: np.ndarray, n: int, lambda_value: float, cache_size: int | None) -> None:
-        lambda_value = float(lambda_value)
-        if not np.isfinite(lambda_value) or lambda_value < 0.0:
-            raise ValueError(f"lambda_value must be finite and non-negative, got {lambda_value}")
+        lambda_value = penalty_weight(lambda_value)
         self.cov = cov
         self.n = n
         self.lambda_value = lambda_value

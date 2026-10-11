@@ -86,7 +86,7 @@ _add(
         summary="General-purpose structure learning from i.i.d. observational data: "
         "conditional-independence tests remove edges, then orientation rules direct the edges the "
         "data determine; returns a CPDAG. A good first method when nothing is known about the "
-        "graph.",
+        "graph; indep_test=chisq or gsq for categorical data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(structure_type="graph", graph_kind="cpdag"),
         determinism="deterministic",
@@ -185,8 +185,9 @@ _add(
     MethodSpec(
         name="ges",
         family="score",
-        summary="Greedy equivalence search: a BIC-scored greedy search over CPDAGs. Fast and "
-        "accurate on linear-Gaussian data; the BIC score is in metadata['score'].",
+        summary="Greedy equivalence search: a score-based greedy search over CPDAGs. Fast and "
+        "accurate on linear-Gaussian data with the BIC; score_func=local_score_BDeu for "
+        "categorical data. The score is in metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"

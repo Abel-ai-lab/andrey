@@ -222,3 +222,58 @@ def test_cdnod_with_one_domain_gives_the_pc_graph():
 def test_cdnod_rejects_nan_in_c_indx():
     with pytest.raises(ValueError, match="c_indx contains NaN"):
         andrey.cdnod(_data(), c_indx=np.r_[np.nan, np.zeros(59)])
+
+
+# Every categorical setting of each facade that takes one, called on one data matrix.
+CATEGORICAL = {
+    ("pc", "indep_test", "chisq"): lambda x: andrey.pc(x, indep_test="chisq"),
+    ("pc", "indep_test", "gsq"): lambda x: andrey.pc(x, indep_test="gsq"),
+    ("fci", "indep_test", "chisq"): lambda x: andrey.fci(x, indep_test="chisq"),
+    ("fci", "indep_test", "gsq"): lambda x: andrey.fci(x, indep_test="gsq"),
+    ("cdnod", "indep_test", "gsq"): lambda x: andrey.cdnod(
+        x, np.arange(len(x)) % 2, indep_test="gsq"
+    ),
+    ("gfci", "indep_test", "chisq"): lambda x: andrey.gfci(x, indep_test="chisq"),
+    ("gfci", "score_func", "local_score_BDeu"): lambda x: andrey.gfci(
+        x, score_func="local_score_BDeu"
+    ),
+    ("ges", "score_func", "local_score_BDeu"): lambda x: andrey.ges(
+        x, score_func="local_score_BDeu"
+    ),
+    ("hc", "score_func", "local_score_BDeu"): lambda x: andrey.hc(x, score_func="local_score_BDeu"),
+}
+
+
+def _categories(n=200, d=3):
+    return np.random.default_rng(0).integers(0, 3, (n, d)).astype(np.float64)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
+def test_a_categorical_setting_rejects_a_fractional_value(setting):
+    _, option, value = setting
+    with pytest.raises(ValueError, match=rf"{option}='{value}' reads data .* 0\.5 at row 7, col"):
+        CATEGORICAL[setting](_with(_categories(), (7, 2), 0.5))
+    assert CATEGORICAL[setting](_categories()).structure.n_nodes == 3
+
+
+def test_a_categorical_error_names_the_dataframe_column():
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_with(_categories(), (4, 1), 2.25), columns=["a", "b", "c"])
+    with pytest.raises(ValueError, match=r"2\.25 at row 4, column 'b'"):
+        andrey.pc(frame, indep_test="chisq")
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("fit", [andrey.ges, andrey.hc, andrey.gfci])
+def test_bdeu_still_checks_lambda_value(fit):
+    """BDeu has no penalty weight, but a setting outside its range is an error under any score."""
+    with pytest.raises(ValueError, match="lambda_value"):
+        fit(_categories(), score_func="local_score_BDeu", lambda_value=-1.0)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
+    c_indx = np.r_[0.5, np.zeros(99), np.ones(100)]
+    with pytest.raises(ValueError, match=r"c_indx .* 0\.5 at row 0"):
+        andrey.cdnod(_categories(), c_indx, indep_test="chisq")
