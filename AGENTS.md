@@ -38,7 +38,8 @@ right, make it fast." For algorithm implementations:
 ## Documentation style
 
 Concise and simple; describe current behavior only - no "this PR adds ..." commentary or issue
-numbers in prose. Code, docstrings, comments, and the developer docs (`AGENTS.md`,
+numbers in prose. The CHANGELOG is the exception: each entry ends with a link to its pull request.
+Code, docstrings, comments, and the developer docs (`AGENTS.md`,
 `DEVELOPMENT.md`, `CONTRIBUTING.md`) are written in the third person. Pages written for readers
 (the README, the blog, the homepage, and the pages under `docs/docs/`) keep their voice: they
 address the reader as "you" and speak for the project as "we". In code and tests, describe what
