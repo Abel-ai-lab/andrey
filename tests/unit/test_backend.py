@@ -348,3 +348,16 @@ def test_fork_reset_frees_a_held_dispatch_lock():
     finally:
         backend._recording.reset(token)
         held.release()
+
+
+def test_one_blas_thread_limits_inside_and_restores_after():
+    from threadpoolctl import threadpool_info
+
+    def counts():
+        return [lib["num_threads"] for lib in threadpool_info()]
+
+    backend._thread_pools.cache_clear()  # pools loaded by earlier tests are found again
+    before = counts()
+    with backend.one_blas_thread():
+        assert set(counts()) <= {1}
+    assert counts() == before

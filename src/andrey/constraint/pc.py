@@ -10,7 +10,6 @@ from itertools import combinations
 from math import comb
 
 import numpy as np
-from threadpoolctl import threadpool_limits
 
 from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
@@ -20,7 +19,7 @@ from andrey.constraint._skeleton import (
     prescreen_capable,
     scan_pairs,
 )
-from andrey.core import ARROW, NULL, TAIL, GraphStructure
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
@@ -204,7 +203,7 @@ def _discover_skeleton(
                 else:
                     # Pin BLAS to one thread: the conditioning-submatrix inversions then match the
                     # (1-thread) parallel skeleton workers regardless of the host thread count.
-                    with threadpool_limits(limits=1):
+                    with backend.one_blas_thread():
                         removals = scan_pairs(test, pairs, neighbours, size, alpha, _trace)
                 for x, y, separating in removals:
                     remove.append((x, y))

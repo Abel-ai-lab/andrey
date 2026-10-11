@@ -3,9 +3,16 @@
 All notable changes to Andrey are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the major version is 0, Andrey is
-in alpha, and any minor release may change the API.
+in alpha, and any minor release may change the API. Each release lists its highlights first, then
+the changes by kind.
 
 ## [Unreleased]
+
+### Highlights
+
+- Small fits run several times faster. At 10 variables, PC and FCI take about a twelfth of the
+  time, hill climbing an eighth, and GES two fifths. Larger fits are no slower, and graphs are
+  unchanged.
 
 ### Added
 
