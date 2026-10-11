@@ -144,7 +144,7 @@ def test_anm_names_the_planted_direction_in_any_units_and_column_order():
     assert first.structure.oriented_edges() == [(0, 1, "directed")]
     assert set(first.metadata) == {"algorithm", "pval_forward", "pval_backward"}
     pvalues = (first.metadata["pval_forward"], first.metadata["pval_backward"])
-    for scale in (100.0, 0.01):
+    for scale in (100.0, 0.01, 1e-200):  # 1e-200: squared deviations would underflow
         out = anm_facade(planted * np.array([scale, 1 / scale]))
         assert np.allclose((out.metadata["pval_forward"], out.metadata["pval_backward"]), pvalues)
     df = pd.DataFrame(planted, columns=["cause", "effect"])

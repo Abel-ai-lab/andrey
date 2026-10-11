@@ -65,8 +65,9 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     Notes
     -----
     With ``alpha=None``, the edge points in the direction with the larger p-value; equal values
-    give no edge. Unequal p-values therefore produce an edge even for unrelated variables or a
-    pair whose direction cannot be identified. Mooij et al. (2016) [3]_ use this rule to avoid
+    give no edge. Unequal p-values therefore produce an edge even for unrelated variables, a
+    deterministic pair whose p-values are both near zero, or a pair whose direction cannot be
+    identified. Mooij et al. (2016) [3]_ use this rule to avoid
     choosing a significance level and found it among the best methods in their benchmark.
 
     With a significance level, a direction passes when its p-value exceeds ``alpha``:
@@ -121,6 +122,7 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     if alpha is not None:
         alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
     Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
     pval_forward, pval_backward = _native(Z[:, 0], Z[:, 1])
     return _adapt_anm(pval_forward, pval_backward, alpha=alpha, labels=labels)
