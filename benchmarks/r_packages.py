@@ -6,7 +6,7 @@ Compare speed, accuracy, and the largest graph each search finishes on the same 
 Each job runs one lane. Their graph-size limits differ by an order of magnitude, so a shared
 ladder would miss larger GES sizes or exhaust its time limit on FCI timeouts:
 
-    --lane score  Andrey GES (3 builds), HC (2) and tabu (2), pcalg ges, bnlearn hc and tabu
+    --lane score  Andrey GES (3 builds), HC and tabu, pcalg ges, bnlearn hc and tabu
     --lane pc     Andrey PC, pcalg pc, bnlearn pc.stable
     --lane fci    Andrey FCI, pcalg fci and rfci
 
@@ -89,13 +89,8 @@ LANES: dict[str, tuple] = {
     "fci": (lambda: [AndreyFCI(), PcalgFCI(), PcalgRFCI(), BaselineEmpty()], ("pcalg",)),
 }
 
-#: Algorithm-specific parallel thresholds. GES and HC each read their own variable; assigning
-#: one to both algorithms would record an unused setting. Tabu search reads HC's.
-WORK_GATE_ENV: dict[str, str] = {
-    "ges": "ANDREY_GES_PARALLEL_MIN_WORK",
-    "hc": "ANDREY_HC_PARALLEL_MIN_WORK",
-    "tabu": "ANDREY_HC_PARALLEL_MIN_WORK",
-}
+#: The algorithms with a parallel work threshold, and the variable each reads.
+WORK_GATE_ENV: dict[str, str] = {"ges": "ANDREY_GES_PARALLEL_MIN_WORK"}
 
 #: The canonical sparse slice: linear-Gaussian on Erdos-Renyi at average degree 2, where GES, PC and
 #: FCI are all identifiable and every solution above can run.
@@ -145,8 +140,8 @@ def groups(solutions: list, min_work: Mapping[str, int | None]):
     """Group solutions by environment as `(solutions, extra_env)` pairs.
 
     Work thresholds apply only to parallel Andrey solutions; serial fits use one worker and R
-    solutions have no threshold. GES and HC read separate variables, so each algorithm with a
-    threshold gets its own group and environment overlay.
+    solutions have no threshold. Each algorithm with a threshold gets its own group and
+    environment overlay.
     """
     gated: dict[str, list] = {}
     for adapter in solutions:
@@ -221,14 +216,6 @@ def main(argv: list[str] | None = None) -> int:
         "refuses a continuation under a different value rather than pooling two gates in one table",
     )
     p.add_argument(
-        "--hc-min-work",
-        type=int,
-        default=None,
-        help="parallel work gate for andrey's parallel HC and tabu, in scanned moves per pass - a "
-        "different unit and a different environment variable from the GES gate. The shipped "
-        "default has never been measured on any host, so a campaign should declare one",
-    )
-    p.add_argument(
         "--machine-id",
         default=socket.gethostname(),
         help="machine id stamped on every record and in run_id (default: this host's name)",
@@ -244,10 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(args.out)
     build_solutions, r_packages = LANES[args.lane]
     solutions = select(build_solutions(), args.only)
-    work_gates = {
-        "ANDREY_GES_PARALLEL_MIN_WORK": args.ges_min_work,
-        "ANDREY_HC_PARALLEL_MIN_WORK": args.hc_min_work,
-    }
+    work_gates = {"ANDREY_GES_PARALLEL_MIN_WORK": args.ges_min_work}
     # Check R availability and record its environment before materializing or measuring.
     r_environment = rsession.check_environment(*r_packages)
 
@@ -259,9 +243,7 @@ def main(argv: list[str] | None = None) -> int:
         "params": {a.name: dict(a.params()) for a in solutions},
         "r environment": r_environment,
         # `aggregate.STAMPS` uses this name to group pooled results by GES threshold.
-        # Record the HC threshold alongside it.
         "ges_min_work": args.ges_min_work,
-        "hc_min_work": args.hc_min_work,
         "slice": SLICE,
         "ladder": args.ladder,
         "seeds": args.seeds,

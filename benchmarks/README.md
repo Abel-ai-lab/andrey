@@ -121,8 +121,8 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 |---|---|
 | GES | Andrey (numpy/serial, numpy/parallel, numba/serial), causal-learn, gCastle, pcalg |
 | XGES (GES family) | xges |
-| HC | Andrey (serial, parallel), bnlearn (`hc`) |
-| Tabu | Andrey (serial, parallel), bnlearn (`tabu`) |
+| HC | Andrey, bnlearn (`hc`) |
+| Tabu | Andrey, bnlearn (`tabu`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
 | BOSS | Andrey, causal-learn |
@@ -273,30 +273,24 @@ provide no fit-time bound.
 
 Andrey uses hardcoded thresholds for accelerated paths:
 
-- `ANDREY_GES_PARALLEL_MIN_WORK` and `ANDREY_HC_PARALLEL_MIN_WORK` select the worker pool.
+- `ANDREY_GES_PARALLEL_MIN_WORK` selects the worker pool.
 - `ANDREY_COV_GPU_THRESHOLD` and `ANDREY_ENTROPY_GPU_THRESHOLD` select the accelerator.
 
 Three thresholds were calibrated once on one machine. Later measurements found errors of 7x for GES,
 25x for `cov`, and 40x for entropy. Each error kept the faster path disabled.
 
-**The worker-pool defaults suit a single fit, not a campaign.** A campaign runs many fits in one
+**The worker-pool default suits a single fit, not a campaign.** A campaign runs many fits in one
 process, and after the first pool start (about 2 s) the pool pays off at smaller sizes. With 8
-workers, `andrey calibrate` measured about 1,100 for GES and 7,500 for HC, against the defaults of
-10,000 and 30,000. Repeated runs produce a range because other node activity affects pool
-round-trip time.
+workers, `andrey calibrate` measured about 1,100 for GES, against the default of 10,000. Repeated
+runs produce a range because other node activity affects pool round-trip time.
 
-HC's best pool size grows with `d`: 4 workers at `d = 150`, 8 at `d = 300`, 16 at `d = 500`. A
-campaign using the same budget for every solution reaches HC's peak performance only at the larger
-sizes.
-
-Measure both on the campaign node with the pool size used for fits, and **apply the measured
+Measure on the campaign node with the pool size used for fits, and **apply the measured
 thresholds**. Recording an unused calibration is worse than no calibration: it records a threshold
 that did not control the run.
 
-**Check the unit before setting a threshold.** GES uses candidate evaluations, HC uses moves per
-pass, `cov` uses `n * d`, and `entropy` uses batch width `B`. `andrey.spec.environment` lists these
-units, and `andrey --help --json` prints them. A value in the wrong unit silently selects the wrong
-path.
+**Check the unit before setting a threshold.** GES uses candidate evaluations, `cov` uses `n * d`,
+and `entropy` uses batch width `B`. `andrey.spec.environment` lists these units, and
+`andrey --help --json` prints them. A value in the wrong unit silently selects the wrong path.
 
 **Backend pins affect the gates differently.** Worker-pool gates run on each search pass and ignore
 the backend. Below the GES threshold, `ges.numpy.parallel` uses the serial path. Device thresholds
@@ -309,8 +303,8 @@ Check the adapter before treating a lane name as the measured device.
 Before a campaign:
 
 1. Measure the crossover on the campaign machine. Run `andrey calibrate --workers <pool size>` for
-   GES and HC. For a device threshold, compare the primitive with numpy across the sizes used by
-   the fits.
+   GES. For a device threshold, compare the primitive with numpy across the sizes used by the
+   fits.
 2. Set the environment variable and record it in `run_meta.json`. Declare every hyperparameter.
 3. Record which side of the threshold contains each rung. Keep one rung where the accelerated path
    is slower.

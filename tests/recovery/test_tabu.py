@@ -19,7 +19,6 @@ from andrey import data
 from andrey.core import backend
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent, to_cpdag
-from andrey.search import _parallel_hc as phc
 from tests.recovery.helpers import datagen
 
 pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
@@ -96,26 +95,16 @@ def test_longer_searches_never_score_worse():
     assert andrey.tabu(x).metadata["score"] <= short
 
 
-def test_tabu_is_deterministic_across_runs_and_worker_counts(monkeypatch):
-    """The worker pool reproduces the in-process search exactly, non-improving moves included."""
+def test_tabu_is_deterministic_across_runs_and_worker_counts():
+    """Repeated fits, and fits under different worker counts, agree exactly, non-improving moves
+    included."""
     x = _er_sample(10, 9).data
-    serial = andrey.tabu(x)
-    assert np.array_equal(andrey.tabu(x).structure.to_numpy(), serial.structure.to_numpy())
-    pools = []
-    create_pool = phc._create_pool
-
-    def counting(*args, **kwargs):
-        pools.append(1)
-        return create_pool(*args, **kwargs)
-
-    monkeypatch.setattr(phc, "_create_pool", counting)
-    monkeypatch.setenv("ANDREY_HC_PARALLEL_MIN_WORK", "0")  # every pass fans out to the workers
-    for workers in (2, 3):
+    first = andrey.tabu(x)
+    for workers in (1, 2, 3):
         with backend.config(num_workers=workers):
-            pooled = andrey.tabu(x)
-        assert np.array_equal(pooled.structure.to_numpy(), serial.structure.to_numpy())
-        assert pooled.metadata["score"] == serial.metadata["score"]
-    assert len(pools) == 2  # one worker set per fit, kept across its passes
+            again = andrey.tabu(x)
+        assert np.array_equal(again.structure.to_numpy(), first.structure.to_numpy())
+        assert again.metadata["score"] == first.metadata["score"]
 
 
 def test_tabu_sets_no_move_limit_by_default():

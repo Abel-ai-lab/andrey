@@ -1,4 +1,4 @@
-"""Andrey tabu-search adapters for greedy score-based search.
+"""Andrey tabu-search adapter for greedy score-based search.
 
 Tabu search is hill climbing that keeps going past a local optimum: when no move improves the score
 it takes the best non-improving move, never returning to one of the `tabu_length` DAGs it visited
@@ -27,7 +27,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from andrey_bench.adapters.andrey_hc import _andrey_version, _parallel_workers
+from andrey_bench.adapters.andrey_hc import _andrey_version
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
 #: Deviance units, bnlearn's `bic-g` at `k = log(n)/2` up to its residual variance, which
@@ -42,7 +42,7 @@ _DEFAULT_MAX_ITER = 100_000
 
 @dataclass(frozen=True)
 class AndreyTabu:
-    """Benchmark adapter for one Andrey tabu-search execution mode."""
+    """Benchmark adapter for Andrey tabu search."""
 
     name: str
     backend: str
@@ -76,9 +76,8 @@ class AndreyTabu:
         import andrey
         from andrey.search.tabu import tabu as _tabu
 
-        workers = 1 if self.mode == "serial" else _parallel_workers()
         X = np.asarray(data, dtype=np.float64)
-        with andrey.config(backend=self.backend, num_workers=workers):
+        with andrey.config(backend=self.backend):
             cpdag, _score = _tabu(
                 X,
                 score_func=params.get("score_func", _DEFAULT_SCORE_FUNC),
@@ -97,16 +96,12 @@ class AndreyTabu:
 
 
 def andrey_tabu_adapters() -> list[AndreyTabu]:
-    """Return serial and parallel tabu contestants.
-
-    The parallel one reads hill climbing's work gate, ``ANDREY_HC_PARALLEL_MIN_WORK``.
-    """
-    version = _andrey_version()
-    specs = (
-        ("andrey.tabu.numpy.serial", "numpy", "serial"),
-        ("andrey.tabu.numpy.parallel", "numpy", "parallel"),
-    )
+    """Return the tabu contestant."""
     return [
-        AndreyTabu(name=name, backend=backend, mode=mode, package_version=version)
-        for name, backend, mode in specs
+        AndreyTabu(
+            name="andrey.tabu.numpy.serial",
+            backend="numpy",
+            mode="serial",
+            package_version=_andrey_version(),
+        )
     ]

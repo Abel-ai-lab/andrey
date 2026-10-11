@@ -42,16 +42,11 @@ from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores
 
-
-def _serial(adapters: list) -> list:
-    return [a for a in adapters if a.mode == "serial"]
-
-
-#: The solutions, tabu pairs first. Every one is serial, as bnlearn is.
+#: The solutions, tabu pairs first.
 SOLUTIONS = [
-    *_serial(andrey_tabu_adapters()),
+    *andrey_tabu_adapters(),
     BnlearnTabu(),
-    *_serial(andrey_hc_adapters()),
+    *andrey_hc_adapters(),
     BnlearnHC(),
     BaselineEmpty(),
 ]

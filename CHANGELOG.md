@@ -22,6 +22,8 @@ in alpha, and any minor release may change the API.
 ### Changed
 
 - `hc` gives the same graphs in less time: a fit on 200 variables runs about 60 times faster.
+- `hc` runs in one process: its worker processes were slower at every measured size.
+  `ANDREY_HC_PARALLEL_MIN_WORK` and `andrey calibrate --method hc` are removed.
 
 ### Fixed
 

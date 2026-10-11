@@ -1,17 +1,16 @@
-"""Measure the GES and HC worker-pool cutoffs on this machine (``andrey calibrate``).
+"""Measure the GES worker-pool cutoff on this machine (``andrey calibrate``).
 
-A GES or HC pass runs on the worker pool only when its estimated work exceeds a cutoff:
-``ANDREY_GES_PARALLEL_MIN_WORK`` (estimated candidate evaluations) and
-``ANDREY_HC_PARALLEL_MIN_WORK`` (moves scanned). Where the pool starts to pay depends on the
-machine, the worker count, and the numerical libraries, so the defaults are a starting point.
-Nothing here runs unless called: fits never calibrate.
+A GES pass runs on the worker pool only when its estimated work exceeds a cutoff,
+``ANDREY_GES_PARALLEL_MIN_WORK`` (estimated candidate evaluations). Where the pool starts to pay
+depends on the machine, the worker count, and the numerical libraries, so the default is a starting
+point. Nothing here runs unless called: fits never calibrate.
 
-Each method is timed on whole fits of a sparse linear-Gaussian sample over ``d`` variables: a
-serial fit against one that runs every pass on the pool, including starting it. :func:`bracket`
-finds the two sizes around the crossover, extending below or above the probe grid when needed. The
-cutoff is the first pass's work there, ``d * (d - 1)`` for both methods: a fit that large uses the
-pool from its first pass, and a smaller fit only for its larger later passes. The process's first
-pool start is paid before timing, so the values suit many fits in one process (:data:`NOTE`).
+GES is timed on whole fits of a sparse linear-Gaussian sample over ``d`` variables: a serial fit
+against one that runs every pass on the pool, including starting it. :func:`bracket` finds the two
+sizes around the crossover, extending below or above the probe grid when needed. The cutoff is the
+first pass's work there, ``d * (d - 1)``: a fit that large uses the pool from its first pass, and a
+smaller fit only for its larger later passes. The process's first pool start is paid before timing,
+so the value suits many fits in one process (:data:`NOTE`).
 """
 
 from __future__ import annotations
@@ -25,21 +24,17 @@ from dataclasses import dataclass
 import numpy as np
 
 COMMAND = "andrey calibrate"
-CUTOFFS = {"ges": "ANDREY_GES_PARALLEL_MIN_WORK", "hc": "ANDREY_HC_PARALLEL_MIN_WORK"}
+CUTOFFS = {"ges": "ANDREY_GES_PARALLEL_MIN_WORK"}
 NOTE = (
-    "These values suit many fits in one process. Starting the first pool in a process costs more, "
-    "so a single fit gains from the pool only at larger sizes; the defaults allow for it."
+    "This value suits many fits in one process. Starting the first pool in a process costs more, "
+    "so a single fit gains from the pool only at larger sizes; the default allows for it."
 )
 # A fit with more than one worker on a default cutoff warns once a pass's estimated work reaches
-# this fraction of the cutoff. The cutoffs measured for many fits per process sit within this factor
-# below the defaults, so a smaller fit would not use the pool under either value.
+# this fraction of the cutoff. The cutoff measured for many fits per process sits within this factor
+# below the default, so a smaller fit would not use the pool under either value.
 WARN_FRACTION = 0.1
-# What each default suits: GES's allows for the first pool start of a one-off fit; HC's sits
-# between the cutoffs for one fit and for many fits per process.
-_DEFAULT_SUITS = {
-    "ges": "which suits one fit per process",
-    "hc": "which sits between the values for one fit and for many fits per process",
-}
+# What each default suits: GES's allows for the first pool start of a one-off fit.
+_DEFAULT_SUITS = {"ges": "which suits one fit per process"}
 
 # Probe sizes (variables). Serial GES at d = 256 takes minutes, so the search stops there.
 GRID = (16, 32, 64, 128)
@@ -211,7 +206,7 @@ def fit_timers(method: str, workers: int, repeats: int = 3) -> tuple[Callable[[i
     return (lambda d: run(d, 1, None)), (lambda d: run(d, workers, "0"))
 
 
-def calibrate(workers: int, methods: Sequence[str] = ("ges", "hc")) -> dict[str, Crossover]:
+def calibrate(workers: int, methods: Sequence[str] = ("ges",)) -> dict[str, Crossover]:
     """Measure each method's crossover with ``workers`` pool processes."""
     import warnings
 

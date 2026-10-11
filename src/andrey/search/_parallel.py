@@ -51,8 +51,8 @@ def balanced_chunks(work_per_unit: Sequence[int], n_chunks: int) -> list[list[in
     return [list(range(a, b)) for a, b in zip(edges, edges[1:]) if a < b]
 
 
-# What a worker hands back for its chunk: a tuple whose leading entries form the total-order key
-# (GES and HC both lead with ``(delta, x, y, index)``), or ``None`` when the chunk found no move.
+# What a worker hands back for its chunk: a tuple whose leading entries form the total-order key,
+# or ``None`` when the chunk found no move.
 ChunkBest = tuple[Any, ...]
 
 
@@ -61,9 +61,9 @@ def reduce_best(
 ) -> ChunkBest | None:
     """Reduce chunk bests to the one global best by a strict total-order ``key`` (``None`` skipped).
 
-    The default key ``r[:4]`` matches the ``(delta, x, y, index)`` prefix both GES and HC emit; a
-    learner with a different arity passes its own. Strict ``<`` so the first chunk to reach a key
-    wins ties, exactly as a single serial scan resolves them.
+    The default key is the first four entries ``r[:4]``; a learner with a different key passes its
+    own. Strict ``<`` so the first chunk to reach a key wins ties, exactly as a single serial scan
+    resolves them.
     """
     if key is None:
         key = lambda r: r[:4]  # noqa: E731 -- the shared (delta, src, tgt, op-index) prefix
@@ -114,14 +114,13 @@ def fork_safe() -> bool:
 # filesystem -- slow on a network filesystem, serialized (each single-worker pool spawns inside its
 # own first ``submit``) and repaid per search (the pools do not outlive a run). Every module that
 # defines a worker initializer/task must be listed: the template is process-wide, so a worker only
-# inherits what the template imported. The three below are the search workers (``_parallel_ges`` /
-# ``_parallel_hc``) and the constraint-skeleton worker (``_parallel_skeleton``); score/backend/
-# operators/CI/threadpoolctl come in transitively. Names must match the tree exactly: the forkserver
+# inherits what the template imported. The two below are the GES search worker (``_parallel_ges``)
+# and the constraint-skeleton worker (``_parallel_skeleton``); score/backend/operators/CI/
+# threadpoolctl come in transitively. Names must match the tree exactly: the forkserver
 # imports the list in a ``try/except`` and *silently skips* a bad name, so a typo silently restores
 # the tax -- test_forkserver_template_preloads_worker_modules resolves each name loudly.
 _FORKSERVER_PRELOAD = (
     "andrey.search._parallel_ges",
-    "andrey.search._parallel_hc",
     "andrey.constraint._parallel_skeleton",
 )
 
@@ -225,12 +224,12 @@ class StableWorkerSet:
         self._pools = []
 
 
-# ---- determinism knobs shared by the GES and HC delta-search parallelizations -------------------
+# ---- determinism knobs shared by the GES and HC delta searches ----------------------------------
 #
 # The Schur delta-BIC is not bit-pure across evaluation paths (its float64 arithmetic depends on the
-# einsum batch shape / the scorer's residual-cache history), so GES and HC must agree on two knobs
-# for serial and parallel to select byte-identical moves: a strict-improvement floor, and a
-# scale-invariant reduce tie-break key. Both live here so the two learners share one definition.
+# einsum batch shape / the scorer's residual-cache history), so GES and HC share two knobs to select
+# byte-identical moves: a strict-improvement floor, and a scale-invariant reduce tie-break key. Both
+# live here so the two learners share one definition.
 
 # Strict-improvement floor: a move counts as improving only when its raw delta is more than this
 # below zero. It sits far above float64 Schur-delta noise and below the smallest real score

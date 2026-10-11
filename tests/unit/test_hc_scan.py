@@ -21,7 +21,7 @@ from andrey.search.hc import MoveScanner, _apply_move, _key_after, hc
 from andrey.search.tabu import tabu
 
 
-def _reference_scan(score, targets, adj_int, parents_of, d, floor, tabu):
+def _reference_scan(score, adj_int, parents_of, d, floor, tabu):
     """Every legal move with delta below ``floor``, rescanned u-major, v-minor."""
     add = [add_deltas(score, v, parents_of[v]) for v in range(d)]
     remove = [remove_deltas(score, v, parents_of[v]) for v in range(d)]
@@ -47,7 +47,7 @@ def _reference_scan(score, targets, adj_int, parents_of, d, floor, tabu):
                 best = cand
 
     for u in range(d):
-        for v in targets:
+        for v in range(d):
             if u == v:
                 continue
             if adj_int[u] >> v & 1:
@@ -72,8 +72,7 @@ def _data(seed: int, n: int, d: int) -> np.ndarray:
 
 
 @pytest.mark.parametrize("seed", range(3))
-@pytest.mark.parametrize("targets", [None, list(range(3, 9))])
-def test_scanner_picks_as_full_rescan(seed: int, targets: list[int] | None) -> None:
+def test_scanner_picks_as_full_rescan(seed: int) -> None:
     """Along a walk that adds, reverses, and drops edges, picks and keys match a full rescan.
 
     The walk takes the best move outside a short tabu list, worsening or not, and every third step
@@ -84,7 +83,6 @@ def test_scanner_picks_as_full_rescan(seed: int, targets: list[int] | None) -> N
     x = _data(seed, 400, d)
     scanner = MoveScanner(DeltaBICScore(BICScore(x)), d)
     reference = BICScore(x)
-    heads = range(d) if targets is None else targets
     rng = np.random.default_rng(seed)
     adj_int = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
@@ -93,17 +91,9 @@ def test_scanner_picks_as_full_rescan(seed: int, targets: list[int] | None) -> N
         recent = [*recent[-5:], tuple(adj_int)]
         tabu = set(recent)
         for floor in (-_EPS_IMPROVE, math.inf):
-            want = _reference_scan(reference, heads, adj_int, parents_of, d, floor, tabu)
-            assert (
-                scanner.best(adj_int, parents_of, targets=targets, floor=floor, tabu=tabu) == want
-            )
-        if targets is None:
-            move = want
-        else:  # step both sides over the whole range, in the same order
-            move = scanner.best(adj_int, parents_of, floor=math.inf, tabu=tabu)
-            assert move == _reference_scan(
-                reference, range(d), adj_int, parents_of, d, math.inf, tabu
-            )
+            want = _reference_scan(reference, adj_int, parents_of, d, floor, tabu)
+            assert scanner.best(adj_int, parents_of, floor=floor, tabu=tabu) == want
+        move = want
         edges = [(u, v) for v in range(d) for u in parents_of[v]]
         if step % 3 == 2 and edges:
             u, v = edges[rng.integers(len(edges))]

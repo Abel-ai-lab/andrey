@@ -40,7 +40,7 @@ def test_the_row_schema_is_what_it_says():
         "algorithm", "backend", "cap_mem_mb", "cap_wall_s", "child_cpu_s", "child_peak_rss_mb",
         "cores", "cpu_s", "d", "data_seed", "dataset_id", "density", "device", "device_id",
         "dtype", "elapsed_at_kill_s", "error_text", "exit_code", "functional", "ges_min_work",
-        "gpu_energy_j", "gpu_peak_alloc_mb", "hc_min_work", "latents", "machine_id", "mem_route",
+        "gpu_energy_j", "gpu_peak_alloc_mb", "latents", "machine_id", "mem_route",
         "metrics",
         "mode", "n", "name",
         "noise", "num_workers", "oom_source", "output_hash", "output_type", "package",

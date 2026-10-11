@@ -338,9 +338,7 @@ def tabu(
 
     Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
-    moves break as they do for :func:`andrey.hc`. Above ``ANDREY_HC_PARALLEL_MIN_WORK``, the
-    search runs its passes on hill climbing's worker pool, and the result does not depend on the
-    worker count.
+    moves break as they do for :func:`andrey.hc`.
 
     References
     ----------

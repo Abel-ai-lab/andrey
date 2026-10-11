@@ -11,7 +11,7 @@ the reported objective is the DAG's total BIC, lower is better.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection
 from itertools import compress
 from operator import ne
 
@@ -83,11 +83,8 @@ class MoveScanner:
     reaches fewer nodes is rebuilt. An
     added edge can only make more adds close a cycle, so a row stays valid until its lowest add is
     found to close one; then the row drops every node its target now reaches. A pass therefore
-    checks for cycles only its lowest candidates.
-
-    A move ``u -> v`` belongs to the scan whose ``targets`` hold its head ``v``, so partitioning the
-    targets partitions the moves (:mod:`andrey.search._parallel_hc`). Reversing ``u -> v`` sums an
-    add of ``v`` at target ``u`` and a remove of ``u`` at target ``v``.
+    checks for cycles only its lowest candidates. Reversing ``u -> v`` sums an add of ``v`` at
+    target ``u`` and a remove of ``u`` at target ``v``.
     """
 
     def __init__(self, delta: DeltaBICScore, d: int) -> None:
@@ -115,36 +112,29 @@ class MoveScanner:
         adj_int: list[int],
         parents_of: dict[int, list[int]],
         *,
-        targets: Sequence[int] | None = None,
         floor: float = -_EPS_IMPROVE,
         tabu: Collection[StructureKey] | None = None,
     ) -> ScannedMove | None:
-        """The best legal move with delta below ``floor`` whose head is in ``targets``.
+        """The best legal move with delta below ``floor``.
 
-        ``targets`` defaults to every node. Moves are keyed ``(delta / n_samples rounded to
-        _KEY_DP places, u, v, op_rank)``, a strict total order, so the best of a partition's
-        bests is the best overall. The default ``floor`` admits improving moves only; ``floor=inf``
-        admits every legal move. A move that leads to a structure in ``tabu`` is skipped.
+        Moves are keyed ``(delta / n_samples rounded to _KEY_DP places, u, v, op_rank)``, a strict
+        total order, so ties break the same way on every run. The default ``floor`` admits improving
+        moves only; ``floor=inf`` admits every legal move. A move that leads to a structure in
+        ``tabu`` is skipped.
         """
         if self._d < 2:
             return None
         self._sync(adj_int, parents_of)
         low = self._low.copy()
-        edges = np.arange(self._tails.size)
-        if targets is not None:
-            head = np.zeros(self._d, dtype=bool)
-            head[list(targets)] = True
-            low[~head] = np.inf
-            edges = edges[head[self._heads]]
-        tails, heads = self._tails[edges], self._heads[edges]
+        tails, heads = self._tails, self._heads
         with np.errstate(invalid="ignore"):  # a degenerate row's deltas may be infinite
             rev = self._add[tails, heads] + self._rem[heads, tails]
         rev[self._set_of[heads] == self._set_with[tails]] = 0.0
-        rev[np.isnan(rev) | self._cyclic[edges]] = np.inf
+        rev[np.isnan(rev) | self._cyclic] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:
             while True:  # the best move, unless it leads into the tabu list; then the next best
-                best = self._pick(low, rev, edges, floor)
+                best = self._pick(low, rev, floor)
                 if best is None or tabu is None or _key_after(adj_int, best[4]) not in tabu:
                     return best
                 _, u, v, rank, _ = best
@@ -238,16 +228,14 @@ class MoveScanner:
         """Whether reversing ``u -> v`` keeps the graph acyclic: ``u`` reaches ``v`` only by it."""
         return not self._reach[self._parent[:, u], v].any()  # no child of u reaches v
 
-    def _pick(
-        self, low: np.ndarray, rev: np.ndarray, edges: np.ndarray, floor: float
-    ) -> ScannedMove | None:
+    def _pick(self, low: np.ndarray, rev: np.ndarray, floor: float) -> ScannedMove | None:
         """The legal move with the lowest key among those below ``floor``.
 
-        ``rev`` scores reversing the edges ``edges``. A row whose candidate closes a cycle drops
-        every such add, and a reverse that closes one is marked, until an edge goes.
+        ``rev`` scores reversing each listed edge. A row whose candidate closes a cycle drops every
+        such add, and a reverse that closes one is marked, until an edge goes.
         """
         single, parent, reach = self._single, self._parent, self._reach
-        tails, heads = self._tails[edges], self._heads[edges]
+        tails, heads = self._tails, self._heads
         lowest = np.inf
         while True:  # the lowest legal single move below floor
             v = int(np.argmin(low))
@@ -266,7 +254,7 @@ class MoveScanner:
                 lowest = float(rev[i])
                 break
             rev[i] = np.inf
-            self._cyclic[edges[i]] = True
+            self._cyclic[i] = True
         if not lowest < floor:
             return None
         # Rounding is monotone, so the moves that round to the lowest key lie within one grid step
@@ -372,23 +360,16 @@ def hc(
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
 
-    # Pin BLAS to one thread for the delta loops so the Schur updates are thread-count-reproducible
-    # and equal to the (1-thread) parallel workers; above the work threshold the pass fans out.
+    # Pin BLAS to one thread for the delta loops so the Schur updates are thread-count-reproducible.
     with backend.one_blas_thread():
-        workers = backend.worker_count()
-        if workers > 1 and d > 1:
-            from andrey.search import _parallel_hc  # local import breaks the import cycle
-
-            moves = _parallel_hc.run_hc(adj_int, parents_of, delta, d, max_iter, workers=workers)
-        else:
-            scanner = MoveScanner(delta, d)
-            moves = 0
-            for _ in range(max_iter):
-                best = scanner.best(adj_int, parents_of)
-                if best is None:
-                    break
-                _apply_move(adj_int, parents_of, best[4])
-                moves += 1
+        scanner = MoveScanner(delta, d)
+        moves = 0
+        for _ in range(max_iter):
+            best = scanner.best(adj_int, parents_of)
+            if best is None:
+                break
+            _apply_move(adj_int, parents_of, best[4])
+            moves += 1
     if moves == max_iter:
         warn_once(
             f"hc stopped at its limit of max_iter={max_iter} moves; a longer search may find a "

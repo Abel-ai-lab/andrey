@@ -127,9 +127,7 @@ DEFERRED_MODULES = {
     "andrey.ges.numpy.parallel": "andrey.search.ges",
     "andrey.ges.numba.serial": "andrey.search.ges",
     "andrey.hc.numpy.serial": "andrey.search.hc",
-    "andrey.hc.numpy.parallel": "andrey.search.hc",
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
-    "andrey.tabu.numpy.parallel": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
     "andrey.fci.numpy": "andrey.constraint.fci",
     "andrey.fci.majority.numpy": "andrey.constraint.fci",
@@ -159,19 +157,15 @@ def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter) -> None:
     )
 
 
-@pytest.mark.parametrize("module", ["andrey_ges", "andrey_hc"])
 @pytest.mark.parametrize(("pinned", "workers"), [("1", 1), ("4", 4), ("-1", -1), ("", 2), ("x", 2)])
-def test_a_parallel_adapter_runs_the_workers_the_runner_pinned(
-    monkeypatch, module, pinned, workers
-):
+def test_a_parallel_adapter_runs_the_workers_the_runner_pinned(monkeypatch, pinned, workers):
     """`split_cores` pins `ANDREY_NUM_WORKERS` to the core budget, so at `--cores 1` a parallel
     adapter runs one worker, as its record says. The fallback covers only an unset or unreadable
     value."""
-    import importlib
+    from andrey_bench.adapters import andrey_ges
 
-    adapters = importlib.import_module(f"andrey_bench.adapters.{module}")
     monkeypatch.setenv("ANDREY_NUM_WORKERS", pinned)
-    assert adapters._parallel_workers() == workers
+    assert andrey_ges._parallel_workers() == workers
 
 
 def test_gcastle_ges_declares_only_the_params_it_honors() -> None:
