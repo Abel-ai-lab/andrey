@@ -134,6 +134,43 @@ def test_anm_resolves_the_planted_direction():
     assert set(out.metadata) == {"algorithm", "pval_forward", "pval_backward"}
 
 
+def test_anm_hyperparameter_objective_is_scikit_learns():
+    """The search's objective is scikit-learn's log marginal likelihood, and so is its gradient."""
+    from sklearn.gaussian_process import GaussianProcessRegressor
+
+    from andrey.irregular.anm import _kernel, _negative_log_marginal_likelihood
+
+    x = datagen.generate("anm_pair_cubic")
+    cause, effect = np.ascontiguousarray(x[:, :1]), np.ascontiguousarray(x[:, 1:])
+    gp = GaussianProcessRegressor(kernel=_kernel(), optimizer=None).fit(cause, effect)
+    # The start, an interior point, and the signal variance at its floor (y unrelated to x).
+    for theta in (gp.kernel_.theta, np.log([2.0, 0.3, 0.05]), np.log([1e-3, 1.0, 1.0])):
+        value, gradient = gp.log_marginal_likelihood(theta, eval_gradient=True)
+        negative, negative_gradient = _negative_log_marginal_likelihood(theta, cause, effect)
+        assert -negative == value
+        np.testing.assert_allclose(-negative_gradient, gradient, rtol=1e-9, atol=1e-9)
+
+
+def test_anm_matches_scikit_learns_own_search():
+    """The p-values of scikit-learn's default L-BFGS-B fit, up to rounding."""
+    import warnings
+
+    from sklearn.exceptions import ConvergenceWarning
+    from sklearn.gaussian_process import GaussianProcessRegressor
+
+    from andrey.core.independence import hsic_test
+    from andrey.irregular.anm import _kernel
+
+    x = datagen.generate("anm_pair_cubic")
+    expected = []
+    for cause, effect in ((x[:, :1], x[:, 1:]), (x[:, 1:], x[:, :1])):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ConvergenceWarning)
+            gp = GaussianProcessRegressor(kernel=_kernel()).fit(cause, effect)
+        expected.append(hsic_test(cause, effect - gp.predict(cause).reshape(-1, 1)))
+    assert np.allclose(anm(x[:, 0], x[:, 1]), expected, rtol=0, atol=1e-8)
+
+
 def test_anm_names_the_planted_direction_in_any_units_and_column_order():
     import pandas as pd
 
