@@ -12,7 +12,7 @@ keeps the result when its score is lower.
 operator is checked against the current CPDAG and dropped when it no longer applies; after a move,
 only the operators the move's edge changes can affect are rescored, and the CPDAG is completed
 locally around the changed edges. The update rules and the local completion follow the authors'
-Python package (``xges`` 0.1.6). :func:`_rescan_search` is the same search with every operator
+reference implementation. :func:`_rescan_search` is the same search with every operator
 rescanned from :mod:`andrey.search.operators` after each move and the CPDAG re-formed globally; the
 tests compare the two.
 
@@ -20,8 +20,7 @@ Scores are deltas of the deviance :class:`~andrey.core.score.BICScore` minimizes
 when its delta is negative. Insert deltas come from :func:`~andrey.core.score_delta.add_deltas`,
 which scores every candidate parent of a target against one parent set at once. A Delete, and the
 parent a Reverse removes, need one delta each: the difference of two memoized local scores, as in
-the rescanning reference. The package scores in log-likelihood units, ``-0.5`` times Andrey's
-plus terms that cancel in every delta, so its ``alpha`` is Andrey's ``lambda_value``.
+the rescanning reference.
 
 References
 ----------
@@ -55,14 +54,14 @@ from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search.ges import _reach_factory, _recompute_objective, _reform_cpdag
 
 # The extended search keeps a branch when it lowers the deviance by more than this times the sample
-# count: the package's 1e-7 * n in log-likelihood units, which are -0.5 times the deviance.
+# count (1e-7 times the sample count in log-likelihood units).
 _ACCEPT_PER_SAMPLE = 2e-7
 
 # The state of the pair (a, b), a < b.
 _NONE, _UNDIRECTED, _LOW_TO_HIGH, _HIGH_TO_LOW = 0, 1, 2, 3
 
 # What an edge change does, keyed by (old state kind, new state kind); the update rules are written
-# per change, following the package's numbering.
+# per change.
 _ADD_UNDIRECTED, _ADD_DIRECTED, _DROP_UNDIRECTED, _ORIENT, _DROP_DIRECTED, _UNORIENT, _REVERSE = (
     range(1, 8)
 )
@@ -1052,8 +1051,7 @@ def xges(
     score_func : str
         Local score; ``"local_score_BIC"`` (linear-Gaussian BIC) is supported.
     lambda_value : float
-        Weight on the BIC complexity term of the deviance the search minimizes; the package's
-        ``alpha``.
+        Weight on the BIC complexity term of the deviance the search minimizes.
     extended_search : bool
         Run the extended search after XGES-0 (XGES); ``False`` stops at XGES-0.
     _rescan : bool

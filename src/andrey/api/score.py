@@ -205,8 +205,7 @@ def xges(
         Local score objective. Only the Gaussian BIC score is supported.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative. It is the
-        ``alpha`` of the authors' xges package.
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
     extended_search : bool, default=True
         After the greedy search converges, delete each edge in turn, forbid adding it back, search
         again, and keep any result with a better score. ``False`` returns the converged graph
@@ -253,10 +252,6 @@ def xges(
     score first, forbids adding the edge back in that direction, and reruns the search. It keeps a
     result whose score is lower by more than ``2e-7 * n_samples``, and stops once a fresh pass over
     the edges keeps nothing. No variable has a parent limit.
-
-    **Choosing lambda_value.** ``lambda_value`` multiplies the BIC penalty exactly as the xges
-    package's ``alpha`` does: the two scores differ by a factor of ``-2`` and by terms that cancel
-    in every move. The package defaults to ``alpha=2.0``, which is ``lambda_value=2.0`` here.
 
     References
     ----------

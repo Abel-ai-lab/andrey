@@ -229,7 +229,8 @@ CAM-UV results.
 without its extended phase), with Andrey's `ges` and the empty-graph baseline. The data are
 linear-Gaussian and standardized, on Erdos-Renyi graphs of average degree 2 and 4, with `10 * d`
 rows. XGES gains most over GES on the denser graphs. Every arm searches under one BIC weight: the
-package's `alpha` is Andrey's `lambda_value`, as the `andrey.xges` docstring states. No arm caps the
+package scores in log-likelihood units, -0.5 times Andrey's deviance plus terms that cancel in
+every move, so its `alpha` is Andrey's `lambda_value`. No arm caps the
 parents of a node: XGES has no cap, and the GES arm lifts the adapter's usual cap of 4, as
 `andrey.ges` does. `params` records the settings.
 

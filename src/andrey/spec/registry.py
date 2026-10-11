@@ -246,7 +246,7 @@ _add(
                 type="float",
                 default=1.0,
                 doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values "
-                "give sparser graphs; 1.0 is the standard BIC. The xges package's alpha.",
+                "give sparser graphs; 1.0 is the standard BIC.",
             ),
             ParamSpec(
                 name="extended_search",
