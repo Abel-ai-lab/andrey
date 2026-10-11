@@ -53,6 +53,10 @@ def _negative_log_marginal_likelihood(
     ``dK`` in ``(c * R, c * R * D, w * I)``, with ``a = K^-1 effect``: ``K^-1`` comes from the
     Cholesky factor (LAPACK ``potri``), where scikit-learn solves against the identity, and each
     trace is a sum over the elementwise product. The two agree up to rounding.
+
+    The gradient's ``O(n^2)`` sums run in ``np.einsum``, outside BLAS: a multithreaded BLAS call
+    this small spends most of its time waiting for the pool's threads when the cores are busy, and
+    the search makes several per evaluation.
     """
     c, length, w = np.exp(theta[0]), np.exp(theta[1]), np.exp(theta[2])
     distances = pdist(cause / length, metric="sqeuclidean")
@@ -75,13 +79,16 @@ def _negative_log_marginal_likelihood(
     a = alpha[:, 0]
     trace = np.trace(inverse)
     rbf_distances = rbf * squareform(distances)
-    # sum(K^-1 * M) over the full matrix is 2 * vdot(lower triangle, M) - the diagonal's part;
-    # diag(R) is 1 and diag(R * D) is 0.
+    # For a symmetric M, sum(K^-1 * M) over the full matrix is 2 * sum(triangle * M) - the
+    # diagonal's part; diag(R) is 1 and diag(R * D) is 0.
+    triangle = inverse.T  # K^-1 on and above the diagonal, C-ordered like R
+    triangle_rbf = np.einsum("ij,ij", triangle, rbf)
+    triangle_rbf_distances = np.einsum("ij,ij", triangle, rbf_distances)
     gradient = 0.5 * np.array(
         [
-            c * (a @ (rbf @ a) - 2 * np.vdot(inverse, rbf) + trace),
-            c * (a @ (rbf_distances @ a) - 2 * np.vdot(inverse, rbf_distances)),
-            w * (a @ a - trace),
+            c * (np.einsum("i,ij,j", a, rbf, a) - 2 * triangle_rbf + trace),
+            c * (np.einsum("i,ij,j", a, rbf_distances, a) - 2 * triangle_rbf_distances),
+            w * (np.einsum("i,i", a, a) - trace),
         ]
     )
     return -log_likelihood.sum(axis=-1), -gradient
