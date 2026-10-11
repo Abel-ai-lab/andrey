@@ -40,42 +40,6 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 __all__ = ["hc"]
 
 
-def _descendants(adj_int: list[int], d: int) -> list[int]:
-    """Descendant bitsets of each node, by one pass over the DAG in reverse topological order.
-
-    ``adj_int[u]`` is the out-neighbor bitset of ``u`` (bit ``v`` set iff the edge ``u -> v``
-    exists).
-    """
-    indegree = [0] * d
-    for row in adj_int:
-        while row:
-            lsb = row & -row
-            indegree[lsb.bit_length() - 1] += 1
-            row ^= lsb
-    order: list[int] = []
-    stack = [u for u in range(d) if not indegree[u]]
-    while stack:
-        u = stack.pop()
-        order.append(u)
-        row = adj_int[u]
-        while row:
-            lsb = row & -row
-            c = lsb.bit_length() - 1
-            indegree[c] -= 1
-            if not indegree[c]:
-                stack.append(c)
-            row ^= lsb
-    reach = [0] * d
-    for u in reversed(order):
-        below = row = adj_int[u]
-        while row:
-            lsb = row & -row
-            below |= reach[lsb.bit_length() - 1]
-            row ^= lsb
-        reach[u] = below
-    return reach
-
-
 # A scanned candidate: (delta, u, v, op_rank, (op, u, v)). op_rank orders the ops that share a
 # ``(u, v)`` (remove 0 < reverse 1; add is 0 and never coexists with remove), so ``key = r[:4]``
 # is a strict total order over the moves of a pass.
@@ -115,7 +79,8 @@ class MoveScanner:
     ``_EPS_IMPROVE`` and turn a no-op into an improvement.
 
     ``reach[x, y]`` holds whether ``x`` reaches ``y``; it is extended on each added edge and
-    recomputed when an edge goes, and then every row whose target reaches fewer nodes is rebuilt. An
+    recomputed, for the nodes that reached it, when an edge goes; then every row whose target
+    reaches fewer nodes is rebuilt. An
     added edge can only make more adds close a cycle, so a row stays valid until its lowest add is
     found to close one; then the row drops every node its target now reaches. A pass therefore
     checks for cycles only its lowest candidates.
@@ -207,10 +172,6 @@ class MoveScanner:
         for u in range(d) if first else compress(range(d), map(ne, adj_int, old)):
             gained += [(u, v) for v in _bits(adj_int[u] & ~old[u])]
             lost += [(u, v) for v in _bits(old[u] & ~adj_int[u])]
-        for u, v in gained:
-            self._parent[v, u] = True
-        for u, v in lost:
-            self._parent[v, u] = False
         for v in range(d) if first else {v for _, v in gained + lost}:
             pa = parents_of[v]
             self._add[v] = add_deltas(self._score, v, pa, cond_threshold=self._cond)
@@ -220,23 +181,23 @@ class MoveScanner:
             self._set_with[v] = ids.setdefault(tuple(sorted([*pa, v])), len(ids))
         reach = self._reach
         rows = set(range(d)) if first else {x for pair in gained + lost for x in pair}
-        if first or lost:
-            new = _bit_matrix(_descendants(adj_int, d), d)
-            rows.update(np.flatnonzero((new != reach).any(axis=1)).tolist())
-            self._reach = reach = new
+        if lost:
+            for u, v in lost:
+                self._parent[v, u] = False
+            rows.update(self._unreach([u for u, _ in lost]))
             keep = np.ones(self._tails.size, dtype=bool)
             for a, b in lost:
                 keep &= (self._tails != a) | (self._heads != b)
             self._tails, self._heads = self._tails[keep], self._heads[keep]
             self._cyclic = np.zeros(self._tails.size, dtype=bool)
-        else:
-            for a, b in gained:
-                if not reach[a, b]:  # a now reaches b, and so does every node that reaches a
-                    above = reach[:, a].copy()
-                    above[a] = True
-                    below = reach[b].copy()
-                    below[b] = True
-                    reach[above] |= below
+        for a, b in gained:
+            self._parent[b, a] = True
+            if not reach[a, b]:  # a now reaches b, and so does every node that reaches a
+                above = reach[:, a].copy()
+                above[a] = True
+                below = reach[b].copy()
+                below[b] = True
+                reach[above] |= below
         pairs = np.array(gained, dtype=np.intp).reshape(-1, 2)
         self._tails = np.concatenate((self._tails, pairs[:, 0]))
         self._heads = np.concatenate((self._heads, pairs[:, 1]))
@@ -247,6 +208,26 @@ class MoveScanner:
             self._single[v] = row
             self._low[v] = row.min()
         self._adj = list(adj_int)
+
+    def _unreach(self, tails: list[int]) -> list[int]:
+        """Recompute ``reach`` after edges out of ``tails`` went; return the nodes it changed for.
+
+        Only a node that reached a tail, or is one, can reach fewer nodes. Such a node reaches
+        another only if it did before, and then it reached more nodes than the other did, so
+        visiting them by their old count, fewest first, visits every child before its parents.
+        """
+        reach, parent = self._reach, self._parent
+        hit = np.logical_or.reduce(reach[:, tails], axis=1)
+        hit[tails] = True
+        nodes = np.flatnonzero(hit)
+        changed = []
+        for x in nodes[np.argsort(reach[nodes].sum(axis=1), kind="stable")].tolist():
+            kids = parent[:, x]
+            row = reach[kids].any(axis=0) | kids
+            if not np.array_equal(row, reach[x]):
+                reach[x] = row
+                changed.append(x)
+        return changed
 
     def _drop_reached(self, v: int, low: np.ndarray) -> None:
         """Drop from row ``v`` every add that closes a cycle now, and update its minimum."""
@@ -312,15 +293,6 @@ class MoveScanner:
                 if best is None or cand[:4] < best[:4]:
                     best = cand
         return best
-
-
-def _bit_matrix(rows: list[int], d: int) -> np.ndarray:
-    """Boolean matrix of bitset rows: ``out[i, j]`` is bit ``j`` of ``rows[i]``."""
-    width = (d + 7) // 8
-    raw = np.frombuffer(b"".join(r.to_bytes(width, "little") for r in rows), dtype=np.uint8)
-    return np.unpackbits(raw.reshape(len(rows), width), axis=1, count=d, bitorder="little").view(
-        bool
-    )
 
 
 def _bits(row: int) -> list[int]:
