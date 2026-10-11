@@ -653,6 +653,111 @@ _add(
 )
 
 
+# --- hidden-confounder family: a PAG over the observed variables ---------------------------------
+
+_CONFOUNDED_OUTPUT_DOC = (
+    "PAG over the observed variables; metadata confounded_pairs lists the pairs a hidden common "
+    "cause affects."
+)
+_MAX_EXPLANATORY_DOC = "at least 1; larger values find more {} and take longer."
+
+_add(
+    MethodSpec(
+        name="rcd",
+        family="latent",
+        summary="Repetitive causal discovery (RCD) for linear non-Gaussian data with hidden common "
+        "causes: direct causes as ->, confounded pairs as <->.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        params=(
+            ParamSpec(
+                name="max_explanatory_vars",
+                type="int",
+                default=2,
+                doc="Most variables regressed out together in an ancestor test; "
+                + _MAX_EXPLANATORY_DOC.format("ancestors"),
+            ),
+            ParamSpec(
+                name="cor_alpha",
+                type="float",
+                default=0.01,
+                doc="Significance level of the Pearson correlation tests.",
+            ),
+            ParamSpec(
+                name="ind_alpha",
+                type="float",
+                default=0.01,
+                doc="Significance level of the HSIC independence tests.",
+            ),
+            ParamSpec(
+                name="shapiro_alpha",
+                type="float",
+                default=0.01,
+                doc="Significance level of the Shapiro-Wilk non-Gaussianity tests.",
+            ),
+        ),
+        output=OutputSpec(structure_type="graph", graph_kind="pag", doc=_CONFOUNDED_OUTPUT_DOC),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        references=("Maeda & Shimizu 2020",),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="camuv",
+        family="latent",
+        summary="Causal additive models with unobserved variables (CAM-UV) for nonlinear data: "
+        "direct causes as ->, pairs linked through an unobserved variable as <->.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=0.01,
+                doc="Significance level of the HSIC independence tests.",
+            ),
+            ParamSpec(
+                name="max_explanatory_vars",
+                type="int",
+                default=3,
+                doc="Largest parent set tried for one variable; "
+                + _MAX_EXPLANATORY_DOC.format("parents"),
+            ),
+        ),
+        output=OutputSpec(structure_type="graph", graph_kind="pag", doc=_CONFOUNDED_OUTPUT_DOC),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        references=("Maeda & Shimizu 2021",),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="bottom_up_parce_lingam",
+        family="latent",
+        summary="BottomUpParceLiNGAM for linear non-Gaussian data with hidden common causes: a "
+        "causal order that leaves confounded variables unordered (o-o).",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=0.1,
+                doc="Significance level of the independence test that accepts a sink, "
+                "Bonferroni-corrected across the remaining variables.",
+            ),
+        ),
+        output=OutputSpec(structure_type="graph", graph_kind="pag", doc=_CONFOUNDED_OUTPUT_DOC),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        references=("Tashiro et al. 2014",),
+    )
+)
+
+
 def get_spec(name: str) -> MethodSpec:
     """The spec for one method name, or a ``KeyError`` with the valid names."""
     try:

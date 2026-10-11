@@ -8,7 +8,9 @@ callables (``andrey.ges``, ...) are exposed with their facade wrappers.
 
 from .api import (
     boss,
+    bottom_up_parce_lingam,
     calm,
+    camuv,
     cdnod,
     direct_lingam,
     exact_search,
@@ -24,6 +26,7 @@ from .api import (
     multi_group_direct_lingam,
     pc,
     pnl,
+    rcd,
     varma_lingam,
 )
 from .core import GraphStructure, Structure, StructureOutput, SummaryGraph, TemporalStructure
@@ -80,4 +83,8 @@ __all__ = [
     "longitudinal_lingam",
     # Pairwise direction test.
     "pnl",
+    # Hidden common causes: a PAG over the observed variables.
+    "rcd",
+    "camuv",
+    "bottom_up_parce_lingam",
 ]

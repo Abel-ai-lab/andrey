@@ -55,6 +55,12 @@ def _nan_to_zero(B: np.ndarray) -> np.ndarray:
 # ---- ANM / PNL (pairwise direction test) --------------------------------------------------------
 
 
+def _nan_pairs(B: np.ndarray) -> list[list[int]]:
+    """Return the sorted ``[i, j]`` pairs, ``i < j``, whose cell is ``NaN`` in either direction."""
+    rows, cols = np.nonzero(np.isnan(B) | np.isnan(B.T))
+    return [[int(i), int(j)] for i, j in zip(rows, cols, strict=True) if i < j]
+
+
 def _direction(pval_forward: float, pval_backward: float, alpha: float | None) -> int:
     """Return ``1`` for ``x -> y``, ``-1`` for ``y -> x``, or ``0`` for no edge.
 
@@ -121,8 +127,8 @@ def _adapt_camuv(P: Any, U: Any, n_vars: int) -> StructureOutput:
     """CAMUV ``execute`` -> directed edges from ``P`` + bidirected ``<->`` from ``U`` in a ``pag``.
 
     ``P[i]`` is the parent set of variable ``i`` (edge ``j -> i`` for ``j in P[i]``); ``U`` is a
-    list of index sets sharing an unobserved confounder. The normalized confounded pairs (sorted
-    ``[i, j]`` lists) ride in ``metadata["confounded_pairs"]``. No ``weighted_adjacency``.
+    list of index sets sharing an unobserved confounder. Each confounded pair, as a sorted
+    ``[i, j]`` list, rides in ``metadata["confounded_pairs"]``. No ``weighted_adjacency``.
     """
     B = np.zeros((n_vars, n_vars), dtype=np.float64)
     items = P.items() if isinstance(P, dict) else enumerate(P)
@@ -132,10 +138,10 @@ def _adapt_camuv(P: Any, U: Any, n_vars: int) -> StructureOutput:
     M = directed_marks(B)
     confounded_pairs: list[list[int]] = []
     for group in U:
-        idx = sorted(int(x) for x in group)
-        confounded_pairs.append(idx)
-        for a, b in combinations(idx, 2):
+        for a, b in combinations(sorted(int(x) for x in group), 2):
+            confounded_pairs.append([a, b])
             set_bidirected(M, a, b)
+    confounded_pairs.sort()
     structure = GraphStructure.from_numpy(M, kind="pag")
     return structure_output(structure, metadata={"confounded_pairs": confounded_pairs})
 
@@ -149,12 +155,17 @@ def _adapt_rcd(model: Any) -> StructureOutput:
     Finite nonzero ``B[i, j]`` is edge ``j -> i``; a ``NaN`` cell marks a latent confounder and
     becomes a bidirected ``pag`` edge. ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN``
     replaced by ``0.0``, so ``weighted_adjacency[i, j] != 0`` iff there is an arrowhead into ``j``
-    (one orientation with the marks -- the frozen contract).
+    (one orientation with the marks -- the frozen contract). The ``NaN`` pairs, as sorted
+    ``[i, j]`` lists, ride in ``metadata["confounded_pairs"]``.
     """
     B = _adjacency(model)
     M = marks_from_signed(B, nan_mark="bidirected")
     structure = GraphStructure.from_numpy(M, kind="pag")
-    return structure_output(structure, weighted_adjacency=_nan_to_zero(B).T)
+    return structure_output(
+        structure,
+        weighted_adjacency=_nan_to_zero(B).T,
+        metadata={"confounded_pairs": _nan_pairs(B)},
+    )
 
 
 # ---- BottomUpParceLiNGAM (order-unknown adjacency) ----------------------------------------------
@@ -166,15 +177,15 @@ def _adapt_bottom_up_parce(model: Any) -> StructureOutput:
     A symmetric ``NaN`` block is an order-unknown pair and becomes a circle ``pag`` edge. The
     ``causal_order_`` is nested (order-unknown vars nest as sub-lists) so it cannot be a flat
     ``ordering`` permutation -- it rides in ``metadata["causal_order"]`` as a JSON-safe nested list.
-    ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN`` replaced by ``0.0``.
+    ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN`` replaced by ``0.0``. The ``NaN``
+    pairs, whose order a hidden common cause leaves unresolved, ride in
+    ``metadata["confounded_pairs"]`` as sorted ``[i, j]`` lists.
     """
     B = _adjacency(model)
     M = marks_from_signed(B, nan_mark="circle")
     structure = GraphStructure.from_numpy(M, kind="pag")
-    metadata: dict[str, Any] = {}
+    metadata: dict[str, Any] = {"confounded_pairs": _nan_pairs(B)}
     order = getattr(model, "causal_order_", None)
     if order is not None:
         metadata["causal_order"] = order  # json_safe (via structure_output) coerces the nesting
-    return structure_output(
-        structure, weighted_adjacency=_nan_to_zero(B).T, metadata=metadata or None
-    )
+    return structure_output(structure, weighted_adjacency=_nan_to_zero(B).T, metadata=metadata)
