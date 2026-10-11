@@ -106,9 +106,9 @@ def direct_lingam(
     **Feasibility.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
     stayed below the empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20
-    variables and 545 s at 200, on 16 CPU cores. At 300 variables a CPU run did not finish its
-    warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a fit took 528 s at 300
-    variables and 1,410 s at 400.
+    variables and 545 s at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300
+    variables did not finish its warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a
+    fit took 528 s at 300 variables and 1,410 s at 400.
 
     References
     ----------

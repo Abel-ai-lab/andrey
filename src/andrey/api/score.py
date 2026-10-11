@@ -86,8 +86,8 @@ def ges(
     variable rather than ``n_variables / 2``. At ``lambda_value=1.0`` its median errors (SHD) stayed
     below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against
     200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
-    and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows, its
-    median errors passed the empty graph's (612 against 338).
+    and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
+    the default parent cap, its median errors passed the empty graph's (612 against 338).
 
     References
     ----------
