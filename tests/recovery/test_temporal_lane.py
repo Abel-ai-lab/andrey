@@ -124,15 +124,17 @@ def test_granger_finds_the_planted_lagged_edges_as_the_largest_weights(var_lag2_
     assert np.abs(weights[truth == 0]).max() < 0.1
 
 
-def test_granger_does_not_depend_on_the_units(var_lag2_fit):
+# 1e-200: the squared deviations of that column would underflow to zero.
+@pytest.mark.parametrize("scale", [[100.0, 0.01, 7.0], [1e-200, 1.0, 7.0]])
+def test_granger_does_not_depend_on_the_units(var_lag2_fit, scale):
     from andrey.api.temporal import granger
 
-    scale = np.array([100.0, 0.01, 7.0])
+    scale = np.array(scale)
     out = granger(datagen.generate("var_3v_lag2") * scale)
     weights = var_lag2_fit.structure.lag_weights
     # A weight of x_i on x_j scales with the units of x_j over those of x_i.
     np.testing.assert_allclose(
-        out.structure.lag_weights, weights * scale[None, None, :] / scale[None, :, None], atol=1e-9
+        out.structure.lag_weights, weights * scale[None, None, :] / scale[None, :, None], rtol=1e-7
     )
     assert np.array_equal(out.structure.lag_weights != 0, weights != 0)
     assert np.array_equal(granger(datagen.generate("var_3v_lag2")).structure.lag_weights, weights)

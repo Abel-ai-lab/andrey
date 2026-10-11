@@ -130,6 +130,15 @@ def _read(out: Path) -> list[dict]:
 
 def rescore(out: Path) -> list[dict]:
     """Recompute every record's scores from its stored coefficients and rewrite the records."""
+    meta = json.loads((out / "run_meta.json").read_text())
+    if (meta["driver"], meta["lags"], meta["lag_degree"]) != (
+        Path(__file__).name,
+        LAGS,
+        LAG_DEGREE,
+    ):
+        raise SystemExit(
+            f"--rescore: {out} was drawn with other process settings than this script's"
+        )
     records = _read(out)
     for record in records:
         for column in SCORE_COLUMNS:
@@ -252,6 +261,8 @@ def main(argv: list[str] | None = None) -> int:
                         num_workers=num_workers,
                     )
                     for repeat, m in enumerate(measures):
+                        if (d, seed, adapter.name, repeat) in done:  # kept from an earlier run
+                            continue
                         record = {
                             "d": d,
                             "n": args.n,

@@ -286,8 +286,10 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     X = data_matrix(data, min_rows=maxlag + cv)  # LassoCV needs a time step in every fold
     if X.shape[1] < 2:
         raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
-    scale = X.std(axis=0)  # data_matrix rejects a constant column
-    coeff = granger_lasso((X - X.mean(axis=0)) / scale, maxlag=maxlag, cv=cv)
+    peak = np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot underflow the std
+    spread = (X / peak).std(axis=0)  # data_matrix rejects a constant column
+    coeff = granger_lasso((X / peak - (X / peak).mean(axis=0)) / spread, maxlag=maxlag, cv=cv)
+    scale = spread * peak
     # coeff[i, j + d*k] weights standardized x_j(t-k-1) in standardized x_i(t): rescale to units
     coeff *= scale[:, None] / np.tile(scale, maxlag)[None, :]
     return with_labels(_adapt_granger(coeff, X.shape[1], maxlag), column_labels(data))
