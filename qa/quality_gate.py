@@ -21,15 +21,16 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import combinations
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from threadpoolctl import threadpool_limits
 
 import andrey
 from andrey import GraphStructure, StructureOutput, data, metrics
-from andrey.core import Kind
+from andrey.core import ARROW, LATENT, TAIL
 from andrey.data.latent import marginal
 from andrey.data.real import SACHS_ARCS, SACHS_NODES
 
@@ -49,17 +50,27 @@ class Draw:
     truth: GraphStructure
 
 
-#: The published regimes as ``andrey.data.sample_scm`` arguments: mean degree 2, standardized
-#: columns, and one node in ten hidden for ``latent_gauss_er``.
+#: The published regimes as ``andrey.data.sample_scm`` arguments: mean degree 2 and standardized
+#: columns, with hidden nodes in the ``latent_*`` regimes (:data:`HIDDEN`).
 REGIMES: dict[str, dict[str, str]] = {
     "linear_gauss_er": {"graph": "erdos_renyi", "noise": "gaussian"},
     "latent_gauss_er": {"graph": "erdos_renyi", "noise": "gaussian"},
     "lingam_sf": {"graph": "scale_free", "noise": "uniform"},
+    "latent_lingam_er": {"graph": "erdos_renyi", "noise": "uniform"},
 }
 
-#: ``(d, n)`` for every regime. The benchmarks use ``n = 10d``, where ICA-LiNGAM scores worse than
-#: the empty graph. At ``n = 50d`` every method's correct output beats it, so the check has power.
+#: One node in this many is hidden, at least one.
+HIDDEN: dict[str, int] = {"latent_gauss_er": 10, "latent_lingam_er": 5}
+
+#: ``(d, n)`` for a regime. The benchmarks use ``n = 10d``, where ICA-LiNGAM scores worse than the
+#: empty graph. At ``n = 50d`` every method's correct output beats it, so the check has power.
 SIZES: tuple[tuple[int, int], ...] = ((20, 1000), (50, 2500))
+#: ``latent_lingam_er`` keeps its benchmark's 2,000 rows; ``d`` counts the hidden nodes. At
+#: ``d = 20`` BottomUpParceLiNGAM's median SHD is no lower than the empty graph's (37.5 and 36 over
+#: ten seeds), so the check would have no power there.
+REGIME_SIZES: dict[str, tuple[tuple[int, int], ...]] = {
+    "latent_lingam_er": ((10, 2000), (15, 2000)),
+}
 SEEDS = range(10)
 ASIA_N = 1000
 
@@ -79,6 +90,11 @@ ASIA_ARCS = (
 )
 
 
+def sizes(regime: str) -> tuple[tuple[int, int], ...]:
+    """Return the ``(d, n)`` pairs the gate draws ``regime`` at."""
+    return REGIME_SIZES.get(regime, SIZES)
+
+
 def regime_kwargs(regime: str, d: int, n: int, seed: int) -> dict[str, Any]:
     """Return the ``andrey.data.sample_scm`` arguments for one draw of ``regime``."""
     kwargs: dict[str, Any] = {
@@ -90,8 +106,8 @@ def regime_kwargs(regime: str, d: int, n: int, seed: int) -> dict[str, Any]:
         "scale": "standardize",
         "density": 2.0,
     }
-    if regime == "latent_gauss_er":
-        kwargs["latents"] = max(1, d // 10)
+    if regime in HIDDEN:
+        kwargs["latents"] = max(1, d // HIDDEN[regime])
     return kwargs
 
 
@@ -129,7 +145,7 @@ DATASETS: dict[str, Callable[[], tuple[Draw, ...]]] = {
     **{
         f"{regime}_d{d}": functools.partial(regime_draws, regime, d, n)
         for regime in REGIMES
-        for d, n in SIZES
+        for d, n in sizes(regime)
     },
     "asia_gauss": functools.partial(asia_draws, "gaussian"),
     "asia_lingam": functools.partial(asia_draws, "uniform"),
@@ -148,15 +164,20 @@ def draws(dataset: str) -> tuple[Draw, ...]:
 # ==================================================================================================
 
 
+#: What an estimate is scored against: the truth's CPDAG, its DAG, the PAG of its observed nodes,
+#: or its latent projection (:func:`projection`).
+Target = Literal["cpdag", "dag", "pag", "projection"]
+
+
 @dataclass(frozen=True)
 class Method:
     fit: Callable[[np.ndarray], StructureOutput]
-    target: Kind  # "cpdag", "dag", or "pag": the class the SHD is measured in
+    target: Target
     datasets: tuple[str, ...]
 
 
 def _sizes(regime: str) -> tuple[str, ...]:
-    return tuple(f"{regime}_d{d}" for d, _ in SIZES)
+    return tuple(f"{regime}_d{d}" for d, _ in sizes(regime))
 
 
 # A method applies where its assumptions hold. PC, GES, BOSS, and GRaSP assume no hidden variables,
@@ -178,28 +199,66 @@ SUPPORTED: dict[str, Method] = {
 }
 
 
-def target_truth(truth: GraphStructure, target: Kind) -> GraphStructure:
-    """Return what an estimate of class ``target`` is scored against, as in the published summary.
+def projection(truth: GraphStructure) -> GraphStructure:
+    """Return the latent projection of a DAG ``truth`` over its observed nodes, as a ``pag``.
 
-    A CPDAG is scored against the truth's CPDAG, a DAG against the DAG, and a PAG against the PAG
-    of the observed variables.
+    Observed ``i -> j`` when a directed path runs from ``i`` to ``j`` with every node between them
+    hidden, a direct edge included. Observed ``i <-> j`` when one hidden node reaches both through
+    hidden nodes only; it replaces ``i -> j`` on a pair that has both. These are the edges and the
+    confounded pairs the published summary scores RCD and BottomUpParceLiNGAM on.
+    """
+    marks = truth.to_numpy()
+    child = (marks == TAIL) & (marks.T == ARROW)  # child[i, j]: i -> j
+    types = truth.node_types
+    hidden = np.zeros(len(marks), dtype=bool) if types is None else np.asarray(types) == LATENT
+    edges, pairs = [], []
+    for source in range(len(marks)):
+        seen, stack, reached = {source}, [source], set()
+        while stack:
+            for node in map(int, np.flatnonzero(child[stack.pop()])):
+                if not hidden[node]:
+                    reached.add(node)
+                elif node not in seen:
+                    seen.add(node)
+                    stack.append(node)
+        if hidden[source]:
+            pairs += combinations(sorted(reached), 2)
+        else:
+            edges += [(source, node) for node in reached]
+    n_observed = int(np.count_nonzero(~hidden))  # observed nodes come first
+    out = np.zeros((n_observed, n_observed), dtype=np.int8)
+    for i, j in edges:
+        out[i, j], out[j, i] = TAIL, ARROW
+    for i, j in pairs:
+        out[i, j] = out[j, i] = ARROW
+    return GraphStructure.from_numpy(out, kind="pag")
+
+
+def target_truth(truth: GraphStructure, target: Target) -> GraphStructure:
+    """Return what an estimate scored as ``target`` is compared with, as in the published summary.
+
+    A CPDAG is scored against the truth's CPDAG, a DAG against the DAG, a PAG against the PAG of
+    the observed variables, and a ``projection`` estimate against :func:`projection`.
     """
     if target == "pag":
         return marginal(truth, "pag", max_nodes=truth.n_nodes)
+    if target == "projection":
+        return projection(truth)
     if target == "cpdag":
         return metrics.to_cpdag(truth)
     return truth
 
 
-def shd(estimate: object, truth: GraphStructure, target: Kind) -> int:
-    """Return the SHD of ``estimate`` against ``target_truth``; a PAG counts endpoints."""
+def shd(estimate: object, truth: GraphStructure, target: Target) -> int:
+    """Return the SHD of ``estimate`` against ``target_truth``; PAG-like targets count endpoints."""
     if target == "cpdag":
         estimate = metrics.to_cpdag(estimate)
-    return metrics.shd(estimate, truth, endpoint_aware=target == "pag")
+    return metrics.shd(estimate, truth, endpoint_aware=target in ("pag", "projection"))
 
 
-def empty_graph(n_nodes: int, target: Kind) -> GraphStructure:
-    return GraphStructure.from_numpy(np.zeros((n_nodes, n_nodes), dtype=np.int8), kind=target)
+def empty_graph(n_nodes: int, target: Target) -> GraphStructure:
+    kind = "pag" if target == "projection" else target
+    return GraphStructure.from_numpy(np.zeros((n_nodes, n_nodes), dtype=np.int8), kind=kind)
 
 
 # ==================================================================================================

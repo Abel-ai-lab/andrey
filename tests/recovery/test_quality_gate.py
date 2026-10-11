@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 
 from andrey import GraphStructure
-from andrey.core import Kind
 from andrey.data import real
 from qa import quality_gate as qg
 
@@ -24,15 +23,16 @@ def test_every_cell_has_a_baseline_and_every_method_a_tolerance() -> None:
     }
 
 
-def empty_answer(draw: qg.Draw, target: Kind) -> GraphStructure:
+def empty_answer(draw: qg.Draw, target: qg.Target) -> GraphStructure:
     return qg.empty_graph(draw.data.shape[1], target)
 
 
-def shifted_truth(draw: qg.Draw, target: Kind) -> GraphStructure:
+def shifted_truth(draw: qg.Draw, target: qg.Target) -> GraphStructure:
     """The true graph with each variable moved one column: an off-by-one in column handling."""
-    marks = qg.target_truth(draw.truth, target).to_numpy()
+    truth = qg.target_truth(draw.truth, target)
+    marks = truth.to_numpy()
     shift = np.roll(np.arange(len(marks)), 1)
-    return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=target)
+    return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=truth.kind)
 
 
 @pytest.mark.parametrize("method", sorted(qg.SUPPORTED))
@@ -67,7 +67,7 @@ def test_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) ->
     bench = importlib.import_module("andrey_bench.datasets")
     for regime in qg.REGIMES:
         topology, functional, noise, standardize = bench.REGIMES[regime]
-        for d, n in qg.SIZES:
+        for d, n in qg.sizes(regime):
             key = bench.DatasetKey(
                 topology=topology,
                 functional=functional,
@@ -80,6 +80,28 @@ def test_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) ->
                 latents=bench.latents_for(regime, d),
             )
             assert qg.regime_kwargs(regime, d, n, 3) == bench.generation_kwargs(key)
+
+
+def test_the_projection_holds_the_edges_and_pairs_the_benchmarks_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The gate's latent projection has the benchmark scorer's edges and confounded pairs."""
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "benchmarks"))
+    scoring = importlib.import_module("andrey_bench.scoring")
+    found = 0
+    for d, n in qg.sizes("latent_lingam_er"):
+        for seed in range(5):
+            truth = qg.data.sample_scm(**qg.regime_kwargs("latent_lingam_er", d, n, seed)).graph
+            edges = qg.projection(truth).oriented_edges()
+            pairs = scoring.true_confounded_pairs(truth, "hidden_cause")
+            projected = {
+                e for e in scoring.projected_directed(truth) if tuple(sorted(e)) not in pairs
+            }
+            assert {(i, j) for i, j, kind in edges if kind == "directed"} == projected
+            assert {(i, j) for i, j, kind in edges if kind == "bidirected"} == pairs
+            assert {kind for _, _, kind in edges} <= {"directed", "bidirected"}
+            found += len(pairs)
+    assert found, "no draw has a confounded pair, so the check above tests nothing"
 
 
 def test_the_gates_asia_is_bnlearns():
