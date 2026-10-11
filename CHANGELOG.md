@@ -11,7 +11,8 @@ in alpha, and any minor release may change the API.
 
 - `xges`, an experimental method: extremely greedy equivalence search, which applies GES's moves
   with deletions first and then retries deleting each edge. It returns a CPDAG and its BIC
-  score; `extended_search=False` skips the retries (XGES-0).
+  score; `extended_search=False` skips the retries (XGES-0). It warns with the new
+  `andrey.ScoreWarning` when that score is not finite, as on collinear columns.
 - Three experimental methods for data with hidden common causes: `rcd`, `camuv`, and
   `bottom_up_parce_lingam`. Each returns a PAG over the observed variables. `rcd` and `camuv`
   list the pairs a hidden variable links in `metadata["confounded_pairs"]`;

@@ -38,6 +38,7 @@ from .core.warning_policy import (
     BackendFallbackWarning,
     ExperimentalWarning,
     PerformanceWarning,
+    ScoreWarning,
     SearchLimitWarning,
 )
 
@@ -60,6 +61,7 @@ __all__ = [
     "BackendFallbackWarning",
     "ExperimentalWarning",
     "PerformanceWarning",
+    "ScoreWarning",
     "SearchLimitWarning",
     # Algorithm facades - one uniform StructureOutput each.
     "pc",

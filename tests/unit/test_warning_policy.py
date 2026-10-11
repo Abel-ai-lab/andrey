@@ -120,6 +120,8 @@ def test_every_category_is_a_user_warning_under_the_base():
         andrey.ExperimentalWarning,
         andrey.PerformanceWarning,
         andrey.BackendFallbackWarning,
+        andrey.SearchLimitWarning,
+        andrey.ScoreWarning,
     ):
         assert issubclass(category, andrey.AndreyWarning)
     assert issubclass(andrey.AndreyWarning, UserWarning)

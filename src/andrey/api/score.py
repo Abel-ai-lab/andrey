@@ -11,6 +11,7 @@ committed baseline.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 from andrey.api._adapt import (
@@ -24,6 +25,7 @@ from andrey.api._adapt import (
 from andrey.api._experimental import warn_experimental
 from andrey.core import backend
 from andrey.core.seeding import resolve_seed
+from andrey.core.warning_policy import ScoreWarning, warn_once
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -236,6 +238,10 @@ def xges(
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+    ScoreWarning
+        When the returned score is ``nan`` or ``-inf``. The BIC is undefined on rank-deficient
+        data, such as no more rows than columns or collinear columns, so the score cannot rank
+        graphs and the result may depend on rounding.
 
     See Also
     --------
@@ -288,6 +294,13 @@ def xges(
     cpdag, score = _xges(
         X, score_func=score_func, lambda_value=lambda_value, extended_search=extended_search
     )
+    if not math.isfinite(score):
+        warn_once(
+            "xges returned a BIC score that is not finite. The BIC is undefined on rank-deficient "
+            "data (no more rows than columns, or collinear columns), so the score cannot rank "
+            "graphs and the result may depend on rounding.",
+            ScoreWarning,
+        )
     metadata = {"algorithm": "XGES" if extended_search else "XGES-0", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 

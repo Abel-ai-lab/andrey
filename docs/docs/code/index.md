@@ -131,6 +131,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` took `max_iter` moves. |
+| {py:class}`~andrey.ScoreWarning` | A fit returned a score that is not finite: `xges` on rank-deficient data, such as collinear columns. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -165,6 +166,7 @@ name.
    PerformanceWarning
    BackendFallbackWarning
    SearchLimitWarning
+   ScoreWarning
 ```
 
 ## Datasets
