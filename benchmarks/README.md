@@ -129,6 +129,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
+| Granger (lasso) | Andrey, causal-learn |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -222,6 +223,43 @@ The two CAM-UV implementations differ inside, so the same settings can give diff
 Andrey regresses with spline features and least squares where lingam fits pygam's `LinearGAM`, and
 their HSIC tests use different kernel bandwidths and null approximations. Report this beside the
 CAM-UV results.
+
+### Lasso Granger causality
+
+`granger_var.py` compares Andrey's `granger` with causal-learn's `Granger.granger_lasso` on
+vector-autoregressive series with known lagged edges, drawn by `andrey.data`: two lags, Gaussian
+noise, and no effects within a time step, so the true lagged edges are the nonzero entries of the
+lag matrices. Every variable keeps its own past, and each other variable enters a lag with
+probability `2 / (d - 1)`; the lag matrices are scaled so the series is stationary. Both packages
+fit with the same `maxlag` and `cv`. The data do not fit the dataset store, which holds one graph
+per dataset, so the driver draws each series itself and calls the runner directly, as
+`public_datasets.py` does.
+
+The defaults are `d` of 5, 10, 20, 40, and 80 variables, 1000 time steps, five seeds, `maxlag` 2,
+`cv` 5, one repeat without warm-up, and `--cap-wall-s` of 1800. A fit past the cap is a `timeout`
+record with no scores. A smoke run fits one series of 5 variables:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/granger_var.py --out outputs/granger-smoke --smoke
+```
+
+A lagged edge is a nonzero coefficient at lags 1 to `maxlag`. `precision`, `recall`, and `f1`
+score every lagged edge; `cross_precision`, `cross_recall`, and `cross_f1` leave out each
+variable's edges from its own past, which every true series holds. The summary prints their means
+per `d` and solution, the median wall time, and `agree`, the share of series on which the two
+solutions return the same lagged edges.
+
+Each fit is one JSON line in `records.jsonl`, with its coefficients. A resumed run skips the fits
+already recorded, and a rescore recomputes the scores without fitting anything:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/granger_var.py --out outputs/granger-var --rescore
+```
+
+Both packages fit the same cross-validated lasso per variable. Andrey standardizes each variable
+first and returns the coefficients in the data's units, so its edges do not depend on the units;
+causal-learn fits the series as given. The generated variables differ in variance, so the two can
+keep different small coefficients: read `agree` beside the scores.
 
 ### Where the clock starts
 
@@ -526,6 +564,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
+- `granger_var.py` - compares lasso Granger causality with causal-learn on vector-autoregressive
+  series.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.
