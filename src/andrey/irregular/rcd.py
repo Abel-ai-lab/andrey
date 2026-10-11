@@ -137,7 +137,7 @@ def _pearson_pvalue_fast(a: np.ndarray, b: np.ndarray) -> float | None:
     input wrapper: the correlation is formed with the same numerically stable normalization, and the
     p-value is the same upper tail of the symmetric beta law on ``[-1, 1]``,
     ``2 * betaincc(k, k, (|r| + 1) / 2)`` with ``k = n / 2 - 1``, evaluated as SciPy evaluates it,
-    so a correlation that rounds to 1 gives SciPy's ``p = 0``. ``None`` signals a degenerate or
+    so a correlation that rounds to 1 gives ``p = 0``. ``None`` signals a degenerate or
     unsupported input (not 1-D, mismatched or under-length, complex, or a near-constant column) for
     the caller to resolve with the full test.
     """
