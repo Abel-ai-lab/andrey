@@ -223,6 +223,33 @@ Andrey regresses with spline features and least squares where lingam fits pygam'
 their HSIC tests use different kernel bandwidths and null approximations. Report this beside the
 CAM-UV results.
 
+### Categorical data
+
+`discrete_cpu.py` compares Andrey's PC with the chi-square and the G-square test and GES with the
+BDeu score against causal-learn's, with the empty-graph baseline. It runs on `discrete_er`:
+category codes from a discrete network on an Erdos-Renyi graph, each node with 2 or 3 categories
+and each row of its conditional probability table drawn from a flat Dirichlet
+(`datasets.DISCRETE_SETTINGS`, recorded in each dataset's generator call). The codes are never
+rescaled. Both packages run each method with the same settings, listed in `params`: `alpha=0.05`
+for PC; BDeu's default priors and at most four parents for GES. Andrey's GES runs serially on the
+numpy backend; BDeu moves are scored in one process.
+
+The defaults are 2000 rows, `d` of 10, 20, and 40, five seeds, one repeat after one warm-up fit, and
+`--cap-wall-s` of 1800. Each estimate is scored against the true DAG's CPDAG: `shd` and the
+skeleton and arrowhead columns. The summary prints each solution's median wall time and SHD per
+`d`, then each method's speed-up, causal-learn's median wall time over Andrey's on the datasets
+where both finished. A smoke run covers every solution on one small dataset, and a rescore
+recomputes the score columns from the stored estimates; pass the first run's flags:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-cpu --rescore
+```
+
+The p-values and BDeu scores follow causal-learn's definitions, and on the datasets of
+`benchmarks/tests/test_adapters_discrete.py` the two packages return the same graph. Read the SHD
+columns beside the speed-up: where the graphs differ, the difference is a result to report.
+
 ### Where the clock starts
 
 Only `fit` is timed. Package imports, interpreter startup, and library loading belong in an optional
@@ -526,6 +553,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
+- `discrete_cpu.py` - compares PC with the chi-square and G-square tests and GES with BDeu with
+  causal-learn on categorical data.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.

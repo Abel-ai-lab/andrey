@@ -1,7 +1,9 @@
 """Generate and store benchmark datasets with ``andrey.data.sample_scm``.
 
 Each ``(topology, functional, noise, density, d, n, seed, standardize, latents)`` dataset is stored
-once as a ``.npz`` containing ``float64`` samples and the true graph's int8 endpoint marks.
+once as a ``.npz`` containing ``float64`` samples and the true graph's int8 endpoint marks. The
+``categorical`` functional samples a discrete network with ``andrey.data.sample_discrete`` instead;
+its samples are category codes.
 :class:`DatasetKey` supplies the ``dataset_id``; :func:`load` casts to ``float32`` for those fits
 outside timing, without storing another copy.
 """
@@ -69,7 +71,17 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "latent_lingam_er": ("er", "linear", "uniform", "standardized"),
     # Nonlinear additive noise with hidden confounders, where CAM-UV is identifiable.
     "latent_anm_er": ("er", "anm", "gaussian", "standardized"),
+    # Categorical data from a discrete network, Dirichlet tables on an ER DAG: the chi-square and
+    # G-square tests and the BDeu score. Codes are categories, so they are never rescaled.
+    "discrete_er": ("er", "categorical", "dirichlet", "raw"),
 }
+
+#: The functional label of :data:`REGIMES` that ``andrey.data.sample_discrete`` generates, with the
+#: arguments it takes beyond the key's coordinates: categories per node and the Dirichlet
+#: concentration of each table row. They are recorded in the generator call, so the digest follows
+#: them.
+DISCRETE_FUNCTIONAL = "categorical"
+DISCRETE_SETTINGS: dict[str, object] = {"categories": [2, 3], "concentration": 1.0}
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
 #: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
@@ -198,8 +210,21 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
     """Return the ``andrey.data.sample_scm`` arguments for ``key``, including ``key.density``.
 
     The registry stores this call for reproduction. Unmapped labels raise ``KeyError`` or
-    ``ValueError``.
+    ``ValueError``. A categorical key returns the ``andrey.data.sample_discrete`` arguments, with
+    ``"generator"`` naming it.
     """
+    if key.functional == DISCRETE_FUNCTIONAL:
+        if key.standardize != "raw" or key.latents:
+            raise ValueError(f"{key.label}: categorical data are raw codes with no hidden nodes")
+        return {
+            "generator": "sample_discrete",
+            "graph": TOPOLOGY_TO_GRAPH[key.topology],
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+            "density": key.density,
+            **DISCRETE_SETTINGS,
+        }
     try:
         graph = TOPOLOGY_TO_GRAPH[key.topology]
         functional = FUNCTIONAL_TO_ANDREY[key.functional]
@@ -246,7 +271,10 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
     nodes. :func:`latent_node_types` rebuilds their types from the key.
     """
     kwargs = generation_kwargs(key)
-    ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
+    if kwargs.pop("generator", None) == "sample_discrete":
+        ds = data.sample_discrete(**kwargs)  # type: ignore[arg-type]
+    else:
+        ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
     data_arr = np.ascontiguousarray(ds.data, dtype=CANONICAL_DTYPE)
     graph = ds.graph
     if not hasattr(graph, "to_numpy"):  # Temporal families are unsupported here.
@@ -421,6 +449,8 @@ __all__ = [
     "load",
     "TOPOLOGY_TO_GRAPH",
     "FUNCTIONAL_TO_ANDREY",
+    "DISCRETE_FUNCTIONAL",
+    "DISCRETE_SETTINGS",
     "NOISES",
     "STANDARDIZE_TO_SCALE",
 ]
