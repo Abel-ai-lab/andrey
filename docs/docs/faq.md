@@ -123,7 +123,7 @@ workers re-imports the script;
 workers only above a work cutoff. GES's default suits one fit per process, and HC's sits between
 the values for one fit and for many; for a process that runs many fits, `andrey calibrate` measures
 the cutoffs on your machine and prints the settings. With the same setting, `granger` fits its
-variables on worker threads and returns the same coefficients as serially.
+variables on worker threads, which need no `__main__` guard, and returns the same coefficients.
 
 ## Data
 
