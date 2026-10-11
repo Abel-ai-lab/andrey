@@ -182,10 +182,13 @@ def _sizes(regime: str) -> tuple[str, ...]:
 
 # A method applies where its assumptions hold. PC, GES, BOSS, and GRaSP assume no hidden variables,
 # FCI allows them, and the LiNGAM methods need non-Gaussian noise. Sachs is measured data that fits
-# each only approximately.
+# each only approximately. RCD and BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's
+# 1,000 rows RCD marks most pairs <-> and scores worse than the empty graph, and on Sachs
+# BottomUpParceLiNGAM does.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
+CONFOUNDED_DATA = _sizes("latent_lingam_er")
 
 #: Public defaults. A fixed seed pins BOSS's and GRaSP's search orders and FastICA's start.
 SUPPORTED: dict[str, Method] = {
@@ -196,6 +199,10 @@ SUPPORTED: dict[str, Method] = {
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
     "DirectLiNGAM": Method(lambda x: andrey.direct_lingam(x), "dag", LINGAM_DATA),
     "ICA-LiNGAM": Method(lambda x: andrey.ica_lingam(x, random_state=0), "dag", LINGAM_DATA),
+    "RCD": Method(lambda x: andrey.rcd(x), "projection", CONFOUNDED_DATA),
+    "BottomUpParceLiNGAM": Method(
+        lambda x: andrey.bottom_up_parce_lingam(x), "projection", CONFOUNDED_DATA
+    ),
 }
 
 

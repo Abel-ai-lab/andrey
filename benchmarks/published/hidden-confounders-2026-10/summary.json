@@ -1,6 +1,168 @@
 {
-  "placeholder": true,
   "release": "0.2.0",
-  "generated": null,
-  "methods": []
+  "generated": "2026-10-11",
+  "methods": [
+    {
+      "method": "RCD",
+      "family": "latent",
+      "comparator": "lingam",
+      "regime": "latent_lingam_er",
+      "hardware": "AMD EPYC 7713 64-Core Processor, 2 cores",
+      "build": "pre-release Andrey 0.2.0 build, 11 October 2026",
+      "pair_score": "f1",
+      "rows": [
+        {
+          "d": 5,
+          "observed": 4,
+          "seeds": 5,
+          "andrey_s": 1.99,
+          "comparator_s": 3.31,
+          "ratio": 1.66,
+          "same_graph": 5,
+          "andrey_directed_errors": 0.0,
+          "comparator_directed_errors": 0.0,
+          "empty_directed_errors": 3.0,
+          "andrey_pair_score": 0.657,
+          "comparator_pair_score": 0.657
+        },
+        {
+          "d": 10,
+          "observed": 8,
+          "seeds": 5,
+          "andrey_s": 3.75,
+          "comparator_s": 8.81,
+          "ratio": 2.35,
+          "same_graph": 5,
+          "andrey_directed_errors": 4.0,
+          "comparator_directed_errors": 4.0,
+          "empty_directed_errors": 4.0,
+          "andrey_pair_score": 0.344,
+          "comparator_pair_score": 0.344
+        },
+        {
+          "d": 15,
+          "observed": 12,
+          "seeds": 5,
+          "andrey_s": 6.83,
+          "comparator_s": 16.7,
+          "ratio": 2.17,
+          "same_graph": 5,
+          "andrey_directed_errors": 6.0,
+          "comparator_directed_errors": 6.0,
+          "empty_directed_errors": 8.0,
+          "andrey_pair_score": 0.454,
+          "comparator_pair_score": 0.454
+        },
+        {
+          "d": 20,
+          "observed": 16,
+          "seeds": 5,
+          "andrey_s": 11.9,
+          "comparator_s": 34.7,
+          "ratio": 2.88,
+          "same_graph": 5,
+          "andrey_directed_errors": 8.0,
+          "comparator_directed_errors": 8.0,
+          "empty_directed_errors": 11.0,
+          "andrey_pair_score": 0.543,
+          "comparator_pair_score": 0.543
+        },
+        {
+          "d": 30,
+          "observed": 24,
+          "seeds": 5,
+          "andrey_s": 17.9,
+          "comparator_s": 52.5,
+          "ratio": 2.55,
+          "same_graph": 5,
+          "andrey_directed_errors": 11.0,
+          "comparator_directed_errors": 11.0,
+          "empty_directed_errors": 19.0,
+          "andrey_pair_score": 0.467,
+          "comparator_pair_score": 0.467
+        }
+      ]
+    },
+    {
+      "method": "BottomUpParceLiNGAM",
+      "family": "latent",
+      "comparator": "lingam",
+      "regime": "latent_lingam_er",
+      "hardware": "AMD EPYC 7713 64-Core Processor, 2 cores",
+      "build": "pre-release Andrey 0.2.0 build, 11 October 2026",
+      "pair_score": "recall",
+      "rows": [
+        {
+          "d": 5,
+          "observed": 4,
+          "seeds": 5,
+          "andrey_s": 1.84,
+          "comparator_s": 4.59,
+          "ratio": 2.48,
+          "same_graph": 5,
+          "andrey_directed_errors": 1.0,
+          "comparator_directed_errors": 1.0,
+          "empty_directed_errors": 3.0,
+          "andrey_pair_score": 0.233,
+          "comparator_pair_score": 0.233
+        },
+        {
+          "d": 10,
+          "observed": 8,
+          "seeds": 5,
+          "andrey_s": 8.66,
+          "comparator_s": 46.9,
+          "ratio": 5.08,
+          "same_graph": 5,
+          "andrey_directed_errors": 11.0,
+          "comparator_directed_errors": 11.0,
+          "empty_directed_errors": 4.0,
+          "andrey_pair_score": 0.145,
+          "comparator_pair_score": 0.145
+        },
+        {
+          "d": 15,
+          "observed": 12,
+          "seeds": 5,
+          "andrey_s": 21.7,
+          "comparator_s": 126.0,
+          "ratio": 5.68,
+          "same_graph": 5,
+          "andrey_directed_errors": 17.0,
+          "comparator_directed_errors": 17.0,
+          "empty_directed_errors": 8.0,
+          "andrey_pair_score": 0.05,
+          "comparator_pair_score": 0.05
+        },
+        {
+          "d": 20,
+          "observed": 16,
+          "seeds": 5,
+          "andrey_s": 39.9,
+          "comparator_s": 279.0,
+          "ratio": 6.61,
+          "same_graph": 5,
+          "andrey_directed_errors": 22.0,
+          "comparator_directed_errors": 22.0,
+          "empty_directed_errors": 11.0,
+          "andrey_pair_score": 0.0,
+          "comparator_pair_score": 0.0
+        },
+        {
+          "d": 30,
+          "observed": 24,
+          "seeds": 5,
+          "andrey_s": 95.9,
+          "comparator_s": 1030.0,
+          "ratio": 10.8,
+          "same_graph": 5,
+          "andrey_directed_errors": 40.0,
+          "comparator_directed_errors": 40.0,
+          "empty_directed_errors": 19.0,
+          "andrey_pair_score": 0.0,
+          "comparator_pair_score": 0.0
+        }
+      ]
+    }
+  ]
 }

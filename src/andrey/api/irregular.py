@@ -164,12 +164,6 @@ def rcd(
         If ``data`` has fewer than 6 rows, if ``max_explanatory_vars`` is less than 1, or if a
         significance level is not in ``(0, 1)``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     RCD assumes linear relations and non-Gaussian noise. It needs more rows than DirectLiNGAM: its
@@ -193,7 +187,6 @@ def rcd(
     >>> out.metadata["confounded_pairs"]
     [[0, 1]]
     """
-    warn_experimental("rcd")
     from andrey.irregular.rcd import fit_rcd
 
     X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
@@ -313,12 +306,6 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
         If ``data`` has fewer than 6 rows or no more rows than columns, or if ``alpha`` is not in
         ``(0, 1)``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     The search finds sinks from the bottom up and stops at the first variable it cannot separate,
@@ -346,7 +333,6 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     >>> out.metadata["causal_order"]
     [[0, 1], 2, 3]
     """
-    warn_experimental("bottom_up_parce_lingam")
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
 
     X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
