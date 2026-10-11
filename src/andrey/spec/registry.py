@@ -566,6 +566,47 @@ _add(
     )
 )
 
+_add(
+    MethodSpec(
+        name="granger",
+        family="temporal",
+        summary="Lasso Granger causality for a single multivariate time series: lagged effects "
+        "only, one cross-validated lasso per variable. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="lag_weights at lags 1..maxlag (the lasso coefficients, no lag 0); no ordering.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        params=(
+            ParamSpec(
+                name="maxlag",
+                type="int",
+                default=2,
+                doc="Number of past time steps each regression uses, at least 1.",
+            ),
+            ParamSpec(
+                name="cv",
+                type="int",
+                default=5,
+                doc="Cross-validation folds that choose each regression's lasso penalty, at "
+                "least 2.",
+            ),
+        ),
+        references=("Granger 1969", "Arnold, Liu & Abe 2007", "Shojaie & Michailidis 2010"),
+    )
+)
+
 # --- pairwise family ------------------------------------------------------------------------------
 
 _add(

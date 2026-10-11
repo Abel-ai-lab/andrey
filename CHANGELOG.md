@@ -13,6 +13,9 @@ in alpha, and any minor release may change the API.
   `bottom_up_parce_lingam`. Each returns a PAG over the observed variables. `rcd` and `camuv`
   list the pairs a hidden variable links in `metadata["confounded_pairs"]`;
   `bottom_up_parce_lingam` leaves the variables whose order such a cause hides unordered.
+- `granger`, experimental lasso Granger causality for a multivariate time series. It returns a
+  temporal structure with lags 1 to `maxlag` and the coefficients as weights, and does not
+  depend on the units of any variable.
 - `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
   search stops there.
 

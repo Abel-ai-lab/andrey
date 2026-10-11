@@ -55,6 +55,7 @@ SINGLE = {
     "direct_lingam": andrey.direct_lingam,
     "ica_lingam": andrey.ica_lingam,
     "varma_lingam": andrey.varma_lingam,
+    "granger": andrey.granger,
     "gin": andrey.gin,
     "rcd": andrey.rcd,
     "camuv": andrey.camuv,
@@ -92,7 +93,9 @@ def test_a_dataframe_error_names_the_constant_column():
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-@pytest.mark.parametrize("method", [m for m in SINGLE if m not in ("calm", "varma_lingam")])
+@pytest.mark.parametrize(
+    "method", [m for m in SINGLE if m not in ("calm", "varma_lingam", "granger")]
+)
 def test_one_column_gives_a_one_node_graph(method):
     structure = SINGLE[method](_data(d=1)).structure
     assert structure.n_nodes == 1
@@ -100,9 +103,32 @@ def test_one_column_gives_a_one_node_graph(method):
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-def test_varma_lingam_needs_two_variables():
+@pytest.mark.parametrize("fit", [andrey.varma_lingam, andrey.granger], ids=lambda f: f.__name__)
+def test_time_series_methods_need_two_variables(fit):
     with pytest.raises(ValueError, match="data needs at least 2 columns"):
-        andrey.varma_lingam(_data(d=1))
+        fit(_data(d=1))
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("setting", "value", "error"),
+    [
+        ("maxlag", 0, ValueError),
+        ("maxlag", 1.5, TypeError),
+        ("cv", 1, ValueError),
+        ("cv", 2.5, TypeError),
+    ],
+)
+def test_granger_checks_maxlag_and_cv(setting, value, error):
+    with pytest.raises(error, match=setting):
+        andrey.granger(_data(), **{setting: value})
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_granger_needs_a_time_step_in_every_fold():
+    with pytest.raises(ValueError, match="data needs at least 8 rows"):
+        andrey.granger(_data()[:7], maxlag=3, cv=5)
+    assert andrey.granger(_data()[:8], maxlag=3, cv=5).structure.lags == (1, 2, 3)
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

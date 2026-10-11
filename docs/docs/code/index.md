@@ -70,6 +70,7 @@ in a process.
    multi_group_direct_lingam
    varma_lingam
    longitudinal_lingam
+   granger
    pnl
    gin
    rcd

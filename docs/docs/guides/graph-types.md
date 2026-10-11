@@ -140,8 +140,9 @@ assert summary.lags_of(0, 1) == (1,)
 assert summary.lags_of(1, 0) == (2,)
 ```
 
-`lags` lists lag values, so `lag(2)` selects lag 2, not the third array position. `lag_weights`
-holds autoregressive coefficients; VARMA can also provide `lag_weights_ma` for moving-average
+`lags` lists lag values, so `lag(2)` selects lag 2, not the third array position. Granger
+causality finds no effects within a time step, so its lags start at 1. `lag_weights` holds
+autoregressive coefficients; VARMA can also provide `lag_weights_ma` for moving-average
 coefficients.
 
 Longitudinal results add an occasion axis. Use `at(time, lag)` and `time_weights` to inspect the
@@ -155,7 +156,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `gin` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `hc`, `boss`, `grasp` |
 | `pag` | `fci`, `gfci`, `rcd`, `camuv`, `bottom_up_parce_lingam` |
-| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam` |
+| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `granger` |
 
 `multi_group_direct_lingam` returns a list of results, one per group. GIN includes explicit latent
 nodes, marked by `node_types` (`OBSERVED=0`, `LATENT=1`). PNL is a direction test on two variables:

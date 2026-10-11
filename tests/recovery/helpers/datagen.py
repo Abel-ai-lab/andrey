@@ -67,6 +67,26 @@ def _var_process(
     return X[burn_in:]
 
 
+def _lagged_var(
+    seed: int, n_samples: int, lags: list[list[list[float]]], noise: str, burn_in: int
+) -> np.ndarray:
+    """Stable VAR(p) with lagged effects only: ``x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + e_t``.
+
+    ``lags`` lists ``A_1 .. A_p``, each ``A_k[i, j]`` the effect of ``x_j(t-k)`` on ``x_i(t)``;
+    there is no instantaneous mixing, so the lagged edges are exactly the nonzero entries. A
+    ``burn_in`` prefix is discarded so the returned window is stationary.
+    """
+    rng = np.random.default_rng(seed)
+    A = np.asarray(lags, dtype=np.float64)
+    p, d = A.shape[0], A.shape[1]
+    total = n_samples + burn_in
+    e = _noise(rng, (total, d), noise)
+    X = np.zeros((total, d), dtype=np.float64)
+    for t in range(total):
+        X[t] = e[t] + sum(A[k] @ X[t - k - 1] for k in range(min(p, t)))
+    return X[burn_in:]
+
+
 def _varma_process(
     seed: int,
     n_samples: int,
@@ -215,6 +235,19 @@ CASES: dict[str, dict] = {
             [0.0, 0.3, 0.0, 0.0],
             [0.0, 0.0, 0.3, 0.0],
             [0.1, 0.0, 0.0, 0.3],
+        ],
+    },
+    # Stable VAR(2) with lagged effects only - Granger. Lag 1: x0 -> x0, x0 -> x1, x2 -> x2; lag 2:
+    # x1 -> x2.
+    "var_3v_lag2": {
+        "model": "lagged_var",
+        "noise": "gaussian",
+        "seed": 20240619,
+        "n_samples": 1000,
+        "burn_in": 200,
+        "lags": [
+            [[0.5, 0.0, 0.0], [0.6, 0.0, 0.0], [0.0, 0.0, 0.3]],
+            [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, -0.5, 0.0]],
         ],
     },
     # Stable/invertible VARMA(1,1), non-Gaussian noise - VARMALiNGAM.
@@ -369,6 +402,14 @@ def generate(case_id: str, *, replicate: int = 0) -> np.ndarray:
             n_samples=spec["n_samples"],
             B0=spec["B0"],
             A1=spec["A1"],
+            noise=spec["noise"],
+            burn_in=spec["burn_in"],
+        )
+    if model == "lagged_var":
+        return _lagged_var(
+            seed=seed,
+            n_samples=spec["n_samples"],
+            lags=spec["lags"],
             noise=spec["noise"],
             burn_in=spec["burn_in"],
         )

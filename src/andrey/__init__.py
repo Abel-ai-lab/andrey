@@ -19,6 +19,7 @@ from .api import (
     gfci,
     gies,
     gin,
+    granger,
     grasp,
     hc,
     ica_lingam,
@@ -81,6 +82,7 @@ __all__ = [
     # Temporal family - one StructureOutput over a per-lag stack.
     "varma_lingam",
     "longitudinal_lingam",
+    "granger",
     # Pairwise direction test.
     "pnl",
     # Hidden common causes: a PAG over the observed variables.
