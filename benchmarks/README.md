@@ -129,6 +129,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
+| ANM | Andrey, causal-learn |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -222,6 +223,34 @@ The two CAM-UV implementations differ inside, so the same settings can give diff
 Andrey regresses with spline features and least squares where lingam fits pygam's `LinearGAM`, and
 their HSIC tests use different kernel bandwidths and null approximations. Report this beside the
 CAM-UV results.
+
+### ANM direction test
+
+`anm_pairs.py` compares Andrey's `anm` with causal-learn's `ANM` on cause-effect pairs from the
+`anm_pair` regime: two nodes at density 1.0, so every pair has one edge, in a direction the seed
+draws, with a nonlinear additive-noise mechanism and Gaussian noise. The ladder runs over the
+number of rows, `--sizes`, since a pair always has two columns. causal-learn returns the two
+p-values only, so its adapter decides the edge with Andrey's function: both solutions draw the
+direction with the larger p-value.
+
+The defaults are sizes of 200, 500, 1000, and 2000 rows, 20 seeds, one repeat without warm-up, and
+`--cap-wall-s` of 1800. A fit at 2000 rows takes about half a minute: the Gaussian-process
+regression grows with the cube of the rows. A smoke run fits one pair of 100 rows:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/anm_pairs.py --out outputs/anm-smoke --smoke
+```
+
+Each record gets `direction_correct`, `direction_reversed`, and `direction_none`, one of them 1.0,
+from the estimate stored in `structures/`; `--rescore` recomputes them without fitting, as in
+[Hidden-confounder methods](#hidden-confounder-methods). The summary prints, per size and solution,
+the median wall time, the share of pairs with the true direction, and `agree`, the share of pairs
+on which the two solutions return the same graph.
+
+Both packages fit the same Gaussian process and the same HSIC test. Andrey standardizes each
+column first, so its answer does not depend on the units; causal-learn fits the data as given. The
+regime's data are standardized, so the two compute the same p-values here up to rounding, and the
+comparison measures time.
 
 ### Where the clock starts
 
@@ -526,6 +555,7 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
+- `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.
