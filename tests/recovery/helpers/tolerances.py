@@ -23,7 +23,15 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
+    "XGES": {
+        "structural": ["graph"],
+        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
+    },
     "HC": {
+        "structural": ["graph"],
+        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
+    },
+    "Tabu": {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
