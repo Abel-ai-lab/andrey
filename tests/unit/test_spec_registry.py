@@ -9,7 +9,6 @@ method is benchmarked, and that every ``ANDREY_*`` variable the source reads has
 from __future__ import annotations
 
 import ast
-import importlib.util
 import inspect
 import json
 import pathlib
@@ -304,6 +303,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")
 EXPERIMENTAL = sorted(n for n, s in REGISTRY.items() if s.status == "experimental")
 GRADUATE = "mark it experimental until it meets the criteria in docs/docs/code/index.md"
+LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the paragraph holds"
 
 
 def _normalized(name: str) -> str:
@@ -312,12 +312,13 @@ def _normalized(name: str) -> str:
 
 
 def _published() -> set[str]:
-    """Methods in the summary the homepage and README publish (``SUMMARY`` in ``site/build.py``)."""
-    spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
-    assert spec and spec.loader
-    site = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(site)
-    return {_normalized(m["method"]) for m in json.loads(site.SUMMARY.read_text())["methods"]}
+    """Methods in the published summaries, one per benchmark report (``benchmarks/published/``)."""
+    summaries = (ROOT / "benchmarks" / "published").glob("*/summary.json")
+    return {
+        _normalized(m["method"])
+        for path in summaries
+        for m in json.loads(path.read_text())["methods"]
+    }
 
 
 def _calls(source: str) -> set[str]:
@@ -363,19 +364,20 @@ def test_every_method_has_a_status():
 
 
 def test_supported_means_published():
-    """Exactly the supported methods appear in the published benchmark summary."""
+    """Exactly the supported methods appear in the published benchmark summaries."""
     assert _published() == {_normalized(n) for n in SUPPORTED}, GRADUATE
 
 
 @pytest.mark.parametrize("name", SUPPORTED)
 def test_supported_method_has_a_benchmarks_section(name):
-    page = (ROOT / "docs" / "docs" / "benchmarks.md").read_text()
+    reports = (ROOT / "docs" / "docs" / "benchmarks").glob("*.md")
     sections = {
         _normalized(part)
-        for heading in re.findall(r"^### (.+)$", page, re.MULTILINE)
+        for page in reports
+        for heading in re.findall(r"^### (.+)$", page.read_text(), re.MULTILINE)
         for part in re.split(r",| and ", heading)
     }
-    missing = f"{name}: no section on docs/docs/benchmarks.md; {GRADUATE}"
+    missing = f"{name}: no section in a report under docs/docs/benchmarks/; {GRADUATE}"
     assert _normalized(name) in sections, missing
 
 
@@ -400,6 +402,19 @@ def test_supported_method_has_an_example(name):
     notebooks = (ROOT / "examples").glob("*.ipynb")
     called = set().union(*(_calls(_notebook_code(path)) for path in notebooks))
     assert name in called, f"{name}: no example notebook calls it; {GRADUATE}"
+
+
+@pytest.mark.parametrize("name", _SPEC_NAMES)
+def test_method_declares_its_limitations(name):
+    """The docstring's Notes carry a **Limitations.** paragraph: what is measured or tested."""
+    doc = inspect.getdoc(getattr(andrey, name)) or ""
+    notes = re.search(
+        r"^Notes\n-{3,}\n(.*?)(?=^\S[^\n]*\n-{3,}\n|\Z)", doc, re.MULTILINE | re.DOTALL
+    )
+    assert notes, f"{name}: no Notes section; {LIMITATIONS}"
+    assert re.search(r"^\*\*Limitations\.\*\* ", notes.group(1), re.MULTILINE), (
+        f"{name}: no **Limitations.** paragraph in Notes; {LIMITATIONS}"
+    )
 
 
 @pytest.mark.parametrize("name", EXPERIMENTAL)

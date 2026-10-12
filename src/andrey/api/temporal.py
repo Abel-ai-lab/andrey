@@ -82,6 +82,13 @@ def varma_lingam(
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
 
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on one series of 500 time steps over 3
+    variables. It assumes linear effects and non-Gaussian noise. The likelihood fit stops after 100
+    iterations and gives no warning when it has not converged; with ``criterion`` set, it fits one
+    model for every ``(p, q)`` in the grid.
+
     References
     ----------
     .. [1] Kawahara, Y., Shimizu, S., and Washio, T. (2011). Analyzing relationships among ARMA
@@ -170,6 +177,13 @@ def longitudinal_lingam(
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on 4 time points of 600 units and 4
+    variables. It assumes linear effects and non-Gaussian noise. Each time point's fit uses only the
+    units' rows at that time, so its accuracy depends on the number of units, not on the number of
+    time points.
 
     References
     ----------
