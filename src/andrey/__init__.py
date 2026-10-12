@@ -27,7 +27,9 @@ from .api import (
     pc,
     pnl,
     rcd,
+    tabu,
     varma_lingam,
+    xges,
 )
 from .core import GraphStructure, Structure, StructureOutput, SummaryGraph, TemporalStructure
 from .core.backend import config, describe
@@ -40,7 +42,7 @@ from .core.warning_policy import (
     SearchLimitWarning,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "__version__",
@@ -67,7 +69,9 @@ __all__ = [
     "cdnod",
     "ges",
     "gies",
+    "xges",
     "hc",
+    "tabu",
     "exact_search",
     "calm",
     "boss",

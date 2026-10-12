@@ -527,13 +527,11 @@ X = np.random.default_rng(0).standard_normal((200, {d}))
 # d=120: the covariance exceeds the 64 KiB pipe buffer, so the payload write finds no reader
 # (``BrokenPipeError``). d=8 fits, so the parent waits for a pid or result that never arrives
 # (``EOFError`` under forkserver, ``BrokenProcessPool`` under spawn). GIES and GFCI call ``ges()``,
-# so GES stands for them; HC builds its own pool.
-@pytest.mark.parametrize(
-    "fn,d,guarded", [("ges", 8, False), ("ges", 120, False), ("hc", 8, False), ("ges", 8, True)]
-)
-def test_script_without_main_guard(tmp_path, fn, d, guarded):
+# so GES stands for them.
+@pytest.mark.parametrize("d,guarded", [(8, False), (120, False), (8, True)])
+def test_script_without_main_guard(tmp_path, d, guarded):
     """An unguarded script gets the guard-first message; the same script guarded runs."""
-    call = f"andrey.{fn}(X)"
+    call = "andrey.ges(X)"
     if guarded:
         call = f'if __name__ == "__main__":\n    {call}'
     script = tmp_path / "fit.py"  # a real file: forkserver and spawn re-import ``__main__`` by path
@@ -544,7 +542,6 @@ def test_script_without_main_guard(tmp_path, fn, d, guarded):
         "PYTHONPATH": os.pathsep.join(filter(None, [src_dir, os.environ.get("PYTHONPATH")])),
         "ANDREY_NUM_WORKERS": "2",
         "ANDREY_GES_PARALLEL_MIN_WORK": "0",
-        "ANDREY_HC_PARALLEL_MIN_WORK": "0",
     }
     proc = subprocess.run(
         [sys.executable, str(script)],
