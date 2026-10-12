@@ -85,8 +85,8 @@ experimental.
 RCD, BottomUpParceLiNGAM, and CAM-UV also test whether regression residuals are independent,
 which, with non-Gaussian noise, settles the directions. RCD and BottomUpParceLiNGAM estimate the
 edge weights too: 0.598 and 0.61, against the true 0.6. For comparison, DirectLiNGAM, which
-assumes every common cause is measured, returns `x0 -> x1` on the same data, an edge the true
-graph does not have.
+assumes every common cause is measured, returns `x0 -> x1` on the same data (the last result
+above), an edge the true graph does not have.
 
 GIN answers a different question. It takes data whose measured variables are noisy indicators of
 a few hidden variables, groups the indicators by hidden variable, and orders the hidden variables.

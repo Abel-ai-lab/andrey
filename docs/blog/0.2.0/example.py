@@ -11,3 +11,7 @@ df = pd.DataFrame({"x0": x0, "x1": x1, "x2": 0.6 * x1 + e2, "x3": 0.6 * x0 + e3}
 
 methods = (andrey.fci, andrey.gfci, andrey.rcd, andrey.bottom_up_parce_lingam, andrey.camuv)
 print(*(method(df) for method in methods), sep="\n\n")
+
+# For comparison: DirectLiNGAM assumes every common cause is in the data.
+print()
+print(andrey.direct_lingam(df))

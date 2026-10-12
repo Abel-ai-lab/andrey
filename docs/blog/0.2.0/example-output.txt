@@ -33,3 +33,11 @@ CAMUV  pag  |  4 nodes  |  3 edges (1 bidirected, 2 directed)
   x1 -> x2
 
   confounded_pairs: [[0, 1]]
+
+DirectLiNGAM  dag  |  4 nodes  |  3 edges (3 directed)
+
+  x0 -> x1  (+0.686)
+  x0 -> x3  (+0.598)
+  x1 -> x2  (+0.61)
+
+  order: x0 -> x1 -> x2 -> x3
