@@ -267,6 +267,12 @@ def xges(
     result whose score is lower by more than ``2e-7 * n_samples``, and stops once a fresh pass over
     the edges keeps nothing. No variable has a parent limit.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 258 variables with 512 rows,
+    and on 10,000 rows with 10 variables. The extended search reruns the base search once for each
+    edge it tries to delete, and tries the edges again after it keeps a result, so its run time
+    grows with both the number of edges and the number of results kept; ``extended_search=False``
+    skips it. Its BIC score assumes linear relations with Gaussian noise.
+
     References
     ----------
     .. [1] Nazaret, A., and Blei, D. (2024). Extremely greedy equivalence search. Proceedings of
