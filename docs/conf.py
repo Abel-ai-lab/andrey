@@ -418,6 +418,9 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
         css = ["examples.css"]
     elif pagename == "docs/benchmarks":
         css = ["benchmarks.css"]
+    elif pagename.startswith("docs/benchmarks/"):
+        # A release card: its cover and its figures.
+        css, js = ["benchmarks.css", "figures.css"], ["figures.js"]
     elif pagename == "docs/guides/graph-representation":
         js = ["graph-guides.js"]
     # The "Why Andrey is fast" scenes, on top of the page's own files: Motion, then its script.
@@ -465,7 +468,8 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
 
 def _post_cover(app, docname: str) -> str:  # noqa: ANN001
     """Draw the post's cover (site/cards.py) and return its figure. The front matter's ``cover``
-    names it (``pair`` or ``graph``, the default); ``cover_caption`` adds a caption."""
+    names it (``pair``, ``iceberg``, or ``graph``, the default); ``cover_caption`` adds a
+    caption."""
     meta = app.env.metadata.get(docname, {})
     kind = meta.get("cover", "graph")
     image = f"assets/covers/{docname.removeprefix('blog/')}.jpg"
