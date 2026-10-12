@@ -75,6 +75,7 @@ in a process.
    varma_lingam
    longitudinal_lingam
    pcmci
+   pcmciplus
    pnl
    gin
    camuv

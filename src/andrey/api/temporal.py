@@ -1,4 +1,4 @@
-"""Temporal-family facades: VARMA-LiNGAM, Longitudinal LiNGAM, and PCMCI.
+"""Temporal-family facades: VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, and PCMCI+.
 
 Each callable runs the native engine and returns one uniform ``StructureOutput`` wrapping a
 :class:`~andrey.core.TemporalStructure` (a per-lag stack of graphs, plus the lossless coefficient
@@ -20,7 +20,12 @@ from ._adapt import (
     with_labels,
 )
 from ._experimental import warn_experimental
-from ._temporal import _adapt_longitudinal_lingam, _adapt_pcmci, _adapt_varma_lingam
+from ._temporal import (
+    _adapt_longitudinal_lingam,
+    _adapt_pcmci,
+    _adapt_pcmciplus,
+    _adapt_varma_lingam,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -344,3 +349,147 @@ def pcmci(
         X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level, indep_test=indep_test
     )
     return with_labels(_adapt_pcmci(result), column_labels(data))
+
+
+def pcmciplus(
+    data: npt.ArrayLike,
+    *,
+    tau_max: int = 1,
+    pc_alpha: float = 0.01,
+    collider_rule: str = "majority",
+    indep_test: str = "student_t",
+) -> StructureOutput:
+    """Learn the lagged and same-step causal links of one multivariate time series with PCMCI+.
+
+    PCMCI+ [1]_ extends PCMCI to links within one time step. It first selects, for each variable, a
+    few candidate parents among the lagged values of all variables. It then tests every lagged
+    candidate and every pair of variables at the same step, given subsets of the same-step
+    neighbors plus the selected lagged parents of both ends, and orients the same-step links with
+    the collider and orientation rules of the PC algorithm. Lagged links always point forward in
+    time. Use it on one series whose causal effects can act within a time step.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        A multivariate time series, one row per time step. Coerced to ``float64``. A DataFrame's
+        column names become the structure's ``labels``.
+    tau_max : int, default=1
+        The largest lag tested, at least ``1``: links at lags ``0`` to ``tau_max`` are tested.
+    pc_alpha : float, default=0.01
+        Significance level of every test, in ``(0, 1)``: a link is removed when a test gives it a
+        p-value above ``pc_alpha``.
+    collider_rule : {"majority", "conservative", "none"}, default="majority"
+        How an unshielded triple ``a - b - c`` with a same-step link ``b - c`` is judged a
+        collider ``a -> b <- c``. ``"majority"`` and ``"conservative"`` test ``a`` and ``c`` again
+        given every subset of their same-step neighbors and look at the subsets that separate
+        them: ``"majority"`` calls the triple a collider when fewer than half hold ``b``, and
+        ``"conservative"`` when none does; a triple neither rule can decide is ambiguous and
+        orients nothing. ``"none"`` calls it a collider when ``b`` is not in the one separating
+        set the skeleton search found.
+    indep_test : {"student_t", "fisherz"}, default="student_t"
+        The partial-correlation test behind every p-value. Both report the same partial
+        correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
+        ``"fisherz"`` from Fisher's z-transform.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to
+        ``tau_max``. ``structure.lag(0)`` is a ``cpdag`` of the same-step links: ``i -> j`` is
+        oriented, and ``i -- j`` is a link whose direction the data cannot tell or whose
+        orientations conflict; ``metadata["conflicts"]`` lists the latter as ``[i, j]`` pairs,
+        ``i < j``. ``structure.lag(k)``, ``k >= 1``, is a ``digraph`` whose edge ``i -> j`` is
+        the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a
+        self-loop is a variable's dependence on its own past. The structure has no
+        ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value among the tests
+        of the link between variable ``i`` at ``t - k`` and variable ``j`` at ``t``, and
+        ``metadata["statistics"][k][i][j]`` the partial correlation of that test; lag ``0`` is
+        symmetric with ``1`` and ``0`` on the diagonal. ``metadata["parents"][j]`` lists the
+        ``[i, k]`` pairs (variable ``i`` at lag ``k``) the first step selected for variable
+        ``j``, strongest first, and ``metadata["ambiguous_triples"]`` the ``[i, k, m, j]``
+        triples (variable ``i`` at lag ``k``, then ``m`` and ``j`` at lag ``0``) the collider rule
+        left undecided. ``ordering`` is ``None``, and ``metadata["algorithm"]`` is
+        ``"pcmciplus"``.
+
+    Raises
+    ------
+    TypeError
+        If ``tau_max`` is not an int.
+    ValueError
+        If ``tau_max`` is below 1, if ``pc_alpha`` is not in ``(0, 1)``, if ``collider_rule`` or
+        ``indep_test`` is not one of its choices, or if ``data`` is not a usable 2-D matrix with
+        at least ``2 * tau_max * (n_variables + 1) + n_variables + 1`` rows, the length at which
+        every test keeps a degree of freedom.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    The method runs in four phases. The lagged phase selects the lagged parents of each variable
+    as PCMCI's PC1 step does. The skeleton phase starts from those lagged links and from a link
+    between every two variables at the same step. Round ``p = 0, 1, ...`` tests each linked pair
+    given each subset of ``p`` same-step neighbors of the later end, with the lagged parents of
+    both ends added, and removes the link at the first p-value above ``pc_alpha``. A same-step
+    pair is tested from both ends, and the neighbor sets stay fixed during a round, so the
+    result does not depend on the order of the variables. The collider phase orients the
+    unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules R1 to R3 to
+    the same-step links until none applies. Each collider or rule pass collects its orientations
+    before applying them, and marks a link that gets both orientations as a conflict.
+
+    All tests use the same time steps, the last ``n_samples - 2 * tau_max``. The default test,
+    ``"student_t"``, takes the p-value from the Student-t distribution with ``n - |S| - 2``
+    degrees of freedom, for ``|S|`` conditions.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over
+    5 variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no hidden
+    common causes. The skeleton and collider phases test every subset of a variable's same-step
+    neighbors, so the number of tests grows exponentially with the number of same-step links at
+    one variable. A test conditions on up to ``2 * n_variables * tau_max + n_variables - 2``
+    values, so the series needs many more time steps than that.
+
+    References
+    ----------
+    .. [1] Runge, J. (2020). Discovering contemporaneous and lagged causal relations in
+       autocorrelated nonlinear time series datasets. Proceedings of the 36th Conference on
+       Uncertainty in Artificial Intelligence (UAI), PMLR 124, 1388-1397.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import pcmciplus
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = 0.8 * x + rng.standard_normal(500)
+    >>> z = np.r_[0.0, 0.8 * y[:-1]] + rng.standard_normal(500)
+    >>> out = pcmciplus(np.column_stack([x, y, z]))
+    >>> out.structure.lag(0).oriented_edges()
+    [(0, 1, 'undirected')]
+    >>> out.structure.lag(1).oriented_edges()
+    [(1, 2, 'directed')]
+    """
+    warn_experimental("pcmciplus")
+    from andrey.temporal.pcmciplus import pcmciplus as _native
+
+    tau_max = int_in_range(tau_max, "tau_max", 1)
+    pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
+    X = data_matrix(data)
+    # A test conditions on up to 2 * n * tau_max + n - 2 columns of the last
+    # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
+    min_rows = 2 * tau_max * (X.shape[1] + 1) + X.shape[1] + 1
+    if X.shape[0] < min_rows:
+        raise ValueError(
+            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
+            f"{X.shape[1]} variables, got {X.shape[0]}"
+        )
+    result = _native(
+        X,
+        tau_max=tau_max,
+        pc_alpha=pc_alpha,
+        collider_rule=collider_rule,
+        indep_test=indep_test,
+    )
+    return with_labels(_adapt_pcmciplus(result), column_labels(data))

@@ -18,7 +18,7 @@ from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
 from .permutation import boss, grasp
 from .score import calm, exact_search, ges, gies, hc
-from .temporal import longitudinal_lingam, pcmci, varma_lingam
+from .temporal import longitudinal_lingam, pcmci, pcmciplus, varma_lingam
 
 __all__ = [
     # constraint-based
@@ -43,6 +43,7 @@ __all__ = [
     "varma_lingam",
     "longitudinal_lingam",
     "pcmci",
+    "pcmciplus",
     # irregular / pairwise family
     "pnl",
     # latent-variable family

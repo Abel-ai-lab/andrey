@@ -623,6 +623,66 @@ _add(
         references=("Runge et al. 2019",),
     )
 )
+_add(
+    MethodSpec(
+        name="pcmciplus",
+        family="temporal",
+        summary="PCMCI+ for a single multivariate time series: lagged and same-step causal links. "
+        "Lagged links point forward in time; same-step links are oriented by collider and Meek "
+        "rules where the data allow. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="a cpdag at lag 0 and lag graphs for lags 1..tau_max; p_values, statistics, the "
+            "lagged parents, conflicting and ambiguous orientations in metadata.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        params=(
+            ParamSpec(
+                name="tau_max",
+                type="int",
+                default=1,
+                doc="The largest lag tested; links at lags 0 to tau_max are tested.",
+            ),
+            ParamSpec(
+                name="pc_alpha",
+                type="float",
+                default=0.01,
+                doc="Significance level of every test; a link is removed when a test gives it a "
+                "p-value above this.",
+            ),
+            ParamSpec(
+                name="collider_rule",
+                type="str",
+                default="majority",
+                choices=("majority", "conservative", "none"),
+                doc="How a same-step collider is judged: majority = fewer than half of the "
+                "separating subsets hold the middle; conservative = none does; none = the middle "
+                "is not in the one separating set found.",
+            ),
+            ParamSpec(
+                name="indep_test",
+                type="str",
+                default="student_t",
+                choices=("student_t", "fisherz"),
+                doc="Partial-correlation test behind every p-value: student_t = Student-t "
+                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
+                "z-transform.",
+            ),
+        ),
+        references=("Runge 2020",),
+    )
+)
 
 # --- pairwise family ------------------------------------------------------------------------------
 

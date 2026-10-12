@@ -56,6 +56,7 @@ SINGLE = {
     "ica_lingam": andrey.ica_lingam,
     "varma_lingam": andrey.varma_lingam,
     "pcmci": andrey.pcmci,
+    "pcmciplus": andrey.pcmciplus,
     "gin": andrey.gin,
     "rcd": andrey.rcd,
     "camuv": andrey.camuv,
@@ -94,7 +95,7 @@ def test_a_dataframe_error_names_the_constant_column():
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
-    "method", [m for m in SINGLE if m not in ("calm", "varma_lingam", "pcmci")]
+    "method", [m for m in SINGLE if m not in ("calm", "varma_lingam", "pcmci", "pcmciplus")]
 )
 def test_one_column_gives_a_one_node_graph(method):
     structure = SINGLE[method](_data(d=1)).structure
@@ -178,6 +179,40 @@ def test_pcmci_needs_enough_time_steps_for_every_test():
     with pytest.raises(ValueError, match="data needs at least 27 rows"):
         andrey.pcmci(_data(n=26), tau_max=3, pc_alpha=0.99)
     assert andrey.pcmci(_data(n=27), tau_max=3, pc_alpha=0.99).structure.lags == (1, 2, 3)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("params", "error", "name"),
+    [
+        ({"tau_max": 0}, ValueError, "tau_max"),
+        ({"tau_max": 1.5}, TypeError, "tau_max"),
+        ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
+        ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
+        ({"collider_rule": "vote"}, ValueError, "collider_rule"),
+        ({"indep_test": "spearman"}, ValueError, "indep_test"),
+    ],
+)
+def test_pcmciplus_checks_its_parameters(params, error, name):
+    with pytest.raises(error, match=name):
+        andrey.pcmciplus(_data(), **params)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_pcmciplus_needs_enough_time_steps_for_every_test():
+    # 2 * tau_max * (n_variables + 1) + n_variables + 1 = 28 rows for tau_max=3 over 3 variables.
+    with pytest.raises(ValueError, match="data needs at least 28 rows"):
+        andrey.pcmciplus(_data(n=27), tau_max=3, pc_alpha=0.99)
+    out = andrey.pcmciplus(_data(n=28), tau_max=3, pc_alpha=0.99)
+    assert out.structure.lags == (0, 1, 2, 3)
+    assert len(out.structure.lag(0).oriented_edges()) == 3  # nothing removed: the largest tests ran
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_pcmciplus_takes_one_variable():
+    out = andrey.pcmciplus(_data(d=1))
+    assert out.structure.n_nodes == 1
+    assert out.structure.lag(0).oriented_edges() == []
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

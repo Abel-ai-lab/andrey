@@ -26,6 +26,7 @@ from .api import (
     multi_group_direct_lingam,
     pc,
     pcmci,
+    pcmciplus,
     pnl,
     rcd,
     varma_lingam,
@@ -83,6 +84,7 @@ __all__ = [
     "varma_lingam",
     "longitudinal_lingam",
     "pcmci",
+    "pcmciplus",
     # Pairwise direction test.
     "pnl",
     # Hidden common causes: a PAG over the observed variables.
