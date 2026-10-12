@@ -75,7 +75,7 @@ Not always. In the benchmarks, which use sparse simulated graphs with ten sample
 at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
 causal-learn, so there the limit is the algorithm's, not the software's. PC's graphs
 in gCastle are worse than the empty graph at 200 and 400 variables, while PC in Andrey and
-causal-learn stays below it. The benchmarks' [large graphs](benchmarks.md#large-graphs) section
+causal-learn stays below it. The benchmarks' [large graphs](benchmarks/0.1.0.md#large-graphs) section
 lists every case, including Andrey's GES at 200 variables with the default penalty.
 
 ### Why does a result differ from another package's?
@@ -216,7 +216,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: A very fast causal discovery package},
   year = {2026},
-  version = {0.1.0},
+  version = {0.2.0},
   url = {https://andrey.abel.ai},
 }
 ```
