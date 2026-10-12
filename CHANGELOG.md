@@ -12,17 +12,18 @@ change names its pull request.
 ### Breaking
 
 - `hc` runs in one process: its worker processes were slower at every measured size.
-  `ANDREY_HC_PARALLEL_MIN_WORK` and `andrey calibrate --method hc` are removed.
+  `ANDREY_HC_PARALLEL_MIN_WORK` and `andrey calibrate --method hc` are removed. ([#56])
 
 ### Added
 
 - An experimental method, `tabu`: tabu search, hill climbing that keeps going past a local optimum
   and returns the best DAG it visits, as a CPDAG. With the same settings its BIC score is never
-  worse than `hc`'s.
+  worse than `hc`'s. ([#56])
 
 ### Changed
 
 - `hc` gives the same graphs in less time: a fit on 200 variables runs about 60 times faster.
+  ([#56])
 
 ## [0.2.0] - 2026-10-12
 
@@ -90,3 +91,4 @@ First alpha release.
 [#31]: https://github.com/Abel-ai-lab/andrey/pull/31
 [#33]: https://github.com/Abel-ai-lab/andrey/pull/33
 [#53]: https://github.com/Abel-ai-lab/andrey/pull/53
+[#56]: https://github.com/Abel-ai-lab/andrey/pull/56
