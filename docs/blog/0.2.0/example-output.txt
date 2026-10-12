@@ -1,0 +1,7 @@
+pag  |  4 nodes  |  3 edges (1 bidirected, 2 directed)
+
+  x0 <-> x1
+  x0 -> x3  (+0.598)
+  x1 -> x2  (+0.61)
+
+  confounded_pairs: [[0, 1]]
