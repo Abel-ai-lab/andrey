@@ -205,11 +205,11 @@ def xges(
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with extremely greedy equivalence search (XGES).
 
-    XGES searches the equivalence classes that GES searches, with GES's moves and BIC score, but
-    applies them in a different order [1]_. The base search deletes an edge if that improves the
-    score, otherwise reverses one, otherwise adds one, until no move improves the score. The
-    extended search then retries deleting each edge of the result. On linear-Gaussian data it often
-    finds a graph with a better score than GES.
+    XGES searches the equivalence classes that GES searches [2]_, with GES's moves, the turning move
+    of GIES [3]_, and the BIC score, but applies them in a different order [1]_. The base search
+    deletes an edge if that improves the score, otherwise reverses one, otherwise adds one, until no
+    move improves the score. The extended search then retries deleting each edge of the result. On
+    linear-Gaussian data it often finds a graph with a better score than GES.
 
     Parameters
     ----------
