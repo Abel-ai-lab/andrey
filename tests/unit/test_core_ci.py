@@ -1,9 +1,11 @@
-"""Fisher-Z conditional-independence test: equivalence, error, and known-value checks.
+"""Fisher-Z and Student-t conditional-independence tests: equivalence, error, and known values.
 
 Covers the :class:`FisherZ` contract: exact scalar-vs-batched agreement,
 argument-order independence, no per-query state retained, fail-fast error paths, an
 independently derived closed-form p-value for the empty conditioning set, and a small inline
 baseline pinning current outputs. The numpy path is pinned as the exact float64 oracle.
+:class:`StudentT` reports the same partial correlation with a Student-t p-value, checked against
+a direct scipy computation.
 """
 
 from __future__ import annotations
@@ -13,9 +15,11 @@ from itertools import combinations
 
 import numpy as np
 import pytest
+from scipy import stats
 from scipy.special import ndtr
 
-from andrey.core.ci import FisherZ
+from andrey.core import ci
+from andrey.core.ci import FisherZ, StudentT
 
 
 @pytest.fixture(autouse=True)
@@ -221,3 +225,78 @@ def test_matches_inline_baseline(data):
     test = FisherZ(data)
     for (x, y, cond), expected in _BASELINE.items():
         assert test(x, y, cond) == pytest.approx(expected, abs=1e-12)
+
+
+# ---- Student-t test -------------------------------------------------------------------------
+
+
+def _residual_correlation(data, x, y, condition_set):
+    """Correlation of the least-squares residuals of columns ``x`` and ``y`` on the conditions."""
+    design = np.column_stack([np.ones(len(data)), data[:, list(condition_set)]])
+    residuals = [data[:, k] - design @ np.linalg.lstsq(design, data[:, k])[0] for k in (x, y)]
+    return np.corrcoef(*residuals)[0, 1]
+
+
+@pytest.mark.parametrize(
+    ("x", "y", "condition_set"),
+    [(0, 1, ()), (2, 5, ()), (1, 4, (2,)), (5, 0, (3,)), (0, 1, (2, 3)), (4, 2, (0, 1, 3))],
+)
+def test_student_t_p_value_is_the_t_tail_of_the_residual_correlation(data, x, y, condition_set):
+    r = _residual_correlation(data, x, y, condition_set)
+    df = len(data) - len(condition_set) - 2
+    expected = 2 * stats.t.sf(abs(r * np.sqrt(df / (1 - r * r))), df)
+    statistic, p = StudentT(data).statistic_pvalue(x, y, condition_set)
+    assert statistic == pytest.approx(r, abs=1e-12)
+    assert p == pytest.approx(expected, rel=1e-10)
+    assert StudentT(data)(x, y, condition_set) == p
+
+
+def test_student_t_reports_the_statistic_fisher_z_reports(data):
+    for x, y, condition_set in [(0, 1, ()), (1, 4, (2,)), (4, 2, (0, 1, 3))]:
+        assert (
+            StudentT(data).statistic_pvalue(x, y, condition_set)[0]
+            == (FisherZ(data).statistic_pvalue(x, y, condition_set)[0])
+        )
+
+
+def test_student_t_p_value_is_independent_of_argument_order(data):
+    test = StudentT(data)
+    assert test(4, 1, (3, 2)) == test(1, 4, (2, 3, 3))
+
+
+def test_student_t_is_not_a_registered_indep_test():
+    assert "student_t" not in ci.available_indep_tests()
+    assert "student_t" not in ci.SHIPPED_INDEP_TESTS
+
+
+def test_student_t_needs_more_samples_than_conditions_plus_two():
+    rng = np.random.default_rng(1)
+    with pytest.raises(ValueError, match="degrees of freedom"):
+        StudentT(rng.standard_normal((2, 4)))(0, 1)
+    with pytest.raises(ValueError, match="degrees of freedom"):
+        StudentT(rng.standard_normal((4, 4)))(0, 3, (1, 2))
+    r, p = StudentT(rng.standard_normal((3, 4))).statistic_pvalue(0, 1)  # one degree of freedom
+    assert abs(r) < 1 and 0 < p <= 1
+
+
+def test_student_t_on_exactly_dependent_columns_gives_a_finite_tiny_p_value():
+    rng = np.random.default_rng(2)
+    x = rng.standard_normal(50)
+    for sign in (1.0, -1.0):
+        r, p = StudentT(np.column_stack([x, sign * x, rng.standard_normal(50)])).statistic_pvalue(
+            0, 1
+        )
+        assert abs(r) < 1 and np.isclose(abs(r), 1.0)
+        assert 0 <= p < 1e-12
+
+
+def test_student_t_shares_the_fisher_z_error_paths():
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((100, 5))
+    X[:, 4] = X[:, 0]
+    with pytest.raises(ValueError, match="singular"):
+        StudentT(X)(1, 2, (0, 4))
+    with pytest.raises(ValueError, match="NaN or Inf"):
+        StudentT(np.array([[1.0, np.nan], [2.0, 3.0], [4.0, 5.0]]))
+    with pytest.raises(AssertionError, match="condition_set"):
+        StudentT(X)(0, 1, (0, 2))

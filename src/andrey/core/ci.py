@@ -1,4 +1,4 @@
-"""Conditional-independence test substrate: the partial-correlation Fisher-Z test.
+"""Conditional-independence test substrate: the partial-correlation Fisher-Z and Student-t tests.
 
 The constraint-based discovery family (PC / FCI / CDNOD) consumes a conditional-independence test
 through the :class:`CITest` contract: an object constructed once over the data and called as
@@ -12,6 +12,9 @@ partial correlation and skip the matrix inversion entirely; larger sets invert t
 submatrix. numpy float64 is the oracle. A query is canonicalized (``x``, ``y`` ordered, the
 conditioning set sorted unique) so its p-value does not depend on argument order, and nothing is
 memoized: a test object holds the correlation matrix and the sample size, whatever it is asked.
+
+:class:`StudentT` reports the same partial correlation with a Student-t p-value. It serves the
+time-series method PCMCI and is not in the registry the constraint methods read.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ from collections.abc import Callable, Iterable
 from typing import Protocol, cast, runtime_checkable
 
 import numpy as np
-from scipy.special import ndtr
+from scipy.special import ndtr, stdtr
 
 from . import stats
 
@@ -71,7 +74,7 @@ class FisherZ:
                 f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
             )
         if not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot run Fisher-Z test")
+            raise ValueError("data contains NaN or Inf; cannot run a partial-correlation test")
         self._n: int = arr.shape[0]
         self._corr: np.ndarray = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
 
@@ -98,10 +101,20 @@ class FisherZ:
             raise ValueError(
                 f"Fisher-Z degrees of freedom is negative (n={self._n}, |S|={m}); need n > |S| + 3"
             )
+        r = self._partial_correlation(x_int, y_int, cond)
+        z = 0.5 * np.log((1.0 + r) / (1.0 - r))
+        return r, 2.0 * (1.0 - float(ndtr(math.sqrt(df) * abs(z))))
+
+    def _partial_correlation(self, x_int: int, y_int: int, cond: list[int]) -> float:
+        """Partial correlation of columns ``x_int`` and ``y_int`` given ``cond``, clamped.
+
+        The arguments are canonical (see :func:`_canonical`). The result lies just inside
+        ``(-1, 1)``.
+        """
         corr = self._corr
-        if m == 0:
+        if not cond:
             r = float(corr[x_int, y_int])  # marginal correlation; no inversion
-        elif m == 1:  # first-order partial correlation, closed form
+        elif len(cond) == 1:  # first-order partial correlation, closed form
             z_idx = cond[0]
             rxy = float(corr[x_int, y_int])
             rxz = float(corr[x_int, z_idx])
@@ -116,12 +129,14 @@ class FisherZ:
             # spectrum exposes the rank deficiency (a zero eigenvalue) reliably on every backend.
             w = np.linalg.eigvalsh(sub)
             if w[0] <= w[-1] * 1e-12:
-                raise ValueError("correlation matrix is singular; cannot run Fisher-Z test")
+                raise ValueError(
+                    "correlation matrix is singular; cannot run a partial-correlation test"
+                )
             inv = np.linalg.inv(sub)
             r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
-        r = -_ONE_MINUS_EPS if r < -_ONE_MINUS_EPS else _ONE_MINUS_EPS if r > _ONE_MINUS_EPS else r
-        z = 0.5 * np.log((1.0 + r) / (1.0 - r))
-        return r, 2.0 * (1.0 - float(ndtr(math.sqrt(df) * abs(z))))
+        return (
+            -_ONE_MINUS_EPS if r < -_ONE_MINUS_EPS else _ONE_MINUS_EPS if r > _ONE_MINUS_EPS else r
+        )
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return Fisher-Z p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -187,7 +202,9 @@ class FisherZ:
             # Accelerate.
             w = np.linalg.eigvalsh(stack)  # (n, dim), ascending per row
             if (w[:, 0] <= w[:, -1] * 1e-12).any():
-                raise ValueError("correlation matrix is singular; cannot run Fisher-Z test")
+                raise ValueError(
+                    "correlation matrix is singular; cannot run a partial-correlation test"
+                )
             inv = np.linalg.inv(stack)
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
@@ -245,6 +262,47 @@ class FisherZ:
         a worker rebuilds an equivalent test over the parent's exact correlation bytes.
         """
         return self._corr, self._n
+
+
+class StudentT:
+    """Student-t partial-correlation conditional-independence test.
+
+    Reports the same partial correlation ``r`` as :class:`FisherZ`, computed by the same code, with
+    an exact Student-t p-value on ``df = n - |S| - 2`` degrees of freedom:
+    ``t = r * sqrt(df / (1 - r**2))`` and ``p = 2 * P(T_df > |t|)``. Its p-values differ slightly
+    from Fisher-Z's. ``r`` is clamped just inside ``(-1, 1)``, so a deterministic relation gives a
+    tiny finite p-value. A query needs ``n > |S| + 2``.
+
+    Queries are canonicalized as in :class:`FisherZ`. Unlike it, this test has no batched or
+    vectorized path and is not registered under an ``indep_test`` name.
+    """
+
+    def __init__(self, data: np.ndarray) -> None:
+        self._partial = FisherZ(data)
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the Student-t p-value for ``x`` independent of ``y`` given ``condition_set``."""
+        return self.statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int] = ()
+    ) -> tuple[float, float]:
+        """Return the partial correlation and p-value of ``x`` and ``y`` given ``condition_set``.
+
+        The p-value is the one :meth:`__call__` returns. The partial correlation is clamped just
+        inside ``(-1, 1)`` and is symmetric in ``x`` and ``y``.
+        """
+        x_int, y_int, cond = _canonical(x, y, condition_set)
+        n_samples = self._partial._n
+        df = n_samples - len(cond) - 2
+        if df <= 0:
+            raise ValueError(
+                f"Student-t degrees of freedom is not positive (n={n_samples}, |S|={len(cond)}); "
+                "need n > |S| + 2"
+            )
+        r = self._partial._partial_correlation(x_int, y_int, cond)
+        t = r * math.sqrt(df / (1.0 - r * r))
+        return r, 2.0 * float(stdtr(df, -abs(t)))
 
 
 # The indep_test registry: a name maps to a factory building a :class:`CITest` over the data.
