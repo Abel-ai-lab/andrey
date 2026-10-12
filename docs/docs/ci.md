@@ -14,8 +14,8 @@ the optional extras. It also builds and installs the wheel, and builds this webs
 notebook. NumPy in float64 is the reference: the Numba and PyTorch paths must match its results and
 repeat exactly.
 
-Before each release, a quality gate fits the seven supported methods to known graphs and to the
-Sachs data, and the release is published only when every method passes.
+Before each release, a quality gate fits the nine supported methods to data with known graphs,
+seven of them to the Sachs data too, and the release is published only when every method passes.
 
 | Platform | What is tested |
 |---|---|

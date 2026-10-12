@@ -67,6 +67,14 @@ def gin(
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
 
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on 6 observed indicators of 2 latents,
+    with 1,500 rows. It tests every group of observed variables of each size, from pairs upward, so
+    the number of tests grows combinatorially with the variable count, and each HSIC test's time and
+    memory grow with the square of the row count. Clusters have at least two variables, so a latent
+    with a single indicator is not found.
+
     References
     ----------
     .. [1] Xie, F., Cai, R., Huang, B., Glymour, C., Hao, Z., and Zhang, K. (2020). Generalized

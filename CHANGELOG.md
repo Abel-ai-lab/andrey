@@ -3,23 +3,27 @@
 All notable changes to Andrey are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the major version is 0, Andrey is
-in alpha, and any minor release may change the API. From 0.2.0, a release opens with two sections
-Keep a Changelog does not define, Highlights and Breaking, and each change names its pull request.
+in alpha, and any minor release may change the API. From 0.2.0, a release opens with Highlights
+and, when a change breaks the API, Breaking, two sections Keep a Changelog does not define; each
+change names its pull request.
 
 ## [Unreleased]
 
 ### Highlights
 
+- `rcd` and `bottom_up_parce_lingam` are supported: on data with hidden common causes they return
+  the same graphs as lingam and run 1.7-10.8x faster. The 0.2.0 release card gives the numbers and
+  each method's limits. ([#31])
 - Small fits run several times faster. At 10 variables, PC and FCI take about a twelfth of the
   time, hill climbing an eighth, and GES two fifths. Larger fits are no slower, and graphs are
   unchanged. ([#33])
 
 ### Added
 
-- Three experimental methods for data with hidden common causes: `rcd`, `camuv`, and
-  `bottom_up_parce_lingam`. Each returns a PAG over the observed variables. `rcd` and `camuv`
-  list the pairs a hidden variable links in `metadata["confounded_pairs"]`;
-  `bottom_up_parce_lingam` leaves the variables whose order such a cause hides unordered. ([#18])
+- Three methods for data with hidden common causes: `rcd`, `bottom_up_parce_lingam`, and the
+  experimental `camuv`. Each returns a PAG over the observed variables. `rcd` and `camuv` list the
+  pairs a hidden variable links in `metadata["confounded_pairs"]`; `bottom_up_parce_lingam` leaves
+  the variables whose order such a cause hides unordered. ([#18], [#31])
 - `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
   search stops there. ([#14])
 
@@ -65,4 +69,5 @@ First alpha release.
 [0.1.0]: https://github.com/Abel-ai-lab/andrey/releases/tag/v0.1.0
 [#14]: https://github.com/Abel-ai-lab/andrey/pull/14
 [#18]: https://github.com/Abel-ai-lab/andrey/pull/18
+[#31]: https://github.com/Abel-ai-lab/andrey/pull/31
 [#33]: https://github.com/Abel-ai-lab/andrey/pull/33

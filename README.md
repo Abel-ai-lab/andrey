@@ -84,7 +84,7 @@ Four ideas make it fast; each is animated in
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/code/generated/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/code/generated/andrey.grasp.html) | CPDAG |
 | Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.multi_group_direct_lingam.html)\* | DAG |
 | Time series | [`varma_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.varma_lingam.html)\*, [`longitudinal_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.longitudinal_lingam.html)\* | Temporal graph |
-| Latent variables | [`gin`](https://andrey.abel.ai/docs/code/generated/andrey.gin.html)\*, [`rcd`](https://andrey.abel.ai/docs/code/generated/andrey.rcd.html)\*, [`camuv`](https://andrey.abel.ai/docs/code/generated/andrey.camuv.html)\*, [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.bottom_up_parce_lingam.html)\* | DAG, PAG |
+| Latent variables | [`gin`](https://andrey.abel.ai/docs/code/generated/andrey.gin.html)\*, [`rcd`](https://andrey.abel.ai/docs/code/generated/andrey.rcd.html), [`camuv`](https://andrey.abel.ai/docs/code/generated/andrey.camuv.html)\*, [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.bottom_up_parce_lingam.html) | DAG, PAG |
 | Pairwise direction | [`pnl`](https://andrey.abel.ai/docs/code/generated/andrey.pnl.html)\* | Two-node DAG |
 
 \* [Experimental](https://andrey.abel.ai/docs/code/index.html#experimental-methods):

@@ -85,7 +85,8 @@ It is tested at two levels:
 - Every method has a status. A supported method meets each criterion listed under "Experimental
   methods" in `docs/docs/code/index.md`, and the published summary names exactly the supported
   methods. An experimental method has a recovery test, warns before it reads its inputs, and lists
-  `ExperimentalWarning` under `Warns`.
+  `ExperimentalWarning` under `Warns`. Every method's docstring has a **Limitations.** paragraph in
+  its Notes.
 
 `tests/unit/test_spec_generate.py` then asserts the generated surfaces stay consistent with the
 specs.
@@ -125,6 +126,9 @@ guard pins every public core method's `Parameters` to its signature instead.
 ### Add a method
 
 1. Implement the facade in `src/andrey/api/<family>.py` and add its name to `andrey.api.__all__`.
+   End the docstring's Notes with a **Limitations.** paragraph: "Not benchmarked yet.", the largest
+   problem its tests run it on (variables, and rows where they matter), and any known structural
+   limit, such as an assumption on the data or a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature). Set `status="experimental"` and call `warn_experimental("<name>")`
    first in the facade, until the method meets the criteria for supported.
@@ -155,10 +159,10 @@ precedence tuple if it participates in layered selection.
 
 A new method ships as experimental. It becomes supported once it passes every step below.
 `tests/unit/test_spec_registry.py` checks most of them and names what is missing: a recovery test
-for an experimental method; for a supported one, a recorded output, a place in the quality gate, a
-section on the benchmarks page, a row in the published summary, an example notebook, and its entry
-under "Supported methods" in the API reference. Review checks the rest: device parity and the
-benchmarks page's "Reproduce" table.
+for an experimental method; a **Limitations.** paragraph for every method; for a supported one, a
+recorded output, a place in the quality gate, a section in a release card, a row in a published
+summary, an example notebook, and its entry under "Supported methods" in the API reference.
+Review checks the rest: device parity and the card's "Reproduce" table.
 
 | Step | Where | When it runs | Required for |
 |---|---|---|---|
@@ -262,15 +266,21 @@ difference and its cause. The fit records stay outside the repository.
 
 One pull request switches the method from experimental to supported, because the checks tie these
 changes together: the quality gate must cover exactly the supported methods, and the published
-summary must list exactly them, so any one of the changes below without the others fails. The pull
-request makes:
+summaries together must list exactly them, so any one of the changes below without the others
+fails. The pull request makes:
 
 - `status="supported"` in its `MethodSpec`, with the `warn_experimental` call and the docstring's
   `ExperimentalWarning` entry removed;
+- the docstring's **Limitations.** paragraph replaced with one from the campaign: the data and
+  sizes measured, the sizes where its median errors reach the empty graph's, its fit times with the
+  core count, and the size where it stops being practical, if the report shows one;
 - the method under "Supported methods" in `docs/docs/code/index.md`;
-- its row in the published summary, `benchmarks/published/<release>/summary.json`, generated from
-  the campaign's records;
-- a section for it on `docs/docs/benchmarks.md`, with its driver in the "Reproduce" table;
+- its rows in the summary of the release that publishes its benchmark,
+  `benchmarks/published/<label>/summary.json`, generated from the campaign's records;
+- a section for it in that release's card, `docs/docs/benchmarks/<release>.md`, with its driver in
+  the "Reproduce" table; the Release cards page, `docs/docs/benchmarks.md`, features the latest
+  release and lists the earlier ones ("The release cards" in
+  [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) says how to add one);
 - an example notebook in `examples/` that calls it;
 - the quality-gate and recorded-output entries from steps 2 and 4.
 
