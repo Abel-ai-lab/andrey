@@ -1,6 +1,7 @@
 """Scoring utilities for benchmark estimates.
 
-``score_result`` scores through ``andrey.metrics``, against the truth's PAG for a PAG estimate.
+``score_result`` scores through ``andrey.metrics``, against the truth's PAG for a PAG estimate, and
+lag by lag for a temporal estimate (:func:`temporal_score_columns`).
 
 ``confounded_pair_scores`` scores the pairs an estimate attributes to a hidden common cause.
 
@@ -18,21 +19,33 @@ from typing import Any
 import numpy as np
 
 import andrey.metrics as M
-from andrey import GraphStructure
+from andrey import GraphStructure, TemporalStructure
 from andrey.core import LATENT
 from andrey.data.latent import marginal
+from andrey_bench.contracts import links_from_temporal
 
 # Andrey endpoint-mark convention (mirrors contracts.py): mark AT node i on edge i-j is marks[i, j].
 _TAIL, _ARROW, _CIRCLE = 1, 2, 3
 
 
-def structure_hash(structure: GraphStructure) -> str:
-    """A hash of the normalized graph, comparable across packages."""
+def structure_hash(structure: GraphStructure | TemporalStructure) -> str:
+    """A hash of the normalized graph, comparable across packages.
+
+    A temporal structure hashes its links as sorted ``(lag, cause, effect)`` triples.
+    """
+    if isinstance(structure, TemporalStructure):
+        links = sorted(
+            (int(lag) + 1, int(i), int(j))
+            for lag, i, j in zip(*np.nonzero(links_from_temporal(structure)), strict=True)
+        )
+        return hashlib.sha1(f"temporal:{structure.n_nodes}:{links}".encode()).hexdigest()
     edges = sorted(tuple(int(v) for v in e) for e in structure.to_edges())
     return hashlib.sha1(f"{structure.kind}:{structure.n_nodes}:{edges}".encode()).hexdigest()
 
 
-def score_result(estimate: GraphStructure, truth: GraphStructure) -> dict[str, Any]:
+def score_result(
+    estimate: GraphStructure | TemporalStructure, truth: GraphStructure | TemporalStructure
+) -> dict[str, Any]:
     """Score an estimated graph against the ground truth.
 
     A PAG estimate is scored against the truth's PAG - the class FCI and RFCI recover, whose circles
@@ -43,10 +56,38 @@ def score_result(estimate: GraphStructure, truth: GraphStructure) -> dict[str, A
     A truth with hidden nodes is scored as its observed PAG for every estimate kind. The truth DAG
     includes nodes absent from the data. ``andrey.metrics.score`` would treat that DAG as a latent
     clustering.
+
+    A temporal truth or estimate is scored by :func:`temporal_score_columns`, which raises
+    ``TypeError`` unless both are temporal.
     """
+    if isinstance(truth, TemporalStructure) or isinstance(estimate, TemporalStructure):
+        return temporal_score_columns(estimate, truth)
     if truth.kind == "dag" and (estimate.kind == "pag" or _has_hidden(truth)):
         truth = _pag_of(truth)
     return dict(M.score(estimate, truth))
+
+
+def temporal_score_columns(estimate: object, truth: object) -> dict[str, Any]:
+    """Score a lagged estimate lag by lag through ``andrey.metrics.temporal_scores``.
+
+    Returns flat columns: ``family`` (``"temporal"``); ``lag<k>_shd``, ``lag<k>_precision``,
+    ``lag<k>_recall``, and ``lag<k>_f1`` for every lag either structure holds; ``temporal_shd``,
+    their SHDs summed, the lag-resolved SHD; ``lagged_*``, the lags >= 1 merged into one graph; and
+    ``summary_*``, every scored lag merged with self-loops left out. Each lag is a directed graph,
+    so a link in the wrong direction counts 2 in its SHD. A lag with no true link has recall 1 and a
+    lag with no estimated link precision 1 (``andrey.metrics``' convention), so read them beside
+    the SHD. The CPDAG and PAG columns stay empty: their units are not these.
+    """
+    scores = M.temporal_scores(estimate, truth)
+    columns: dict[str, Any] = {"family": "temporal"}
+    per_lag = scores["per_lag"]
+    for lag, stats in sorted(per_lag.items()):
+        columns.update({f"lag{lag}_{stat}": float(value) for stat, value in stats.items()})
+    columns["temporal_shd"] = float(sum(stats["shd"] for stats in per_lag.values()))
+    for block in ("lagged", "summary"):
+        if block in scores:
+            columns.update({f"{block}_{stat}": float(v) for stat, v in scores[block].items()})
+    return columns
 
 
 def _has_hidden(truth: GraphStructure) -> bool:
@@ -269,13 +310,15 @@ def directed_edge_scores(estimate: GraphStructure, truth: GraphStructure) -> dic
     return scores
 
 
-def sortability(data: np.ndarray, truth: GraphStructure) -> dict[str, float]:
+def sortability(data: np.ndarray, truth: GraphStructure | TemporalStructure) -> dict[str, float]:
     """Compute variance- and R²-sortability under the ground-truth DAG.
 
     Returns an empty dictionary when the optional sortability implementation
-    is unavailable.
+    is unavailable, or for a temporal truth: sortability is defined for i.i.d. rows, not a series.
 
     """
+    if isinstance(truth, TemporalStructure):
+        return {}
     try:
         import andrey.data as _data  # noqa: WPS433 (deliberately lazy — optional dependency probe)
 

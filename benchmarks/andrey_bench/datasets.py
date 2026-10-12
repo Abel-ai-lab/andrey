@@ -4,6 +4,10 @@ Each ``(topology, functional, noise, density, d, n, seed, standardize, latents)`
 once as a ``.npz`` containing ``float64`` samples and the true graph's int8 endpoint marks.
 :class:`DatasetKey` supplies the ``dataset_id``; :func:`load` casts to ``float32`` for those fits
 outside timing, without storing another copy.
+
+A temporal dataset (functional ``var``) is one series of ``n`` time steps. Its truth is stored as
+the ``(L, d, d)`` int8 marks of lags ``1..L`` (:func:`~andrey_bench.contracts.lag_marks`), with
+``graph_kind`` ``"temporal"`` in the registry.
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ from typing import Any, Iterable, Iterator
 import numpy as np
 
 import andrey.data as data
+from andrey import TemporalStructure
 from andrey.core import LATENT, OBSERVED
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
@@ -42,6 +47,7 @@ FUNCTIONAL_TO_ANDREY = {
     "linear": "linear",
     "anm": "additive_noise",
     "pnl": "post_nonlinear",
+    "var": "var",
 }
 STANDARDIZE_TO_SCALE = {
     "standardized": "standardize",
@@ -69,7 +75,16 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "latent_lingam_er": ("er", "linear", "uniform", "standardized"),
     # Nonlinear additive noise with hidden confounders, where CAM-UV is identifiable.
     "latent_anm_er": ("er", "anm", "gaussian", "standardized"),
+    # A lagged linear-Gaussian series for PCMCI: andrey.data's VAR(1) on an empty instantaneous
+    # graph (the key sets density LAG_ONLY_DENSITY), so every true link has lag 1. Temporal
+    # generation takes raw scale only.
+    "var_lagged": ("er", "var", "gaussian", "raw"),
 }
+
+#: Temporal regimes and the density their keys set. At density 0 the instantaneous graph has no
+#: edges, so the truth is lag-only: lag 1 holds every link.
+LAG_ONLY_DENSITY = 0.0
+TEMPORAL_REGIMES: dict[str, float] = {"var_lagged": LAG_ONLY_DENSITY}
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
 #: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
@@ -243,16 +258,19 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
 
     Samples are contiguous canonical ``float64``. Truth uses ``ds.graph.to_numpy()`` endpoint marks,
     as consumed by the scorer and Andrey adapter. With hidden nodes, the truth covers all ``d``
-    nodes. :func:`latent_node_types` rebuilds their types from the key.
+    nodes. :func:`latent_node_types` rebuilds their types from the key. A temporal truth is
+    returned as :func:`lag_only_marks` with the kind ``"temporal"``.
     """
     kwargs = generation_kwargs(key)
     ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
     data_arr = np.ascontiguousarray(ds.data, dtype=CANONICAL_DTYPE)
     graph = ds.graph
-    if not hasattr(graph, "to_numpy"):  # Temporal families are unsupported here.
+    if isinstance(graph, TemporalStructure):
+        return data_arr, lag_only_marks(key, graph), "temporal"
+    if not hasattr(graph, "to_numpy"):
         raise TypeError(
             f"graph for {key.label} has no to_numpy() (kind={type(graph).__name__}); "
-            "temporal families are not materialized by this node"
+            "the store holds a GraphStructure or a TemporalStructure truth"
         )
     types = getattr(graph, "node_types", None)
     hidden = np.flatnonzero(types == LATENT) if types is not None else np.arange(0)
@@ -260,6 +278,23 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
         raise ValueError(f"{key.label}: hidden nodes are not the last {key.latents} nodes")
     marks = np.ascontiguousarray(graph.to_numpy())  # int8 endpoint marks
     return data_arr, marks, str(graph.kind)
+
+
+def lag_only_marks(key: DatasetKey, truth: TemporalStructure) -> np.ndarray:
+    """Return the ``(L, d, d)`` int8 marks of lags ``1..L`` of a lag-only temporal truth.
+
+    Raises ``ValueError`` when the instantaneous (lag-0) graph has an edge or the lags are not
+    ``1..L``: the stored stack holds lagged links only, and a lag-0 edge would be dropped unseen.
+    """
+    if 0 in truth.lags and np.asarray(truth.lag(0).to_numpy()).any():
+        raise ValueError(
+            f"{key.label}: the instantaneous graph has edges; a temporal key needs density "
+            f"{LAG_ONLY_DENSITY:g} so that its truth is lag-only"
+        )
+    lags = [lag for lag in truth.lags if lag > 0]
+    if lags != list(range(1, len(lags) + 1)):
+        raise ValueError(f"{key.label}: truth lags {lags} are not 1..L")
+    return np.stack([np.asarray(truth.lag(lag).to_numpy(), dtype=np.int8) for lag in lags])
 
 
 def _same_call(recorded: Any, wanted: Any) -> bool:
@@ -407,6 +442,8 @@ __all__ = [
     "CANONICAL_DENSITY",
     "REGIMES",
     "LATENT_REGIMES",
+    "TEMPORAL_REGIMES",
+    "LAG_ONLY_DENSITY",
     "DEFAULT_REGIME",
     "latents_for",
     "latent_node_types",
@@ -414,6 +451,7 @@ __all__ = [
     "DatasetKey",
     "generation_kwargs",
     "generate_one",
+    "lag_only_marks",
     "graph_record",
     "materialize",
     "data_path",

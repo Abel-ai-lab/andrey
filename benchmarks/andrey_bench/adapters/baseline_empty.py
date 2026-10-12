@@ -52,3 +52,42 @@ class BaselineEmpty:
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+@dataclass(frozen=True)
+class BaselineEmptyTemporal:
+    """Empty lag-stack correctness floor for temporal solutions.
+
+    The temporal counterpart of :class:`BaselineEmpty`: no link at any lag ``1..tau_max``, scored
+    lag by lag like the solutions it bounds. Its lag-resolved SHD is the truth's link count within
+    the window. ``tau_max`` is in the name because ``params`` are not part of a ``run_id``.
+    """
+
+    name: str = "baseline.empty.temporal.tau2"
+    tau_max: int = 2
+    package: str = "baseline"
+    package_version: str = "1.0"
+    backend: str = "native"
+    mode: str = "serial"
+    algorithm: str = "baseline"
+    output_type: str = "temporal"
+
+    def params(self) -> dict[str, Any]:
+        """The lag window the empty stack covers."""
+        return {"tau_max": self.tau_max}
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Return the all-zero ``(tau_max, d, d)`` link stack. The timed region."""
+        d = int(np.asarray(data).shape[1])
+        return np.zeros((int(params["tau_max"]), d, d), dtype=np.int8)
+
+    def to_structure(self, native: np.ndarray) -> Any:
+        """All-zero link stack -> the empty ``TemporalStructure``; untimed."""
+        from andrey_bench.contracts import temporal_from_links
+
+        return temporal_from_links(native)
+
+
+def baseline_empty_temporal(tau_max: int = 2) -> BaselineEmptyTemporal:
+    """A :class:`BaselineEmptyTemporal` named for its lag window."""
+    return BaselineEmptyTemporal(name=f"baseline.empty.temporal.tau{tau_max}", tau_max=tau_max)
