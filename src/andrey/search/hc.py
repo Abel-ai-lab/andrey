@@ -1,12 +1,9 @@
 """Hill climbing over DAGs, the engine behind :func:`andrey.hc`.
 
-The algorithm, its settings, and its references are described on :func:`andrey.hc`.
-
-Candidate moves are scored by the Schur-complement deltas of :mod:`andrey.core.score_delta`;
-:class:`MoveScanner` keeps them between passes and recomputes only the targets a move changed.
-The move budget also regularizes: greedy ascent adds the strongest edges first, so stopping early
-keeps noise-fitting edges out of large, dense graphs. The DAG is converted to its CPDAG for output;
-the reported objective is the DAG's total BIC, lower is better.
+Candidate moves use Schur-complement deltas from :mod:`andrey.core.score_delta`;
+:class:`MoveScanner` caches them between passes, recomputing only changed targets. The move budget
+regularizes large, dense graphs by stopping before weaker, noise-fitting edges are added. Output is
+the DAG's CPDAG and total BIC; lower is better.
 """
 
 from __future__ import annotations
@@ -24,28 +21,21 @@ from andrey.core.score_delta import DeltaBICScore, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
-# ``_EPS_IMPROVE`` (the strict-improvement floor) and ``_KEY_DP`` (the tie-break quantization
-# decimals) are shared with GES via ``search._parallel`` so the two learners break near-ties by the
-# same rule. A move is a candidate only when its raw delta clears ``-_EPS_IMPROVE`` (above float64
-# Schur-delta noise, below the smallest real improvement); the comparison key quantizes the
-# *normalized* delta ``delta / n_samples`` to ``_KEY_DP`` places. Two mathematically equal moves
-# (add x->y vs y->x, from different cov submatrices) differ in their last bits, so the key, not the
-# raw delta, decides between them, and the tie goes to the lower ``(u, v, op_rank)``. The noise
-# scales as ~n_samples * cond(cov) * eps, as does the signal (a real BIC improvement); keying on
-# delta/n makes the grid track the signal, so after normalization the residual is ~cond*eps, which
-# _KEY_DP=9 clears for cond up to ~1e5 (all non-degenerate data), independent of n. It is a
-# mitigation, not a proof -- a normalized delta within ULP of a grid line could still round either
-# way. The objective is recomputed from the final structure (not accumulated), so this never touches
-# the reported score, and delta/n is monotone in delta, so non-tied move order is unchanged.
+# Moves are keyed on ``delta / n_samples`` rounded to ``_KEY_DP`` places, not on the raw delta.
+# Two equal moves (add x->y vs y->x, from different cov submatrices) differ in their last bits;
+# the key makes them tie, and the lower ``(u, v, op_rank)`` wins. Schur noise scales as
+# ~n_samples * cond(cov) * eps, like a real improvement, so the normalized residual is
+# ~cond * eps: ``_KEY_DP`` = 9 clears it for cond up to ~1e5, independent of n. A mitigation, not
+# a proof: a normalized delta within ULP of a grid line can round either way. Rounding is
+# monotone, so non-tied order holds; the reported score is recomputed from the final structure.
 __all__ = ["hc"]
 
 
-# A scanned candidate: (delta, u, v, op_rank, (op, u, v)). op_rank orders the ops that share a
-# ``(u, v)`` (remove 0 < reverse 1; add is 0 and never coexists with remove), so ``key = r[:4]``
-# is a strict total order over the moves of a pass.
+# (delta, u, v, op_rank, (op, u, v)). op_rank: remove 0 < reverse 1; add is 0 and never shares
+# ``(u, v)`` with a remove.
 ScannedMove = tuple[float, int, int, int, tuple[str, int, int]]
 
-# A DAG's identity for a tabu list: its out-neighbor bitset rows, ``tuple(adj_int)``.
+# Out-neighbor bitset rows, ``tuple(adj_int)``, used as tabu keys.
 StructureKey = tuple[int, ...]
 
 
@@ -55,7 +45,7 @@ def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
     rows = list(adj_int)
     if op == "add":
         rows[u] |= 1 << v
-    else:  # remove, or reverse: u -> v goes, and reverse adds v -> u
+    else:
         rows[u] &= ~(1 << v)
         if op == "reverse":
             rows[v] |= 1 << u
@@ -65,33 +55,30 @@ def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
 class MoveScanner:
     """The best single-edge move of a pass, from delta tables kept between passes.
 
-    The delta of adding or removing ``u`` at target ``v`` depends only on ``v``'s parent set, so the
-    tables ``add[v, u]`` and ``rem[v, u]`` hold row ``v`` for ``v``'s current parents. A pass
-    recomputes the rows of the targets whose parents changed, each in one vectorized Schur step
+    ``add[v, u]`` and ``rem[v, u]`` depend only on target ``v`` and its parent set. Changed parent
+    sets trigger one vectorized Schur update per affected row
     (:func:`~andrey.core.score_delta.add_deltas`, :func:`~andrey.core.score_delta.remove_deltas`).
-    A delta depends on its target and parent set alone, so every scanner computes the same value.
+    Every scanner computes the same deltas for the same target and parents.
 
-    ``single[v, u]`` is the add or remove delta of ``u -> v``, ``inf`` when ``v -> u`` exists
-    (moving it is a reverse) or when ``v`` reaches ``u`` (adding it closes a cycle), and ``low[v]``
-    is the minimum of row ``v``. Reverses are scored over the edge list. Reversing a covered edge
-    ``u -> v`` (``pa(v) = pa(u) + u``) leads to a Markov equivalent DAG of equal score, so its delta
-    is exactly zero rather than the rounding noise of two Schur deltas, which can exceed
-    ``_EPS_IMPROVE`` and turn a no-op into an improvement.
+    ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
+    ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
+    ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
+    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score. Its delta is set
+    to zero to prevent Schur rounding noise exceeding ``_EPS_IMPROVE`` from creating a false
+    improvement.
 
-    ``reach[x, y]`` holds whether ``x`` reaches ``y``; it is extended on each added edge and
-    recomputed, for the nodes that reached it, when an edge goes; then every row whose target
-    reaches fewer nodes is rebuilt. An
-    added edge can only make more adds close a cycle, so a row stays valid until its lowest add is
-    found to close one; then the row drops every node its target now reaches. A pass therefore
-    checks for cycles only its lowest candidates. Reversing ``u -> v`` sums an add of ``v`` at
-    target ``u`` and a remove of ``u`` at target ``v``.
+    ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
+    trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
+    nodes. Added edges can only invalidate adds. A row stays valid until its lowest add closes a
+    cycle, then drops every node its target reaches. A pass checks only its lowest candidates for
+    cycles.
     """
 
     def __init__(self, delta: DeltaBICScore, d: int) -> None:
         self._score = delta.score_obj
         self._cond = delta.cond_threshold
         self._d = d
-        self._inv_n = 1.0 / self._score.n  # key on delta/n: noise and signal scale with n
+        self._inv_n = 1.0 / self._score.n
         self._add = np.full((d, d), np.inf)
         self._rem = np.full((d, d), np.inf)
         self._parent = np.zeros((d, d), dtype=bool)  # [v, u]: the edge u -> v exists
@@ -99,7 +86,7 @@ class MoveScanner:
         self._low = np.full(d, np.inf)
         self._tails = np.zeros(0, dtype=np.intp)  # the edge list, tails[i] -> heads[i]
         self._heads = np.zeros(0, dtype=np.intp)
-        self._cyclic = np.zeros(0, dtype=bool)  # reversing edge i was found to close a cycle
+        self._cyclic = np.zeros(0, dtype=bool)  # reversing edge i closes a cycle
         self._reach = np.zeros((d, d), dtype=bool)
         self._adj: list[int] | None = None  # the DAG the tables describe
         # Ids of parent sets: u -> v is covered iff set_of[v] == set_with[u], the id of pa(u) + u.
@@ -118,9 +105,8 @@ class MoveScanner:
         """The best legal move with delta below ``floor``.
 
         Moves are keyed ``(delta / n_samples rounded to _KEY_DP places, u, v, op_rank)``, a strict
-        total order, so ties break the same way on every run. The default ``floor`` admits improving
-        moves only; ``floor=inf`` admits every legal move. A move that leads to a structure in
-        ``tabu`` is skipped.
+        total order. The default ``floor`` admits improving moves only; ``floor=inf`` admits every
+        legal move. A move that leads to a structure in ``tabu`` is skipped.
         """
         if self._d < 2:
             return None
@@ -133,7 +119,7 @@ class MoveScanner:
         rev[np.isnan(rev) | self._cyclic] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:
-            while True:  # the best move, unless it leads into the tabu list; then the next best
+            while True:
                 best = self._pick(low, rev, floor)
                 if best is None or tabu is None or _key_after(adj_int, best[4]) not in tabu:
                     return best
@@ -220,7 +206,7 @@ class MoveScanner:
         return changed
 
     def _drop_reached(self, v: int, low: np.ndarray) -> None:
-        """Drop from row ``v`` every add that closes a cycle now, and update its minimum."""
+        """Drop cycle-closing adds from row ``v`` and update its minimum."""
         self._single[v, self._reach[v]] = np.inf
         self._low[v] = low[v] = self._single[v].min()
 
@@ -237,7 +223,7 @@ class MoveScanner:
         single, parent, reach = self._single, self._parent, self._reach
         tails, heads = self._tails, self._heads
         lowest = np.inf
-        while True:  # the lowest legal single move below floor
+        while True:
             v = int(np.argmin(low))
             if not low[v] < floor:
                 break
@@ -246,7 +232,7 @@ class MoveScanner:
                 lowest = float(low[v])
                 break
             self._drop_reached(v, low)
-        while rev.size:  # a legal reverse below both
+        while rev.size:
             i = int(np.argmin(rev))
             if not rev[i] < min(lowest, floor):
                 break
@@ -257,8 +243,7 @@ class MoveScanner:
             self._cyclic[i] = True
         if not lowest < floor:
             return None
-        # Rounding is monotone, so the moves that round to the lowest key lie within one grid step
-        # of the lowest unrounded value; the exact key is computed for those few.
+        # Monotone rounding puts every lowest-key tie within one grid step of the raw minimum.
         inv_n = self._inv_n
         near = lowest * inv_n + 2 * 10.0**-_KEY_DP
         found: list[tuple[float, int, int, int, str]] = []
@@ -360,7 +345,7 @@ def hc(
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
 
-    # Pin BLAS to one thread for the delta loops so the Schur updates are thread-count-reproducible.
+    # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
         scanner = MoveScanner(delta, d)
         moves = 0

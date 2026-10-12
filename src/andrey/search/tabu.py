@@ -1,9 +1,7 @@
 """Tabu search over DAGs, the engine behind :func:`andrey.tabu`.
 
-The algorithm, its settings, and its references are described on :func:`andrey.tabu`; ``_search``
-runs it. Moves are scanned by :class:`andrey.search.hc.MoveScanner`, so tabu search breaks ties as
-hill climbing does. The best DAG visited is converted to its CPDAG and reported with its total BIC
-(lower is better).
+``_search`` uses :class:`andrey.search.hc.MoveScanner`, sharing hill climbing's tie rules. Output is
+the best DAG's CPDAG and total BIC; lower is better.
 """
 
 from __future__ import annotations
@@ -29,12 +27,12 @@ def _search(
 ) -> tuple[StructureKey, int]:
     """Run tabu search from the empty graph; return the best DAG's structure key and moves taken.
 
-    Each step puts the current DAG in the tabu list, then takes the best improving move that does
-    not lead into the list. Without one, the search stops if it has taken ``max_tabu``
-    non-improving moves since the last new best; otherwise it counts one more and takes the best
-    move that does not lead into the list, which leaves the score unchanged or worse. A new best
-    score, lower by more than ``_EPS_IMPROVE``, resets the count. The search also stops when every
-    legal move leads into the list, or after ``max_iter`` moves unless it is ``None``.
+    Each step adds the current DAG to the tabu list and takes the best improving move outside it.
+    Without one, the search stops after ``max_tabu`` non-improving moves since the last new best;
+    otherwise it counts one more and takes the best non-improving move outside the list, leaving the
+    score unchanged or worse. A new best score lower by more than ``_EPS_IMPROVE`` resets the count.
+    The search also stops when every legal move leads into the list, or after ``max_iter`` moves
+    unless it is ``None``.
     """
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
@@ -90,11 +88,11 @@ def tabu(
     tabu_length : int
         Number of recently visited DAGs a move may not return to.
     max_tabu : int or None
-        Non-improving moves allowed without a new best score before the search stops, at most
+        Non-improving moves allowed without a new best score before stopping, at most
         ``tabu_length``; ``None`` means ``tabu_length``.
     max_iter : int or None
-        Maximum number of moves, improving or not; ``None`` sets no limit. Taking ``max_iter`` moves
-        warns with ``SearchLimitWarning``.
+        Maximum moves, improving or not; ``None`` sets no limit. Taking ``max_iter`` moves warns
+        with ``SearchLimitWarning``.
 
     Returns
     -------
@@ -113,7 +111,7 @@ def tabu(
     d = X.shape[1]
     score = BICScore(X, lambda_value=lambda_value)
 
-    # Pin BLAS to one thread so the Schur updates are thread-count-reproducible.
+    # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
         best_key, moves = _search(score, d, tabu_length, max_tabu, max_iter)
     if max_iter is not None and moves == max_iter:

@@ -198,9 +198,8 @@ def hc(
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with hill-climbing search.
 
-    Hill-climbing is a lightweight greedy baseline [1]_ [2]_. It repeatedly adds, removes, or
-    reverses the edge that most improves a covariance-based delta-BIC, then converts the DAG to its
-    Markov equivalence class.
+    The search repeatedly adds, removes, or reverses the edge that most improves a covariance-based
+    delta-BIC, then converts the DAG to its Markov equivalence class [1]_ [2]_.
 
     Parameters
     ----------
@@ -208,21 +207,21 @@ def hc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Local score objective; a covariance-based Gaussian BIC.
+        Covariance-based Gaussian BIC objective.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
     max_iter : int, default=200
-        Most moves the search takes, at least ``1``. Each move adds at most one edge, so the result
-        has at most ``max_iter`` edges.
+        Maximum moves, at least ``1``. Each move adds at most one edge, so the result has at most
+        ``max_iter`` edges.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"HC"`` and ``metadata["score"]`` the BIC score of the DAG found, computed as for
-        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open.
+        ``"HC"`` and ``metadata["score"]`` the DAG's BIC score, computed as for :func:`andrey.ges`;
+        lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
+        the equivalence class leaves open.
 
     Raises
     ------
@@ -239,8 +238,7 @@ def hc(
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
     SearchLimitWarning
-        When the search takes ``max_iter`` moves: it stopped at the limit, and a larger
-        ``max_iter`` may find a better graph.
+        When the search takes ``max_iter`` moves; a larger ``max_iter`` may find a better graph.
 
     Notes
     -----
@@ -290,11 +288,9 @@ def tabu(
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with tabu search.
 
-    Tabu search is hill climbing that can leave a local optimum [1]_ [2]_ [3]_. Each move adds,
-    removes, or reverses the edge that most improves a covariance-based BIC, as in
-    :func:`andrey.hc`. Where no move improves it, the search still takes the best move, one that
-    leaves the score unchanged or worse, and it never moves back to one of the DAGs it visited
-    most recently. It returns the CPDAG of the best-scoring DAG it visited.
+    Tabu search is hill climbing that also takes non-improving moves and never returns to a recently
+    visited DAG [1]_ [2]_ [3]_. Moves are scored as in :func:`andrey.hc`. The result is the CPDAG of
+    the best-scoring DAG visited.
 
     Parameters
     ----------
@@ -302,28 +298,27 @@ def tabu(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Local score objective; a covariance-based Gaussian BIC.
+        Covariance-based Gaussian BIC objective.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
     tabu_length : int, default=10
-        Length of the tabu list: the number of most recently visited DAGs a move may not lead to.
-        At least ``1``.
+        Number of most recently visited DAGs a move may not return to. At least ``1``.
     max_tabu : int or None, default=None
-        Non-improving moves the search may take without finding a better DAG, from ``1`` to
-        ``tabu_length``. ``None`` uses ``tabu_length``.
+        Non-improving moves allowed without a better DAG, from ``1`` to ``tabu_length``. ``None``
+        uses ``tabu_length``.
     max_iter : int or None, default=None
-        Most moves the search takes, improving or not, at least ``1``; ``None`` sets no limit. The
-        search ends without one: each run of non-improving moves is at most ``max_tabu`` long, and
-        each new best DAG scores strictly lower.
+        Maximum moves, improving or not, at least ``1``; ``None`` sets no limit. The search still
+        terminates: non-improving runs are bounded by ``max_tabu``, and each new best DAG scores
+        strictly lower.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"Tabu"`` and ``metadata["score"]`` the BIC score of the best DAG found, computed as for
-        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open.
+        ``"Tabu"`` and ``metadata["score"]`` the best DAG's BIC score, computed as for
+        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
@@ -341,28 +336,27 @@ def tabu(
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
     SearchLimitWarning
-        When the search takes a given ``max_iter`` moves: it stopped at the limit, and a larger
-        ``max_iter`` may find a better graph.
+        When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
+        graph.
 
     Notes
     -----
-    The search starts from the empty graph. Each step first adds the current DAG to the tabu list,
-    which keeps the last ``tabu_length`` DAGs visited. It then takes the move with the best score
-    change among those that lead to a DAG outside the list: an improving move when one exists.
-    Otherwise, if it has taken ``max_tabu`` non-improving moves since the best score last improved,
-    the search stops; if not, it takes the best non-improving move, which leaves the score
-    unchanged or worse. The search also stops when every legal move leads into the list, or after
-    ``max_iter`` moves when it is set.
+    The search starts from the empty graph. Each step adds the current DAG to the tabu list, which
+    keeps the last ``tabu_length`` DAGs visited, then takes the best improving move outside the
+    list. Without one, it stops if ``max_tabu`` non-improving moves have occurred since the best
+    score last improved; otherwise it takes the best non-improving move, leaving the score unchanged
+    or worse. It also stops when every legal move leads into the list, or after ``max_iter`` moves
+    when set.
 
     Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
     moves break as they do for :func:`andrey.hc`.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 200 variables with 2,000
-    rows. It takes hill climbing's moves plus up to ``max_tabu`` non-improving moves between new
-    best scores, and by default no move limit, so its run time grows with the moves it takes. It
-    avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be missed. Its
-    BIC score assumes linear relations with Gaussian noise.
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 200 variables with 2,000 rows.
+    It takes hill climbing's moves plus up to ``max_tabu`` non-improving moves between new best
+    scores, with no move limit by default; run time grows with the moves taken. It avoids only the
+    last ``tabu_length`` DAGs, so a better DAG beyond that reach may be missed. Its BIC score
+    assumes linear relations with Gaussian noise.
 
     References
     ----------

@@ -746,11 +746,10 @@ def add_deltas(
 ) -> np.ndarray:
     """Return ``score(i, base + u) - score(i, base)`` for every variable ``u``, as one array.
 
-    The vector form of :func:`delta_many_with_base`'s ``add`` moves, for a search that scores every
-    candidate parent of ``i`` against one base: ``O(|base|^2 d)`` numpy work instead of a Python
-    loop over the candidates. It shares the conditioning-gated inverse cache and falls back to two
-    full scores where the Schur path is unavailable, as :func:`delta_many_with_base` does. Entries
-    for ``i`` itself and for the members of ``base`` are ``inf``.
+    The vector form of :func:`delta_many_with_base`'s ``add`` moves: ``O(|base|^2 d)`` numpy work
+    instead of a Python loop over the candidates. It shares the conditioning-gated inverse cache and
+    falls back to two full scores where the Schur path is unavailable. Entries for ``i`` itself and
+    for the members of ``base`` are ``inf``.
 
     Parameters
     ----------
@@ -809,11 +808,10 @@ def remove_deltas(
 ) -> np.ndarray:
     """Return ``score(i, base - u) - score(i, base)`` for every ``u`` in ``base``, as one array.
 
-    The removal counterpart of :func:`add_deltas`. With ``M = inv(cov[base, base])`` and the
-    regression coefficients ``b = M cov[base, i]``, dropping the member at position ``j`` raises the
-    residual by ``b_j^2 / M_jj``, so one inverse serves every removal. A near-singular base, or a
-    candidate whose residual is not positive and finite, falls back to two full scores. Entries for
-    variables outside ``base`` are ``inf``.
+    The removal counterpart of :func:`add_deltas`. With ``M = inv(cov[base, base])`` and
+    ``b = M cov[base, i]``, dropping position ``j`` raises the residual by ``b_j^2 / M_jj``; one
+    inverse serves every removal. A near-singular base or a residual that is not positive and finite
+    triggers two full scores. Entries outside ``base`` are ``inf``.
 
     Parameters
     ----------

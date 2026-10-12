@@ -1,16 +1,14 @@
 """Measure the GES worker-pool cutoff on this machine (``andrey calibrate``).
 
-A GES pass runs on the worker pool only when its estimated work exceeds a cutoff,
-``ANDREY_GES_PARALLEL_MIN_WORK`` (estimated candidate evaluations). Where the pool starts to pay
-depends on the machine, the worker count, and the numerical libraries, so the default is a starting
-point. Nothing here runs unless called: fits never calibrate.
+A GES pass uses the pool when estimated candidate evaluations exceed
+``ANDREY_GES_PARALLEL_MIN_WORK``. The crossover depends on the machine, worker count, and numerical
+libraries. Fits never calibrate automatically.
 
-GES is timed on whole fits of a sparse linear-Gaussian sample over ``d`` variables: a serial fit
-against one that runs every pass on the pool, including starting it. :func:`bracket` finds the two
-sizes around the crossover, extending below or above the probe grid when needed. The cutoff is the
-first pass's work there, ``d * (d - 1)``: a fit that large uses the pool from its first pass, and a
-smaller fit only for its larger later passes. The process's first pool start is paid before timing,
-so the value suits many fits in one process (:data:`NOTE`).
+GES is timed on whole fits of sparse linear-Gaussian data over ``d`` variables: serial against every
+pass pooled, pool start included. :func:`bracket` finds sizes around the crossover, extending beyond
+the probe grid when needed. The cutoff uses first-pass work, ``d * (d - 1)``: a fit that large uses
+the pool from its first pass; smaller fits use it only for larger later passes. The process's first
+pool start occurs before timing, so the value suits many fits in one process (:data:`NOTE`).
 """
 
 from __future__ import annotations
@@ -33,7 +31,6 @@ NOTE = (
 # this fraction of the cutoff. The cutoff measured for many fits per process sits within this factor
 # below the default, so a smaller fit would not use the pool under either value.
 WARN_FRACTION = 0.1
-# What each default suits: GES's allows for the first pool start of a one-off fit.
 _DEFAULT_SUITS = {"ges": "which suits one fit per process"}
 
 # Probe sizes (variables). Serial GES at d = 256 takes minutes, so the search stops there.
