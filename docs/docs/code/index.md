@@ -28,8 +28,8 @@ column. A single column gives a one-node graph.
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
 workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs) and
-[0.2.0](../benchmarks/0.2.0.md#known-limits) benchmark reports show where a method scores worse
-than the empty graph, as ICA-LiNGAM does at the 0.1.0 report's sample size and BottomUpParceLiNGAM
+[0.2.0](../benchmarks/0.2.0.md#known-limits) release cards show where a method scores worse
+than the empty graph, as ICA-LiNGAM does at the 0.1.0 card's sample size and BottomUpParceLiNGAM
 does from 8 observed variables.
 
 ```{eval-rst}
