@@ -98,7 +98,6 @@ def _get_inv_with_cond(
         except np.linalg.LinAlgError:
             inv_cov_cache[S_sorted] = _ILL
             return None, True
-        # Infinity norms (largest absolute row sum), as np.linalg.norm(., np.inf) computes them.
         XX_norm = float(np.abs(XX).sum(axis=1).max())
         M_norm = float(np.abs(M_candidate).sum(axis=1).max())
         if XX_norm * M_norm > cond_threshold:
@@ -747,11 +746,10 @@ def add_deltas(
 ) -> np.ndarray:
     """Return ``score(i, base + u) - score(i, base)`` for every variable ``u``, as one array.
 
-    The vector form of :func:`delta_many_with_base`'s ``add`` moves, for a search that scores every
-    candidate parent of ``i`` against one base: ``O(|base|^2 d)`` numpy work instead of a Python
-    loop over the candidates. It shares the conditioning-gated inverse cache and falls back to two
-    full scores where the Schur path is unavailable, as :func:`delta_many_with_base` does. Entries
-    for ``i`` itself and for the members of ``base`` are ``inf``.
+    The vector form of :func:`delta_many_with_base`'s ``add`` moves: ``O(|base|^2 d)`` numpy work
+    instead of a Python loop over the candidates. It shares the conditioning-gated inverse cache and
+    falls back to two full scores where the Schur path is unavailable. Entries for ``i`` itself and
+    for the members of ``base`` are ``inf``.
 
     Parameters
     ----------

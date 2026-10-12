@@ -1,26 +1,20 @@
-"""Extremely Greedy Equivalence Search over the linear-Gaussian BIC, the engine behind
-:func:`andrey.xges`.
+"""Extremely Greedy Equivalence Search, the engine behind :func:`andrey.xges`.
 
-XGES searches the CPDAGs that GES searches, with GES's Insert and Delete operators and the Reverse
-operator of GES's turning phase, but interleaves them. The base search applies the best improving
-Delete if there is one, else the best improving Reverse, else the best improving Insert, and stops
-when no operator improves the score. The extended search then forces each Delete of the converged
-CPDAG in turn, forbids re-inserting the deleted edge, reruns the base search from there, and keeps
-the result when its score is lower.
+The base search applies the best improving Delete, else Reverse, else Insert, and stops when none
+improves the linear-Gaussian BIC. The extended search forces each Delete of the converged CPDAG,
+forbids re-inserting the deleted edge, reruns the base search, and keeps lower-scoring results.
 
-:class:`_Search` keeps every candidate operator in a priority queue per operator type. A popped
-operator is checked against the current CPDAG and dropped when it no longer applies; after a move,
-only the operators the move's edge changes can affect are rescored, and the CPDAG is completed
-locally around the changed edges. The update rules and the local completion follow the authors'
-reference implementation. :func:`_rescan_search` is the same search with every operator
-rescanned from :mod:`andrey.search.operators` after each move and the CPDAG re-formed globally; the
-tests compare the two.
+:class:`_Search` keeps candidates in a priority queue per operator type. A popped operator is
+dropped when it no longer applies to the current CPDAG. After a move, only the operators it can
+affect are rescored, and the CPDAG is completed locally. The update rules and the local completion
+follow the authors' reference implementation. :func:`_rescan_search` is the same search with every
+operator rescanned from :mod:`andrey.search.operators` and the CPDAG re-formed globally after each
+move.
 
-Scores are deltas of the deviance :class:`~andrey.core.score.BICScore` minimizes, so a move improves
-when its delta is negative. Insert deltas come from :func:`~andrey.core.score_delta.add_deltas`,
-which scores every candidate parent of a target against one parent set at once. A Delete, and the
-parent a Reverse removes, need one delta each: the difference of two memoized local scores, as in
-the rescanning reference.
+Scores are deltas of the deviance :class:`~andrey.core.score.BICScore` minimizes; a negative delta
+improves it. Insert deltas come from :func:`~andrey.core.score_delta.add_deltas`, which scores every
+candidate parent against one parent set at once. A Delete and the parent removed by a Reverse each
+use the difference of two memoized local scores.
 
 References
 ----------
@@ -58,8 +52,6 @@ _ACCEPT_PER_SAMPLE = 2e-7
 # The state of the pair (a, b), a < b.
 _NONE, _UNDIRECTED, _LOW_TO_HIGH, _HIGH_TO_LOW = 0, 1, 2, 3
 
-# What an edge change does, keyed by (old state kind, new state kind); the update rules are written
-# per change.
 _ADD_UNDIRECTED, _ADD_DIRECTED, _DROP_UNDIRECTED, _ORIENT, _DROP_DIRECTED, _UNORIENT, _REVERSE = (
     range(1, 8)
 )
@@ -119,7 +111,7 @@ class _Changes(dict):
 
 
 def _returns(moves: Iterable[_Changes]) -> bool:
-    """Whether ``moves``, applied in turn, leave every pair in its state before the first."""
+    """Whether ``moves``, applied in order, restore every pair's initial state."""
     net = _Changes()
     for move in moves:
         for (a, b), (old, new) in move.items():
@@ -256,9 +248,8 @@ def _extension_scores(
 ) -> dict[int, float]:
     """The memoized local score of each node :func:`_extension_parents` covers.
 
-    The sum over all nodes is the CPDAG's total score. Unlike a sum of the search's deltas it does
-    not depend on the moves that reached the graph, even where a singular parent set makes the Schur
-    update and two full scores disagree.
+    The sum over all nodes is the CPDAG's total score, independent of the moves that reached it,
+    even when singular parent sets make Schur updates and full-score differences disagree.
     """
     with np.errstate(divide="ignore", invalid="ignore"):
         return {v: score.score(v, tuple(ps)) for v, ps in _extension_parents(pa, ne, nodes).items()}
@@ -387,8 +378,8 @@ def _blocks_paths(
 ) -> bool:
     """True when every semi-directed path from ``y`` to ``x`` passes through ``blocked``.
 
-    ``skip_direct`` ignores the edge ``y -> x`` itself (a Reverse). An open path is recorded in
-    ``paths``: each of its edges maps to ``(x, y)``, so a change to that edge requeues the Insert.
+    ``skip_direct`` ignores ``y -> x`` itself (a Reverse). Each edge of an open path maps to
+    ``(x, y)`` in ``paths`` so edge changes requeue the Insert.
     """
     if y == x:
         return False
@@ -956,7 +947,7 @@ def _insert_marks(adj: np.ndarray, x: int, y: int, T: frozenset[int]) -> np.ndar
 def _rescan_moves(
     adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]], reach: Callable
 ) -> Iterable[np.ndarray]:
-    """The graphs the base search's improving moves on ``adj`` lead to, in the order it tries."""
+    """The graphs reached by improving base-search moves on ``adj``, in search order."""
     for _, x, y, C, _E in _improving(_all_deletes(adj, score)):
         yield _delete_marks(adj, x, y, C)
     for _, x, y, T in _improving(_all_reverses(adj, score, forbidden)):
@@ -1037,7 +1028,7 @@ def xges(
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
-        Data matrix; rows are observations, columns are variables.
+        Rows are observations; columns are variables.
     score_func : str
         Local score; ``"local_score_BIC"`` (linear-Gaussian BIC) is supported.
     lambda_value : float
@@ -1045,7 +1036,7 @@ def xges(
     extended_search : bool
         Run the extended search after the base search; ``False`` stops after the base search.
     _rescan : bool
-        Private test lever: rescan every operator after each move instead of updating the queues.
+        Test-only: rescan every operator after each move instead of updating the queues.
 
     Returns
     -------
@@ -1057,7 +1048,7 @@ def xges(
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
     score = BICScore(X, lambda_value=lambda_value)
-    # One BLAS thread keeps every score, and so every tie between moves, reproducible.
+    # One BLAS thread for reproducible scores and move ties.
     with backend.one_blas_thread():
         if _rescan:
             adj = _rescan_search(score, d, extended_search)

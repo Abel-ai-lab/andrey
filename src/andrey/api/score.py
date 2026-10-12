@@ -206,9 +206,7 @@ def xges(
     """Learn a CPDAG from observational data with extremely greedy equivalence search (XGES).
 
     XGES searches the equivalence classes that GES searches [2]_, with GES's moves, the turning move
-    of GIES [3]_, and the BIC score, but applies them in a different order [1]_. The base search
-    deletes an edge if that improves the score, otherwise reverses one, otherwise adds one, until no
-    move improves the score. The extended search then retries deleting each edge of the result. On
+    of GIES [3]_, and the BIC score, but applies them in a different order [1]_ (see Notes). On
     linear-Gaussian data it often finds a graph with a better score than GES.
 
     Parameters
@@ -217,22 +215,21 @@ def xges(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : {"local_score_BIC"}, default="local_score_BIC"
-        Local score objective. Only the Gaussian BIC score is supported.
+        Only the Gaussian BIC score is supported.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
     extended_search : bool, default=True
-        Run the extended search after the base search: delete each edge in turn, forbid adding it
-        back, rerun the base search, and keep any result with a better score. ``False`` returns the
-        base search's graph (XGES without the extended search), which is faster.
+        Run the extended search after the base search (see Notes). ``False`` returns the base
+        search's graph, which is faster.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"XGES"`` and ``metadata["score"]`` the BIC score of the result, computed as for
-        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open.
+        ``"XGES"`` and ``metadata["score"]`` the BIC score, computed as for :func:`andrey.ges`;
+        lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
+        the equivalence class leaves open.
 
     Raises
     ------
@@ -257,21 +254,20 @@ def xges(
     Notes
     -----
     **When to use it.** XGES makes the assumptions of :func:`~andrey.ges`: continuous data, no
-    unmeasured common causes, and each variable depending linearly on its causes with Gaussian
-    noise. It returns the equivalence class.
+    unmeasured common causes, and linear relations with Gaussian noise. It returns the equivalence
+    class.
 
-    **How it works.** Each step takes the best move of the first kind that improves the score:
-    deleting an edge, else reversing a directed edge, else adding an edge. The search stops when no
-    move improves the score [1]_. The extended search then deletes each edge of that graph, best
-    score first, forbids adding the edge back in that direction, and reruns the search. It keeps a
-    result whose score is lower by more than ``2e-7 * n_samples``, and stops once a fresh pass over
-    the edges keeps nothing. No variable has a parent limit.
+    **How it works.** Each step takes the best improving deletion, else reversal of a directed edge,
+    else addition; the search stops when no move improves the score [1]_. The extended search then
+    deletes each edge of that graph, best score first, forbids adding it back in that direction, and
+    reruns the search. It keeps a result whose score is lower by more than ``2e-7 * n_samples``, and
+    stops once a fresh pass over the edges keeps nothing. No variable has a parent limit.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 258 variables with 512 rows,
-    and on 10,000 rows with 10 variables. The extended search reruns the base search once for each
-    edge it tries to delete, and tries the edges again after it keeps a result, so its run time
-    grows with both the number of edges and the number of results kept; ``extended_search=False``
-    skips it. Its BIC score assumes linear relations with Gaussian noise.
+    and on 10,000 rows with 10 variables. The extended search reruns the base search for each edge
+    it tries to delete and retries the edges after keeping a result, so its run time grows with the
+    number of edges and of results kept; ``extended_search=False`` skips it. Its BIC score assumes
+    linear relations with Gaussian noise.
 
     References
     ----------
