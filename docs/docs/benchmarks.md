@@ -17,45 +17,74 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.2.0
+:link: benchmarks/0.3.0
 :link-type: doc
-:link-alt: The 0.2.0 release card: hidden common causes
+:link-alt: The 0.3.0 release card: score-based search
 :class-card: release-cover release-art
 :shadow: none
 :margin: 0
 
 Release card
 
-Hidden common causes
+Score-based search
 
-0.2.0
+0.3.0
 :::
 
 ::::{div} release-tldr
 
-RCD and BottomUpParceLiNGAM, two methods for data with hidden common causes, compared with lingam,
-which implements both. Both are supported from 0.2.0.
+Three score-based searches on linear-Gaussian data: XGES, compared with xges, and Tabu search and
+hill climbing, compared with bnlearn. XGES and Tabu search are new in 0.3.0.
 
 :::{div} release-stats
 
-- **25 of 25** datasets with the same graph as lingam
-- **1.7-2.9x** RCD speedup over lingam
-- **2.5-10.8x** BottomUpParceLiNGAM speedup over lingam
+- **40 of 40** datasets with the same graph as xges
+- **3.95-140x** XGES speedup over xges
+- **2.56-208x** Tabu search speedup over bnlearn
 :::
 
 :::{div} release-limit
-**Limit** BottomUpParceLiNGAM's directed edges have more errors than the empty graph's from 8
-observed variables, in both packages.
+**Limit** Tabu search and hill climbing return graphs with more errors than the empty graph's
+from 50 variables, in both packages.
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.2.0.md)
-[Read the post](../blog/andrey-0-2-0.md)
+[Read the release card](benchmarks/0.3.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.2.0
+:link-type: doc
+:link-alt: The 0.2.0 release card: hidden common causes
+:class-card: release-tile
+:shadow: none
+:margin: 0
+
+0.2.0
+:::
+
+:::{div} release-body
+<h3>Hidden common causes</h3>
+
+RCD and BottomUpParceLiNGAM, two methods for data with hidden common causes, compared with lingam.
+
+- **2** methods
+- BottomUpParceLiNGAM **10.8x** faster than lingam at 24 observed variables
+:::
+
+:::{div} release-meta
+Released 12 October 2026
+
+- [Release card<span class="visually-hidden"> 0.2.0</span>](benchmarks/0.2.0.md)
+- [Post: Hidden common causes](../blog/andrey-0-2-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -93,6 +122,7 @@ The homepage's speed claim and charts come from the 0.1.0 release card.
 ```{toctree}
 :hidden:
 
+0.3.0: score-based search <benchmarks/0.3.0>
 0.2.0: hidden common causes <benchmarks/0.2.0>
 0.1.0: the alpha benchmarks <benchmarks/0.1.0>
 ```

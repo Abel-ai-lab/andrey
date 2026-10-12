@@ -314,15 +314,17 @@ def _normalized(name: str) -> str:
 def _published() -> set[str]:
     """Methods in the published summaries, one per benchmark report (``benchmarks/published/``).
 
-    A summary with ``builds`` times two Andrey builds against each other, not another package, so
-    its methods do not count.
+    A method with a ``solution`` (``andrey.<name>.<backend>...``) counts as the registry method it
+    names, so a display name ("Tabu search") or a setting ("XGES without extended search") maps
+    to its facade; one without counts by its ``method``. A summary with ``builds`` times two
+    Andrey builds against each other, not another package, so its methods do not count.
     """
     summaries = (
         json.loads(p.read_text())
         for p in (ROOT / "benchmarks" / "published").glob("*/summary.json")
     )
     return {
-        _normalized(m["method"])
+        _normalized(m["solution"].split(".")[1] if "solution" in m else m["method"])
         for summary in summaries
         if "builds" not in summary
         for m in summary["methods"]

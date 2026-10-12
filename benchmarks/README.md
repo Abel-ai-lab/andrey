@@ -9,6 +9,7 @@ folder under `published/` with the summary its numbers come from:
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.3.0 | [Score-based search](../docs/docs/benchmarks/0.3.0.md) | [`published/score-search-2026-10/summary.json`](published/score-search-2026-10/summary.json) |
 | 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
 | 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |
 
@@ -16,7 +17,8 @@ A summary holds one row per comparison and size. It is generated from the record
 records and the script that writes it are kept outside this repository. A released report and its
 folder do not change: new measurements go into the next release's report and folder. To rerun a
 comparison, use its driver with the builds, versions, and settings its report lists under
-Reproduce ([0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
+Reproduce ([0.3.0](../docs/docs/benchmarks/0.3.0.md#reproduce),
+[0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
 [0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
 
 ## Comparison packages
