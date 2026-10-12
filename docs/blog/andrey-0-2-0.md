@@ -66,9 +66,8 @@ first call.
 :caption: example.py
 ```
 
-```{literalinclude} 0.2.0/example-output.txt
-:language: text
-:caption: example.py
+```{raw} html
+:file: 0.2.0/graphs.html
 ```
 
 - RCD and CAM-UV return the true graph: `x0 <-> x1` for the pair linked by `h`, and both direct
@@ -85,8 +84,15 @@ first call.
 RCD, BottomUpParceLiNGAM, and CAM-UV also test whether regression residuals are independent.
 With non-Gaussian noise, this test settles the directions in this example. RCD and
 BottomUpParceLiNGAM also estimate the edge weights: 0.598 and 0.61, compared with the true 0.6.
-DirectLiNGAM assumes causal sufficiency. On the same data, it returns `x0 -> x1` (the last result
+DirectLiNGAM assumes causal sufficiency. On the same data, it returns `x0 -> x1` (the last graph
 above), an edge absent from the true graph.
+
+The script prints each result in full:
+
+```{literalinclude} 0.2.0/example-output.txt
+:language: text
+:caption: example.py
+```
 
 ## Benchmarks
 
@@ -100,8 +106,18 @@ We compared the three supported methods with packages that implement them.
 
 The [0.2.0 release card](../docs/benchmarks/0.2.0.md) reports measurements for RCD and
 BottomUpParceLiNGAM on linear data with uniform noise, one node in five hidden, and 2,000 rows,
-on 2 cores. Agreement between packages does not establish accuracy: from 8 observed variables,
+on 2 cores.
+
+```{raw} html
+:file: 0.2.0/speedup.html
+```
+
+Agreement between packages does not establish accuracy: from 8 observed variables,
 BottomUpParceLiNGAM's directed edges have more errors than the empty graph's, in both packages.
+
+```{raw} html
+:file: 0.2.0/errors.html
+```
 
 FCI's numbers come from the [0.1.0 release card](../docs/benchmarks/0.1.0.md): linear-Gaussian
 data with one variable in ten hidden and ten rows per variable, on 16 cores. At 20 variables,
