@@ -39,13 +39,11 @@ from __future__ import annotations
 import heapq
 from collections import OrderedDict, defaultdict, deque
 from collections.abc import Callable, Iterable
-from functools import cache
 from itertools import chain, count
 
 import numpy as np
-from threadpoolctl import ThreadpoolController
 
-from andrey.core import ARROW, NULL, TAIL, GraphStructure
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import add_deltas
@@ -458,16 +456,6 @@ def _delete_valid(g: _Graph, x: int, y: int, C: frozenset[int], E: frozenset[int
 
 
 # ---- the search ---------------------------------------------------------------------------------
-
-
-@cache
-def _blas() -> ThreadpoolController:
-    """The thread pools of the native libraries loaded at the first search.
-
-    Building a controller stats every mapped library file, tens of milliseconds on a network file
-    system, so it is built once. The search calls only NumPy's BLAS, loaded with NumPy itself.
-    """
-    return ThreadpoolController()
 
 
 # Bytes the cached per-(target, parent set) score arrays may hold; each is one float per variable.
@@ -1070,7 +1058,7 @@ def xges(
     d = X.shape[1]
     score = BICScore(X, lambda_value=lambda_value)
     # One BLAS thread keeps every score, and so every tie between moves, reproducible.
-    with _blas().limit(limits=1):
+    with backend.one_blas_thread():
         if _rescan:
             adj = _rescan_search(score, d, extended_search)
         else:
