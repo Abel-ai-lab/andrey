@@ -9,6 +9,8 @@ change names its pull request.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
 ### Highlights
 
 - `rcd` and `bottom_up_parce_lingam` are supported: on data with hidden common causes they return
@@ -65,7 +67,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Abel-ai-lab/andrey/releases/tag/v0.1.0
 [#14]: https://github.com/Abel-ai-lab/andrey/pull/14
 [#18]: https://github.com/Abel-ai-lab/andrey/pull/18
