@@ -330,7 +330,7 @@ def test_the_example_copy_counts_the_links_pc_finds_in_the_known_network(placeho
     found, known = ({frozenset(edge[:2]) for edge in edges} for edges in (found, known))
     assert found <= known
     claim = (
-        f"PC finds {len(found)} of the {len(known)} links in the known signalling network, "
+        f"PC finds {len(found)} of the {len(known)} links in the known signaling network, "
         "and none outside it"
     )
     guide = (ROOT / "docs" / "docs" / "guides" / "getting-started.md").read_text(encoding="utf-8")
@@ -916,7 +916,7 @@ def test_the_hero_grain_is_small_and_the_same_on_every_build(cards):
     assert "cards.grain.hero_tiles()" in (ROOT / "docs" / "conf.py").read_text()
 
 
-def test_the_homepage_and_docs_css_name_no_colour(cards):
+def test_the_homepage_and_docs_css_name_no_color(cards):
     # Every color is a generated token, so a palette edit reaches the hero and the chip too.
     sheets = ("site.css", "figures.css", "why-fast.css")
     docs = ("docs/_static/andrey.css", "docs/_static/benchmarks.css")

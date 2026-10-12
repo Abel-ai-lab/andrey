@@ -72,8 +72,8 @@ def _scan_task(payload: tuple) -> list[Removal]:
         raise RuntimeError("skeleton worker pool reused across runs (corr/token mismatch)")
     assert _WORKER_TEST is not None  # _init_worker runs before any task
     d = adj_mask.shape[0]
-    neighbours = [np.flatnonzero(adj_mask[i]) for i in range(d)]
-    return scan_pairs(_WORKER_TEST, pairs, neighbours, size, alpha)
+    neighbors = [np.flatnonzero(adj_mask[i]) for i in range(d)]
+    return scan_pairs(_WORKER_TEST, pairs, neighbors, size, alpha)
 
 
 class SkeletonWorkerPool:
