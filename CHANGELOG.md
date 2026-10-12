@@ -13,10 +13,10 @@ change names its pull request.
 
 - `hc`, `tabu`, and `xges` are supported: on linear-Gaussian data, XGES returns the same graphs as
   xges, and Tabu search and hill climbing return the same equivalence classes as bnlearn on most
-  datasets. TODO(0.3.0): the speedup ranges over xges and bnlearn, from the final summary. The
-  0.3.0 release card gives the numbers and each method's limits, among them that Tabu search and
-  hill climbing score worse than the empty graph from 50 variables at ten rows per variable.
-  ([#64])
+  datasets. XGES runs 3.95-140x faster than xges, and 1.13-6.35x without its extended search.
+  Tabu search and hill climbing run 2.38-561x and 3.60-906x faster than bnlearn. The 0.3.0 release
+  card gives the numbers and each method's limits, among them that Tabu search and hill climbing
+  score worse than the empty graph from 50 variables at ten rows per variable. ([#64])
 
 ### Breaking
 
