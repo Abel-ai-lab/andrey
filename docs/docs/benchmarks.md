@@ -118,7 +118,7 @@ Released 8 October 2026
 :::
 ::::
 
-The homepage's speed claim and charts come from the 0.1.0 release card.
+The homepage's speed claim and charts come from these release cards.
 
 ```{toctree}
 :hidden:
