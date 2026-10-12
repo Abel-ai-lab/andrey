@@ -221,6 +221,47 @@ _add(
 )
 _add(
     MethodSpec(
+        name="xges",
+        family="score",
+        summary="Extremely greedy equivalence search: GES's moves and BIC score, deleting an edge "
+        "before reversing one and reversing before adding, then retrying each deletion. Returns a "
+        "CPDAG + score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        params=(
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC",
+                doc="Local score objective.",
+                choices=("local_score_BIC",),
+            ),
+            ParamSpec(
+                name="lambda_value",
+                type="float",
+                default=1.0,
+                doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values "
+                "give sparser graphs; 1.0 is the standard BIC.",
+            ),
+            ParamSpec(
+                name="extended_search",
+                type="bool",
+                default=True,
+                doc="Run the extended search: after the greedy search converges, delete each edge "
+                "in turn, forbid adding it back, search again, and keep a better result. "
+                "false returns the converged graph.",
+            ),
+        ),
+        references=("Nazaret & Blei 2024",),
+    )
+)
+_add(
+    MethodSpec(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "

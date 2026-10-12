@@ -50,6 +50,7 @@ SINGLE = {
     "cdnod": lambda data: andrey.cdnod(data, c_indx=np.arange(len(data)) % 2),
     "ges": andrey.ges,
     "gies": andrey.gies,
+    "xges": andrey.xges,
     "hc": andrey.hc,
     "tabu": andrey.tabu,
     "exact_search": andrey.exact_search,
@@ -101,6 +102,12 @@ def test_one_column_gives_a_one_node_graph(method):
     structure = SINGLE[method](_data(d=1)).structure
     assert structure.n_nodes == 1
     assert structure.oriented_edges() == []
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("method", ["pc", "ges", "hc", "xges"])
+def test_no_columns_give_an_empty_graph(method):
+    assert SINGLE[method](_data(d=0)).structure.n_nodes == 0
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
@@ -267,3 +274,19 @@ def test_cdnod_with_one_domain_gives_the_pc_graph():
 def test_cdnod_rejects_nan_in_c_indx():
     with pytest.raises(ValueError, match="c_indx contains NaN"):
         andrey.cdnod(_data(), c_indx=np.r_[np.nan, np.zeros(59)])
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("setting", "value", "error"),
+    [
+        ("extended_search", 1, TypeError),
+        ("extended_search", "yes", TypeError),
+        ("lambda_value", -1.0, ValueError),
+        ("lambda_value", float("inf"), ValueError),
+        ("score_func", "local_score_BDeu", NotImplementedError),
+    ],
+)
+def test_xges_rejects_a_bad_setting(setting, value, error):
+    with pytest.raises(error, match=setting):
+        andrey.xges(_data(), **{setting: value})

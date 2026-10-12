@@ -4,7 +4,8 @@
 base)`` for a batch of single add/remove moves. Unlike the chained ``score_many_with_base`` (HC /
 BOSS), it is *pure*: it shares only the condition-gated ``inv(cov[S, S])`` cache (a pure function of
 ``S``), recomputes each residual fresh from that inverse, and never writes a chained residual or
-a derived score. This file pins three contracts:
+a derived score. This file pins three contracts, and the first two for its vector forms
+``add_deltas`` and ``remove_deltas`` (every add or every removal against one base at once):
 
 * **units** -- each raw delta is within ``1e-9`` relative of two full ``BICScore.score`` calls, for
   adds and removes, empty and non-empty bases;

@@ -1,8 +1,8 @@
 """Score-based facade adapters.
 
-``ges``, ``gies``, ``exact_search``, ``hc``, and ``tabu`` use :mod:`andrey.core` for BIC scoring
-and orientation; ``hc`` and ``tabu`` use the Schur delta-BIC. Reported objectives are stored in
-``metadata``.
+``ges``, ``gies``, ``xges``, ``exact_search``, ``hc``, and ``tabu`` use :mod:`andrey.core` for BIC
+scoring and orientation; ``xges``, ``hc``, and ``tabu`` use the Schur delta-BIC. Reported objectives
+are stored in ``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -13,7 +13,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from andrey.api._adapt import column_labels, data_matrix, int_in_range, json_safe, structure_output
+from andrey.api._adapt import (
+    column_labels,
+    data_matrix,
+    flag,
+    int_in_range,
+    json_safe,
+    structure_output,
+)
 from andrey.api._experimental import warn_experimental
 from andrey.core import backend
 from andrey.core.seeding import resolve_seed
@@ -186,6 +193,113 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     labels = column_labels(data)
     cpdag, score = _gies(X, lambda_value=lambda_value)
     metadata = {"algorithm": "GIES", "score": json_safe(score)}
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def xges(
+    data: npt.ArrayLike,
+    *,
+    score_func: str = "local_score_BIC",
+    lambda_value: float = 1.0,
+    extended_search: bool = True,
+) -> StructureOutput:
+    """Learn a CPDAG from observational data with extremely greedy equivalence search (XGES).
+
+    XGES searches the equivalence classes that GES searches [2]_, with GES's moves, the turning move
+    of GIES [3]_, and the BIC score, but applies them in a different order [1]_ (see Notes). On
+    linear-Gaussian data it often finds a graph with a better score than GES.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    score_func : {"local_score_BIC"}, default="local_score_BIC"
+        Only the Gaussian BIC score is supported.
+    lambda_value : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+    extended_search : bool, default=True
+        Run the extended search after the base search (see Notes). ``False`` returns the base
+        search's graph, which is faster.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"XGES"`` and ``metadata["score"]`` the BIC score, computed as for :func:`andrey.ges`;
+        lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
+        the equivalence class leaves open.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``score_func`` is not ``"local_score_BIC"``.
+    TypeError
+        If ``extended_search`` is not a bool.
+    ValueError
+        If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
+        no constant column, or if ``lambda_value`` is negative or non-finite.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+
+    See Also
+    --------
+    andrey.ges : Adds edges, then removes them, in two separate phases.
+
+    Notes
+    -----
+    **When to use it.** XGES makes the assumptions of :func:`~andrey.ges`: continuous data, no
+    unmeasured common causes, and linear relations with Gaussian noise. It returns the equivalence
+    class.
+
+    **How it works.** Each step takes the best improving deletion, else reversal of a directed edge,
+    else addition; the search stops when no move improves the score [1]_. The extended search then
+    deletes each edge of that graph, best score first, forbids adding it back in that direction, and
+    reruns the search. It keeps a result whose score is lower by more than ``2e-7 * n_samples``, and
+    stops once a fresh pass over the edges keeps nothing. No variable has a parent limit.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 258 variables with 512 rows,
+    and on 10,000 rows with 10 variables. The extended search reruns the base search for each edge
+    it tries to delete and retries the edges after keeping a result, so its run time grows with the
+    number of edges and of results kept; ``extended_search=False`` skips it. Its BIC score assumes
+    linear relations with Gaussian noise.
+
+    References
+    ----------
+    .. [1] Nazaret, A., and Blei, D. (2024). Extremely greedy equivalence search. Proceedings of
+       the Fortieth Conference on Uncertainty in Artificial Intelligence, PMLR 244, 2716-2745.
+    .. [2] Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3,
+       507-554.
+    .. [3] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
+       interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import xges
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = rng.standard_normal(500)
+    >>> z = x + y + 0.5 * rng.standard_normal(500)
+    >>> xges(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
+    [('x', 'z', 'directed'), ('y', 'z', 'directed')]
+    """
+    warn_experimental("xges")
+    from andrey.search.xges import xges as _xges
+
+    X = data_matrix(data)
+    extended_search = flag(extended_search, "extended_search")
+    labels = column_labels(data)
+    cpdag, score = _xges(
+        X, score_func=score_func, lambda_value=lambda_value, extended_search=extended_search
+    )
+    metadata = {"algorithm": "XGES", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 

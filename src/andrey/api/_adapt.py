@@ -66,6 +66,17 @@ def int_in_range(value: object, name: str, low: int, high: int | None = None) ->
     return int(value)
 
 
+def flag(value: object, name: str) -> bool:
+    """Return ``value`` as a ``bool``.
+
+    Raises ``TypeError``, naming ``name``, for anything but ``True`` or ``False``; ``0`` and ``1``
+    included.
+    """
+    if not isinstance(value, (bool, np.bool_)):
+        raise TypeError(f"{name} must be True or False, got {type(value).__name__}")
+    return bool(value)
+
+
 def open_unit_interval(value: float, name: str) -> float:
     """Return ``value`` as a ``float`` in the open interval ``(0, 1)``.
 

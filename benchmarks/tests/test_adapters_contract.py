@@ -30,6 +30,7 @@ from andrey_bench.adapters.andrey_hc import andrey_hc_adapters
 from andrey_bench.adapters.andrey_ica_lingam import AndreyICALiNGAM
 from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.andrey_tabu import andrey_tabu_adapters
+from andrey_bench.adapters.andrey_xges import AndreyXGES
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
@@ -62,6 +63,8 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyGRaSP(),
     *andrey_direct_lingam_adapters(),
     AndreyICALiNGAM(),
+    AndreyXGES(),
+    AndreyXGES(name="andrey.xges.numpy.no_extended_search", extended_search=False),
     CausalLearnGES(),
     CausalLearnPC(),
     CausalLearnFCI(),
@@ -136,6 +139,8 @@ DEFERRED_MODULES = {
     "andrey.direct_lingam.numpy": "andrey.lingam.direct",
     "andrey.direct_lingam.torch-cuda": "andrey.lingam.direct",
     "andrey.ica_lingam.numpy": "andrey.lingam.ica",
+    "andrey.xges.numpy": "andrey.search.xges",
+    "andrey.xges.numpy.no_extended_search": "andrey.search.xges",
     "causal-learn.boss": "causallearn.search.PermutationBased.BOSS",
     "causal-learn.grasp": "causallearn.search.PermutationBased.GRaSP",
 }
@@ -204,6 +209,7 @@ FIT_CASES = [
     _case(AndreyGRaSP(), "linear_gauss_er", "cpdag", _MARKS),
     _case(CausalLearnBOSS(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(CausalLearnGRaSP(), "linear_gauss_er", "cpdag", _ADJACENCY),
+    _case(AndreyXGES(), "linear_gauss_er", "cpdag", _MARKS),
     _case(AndreyFCI(), "latent_confounded_er", "pag", _PAG_MARKS),
     _case(CausalLearnFCI(), "latent_confounded_er", "pag", _PAG_MARKS),
     *[

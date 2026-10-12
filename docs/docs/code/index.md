@@ -68,6 +68,7 @@ in a process.
    gfci
    cdnod
    gies
+   xges
    hc
    tabu
    exact_search

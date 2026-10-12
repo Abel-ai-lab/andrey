@@ -197,6 +197,22 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.9, 0.0],
         ],
     },
+    # Linear-Gaussian SEM whose CPDAG has every kind of edge, with strong weights: the collider
+    # 0 -> 2 <- 1, the chain 2 -> 3 -> 4 it orients, and the pair 5 -- 6 no collider orients.
+    "gauss_7v": {
+        "noise": "gaussian",
+        "seed": 20261011,
+        "n_samples": 2000,
+        "weights": [
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.8, 0.8, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.9, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.7, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0],
+        ],
+    },
     # Stable VAR(1), non-Gaussian noise - VARLiNGAM and (linear) Granger.
     "var_4v_stable": {
         "model": "var",

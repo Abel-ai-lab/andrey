@@ -18,6 +18,8 @@ change names its pull request.
 
 - `tabu`, an experimental method: hill climbing that keeps searching past a local optimum and
   returns the best DAG it visits, as a CPDAG. ([#56])
+- `xges`, an experimental method: extremely greedy equivalence search, returning a CPDAG and its
+  BIC score. ([#57])
 
 ### Changed
 
@@ -99,4 +101,5 @@ First alpha release.
 [#33]: https://github.com/Abel-ai-lab/andrey/pull/33
 [#53]: https://github.com/Abel-ai-lab/andrey/pull/53
 [#56]: https://github.com/Abel-ai-lab/andrey/pull/56
+[#57]: https://github.com/Abel-ai-lab/andrey/pull/57
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59

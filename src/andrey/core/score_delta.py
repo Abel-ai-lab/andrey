@@ -98,8 +98,8 @@ def _get_inv_with_cond(
         except np.linalg.LinAlgError:
             inv_cov_cache[S_sorted] = _ILL
             return None, True
-        XX_norm = float(np.linalg.norm(XX, np.inf))
-        M_norm = float(np.linalg.norm(M_candidate, np.inf))
+        XX_norm = float(np.abs(XX).sum(axis=1).max())
+        M_norm = float(np.abs(M_candidate).sum(axis=1).max())
         if XX_norm * M_norm > cond_threshold:
             inv_cov_cache[S_sorted] = _ILL
             return None, True
