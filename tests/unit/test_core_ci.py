@@ -182,6 +182,18 @@ def test_empty_condition_set_is_marginal_pearson(data):
         assert FisherZ(data)(x, y) == pytest.approx(expected, abs=1e-12)
 
 
+@pytest.mark.parametrize("condition_set", [(), (2,), (2, 3), (2, 3, 4)])
+def test_statistic_is_the_residual_correlation_and_the_p_value_is_the_call(data, condition_set):
+    # Each closed form (|S| = 0, 1) and the inversion path (|S| >= 2) gives the correlation of the
+    # least-squares residuals of x and y on the conditioning columns, and the p-value of a call.
+    test = FisherZ(data)
+    design = np.column_stack([np.ones(len(data)), data[:, list(condition_set)]])
+    residuals = [data[:, k] - design @ np.linalg.lstsq(design, data[:, k])[0] for k in (0, 5)]
+    r, p = test.statistic_pvalue(5, 0, condition_set)
+    assert r == pytest.approx(np.corrcoef(*residuals)[0, 1], abs=1e-12)
+    assert p == test(0, 5, condition_set)
+
+
 def test_independent_columns_give_large_p_dependent_give_small_p():
     # A strong linear dependence drives the p-value toward 0 (reject independence); an unrelated
     # column pair leaves it well above any usual threshold. Directional sanity.

@@ -81,6 +81,16 @@ class FisherZ:
         ``condition_set`` is canonicalized to sorted unique ints; ``x`` and ``y`` are ordered so the
         p-value is independent of argument order. A larger p-value means more independence.
         """
+        return self.statistic_pvalue(x, y, condition_set)[1]
+
+    def statistic_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int] = ()
+    ) -> tuple[float, float]:
+        """Return the partial correlation and p-value of ``x`` and ``y`` given ``condition_set``.
+
+        The p-value is the one :meth:`__call__` returns. The partial correlation is clamped just
+        inside ``(-1, 1)`` and is symmetric in ``x`` and ``y``.
+        """
         x_int, y_int, cond = _canonical(x, y, condition_set)
         m = len(cond)
         df = self._n - m - 3
@@ -111,7 +121,7 @@ class FisherZ:
             r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
         r = -_ONE_MINUS_EPS if r < -_ONE_MINUS_EPS else _ONE_MINUS_EPS if r > _ONE_MINUS_EPS else r
         z = 0.5 * np.log((1.0 + r) / (1.0 - r))
-        return 2.0 * (1.0 - float(ndtr(math.sqrt(df) * abs(z))))
+        return r, 2.0 * (1.0 - float(ndtr(math.sqrt(df) * abs(z))))
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return Fisher-Z p-values for one ``(x, y)`` pair over many conditioning sets.
