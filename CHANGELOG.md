@@ -3,32 +3,41 @@
 All notable changes to Andrey are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the major version is 0, Andrey is
-in alpha, and any minor release may change the API.
+in alpha, and any minor release may change the API. From 0.2.0, a release opens with two sections
+Keep a Changelog does not define, Highlights and Breaking, and each change names its pull request.
 
 ## [Unreleased]
+
+### Highlights
+
+- `rcd` and `bottom_up_parce_lingam` are supported: on data with hidden common causes they return
+  the same graphs as lingam and run 1.7-10.8x faster. The 0.2.0 release card gives the numbers and
+  each method's limits. ([#31])
+- Small fits run several times faster. At 10 variables, PC and FCI take about a twelfth of the
+  time, hill climbing an eighth, and GES two fifths. Larger fits are no slower, and graphs are
+  unchanged. ([#33])
 
 ### Added
 
 - Three methods for data with hidden common causes: `rcd`, `bottom_up_parce_lingam`, and the
   experimental `camuv`. Each returns a PAG over the observed variables. `rcd` and `camuv` list the
   pairs a hidden variable links in `metadata["confounded_pairs"]`; `bottom_up_parce_lingam` leaves
-  the variables whose order such a cause hides unordered. `rcd` and `bottom_up_parce_lingam` are
-  supported, benchmarked compared with lingam in the 0.2.0 benchmark report.
+  the variables whose order such a cause hides unordered. ([#18], [#31])
 - `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
-  search stops there.
+  search stops there. ([#14])
 
 ### Fixed
 
 - Every method checks its data before the fit. Data with one dimension, fewer than 2 rows, `NaN` or
   infinity, or a constant column raises a `ValueError` that names the argument, instead of an error
-  from NumPy or scikit-learn or a graph from data no method can use.
+  from NumPy or scikit-learn or a graph from data no method can use. ([#14])
 - A single column gives a one-node graph in every method, and `cdnod` with one domain gives the PC
-  graph.
+  graph. ([#14])
 - Settings outside their range raise an error naming them: `n_lags`, `order`, `max_iter`, and
-  `gin`'s `alpha` and `labels`.
+  `gin`'s `alpha` and `labels`. ([#14])
 - `GraphStructure.from_numpy` rejects an unknown `kind` and a self-loop not marked as an arrowhead,
-  and `andrey.viz.draw` points a `TemporalStructure` to `lag(k)` or `summary_graph()`.
-- `calm` no longer suggests a CUDA GPU, which it does not use.
+  and `andrey.viz.draw` points a `TemporalStructure` to `lag(k)` or `summary_graph()`. ([#14])
+- `calm` no longer suggests a CUDA GPU, which it does not use. ([#14])
 
 ## [0.1.0] - 2026-10-08
 
@@ -57,3 +66,7 @@ First alpha release.
 
 [Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Abel-ai-lab/andrey/releases/tag/v0.1.0
+[#14]: https://github.com/Abel-ai-lab/andrey/pull/14
+[#18]: https://github.com/Abel-ai-lab/andrey/pull/18
+[#31]: https://github.com/Abel-ai-lab/andrey/pull/31
+[#33]: https://github.com/Abel-ai-lab/andrey/pull/33

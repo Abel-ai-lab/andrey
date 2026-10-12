@@ -13,7 +13,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import numpy as np
-from threadpoolctl import threadpool_limits
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
@@ -251,7 +250,7 @@ def hc(
 
     # Pin BLAS to one thread for the delta loops so the Schur updates are thread-count-reproducible
     # and equal to the (1-thread) parallel workers; above the work threshold the pass fans out.
-    with threadpool_limits(limits=1):
+    with backend.one_blas_thread():
         workers = backend.worker_count()
         if workers > 1 and d > 1:
             from andrey.search import _parallel_hc  # local import breaks the import cycle

@@ -10,7 +10,6 @@ from collections.abc import Iterator, Mapping
 from itertools import combinations, islice
 
 import numpy as np
-from threadpoolctl import threadpool_limits
 
 from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
@@ -20,7 +19,7 @@ from andrey.constraint._skeleton import (
     prescreen_capable,
     scan_pairs,
 )
-from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure
+from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
@@ -124,7 +123,7 @@ def _fast_adjacency_search(
                 else:
                     # Pin BLAS to one thread: the conditioning-submatrix inversions then match the
                     # (1-thread) parallel skeleton workers regardless of the host thread count.
-                    with threadpool_limits(limits=1):
+                    with backend.one_blas_thread():
                         removals = scan_pairs(test, pairs, neighbours, size, alpha)
                 for x, y, separating in removals:
                     remove.append((x, y))
