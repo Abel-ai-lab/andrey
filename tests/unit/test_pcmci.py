@@ -135,8 +135,7 @@ def test_default_p_values_are_the_student_t_tail_of_each_links_partial_correlati
                 assert result.p_values[lag - 1, i, j] == pytest.approx(p, rel=1e-6, abs=1e-300)
 
 
-# Fisher-Z results recorded on _chain(300) before the Student-t test existed:
-# {(lag - 1, cause, effect): p_value}.
+# Fisher-Z MCI p-values on _chain(300), tau_max=2: {(lag - 1, cause, effect): p_value}.
 FISHER_Z_BASELINE = {
     (0, 1, 0): 0.06821704538462758,
     (0, 1, 1): 4.9960036108132044e-14,

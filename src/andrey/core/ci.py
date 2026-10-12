@@ -274,7 +274,7 @@ class StudentT:
     tiny finite p-value. A query needs ``n > |S| + 2``.
 
     Queries are canonicalized as in :class:`FisherZ`. Unlike it, this test has no batched or
-    vectorized path and is not registered under an ``indep_test`` name.
+    vectorized path.
     """
 
     def __init__(self, data: np.ndarray) -> None:
