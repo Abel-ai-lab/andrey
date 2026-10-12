@@ -130,15 +130,19 @@ rows per variable.
 | Method | Compared with | Variables | Andrey's speedup | Same graph |
 |---|---|---|---|---|
 | XGES | xges | 25-200 | 3.95-140x | 40 of 40 datasets |
-| Tabu search | bnlearn | 10-400 | 2.56-208x | 27 of 30 datasets |
-| Hill climbing | bnlearn | 10-400 | 3.48-225x | 27 of 30 datasets |
+| Tabu search | bnlearn | 10-800 | 2.56-617x | 31 of 35 datasets |
+| Hill climbing | bnlearn | 10-800 | 3.48x to at least 933x | 30 of 34 datasets |
 
 The [0.3.0 release card](../docs/benchmarks/0.3.0.md) reports every measurement. XGES ran on
 graphs with a mean degree of 2 and 4, on 1 core per fit, and Tabu search and hill climbing on graphs
 with a mean degree of 2, on 4 cores per fit, all on an AMD EPYC 7713. Hill climbing and Tabu search
-ran with a move limit, `max_iter`, high enough never to stop them. Without the extended search,
-XGES returns the same graph as xges on every dataset, and at a mean degree of 2 it runs 1.34-6.35x
-faster.
+ran with a move limit, `max_iter`, high enough never to stop them. Their speedups are approximate,
+because Andrey's times vary between datasets of one size; the release card has the details. At 800
+variables, one bnlearn hill-climbing fit hit its time limit, so that speedup is a lower bound. At
+1,600 variables, every bnlearn fit hit its 1-hour limit, so Andrey's speedup is at least 474x for
+Tabu search and at least 609x for hill climbing. Andrey alone also ran both at 3,200 variables.
+Without the extended search, XGES returns the same graph as xges on every dataset, and at a mean
+degree of 2 it runs 1.34-6.35x faster.
 
 ```{raw} html
 :file: 0.3.0/speedup.html
@@ -161,7 +165,8 @@ size: with ten rows per variable, the best-scoring graph is not the true one. A 
 ```
 
 Andrey's XGES alone also ran at 500 and 1,000 variables. At a mean degree of 2, its graphs there
-have more errors than the empty graph's.
+have more errors than the empty graph's, as Tabu search's and hill climbing's do at 1,600 and 3,200
+variables.
 
 Speed and accuracy depend on your data, settings, and hardware.
 
