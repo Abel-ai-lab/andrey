@@ -33,7 +33,8 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     ANM [1]_ fits ``y = f(x) + e`` in each direction by Gaussian-process regression. An HSIC test
     [2]_ checks whether the residual ``e`` is independent of the proposed cause, which holds only in
-    the causal direction. The two p-values determine the edge.
+    the causal direction. The two p-values determine the edge, and the two test statistics decide a
+    tie.
 
     Parameters
     ----------
@@ -41,15 +42,18 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         The two variables, one per column: column 0 is ``x`` and column 1 is ``y``. Coerced to
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
-        ``None`` chooses the direction with the larger p-value. A significance level such as
-        ``0.05`` draws an edge only when exactly one p-value exceeds it. See Notes.
+        ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
+        when the p-values are equal. A significance level such as ``0.05`` draws an edge only when
+        exactly one p-value exceeds it. See Notes.
 
     Returns
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
         edge, or no edge. ``metadata["algorithm"]`` is ``"ANM"``; ``pval_forward`` is the
-        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``.
+        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
+        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
+        divided by its mean under independence.
 
     Raises
     ------
@@ -64,20 +68,25 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Notes
     -----
-    With ``alpha=None``, the edge points in the direction with the larger p-value; equal values
-    give no edge. Unequal p-values therefore produce an edge even for unrelated variables, a
-    deterministic pair whose p-values are both near zero, or a pair whose direction cannot be
-    identified. Mooij et al. (2016) [3]_ use this rule to avoid
-    choosing a significance level and found it among the best methods in their benchmark.
+    With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
+    sample, or a pair that fits neither direction, both p-values can be zero; equal p-values leave
+    the choice to the HSIC statistics, each divided by its mean under independence, and the edge
+    points in the direction with the smaller one, the weaker dependence between the proposed cause
+    and its residual. Equal statistics give no edge. The rule therefore produces an edge even for
+    unrelated variables, a deterministic pair whose p-values are both near zero, or a pair whose
+    direction cannot be identified. Mooij et al. (2016) [3]_ compare p-values to avoid choosing a
+    significance level and found the comparison among the best methods in their benchmark.
 
-    With a significance level, a direction passes when its p-value exceeds ``alpha``:
+    With a significance level, only the p-values decide; a direction passes when its p-value
+    exceeds ``alpha``:
 
     - only ``x -> y`` passes: the edge ``x -> y``;
     - only ``y -> x`` passes: the edge ``y -> x``;
     - both pass: no edge, since neither direction is rejected;
     - neither passes: no edge, since both directions are rejected.
 
-    Hoyer et al. (2008) [1]_ use a level of 0.02. Both p-values remain in ``metadata``.
+    Hoyer et al. (2008) [1]_ use a level of 0.02. Both p-values and both statistics remain in
+    ``metadata``.
 
     The direction is identifiable when ``f`` is nonlinear or the noise is non-Gaussian; a linear
     pair with Gaussian noise fits an additive noise model in both directions [1]_.
@@ -128,8 +137,15 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     labels = column_labels(data)
     X = X / np.abs(X).max(axis=0)  # first, so a column in tiny or huge units cannot underflow
     Z = (X - X.mean(axis=0)) / X.std(axis=0)  # data_matrix rejects a constant column
-    pval_forward, pval_backward = _native(Z[:, 0], Z[:, 1])
-    return _adapt_anm(pval_forward, pval_backward, alpha=alpha, labels=labels)
+    pval_forward, pval_backward, stat_forward, stat_backward = _native(Z[:, 0], Z[:, 1])
+    return _adapt_anm(
+        pval_forward,
+        pval_backward,
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        alpha=alpha,
+        labels=labels,
+    )
 
 
 def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
@@ -155,7 +171,8 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
         edge, or no edge. ``metadata["algorithm"]`` is ``"PNL"``; ``pval_forward`` is the
         independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
-        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests.
+        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests, each
+        divided by its mean under independence.
 
     Raises
     ------
@@ -171,13 +188,13 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     Notes
     -----
     With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
-    sample both p-values can be zero; equal p-values leave the choice to the HSIC statistics, and
-    the edge points in the direction with the smaller statistic, the weaker dependence between the
-    proposed cause and its estimated noise. Equal statistics give no edge. The rule therefore
-    produces an edge even for unrelated variables or a pair whose direction cannot be identified,
-    such as a linear Gaussian pair. Mooij et al. (2016) [4]_ compare p-values to avoid choosing a
-    significance level and found the comparison among the best methods in their benchmark of
-    additive-noise models.
+    sample, or a pair that fits neither direction, both p-values can be zero; equal p-values leave
+    the choice to the HSIC statistics, each divided by its mean under independence, and the edge
+    points in the direction with the smaller one, the weaker dependence between the proposed cause
+    and its estimated noise. Equal statistics give no edge. The rule therefore produces an edge
+    even for unrelated variables or a pair whose direction cannot be identified, such as a linear
+    Gaussian pair. Mooij et al. (2016) [4]_ compare p-values to avoid choosing a significance level
+    and found the comparison among the best methods in their benchmark of additive-noise models.
 
     With a significance level, only the p-values decide; a direction passes when its p-value
     exceeds ``alpha``:

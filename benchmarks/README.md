@@ -322,7 +322,8 @@ removals, then reversals; Andrey ranks all moves by score change, then by the ed
 draws, with a nonlinear additive-noise mechanism and Gaussian noise. The ladder runs over the
 number of rows, not over `d`, since a pair always has two columns. causal-learn returns the two
 p-values only, so its adapter decides the edge with Andrey's function: both solutions draw the
-direction with the larger p-value.
+direction with the larger p-value. On equal p-values, Andrey takes the direction with the smaller
+HSIC statistic relative to its mean under independence, and causal-learn draws no edge.
 
 The defaults are sizes of 200, 500, 1000, and 2000 rows, 20 seeds, one repeat without warm-up, and
 `--cap-wall-s` of 1800. A fit at 2000 rows takes about half a minute: the Gaussian-process

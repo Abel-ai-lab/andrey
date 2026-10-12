@@ -2,9 +2,9 @@
 
 Fitted models are read by attribute name.
 
-* **ANM, PNL** (``(pval_forward, pval_backward)``, plus PNL's ``(stat_forward, stat_backward)``):
-  a two-node ``dag`` with the edge :func:`_direction` picks, or none; the p-values and statistics
-  go in metadata as ``float``.
+* **ANM, PNL** (``(pval_forward, pval_backward, stat_forward, stat_backward)``): a two-node
+  ``dag`` with the edge :func:`_direction` picks, or none; the p-values and statistics go in
+  metadata as ``float``.
 * **CAM-UV** (``(P, U)``): ``P[i]`` holds the parents of ``i``; ``U`` holds pairs sharing an
   unobserved cause. A ``pag`` with the directed edges and a ``<->`` per pair; the pairs also go
   in metadata.
@@ -128,12 +128,25 @@ def _adapt_anm(
     pval_forward: Any,
     pval_backward: Any,
     *,
+    stat_forward: Any = None,
+    stat_backward: Any = None,
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
 ) -> StructureOutput:
-    """Convert ANM p-values to a two-node ``dag`` and metadata."""
+    """Convert ANM p-values, and the statistics when given, to a two-node ``dag`` and metadata.
+
+    Each statistic is an HSIC statistic divided by its mean under independence. With
+    ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
+    gives no edge.
+    """
     return _pairwise_output(
-        pval_forward, pval_backward, algorithm="ANM", alpha=alpha, labels=labels
+        pval_forward,
+        pval_backward,
+        algorithm="ANM",
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        alpha=alpha,
+        labels=labels,
     )
 
 
@@ -146,10 +159,11 @@ def _adapt_pnl(
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
 ) -> StructureOutput:
-    """Convert PNL p-values, and the HSIC statistics when given, to a two-node ``dag`` and metadata.
+    """Convert PNL p-values, and the statistics when given, to a two-node ``dag`` and metadata.
 
-    With ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a
-    tie gives no edge. A p-value or statistic may be a shape-``(1,)`` array; :func:`_coerce_float`
+    Each statistic is an HSIC statistic divided by its mean under independence. With
+    ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
+    gives no edge. A p-value or statistic may be a shape-``(1,)`` array; :func:`_coerce_float`
     converts it to a Python ``float``.
     """
     return _pairwise_output(

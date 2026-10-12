@@ -3,7 +3,8 @@
 Calls ``ANM().cause_or_effect(x, y)`` on the two columns, which returns the p-values of the two
 directions and decides nothing. The adapter decides the edge with the function that decides Andrey's,
 so both solutions apply the same rule to their p-values: with ``alpha=None``, the direction with the
-larger p-value.
+larger p-value. causal-learn reports no test statistic, so equal p-values give no edge, where Andrey
+takes the direction with the smaller HSIC statistic relative to its mean under independence.
 
 causal-learn regresses with the same Gaussian process and tests with the same HSIC as Andrey, but on
 the data as given; Andrey standardizes each column first. On standardized data the two agree.

@@ -139,8 +139,8 @@ def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
     under the ``x -> y`` post-nonlinear model; ``pval_backward`` is the same quantity under the
     ``y -> x`` model. A larger p-value means the assumed cause and the recovered disturbance are
     more independent, so it favors that direction. ``stat_forward`` and ``stat_backward`` are the
-    HSIC statistics of the same two tests; a smaller statistic means weaker dependence. ``x`` and
-    ``y`` are 1-D arrays of equal length.
+    HSIC statistics of the same two tests, each divided by its mean under independence; a smaller
+    value means weaker dependence. ``x`` and ``y`` are 1-D arrays of equal length.
     """
     cause = _gaussianize(np.asarray(x, dtype=np.float64).ravel())
     effect = _gaussianize(np.asarray(y, dtype=np.float64).ravel())

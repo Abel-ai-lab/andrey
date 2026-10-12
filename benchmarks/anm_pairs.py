@@ -5,7 +5,9 @@ Runs Andrey's ``anm`` and causal-learn's ``ANM`` on cause-effect pairs from the 
 regime: two nodes, one edge in a direction the seed draws, a nonlinear additive-noise mechanism, and
 Gaussian noise. The ladder runs over the number of rows, since a pair always has two columns. Both
 solutions decide the edge with the same rule, the direction with the larger p-value, so a pair gets
-an edge whenever the p-values differ. A timeout is a timeout: it has no scores.
+an edge whenever the p-values differ. On equal p-values, Andrey takes the direction with the smaller
+HSIC statistic relative to its mean under independence; causal-learn reports no statistic, so a tie
+gives it no edge. A timeout is a timeout: it has no scores.
 
 Each fit is scored by whether it names the true direction (:func:`direction_scores`), on top of the
 standard scores ``run_batch`` records.

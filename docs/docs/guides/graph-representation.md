@@ -78,9 +78,9 @@ in a `dag` or `digraph`.
   `W[i, j]` is the weight of `i -> j`, so rows are causes. This is the transpose of lingam's
   `adjacency_matrix_`, where `B[i, j]` is the effect of $x_j$ on $x_i$ in $x = Bx + e$.
 - `metadata` - JSON-safe, method-specific values. GES, GIES, XGES, HC, BOSS, and GRaSP report
-  `score`; CALM reports `objective`. ExactSearch does not report a score. PNL reports its two
-  directional p-values and HSIC statistics; its two-node graph holds the direction they decide, by
-  the rule its `alpha` parameter selects.
+  `score`; CALM reports `objective`. ExactSearch does not report a score. ANM and PNL report their
+  two directional p-values and HSIC statistics; each two-node graph holds the direction they
+  decide, by the rule the method's `alpha` parameter selects.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results
