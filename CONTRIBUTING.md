@@ -62,3 +62,27 @@ gitleaks, to this checkout, so they run on every commit; `prek run --all-files` 
   and may change without notice; do not import them from outside the package.
 - Code, data, and assets copied from another project keep their license notice, as
   `site/brand/fonts/OFL.txt` does for the site's fonts.
+
+## Labels, milestones, and the changelog
+
+Every pull request has exactly one type label, which also gives its section in the release notes:
+
+| Label | For | Release-notes section |
+|---|---|---|
+| `feature` | a new method, option, or speed-up | Added |
+| `bug` | a fix | Fixed |
+| `docs` | docs, the website, and the blog | Documentation |
+| `chore` | CI, tests, build, and refactors | Chores |
+| `dependencies` | dependency updates; Dependabot sets it | Dependencies |
+
+Two optional flags put a change first: `highlight` lists it under Highlights and `breaking` under
+Breaking. Every pull request also has a milestone, the release it ships in. The labels and the
+milestone are set when the pull request is opened or reviewed, and a `feature` or `bug` pull
+request adds a bullet under `## [Unreleased]` in `CHANGELOG.md` that ends with a link to it,
+`([#<number>])`, defined at the end of the file.
+
+`CHANGELOG.md` is the record of each release. Before the release pull request merges, the
+maintainer (or an agent) lists the milestone's pull requests with
+`gh pr list --search "milestone:<version>" --state all`, fixes missing type labels, milestones, and
+CHANGELOG links, and drafts the GitHub release notes from the CHANGELOG section, checked against
+the notes GitHub generates by label (`.github/release.yml`).

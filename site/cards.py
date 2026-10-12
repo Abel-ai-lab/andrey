@@ -345,21 +345,23 @@ def graph_cover_svg() -> str:
     )
 
 
-# The pair cover is a stored JPEG, drawn once from portraits kept outside the repository.
-PAIR_COVER = BRAND / "cover-pair.jpg"
+# The pair and iceberg covers are stored JPEGs, each drawn once from a source kept outside the
+# repository.
+STORED_COVERS = {"pair": BRAND / "cover-pair.jpg", "iceberg": BRAND / "cover-iceberg.jpg"}
 COVERS = {
     "pair": "portraits of Andrey Kolmogorov and Andrey Markov",
+    "iceberg": "an iceberg whose two peaks join into one mass under the waterline",
     "graph": "the letters of Andrey as a graph",
 }
 
 
 def cover_jpeg(kind: str, quality: int = COVER_QUALITY) -> bytes:
-    """A post's cover as a JPEG: ``kind`` is ``pair`` or ``graph``, the default. The pair cover is
-    stored, so ``quality`` applies to the graph cover only."""
+    """A post's cover as a JPEG: ``kind`` is ``pair``, ``iceberg``, or ``graph``, the default. The
+    pair and iceberg covers are stored, so ``quality`` applies to the graph cover only."""
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
-    if kind == "pair":
-        return PAIR_COVER.read_bytes()
+    if kind in STORED_COVERS:
+        return STORED_COVERS[kind].read_bytes()
     return _jpeg(graph_cover_svg(), quality)
 
 
@@ -367,4 +369,6 @@ def cover_alt(kind: str) -> str:
     """The cover's alt text."""
     if kind == "pair":
         return "Portraits of Andrey Kolmogorov and Andrey Markov drawn in navy lines"
+    if kind == "iceberg":
+        return "An iceberg drawn in navy lines: two peaks above the waterline, one mass below it"
     return "The letters a, n, d, r, e, y as a small directed graph, with a dashed arc from a to y"

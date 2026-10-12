@@ -740,7 +740,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         references=("Maeda & Shimizu 2020",),
     )
 )
@@ -806,7 +806,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         references=("Tashiro et al. 2014",),
     )
 )

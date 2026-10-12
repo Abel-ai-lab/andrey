@@ -14,7 +14,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 ## FCI column order
 
 FCI and GFCI depend on column order. `column_order.py` measures how much, for the column-order
-sentence on the benchmarks page. It fits both methods on 237 latent-confounded models
+sentence in the 0.1.0 benchmark report. It fits both methods on 237 latent-confounded models
 (Erdos-Renyi and scale-free graphs with one hidden confounder, 6-12 nodes, 500-5000 samples, seeds
 0-9), refits each on three seeded column orders, maps the answers back, and counts the relabelings
 that change any endpoint mark. It is a measurement with no passing threshold: permutation equality
@@ -34,21 +34,26 @@ uv run python -m qa.quality_gate
 
 The `quality-gate` workflow runs the same command. Every job that publishes to PyPI must need a job
 that calls it; `tests/unit/test_release_gates.py` fails otherwise. Pull requests do not run the
-gate. It checks PC, FCI, GES, BOSS, GRaSP, DirectLiNGAM, and ICA-LiNGAM on the datasets whose
-assumptions each method needs:
+gate. It checks PC, FCI, GES, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, RCD, and
+BottomUpParceLiNGAM on the datasets whose assumptions each method needs:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, GES, BOSS, GRaSP |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
+| `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
 | ASIA, linear-Gaussian | 10 seeds | PC, GES, BOSS, GRaSP, FCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
-| Sachs, measured | 1 | all seven |
+| Sachs, measured | 1 | PC, FCI, GES, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM |
 
 - **Regimes.** `andrey.data` generates the published benchmark regimes with the benchmarks'
   arguments, at `n = 50d`; a test keeps the two in step. At the benchmarks' `n = 10d`, ICA-LiNGAM
   scores worse than the empty graph, so the check could not tell a broken build from a correct one.
+  `latent_lingam_er` keeps its benchmark's 2,000 rows, with one node in five hidden; `d` counts
+  the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
+  graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
+  regime only.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -58,9 +63,12 @@ assumptions each method needs:
   from `cmu-phil/example-causal-datasets` (CC0-1.0) at a pinned commit once, checks its SHA-256,
   and caches it, so the first run needs network access.
 
-SHD follows the published summary: PC, GES, BOSS, and GRaSP against the truth's CPDAG, the LiNGAM
-methods against the DAG, and FCI by endpoint SHD against the PAG of the observed variables. On each
-dataset, a method passes when its median SHD over the draws is:
+SHD follows the published summaries: PC, GES, BOSS, and GRaSP against the truth's CPDAG, the
+LiNGAM methods against the DAG, and FCI by endpoint SHD against the PAG of the observed variables.
+RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent projection, the edges
+and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through hidden
+nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. On
+each dataset, a method passes when its median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.
