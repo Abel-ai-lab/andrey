@@ -40,7 +40,7 @@ hill climbing, compared with bnlearn. XGES and Tabu search are new in 0.3.0.
 
 - **40 of 40** datasets with the same graph as xges
 - **3.95-140x** XGES speedup over xges
-- **2.56-208x** Tabu search speedup over bnlearn
+- **2.56-34.4x** Tabu search speedup over bnlearn up to 200 variables
 :::
 
 :::{div} release-limit

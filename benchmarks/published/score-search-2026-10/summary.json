@@ -32,35 +32,19 @@
     }
   },
   "complete": false,
-  "pending_fits": 13,
+  "pending_fits": 0,
   "incomplete": [
     {
-      "method": "Tabu search",
+      "method": "Hill climbing",
       "d": 800,
       "mean_degree": 2.0,
-      "andrey_ok": 2,
-      "comparator_ok": 1,
+      "andrey_ok": 5,
+      "comparator_ok": 4,
       "fits": 5,
       "not_ok": {
         "comparator": {
           "timeout": 1
         }
-      },
-      "pending": {
-        "andrey": 3,
-        "comparator": 3
-      }
-    },
-    {
-      "method": "Hill climbing",
-      "d": 800,
-      "mean_degree": 2.0,
-      "andrey_ok": 2,
-      "comparator_ok": 1,
-      "fits": 5,
-      "pending": {
-        "andrey": 3,
-        "comparator": 4
       }
     }
   ],
@@ -274,8 +258,8 @@
           "comparator_ok": 5,
           "paired": 5,
           "andrey_s": 12.3,
-          "comparator_s": 1160.0,
-          "ratio": 96.1,
+          "comparator_s": 1090.0,
+          "ratio": 89.3,
           "same_graph": 5,
           "andrey_shd": 151.0,
           "comparator_shd": 151.0,
@@ -288,8 +272,7 @@
           "ges_s": 245.0,
           "ges_shd": 266.0,
           "ges_bic_gap": 670.27,
-          "comparator_warmup": 0,
-          "note": "The package fits in this row ran without an untimed warm-up fit, so each timed fit includes the package's one-time compile (about 10 s in the other rows' warm-up fits, 1% of this row's median)."
+          "comparator_warmup": 1
         }
       ],
       "reach": [
@@ -556,8 +539,8 @@
           "comparator_ok": 5,
           "paired": 5,
           "andrey_s": 0.449,
-          "comparator_s": 11.3,
-          "ratio": 23.0,
+          "comparator_s": 1.88,
+          "ratio": 3.77,
           "same_graph": 5,
           "andrey_shd": 236.0,
           "comparator_shd": 236.0,
@@ -570,8 +553,7 @@
           "ges_s": 245.0,
           "ges_shd": 266.0,
           "ges_bic_gap": 670.27,
-          "comparator_warmup": 0,
-          "note": "The package fits in this row ran without an untimed warm-up fit, so each timed fit includes the package's one-time compile (about 10 s in the other rows' warm-up fits, 88% of this row's median)."
+          "comparator_warmup": 1
         }
       ],
       "reach": [
@@ -644,7 +626,8 @@
       "same_graph_test": "the fits fall in one Markov equivalence class (same skeleton and v-structures); bnlearn returns DAGs, Andrey CPDAGs, so structure_hash cannot be compared",
       "bic_definition": "bic_vs_hc: the median over datasets of the fit's BIC minus Andrey hill climbing's on the same dataset, deviance units; below zero is a lower BIC than hill climbing",
       "bic_reference": "andrey.hc.numpy.serial",
-      "complete": false,
+      "timing_note": "Andrey's sub-second fits ran on shared cluster nodes; their per-dataset times vary up to 2.7x within a size, so speedups at those sizes are approximate.",
+      "complete": true,
       "rows": [
         {
           "mean_degree": 2.0,
@@ -658,6 +641,8 @@
           "paired": 5,
           "andrey_s": 0.0118,
           "comparator_s": 0.0305,
+          "andrey_dataset_spread": 1.27,
+          "comparator_dataset_spread": 1.08,
           "ratio": 2.58,
           "same_graph": 5,
           "andrey_shd": 10.0,
@@ -667,7 +652,8 @@
           "comparator_worse_than_empty": 2,
           "andrey_bic_vs_hc": -0.15,
           "comparator_bic_vs_hc": -0.15,
-          "complete": true
+          "complete": true,
+          "run": "original"
         },
         {
           "mean_degree": 2.0,
@@ -679,8 +665,10 @@
           "andrey_ok": 15,
           "comparator_ok": 15,
           "paired": 5,
-          "andrey_s": 0.0176,
+          "andrey_s": 0.0177,
           "comparator_s": 0.0434,
+          "andrey_dataset_spread": 1.34,
+          "comparator_dataset_spread": 1.11,
           "ratio": 2.56,
           "same_graph": 5,
           "andrey_shd": 14.0,
@@ -690,7 +678,8 @@
           "comparator_worse_than_empty": 0,
           "andrey_bic_vs_hc": -0.06,
           "comparator_bic_vs_hc": -0.06,
-          "complete": true
+          "complete": true,
+          "run": "original"
         },
         {
           "mean_degree": 2.0,
@@ -702,8 +691,10 @@
           "andrey_ok": 15,
           "comparator_ok": 15,
           "paired": 5,
-          "andrey_s": 0.0474,
+          "andrey_s": 0.0444,
           "comparator_s": 0.234,
+          "andrey_dataset_spread": 1.24,
+          "comparator_dataset_spread": 1.42,
           "ratio": 5.73,
           "same_graph": 3,
           "andrey_shd": 54.0,
@@ -713,7 +704,8 @@
           "comparator_worse_than_empty": 3,
           "andrey_bic_vs_hc": -15.44,
           "comparator_bic_vs_hc": -15.44,
-          "complete": true
+          "complete": true,
+          "run": "original"
         },
         {
           "mean_degree": 2.0,
@@ -725,8 +717,10 @@
           "andrey_ok": 15,
           "comparator_ok": 15,
           "paired": 5,
-          "andrey_s": 0.0771,
+          "andrey_s": 0.0856,
           "comparator_s": 1.35,
+          "andrey_dataset_spread": 1.38,
+          "comparator_dataset_spread": 1.15,
           "ratio": 15.9,
           "same_graph": 5,
           "andrey_shd": 117.0,
@@ -736,7 +730,8 @@
           "comparator_worse_than_empty": 3,
           "andrey_bic_vs_hc": -24.66,
           "comparator_bic_vs_hc": -24.66,
-          "complete": true
+          "complete": true,
+          "run": "original"
         },
         {
           "mean_degree": 2.0,
@@ -748,9 +743,11 @@
           "andrey_ok": 15,
           "comparator_ok": 15,
           "paired": 5,
-          "andrey_s": 0.213,
-          "comparator_s": 12.1,
-          "ratio": 49.0,
+          "andrey_s": 0.336,
+          "comparator_s": 12.2,
+          "andrey_dataset_spread": 2.7,
+          "comparator_dataset_spread": 1.19,
+          "ratio": 34.4,
           "same_graph": 4,
           "andrey_shd": 267.0,
           "comparator_shd": 267.0,
@@ -759,7 +756,8 @@
           "comparator_worse_than_empty": 5,
           "andrey_bic_vs_hc": -49.64,
           "comparator_bic_vs_hc": -49.64,
-          "complete": true
+          "complete": true,
+          "run": "rerun"
         },
         {
           "mean_degree": 2.0,
@@ -773,6 +771,8 @@
           "paired": 5,
           "andrey_s": 0.401,
           "comparator_s": 85.1,
+          "andrey_dataset_spread": 2.16,
+          "comparator_dataset_spread": 1.11,
           "ratio": 208.0,
           "same_graph": 5,
           "andrey_shd": 615.0,
@@ -782,7 +782,10 @@
           "comparator_worse_than_empty": 5,
           "andrey_bic_vs_hc": -53.9,
           "comparator_bic_vs_hc": -53.9,
-          "complete": true
+          "complete": true,
+          "run": "original",
+          "rerun_pending": true,
+          "note": "The Andrey times in this row include interference on a shared node, and a rerun of this rung is pending."
         },
         {
           "mean_degree": 2.0,
@@ -791,30 +794,80 @@
           "d": 800,
           "n": 8000,
           "fits": 5,
-          "andrey_ok": 2,
-          "comparator_ok": 1,
-          "paired": 1,
-          "andrey_s": 1.43,
+          "andrey_ok": 5,
+          "comparator_ok": 5,
+          "paired": 5,
+          "andrey_s": 1.45,
           "comparator_s": 898.0,
-          "ratio": 626.0,
-          "same_graph": 1,
-          "andrey_shd": 1435.0,
-          "comparator_shd": 1435.0,
-          "empty_shd": null,
-          "andrey_worse_than_empty": null,
-          "comparator_worse_than_empty": null,
-          "andrey_bic_vs_hc": null,
-          "comparator_bic_vs_hc": null,
-          "complete": false,
+          "andrey_dataset_spread": 1.43,
+          "comparator_dataset_spread": 1.25,
+          "ratio": 617.0,
+          "same_graph": 4,
+          "andrey_shd": 1495.0,
+          "comparator_shd": 1495.0,
+          "empty_shd": 800.0,
+          "andrey_worse_than_empty": 5,
+          "comparator_worse_than_empty": 5,
+          "andrey_bic_vs_hc": -69.01,
+          "comparator_bic_vs_hc": -69.01,
+          "complete": true,
+          "run": "original",
+          "comparator_rerun": {
+            "fits": 2,
+            "cap_s": 7200,
+            "warmup": 0,
+            "main_cap_s": 1800,
+            "main_warmup": 1
+          },
+          "rerun_pending": true,
+          "note": "2 of 5 comparator fits rerun with a 2-hour cap and no warm-up after hitting the 30-minute cap. The Andrey times in this row include interference on a shared node, and a rerun of this rung is pending."
+        }
+      ],
+      "reach": [
+        {
+          "mean_degree": 2.0,
+          "seeds": 5,
+          "repeats": 1,
+          "d": 1600,
+          "n": 16000,
+          "fits": 5,
+          "andrey_ok": 5,
+          "comparator_ok": 0,
+          "andrey_s": 7.6,
+          "ratio_lower_bound": 474.0,
+          "ratio_is_lower_bound": true,
+          "ratio_cap_s": 3600,
+          "ratio_capped_fits": 5,
+          "andrey_shd": 3754.0,
+          "empty_shd": 1600.0,
+          "andrey_worse_than_empty": 5,
+          "andrey_bic_vs_hc": -53.62,
+          "complete": true,
           "not_ok": {
             "comparator": {
-              "timeout": 1
+              "timeout": 5
             }
           },
-          "pending": {
-            "andrey": 3,
-            "comparator": 3
-          }
+          "run": "extra",
+          "comparator_cap_s": 3600,
+          "comparator_warmup": 0,
+          "note": "The bnlearn fits in this row had a 1-hour cap and no warm-up; a fit that hit the cap did not finish and has no time, graph, or score. 5 of 5 comparator fits hit the 1-hour cap; the speedup is a lower bound."
+        },
+        {
+          "mean_degree": 2.0,
+          "seeds": 5,
+          "repeats": 1,
+          "d": 3200,
+          "n": 32000,
+          "fits": 5,
+          "andrey_ok": 5,
+          "andrey_s": 63.4,
+          "andrey_shd": 9312.0,
+          "empty_shd": 3200.0,
+          "andrey_worse_than_empty": 5,
+          "andrey_bic_vs_hc": -58.31,
+          "complete": true,
+          "run": "extra"
         }
       ]
     },
@@ -833,6 +886,7 @@
       "same_graph_test": "the fits fall in one Markov equivalence class (same skeleton and v-structures); bnlearn returns DAGs, Andrey CPDAGs, so structure_hash cannot be compared",
       "bic_definition": "bic_vs_hc: the median over datasets of the fit's BIC minus Andrey hill climbing's on the same dataset, deviance units; below zero is a lower BIC than hill climbing",
       "bic_reference": "andrey.hc.numpy.serial",
+      "timing_note": "Andrey's sub-second fits ran on shared cluster nodes; their per-dataset times vary up to 2.54x within a size, so speedups at those sizes are approximate.",
       "complete": false,
       "rows": [
         {
@@ -845,8 +899,10 @@
           "andrey_ok": 15,
           "comparator_ok": 15,
           "paired": 5,
-          "andrey_s": 0.00522,
-          "comparator_s": 0.0266,
+          "andrey_s": 0.00521,
+          "comparator_s": 0.0263,
+          "andrey_dataset_spread": 1.49,
+          "comparator_dataset_spread": 1.06,
           "ratio": 5.05,
           "same_graph": 5,
           "andrey_shd": 10.0,
@@ -856,7 +912,8 @@
           "comparator_worse_than_empty": 2,
           "andrey_bic_vs_hc": 0.0,
           "comparator_bic_vs_hc": 0.0,
-          "complete": true
+          "complete": true,
+          "run": "original"
         },
         {
           "mean_degree": 2.0,
@@ -869,7 +926,9 @@
           "comparator_ok": 15,
           "paired": 5,
           "andrey_s": 0.0106,
-          "comparator_s": 0.0377,
+          "comparator_s": 0.037,
+          "andrey_dataset_spread": 1.25,
+          "comparator_dataset_spread": 1.16,
           "ratio": 3.48,
           "same_graph": 5,
           "andrey_shd": 12.0,
@@ -879,7 +938,8 @@
           "comparator_worse_than_empty": 0,
           "andrey_bic_vs_hc": 0.0,
           "comparator_bic_vs_hc": 0.0,
-          "complete": true
+          "complete": true,
+          "run": "original"
         },
         {
           "mean_degree": 2.0,
@@ -891,8 +951,10 @@
           "andrey_ok": 15,
           "comparator_ok": 15,
           "paired": 5,
-          "andrey_s": 0.0308,
+          "andrey_s": 0.0286,
           "comparator_s": 0.174,
+          "andrey_dataset_spread": 1.35,
+          "comparator_dataset_spread": 1.29,
           "ratio": 6.12,
           "same_graph": 3,
           "andrey_shd": 55.0,
@@ -902,7 +964,8 @@
           "comparator_worse_than_empty": 4,
           "andrey_bic_vs_hc": 0.0,
           "comparator_bic_vs_hc": 0.0,
-          "complete": true
+          "complete": true,
+          "run": "original"
         },
         {
           "mean_degree": 2.0,
@@ -916,6 +979,8 @@
           "paired": 5,
           "andrey_s": 0.0507,
           "comparator_s": 1.06,
+          "andrey_dataset_spread": 1.17,
+          "comparator_dataset_spread": 1.15,
           "ratio": 20.8,
           "same_graph": 5,
           "andrey_shd": 120.0,
@@ -925,7 +990,8 @@
           "comparator_worse_than_empty": 3,
           "andrey_bic_vs_hc": 0.0,
           "comparator_bic_vs_hc": 0.0,
-          "complete": true
+          "complete": true,
+          "run": "original"
         },
         {
           "mean_degree": 2.0,
@@ -937,9 +1003,11 @@
           "andrey_ok": 15,
           "comparator_ok": 15,
           "paired": 5,
-          "andrey_s": 0.397,
-          "comparator_s": 10.2,
-          "ratio": 29.0,
+          "andrey_s": 0.338,
+          "comparator_s": 10.3,
+          "andrey_dataset_spread": 2.53,
+          "comparator_dataset_spread": 1.21,
+          "ratio": 30.5,
           "same_graph": 4,
           "andrey_shd": 273.0,
           "comparator_shd": 273.0,
@@ -948,7 +1016,8 @@
           "comparator_worse_than_empty": 5,
           "andrey_bic_vs_hc": 0.0,
           "comparator_bic_vs_hc": 0.0,
-          "complete": true
+          "complete": true,
+          "run": "rerun"
         },
         {
           "mean_degree": 2.0,
@@ -962,6 +1031,8 @@
           "paired": 5,
           "andrey_s": 0.347,
           "comparator_s": 76.5,
+          "andrey_dataset_spread": 2.54,
+          "comparator_dataset_spread": 1.07,
           "ratio": 225.0,
           "same_graph": 5,
           "andrey_shd": 605.0,
@@ -971,7 +1042,10 @@
           "comparator_worse_than_empty": 5,
           "andrey_bic_vs_hc": 0.0,
           "comparator_bic_vs_hc": 0.0,
-          "complete": true
+          "complete": true,
+          "run": "original",
+          "rerun_pending": true,
+          "note": "The Andrey times in this row include interference on a shared node, and a rerun of this rung is pending."
         },
         {
           "mean_degree": 2.0,
@@ -980,25 +1054,82 @@
           "d": 800,
           "n": 8000,
           "fits": 5,
-          "andrey_ok": 2,
-          "comparator_ok": 1,
-          "paired": 1,
-          "andrey_s": 0.944,
-          "comparator_s": 894.0,
-          "ratio": 947.0,
-          "same_graph": 0,
-          "andrey_shd": 1595.0,
-          "comparator_shd": 1594.0,
+          "andrey_ok": 5,
+          "comparator_ok": 4,
+          "paired": 4,
+          "andrey_s": 0.977,
+          "comparator_s": 833.0,
+          "andrey_dataset_spread": 1.83,
+          "comparator_dataset_spread": 1.11,
+          "ratio": 866.0,
+          "ratio_lower_bound": 933.0,
+          "ratio_is_lower_bound": true,
+          "ratio_cap_s": 1800,
+          "ratio_capped_fits": 1,
+          "same_graph": 3,
+          "andrey_shd": 1483.5,
+          "comparator_shd": 1483.5,
           "empty_shd": 800.0,
-          "andrey_worse_than_empty": 1,
-          "comparator_worse_than_empty": 1,
-          "andrey_bic_vs_hc": null,
-          "comparator_bic_vs_hc": null,
+          "andrey_worse_than_empty": 4,
+          "comparator_worse_than_empty": 4,
+          "andrey_bic_vs_hc": 0.0,
+          "comparator_bic_vs_hc": 0.0,
           "complete": false,
-          "pending": {
-            "andrey": 3,
-            "comparator": 4
-          }
+          "not_ok": {
+            "comparator": {
+              "timeout": 1
+            }
+          },
+          "run": "original",
+          "rerun_pending": true,
+          "note": "1 of 5 comparator fits hit the 30-minute cap; the speedup is a lower bound. The Andrey times in this row include interference on a shared node, and a rerun of this rung is pending."
+        }
+      ],
+      "reach": [
+        {
+          "mean_degree": 2.0,
+          "seeds": 5,
+          "repeats": 1,
+          "d": 1600,
+          "n": 16000,
+          "fits": 5,
+          "andrey_ok": 5,
+          "comparator_ok": 0,
+          "andrey_s": 5.91,
+          "ratio_lower_bound": 609.0,
+          "ratio_is_lower_bound": true,
+          "ratio_cap_s": 3600,
+          "ratio_capped_fits": 5,
+          "andrey_shd": 3752.0,
+          "empty_shd": 1600.0,
+          "andrey_worse_than_empty": 5,
+          "andrey_bic_vs_hc": 0.0,
+          "complete": true,
+          "not_ok": {
+            "comparator": {
+              "timeout": 5
+            }
+          },
+          "run": "extra",
+          "comparator_cap_s": 3600,
+          "comparator_warmup": 0,
+          "note": "The bnlearn fits in this row had a 1-hour cap and no warm-up; a fit that hit the cap did not finish and has no time, graph, or score. 5 of 5 comparator fits hit the 1-hour cap; the speedup is a lower bound."
+        },
+        {
+          "mean_degree": 2.0,
+          "seeds": 5,
+          "repeats": 1,
+          "d": 3200,
+          "n": 32000,
+          "fits": 5,
+          "andrey_ok": 5,
+          "andrey_s": 26.0,
+          "andrey_shd": 9306.0,
+          "empty_shd": 3200.0,
+          "andrey_worse_than_empty": 5,
+          "andrey_bic_vs_hc": 0.0,
+          "complete": true,
+          "run": "extra"
         }
       ]
     }
