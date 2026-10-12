@@ -132,7 +132,8 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     """Test the direction of a variable pair with the post-nonlinear (PNL) model.
 
     PNL [1]_ [2]_ fits ``y = f2(f1(x) + e)`` in each direction. An HSIC test checks whether the
-    estimated noise ``e`` is independent of the proposed cause. The two p-values determine the edge.
+    estimated noise ``e`` is independent of the proposed cause. The two p-values determine the edge,
+    and the two test statistics decide a tie.
 
     Parameters
     ----------
@@ -140,15 +141,17 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
         The two variables, one per column: column 0 is ``x`` and column 1 is ``y``. Coerced to
         ``float64``. A DataFrame's column names become the structure's ``labels``.
     alpha : float or None, default=None
-        ``None`` chooses the direction with the larger p-value. A significance level such as
-        ``0.05`` draws an edge only when exactly one p-value exceeds it. See Notes.
+        ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
+        when the p-values are equal. A significance level such as ``0.05`` draws an edge only when
+        exactly one p-value exceeds it. See Notes.
 
     Returns
     -------
     StructureOutput
         Contains a two-node :class:`~andrey.core.GraphStructure` of kind ``dag`` with the chosen
         edge, or no edge. ``metadata["algorithm"]`` is ``"PNL"``; ``pval_forward`` is the
-        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``.
+        independence p-value for ``x -> y`` and ``pval_backward`` is the p-value for ``y -> x``;
+        ``stat_forward`` and ``stat_backward`` are the HSIC statistics of the same two tests.
 
     Raises
     ------
@@ -163,13 +166,17 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
 
     Notes
     -----
-    With ``alpha=None``, the edge points in the direction with the larger p-value; equal values
-    give no edge. Unequal p-values therefore produce an edge even for unrelated variables or a
-    pair whose direction cannot be identified, such as a linear Gaussian pair. Mooij et al. (2016)
-    [4]_ use this rule to avoid choosing a significance level and found it among the best methods
-    in their benchmark of additive-noise models.
+    With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
+    sample both p-values can be zero; equal p-values leave the choice to the HSIC statistics, and
+    the edge points in the direction with the smaller statistic, the weaker dependence between the
+    proposed cause and its estimated noise. Equal statistics give no edge. The rule therefore
+    produces an edge even for unrelated variables or a pair whose direction cannot be identified,
+    such as a linear Gaussian pair. Mooij et al. (2016) [4]_ compare p-values to avoid choosing a
+    significance level and found the comparison among the best methods in their benchmark of
+    additive-noise models.
 
-    With a significance level, a direction passes when its p-value exceeds ``alpha``:
+    With a significance level, only the p-values decide; a direction passes when its p-value
+    exceeds ``alpha``:
 
     - only ``x -> y`` passes: the edge ``x -> y``;
     - only ``y -> x`` passes: the edge ``y -> x``;
@@ -179,7 +186,8 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     Zhang and Hyvarinen (2010) [2]_ use a level of 0.01 for PNL; Hoyer et al. (2008) [3]_ use 0.02
     for additive-noise models. The result depends on ``alpha``. Estimated noise can appear dependent
     on the true cause, so a standard level can reject the true direction; no theory establishes
-    the right level (Mooij et al., 2016). Both p-values remain in ``metadata``.
+    the right level (Mooij et al., 2016). Both p-values and both statistics remain in
+    ``metadata``.
 
     PNL fits each transform as a sum of smooth basis functions, so the fit is deterministic but can
     miss a sharply varying nonlinearity.
@@ -220,8 +228,15 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     if alpha is not None:
         alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pval_forward, pval_backward = _native(X[:, 0], X[:, 1])
-    return _adapt_pnl(pval_forward, pval_backward, alpha=alpha, labels=labels)
+    pval_forward, pval_backward, stat_forward, stat_backward = _native(X[:, 0], X[:, 1])
+    return _adapt_pnl(
+        pval_forward,
+        pval_backward,
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        alpha=alpha,
+        labels=labels,
+    )
 
 
 def rcd(

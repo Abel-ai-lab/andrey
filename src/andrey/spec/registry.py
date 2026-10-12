@@ -629,8 +629,8 @@ _add(
                 type="float",
                 default=None,
                 doc="How the two p-values decide the edge. null: the direction with the larger "
-                "p-value. A level such as 0.05: an edge only when exactly one direction's p-value "
-                "is above it.",
+                "p-value, or with the smaller HSIC statistic when the p-values are equal. A level "
+                "such as 0.05: an edge only when exactly one direction's p-value is above it.",
                 nullable=True,
             ),
         ),
@@ -638,7 +638,7 @@ _add(
             structure_type="graph",
             graph_kind="dag",
             doc="two-node graph with the decided edge, or none; metadata pval_forward (x->y) "
-            "and pval_backward (y->x).",
+            "and pval_backward (y->x), and the HSIC statistics stat_forward and stat_backward.",
         ),
         determinism="deterministic",
         accel="numpy",

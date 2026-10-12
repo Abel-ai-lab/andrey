@@ -54,7 +54,7 @@ def _pnl_pair(rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
 
 def test_pnl_resolves_the_planted_direction():
     x = datagen.generate("anm_pair_cubic")
-    pval_forward, pval_backward = pnl(x[:, 0], x[:, 1])
+    pval_forward, pval_backward, *_ = pnl(x[:, 0], x[:, 1])
     assert pval_forward > pval_backward  # anm_pair_cubic plants x -> y
     assert np.allclose((pval_forward, pval_backward), _PNL_CUBIC_PVALUES, atol=1e-6)
 
@@ -64,7 +64,7 @@ def test_pnl_is_deterministic_over_varied_pairs():
     for _ in range(6):
         x, y = _pnl_pair(rng)
         first = pnl(x, y)
-        assert all(0.0 <= p <= 1.0 for p in first)
+        assert all(0.0 <= p <= 1.0 for p in first[:2])
         assert pnl(x, y) == first, "PNL is not deterministic"
 
 
@@ -74,8 +74,35 @@ def test_pnl_output_contract():
     x = datagen.generate("anm_pair_cubic")
     out = pnl_facade(x)
     assert out.structure.type == "graph"
-    assert set(out.metadata) == {"algorithm", "pval_forward", "pval_backward"}
-    assert (out.metadata["pval_forward"], out.metadata["pval_backward"]) == pnl(x[:, 0], x[:, 1])
+    keys = ("pval_forward", "pval_backward", "stat_forward", "stat_backward")
+    assert set(out.metadata) == {"algorithm", *keys}
+    assert tuple(out.metadata[key] for key in keys) == pnl(x[:, 0], x[:, 1])
+
+
+def test_pnl_breaks_a_zero_pvalue_tie_by_the_statistic():
+    # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits
+    # and both p-values round to zero; the smaller HSIC statistic decides.
+    from andrey.api.irregular import pnl as pnl_facade
+
+    angle = np.pi * np.random.default_rng(0).uniform(-1, 1, 200)
+    out = pnl_facade(np.column_stack([np.cos(angle), np.sin(angle)]))
+    md = out.metadata
+    assert md["pval_forward"] == md["pval_backward"] == 0.0
+    assert md["stat_forward"] != md["stat_backward"]
+    edge = (0, 1) if md["stat_forward"] < md["stat_backward"] else (1, 0)
+    assert out.structure.oriented_edges() == [(*edge, "directed")]
+
+
+def test_pnl_draws_no_edge_when_the_statistics_tie_too():
+    # Two equal columns fit the same model to the same data in both directions.
+    from andrey.api.irregular import pnl as pnl_facade
+
+    x = datagen.generate("anm_pair_cubic")[:, 0]
+    out = pnl_facade(np.column_stack([x, x]))
+    md = out.metadata
+    assert md["pval_forward"] == md["pval_backward"]
+    assert md["stat_forward"] == md["stat_backward"]
+    assert out.structure.oriented_edges() == []
 
 
 def _pairs() -> dict[str, np.ndarray]:

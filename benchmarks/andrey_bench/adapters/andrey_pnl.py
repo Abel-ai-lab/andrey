@@ -2,7 +2,8 @@
 
 Wraps ``andrey.pnl``, which decides the direction of a two-column table and returns a two-node DAG:
 ``0 -> 1``, ``1 -> 0``, or no edge. ``alpha=None`` draws the direction with the larger p-value, the
-rule the causal-learn adapter applies to causal-learn's p-values.
+rule the causal-learn adapter applies to causal-learn's p-values; equal p-values take the direction
+with the smaller HSIC statistic.
 """
 
 from __future__ import annotations

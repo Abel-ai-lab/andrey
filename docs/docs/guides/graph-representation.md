@@ -79,8 +79,8 @@ in a `dag` or `digraph`.
   `adjacency_matrix_`, where `B[i, j]` is the effect of $x_j$ on $x_i$ in $x = Bx + e$.
 - `metadata` - JSON-safe, method-specific values. GES, GIES, HC, BOSS, and GRaSP report `score`;
   CALM reports `objective`. ExactSearch does not report a score. PNL reports its two directional
-  p-values; its two-node graph holds the direction they decide, by the rule its `alpha` parameter
-  selects.
+  p-values and HSIC statistics; its two-node graph holds the direction they decide, by the rule its
+  `alpha` parameter selects.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results

@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.stats import norm, rankdata
 
-from andrey.core.independence import hsic_test
+from andrey.core.independence import hsic_statistic_test
 
 _N_FEATURES = 10
 _RIDGE = 1e-8
@@ -132,21 +132,23 @@ def _fit_disturbance(cause: np.ndarray, effect: np.ndarray) -> np.ndarray:
     return residual_basis @ weights
 
 
-def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
-    """Return ``(pval_forward, pval_backward)`` for the PNL direction test on the pair ``x, y``.
+def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
+    """Return ``(pval_forward, pval_backward, stat_forward, stat_backward)`` for the pair ``x, y``.
 
     ``pval_forward`` is the HSIC independence p-value between ``x`` and the disturbance recovered
     under the ``x -> y`` post-nonlinear model; ``pval_backward`` is the same quantity under the
     ``y -> x`` model. A larger p-value means the assumed cause and the recovered disturbance are
-    more independent, so it favors that direction. ``x`` and ``y`` are 1-D arrays of equal length.
+    more independent, so it favors that direction. ``stat_forward`` and ``stat_backward`` are the
+    HSIC statistics of the same two tests; a smaller statistic means weaker dependence. ``x`` and
+    ``y`` are 1-D arrays of equal length.
     """
     cause = _gaussianize(np.asarray(x, dtype=np.float64).ravel())
     effect = _gaussianize(np.asarray(y, dtype=np.float64).ravel())
 
     disturbance_forward = _fit_disturbance(cause, effect)
-    pval_forward = hsic_test(cause, disturbance_forward)
+    stat_forward, pval_forward = hsic_statistic_test(cause, disturbance_forward)
 
     disturbance_backward = _fit_disturbance(effect, cause)
-    pval_backward = hsic_test(effect, disturbance_backward)
+    stat_backward, pval_backward = hsic_statistic_test(effect, disturbance_backward)
 
-    return pval_forward, pval_backward
+    return pval_forward, pval_backward, stat_forward, stat_backward

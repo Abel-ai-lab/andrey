@@ -6,6 +6,8 @@ independent.
 
 - :func:`hsic_test`, used by ANM, z-scores each variable (``ddof=1``; a constant column becomes
   zero) and sets the bandwidth by the empirical rule, or by the median heuristic on request.
+  :func:`hsic_statistic_test`, used by PNL, runs the same test and returns the statistic with the
+  p-value.
 - :func:`hsic_gamma_test`, used by RCD and ParceLiNGAM, sets the bandwidth by the median distance
   over the first rows without z-scoring, corrects the variance for bias, and returns the statistic
   with the p-value.
@@ -139,6 +141,23 @@ def hsic_test(
 ) -> float:
     """Return the gamma-approximation p-value of the HSIC independence test between ``x`` and ``y``.
 
+    The p-value of :func:`hsic_statistic_test`, which describes the test and its settings.
+    """
+    return hsic_statistic_test(
+        x, y, est_width=est_width, kernel_width_x=kernel_width_x, kernel_width_y=kernel_width_y
+    )[1]
+
+
+def hsic_statistic_test(
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    est_width: str = "empirical",
+    kernel_width_x: float | None = None,
+    kernel_width_y: float | None = None,
+) -> tuple[float, float]:
+    """Return ``(statistic, p_value)`` of the HSIC independence test between ``x`` and ``y``.
+
     Each variable is z-scored (``ddof=1``), mapped through a Gaussian kernel whose bandwidth follows
     the empirical rule (``est_width='empirical'``, the ANM default) or the median heuristic, and
     centered. The HSIC V-statistic ``T = sum(Kxc * Kyc)`` is compared against a gamma distribution
@@ -149,7 +168,8 @@ def hsic_test(
 
     and the p-value is the gamma upper tail ``1 - P(shape, T / scale)`` with ``P`` the regularized
     lower incomplete gamma function (equivalently ``scipy.stats.gamma.sf(T, shape, scale=scale)``).
-    A larger p-value means more independent. Accepts 1-D vectors or ``(n, d)`` matrices.
+    A larger p-value means more independent; a larger statistic means more dependent. Accepts 1-D
+    vectors or ``(n, d)`` matrices.
     """
     n = _as_columns(x).shape[0]
     kxc = _centered_kernel(_as_columns(x), est_width, kernel_width_x)
@@ -160,7 +180,7 @@ def hsic_test(
     var_appr = 2 * np.sum(kxc**2) * np.sum(kyc**2) / n / n
     shape = mean_appr**2 / var_appr
     scale = var_appr / mean_appr
-    return float(1.0 - gammainc(shape, statistic / scale))
+    return float(statistic), float(1.0 - gammainc(shape, statistic / scale))
 
 
 # ---- LiNGAM-family HSIC (median-distance bandwidth, biased V-statistic) --------------------------
