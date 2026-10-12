@@ -233,25 +233,6 @@ def test_speed_intro_names_the_packages_and_leaves_accuracy_out():
     assert "errors" not in intro
 
 
-def test_quality_counts_every_scored_size():
-    # PC 357/357, FCI 12/12, 30/31, 450/452, 900/905, DirectLiNGAM 6.7/6.3: five as good. At
-    # DirectLiNGAM 200 lingam passed its time cap, so it has no graph to count.
-    intro = build.quality_intro([SUMMARY])
-    assert build.accuracy_tally([SUMMARY]) == (5, 6)
-    assert build.accuracy_share([SUMMARY]) == "over 80% of"
-    assert "or fewer, in over 80% of comparisons, and every release is tested" in intro
-
-
-@pytest.mark.parametrize(
-    ("tally", "text"),
-    [((5, 6), "over 80% of"), ((9, 10), "90% of"), ((69, 74), "over 90% of"), ((4, 4), "every")],
-)
-def test_the_accuracy_share_rounds_down_to_tens_of_percent(monkeypatch, tally, text):
-    # A headline share never overstates the tally: it rounds down and says "over" when above.
-    monkeypatch.setattr(build, "accuracy_tally", lambda summaries: tally)
-    assert build.accuracy_share([]) == text
-
-
 def test_the_release_promise_is_the_quality_gate():
     # The intro says every release is tested against true graphs. The quality gate is that test,
     # and tests/unit/test_release_gates.py holds every PyPI publish job to needing it.

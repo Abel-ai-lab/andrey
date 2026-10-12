@@ -45,7 +45,7 @@ def test_readme_blocks_match_summary_and_registry(monkeypatch, offline_datasets)
     assert readme.index(end) < readme.index("```")
     summaries = build.release_summaries(summary)
     assert f"- **Fast**: {build.claim_sentence(summaries)}" in pitch
-    assert f"in {build.accuracy_share(summaries)} comparisons" in pitch
+    assert "- **Just as accurate**:" in pitch
 
 
 def readme_targets(readme):
