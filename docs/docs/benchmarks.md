@@ -20,7 +20,7 @@ rerun the measurements. A card keeps the numbers its release published.
 :link: benchmarks/0.3.0
 :link-type: doc
 :link-alt: The 0.3.0 release card: score-based search
-:class-card: release-cover release-art
+:class-card: release-cover release-art release-art-0-3-0
 :shadow: none
 :margin: 0
 
