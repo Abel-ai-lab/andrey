@@ -358,6 +358,13 @@ def tabu(
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
     moves break as they do for :func:`andrey.hc`.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 200 variables with 2,000
+    rows. It takes hill climbing's moves plus up to ``max_tabu`` non-improving moves after each
+    local optimum, and by default no move limit, so its run time grows with the moves it takes. It
+    leaves a local optimum for at most ``max_tabu`` moves and avoids only the last ``tabu_length``
+    DAGs, so a better DAG farther away is not reached. Its BIC score assumes linear relations with
+    Gaussian noise.
+
     References
     ----------
     .. [1] Glover, F. (1986). Future paths for integer programming and links to artificial
