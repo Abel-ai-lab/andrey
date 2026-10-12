@@ -26,7 +26,7 @@ assumption. A hidden common cause can make two variables dependent even without 
 them. A method that assumes causal sufficiency can then draw an edge that is not there. Methods
 that allow hidden common causes can mark the pair or leave the edge's ends unresolved.
 
-## Six methods
+## Methods
 
 We benchmark each supported method against another package and check its results on known graphs
 before each release. Experimental methods pass recovery tests but have no published
@@ -58,7 +58,7 @@ the same marks for their findings: `->` for a direct cause and `<->` for a pair 
 variable. BottomUpParceLiNGAM also uses `o-o` between variables it cannot order.
 See [Graph types](../docs/guides/graph-types.md#pag-uncertainty-with-hidden-variables) for details.
 
-## One dataset, five methods
+## Example
 
 Here `h` causes `x0` and `x1` but is not in the data. Also, `x0` causes `x3`, and `x1` causes
 `x2`. The noise is uniform, so it is not Gaussian. GFCI and CAM-UV issue the experimental warning
