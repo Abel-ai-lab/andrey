@@ -65,6 +65,17 @@ BOSS and GRaSP search over orderings of the variables for the best-scoring graph
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Score-based search
+:link: score_search
+:link-type: doc
+:img-top: /_generated/thumbs/score_search.svg
+:img-alt: The true graph of this notebook's data
+
+XGES, hill climbing, and Tabu search look for the graph with the best BIC score.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Linear non-Gaussian models
 :link: lingam
 :link-type: doc
@@ -118,6 +129,7 @@ speed_on_your_machine
 ges_quickstart
 constraint_based
 permutation_based
+score_search
 lingam
 rcd
 bottom_up_parce_lingam

@@ -6,6 +6,9 @@
       "PC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline independence decision to differ on another host."},
       "FCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline independence decision to differ on another host."},
       "GES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
+      "XGES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
+      "HC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
+      "Tabu": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "BOSS": {"median_shd": 1, "reason": "No graph changed on the linear_gauss_er cells when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "GRaSP": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
       "DirectLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline ordering decision to differ on another host."},
@@ -31,6 +34,24 @@
         "linear_gauss_er_d50": {"median_shd": 15.5, "empty_median_shd": 50.0, "shd": [11, 20, 8, 14, 24, 10, 17, 10, 22, 26]},
         "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [9, 0, 0, 0, 0, 0, 1, 0, 0, 0]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
+      "XGES": {
+        "linear_gauss_er_d20": {"median_shd": 5.5, "empty_median_shd": 20.0, "shd": [5, 7, 8, 6, 0, 8, 2, 2, 26, 2]},
+        "linear_gauss_er_d50": {"median_shd": 11.5, "empty_median_shd": 50.0, "shd": [11, 11, 9, 14, 10, 12, 17, 10, 13, 26]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 0, 0, 0, 1, 0, 1, 0, 0, 0]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
+      "HC": {
+        "linear_gauss_er_d20": {"median_shd": 9.0, "empty_median_shd": 20.0, "shd": [7, 7, 13, 4, 8, 24, 3, 15, 20, 10]},
+        "linear_gauss_er_d50": {"median_shd": 36.0, "empty_median_shd": 50.0, "shd": [36, 69, 57, 49, 36, 43, 27, 27, 34, 36]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 6, 0, 0, 1, 0, 1, 0, 0, 4]},
+        "sachs": {"median_shd": 10.0, "empty_median_shd": 17.0, "shd": [10]}
+      },
+      "Tabu": {
+        "linear_gauss_er_d20": {"median_shd": 7.5, "empty_median_shd": 20.0, "shd": [5, 7, 13, 6, 8, 14, 2, 14, 20, 5]},
+        "linear_gauss_er_d50": {"median_shd": 27.5, "empty_median_shd": 50.0, "shd": [29, 70, 43, 40, 20, 17, 27, 17, 26, 28]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 0, 0, 0, 1, 0, 1, 0, 0, 0]},
+        "sachs": {"median_shd": 10.0, "empty_median_shd": 17.0, "shd": [10]}
       },
       "BOSS": {
         "linear_gauss_er_d20": {"median_shd": 4.0, "empty_median_shd": 20.0, "shd": [5, 7, 2, 6, 0, 7, 0, 15, 3, 2]},

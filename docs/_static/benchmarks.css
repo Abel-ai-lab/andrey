@@ -118,9 +118,14 @@ html[data-theme="dark"] .release-cover {
 }
 
 /* The release's own art, `release-cards/<release>.jpg`, in place of the ground. It carries its own
-   glow and grain, so the grain layers are off; navy shows until it loads. */
+   glow and grain, so the grain layers are off; navy shows until it loads. The bare class keeps
+   0.2.0's art, which its released card uses; each later card adds `release-art-<release>`. */
 .bd-content .sd-card.release-cover.release-art {
   background: url("release-cards/0.2.0.jpg") center / cover no-repeat, var(--andrey-ground-navy);
+}
+
+.bd-content .sd-card.release-cover.release-art.release-art-0-3-0 {
+  background: url("release-cards/0.3.0.jpg") center / cover no-repeat, var(--andrey-ground-navy);
 }
 
 .release-cover.release-art::before,

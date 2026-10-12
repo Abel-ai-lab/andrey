@@ -9,6 +9,7 @@ folder under `published/` with the summary its numbers come from:
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.3.0 | [Score-based search](../docs/docs/benchmarks/0.3.0.md) | [`published/score-search-2026-10/summary.json`](published/score-search-2026-10/summary.json) |
 | 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
 | 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |
 
@@ -16,7 +17,8 @@ A summary holds one row per comparison and size. It is generated from the record
 records and the script that writes it are kept outside this repository. A released report and its
 folder do not change: new measurements go into the next release's report and folder. To rerun a
 comparison, use its driver with the builds, versions, and settings its report lists under
-Reproduce ([0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
+Reproduce ([0.3.0](../docs/docs/benchmarks/0.3.0.md#reproduce),
+[0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
 [0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
 
 ## Comparison packages
@@ -296,6 +298,14 @@ and `--cap-wall-s` of 1800. Load R as [The R lane](#the-r-lane) describes, then:
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-smoke --smoke
 $ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-cpu --cap-mem-mb 32000
+```
+
+To run only some of the solutions, name them, comma-separated. A run without bnlearn's solutions
+does not need R:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-andrey --ladder 1600 3200 \
+    --repeats 1 --solutions andrey.tabu.numpy.serial,andrey.hc.numpy.serial,baseline.empty
 ```
 
 Each fit also gets `bic`, the BIC of the graph it returned on its dataset, in Andrey's deviance
