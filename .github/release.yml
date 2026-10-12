@@ -1,0 +1,19 @@
+# Sections of a GitHub release's generated notes, by pull request label. A pull request appears in
+# the first section whose label it has. The CHANGELOG section is the record; the generated notes
+# are checked against it.
+changelog:
+  categories:
+    - title: Highlights
+      labels: [highlight]
+    - title: Breaking
+      labels: [breaking]
+    - title: Added
+      labels: [enhancement]
+    - title: Fixed
+      labels: [bug]
+    - title: Documentation
+      labels: [documentation]
+    - title: Dependencies
+      labels: [dependencies]
+    - title: Other changes
+      labels: ["*"]
