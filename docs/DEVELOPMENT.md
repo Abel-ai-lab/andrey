@@ -89,7 +89,7 @@ next release's card.
 
 [`docs/benchmarks.md`](docs/benchmarks.md) is the Release cards page, at the address the README and
 the homepage link. The latest release leads as a cover (masthead, title, version) beside its TL;DR:
-the measurement date, the abstract, three numbers, a limit, and a button to the card.
+the abstract, three numbers, a limit, and a button to the card.
 Earlier releases follow as a list, newest first, each with a square tile showing its version. To
 add a release:
 

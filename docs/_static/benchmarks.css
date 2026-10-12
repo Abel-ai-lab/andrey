@@ -233,12 +233,6 @@ html[data-theme="dark"] .release-tile {
   line-height: 1.55;
 }
 
-/* Latest and the measurement date, as one line of text. */
-.release-tldr > p.release-status {
-  color: var(--andrey-muted);
-  font-size: 0.82rem;
-}
-
 /* The three numbers, each over what it counts. */
 .release-stats ul {
   display: grid;
