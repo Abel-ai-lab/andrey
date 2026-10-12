@@ -9,7 +9,6 @@ import andrey
 from andrey.core import backend
 from andrey.core.score import BICScore
 from andrey.search import _parallel_ges as pg
-from andrey.search import _parallel_hc as ph
 from andrey.search.boss import boss
 from andrey.search.ges import ges
 from andrey.search.gfci import gfci
@@ -102,54 +101,37 @@ def test_the_guard_is_reached_from_every_entry_point(name, run):
 
 _PARALLEL_GRID = (0.5, 1.0, 16.0)
 _GES_PARALLEL_SEM = _gaussian_sem(0, 600, 12, 0.3)
-_HC_PARALLEL_SEM = _gaussian_sem(0, 600, 16, 0.2)
+_GES_WORKERS = 3
 
 
-def _spy_pool(monkeypatch, module) -> list[int]:
+def _spy_pool(monkeypatch) -> list[int]:
     created: list[int] = []
-    real = module._create_pool
+    real = pg._create_pool
 
     def counting(*args, **kwargs):
         created.append(1)
         return real(*args, **kwargs)
 
-    monkeypatch.setattr(module, "_create_pool", counting)
+    monkeypatch.setattr(pg, "_create_pool", counting)
     return created
 
 
-@pytest.mark.parametrize(
-    "run,module,env,data,workers",
-    [
-        (ges, pg, "ANDREY_GES_PARALLEL_MIN_WORK", _GES_PARALLEL_SEM, 3),
-        (hc, ph, "ANDREY_HC_PARALLEL_MIN_WORK", _HC_PARALLEL_SEM, 4),
-    ],
-    ids=["ges", "hc"],
-)
 @pytest.mark.parametrize("lam", _PARALLEL_GRID)
-def test_parallel_matches_serial_at_every_penalty(
-    monkeypatch, run, module, env, data, workers, lam
-):
-    monkeypatch.setenv(env, "0")
-    created = _spy_pool(monkeypatch, module)
-    serial_structure, serial_score = run(data, lambda_value=lam)
-    with backend.config(num_workers=workers):
-        parallel_structure, parallel_score = run(data, lambda_value=lam)
+def test_parallel_matches_serial_at_every_penalty(monkeypatch, lam):
+    monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
+    created = _spy_pool(monkeypatch)
+    serial_structure, serial_score = ges(_GES_PARALLEL_SEM, lambda_value=lam)
+    with backend.config(num_workers=_GES_WORKERS):
+        parallel_structure, parallel_score = ges(_GES_PARALLEL_SEM, lambda_value=lam)
     assert sum(created) == 1, "the pool never opened -- the comparison would be serial vs serial"
     assert np.array_equal(serial_structure.to_numpy(), parallel_structure.to_numpy())
     assert serial_score == parallel_score
 
 
-@pytest.mark.parametrize(
-    "name,run,module,env,data,workers",
-    [
-        ("ges", ges, pg, "ANDREY_GES_PARALLEL_MIN_WORK", _GES_PARALLEL_SEM, 3),
-        ("hc", hc, ph, "ANDREY_HC_PARALLEL_MIN_WORK", _HC_PARALLEL_SEM, 4),
-    ],
-)
-def test_parallel_arm_tracks_the_penalty(monkeypatch, name, run, module, env, data, workers):
-    monkeypatch.setenv(env, "0")
-    created = _spy_pool(monkeypatch, module)
-    with backend.config(num_workers=workers):
-        marks = {lam: _marks(run(data, lambda_value=lam)[0]) for lam in _PARALLEL_GRID}
+def test_parallel_arm_tracks_the_penalty(monkeypatch):
+    monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
+    created = _spy_pool(monkeypatch)
+    with backend.config(num_workers=_GES_WORKERS):
+        marks = {lam: _marks(ges(_GES_PARALLEL_SEM, lambda_value=lam)[0]) for lam in _PARALLEL_GRID}
     assert sum(created) == len(_PARALLEL_GRID), "a run stayed in-process instead of fanning out"
-    assert len(set(marks.values())) == len(_PARALLEL_GRID), f"{name}: pooled answers {marks}"
+    assert len(set(marks.values())) == len(_PARALLEL_GRID), f"ges: pooled answers {marks}"

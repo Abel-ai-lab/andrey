@@ -101,7 +101,6 @@ BACKEND = Setting("ANDREY_BACKEND", parse_backend)
 DEVICE = Setting("ANDREY_DEVICE", parse_backend)
 NUM_WORKERS = Setting("ANDREY_NUM_WORKERS", parse_num_workers)
 GES_PARALLEL_MIN_WORK = Setting("ANDREY_GES_PARALLEL_MIN_WORK", parse_int)
-HC_PARALLEL_MIN_WORK = Setting("ANDREY_HC_PARALLEL_MIN_WORK", parse_int)
 COV_GPU_THRESHOLD = Setting("ANDREY_COV_GPU_THRESHOLD", parse_int)
 ENTROPY_GPU_THRESHOLD = Setting("ANDREY_ENTROPY_GPU_THRESHOLD", parse_int)
 GPU_CALIBRATE = Setting("ANDREY_GPU_CALIBRATE", parse_flag)
@@ -116,7 +115,6 @@ SETTINGS: dict[str, Setting] = {
         DEVICE,
         NUM_WORKERS,
         GES_PARALLEL_MIN_WORK,
-        HC_PARALLEL_MIN_WORK,
         COV_GPU_THRESHOLD,
         ENTROPY_GPU_THRESHOLD,
         GPU_CALIBRATE,
