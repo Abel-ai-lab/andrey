@@ -273,6 +273,11 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     The penalty is the plain lasso of Arnold et al. [2]_. Shojaie and Michailidis [3]_ propose a
     truncating lasso penalty that also selects the lag order; it is not implemented here.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 4 variables with 500 time
+    steps, and on 1,000 time steps with 3 variables. It assumes linear effects. Each variable's
+    regression takes ``maxlag`` lags of every variable as inputs, so the work grows with ``maxlag``
+    and with the square of the number of variables.
+
     References
     ----------
     .. [1] Granger, C. W. J. (1969). Investigating causal relations by econometric models and
