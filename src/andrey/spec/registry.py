@@ -565,6 +565,55 @@ _add(
         references=("Kadowaki, Shimizu & Washio 2013",),
     )
 )
+_add(
+    MethodSpec(
+        name="pcmci",
+        family="temporal",
+        summary="PCMCI for a single multivariate time series: lagged causal links, tested with "
+        "partial correlation given the parents of both ends, which controls false links from "
+        "autocorrelation. No same-step links. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="lag graphs for lags 1..tau_max; MCI p_values and statistics, and the PC1 parents, "
+            "in metadata.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        params=(
+            ParamSpec(
+                name="tau_max",
+                type="int",
+                default=1,
+                doc="The largest lag tested; links at lags 1 to tau_max are tested.",
+            ),
+            ParamSpec(
+                name="pc_alpha",
+                type="float",
+                default=0.2,
+                doc="Significance level of the PC1 parent selection; larger keeps more parents as "
+                "conditions.",
+            ),
+            ParamSpec(
+                name="alpha_level",
+                type="float",
+                default=0.05,
+                doc="Significance level of the MCI test; a link is kept when its p-value is at "
+                "most this.",
+            ),
+        ),
+        references=("Runge et al. 2019",),
+    )
+)
 
 # --- pairwise family ------------------------------------------------------------------------------
 

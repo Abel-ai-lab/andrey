@@ -25,6 +25,7 @@ from .api import (
     longitudinal_lingam,
     multi_group_direct_lingam,
     pc,
+    pcmci,
     pnl,
     rcd,
     varma_lingam,
@@ -81,6 +82,7 @@ __all__ = [
     # Temporal family - one StructureOutput over a per-lag stack.
     "varma_lingam",
     "longitudinal_lingam",
+    "pcmci",
     # Pairwise direction test.
     "pnl",
     # Hidden common causes: a PAG over the observed variables.

@@ -55,6 +55,7 @@ SINGLE = {
     "direct_lingam": andrey.direct_lingam,
     "ica_lingam": andrey.ica_lingam,
     "varma_lingam": andrey.varma_lingam,
+    "pcmci": andrey.pcmci,
     "gin": andrey.gin,
     "rcd": andrey.rcd,
     "camuv": andrey.camuv,
@@ -92,7 +93,9 @@ def test_a_dataframe_error_names_the_constant_column():
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-@pytest.mark.parametrize("method", [m for m in SINGLE if m not in ("calm", "varma_lingam")])
+@pytest.mark.parametrize(
+    "method", [m for m in SINGLE if m not in ("calm", "varma_lingam", "pcmci")]
+)
 def test_one_column_gives_a_one_node_graph(method):
     structure = SINGLE[method](_data(d=1)).structure
     assert structure.n_nodes == 1
@@ -149,6 +152,38 @@ def test_longitudinal_lingam_takes_n_lags_up_to_the_time_points_minus_one(n_lags
 def test_varma_lingam_checks_order(order, error):
     with pytest.raises(error, match="order"):
         andrey.varma_lingam(_data(), order=order)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("params", "error", "name"),
+    [
+        ({"tau_max": 0}, ValueError, "tau_max"),
+        ({"tau_max": 1.5}, TypeError, "tau_max"),
+        ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
+        ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
+        ({"alpha_level": 0.0}, ValueError, "alpha_level"),
+        ({"alpha_level": 1.5}, ValueError, "alpha_level"),
+    ],
+)
+def test_pcmci_checks_its_parameters(params, error, name):
+    with pytest.raises(error, match=name):
+        andrey.pcmci(_data(), **params)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_pcmci_needs_enough_time_steps_for_every_test():
+    # 2 * tau_max * (n_variables + 1) + 3 = 27 rows for tau_max=3 over 3 variables.
+    with pytest.raises(ValueError, match="data needs at least 27 rows"):
+        andrey.pcmci(_data(n=26), tau_max=3, pc_alpha=0.99)
+    assert andrey.pcmci(_data(n=27), tau_max=3, pc_alpha=0.99).structure.lags == (1, 2, 3)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_pcmci_takes_one_variable():
+    out = andrey.pcmci(_data(d=1))
+    assert out.structure.n_nodes == 1
+    assert out.metadata["parents"] == [[]]
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

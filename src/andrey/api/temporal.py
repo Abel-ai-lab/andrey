@@ -1,8 +1,9 @@
-"""Temporal-family facades: VARMA-LiNGAM and Longitudinal LiNGAM.
+"""Temporal-family facades: VARMA-LiNGAM, Longitudinal LiNGAM, and PCMCI.
 
 Each callable runs the native engine and returns one uniform ``StructureOutput`` wrapping a
-:class:`~andrey.core.TemporalStructure` (a per-lag stack of graphs plus the lossless coefficient
-weights). The mapping onto the public core contract lives in the private ``_temporal`` adapters.
+:class:`~andrey.core.TemporalStructure` (a per-lag stack of graphs, plus the lossless coefficient
+weights for the LiNGAM methods). The mapping onto the public core contract lives in the private
+``_temporal`` adapters.
 """
 
 from __future__ import annotations
@@ -10,9 +11,16 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
-from ._adapt import column_labels, data_matrix, int_in_range, shared_labels, with_labels
+from ._adapt import (
+    column_labels,
+    data_matrix,
+    int_in_range,
+    open_unit_interval,
+    shared_labels,
+    with_labels,
+)
 from ._experimental import warn_experimental
-from ._temporal import _adapt_longitudinal_lingam, _adapt_varma_lingam
+from ._temporal import _adapt_longitudinal_lingam, _adapt_pcmci, _adapt_varma_lingam
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -211,3 +219,116 @@ def longitudinal_lingam(
     labels = shared_labels(column_labels(X) for X in data_list)
     model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure).fit(panel)
     return with_labels(_adapt_longitudinal_lingam(model), labels)
+
+
+def pcmci(
+    data: npt.ArrayLike,
+    *,
+    tau_max: int = 1,
+    pc_alpha: float = 0.2,
+    alpha_level: float = 0.05,
+) -> StructureOutput:
+    """Learn the lagged causal links of one multivariate time series with PCMCI.
+
+    PCMCI [1]_ works in two steps. The PC1 step selects, for each variable, a few candidate parents
+    among the lagged values of all variables. The momentary conditional independence (MCI) step
+    then tests each lagged link given the selected parents of both its ends. Conditioning on the
+    cause's own past removes the autocorrelation that makes a plain lagged-correlation test report
+    false links. Use it on one series whose causal effects take at least one time step.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        A multivariate time series, one row per time step. Coerced to ``float64``. A DataFrame's
+        column names become the structure's ``labels``.
+    tau_max : int, default=1
+        The largest lag tested, at least ``1``: links at lags ``1`` to ``tau_max`` are tested.
+    pc_alpha : float, default=0.2
+        Significance level of the PC1 step, in ``(0, 1)``: a candidate parent is dropped when a test
+        gives it a p-value above ``pc_alpha``. A larger value keeps more parents as conditions for
+        the MCI step.
+    alpha_level : float, default=0.05
+        Significance level of the MCI step, in ``(0, 1)``: a link is in the graph when its p-value
+        is at most ``alpha_level``.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``1`` to
+        ``tau_max`` and no lag 0. ``structure.lag(k)`` is a ``digraph`` whose edge ``i -> j`` is
+        the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a self-loop
+        is a variable's dependence on its own past. The structure has no ``lag_weights``.
+        ``metadata["p_values"][k - 1][i][j]`` and ``metadata["statistics"][k - 1][i][j]`` hold the
+        MCI p-value and partial correlation of that link, for every pair, significant or not.
+        ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag ``k``) that
+        PC1 selected for variable ``j``, strongest first. ``ordering`` is ``None``, and
+        ``metadata["algorithm"]`` is ``"pcmci"``.
+
+    Raises
+    ------
+    TypeError
+        If ``tau_max`` is not an int.
+    ValueError
+        If ``tau_max`` is below 1, if ``pc_alpha`` or ``alpha_level`` is not in ``(0, 1)``, or if
+        ``data`` is not a usable 2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3``
+        rows, the length at which every test keeps one degree of freedom.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    Every test is the Fisher-Z partial-correlation test. All tests use the same time steps, the
+    last ``n_samples - 2 * tau_max``, where every lag a test can condition on exists: the MCI test
+    of a link at lag ``k`` conditions on the cause's parents, which reach back ``k + tau_max``
+    steps. PC1 runs in rounds ``p = 0, 1, ...``: each round tests every remaining candidate given
+    the ``p`` strongest other candidates, one conditioning set per candidate, then drops those
+    that test independent. A candidate's strength is the smallest absolute partial correlation it
+    has had so far.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over 5
+    variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no hidden
+    common causes. It does not test same-step (lag 0) links: an effect within one time step is
+    missed and can show up as a false lagged link. An MCI test conditions on up to
+    ``2 * n_variables * tau_max - 1`` lagged values, so the series needs many more time steps than
+    that. The MCI step alone runs ``n_variables ** 2 * tau_max`` tests.
+
+    References
+    ----------
+    .. [1] Runge, J., Nowack, P., Kretschmer, M., Flaxman, S., and Sejdinovic, D. (2019). Detecting
+       and quantifying causal associations in large nonlinear time series datasets. Science
+       Advances 5(11), eaau4996.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import pcmci
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(500)
+    >>> out = pcmci(np.column_stack([x, y]), tau_max=2, alpha_level=0.01)
+    >>> out.structure.lag(1).oriented_edges()
+    [(0, 1, 'directed')]
+    >>> out.structure.lag(2).oriented_edges()
+    []
+    """
+    warn_experimental("pcmci")
+    from andrey.temporal.pcmci import pcmci as _native
+
+    tau_max = int_in_range(tau_max, "tau_max", 1)
+    pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
+    alpha_level = open_unit_interval(alpha_level, "alpha_level")
+    X = data_matrix(data)
+    # An MCI test conditions on up to 2 * n * tau_max - 1 lagged columns of the last
+    # n_samples - 2 * tau_max steps; this keeps one degree of freedom in every Fisher-Z test.
+    min_rows = 2 * tau_max * (X.shape[1] + 1) + 3
+    if X.shape[0] < min_rows:
+        raise ValueError(
+            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
+            f"{X.shape[1]} variables, got {X.shape[0]}"
+        )
+    result = _native(X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level)
+    return with_labels(_adapt_pcmci(result), column_labels(data))

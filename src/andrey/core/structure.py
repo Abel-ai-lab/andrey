@@ -794,10 +794,11 @@ class GraphStructure(Structure):
 class TemporalStructure(Structure):
     """A time-series result: one ``GraphStructure`` per lag.
 
-    ``varma_lingam`` and ``longitudinal_lingam`` return one as ``StructureOutput.structure``;
-    ``from_lag_graphs`` and ``from_time_lag_graphs`` build one from existing graphs. An edge
-    ``i -> j`` in ``lag(k)`` means ``X_i(t-k) -> X_j(t)``. Lag 0 holds the relations within one
-    time step, and a self-loop at a positive lag is a variable's effect on its own future.
+    ``varma_lingam``, ``longitudinal_lingam``, and ``pcmci`` return one as
+    ``StructureOutput.structure``; ``from_lag_graphs`` and ``from_time_lag_graphs`` build one from
+    existing graphs. An edge ``i -> j`` in ``lag(k)`` means ``X_i(t-k) -> X_j(t)``. Lag 0 holds the
+    relations within one time step, and a self-loop at a positive lag is a variable's effect on its
+    own future.
     ``lags`` lists the lag values, ``lag_weights`` holds the coefficients, and ``summary_graph()``
     merges the lags into one graph over the variables.
 

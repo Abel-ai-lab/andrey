@@ -1,4 +1,4 @@
-"""Private adapters from fitted temporal models (VAR, VARMA, Granger) to a ``TemporalStructure``.
+"""Private adapters from fitted temporal models and PCMCI results to a ``TemporalStructure``.
 
 Fitted models are read by attribute name. The lag coefficients are stored as ``lag_weights`` in
 Andrey's orientation: ``W[i, j]`` weights ``i -> j``, the transpose of the coefficient matrix ``B``,
@@ -11,13 +11,16 @@ contemporaneous lag 0 (VAR and VARMA) is a ``dag``. Nothing here is re-exported 
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from andrey.api._adapt import structure_output
 from andrey.api._marks import directed_marks
 from andrey.core import GraphStructure, StructureOutput, TemporalStructure
+
+if TYPE_CHECKING:
+    from andrey.temporal.pcmci import PCMCIResult
 
 
 def _lag_graphs(ar_stack: np.ndarray, *, instantaneous: bool) -> tuple[GraphStructure, ...]:
@@ -131,3 +134,24 @@ def _adapt_granger(coeff: np.ndarray, n_vars: int, maxlag: int) -> StructureOutp
         graphs, lags=list(range(1, maxlag + 1)), lag_weights=ar.transpose(0, 2, 1)
     )
     return structure_output(temporal, metadata={"algorithm": "granger"})
+
+
+def _adapt_pcmci(result: PCMCIResult) -> StructureOutput:
+    """PCMCI result -> ``StructureOutput`` over a :class:`TemporalStructure` of lags ``1..tau_max``.
+
+    ``result.graph[k, i, j]`` marks the link ``i -> j`` at lag ``k + 1`` (row = cause), so each
+    block is transposed for :func:`_lag_graphs`. PCMCI tests no lag-0 link and finds no causal
+    order, so every lag view is a ``digraph`` and the envelope carries no ``ordering``. The MCI
+    statistics and p-values are test results, not coefficients: they ride in ``metadata`` in the
+    result's ``[lag - 1, cause, effect]`` layout, with the PC1 parents as ``[variable, lag]`` pairs.
+    """
+    graph = np.asarray(result.graph, dtype=np.float64)
+    graphs = _lag_graphs(graph.transpose(0, 2, 1), instantaneous=False)
+    temporal = TemporalStructure.from_lag_graphs(graphs, lags=range(1, graph.shape[0] + 1))
+    metadata = {
+        "algorithm": "pcmci",
+        "p_values": result.p_values,
+        "statistics": result.statistics,
+        "parents": [[list(link) for link in links] for links in result.parents],
+    }
+    return structure_output(temporal, metadata=metadata)
