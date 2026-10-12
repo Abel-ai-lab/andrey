@@ -8,7 +8,6 @@ its settings, and its reference are described on :func:`andrey.ges`.
 from __future__ import annotations
 
 import numpy as np
-from threadpoolctl import threadpool_limits
 
 from andrey.core import GraphStructure, _bitset, backend
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
@@ -157,7 +156,7 @@ def ges(
     # Pin BLAS to one thread for the score-diff loops (the covariance above is already computed):
     # multi-thread BLAS reduction order is not bit-stable, so pinning makes the score host- and
     # thread-count-reproducible and equal to the (1-thread) parallel workers.
-    with threadpool_limits(limits=1):
+    with backend.one_blas_thread():
         workers = backend.worker_count() if n > 1 else 1
         adj = _parallel_ges.run_ges(
             adj, score, n, max_parents, workers=workers, full_scores=_full_scores

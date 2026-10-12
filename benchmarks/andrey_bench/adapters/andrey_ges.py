@@ -54,6 +54,9 @@ class AndreyGES:
     lambda_value: float = _DEFAULT_LAMBDA
     #: The local score. A variant with another score needs its own ``name``, as a weight does.
     score_func: str = _DEFAULT_SCORE_FUNC
+    #: Most directed parents a node may hold and still gain one; ``None`` lifts the cap, as the
+    #: public ``andrey.ges`` does. A benchmark that changes it gives the arm its own ``name``.
+    max_parents: float | None = _DEFAULT_MAX_PARENTS
 
     def setup(self) -> None:
         """Import Andrey before timing; see `contracts.SetupAdapter`.
@@ -69,7 +72,7 @@ class AndreyGES:
         """The score, its BIC weight (BDeu has none), and the parent cap."""
         params: dict[str, Any] = {
             "score_func": self.score_func,
-            "max_parents": _DEFAULT_MAX_PARENTS,
+            "max_parents": self.max_parents,
         }
         if self.score_func != "local_score_BDeu":
             params["lambda_value"] = float(self.lambda_value)

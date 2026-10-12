@@ -162,7 +162,7 @@ def first_order_separating(
 def scan_pairs(
     test: CITest,
     pairs: list[tuple[int, int]],
-    neighbours: list[np.ndarray],
+    neighbors: list[np.ndarray],
     size: int,
     alpha: float,
     trace: list[dict] | None = None,
@@ -180,8 +180,8 @@ def scan_pairs(
     for x, y in pairs:
         separating: set[int] = set()
         found = False
-        from_x = neighbours[x][neighbours[x] != y].tolist()
-        from_y = neighbours[y][neighbours[y] != x].tolist()
+        from_x = neighbors[x][neighbors[x] != y].tolist()
+        from_y = neighbors[y][neighbors[y] != x].tolist()
         # Once the x side has scanned, the y side skips the subsets both sides offer.
         shared = set(from_x) & set(from_y) if len(from_x) >= size else None
         for a, b, candidates, seen in ((x, y, from_x, None), (y, x, from_y, shared)):

@@ -49,8 +49,8 @@ DEFAULT_ALPHA = 1.0
 #: What ``pip install xges`` searches under, which is twice the penalty Andrey ships.
 SHIPPED_ALPHA = 2.0
 
-#: The two search settings the adapter fixes. ``extended_search=False`` would be XGES-0, the
-#: paper's ablation; ``use_fast_numba=False`` would be the pure-Python scorer.
+#: The default search settings. ``extended_search=False`` is XGES without the extended search, an
+#: arm of its own; ``use_fast_numba=False`` would be the pure-Python scorer.
 DEFAULT_EXTENDED_SEARCH = True
 DEFAULT_USE_FAST_NUMBA = True
 
@@ -122,15 +122,16 @@ class XgesGES:
     output_type: str = "cpdag"
     python_env: str = PYTHON_ENV_VAR
     alpha: float = DEFAULT_ALPHA
+    extended_search: bool = DEFAULT_EXTENDED_SEARCH
 
     def params(self) -> dict[str, Any]:
         """The search settings, including the parent cap XGES does not have."""
         return {
             "alpha": float(self.alpha),
-            "extended_search": DEFAULT_EXTENDED_SEARCH,
+            "extended_search": bool(self.extended_search),
             "use_fast_numba": DEFAULT_USE_FAST_NUMBA,
             # Not a default that happens to be unset: XGES offers no parent cap at all, while the
-            # Andrey rows beside these carry max_parents=4.
+            # Andrey GES adapter defaults to max_parents=4.
             "max_parents": None,
         }
 
@@ -189,7 +190,11 @@ class XgesGES:
         return structure_from_adjacency(native, kind=self.output_type)
 
 
-def xges_adapter(alpha: float = DEFAULT_ALPHA, name: str = "xges.ges") -> XgesGES:
+def xges_adapter(
+    alpha: float = DEFAULT_ALPHA,
+    name: str = "xges.ges",
+    extended_search: bool = DEFAULT_EXTENDED_SEARCH,
+) -> XgesGES:
     """An :class:`XgesGES` carrying the version its own interpreter reports.
 
     Resolving that version needs a subprocess, so it happens when a benchmark builds its solution
@@ -197,8 +202,9 @@ def xges_adapter(alpha: float = DEFAULT_ALPHA, name: str = "xges.ges") -> XgesGE
 
     ``name`` exists because ``params`` are **not** part of a ``run_id``: two penalties under one
     name would write to one part file and one of the two measurements would be lost to a resume.
-    Every arm that changes a search setting needs a name of its own.
+    Every arm that changes a search setting, ``alpha`` or ``extended_search``, needs a name of its
+    own.
     """
     python = os.environ.get(PYTHON_ENV_VAR, "").strip()
     version = _xges_version(python) if python else "unknown"
-    return XgesGES(name=name, package_version=version, alpha=alpha)
+    return XgesGES(name=name, package_version=version, alpha=alpha, extended_search=extended_search)

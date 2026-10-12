@@ -116,7 +116,7 @@ SIMULATED_ROWS = 1000
 _SACHS_DESCRIPTION = """\
 Sachs et al. (2005): flow cytometry of 11 phosphorylated proteins and phospholipids in single human
 immune-system cells. These are the 853 observational measurements (the first condition, with no
-intervention), with the 17-arc consensus signalling network they are usually scored against.
+intervention), with the 17-arc consensus signaling network they are usually scored against.
 
 Source: cmu-phil/example-causal-datasets (CC0-1.0), real/sachs/data/sachs.2005.continuous.txt.
 Cite: K. Sachs, O. Perez, D. Pe'er, D. A. Lauffenburger, G. P. Nolan. Causal protein-signaling

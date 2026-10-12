@@ -25,6 +25,7 @@ https://arxiv.org/abs/1302.4972
 
 from __future__ import annotations
 
+import heapq
 from collections.abc import Iterable, Mapping
 
 import numpy as np
@@ -251,10 +252,10 @@ def meek(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
 def pdag2dag(pdag: np.ndarray) -> np.ndarray:
     """Return a consistent DAG extension of a PDAG (Dor & Tarsi), raising if none exists.
 
-    Keeps every directed edge of the PDAG, then repeatedly removes a node ``x`` that has no outgoing
-    directed edge and whose undirected neighbors are each adjacent to all neighbors of ``x``
-    (so orienting the remaining undirected edges into ``x`` adds no collider). Raises ``ValueError``
-    when no such node exists: the PDAG admits no consistent extension.
+    Keeps every directed edge of the PDAG, then repeatedly removes the lowest-numbered node ``x``
+    that has no outgoing directed edge and whose undirected neighbors are each adjacent to all
+    neighbors of ``x`` (so orienting the remaining undirected edges into ``x`` adds no collider).
+    Raises ``ValueError`` when no such node exists: the PDAG admits no consistent extension.
     """
     src = _validate_adjacency(pdag)
     n = src.shape[0]
@@ -264,44 +265,33 @@ def pdag2dag(pdag: np.ndarray) -> np.ndarray:
     out[directed] = TAIL
     out.T[directed] = ARROW
 
-    removed = np.zeros(n, dtype=bool)
-    remaining = n
-    while remaining > 0:
-        progressed = False
-        for i in range(n):
-            if removed[i]:
-                continue
-            # i is a candidate sink: no outgoing directed edge to an active node (i -> c).
-            children = np.nonzero((src[:, i] == ARROW) & (src[i, :] == TAIL))[0]
-            if children.size and not removed[children].all():
-                continue
-            # Undirected neighbors of i (active) and all adjacent nodes (active).
-            und = np.nonzero((src[i] == TAIL) & (src[:, i] == TAIL) & ~removed)[0]
-            if und.size:
-                adjacent = np.nonzero((src[i] != NULL) & ~removed)[0]
-                if not _clique_condition(src, und, adjacent):
-                    continue
-            # Orient every undirected edge nb - i into i as nb -> i.
-            for nb in np.nonzero((src[i] == TAIL) & (src[:, i] == TAIL))[0].tolist():
-                if out[i, nb] == NULL and out[nb, i] == NULL:
-                    _orient(out, nb, i)
-            removed[i] = True
-            remaining -= 1
-            progressed = True
-            break
-        if not progressed:
-            raise ValueError("PDAG admits no consistent DAG extension")
-    return out
+    children = [set(np.flatnonzero(row).tolist()) for row in directed]
+    undirected = [set(np.flatnonzero(row).tolist()) for row in (src == TAIL) & (src.T == TAIL)]
+    adjacent = [set(np.flatnonzero(row).tolist()) for row in src != NULL]
+    active = set(range(n))
 
-
-def _clique_condition(adj: np.ndarray, neighbours: np.ndarray, adjacent: np.ndarray) -> bool:
-    """True when every node in ``neighbours`` is adjacent to all of ``adjacent`` except itself."""
-    support = adj != NULL
-    for nb in neighbours.tolist():
-        row = support[nb, adjacent]
-        if not np.all(row | (adjacent == nb)):
+    def removable(x: int) -> bool:
+        if not children[x].isdisjoint(active):
             return False
-    return True
+        around = adjacent[x] & active
+        return all(around - {nb} <= adjacent[nb] for nb in undirected[x] & active)
+
+    # Removing a node only shrinks its neighbors' conditions, so a removable node stays removable
+    # and only the neighbors of a removed node are rechecked.
+    ready = [x for x in range(n) if removable(x)]
+    queued = set(ready)
+    while ready:
+        x = heapq.heappop(ready)
+        active.discard(x)
+        for nb in undirected[x] & active:
+            _orient(out, nb, x)
+        for v in (adjacent[x] & active) - queued:
+            if removable(v):
+                heapq.heappush(ready, v)
+                queued.add(v)
+    if active:
+        raise ValueError("PDAG admits no consistent DAG extension")
+    return out
 
 
 # ---- DAG to CPDAG -------------------------------------------------------------------------------

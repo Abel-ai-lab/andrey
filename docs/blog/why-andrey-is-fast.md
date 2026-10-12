@@ -25,7 +25,7 @@ one pass of GES, so does each candidate move. Andrey runs them as one batched ar
 thousands at a time, with the same results as one at a time.
 
 ```{raw} html
-:file: ../_generated/why-fast/parallel.html
+:file: 0.1.0/parallel.html
 ```
 
 ## 2. Never compute twice
@@ -35,7 +35,7 @@ caches it. Each test reads the few entries it needs instead of recomputing them,
 its local scores the same way.
 
 ```{raw} html
-:file: ../_generated/why-fast/reuse.html
+:file: 0.1.0/reuse.html
 ```
 
 ## 3. Skip what can't matter
@@ -45,7 +45,7 @@ pass settles most edges before any matrix is inverted. GES rules out invalid can
 masks before scoring them.
 
 ```{raw} html
-:file: ../_generated/why-fast/skip.html
+:file: 0.1.0/skip.html
 ```
 
 ## 4. Use the hardware you have
@@ -55,5 +55,5 @@ a CUDA GPU computes large entropy tables many cells at a time, once they are lar
 the transfer. Correlation matrices move to the GPU too when you set `ANDREY_BACKEND=cuda`.
 
 ```{raw} html
-:file: ../_generated/why-fast/hardware.html
+:file: 0.1.0/hardware.html
 ```

@@ -11,7 +11,6 @@ from contextlib import nullcontext
 from itertools import combinations, islice
 
 import numpy as np
-from threadpoolctl import threadpool_limits
 
 from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
@@ -21,7 +20,7 @@ from andrey.constraint._skeleton import (
     prescreen_capable,
     scan_pairs,
 )
-from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure
+from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
@@ -73,7 +72,7 @@ def _fast_adjacency_search(
 
     Grows the conditioning size from zero over a complete graph; at each size, every still-adjacent
     pair ``(x, y)`` is tested against subsets of a start-of-size snapshot of *either* endpoint's
-    neighbourhood, and pairs found independent are removed together after the size completes.
+    neighborhood, and pairs found independent are removed together after the size completes.
     A removed pair's separating set is the union of every conditioning set that made it independent.
 
     Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
@@ -101,7 +100,7 @@ def _fast_adjacency_search(
             if int(degrees.max(initial=0)) - 1 <= size:
                 break
             size += 1
-            neighbours = [np.flatnonzero(support[i]) for i in range(d)]
+            neighbors = [np.flatnonzero(support[i]) for i in range(d)]
             remove: list[tuple[int, int]] = []
             if can_prescreen and size == 0:
                 for x, y in marginal_removals(test, np.triu(support, 1), alpha):
@@ -111,7 +110,7 @@ def _fast_adjacency_search(
             elif can_prescreen and size == 1:
                 for x, y in adjacent_pairs(support):
                     candidates = sorted(
-                        (set(neighbours[x].tolist()) | set(neighbours[y].tolist())) - {x, y}
+                        (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
                     separating = first_order_separating(test, x, y, candidates, alpha)
                     if separating:
@@ -127,8 +126,8 @@ def _fast_adjacency_search(
                     # Pin BLAS to one thread for a test the workers can run: its conditioning-
                     # submatrix inversions then match the (1-thread) parallel skeleton workers
                     # regardless of the host thread count. The chi-square tests call no BLAS.
-                    with threadpool_limits(limits=1) if seedable else nullcontext():
-                        removals = scan_pairs(test, pairs, neighbours, size, alpha)
+                    with backend.one_blas_thread() if seedable else nullcontext():
+                        removals = scan_pairs(test, pairs, neighbors, size, alpha)
                 for x, y, separating in removals:
                     remove.append((x, y))
                     sepsets[(x, y)] = separating
@@ -240,18 +239,18 @@ def _majority_sepsets(
     Cost grows exponentially with endpoint degree; conditioning sets have no size cap. Subsets are
     tested in chunks of ``_MAJORITY_CHUNK``, so memory per triple stays bounded.
     """
-    neighbours = [_adjacent_nodes(marks, node) for node in range(len(marks))]
+    neighbors = [_adjacent_nodes(marks, node) for node in range(len(marks))]
     ambiguous = set()
     batched = getattr(test, "batched_call", None)
-    for b, adjacent in enumerate(neighbours):
+    for b, adjacent in enumerate(neighbors):
         for a, c in combinations(adjacent, 2):
             if _adjacent(marks, a, c):
                 continue
             subsets = (
                 subset
                 for endpoint in (a, c)
-                for size in range(len(neighbours[endpoint]) + 1)
-                for subset in combinations(neighbours[endpoint], size)
+                for size in range(len(neighbors[endpoint]) + 1)
+                for subset in combinations(neighbors[endpoint], size)
             )
             separating = containing = 0
             while chunk := list(islice(subsets, _MAJORITY_CHUNK)):
@@ -286,7 +285,7 @@ def _orient_colliders(
 ) -> None:
     """Orient every unshielded collider ``a *-> b <-* c`` from the separating sets.
 
-    For each node ``b`` and each non-adjacent pair ``(a, c)`` of its neighbours (visited in
+    For each node ``b`` and each non-adjacent pair ``(a, c)`` of its neighbors (visited in
     ascending order), ``b`` is a collider iff a separating set for ``a`` and ``c`` is recorded and
     does not contain ``b``; the endpoint at ``b`` on both edges is then set to an arrowhead. An
     already-directed tail at ``b`` blocks the orientation.
@@ -553,7 +552,7 @@ def _rule_r2(marks: np.ndarray, a: int, b: int, c: int) -> bool:
 def _rule_r1r2_cycle(
     marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
 ) -> bool:
-    """Sweep R1 and R2 over every node ``b`` and each ordered pair of its neighbours."""
+    """Sweep R1 and R2 over every node ``b`` and each ordered pair of its neighbors."""
     n = marks.shape[0]
     for b in range(n):
         adj = _adjacent_nodes(marks, b)

@@ -11,8 +11,6 @@ import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import pytest
-
 import andrey
 import andrey.viz
 
@@ -89,10 +87,16 @@ def test_readme_quickstart_runs_as_printed(capsys, offline_datasets):
 
 def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
     # The README shows both themes' charts from .github/readme/, with the numbers of the
-    # homepage's speedup panel and an alt text that lists them.
+    # homepage's speedup panel for the methods it keeps, then the later releases' methods, two rows
+    # at most, and an alt text that lists them.
     readme = README.read_text()
     summary = build.load_summary(SUMMARY)
-    slides = build.speedup_slides(summary)
+    slides = build.readme_slides(summary)
+    kept = build.speedup_slides(summary, build.README_METHODS)
+    assert slides[: len(kept)] == [(n, f"{d:,} variables", b) for n, d, b in kept]
+    later = [name for _, methods in build.README_LATER for name in methods]
+    assert [name for name, _, _ in slides] == [*build.README_METHODS, *later]
+    assert len(slides) <= build.README_COLUMNS * build.README_ROWS
     for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         name = build.README_CHART.format(theme=theme)
         assert f'"{IMAGES}/{name}"' in readme
@@ -103,13 +107,13 @@ def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
         labels = re.findall(r'font-weight="600"[^>]*>([^<]+x)</text>', chart)
         assert labels == [build.speedup_text(v) for _, _, bars in slides for _, v in bars]
     panel = build.speedup_panel(summary)
-    for _, _, bars in slides:
+    for _, _, bars in build.speedup_slides(summary):
         for _, speed in bars:
             assert f'class="race-time">{build.speedup_text(speed)}<' in panel
     alt = " ".join(readme.split("<img alt=\"Andrey's speedup", 1)[1].split('"', 1)[0].split())
-    for name, d, bars in slides:
-        assert f"{name} {build.speedup_text(dict(bars)['Andrey'])} at {d:,} variables" in alt
-    assert 'https://andrey.abel.ai/docs/benchmarks.html">Benchmark report</a>' in readme
+    for name, size, bars in slides:
+        assert f"{name} {build.speedup_text(dict(bars)['Andrey'])} at {size}" in alt
+    assert 'https://andrey.abel.ai/docs/benchmarks.html">Release cards</a>' in readme
 
 
 def test_the_launch_post_is_a_published_page():
@@ -137,40 +141,11 @@ def test_every_post_is_dated_once_and_names_its_version():
         # The page states no date of its own beside the front matter's.
         body = post.read_text().split("---\n", 2)[2]
         assert not re.search(r"\b20\d\d-\d\d-\d\d\b|<time", body), post.name
-
-
-@pytest.mark.skipif(not SUMMARY.exists(), reason="the published summary is absent")
-def test_the_launch_post_states_the_summary():
-    summary = build.load_summary(SUMMARY)
-    text, figures = build.launch_post_context(summary)
-    method, top = build.fastest(summary)
-    as_good, total = build.accuracy_tally(summary)
-    title, _ = build.methods(summary)
-    assert text["speed_claim"] == summary["headline"]
-    assert text["speed_short"] == "over 100x on PC"
-    assert text["as_good"] == f"{as_good} of {total}"
-    assert text["method_count"] == title.split(" in ")[0]
-    assert text["slow_fit"] == (
-        f"{method['method']} on {top['d']:,} variables took "
-        f"{build.seconds_text(top['comparator_s'])} in {method['comparator']}"
-    )
-    # The one figure is the homepage's speedup panel; the post sits one level down, so its link
-    # to the benchmark report gains a ../.
-    panel = build.speedup_panel(summary).replace('href="docs/', 'href="../docs/')
-    assert panel in figures["speedup"]
-    assert 'href="../docs/benchmarks.html"' in figures["speedup"]
-    assert 'href="docs/' not in figures["speedup"]
-    # The post uses every number and figure the build provides, and nothing typed: its numbers
-    # come from the build or from docs/conf.py's release and method tiers.
-    post = (POSTS / "introducing-andrey.md").read_text()
-    release = {"release", "n_supported", "n_experimental", "supported_methods"}
-    assert all(f'"{key}":' in CONF for key in release)
-    used = set(re.findall(r"\{\{ (\w+) \}\}", post))
-    assert set(text) <= used <= set(text) | release
-    included = set(re.findall(r":file: \.\./_generated/blog/(\w+)\.html", post))
-    assert included == set(figures)
-    body = post.split("---\n", 2)[2]
-    assert not re.search(r"\b\d+(\.\d+)?x\b", body), "a typed speedup in the post"
+        # Later builds leave it as its version rendered it: the numbers are text, and every file it
+        # includes is stored under blog/<version>/.
+        assert "{{" not in body, post.name
+        for path in re.findall(r"(?::file:|\{literalinclude\}) (\S+)", body):
+            assert path.startswith(f"{meta['version']}/") and (POSTS / path).is_file(), path
 
 
 def test_the_old_demo_address_redirects_to_the_examples():
@@ -186,19 +161,3 @@ def test_the_faq_cites_what_the_readme_cites():
 
     faq = (ROOT / "docs" / "docs" / "faq.md").read_text()
     assert bibtex(faq) == bibtex(README.read_text())
-
-
-def test_the_launch_post_states_the_readme_claims(monkeypatch, offline_datasets):
-    # The post's four claims read as the README's, with the same numbers, and it says Andrey is in
-    # alpha.
-    monkeypatch.syspath_prepend(str(ROOT / "apps"))
-    summary = json.loads(SUMMARY.read_text())
-    launch = runpy.run_path(str(ROOT / "apps" / "build_launch.py"))
-    text, _ = launch["site_builder"]().launch_post_context(summary)
-    post = (ROOT / "docs" / "blog" / "introducing-andrey.md").read_text()
-    post = re.sub(r"\{\{ (\w+) \}\}", lambda m: str(text.get(m.group(1), m.group(0))), post)
-    post = re.sub(r"\n  (?=\S)", " ", post)  # join wrapped list items
-    pitch = launch["pitch_block"](summary).splitlines()
-    for claim in [line for line in pitch if line.startswith("- **")]:
-        assert claim in post, claim
-    assert "is in alpha" in post

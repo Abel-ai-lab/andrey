@@ -29,8 +29,10 @@ column. A single column gives a one-node graph.
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
-workload: the [benchmarks page](../benchmarks.md) shows where a method scores worse than the empty
-graph, as ICA-LiNGAM does at the benchmarks' sample size.
+workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs) and
+[0.2.0](../benchmarks/0.2.0.md#known-limits) release cards show where a method scores worse
+than the empty graph, as ICA-LiNGAM does at the 0.1.0 card's sample size and BottomUpParceLiNGAM
+does from 8 observed variables.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -46,6 +48,8 @@ graph, as ICA-LiNGAM does at the benchmarks' sample size.
    grasp
    direct_lingam
    ica_lingam
+   rcd
+   bottom_up_parce_lingam
 ```
 
 FCI and GFCI use uncovered possibly-directed paths for their R9 and R10 tail orientations:
@@ -66,7 +70,9 @@ in a process.
    gfci
    cdnod
    gies
+   xges
    hc
+   tabu
    exact_search
    calm
    multi_group_direct_lingam
@@ -74,15 +80,13 @@ in a process.
    longitudinal_lingam
    pnl
    gin
-   rcd
    camuv
-   bottom_up_parce_lingam
 ```
 
 A method becomes supported once it has:
 
-- a benchmark campaign compared with another package, in the published summary and with a section
-  on the benchmarks page;
+- a benchmark campaign compared with another package, in a published summary and with a section
+  in its release's [release card](../benchmarks.md);
 - recovery baselines in `tests/recovery/baselines/`;
 - a place in the release quality gate, `qa/quality_gate.py`;
 - an example notebook.
@@ -131,7 +135,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.ExperimentalWarning` | The first call of an experimental method. |
 | {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
-| {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` took `max_iter` moves. |
+| {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -300,7 +304,7 @@ and `rc_params` return plain data and need no import.
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
-| `andrey calibrate` | Measured GES and HC worker-pool cutoffs for this machine, as settings to export |
+| `andrey calibrate` | Measured GES worker-pool cutoff for this machine, as a setting to export |
 | `andrey --skill` / `andrey --llms` | Generated package guides |
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or

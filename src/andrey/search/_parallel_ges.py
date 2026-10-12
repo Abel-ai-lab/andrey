@@ -48,9 +48,8 @@ def reduce_best(
 ) -> ForwardResult | BackwardResult:
     """Select the best chunk by its ``(stable_key, x, y, index)`` key in ``r[0]``.
 
-    Uses :func:`andrey.search._parallel.reduce_best`; HC uses its default ``r[:4]`` key. Each
-    ``(x, y, index)`` belongs to one target partition, so keys are globally unique and strict-``<``
-    reduction is independent of completion order.
+    Uses :func:`andrey.search._parallel.reduce_best`. Each ``(x, y, index)`` belongs to one target
+    partition; unique keys make strict-``<`` reduction independent of completion order.
     """
     return par.reduce_best(results, key=lambda r: r[0])
 
@@ -71,10 +70,10 @@ class DeltaEngine(Protocol):
 
 
 # Per-graph-state neighborhood precompute shared by every chunk of a pass.
-NeighbourState = tuple[list[set[int]], list[np.ndarray], list[set[int]]]
+NeighborState = tuple[list[set[int]], list[np.ndarray], list[set[int]]]
 
 
-def neighbourhood_state(adj: np.ndarray, n: int) -> NeighbourState:
+def neighborhood_state(adj: np.ndarray, n: int) -> NeighborState:
     """The per-node adjacency sets, directed parents, and undirected neighbors for a graph state.
 
     Computed once per graph state (as the serial passes do) and shared read-only across all chunks;
@@ -92,7 +91,7 @@ def forward_chunk_best(
     delta_engine: DeltaEngine,
     n: int,
     max_parents: float | None,
-    state: NeighbourState,
+    state: NeighborState,
     reachable: Callable[[int, int, set[int]], bool],
 ) -> ForwardResult:
     """The best-improving Insert whose target is in ``targets``, by ``(stable_key, x, y, t_idx)``.
@@ -146,7 +145,7 @@ def backward_chunk_best(
     adj: np.ndarray,
     delta_engine: DeltaEngine,
     n: int,
-    state: NeighbourState,
+    state: NeighborState,
 ) -> BackwardResult:
     """The best-improving Delete whose target is in ``targets``, by ``(stable_key, x, y, h_idx)``.
 
@@ -191,7 +190,7 @@ def _forward_inprocess(
     """
     build_state = _reach_factory(n)
     while True:
-        state = neighbourhood_state(adj, n)
+        state = neighborhood_state(adj, n)
         reachable = build_state(adj)
         results = [
             forward_chunk_best(chunk, adj, delta_engine, n, max_parents, state, reachable)
@@ -210,7 +209,7 @@ def _backward_inprocess(
 ) -> np.ndarray:
     """Backward phase over an in-process N-chunk decomposition (no pool; chunk-invariance guard)."""
     while True:
-        state = neighbourhood_state(adj, n)
+        state = neighborhood_state(adj, n)
         results = [
             backward_chunk_best(chunk, adj, delta_engine, n, state)
             for chunk in even_chunks(n, n_chunks)
@@ -275,7 +274,7 @@ def _forward_task(
         raise RuntimeError("GES worker pool reused across runs (cov/token mismatch)")
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     n = _WORKER_N
-    state = neighbourhood_state(adj, n)
+    state = neighborhood_state(adj, n)
     reachable = _reach_factory(n)(adj)
     return forward_chunk_best(targets, adj, _WORKER_DELTA, n, max_parents, state, reachable)
 
@@ -286,7 +285,7 @@ def _backward_task(targets: Sequence[int], adj: np.ndarray, run_token: object) -
         raise RuntimeError("GES worker pool reused across runs (cov/token mismatch)")
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     n = _WORKER_N
-    state = neighbourhood_state(adj, n)
+    state = neighborhood_state(adj, n)
     return backward_chunk_best(targets, adj, _WORKER_DELTA, n, state)
 
 
@@ -315,7 +314,7 @@ def _min_work() -> int:
     return par.min_work(env.GES_PARALLEL_MIN_WORK, _DEFAULT_MIN_WORK)
 
 
-def forward_work_per_target(n: int, state: NeighbourState, max_parents: float | None) -> list[int]:
+def forward_work_per_target(n: int, state: NeighborState, max_parents: float | None) -> list[int]:
     """Estimated candidate evaluations for each forward target ``y`` (0 for a parent-capped target).
 
     ``n_nonadj(y) * 2^min(deg(y), CAP)``: ``n_nonadj(y)`` non-adjacent sources enumerate at most
@@ -334,18 +333,18 @@ def forward_work_per_target(n: int, state: NeighbourState, max_parents: float | 
     return work
 
 
-def backward_work_per_target(n: int, state: NeighbourState) -> list[int]:
+def backward_work_per_target(n: int, state: NeighborState) -> list[int]:
     """Estimated candidate evals per backward target ``y``: ``n_adj(y) * 2^min(deg(y), CAP)``."""
     adj_sets, _par_of, nbr = state
     return [len(adj_sets[y]) * (1 << min(len(nbr[y]), _DEGREE_CAP)) for y in range(n)]
 
 
-def estimate_forward_work(n: int, state: NeighbourState, max_parents: float | None) -> int:
+def estimate_forward_work(n: int, state: NeighborState, max_parents: float | None) -> int:
     """An O(n) upper bound on the forward pass's candidate-eval count (the gate's predictor)."""
     return sum(forward_work_per_target(n, state, max_parents))
 
 
-def estimate_backward_work(n: int, state: NeighbourState) -> int:
+def estimate_backward_work(n: int, state: NeighborState) -> int:
     """An O(n) upper bound on the backward pass's candidate-eval count (the gate's predictor)."""
     return sum(backward_work_per_target(n, state))
 
@@ -440,7 +439,7 @@ def run_ges(
     build_state = _reach_factory(n)
     try:
         while True:  # forward phase
-            state = neighbourhood_state(adj, n)
+            state = neighborhood_state(adj, n)
             work = forward_work_per_target(n, state, max_parents)
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
@@ -463,7 +462,7 @@ def run_ges(
             ops.apply_insert(adj, x, y, T)
             adj = _reform_cpdag(adj)
         while True:  # backward phase
-            state = neighbourhood_state(adj, n)
+            state = neighborhood_state(adj, n)
             work = backward_work_per_target(n, state)
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)

@@ -164,7 +164,7 @@ def test_ties_are_exercised_by_the_sweep():
     from andrey.search.ges import _reach_factory
 
     adj = np.zeros((n, n), dtype=np.int8)
-    state = pg.neighbourhood_state(adj, n)
+    state = pg.neighborhood_state(adj, n)
     reachable = _reach_factory(n)(adj)
     deltas: list[float] = []
     for y in range(n):
@@ -385,8 +385,8 @@ def test_forward_work_estimate_is_density_aware():
     for i in range(8):  # an undirected clique among the first 8 nodes
         for j in range(i + 1, 8):
             dense[i, j] = dense[j, i] = TAIL
-    w_sparse = pg.estimate_forward_work(n, pg.neighbourhood_state(sparse, n), None)
-    w_dense = pg.estimate_forward_work(n, pg.neighbourhood_state(dense, n), None)
+    w_sparse = pg.estimate_forward_work(n, pg.neighborhood_state(sparse, n), None)
+    w_dense = pg.estimate_forward_work(n, pg.neighborhood_state(dense, n), None)
     assert w_dense > 10 * w_sparse  # 2^7 per clique candidate dwarfs the sparse all-singleton scan
 
 
@@ -395,7 +395,7 @@ def test_work_estimate_never_overflows_at_high_degree():
     n = 60
     adj = np.ones((n, n), dtype=np.int8)  # every off-diagonal TAIL -> undirected near-clique
     np.fill_diagonal(adj, 0)
-    state = pg.neighbourhood_state(adj, n)
+    state = pg.neighborhood_state(adj, n)
     assert isinstance(pg.estimate_forward_work(n, state, None), int)
     assert isinstance(pg.estimate_backward_work(n, state), int)
 
@@ -527,13 +527,11 @@ X = np.random.default_rng(0).standard_normal((200, {d}))
 # d=120: the covariance exceeds the 64 KiB pipe buffer, so the payload write finds no reader
 # (``BrokenPipeError``). d=8 fits, so the parent waits for a pid or result that never arrives
 # (``EOFError`` under forkserver, ``BrokenProcessPool`` under spawn). GIES and GFCI call ``ges()``,
-# so GES stands for them; HC builds its own pool.
-@pytest.mark.parametrize(
-    "fn,d,guarded", [("ges", 8, False), ("ges", 120, False), ("hc", 8, False), ("ges", 8, True)]
-)
-def test_script_without_main_guard(tmp_path, fn, d, guarded):
+# so GES stands for them.
+@pytest.mark.parametrize("d,guarded", [(8, False), (120, False), (8, True)])
+def test_script_without_main_guard(tmp_path, d, guarded):
     """An unguarded script gets the guard-first message; the same script guarded runs."""
-    call = f"andrey.{fn}(X)"
+    call = "andrey.ges(X)"
     if guarded:
         call = f'if __name__ == "__main__":\n    {call}'
     script = tmp_path / "fit.py"  # a real file: forkserver and spawn re-import ``__main__`` by path
@@ -544,7 +542,6 @@ def test_script_without_main_guard(tmp_path, fn, d, guarded):
         "PYTHONPATH": os.pathsep.join(filter(None, [src_dir, os.environ.get("PYTHONPATH")])),
         "ANDREY_NUM_WORKERS": "2",
         "ANDREY_GES_PARALLEL_MIN_WORK": "0",
-        "ANDREY_HC_PARALLEL_MIN_WORK": "0",
     }
     proc = subprocess.run(
         [sys.executable, str(script)],
