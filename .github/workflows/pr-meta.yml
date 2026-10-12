@@ -2,7 +2,7 @@ name: pr-meta
 
 # Labels, milestone, and CHANGELOG bullets of a pull request; the rules are in
 # scripts/check_pr_meta.py and CONTRIBUTING.md. Drafts are checked too, and label and milestone
-# changes rerun it.
+# changes rerun it; a closed pull request is skipped, so labeling it afterwards starts no check.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize, labeled, unlabeled, milestoned, demilestoned]
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   pr-meta:
-    if: github.repository_owner == 'Abel-ai-lab'
+    if: github.repository_owner == 'Abel-ai-lab' && github.event.pull_request.state == 'open'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
