@@ -46,8 +46,8 @@ uv add andrey-core
       srcset=".github/readme/benchmark-chart-dark.svg">
     <img alt="Andrey's speedup over the slowest package on the same data: PC 941x at 400 variables,
       FCI 8.7x at 800 variables, GES 4.3x at 150 variables, BOSS 3.4x at 800 variables, GRaSP
-      1.4x at 400 variables, DirectLiNGAM 3.3x at 200 variables, RCD 2.5x at 30 variables,
-      BottomUpParceLiNGAM 11x at 30 variables"
+      1.4x at 400 variables, DirectLiNGAM 3.3x at 200 variables, RCD 2.5x at 24 observed
+      variables, BottomUpParceLiNGAM 11x at 24 observed variables"
       src=".github/readme/benchmark-chart-light.svg" width="100%">
   </picture>
 </p>

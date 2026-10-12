@@ -793,12 +793,21 @@ def speedup_text(speed: float) -> str:
     return "1x" if speed == 1 else ratio_text(speed)
 
 
-def readme_slides(summary: dict) -> list[tuple[str, int, list[tuple[str, float]]]]:
-    """The README chart's cards: the homepage panel's slides, then ``README_LATER``'s."""
-    slides = speedup_slides(summary)
+def readme_slides(summary: dict) -> list[tuple[str, str, list[tuple[str, float]]]]:
+    """The README chart's cards: the homepage panel's slides, then ``README_LATER``'s.
+
+    Each card carries its size as it prints: the variables, or for data with hidden variables,
+    the observed ones, which are the columns a method gets.
+    """
+    slides = [(name, f"{d:,} variables", bars) for name, d, bars in speedup_slides(summary)]
     for folder, methods in README_LATER:
         path = PUBLISHED / folder / "summary.json"
-        slides += speedup_slides(json.loads(path.read_text(encoding="utf-8")), methods)
+        later = json.loads(path.read_text(encoding="utf-8"))
+        for name, d, bars in speedup_slides(later, methods):
+            rows = [r for m in later["methods"] if m["method"] == name for r in m["rows"]]
+            row = next(r for r in rows if r["d"] == d)
+            size = f"{row['observed']:,} observed" if "observed" in row else f"{d:,}"
+            slides.append((name, f"{size} variables", bars))
     return slides
 
 
@@ -836,7 +845,7 @@ def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
         f'<desc id="chart-desc">{escape(readme_chart_alt(summary))}</desc>',
         text(pad, pad + 16, "Speedup on the same data", size=20, weight=600),
     ]
-    for i, (name, d, bars) in enumerate(slides):
+    for i, (name, extent, bars) in enumerate(slides):
         x = pad + (i % columns) * (card_w + gap)
         y = top + (i // columns) * (card_h + gap)
         parts.append(
@@ -846,7 +855,15 @@ def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
         # A long name steps down a size so it clears the size label on the right.
         parts.append(text(x + 18, y + 26, name, size=16 if len(name) <= 14 else 14, weight=600))
         parts.append(
-            text(x + card_w - 18, y + 26, f"{d:,} variables", size=12.5, fill=muted, anchor="end")
+            # A card has room for "24 observed", not "24 observed variables".
+            text(
+                x + card_w - 18,
+                y + 26,
+                extent.replace(" observed variables", " observed"),
+                size=12.5,
+                fill=muted,
+                anchor="end",
+            )
         )
         top_speed = bars[0][1]
         track_x, track_w = x + 112, card_w - 112 - 70
@@ -870,8 +887,8 @@ def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
 def readme_chart_alt(summary: dict) -> str:
     """The README chart's alt text: each method's speedup, as its card shows it."""
     parts = [
-        f"{name} {speedup_text(dict(bars)['Andrey'])} at {d:,} variables"
-        for name, d, bars in readme_slides(summary)
+        f"{name} {speedup_text(dict(bars)['Andrey'])} at {size}"
+        for name, size, bars in readme_slides(summary)
     ]
     return "Andrey's speedup over the slowest package on the same data: " + ", ".join(parts)
 

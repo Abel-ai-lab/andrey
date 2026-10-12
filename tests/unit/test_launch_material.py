@@ -91,7 +91,8 @@ def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
     readme = README.read_text()
     summary = build.load_summary(SUMMARY)
     slides = build.readme_slides(summary)
-    assert slides[: len(build.SPEEDUP_METHODS)] == build.speedup_slides(summary)
+    panel_slides = [(n, f"{d:,} variables", b) for n, d, b in build.speedup_slides(summary)]
+    assert slides[: len(build.SPEEDUP_METHODS)] == panel_slides
     later = [name for _, methods in build.README_LATER for name in methods]
     assert [name for name, _, _ in slides] == [*build.SPEEDUP_METHODS, *later]
     for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
@@ -108,8 +109,8 @@ def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
         for _, speed in bars:
             assert f'class="race-time">{build.speedup_text(speed)}<' in panel
     alt = " ".join(readme.split("<img alt=\"Andrey's speedup", 1)[1].split('"', 1)[0].split())
-    for name, d, bars in slides:
-        assert f"{name} {build.speedup_text(dict(bars)['Andrey'])} at {d:,} variables" in alt
+    for name, size, bars in slides:
+        assert f"{name} {build.speedup_text(dict(bars)['Andrey'])} at {size}" in alt
     assert 'https://andrey.abel.ai/docs/benchmarks.html">Release cards</a>' in readme
 
 
