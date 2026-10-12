@@ -9,6 +9,10 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Fixed
+
+- Result summaries show a long metadata list as its length instead of printing it in full. ([#59])
+
 ## [0.2.0] - 2026-10-12
 
 ### Highlights
@@ -75,3 +79,4 @@ First alpha release.
 [#31]: https://github.com/Abel-ai-lab/andrey/pull/31
 [#33]: https://github.com/Abel-ai-lab/andrey/pull/33
 [#53]: https://github.com/Abel-ai-lab/andrey/pull/53
+[#59]: https://github.com/Abel-ai-lab/andrey/pull/59
