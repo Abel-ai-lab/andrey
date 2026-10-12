@@ -115,18 +115,16 @@ def _child_env(
 ) -> dict[str, str]:
     """Build the child environment with thread limits and import paths for the worker and adapter.
 
-    Remove inherited ``ANDREY_NUM_WORKERS``, ``ANDREY_GES_PARALLEL_MIN_WORK``, and
-    ``ANDREY_HC_PARALLEL_MIN_WORK``, then set ``ANDREY_NUM_WORKERS`` to ``num_workers``.
-    Apply ``extra_env`` last.
+    Remove inherited ``ANDREY_NUM_WORKERS`` and ``ANDREY_GES_PARALLEL_MIN_WORK``, then set
+    ``ANDREY_NUM_WORKERS`` to ``num_workers``. Apply ``extra_env`` last.
     """
     env = dict(os.environ)
     env.update(thread_env(threads))  # BLAS/numeric pools pinned before the child imports numpy.
 
-    # Remove inherited Andrey worker settings, including both algorithm-specific thresholds.
+    # Remove inherited Andrey worker settings, including the GES threshold.
     # Set the worker count allocated to this task.
     env.pop("ANDREY_NUM_WORKERS", None)
     env.pop("ANDREY_GES_PARALLEL_MIN_WORK", None)
-    env.pop("ANDREY_HC_PARALLEL_MIN_WORK", None)
     env["ANDREY_NUM_WORKERS"] = str(num_workers)
 
     paths = [str(BENCH_ROOT)]
@@ -172,7 +170,6 @@ def resolved_env_fields(env: Mapping[str, str]) -> dict[str, Any]:
         "env_num_workers": _int_or_none(env.get("ANDREY_NUM_WORKERS")),
         "env_device": (env.get("ANDREY_DEVICE") or "cpu").strip().lower(),
         "env_ges_min_work": _int_or_none(env.get("ANDREY_GES_PARALLEL_MIN_WORK")),
-        "env_hc_min_work": _int_or_none(env.get("ANDREY_HC_PARALLEL_MIN_WORK")),
     }
 
 

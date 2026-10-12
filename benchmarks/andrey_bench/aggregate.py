@@ -31,7 +31,6 @@ STAMPS: dict[str, tuple[str, str]] = {
     "captured_at": ("provenance", "timestamp"),
     "driver": ("run_meta", "driver"),
     "ges_min_work": ("run_meta", "ges_min_work"),
-    "hc_min_work": ("run_meta", "hc_min_work"),
     "seeds": ("run_meta", "seeds"),
     "repeats": ("run_meta", "repeats"),
     # From STATUS.json, so a reader can tell a finished run from one that stopped early without
@@ -159,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     ):
         print(f"\n! {run_dir}\n  {note}")
 
-    for column in ("git_sha", "cpu_model", "ges_min_work", "hc_min_work"):
+    for column in ("git_sha", "cpu_model", "ges_min_work"):
         distinct = table[column].dropna().unique()
         if len(distinct) > 1:
             print(

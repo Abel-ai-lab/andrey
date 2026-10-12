@@ -9,6 +9,22 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `hc` runs in one process: its worker processes were slower at every measured size.
+  `ANDREY_HC_PARALLEL_MIN_WORK` and `andrey calibrate --method hc` are removed. ([#56])
+
+### Added
+
+- `tabu`, an experimental method: hill climbing that keeps searching past a local optimum and
+  returns the best DAG it visits, as a CPDAG. ([#56])
+
+### Changed
+
+- `hc` returns the same graphs in less time. ([#56])
+- `hc` sets no move limit by default (`max_iter=None`), so large graphs are searched to a local
+  optimum. ([#56])
+
 ## [0.2.1] - 2026-10-12
 
 ### Fixed
@@ -82,4 +98,5 @@ First alpha release.
 [#31]: https://github.com/Abel-ai-lab/andrey/pull/31
 [#33]: https://github.com/Abel-ai-lab/andrey/pull/33
 [#53]: https://github.com/Abel-ai-lab/andrey/pull/53
+[#56]: https://github.com/Abel-ai-lab/andrey/pull/56
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59

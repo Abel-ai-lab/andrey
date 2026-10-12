@@ -29,6 +29,7 @@ from andrey_bench.adapters.andrey_grasp import AndreyGRaSP
 from andrey_bench.adapters.andrey_hc import andrey_hc_adapters
 from andrey_bench.adapters.andrey_ica_lingam import AndreyICALiNGAM
 from andrey_bench.adapters.andrey_pc import AndreyPC
+from andrey_bench.adapters.andrey_tabu import andrey_tabu_adapters
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
@@ -53,6 +54,7 @@ from andrey_bench.oracle import OracleGES
 ALL_ADAPTERS: list[SolutionAdapter] = [
     *andrey_ges_adapters(),
     *andrey_hc_adapters(),
+    *andrey_tabu_adapters(),
     AndreyPC(),
     AndreyFCI(),
     AndreyFCI("majority"),
@@ -125,7 +127,7 @@ DEFERRED_MODULES = {
     "andrey.ges.numpy.parallel": "andrey.search.ges",
     "andrey.ges.numba.serial": "andrey.search.ges",
     "andrey.hc.numpy.serial": "andrey.search.hc",
-    "andrey.hc.numpy.parallel": "andrey.search.hc",
+    "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
     "andrey.fci.numpy": "andrey.constraint.fci",
     "andrey.fci.majority.numpy": "andrey.constraint.fci",
@@ -155,19 +157,15 @@ def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter) -> None:
     )
 
 
-@pytest.mark.parametrize("module", ["andrey_ges", "andrey_hc"])
 @pytest.mark.parametrize(("pinned", "workers"), [("1", 1), ("4", 4), ("-1", -1), ("", 2), ("x", 2)])
-def test_a_parallel_adapter_runs_the_workers_the_runner_pinned(
-    monkeypatch, module, pinned, workers
-):
+def test_a_parallel_adapter_runs_the_workers_the_runner_pinned(monkeypatch, pinned, workers):
     """`split_cores` pins `ANDREY_NUM_WORKERS` to the core budget, so at `--cores 1` a parallel
     adapter runs one worker, as its record says. The fallback covers only an unset or unreadable
     value."""
-    import importlib
+    from andrey_bench.adapters import andrey_ges
 
-    adapters = importlib.import_module(f"andrey_bench.adapters.{module}")
     monkeypatch.setenv("ANDREY_NUM_WORKERS", pinned)
-    assert adapters._parallel_workers() == workers
+    assert andrey_ges._parallel_workers() == workers
 
 
 def test_gcastle_ges_declares_only_the_params_it_honors() -> None:
@@ -196,6 +194,7 @@ def _case(adapter: SolutionAdapter, scm: str, kind: str, values: set[int]):
 #: 6 nodes hidden), or non-Gaussian scale-free, which LiNGAM needs to identify a direction.
 FIT_CASES = [
     *[_case(a, "linear_gauss_er", "cpdag", _MARKS) for a in andrey_ges_adapters()],
+    *[_case(a, "linear_gauss_er", "cpdag", _MARKS) for a in andrey_tabu_adapters()],
     _case(CausalLearnGES(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(GCastleGES(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(AndreyPC(), "linear_gauss_er", "cpdag", _MARKS),

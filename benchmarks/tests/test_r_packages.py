@@ -37,7 +37,6 @@ def test_every_lane_pairs_andrey_against_another_package(lane: str) -> None:
 #: Searches without an Andrey implementation, with reasons. Measure quality and reach, but exclude
 #: speed ratios: comparing different methods would attribute method differences to implementations.
 UNIMPLEMENTED = {
-    "tabu": "bnlearn's tabu escapes a local optimum by accepting worse moves; andrey has none",
     "rfci": "RFCI skips FCI's possible-d-sep pass and may return a different PAG; andrey has none",
 }
 
@@ -89,15 +88,12 @@ def test_selecting_a_solution_the_lane_does_not_have_stops_the_run() -> None:
         r_packages.select(_lane("pc"), ["pcalg.ges"])
 
 
-GATES = {"ANDREY_GES_PARALLEL_MIN_WORK": 28104, "ANDREY_HC_PARALLEL_MIN_WORK": 30000}
+GATES = {"ANDREY_GES_PARALLEL_MIN_WORK": 28104}
 NO_GATES = dict.fromkeys(GATES, None)
 
 
-def test_each_work_gate_reaches_only_the_solutions_that_read_it() -> None:
-    """GES and HC each read their own threshold variable.
-
-    Assigning the GES threshold to parallel HC would record an unused value.
-    """
+def test_the_work_gate_reaches_only_the_solutions_that_read_it() -> None:
+    """Only the parallel GES solution reads the threshold, so it alone gets the overlay."""
     solutions = _lane("score")
     reached = {
         env: {a.name for a in group}
@@ -105,17 +101,8 @@ def test_each_work_gate_reaches_only_the_solutions_that_read_it() -> None:
         if env_map
         for env in env_map
     }
-    assert reached == {
-        "ANDREY_GES_PARALLEL_MIN_WORK": {"andrey.ges.numpy.parallel"},
-        "ANDREY_HC_PARALLEL_MIN_WORK": {"andrey.hc.numpy.parallel"},
-    }
-
-
-def test_a_gate_left_unset_reaches_nobody() -> None:
-    """An unset threshold preserves the shipped default without an overlay of `None`."""
-    solutions = _lane("score")
-    partial = {**NO_GATES, "ANDREY_GES_PARALLEL_MIN_WORK": 28104}
-    overlays = [env for _group, env in r_packages.groups(solutions, partial) if env]
+    assert reached == {"ANDREY_GES_PARALLEL_MIN_WORK": {"andrey.ges.numpy.parallel"}}
+    overlays = [env for _group, env in r_packages.groups(solutions, GATES) if env]
     assert overlays == [{"ANDREY_GES_PARALLEL_MIN_WORK": "28104"}]
 
 

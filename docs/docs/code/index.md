@@ -69,6 +69,7 @@ in a process.
    cdnod
    gies
    hc
+   tabu
    exact_search
    calm
    multi_group_direct_lingam
@@ -131,7 +132,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.ExperimentalWarning` | The first call of an experimental method. |
 | {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
-| {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` took `max_iter` moves. |
+| {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -300,7 +301,7 @@ and `rc_params` return plain data and need no import.
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
-| `andrey calibrate` | Measured GES and HC worker-pool cutoffs for this machine, as settings to export |
+| `andrey calibrate` | Measured GES worker-pool cutoff for this machine, as a setting to export |
 | `andrey --skill` / `andrey --llms` | Generated package guides |
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or

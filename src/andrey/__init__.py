@@ -27,6 +27,7 @@ from .api import (
     pc,
     pnl,
     rcd,
+    tabu,
     varma_lingam,
 )
 from .core import GraphStructure, Structure, StructureOutput, SummaryGraph, TemporalStructure
@@ -68,6 +69,7 @@ __all__ = [
     "ges",
     "gies",
     "hc",
+    "tabu",
     "exact_search",
     "calm",
     "boss",

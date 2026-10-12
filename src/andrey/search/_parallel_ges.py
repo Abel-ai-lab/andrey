@@ -48,9 +48,8 @@ def reduce_best(
 ) -> ForwardResult | BackwardResult:
     """Select the best chunk by its ``(stable_key, x, y, index)`` key in ``r[0]``.
 
-    Uses :func:`andrey.search._parallel.reduce_best`; HC uses its default ``r[:4]`` key. Each
-    ``(x, y, index)`` belongs to one target partition, so keys are globally unique and strict-``<``
-    reduction is independent of completion order.
+    Uses :func:`andrey.search._parallel.reduce_best`. Each ``(x, y, index)`` belongs to one target
+    partition; unique keys make strict-``<`` reduction independent of completion order.
     """
     return par.reduce_best(results, key=lambda r: r[0])
 

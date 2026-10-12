@@ -137,3 +137,37 @@ def test_purity_repeated_interleaved_query_is_bit_identical() -> None:
     for _ in range(5):
         assert delta.delta_many_with_base(*q2) == a2
         assert delta.delta_many_with_base(*q1) == a1
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_row_deltas_match_two_full_scores(seed: int) -> None:
+    """``add_deltas`` and ``remove_deltas`` score every candidate as two full scores do."""
+    x = _well_conditioned(seed, 600, 9)
+    score = BICScore(x, lambda_value=2.0)
+    v = 0
+    for base in [(), (2,), (1, 3), (1, 3, 5, 7)]:
+        add = score_delta.add_deltas(score, v, base)
+        remove = score_delta.remove_deltas(score, v, base)
+        for u in range(9):
+            for op, got, applies in (
+                ("add", add, u != v and u not in base),
+                ("remove", remove, u in base),
+            ):
+                if not applies:
+                    assert got[u] == np.inf, (op, base, u)
+                    continue
+                want = _full_delta(score, v, base, u, op)
+                assert abs(got[u] - want) <= 1e-9 * max(1.0, abs(want)), (op, base, u, got[u], want)
+
+
+def test_row_deltas_are_two_full_scores_on_ill_conditioned_base() -> None:
+    """A near-singular base gives every row entry from two full scores, exactly."""
+    rng = np.random.default_rng(0)
+    base_cols = rng.standard_normal((400, 4))
+    x = np.hstack([base_cols, base_cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))])
+    score = BICScore(x, lambda_value=2.0)
+    base = (0, 4)  # columns 0 and 4 are collinear
+    add = score_delta.add_deltas(score, 1, base)
+    remove = score_delta.remove_deltas(score, 1, base)
+    assert [add[u] for u in (2, 3)] == [_full_delta(score, 1, base, u, "add") for u in (2, 3)]
+    assert [remove[u] for u in base] == [_full_delta(score, 1, base, u, "remove") for u in base]

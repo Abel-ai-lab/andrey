@@ -22,7 +22,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: Over 100x faster on PC, and faster on most other supported methods.
 - **Just as accurate**: the same errors or fewer in 38 of 42 comparisons with other packages.
-- **One API**: 21 methods, each one function call.
+- **One API**: 22 methods, each one function call.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
 <!-- PITCH:END -->
@@ -81,7 +81,7 @@ Four ideas make it fast; each is animated in
 | Family | Methods | Returns |
 |---|---|---|
 | Constraint-based | [`pc`](https://andrey.abel.ai/docs/code/generated/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/code/generated/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/code/generated/andrey.gfci.html)\*, [`cdnod`](https://andrey.abel.ai/docs/code/generated/andrey.cdnod.html)\* | CPDAG, PAG |
-| Score-based | [`ges`](https://andrey.abel.ai/docs/code/generated/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/code/generated/andrey.gies.html)\*, [`hc`](https://andrey.abel.ai/docs/code/generated/andrey.hc.html)\*, [`exact_search`](https://andrey.abel.ai/docs/code/generated/andrey.exact_search.html)\*, [`calm`](https://andrey.abel.ai/docs/code/generated/andrey.calm.html)\* | CPDAG, DAG |
+| Score-based | [`ges`](https://andrey.abel.ai/docs/code/generated/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/code/generated/andrey.gies.html)\*, [`hc`](https://andrey.abel.ai/docs/code/generated/andrey.hc.html)\*, [`tabu`](https://andrey.abel.ai/docs/code/generated/andrey.tabu.html)\*, [`exact_search`](https://andrey.abel.ai/docs/code/generated/andrey.exact_search.html)\*, [`calm`](https://andrey.abel.ai/docs/code/generated/andrey.calm.html)\* | CPDAG, DAG |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/code/generated/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/code/generated/andrey.grasp.html) | CPDAG |
 | Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.multi_group_direct_lingam.html)\* | DAG |
 | Time series | [`varma_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.varma_lingam.html)\*, [`longitudinal_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.longitudinal_lingam.html)\* | Temporal graph |
