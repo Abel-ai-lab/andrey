@@ -201,9 +201,7 @@ def fci(
     Keep a fixed column order for reproducible results.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
-    including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent. An
-    implementation that checks only the inner part of the path [5]_ can orient differently where R5
-    applies.
+    including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
 
     References
     ----------
@@ -216,7 +214,6 @@ def fci(
        1873-1896.
     .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
-    .. [5] causal-learn 0.1.4.8, ``ruleR5`` in ``causallearn/search/ConstraintBased/FCI.py``.
 
     Examples
     --------
@@ -310,8 +307,6 @@ def gfci(
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
-    An implementation that checks only the inner part of the path [4]_ can orient differently where
-    R5 applies.
 
     References
     ----------
@@ -322,7 +317,6 @@ def gfci(
        1873-1896.
     .. [3] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
-    .. [4] causal-learn 0.1.4.8, ``ruleR5`` in ``causallearn/search/ConstraintBased/FCI.py``.
 
     Examples
     --------

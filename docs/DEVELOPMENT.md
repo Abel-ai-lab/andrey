@@ -75,9 +75,9 @@ pages, and an Atom feed at `/blog/atom.xml`. A post is a MyST page whose front m
 list leaves out. A dated post is published in every build, even before its date, so a future date
 does not keep a post private.
 
-A post's numbers come from the summary: sentences use MyST substitutions such as `{{ slow_fit }}`,
-and figures are raw HTML blocks that `conf.py` writes to `_generated/blog/` from `site/build.py`
-(`launch_post_context`).
+A post belongs to the release in its `version` front matter, and later builds leave it as that
+release rendered it: its numbers are typed text, and every file it includes (a figure, code, or
+output) is stored under `blog/<version>/`.
 
 ## The Examples and Demos galleries
 
