@@ -511,6 +511,21 @@ def worker_count(num_workers: int | None = None) -> int:
     return max(1, n)
 
 
+@lru_cache(maxsize=1)
+def _thread_pools():
+    from threadpoolctl import ThreadpoolController
+
+    return ThreadpoolController()
+
+
+def one_blas_thread() -> contextlib.AbstractContextManager:
+    """Limit the loaded BLAS and OpenMP thread pools to one thread inside a ``with`` block.
+
+    The libraries are found once per process; one loaded after the first call is not limited.
+    """
+    return _thread_pools().limit(limits=1)
+
+
 def parallel_map(fn, items, *, num_workers: int | None = None) -> list:
     """Map ``fn`` over ``items`` serially or with a process pool.
 

@@ -23,19 +23,19 @@ ones drive which, and draws them as a graph of causes. As AI systems take on mor
 decisions of their own, they need to know what causes what.
 
 For a long time, scale has held causal discovery back. The methods are well understood, but popular
-Python packages run them slowly. {{ slow_fit }}. At that speed, trying a new idea takes time, and
-data with thousands of variables is out of reach.
+Python packages run them slowly. PC on 400 variables took 617 s in causal-learn. At that speed,
+trying a new idea takes time, and data with thousands of variables is out of reach.
 
 We built Andrey to make causal discovery fast and easy to use. It runs the same methods faster
-({{ speed_short }}).
+(over 100x on PC).
 
-- **Fast**: {{ speed_claim }}
-- **Just as accurate**: the same errors or fewer in {{ as_good }} comparisons with other packages.
-- **One API**: {{ method_count }}, each one function call.
+- **Fast**: Over 100x faster on PC, and faster on most other supported methods.
+- **Just as accurate**: the same errors or fewer in 38 of 42 comparisons with other packages.
+- **One API**: 18 methods, each one function call.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
 ```{raw} html
-:file: ../_generated/blog/speedup.html
+:file: 0.1.0/speedup.html
 ```
 
 [Why Andrey is fast](why-andrey-is-fast.md) explains the four ideas behind the speed. Andrey
@@ -59,19 +59,19 @@ uv add andrey-core
 
 Then run PC on a real dataset:
 
-```{literalinclude} ../../site/example.py
+```{literalinclude} 0.1.0/example.py
 :language: python
 :caption: example.py
 ```
 
-```{literalinclude} ../_generated/blog/example-output.txt
+```{literalinclude} 0.1.0/example-output.txt
 :language: text
 :caption: example.py
 ```
 
 ## Help us build it
 
-Andrey {{ release }} is in alpha, the API may change between releases.
+Andrey 0.1.0 is in alpha, the API may change between releases.
 
 When you try it on your own data,
 [tell us what breaks](https://github.com/Abel-ai-lab/andrey/issues/new) or which method you need.

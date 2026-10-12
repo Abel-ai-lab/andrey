@@ -1,4 +1,4 @@
-"""The GES and HC worker-pool cutoffs: the default warns once, explicit values do not, results hold.
+"""The GES worker-pool cutoff: the default warns once, explicit values do not, results hold.
 
 Controlled inputs only; the calibrator's search runs on fake timing functions.
 """
@@ -17,9 +17,8 @@ from andrey.cli import main
 from andrey.search import calibrate as cal
 
 pg = importlib.import_module("andrey.search._parallel_ges")
-ph = importlib.import_module("andrey.search._parallel_hc")
 
-METHODS = {"ges": pg, "hc": ph}
+METHODS = {"ges": pg}
 
 
 @pytest.fixture(autouse=True)
@@ -58,21 +57,11 @@ def test_default_cutoff_warns_once_naming_the_setting_and_command(method, monkey
 
 @pytest.mark.parametrize("method", METHODS)
 def test_a_fit_far_below_the_default_cutoff_does_not_warn(method):
-    """Six variables: every pass is far below a tenth of either real default."""
+    """Six variables: every pass is far below a tenth of the real default."""
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         _fit(method, workers=2)
     assert not _cutoff_warnings(caught)
-
-
-@pytest.mark.parametrize("cutoff, warns", [(300, True), (301, False)])
-def test_hc_warns_from_a_tenth_of_the_cutoff(cutoff, warns, monkeypatch):
-    """HC's every pass has work d * (d - 1) = 30 at d = 6: the threshold is a tenth of 300."""
-    _small_default(monkeypatch, "hc", cutoff)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        _fit("hc", workers=2)
-    assert bool(_cutoff_warnings(caught)) is warns
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -100,15 +89,11 @@ def test_a_serial_fit_never_warns(method):
     assert not _cutoff_warnings(caught)
 
 
-@pytest.mark.parametrize(
-    "method, offset, pooled",
-    [("ges", -1, True), ("ges", 0, None), ("hc", -1, True), ("hc", 0, False)],
-)
+@pytest.mark.parametrize("method, offset, pooled", [("ges", -1, True), ("ges", 0, None)])
 def test_serial_and_pooled_fits_agree_around_a_forced_cutoff(method, offset, pooled, monkeypatch):
     """A first pass over d variables has work d * (d - 1); a cutoff one below it pools that pass.
 
-    HC's passes all have that work, so at the cutoff it stays serial. GES's later passes do more
-    work, so at the cutoff only the results are compared.
+    GES's later passes do more work, so at the cutoff only the results are compared.
     """
     d = 8
     created = []
@@ -182,11 +167,11 @@ def test_calibrate_command_prints_the_settings(capsys, monkeypatch):
         return {m: cal.Crossover(32, 35, ((32, 0.2, 0.25), (35, 0.27, 0.26))) for m in methods}
 
     monkeypatch.setattr(cal, "calibrate", fake)
-    assert main(["calibrate", "--workers", "4", "--method", "hc", "--json"]) == 0
+    assert main(["calibrate", "--workers", "4", "--method", "ges", "--json"]) == 0
     report = json.loads(capsys.readouterr().out)
-    assert seen == {"workers": 4, "methods": ["hc"]}
-    assert report["settings"] == {"ANDREY_NUM_WORKERS": "4", "ANDREY_HC_PARALLEL_MIN_WORK": "1100"}
-    assert report["methods"]["hc"]["pool_faster_at"] == {"d": 35, "work": 1190}
+    assert seen == {"workers": 4, "methods": ["ges"]}
+    assert report["settings"] == {"ANDREY_NUM_WORKERS": "4", "ANDREY_GES_PARALLEL_MIN_WORK": "1100"}
+    assert report["methods"]["ges"]["pool_faster_at"] == {"d": 35, "work": 1190}
     assert report["schema_version"] == "2"
 
 
@@ -197,7 +182,7 @@ def test_calibrate_command_rejects_a_malformed_environment(capsys, monkeypatch):
     assert error["code"] == "invalid_configuration" and "ANDREY_NUM_WORKERS" in error["message"]
 
 
-@pytest.mark.parametrize("args", [["--workers", "1"], ["--method", "pc"]])
+@pytest.mark.parametrize("args", [["--workers", "1"], ["--method", "pc"], ["--method", "hc"]])
 def test_calibrate_command_rejects_bad_options(args, capsys):
     assert main(["calibrate", *args]) == 2
     assert json.loads(capsys.readouterr().err)["error"]["code"] == "unsupported_value"

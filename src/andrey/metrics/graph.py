@@ -98,10 +98,9 @@ def shd(estimated: object, true: object, *, endpoint_aware: bool = False) -> int
     """Structural Hamming distance between two graphs (lower is better; ``shd(g, g) == 0``).
 
     The default structural count charges one edit per unordered pair whose ``(mark_i, mark_j)``
-    differs, so an inserted, deleted, or reversed edge each costs 1 (the pcalg / bnlearn
-    convention; note cdt doubles reversals by default). ``endpoint_aware=True`` sums the
-    per-endpoint mark mismatches instead -- the standard PAG distance, where a reversal or a deleted
-    directed edge costs 2 and tail/arrow/circle are distinguished.
+    differs, so an inserted, deleted, or reversed edge each costs 1. ``endpoint_aware=True`` sums
+    the per-endpoint mark mismatches instead -- the standard PAG distance, where a reversal or a
+    deleted directed edge costs 2 and tail/arrow/circle are distinguished.
 
     Examples
     --------

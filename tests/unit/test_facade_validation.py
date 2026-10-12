@@ -6,10 +6,13 @@ Direct Python calls (not the CLI, which validates inputs of its own) must not le
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
 import andrey
+from andrey.data import sample_scm
 
 
 def test_direct_lingam_rejects_non_2d():
@@ -47,7 +50,9 @@ SINGLE = {
     "cdnod": lambda data: andrey.cdnod(data, c_indx=np.arange(len(data)) % 2),
     "ges": andrey.ges,
     "gies": andrey.gies,
+    "xges": andrey.xges,
     "hc": andrey.hc,
+    "tabu": andrey.tabu,
     "exact_search": andrey.exact_search,
     "calm": andrey.calm,
     "boss": andrey.boss,
@@ -100,6 +105,12 @@ def test_one_column_gives_a_one_node_graph(method):
     structure = SINGLE[method](_data(d=1)).structure
     assert structure.n_nodes == 1
     assert structure.oriented_edges() == []
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("method", ["pc", "ges", "hc", "xges"])
+def test_no_columns_give_an_empty_graph(method):
+    assert SINGLE[method](_data(d=0)).structure.n_nodes == 0
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
@@ -219,6 +230,8 @@ def test_gin_labels_name_each_column():
         (andrey.hc, 0, ValueError),
         (andrey.hc, 2.5, TypeError),
         (andrey.hc, True, TypeError),
+        (andrey.tabu, 0, ValueError),
+        (andrey.tabu, 2.5, TypeError),
         (andrey.ica_lingam, 0, ValueError),
         (andrey.ica_lingam, 1.5, TypeError),
     ],
@@ -234,7 +247,46 @@ def test_hc_stops_at_max_iter_and_warns():
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
         out = andrey.hc(chain, max_iter=3)
     assert len(out.structure.oriented_edges()) == 3
-    assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # finished before 200 moves
+    assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # runs to a local optimum
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_hc_sets_no_move_limit_by_default():
+    # This dense graph takes over 200 moves: a limit of 200 stops the search, the default does not.
+    x = sample_scm(d=30, n=800, seed=0, density=16.0).data
+    with pytest.warns(andrey.SearchLimitWarning, match="max_iter=200"):
+        andrey.hc(x, max_iter=200)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.SearchLimitWarning)
+        out = andrey.hc(x)
+    assert len(out.structure.oriented_edges()) > 200
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("settings", "named", "error"),
+    [
+        ({"tabu_length": 0}, "tabu_length", ValueError),
+        ({"tabu_length": 2.5}, "tabu_length", TypeError),
+        ({"max_tabu": 0}, "max_tabu", ValueError),
+        ({"max_tabu": 11}, "max_tabu", ValueError),  # longer than the default tabu list
+        ({"tabu_length": 3, "max_tabu": 4}, "max_tabu", ValueError),
+        ({"max_tabu": True}, "max_tabu", TypeError),
+        ({"lambda_value": -1.0}, "lambda_value", ValueError),
+        ({"score_func": "local_score_BDeu"}, "score_func", NotImplementedError),
+    ],
+)
+def test_tabu_rejects_a_bad_setting(settings, named, error):
+    with pytest.raises(error, match=named):
+        andrey.tabu(_data(), **settings)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_tabu_stops_at_max_iter_and_warns():
+    chain = np.cumsum(np.random.default_rng(0).standard_normal((500, 8)), axis=1)
+    with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
+        out = andrey.tabu(chain, max_iter=3)
+    assert len(out.structure.oriented_edges()) == 3
 
 
 def test_cdnod_with_one_domain_gives_the_pc_graph():
@@ -248,3 +300,19 @@ def test_cdnod_with_one_domain_gives_the_pc_graph():
 def test_cdnod_rejects_nan_in_c_indx():
     with pytest.raises(ValueError, match="c_indx contains NaN"):
         andrey.cdnod(_data(), c_indx=np.r_[np.nan, np.zeros(59)])
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("setting", "value", "error"),
+    [
+        ("extended_search", 1, TypeError),
+        ("extended_search", "yes", TypeError),
+        ("lambda_value", -1.0, ValueError),
+        ("lambda_value", float("inf"), ValueError),
+        ("score_func", "local_score_BDeu", NotImplementedError),
+    ],
+)
+def test_xges_rejects_a_bad_setting(setting, value, error):
+    with pytest.raises(error, match=setting):
+        andrey.xges(_data(), **{setting: value})

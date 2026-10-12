@@ -330,7 +330,7 @@ def test_the_example_copy_counts_the_links_pc_finds_in_the_known_network(placeho
     found, known = ({frozenset(edge[:2]) for edge in edges} for edges in (found, known))
     assert found <= known
     claim = (
-        f"PC finds {len(found)} of the {len(known)} links in the known signalling network, "
+        f"PC finds {len(found)} of the {len(known)} links in the known signaling network, "
         "and none outside it"
     )
     guide = (ROOT / "docs" / "docs" / "guides" / "getting-started.md").read_text(encoding="utf-8")
@@ -511,7 +511,7 @@ def test_the_speedup_panel_has_a_slide_per_method_at_its_largest_claimed_size():
     )
     assert 'id="race-m-pc" checked' in html and html.count(" checked") == 1
     assert '<legend class="visually-hidden">Method</legend>' in html
-    assert '<a class="race-link" href="docs/benchmarks.html">Benchmark report</a>' in html
+    assert '<a class="race-link" href="docs/benchmarks.html">Release cards</a>' in html
 
 
 def test_every_speedup_bar_comes_from_andreys_paired_ratios():
@@ -916,10 +916,11 @@ def test_the_hero_grain_is_small_and_the_same_on_every_build(cards):
     assert "cards.grain.hero_tiles()" in (ROOT / "docs" / "conf.py").read_text()
 
 
-def test_the_homepage_and_docs_css_name_no_colour(cards):
+def test_the_homepage_and_docs_css_name_no_color(cards):
     # Every color is a generated token, so a palette edit reaches the hero and the chip too.
     sheets = ("site.css", "figures.css", "why-fast.css")
-    for path in [*(f"site/assets/{name}" for name in sheets), "docs/_static/andrey.css"]:
+    docs = ("docs/_static/andrey.css", "docs/_static/benchmarks.css")
+    for path in [*(f"site/assets/{name}" for name in sheets), *docs]:
         rules = re.sub(r"/\*.*?\*/", "", (ROOT / path).read_text(), flags=re.S)
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(", rules), path
     tokens = cards.grain.ground_tokens()
@@ -959,7 +960,7 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     assert cards.TAGLINE == "A very fast causal discovery package"
 
 
-@pytest.mark.parametrize("kind", ["pair", "graph"])
+@pytest.mark.parametrize("kind", ["pair", "iceberg", "graph"])
 def test_a_post_cover_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
     import io
 
@@ -1002,8 +1003,9 @@ def test_the_published_summary_gives_every_paired_ratio():
             assert (row["ratio"] is not None) == timed, (method["method"], method["comparator"])
 
 
-def test_no_speed_cell_is_withheld_in_the_report_or_the_readme():
-    for page in (ROOT / "docs" / "docs" / "benchmarks.md", ROOT / "README.md"):
+def test_no_speed_cell_is_withheld_in_the_reports_or_the_readme():
+    reports = sorted((ROOT / "docs" / "docs" / "benchmarks").glob("*.md"))
+    for page in (*reports, ROOT / "docs" / "docs" / "benchmarks.md", ROOT / "README.md"):
         text = page.read_text(encoding="utf-8").lower()
         assert "no claim" not in text and "no speed claim" not in text, page.name
 

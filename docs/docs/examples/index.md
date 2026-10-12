@@ -76,6 +76,28 @@ DirectLiNGAM and ICA-LiNGAM orient every edge when the noise is non-Gaussian.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Hidden common causes: RCD
+:link: rcd
+:link-type: doc
+:img-top: /_generated/thumbs/rcd.svg
+:img-alt: The true graph of this notebook's data, with one pair that shares a hidden cause
+
+RCD finds the direct causes and marks the pairs that share a hidden cause.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
+:::{grid-item-card} Hidden common causes: BottomUpParceLiNGAM
+:link: bottom_up_parce_lingam
+:link-type: doc
+:img-top: /_generated/thumbs/bottom_up_parce_lingam.svg
+:img-alt: The true graph of this notebook's data, with one pair that shares a hidden cause
+
+BottomUpParceLiNGAM orders the variables and leaves those a hidden cause confounds unordered.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Drawing a recovered structure
 :link: viz
 :link-type: doc
@@ -97,5 +119,7 @@ ges_quickstart
 constraint_based
 permutation_based
 lingam
+rcd
+bottom_up_parce_lingam
 viz
 ```

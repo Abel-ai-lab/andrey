@@ -10,7 +10,6 @@ from itertools import combinations
 from math import comb
 
 import numpy as np
-from threadpoolctl import threadpool_limits
 
 from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
@@ -20,7 +19,7 @@ from andrey.constraint._skeleton import (
     prescreen_capable,
     scan_pairs,
 )
-from andrey.core import ARROW, NULL, TAIL, GraphStructure
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
@@ -170,8 +169,8 @@ def _discover_skeleton(
     try:
         size = 0
         while True:
-            neighbours = [np.flatnonzero(adj[i] != NULL) for i in range(d)]
-            max_degree = max((nb.size for nb in neighbours), default=0)
+            neighbors = [np.flatnonzero(adj[i] != NULL) for i in range(d)]
+            max_degree = max((nb.size for nb in neighbors), default=0)
             if size > max_degree - 1:
                 break
             remove: list[tuple[int, int]] = []
@@ -182,7 +181,7 @@ def _discover_skeleton(
             elif can_prescreen and size == 1:
                 for x, y in adjacent_pairs(adj):
                     candidates = sorted(
-                        (set(neighbours[x].tolist()) | set(neighbours[y].tolist())) - {x, y}
+                        (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
                     separating = first_order_separating(test, x, y, candidates, alpha, _trace)
                     if separating:
@@ -190,7 +189,7 @@ def _discover_skeleton(
                         sepsets[(x, y)] = tuple(separating)
             else:
                 pairs = adjacent_pairs(adj)
-                if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbours, size):
+                if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbors, size):
                     warn_once(
                         f"PC conditioning size {size} requires at least "
                         f"{_EXPENSIVE_PASS_TESTS:,} CI tests "
@@ -204,8 +203,8 @@ def _discover_skeleton(
                 else:
                     # Pin BLAS to one thread: the conditioning-submatrix inversions then match the
                     # (1-thread) parallel skeleton workers regardless of the host thread count.
-                    with threadpool_limits(limits=1):
-                        removals = scan_pairs(test, pairs, neighbours, size, alpha, _trace)
+                    with backend.one_blas_thread():
+                        removals = scan_pairs(test, pairs, neighbors, size, alpha, _trace)
                 for x, y, separating in removals:
                     remove.append((x, y))
                     sepsets[(x, y)] = separating
@@ -220,14 +219,14 @@ def _discover_skeleton(
     return adj, sepsets
 
 
-def _expensive_pass(pairs: list[tuple[int, int]], neighbours: list[np.ndarray], size: int) -> bool:
+def _expensive_pass(pairs: list[tuple[int, int]], neighbors: list[np.ndarray], size: int) -> bool:
     """Whether the pass reaches the warning threshold, counting shared subsets once."""
     tests = 0
     for x, y in pairs:
-        shared = len(set(neighbours[x]) & set(neighbours[y]))
+        shared = len(set(neighbors[x]) & set(neighbors[y]))
         tests += (
-            comb(len(neighbours[x]) - 1, size)
-            + comb(len(neighbours[y]) - 1, size)
+            comb(len(neighbors[x]) - 1, size)
+            + comb(len(neighbors[y]) - 1, size)
             - comb(shared, size)
         )
         if tests >= _EXPENSIVE_PASS_TESTS:
