@@ -998,16 +998,23 @@ def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
     """The homepage's speedup panel as a standalone SVG: one card per method, Andrey accented.
 
     A README can show only an image, so the panel's slides become cards side by side, from the
-    same :func:`speedup_slides`. The chart sits on an opaque card, so it stays legible where a
-    renderer shows the light file on a dark page.
+    same :func:`speedup_slides`. Each card is as tall as its own bars; a row of cards starts below
+    the tallest card of the row above. The chart sits on an opaque card, so it stays legible where
+    a renderer shows the light file on a dark page.
     """
     slides = readme_slides(summary)
     width, pad, gap, columns = 960, 24, 16, README_COLUMNS
     card_w = (width - 2 * pad - gap * (columns - 1)) / columns
-    rows = max(len(bars) for _, _, bars in slides)
-    card_h = 70 + rows * 30
     top = pad + 44
-    height = top + math.ceil(len(slides) / columns) * (card_h + gap) - gap + pad
+
+    def card_h(bars: list) -> int:
+        return 70 + len(bars) * 30
+
+    row_tops, y_row = [], top
+    for start in range(0, len(slides), columns):
+        row_tops.append(y_row)
+        y_row += max(card_h(bars) for _, _, bars in slides[start : start + columns]) + gap
+    height = y_row - gap + pad
     ink, muted, line, accent = palette.ink, palette.muted, palette.line, palette.accent
 
     def text(x: float, y: float, content: str, *, size=13, fill=ink, weight=400, anchor="start"):
@@ -1029,9 +1036,9 @@ def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
     ]
     for i, (name, size, bars) in enumerate(slides):
         x = pad + (i % columns) * (card_w + gap)
-        y = top + (i // columns) * (card_h + gap)
+        y = row_tops[i // columns]
         parts.append(
-            f'<rect x="{x:.1f}" y="{y:.1f}" width="{card_w:.1f}" height="{card_h}" rx="12" '
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{card_w:.1f}" height="{card_h(bars)}" rx="12" '
             f'fill="{palette.surface}" stroke="{line}"/>'
         )
         # A long name steps down a size so it clears the size label on the right.
