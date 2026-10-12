@@ -233,7 +233,7 @@ html[data-theme="dark"] .release-tile {
   line-height: 1.55;
 }
 
-/* Latest, the status, and the date, as one line of text. */
+/* Latest and the measurement date, as one line of text. */
 .release-tldr > p.release-status {
   color: var(--andrey-muted);
   font-size: 0.82rem;

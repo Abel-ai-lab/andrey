@@ -33,7 +33,7 @@ Hidden common causes
 
 ::::{div} release-tldr
 
-<p class="release-status">Latest · Pre-release · Measured 11 October 2026</p>
+<p class="release-status">Latest · Measured 11 October 2026</p>
 
 RCD and BottomUpParceLiNGAM, two methods for data with hidden common causes, compared with lingam,
 which implements both. Both are supported from 0.2.0.

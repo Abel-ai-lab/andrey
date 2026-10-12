@@ -89,14 +89,15 @@ next release's card.
 
 [`docs/benchmarks.md`](docs/benchmarks.md) is the Release cards page, at the address the README and
 the homepage link. The latest release leads as a cover (masthead, title, version) beside its TL;DR:
-a status line, the abstract, three numbers, a limit, and a button to the card.
+the measurement date, the abstract, three numbers, a limit, and a button to the card.
 Earlier releases follow as a list, newest first, each with a square tile showing its version. To
 add a release:
 
 1. Move the current latest release to the top of "Earlier releases": copy a row and set its
    version, title, methods sentence, facts, release date, and links.
-2. Fill the latest block with the new release. Before the tag, set its status line to Released
-   with the date, and add a link to the post after the card's button.
+2. Fill the latest block with the new release, and add a link to the post after the card's button
+   once the post is out. The block states only what does not change: the published site is built
+   from release tags, so a reader never sees a card before its release.
 3. Add the new card to the toctree, newest first.
 4. Store the cover's art as `_static/release-cards/<release>.jpg`: a finished JPEG, 8.5 x 11 at
    three times the cover's 288 px width, with its own glow and grain and a dark ground behind the
