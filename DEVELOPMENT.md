@@ -273,8 +273,10 @@ fails. The pull request makes:
 - the method under "Supported methods" in `docs/docs/code/index.md`;
 - its rows in the summary of the release that publishes its benchmark,
   `benchmarks/published/<label>/summary.json`, generated from the campaign's records;
-- a section for it in that release's report, `docs/docs/benchmarks/<release>.md`, with its driver
-  in the "Reproduce" table; `docs/docs/benchmarks.md` lists the reports, newest first;
+- a section for it in that release's card, `docs/docs/benchmarks/<release>.md`, with its driver in
+  the "Reproduce" table; the Release cards page, `docs/docs/benchmarks.md`, features the latest
+  release and lists the earlier ones ("The release cards" in
+  [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) says how to add one);
 - an example notebook in `examples/` that calls it;
 - the quality-gate and recorded-output entries from steps 2 and 4.
 

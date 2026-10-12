@@ -1,90 +1,637 @@
-/* The Benchmarks page: one card per release report. Colors are --andrey-* tokens. */
+/* The Release cards page: the latest release's cover beside its TL;DR, then the earlier releases
+   as a list. Loaded on that page only. Colors are --andrey-* tokens. */
 
-/* The grid's edges line up with the text column. */
-.benchmark-reports {
-  padding-inline: 0;
+/* ---------- the intro ---------- */
+.bd-article h1 + p {
+  max-width: 46rem;
+  margin-bottom: 1.75rem;
+  color: var(--andrey-muted);
+  font-size: 1.05rem;
 }
 
-/* A report's cover: the homepage hero's navy ground lit cobalt from the top left, the same in both
-   themes, with the release in large light type. With the extra `.sd-card` the selector ties the
-   theme's `.bd-content .sd-card .sd-card-header`; this file loads after the theme's styles, so its
-   ground and border win. */
-.benchmark-reports .sd-card .report-cover {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 2rem;
-  min-height: 10rem;
-  padding: 1.25rem 1.5rem 1.4rem;
+/* ---------- the cover and the tile: the homepage hero's stipple ground ---------- */
+/* Navy lit cobalt from the top left and amber from the bottom right, the same in both themes, with
+   the hero's grain tiles over it. `.bd-content .sd-card` is the theme's selector; the extra class
+   wins over it. */
+.bd-content .sd-card.release-cover,
+.bd-content .sd-card.release-tile {
+  isolation: isolate;
+  overflow: hidden;
   border: 0;
-  border-radius: calc(var(--andrey-radius-lg) - 1px) calc(var(--andrey-radius-lg) - 1px) 0 0;
   background:
     radial-gradient(
       circle at 14% 0%,
-      color-mix(in srgb, var(--andrey-ground-cobalt) 80%, var(--andrey-ground-navy)) 0,
-      transparent 70%
+      color-mix(in srgb, var(--andrey-ground-cobalt) 82%, var(--andrey-ground-navy)) 0,
+      transparent 68%
+    ),
+    radial-gradient(
+      circle at 104% 112%,
+      color-mix(in srgb, var(--andrey-ground-amber) 34%, transparent),
+      transparent 44%
     ),
     var(--andrey-ground-navy);
   color: var(--andrey-ground-ink);
-  transition: filter var(--andrey-dur) var(--andrey-ease);
 }
 
-.benchmark-reports .sd-card:hover .report-cover {
-  filter: brightness(1.12);
+.release-cover::before,
+.release-cover::after,
+.release-tile::before,
+.release-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
 }
 
-.benchmark-reports .report-cover p {
+/* A mask reads only alpha, so the navy here only sets how much of each tile shows. */
+.release-cover::before,
+.release-tile::before {
+  --fade: radial-gradient(
+    circle at 14% 0%,
+    var(--andrey-ground-navy) 0,
+    color-mix(in srgb, var(--andrey-ground-navy) 50%, transparent) 42%,
+    transparent 80%
+  );
+  background: url("grain-noise.png") 0 0 / 128px, url("grain-cobalt.png") 0 0 / 128px;
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
+}
+
+.release-cover::after,
+.release-tile::after {
+  --fade: radial-gradient(
+    circle at 104% 112%,
+    var(--andrey-ground-navy) 0,
+    color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent) 24%,
+    transparent 50%
+  );
+  background: url("grain-amber.png") 64px 64px / 128px;
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
+}
+
+.bd-content .sd-card.release-cover .sd-card-body,
+.bd-content .sd-card.release-tile .sd-card-body {
+  display: flex;
+  flex-direction: column;
+  background: none;
+}
+
+.release-cover .sd-card-text,
+.release-tile .sd-card-text {
+  margin: 0;
+  color: var(--andrey-ground-ink);
+}
+
+/* The card's link covers it; the ring goes round the cover, outside its clipped edge. */
+.bd-content .sd-card:is(.release-cover, .release-tile) .sd-stretched-link:focus-visible::after {
+  outline: none;
+}
+
+.release-cover:has(.sd-stretched-link:focus-visible),
+.release-tile:has(.sd-stretched-link:focus-visible) {
+  outline: 3px solid var(--andrey-accent);
+  outline-offset: 3px;
+}
+
+/* The latest release's cover: a printed issue, bound on the left. A masthead along the top edge,
+   the title under it, and the version at the foot under a short amber rule. */
+.release-cover {
+  aspect-ratio: 8.5 / 11;
+  border-radius: 3px 7px 7px 3px;
+  box-shadow:
+    inset 5px 0 6px -3px color-mix(in srgb, var(--andrey-ground-navy) 75%, transparent),
+    inset 6px 0 0 -5px color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--andrey-ground-navy) 22%, transparent),
+    0 2px 3px color-mix(in srgb, var(--andrey-ground-navy) 16%, transparent),
+    10px 22px 40px -16px color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent);
+}
+
+html[data-theme="dark"] .release-cover {
+  box-shadow:
+    inset 5px 0 6px -3px color-mix(in srgb, var(--andrey-ground-navy) 75%, transparent),
+    inset 6px 0 0 -5px color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--andrey-ground-cobalt-light) 22%, transparent),
+    10px 22px 44px -14px color-mix(in srgb, var(--andrey-ground-cobalt) 32%, transparent);
+}
+
+.bd-content .sd-card.release-cover .sd-card-body {
+  padding: 1.2rem 1.7rem 1.9rem 2.05rem;
+}
+
+.release-cover .sd-card-text:nth-of-type(1) {
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 24%, transparent);
+  color: color-mix(in srgb, var(--andrey-ground-ink) 70%, transparent);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.release-cover .sd-card-text:nth-of-type(2) {
+  max-width: 12.5rem;
+  margin-top: 1.5rem;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
+}
+
+.release-cover .sd-card-text:nth-of-type(3) {
+  margin-top: auto;
+  font-size: 4.25rem;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 0.85;
+}
+
+.release-cover .sd-card-text:nth-of-type(3)::before {
+  content: "";
+  display: block;
+  width: 2rem;
+  height: 2px;
+  margin-bottom: 0.9rem;
+  background: var(--andrey-ground-amber);
+}
+
+/* An earlier release's tile: the same ground, square, the version at the bottom left. */
+.release-tile {
+  aspect-ratio: 1;
+  border-radius: var(--andrey-radius-md);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--andrey-ground-navy) 20%, transparent),
+    0 6px 14px -8px color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent);
+}
+
+html[data-theme="dark"] .release-tile {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--andrey-ground-cobalt-light) 22%, transparent);
+}
+
+.bd-content .sd-card.release-tile .sd-card-body {
+  justify-content: flex-end;
+  padding: 0.5rem 0.55rem 0.55rem 0.6rem;
+}
+
+.release-tile .sd-card-text {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* ---------- the latest release: the cover beside its TL;DR ---------- */
+.release-latest {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  gap: 2.25rem;
+  align-items: start;
+  padding: 1.9rem 1.9rem 1.9rem 2.1rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background:
+    radial-gradient(
+      36rem 26rem at 0% 0%,
+      color-mix(in srgb, var(--andrey-accent) 8%, transparent),
+      transparent 70%
+    ),
+    var(--andrey-surface);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--andrey-ground-navy) 6%, transparent),
+    0 12px 32px -12px color-mix(in srgb, var(--andrey-ground-navy) 18%, transparent);
+}
+
+.release-tldr {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+  padding-top: 0.25rem;
+}
+
+.release-tldr p,
+.release-tldr ul {
   margin: 0;
 }
 
-/* The label, tracked capitals like the sidebar's section names. */
-.benchmark-reports .report-cover p:first-child {
-  color: var(--andrey-ground-muted);
+/* The abstract. */
+.release-tldr > p {
+  color: var(--andrey-ink);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+/* Latest, the status, and the date. */
+.release-tldr > p.release-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  color: var(--andrey-muted);
+  font-size: 0.82rem;
+}
+
+.release-tag {
+  color: var(--andrey-accent);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-/* The release. */
-.benchmark-reports .report-cover p:last-child {
-  font-size: 3rem;
+.release-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.08rem 0.6rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: var(--andrey-surface);
+  color: var(--andrey-ink);
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.release-badge::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--andrey-ground-amber);
+}
+
+/* The three numbers, each over what it counts. */
+.release-stats ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  border-block: 1px solid var(--andrey-line);
+  list-style: none;
+}
+
+.release-stats li {
+  margin: 0;
+  padding: 0.8rem 0.9rem 0.85rem 0;
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.release-stats li + li {
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--andrey-line);
+}
+
+.release-stats strong {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--andrey-ink);
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* The limit, its label in the margin on the first line. Out of the flow, the label leaves the space
+   after it at the start of the line, where it collapses, so every line starts at the same edge. */
+.release-limit p {
+  position: relative;
+  padding-left: 2.9rem;
+  color: var(--andrey-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.release-limit strong {
+  position: absolute;
+  left: 0;
+  color: var(--andrey-ink);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The card's sections, dot-separated. */
+.release-sections ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0;
+  padding: 0;
+  font-size: 0.86rem;
+  list-style: none;
+}
+
+.release-sections li {
+  margin: 0;
+}
+
+.release-sections li > p {
+  display: inline;
+}
+
+.release-sections li + li::before {
+  content: "\00b7";
+  margin: 0 0.6rem;
+  color: var(--andrey-muted);
+}
+
+.release-sections a,
+.release-meta a {
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.release-sections a:hover,
+.release-meta a:hover {
+  text-decoration: underline;
+}
+
+/* The card, and the post or the place it will take. */
+.release-actions p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.release-actions a,
+.release-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.95rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.3;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.release-actions a {
+  background: var(--andrey-surface);
+  color: var(--andrey-ink);
+  transition: background-color var(--andrey-dur) var(--andrey-ease),
+              border-color var(--andrey-dur) var(--andrey-ease);
+}
+
+.release-actions a:hover {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.release-actions a:first-child {
+  border-color: var(--andrey-ground-cobalt);
+  background: var(--andrey-ground-cobalt);
+  color: var(--andrey-ground-ink);
+  font-weight: 600;
+}
+
+.release-actions a:first-child:hover {
+  border-color: var(--andrey-ground-navy);
+  background: color-mix(in srgb, var(--andrey-ground-cobalt) 82%, var(--andrey-ground-navy));
+  color: var(--andrey-ground-ink);
+}
+
+/* A post that is not out yet: drawn, not a link. */
+.release-pending {
+  border-style: dashed;
+  color: var(--andrey-muted);
+}
+
+/* An arrow after each link to a page. */
+.release-actions a::after,
+.release-meta a::after {
+  content: "";
+  flex: none;
+  width: 0.95em;
+  height: 0.95em;
+  background: currentColor;
+  -webkit-mask: var(--release-arrow) center / contain no-repeat;
+  mask: var(--release-arrow) center / contain no-repeat;
+}
+
+.release-latest,
+.release-row {
+  --release-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4'/%3E%3C/svg%3E");
+}
+
+.release-sections a:focus-visible,
+.release-actions a:focus-visible,
+.release-body a:focus-visible,
+.release-meta a:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+  border-radius: var(--andrey-radius-sm);
+  box-shadow: none;
+}
+
+/* ---------- earlier releases ---------- */
+.bd-article section:has(> .release-row) > h2 {
+  margin: 2.75rem 0 0;
+  padding: 0 0 0.9rem;
+  border-bottom: 1px solid var(--andrey-line);
+  color: var(--andrey-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.release-row {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: start;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--andrey-line);
+}
+
+.release-row p,
+.release-row ul {
+  margin: 0;
+}
+
+.bd-article .release-body h3 {
+  margin: 0.05rem 0 0.25rem;
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+.release-body h3 a {
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.release-body h3 a:hover {
+  color: var(--andrey-accent);
+}
+
+.release-body > p {
+  color: var(--andrey-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* The facts. */
+.release-body ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  margin-top: 0.45rem;
+  padding: 0;
+  color: var(--andrey-ink);
+  font-size: 0.84rem;
+  list-style: none;
+}
+
+.release-body li {
+  margin: 0;
+}
+
+.release-body strong {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-  line-height: 1;
 }
 
-.benchmark-reports .sd-card-body {
+/* The date, then the card and the post. */
+.release-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 1.1rem 1.5rem 1.25rem;
+  align-items: flex-end;
+  gap: 0.35rem;
+  padding-top: 0.15rem;
 }
 
-.benchmark-reports .sd-card-title {
-  margin: 0;
-  font-size: 1.15rem;
-}
-
-.benchmark-reports .sd-card-body p {
-  margin: 0;
+.release-meta > p {
+  margin-bottom: 0.15rem;
   color: var(--andrey-muted);
-  font-size: 0.92rem;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* The badge sits at the bottom, so the dates line up across a row. */
-.benchmark-reports .sd-card-body p:last-child {
-  margin-top: auto;
-  padding-top: 0.25rem;
+.release-meta ul {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  padding: 0;
+  list-style: none;
 }
 
-.benchmark-reports .sd-badge {
-  font-weight: 500;
+.release-meta li {
+  margin: 0;
+}
+
+.release-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+/* The note under the list. */
+.release-row ~ p {
+  margin-top: 1.25rem;
+  color: var(--andrey-muted);
+  font-size: 0.88rem;
+}
+
+/* ---------- narrow screens: the cover over its TL;DR ---------- */
+@media (max-width: 760px) {
+  .release-latest {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding: 1.4rem 1.15rem 1.3rem;
+  }
+
+  .release-cover {
+    justify-self: center;
+    width: 13.5rem;
+  }
+
+  .bd-content .sd-card.release-cover .sd-card-body {
+    padding: 1rem 1.3rem 1.5rem 1.6rem;
+  }
+
+  .release-cover .sd-card-text:nth-of-type(1) {
+    font-size: 0.52rem;
+  }
+
+  .release-cover .sd-card-text:nth-of-type(2) {
+    margin-top: 1.1rem;
+    font-size: 1.2rem;
+  }
+
+  .release-cover .sd-card-text:nth-of-type(3) {
+    font-size: 3.4rem;
+  }
+
+  .release-stats ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .release-stats li,
+  .release-stats li + li {
+    padding: 0.55rem 0;
+    border-left: 0;
+  }
+
+  .release-stats li + li {
+    border-top: 1px solid var(--andrey-line);
+  }
+
+  .release-stats li p {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+
+  .release-stats strong {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+
+  .release-sections ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem 1rem;
+  }
+
+  .release-sections li + li::before {
+    content: none;
+  }
+
+  .release-row {
+    grid-template-columns: 3.4rem minmax(0, 1fr);
+    gap: 0.9rem;
+  }
+
+  .release-tile .sd-card-text {
+    font-size: 0.8rem;
+  }
+
+  .release-meta {
+    grid-column: 2;
+    align-items: flex-start;
+    padding-top: 0;
+  }
+
+  .release-meta ul {
+    align-items: flex-start;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .benchmark-reports .sd-card .report-cover {
+  .release-actions a {
     transition: none;
   }
 }

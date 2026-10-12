@@ -79,13 +79,27 @@ A post belongs to the release in its `version` front matter, and later builds le
 release rendered it: its numbers are typed text, and every file it includes (a figure, code, or
 output) is stored under `blog/<version>/`.
 
-## The benchmark reports
+## The release cards
 
-[`docs/benchmarks.md`](docs/benchmarks.md) lists one report per release, newest first, at the
-address the README and the homepage link. A report is `docs/benchmarks/<release>.md`, and the
-summary its numbers come from is `benchmarks/published/<label>/summary.json`, which the report
-links. Like a post, a released report and its summary never change: their numbers are typed text,
-and new measurements go into the next release's report.
+Each release has a release card, `docs/benchmarks/<release>.md`: its benchmarks, the methods it adds
+or promotes, their known limits, and how to rerun the measurements. The summary its numbers come
+from is `benchmarks/published/<label>/summary.json`, which the card links. Like a post, a released
+card and its summary never change: their numbers are typed text, and new measurements go into the
+next release's card.
+
+[`docs/benchmarks.md`](docs/benchmarks.md) is the Release cards page, at the address the README and
+the homepage link. The latest release leads as a cover (masthead, title, version) beside its TL;DR:
+status, abstract, three numbers, a limit, links to the card's sections, the card, and the post.
+Earlier releases follow as a list, newest first, each with a square tile showing its version. To
+add a release:
+
+1. Move the current latest release to the top of "Earlier releases": copy a row and set its
+   version, title, methods sentence, facts, release date, and links.
+2. Fill the latest block with the new release; the post placeholder becomes a link once the post is
+   out.
+3. Add the new card to the toctree, newest first.
+
+`_static/benchmarks.css` styles the page and loads on it only.
 
 ## The Examples and Demos galleries
 
@@ -178,7 +192,7 @@ To check external links: `uv run --group docs sphinx-build -b linkcheck docs doc
 | Wordmark (Inter outlines, light and dark ink) and its generator | `site/brand/`, `site/wordmark.py` |
 | Palette as CSS custom properties | `docs/palette_css.py` |
 | Blog posts and the post list | `docs/blog/` |
-| Benchmark reports and their list | `docs/docs/benchmarks/`, `docs/docs/benchmarks.md` |
+| Release cards and the page that lists them | `docs/docs/benchmarks/`, `docs/docs/benchmarks.md`, `docs/_static/benchmarks.css` |
 | Docs landing page and section index | `docs/docs/index.md` |
 | API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/code/index.md` |
 | Guides (getting started, contributing) | `docs/docs/guides/` |

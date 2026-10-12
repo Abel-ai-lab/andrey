@@ -22,8 +22,8 @@ so no color is transcribed here.
   Loaded on blog pages only.
 - **`examples.css`** - the Examples gallery's cards and the frame an interactive example fills.
   Loaded on the gallery and the example pages only.
-- **`benchmarks.css`** - the Benchmarks page's report cards and their covers. Loaded on that page
-  only.
+- **`benchmarks.css`** - the Release cards page: the latest release's cover beside its TL;DR, and
+  the earlier releases' rows with their tiles. Loaded on that page only.
 
 Load order in `conf.py` is `andrey-tokens.css`, `andrey.css`, then `graph-guides.css`; a page's own
 stylesheets load after them. The homepage's stylesheets, and the timing comparison and charts it

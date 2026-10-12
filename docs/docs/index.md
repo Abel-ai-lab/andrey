@@ -69,7 +69,7 @@ What changed in each release.
   diagrams.
 - [CLI reference](code/index.md#command-line-interface) covers running methods from the shell.
 - [Configuration](configuration.md) lists the environment variables Andrey reads.
-- [Benchmarks](benchmarks.md) has a report per release: timings, accuracy, and practical limits.
+- [Release cards](benchmarks.md) keep each release's record: timings, accuracy, and known limits.
 - [Testing](ci.md) says what each release is tested on, and how to run the GPU checks.
 
 ```{toctree}
