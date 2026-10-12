@@ -9,6 +9,21 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `hc` runs in one process: its worker processes were slower at every measured size.
+  `ANDREY_HC_PARALLEL_MIN_WORK` and `andrey calibrate --method hc` are removed.
+
+### Added
+
+- An experimental method, `tabu`: tabu search, hill climbing that keeps going past a local optimum
+  and returns the best DAG it visits, as a CPDAG. With the same settings its BIC score is never
+  worse than `hc`'s.
+
+### Changed
+
+- `hc` gives the same graphs in less time: a fit on 200 variables runs about 60 times faster.
+
 ## [0.2.0] - 2026-10-12
 
 ### Highlights
@@ -20,11 +35,6 @@ change names its pull request.
   time, hill climbing an eighth, and GES two fifths. Larger fits are no slower, and graphs are
   unchanged. ([#33])
 
-### Breaking
-
-- `hc` runs in one process: its worker processes were slower at every measured size.
-  `ANDREY_HC_PARALLEL_MIN_WORK` and `andrey calibrate --method hc` are removed.
-
 ### Added
 
 - Three methods for data with hidden common causes: `rcd`, `bottom_up_parce_lingam`, and the
@@ -33,13 +43,6 @@ change names its pull request.
   the variables whose order such a cause hides unordered. ([#18], [#31], [#53])
 - `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
   search stops there. ([#14])
-- An experimental method, `tabu`: tabu search, hill climbing that keeps going past a local optimum
-  and returns the best DAG it visits, as a CPDAG. With the same settings its BIC score is never
-  worse than `hc`'s.
-
-### Changed
-
-- `hc` gives the same graphs in less time: a fit on 200 variables runs about 60 times faster.
 
 ### Fixed
 
