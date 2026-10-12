@@ -138,7 +138,7 @@ shown = ("shd", "skeleton_precision", "skeleton_recall")
 - **SHD**, the structural Hamming distance, counts the links to add, remove, or reorient to reach
   the known network. Lower is better.
 
-PC finds 8 of the 17 links in the known signalling network, and none outside it.
+PC finds 8 of the 17 links in the known signaling network, and none outside it.
 
 A score means little on its own. The graph with no links is the baseline: a graph whose SHD is no
 lower has not improved on it by this measure, even if some of its links are right.

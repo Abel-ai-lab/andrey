@@ -39,6 +39,7 @@ right, make it fast." For algorithm implementations:
 
 Concise and simple; describe current behavior only - no "this PR adds ..." commentary or issue
 numbers in prose. The CHANGELOG is the exception: each entry ends with a link to its pull request.
+Everything, code names included, is written in US English: color, behavior, neighbor, center.
 Code, docstrings, comments, and the developer docs (`AGENTS.md`,
 `DEVELOPMENT.md`, `CONTRIBUTING.md`) are written in the third person. Pages written for readers
 (the README, the blog, the homepage, and the pages under `docs/docs/`) keep their voice: they

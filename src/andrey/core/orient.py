@@ -293,10 +293,10 @@ def pdag2dag(pdag: np.ndarray) -> np.ndarray:
     return out
 
 
-def _clique_condition(adj: np.ndarray, neighbours: np.ndarray, adjacent: np.ndarray) -> bool:
-    """True when every node in ``neighbours`` is adjacent to all of ``adjacent`` except itself."""
+def _clique_condition(adj: np.ndarray, neighbors: np.ndarray, adjacent: np.ndarray) -> bool:
+    """True when every node in ``neighbors`` is adjacent to all of ``adjacent`` except itself."""
     support = adj != NULL
-    for nb in neighbours.tolist():
+    for nb in neighbors.tolist():
         row = support[nb, adjacent]
         if not np.all(row | (adjacent == nb)):
             return False

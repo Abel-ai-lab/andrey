@@ -270,7 +270,7 @@ def test_a_bare_sigkill_is_an_error_when_nothing_was_capped():
     assert m["exit_code"] == -signal.SIGKILL, m
 
 
-def test_a_bare_sigkill_under_a_cap_is_a_labelled_fallback(footprint_mb):
+def test_a_bare_sigkill_under_a_cap_is_a_labeled_fallback(footprint_mb):
     """Under a declared cap the same ``-9`` is an ``oom`` — the kernel OOM-killer can land between
     two samples — but it is labeled ``external`` so it is never confused with one the parent saw."""
     m = _run(StubSelfKillAdapter(), cap_mem_mb=footprint_mb + 3000.0)
