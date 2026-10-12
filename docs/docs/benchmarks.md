@@ -51,6 +51,7 @@ from 50 variables, in both packages.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.3.0.md)
+[Read the post](../blog/andrey-0-3-0.md)
 :::
 ::::
 :::::
