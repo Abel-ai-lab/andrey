@@ -101,7 +101,31 @@ def test_fisherz_default_matches_explicit():
 def test_registry_surface(clean_registry):
     """``register`` / ``make`` / ``available`` behave as documented; ``fisherz`` is shipped."""
     assert "fisherz" in ci.available_indep_tests()
-    assert ci.SHIPPED_INDEP_TESTS == ("fisherz",)
+    assert ci.SHIPPED_INDEP_TESTS == ("fisherz", "student_t")
     ci.register_indep_test("delegate", lambda data: ci.FisherZ(data))
     assert "delegate" in ci.available_indep_tests()
     assert isinstance(ci.make_indep_test("fisherz", _chain_data()), ci.FisherZ)
+    assert isinstance(ci.make_indep_test("student_t", _chain_data()), ci.StudentT)
+
+
+@pytest.mark.parametrize("facade", ["pc", "fci", "gfci", "cdnod"])
+def test_student_t_is_selectable_by_every_constraint_facade(facade):
+    """Each constraint facade accepts ``indep_test="student_t"`` and returns a valid graph."""
+    x = _chain_data()
+    if facade == "cdnod":
+        c = np.repeat([0.0, 1.0], len(x) // 2).reshape(-1, 1)
+        out = andrey.cdnod(x, c, indep_test="student_t")
+    else:
+        out = getattr(andrey, facade)(x, indep_test="student_t")
+    out.structure.validate()
+    assert out.structure.n_nodes == x.shape[1]
+
+
+@pytest.mark.parametrize("indep_test", ["fisherz", "student_t"])
+def test_pc_recovers_a_collider_with_each_test(indep_test):
+    """X -> Z <- Y: both tests keep both edges, drop X - Y, and orient into the collider."""
+    rng = np.random.default_rng(0)
+    x, y = rng.standard_normal((2, 1000))
+    z = x + y + 0.5 * rng.standard_normal(1000)
+    out = andrey.pc(np.column_stack([x, y, z]), indep_test=indep_test)
+    assert set(out.structure.oriented_edges(index=True)) == {(0, 2, "directed"), (1, 2, "directed")}

@@ -26,7 +26,8 @@ def cdnod(
     ``data`` is an ``(n_samples, n_features)`` array; ``c_indx`` is the ``(n_samples,)`` or
     ``(n_samples, 1)`` domain/context index (one label per row); ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
-    ``indep_test`` selects the CI test (``"fisherz"`` shipped, run over the augmented matrix). The
+    ``indep_test`` selects the CI test (``"fisherz"`` or ``"student_t"``, run over the augmented
+    matrix). The
     context is appended as an extra variable and the result is projected back to the
     ``n_features`` data variables. Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
     """

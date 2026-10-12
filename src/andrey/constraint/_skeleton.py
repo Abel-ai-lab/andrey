@@ -4,9 +4,9 @@
 candidate neighborhood. It uses the test's vectorized ``batched_call`` when there is one, one
 stacked ``np.linalg.inv`` per chunk in place of thousands of scalar calls, and the scalar loop
 otherwise, so a test that implements only :class:`~andrey.core.ci.CITest` still works.
-:meth:`~andrey.core.ci.FisherZ.batched_call` returns the scalar p-values exactly, so the skeleton
-is the same either way. Subsets are consumed in fixed-size chunks, so the scan holds one chunk in
-memory however many subsets it visits.
+:meth:`~andrey.core.ci.PartialCorrelationTest.batched_call` returns the scalar p-values exactly, so
+the skeleton is the same either way. Subsets are consumed in fixed-size chunks, so the scan holds
+one chunk in memory however many subsets it visits.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def scan_conditioning_sets(
 ) -> bool:
     """Test every size-``size`` subset of ``candidates`` as a conditioning set for ``(a, b)``.
 
-    Each subset whose Fisher-Z p-value exceeds ``alpha`` (``a`` conditionally independent of ``b``
+    Each subset whose p-value exceeds ``alpha`` (``a`` conditionally independent of ``b``
     given the subset) is unioned into ``separating`` in place. Returns whether any subset separated
     the pair. There is no early exit: the whole subset space is scanned so ``separating``
     accumulates the union over every separating set, exactly as the scalar loop it replaces did.
@@ -100,17 +100,19 @@ def record_tests(
 
 # ---- vectorized size-0/1 prescreen ---------------------------------------------------------------
 #
-# The marginal (|S| = 0) and first-order (|S| = 1) Fisher-Z tests are closed forms over the sample
-# correlation matrix -- no inversion. A CI test that exposes those closed forms vectorized
-# (:meth:`FisherZ.marginal_pvalues` / :meth:`FisherZ.first_order_pvalues`) lets the size-0 pass run
-# as a single all-pairs matrix threshold and the size-1 pass as one vectorized read per surviving
-# pair, in place of the dense per-pair scalar loop. The decisions (p > alpha) and separating sets
-# are identical to the scalar scan (the p-values match exactly), so the recovered
-# skeleton is unchanged.
+# The marginal (|S| = 0) and first-order (|S| = 1) partial-correlation tests are closed forms over
+# the sample correlation matrix -- no inversion. A CI test that exposes those closed forms
+# vectorized (:meth:`PartialCorrelationTest.marginal_pvalues` and
+# :meth:`~PartialCorrelationTest.first_order_pvalues`) lets the size-0 pass run as a single
+# all-pairs matrix threshold and the size-1 pass as one vectorized read per surviving pair, in
+# place of the dense per-pair scalar loop. The decisions (p > alpha) and separating sets are
+# identical to the scalar scan (the p-values match exactly), so the recovered skeleton is
+# unchanged.
 
 
 def prescreen_capable(test: CITest) -> bool:
-    """Whether ``test`` exposes the vectorized size-0/1 prescreen primitives (Fisher-Z does)."""
+    """Whether ``test`` exposes the vectorized size-0/1 prescreen primitives (Fisher-Z and
+    Student-t do)."""
     return callable(getattr(test, "marginal_pvalues", None)) and callable(
         getattr(test, "first_order_pvalues", None)
     )

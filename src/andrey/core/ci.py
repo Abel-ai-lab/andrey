@@ -328,11 +328,14 @@ class StudentT(PartialCorrelationTest):
 
 
 # The indep_test registry: a name maps to a factory building a :class:`CITest` over the data.
-# Fisher-Z is the only shipped test; the constraint facades resolve their ``indep_test`` argument
-# through :func:`make_indep_test`, and :func:`register_indep_test` lets a downstream test or plugin
-# add another under the same Protocol -- the generality this registry exposes.
-SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz",)
-_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {"fisherz": FisherZ}
+# Fisher-Z and Student-t are the shipped tests; the constraint facades resolve their ``indep_test``
+# argument through :func:`make_indep_test`, and :func:`register_indep_test` lets a downstream test
+# or plugin add another under the same Protocol -- the generality this registry exposes.
+SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz", "student_t")
+_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {
+    "fisherz": FisherZ,
+    "student_t": StudentT,
+}
 
 
 def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> None:

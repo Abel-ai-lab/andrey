@@ -28,7 +28,9 @@ _INDEP_TEST = ParamSpec(
     name="indep_test",
     type="str",
     default="fisherz",
-    doc="Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.",
+    doc="Conditional-independence test on the partial correlation: fisherz = Fisher's z-transform "
+    "and the normal distribution; student_t = the Student-t distribution, exact for Gaussian data "
+    "at any sample size.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _COLLIDER_RULE = ParamSpec(
