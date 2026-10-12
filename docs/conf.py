@@ -19,6 +19,8 @@ import re
 import runpy
 import sys
 import textwrap
+import tomllib
+from urllib.parse import urljoin
 
 import ablog.blog
 from ablog.blog import Blog
@@ -56,6 +58,7 @@ sys.path.insert(0, str(ROOT / "apps"))
 sys.path.insert(0, str(ROOT / "apps" / "live-discovery"))
 build_assets = _module("andrey_build_assets", ROOT / "apps" / "build_assets.py")
 compare = _module("andrey_compare", ROOT / "apps" / "compare.py")
+discovery = _module("andrey_discovery", HERE / "discovery.py")
 
 # ---- project ---------------------------------------------------------------------------------
 project = "Andrey"
@@ -195,6 +198,7 @@ html_js_files = [
 REPO_URL = "https://github.com/Abel-ai-lab/andrey"
 PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
+PACKAGE = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
     # release to the changelog, then Docs, Examples, Blog, and FAQ, then search, theme, and GitHub.
@@ -425,11 +429,105 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "og:image:height": str(cards.H),
         "twitter:card": "summary_large_image",
     }
-    return "".join(
+    preview = "".join(
         f'<meta {"property" if key.startswith("og:") else "name"}="{key}" '
         f'content="{html.escape(value, quote=True)}">\n'
         for key, value in tags.items()
     )
+    page = {"title": title, "description": description, "url": url, "image": image}
+    if pagename == "search":
+        page["indexable"] = False
+    if match := re.fullmatch(r"docs/benchmarks/(\d+\.\d+\.\d+)", pagename):
+        page["software_version"] = match[1]
+    post = None
+    if pagename in Blog(app):
+        article = Blog(app)[pagename]
+        post = {
+            "date": article.date.strftime("%Y-%m-%d") if article.date else None,
+            "authors": [
+                {
+                    "name": str(person),
+                    "url": urljoin(url, app.builder.get_relative_uri(pagename, person.docname)),
+                }
+                for person in article.author or ()
+            ],
+            "version": app.env.metadata.get(pagename, {}).get("version"),
+        }
+    parents = [
+        {
+            "title": html.unescape(re.sub(r"<[^>]+>", "", parent["title"])),
+            "url": urljoin(url, parent["link"]),
+        }
+        for parent in context.get("parents", [])
+    ]
+    software = {
+        "name": app.config.project,
+        "description": PACKAGE["description"],
+        "version": release,
+        "license": {
+            "@type": "CreativeWork",
+            "name": PACKAGE["license"],
+            "url": f"{PACKAGE['urls']['Source']}/blob/main/{PACKAGE['license-files'][0]}",
+        },
+        "programmingLanguage": "Python",
+        "runtimePlatform": f"Python {PACKAGE['requires-python']}",
+        "codeRepository": PACKAGE["urls"]["Source"],
+        "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/"],
+    }
+    return preview + discovery.head_tags(
+        page,
+        site_url=SITE_URL,
+        project=app.config.project,
+        author=app.config.author,
+        software=software,
+        language=app.config.language or "en",
+        post=post,
+        parents=parents,
+    )
+
+
+def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Write discovery files from the pages actually built, without changing their content."""
+    if exception is not None or app.builder.name != "html":
+        return
+    outdir = pathlib.Path(app.outdir)
+    # These are existing public reader pages, followed by each release's card and blog posts.
+    documents = [
+        "docs/index",
+        "docs/guides/getting-started",
+        "docs/faq",
+        "docs/code/index",
+        "docs/configuration",
+        "docs/guides/graph-types",
+        "docs/guides/graph-representation",
+        "docs/examples/index",
+        "docs/demos/index",
+        "docs/benchmarks",
+        "docs/changelog",
+        "blog/index",
+    ]
+    documents.extend(
+        sorted(
+            name
+            for name in app.env.found_docs
+            if re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", name)
+        )
+    )
+    documents.extend(post.docname for post in Blog(app).posts if post.published)
+    try:
+        entries = discovery.read_pages(outdir, documents)
+        text = discovery.llms_index(
+            app.andrey_home["description"],
+            entries,
+            documents,
+            site_url=SITE_URL,
+            project=app.config.project,
+            version=release,
+        )
+    except ValueError as error:
+        raise ConfigError(str(error)) from None
+    _write(outdir / "llms.txt", text)
+    _write(outdir / "robots.txt", discovery.robots_txt())
 
 
 # The pages that show the "Why Andrey is fast" scenes.
@@ -918,6 +1016,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
+    app.connect("build-finished", _write_discovery)
     app.connect("doctree-resolved", _post_byline)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)
