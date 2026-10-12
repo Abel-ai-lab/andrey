@@ -230,12 +230,12 @@ def meek_replay(heading=True):
     return document("Meek's rules", body, script)
 
 
-# PC as andrey.constraint.pc runs it: PC-stable neighbourhoods, every subset tried, and the
+# PC as andrey.constraint.pc runs it: PC-stable neighborhoods, every subset tried, and the
 # prioritize-existing collider rule. Each entry is (indent, text); frames name lines by number.
 PC_LINES = (
     (0, "G <- the complete undirected graph"),
-    (0, "for d = 0, 1, 2, … while some node has > d neighbours"),
-    (1, "adj <- the neighbours in G, fixed for this depth"),
+    (0, "for d = 0, 1, 2, … while some node has > d neighbors"),
+    (1, "adj <- the neighbors in G, fixed for this depth"),
     (1, "for each adjacent pair (x, y)"),
     (2, "for each S of size d from adj(x) \\ {y} or adj(y) \\ {x}"),
     (3, "p <- test(x, y | S)"),
@@ -343,7 +343,7 @@ def pc_walkthrough(X, labels, alpha=0.05):
         replay.add(
             [2, 3],
             f"Depth {depth}: test each adjacent pair given every set of {depth} of its "
-            "neighbours, as they stand at the start of this depth."
+            "neighbors, as they stand at the start of this depth."
             if depth
             else "Depth 0: test each adjacent pair with no conditioning set.",
             adj,
@@ -388,7 +388,7 @@ def pc_walkthrough(X, labels, alpha=0.05):
         )
     replay.add(
         [2],
-        f"No node has more than {depth + 1} neighbours, so the tests stop. What remains is the "
+        f"No node has more than {depth + 1} neighbors, so the tests stop. What remains is the "
         "skeleton.",
         adj,
         variables=[("depth d", depth + 1)],
@@ -480,7 +480,7 @@ def pc_by_depth(X, alpha=0.05):
         )
     replay.add(
         [2],
-        f"No node has more than {depth + 1} neighbours, so the tests stop.",
+        f"No node has more than {depth + 1} neighbors, so the tests stop.",
         adj,
         variables=[("depth d", depth + 1), ("edges left", edges(adj))],
     )

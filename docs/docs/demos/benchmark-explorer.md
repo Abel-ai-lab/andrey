@@ -10,7 +10,8 @@ html_theme.sidebar_secondary.remove: true
 
 The controlled benchmark results: fit time against the number of variables for each method, every
 measurement in a table, the largest error reductions, and the hardware, build, and seeds behind each
-comparison. The [benchmarks page](../benchmarks.md) explains the conditions and how to rerun them.
+comparison. The [0.1.0 benchmark report](../benchmarks/0.1.0.md) explains the conditions and how to
+rerun them.
 
 ```{raw} html
 <iframe class="example-frame" src="../../_static/examples/benchmarks.html" title="Benchmark explorer"

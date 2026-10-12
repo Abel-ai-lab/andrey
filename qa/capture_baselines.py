@@ -94,6 +94,8 @@ ALGORITHMS = {
     "VARLiNGAM": (_run_varlingam, "var_4v_stable"),
     "VARMALiNGAM": (_run_varmalingam, "varma_3v"),
     "Granger": (_run_granger, "var_4v_stable"),
+    "RCD": (_facade("rcd"), "confounded_fork_4v"),
+    "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),
 }
 
 # Multi-group methods take a list of matrices (runner receives ``generate_groups(case)``).

@@ -52,6 +52,9 @@ class AndreyGES:
     #: value its own ``name``, because ``params`` are excluded from ``run_id`` and two weights under
     #: one name would collide in the part files.
     lambda_value: float = _DEFAULT_LAMBDA
+    #: Most directed parents a node may hold and still gain one; ``None`` lifts the cap, as the
+    #: public ``andrey.ges`` does. A benchmark that changes it gives the arm its own ``name``.
+    max_parents: float | None = _DEFAULT_MAX_PARENTS
 
     def setup(self) -> None:
         """Import Andrey before timing; see `contracts.SetupAdapter`.
@@ -67,7 +70,7 @@ class AndreyGES:
         return {
             "score_func": _DEFAULT_SCORE_FUNC,
             "lambda_value": float(self.lambda_value),
-            "max_parents": _DEFAULT_MAX_PARENTS,
+            "max_parents": self.max_parents,
         }
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:

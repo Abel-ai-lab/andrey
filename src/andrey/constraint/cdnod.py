@@ -63,7 +63,7 @@ def _orient_with_context(
 ) -> np.ndarray:
     """Orient the augmented skeleton: context edges outward, then unshielded colliders.
 
-    Every edge the ``context`` node retains is oriented ``context -> neighbour`` up front, so the
+    Every edge the ``context`` node retains is oriented ``context -> neighbor`` up front, so the
     context is a source in every triple it touches. Unshielded colliders are then oriented with the
     prioritize-existing rule (``uc_priority=2``): a collider ``x -> y <- z`` is oriented only when
     ``y`` is absent from the separating set of ``x`` and ``z`` and neither ``y -> x`` nor ``y -> z``
@@ -73,9 +73,9 @@ def _orient_with_context(
     n = skeleton.shape[0]
     pdag = np.where(skeleton != NULL, np.int8(TAIL), np.int8(NULL))
     np.fill_diagonal(pdag, np.int8(NULL))
-    neighbours = [] if context is None else np.nonzero(skeleton[context] != NULL)[0].tolist()
-    for neighbour in neighbours:
-        pdag[context, neighbour], pdag[neighbour, context] = TAIL, ARROW
+    neighbors = [] if context is None else np.nonzero(skeleton[context] != NULL)[0].tolist()
+    for neighbor in neighbors:
+        pdag[context, neighbor], pdag[neighbor, context] = TAIL, ARROW
     for y in range(n):
         nbrs = np.nonzero(skeleton[y] != NULL)[0].tolist()
         for a, b in combinations(range(len(nbrs)), 2):

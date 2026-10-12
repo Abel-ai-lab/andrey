@@ -2,14 +2,22 @@
 
 Compare Andrey with other causal discovery packages and older Andrey builds.
 
-## Published alpha measurements
+## Published measurements
 
-The [site's benchmark tables](../docs/docs/benchmarks.md) summarize the alpha campaigns;
-[`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) holds one row per
-comparison and size. The summary is generated from the recorded fits; those records and the script
-that writes it are kept outside this repository. To rerun a comparison, use its driver with the
-builds, versions, and settings the site lists under
-[Reproduce](../docs/docs/benchmarks.md#reproduce).
+The site has a [release card](../docs/docs/benchmarks.md) per release, and each card has its own
+folder under `published/` with the summary its numbers come from:
+
+| Release | Release card | Summary |
+|---|---|---|
+| 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
+| 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |
+
+A summary holds one row per comparison and size. It is generated from the recorded fits; those
+records and the script that writes it are kept outside this repository. A released report and its
+folder do not change: new measurements go into the next release's report and folder. To rerun a
+comparison, use its driver with the builds, versions, and settings its report lists under
+Reproduce ([0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
+[0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
 
 ## Comparison packages
 
@@ -120,8 +128,9 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | method | solutions |
 |---|---|
 | GES | Andrey (numpy/serial, numpy/parallel, numba/serial), causal-learn, gCastle, pcalg |
-| XGES (GES family) | xges |
-| HC | Andrey (serial, parallel), bnlearn (`hc`, `tabu`) |
+| XGES (GES family) | Andrey and xges, each with and without the extended search |
+| HC | Andrey, bnlearn (`hc`) |
+| Tabu | Andrey, bnlearn (`tabu`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
 | BOSS | Andrey, causal-learn |
@@ -225,6 +234,87 @@ Andrey regresses with spline features and least squares where lingam fits pygam'
 their HSIC tests use different kernel bandwidths and null approximations. Report this beside the
 CAM-UV results.
 
+### XGES
+
+`xges_cpu.py` compares Andrey's `xges` with the xges package, each with and without the extended
+search (the arms `andrey.xges.numpy`, `andrey.xges.numpy.no_extended_search`, `xges.xges`, and
+`xges.xges.no_extended_search`), with Andrey's `ges` and the empty-graph baseline. The data are
+linear-Gaussian and standardized, on Erdos-Renyi graphs of average degree 2 and 4, with `10 * d`
+rows. XGES gains most over GES on the denser graphs. Every arm searches under one BIC weight: the
+package scores in log-likelihood units, -0.5 times Andrey's deviance plus terms that cancel in every
+move, so its `alpha` is Andrey's `lambda_value`. No arm caps the parents of a node: XGES has no cap,
+and the GES arm lifts the adapter's usual cap of 4, as `andrey.ges` does. `params` records the
+settings.
+
+Each record's `shd` is against the true CPDAG. After each rung the driver adds two columns from the
+graphs in `structures/`: `bic`, the BIC of the returned graph under Andrey's `BICScore` at the
+campaign's weight (lower is better), and `bic_gap`, `bic` minus the true graph's BIC on the same
+data. One scorer scores every package's graph, so `bic` compares the searches on one scale; a
+negative gap is a graph that scores better than the truth on its data. A fit with no graph has
+`NaN` in both.
+
+Andrey's XGES runs on one BLAS thread whatever its core budget; Andrey GES uses the budget as BLAS
+threads and the package as numba threads. The record's `threads` is the budget.
+
+The package arms need their own environment, as in
+[Separate solution environments](#separate-solution-environments). A smoke run fits every solution
+once at `d = 10` on both densities:
+
+```shell
+export ANDREY_BENCH_XGES_PYTHON=$PWD/benchmarks/.venv-xges/bin/python
+$ANDREY_BENCH_PYTHON benchmarks/xges_cpu.py --out outputs/xges-smoke --smoke
+```
+
+The defaults are `d` of 25, 50, 100, 200, 500, and 1000, five seeds per density, one untimed
+warm-up fit (the package's numba scorer compiles on its first call), and one timed fit. The wall
+cap covers the warm-up too. The package's extended search copies its search state, score cache
+included, for each edge it tries, so the cap bounds that arm first at large `d`:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/xges_cpu.py --out outputs/xges-cpu \
+    --cap-wall-s 3600 --cap-mem-mb 32000
+```
+
+Continue an interrupted run with the first run's flags and `--resume`. A rescore recomputes the BIC
+columns of every part without fitting anything; pass the first run's flags:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/xges_cpu.py --out outputs/xges-cpu --rescore
+```
+
+### Tabu search
+
+`tabu_cpu.py` compares Andrey's `tabu` with bnlearn's, with each package's `hc` beside them and the
+empty-graph baseline. Tabu search is hill climbing that goes on past a local optimum, so the pair
+shows what that costs and buys. Every solution is serial. The data is the R lane's slice:
+linear-Gaussian on an Erdos-Renyi graph at average degree 2, with `n = 10 * d` rows. Both packages
+use a tabu list of 10 DAGs and stop after 10 non-improving moves without a new best, bnlearn's
+defaults. bnlearn 5.2.1 stops after `tabu` such moves whatever `max.tabu` is, so the two settings
+stay equal.
+
+The defaults are `d` of 10, 20, 50, and 100, five seeds, three repeats each after an untimed fit,
+and `--cap-wall-s` of 1800. Load R as [The R lane](#the-r-lane) describes, then:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-cpu --cap-mem-mb 32000
+```
+
+Each fit also gets `bic`, the BIC of the graph it returned on its dataset, in Andrey's deviance
+units (lower is better); a CPDAG is scored through any of its DAGs, which all have the same BIC. The
+summary prints, per solution and `d`, the median `bic` minus `andrey.hc`'s on the same dataset:
+below zero is a better score than hill climbing. Its graph error is a CPDAG row's `shd` or a DAG
+row's `mec_shd`. A rescore recomputes `bic` without fitting anything; pass the first run's flags:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-cpu --rescore
+```
+
+The two tabu searches can end on different graphs from the same data. At hill climbing's optimum
+the best non-improving moves are often several reversals of covered edges, which leave the score
+unchanged, and each package takes the first in its own scan order. bnlearn scans additions, then
+removals, then reversals; Andrey ranks all moves by score change, then by the edge's endpoints.
+
 ### ANM direction test
 
 `anm_pairs.py` compares Andrey's `anm` with causal-learn's `ANM` on cause-effect pairs from the
@@ -283,8 +373,8 @@ Only `fit` is timed. Package imports, interpreter startup, and library loading b
 `setup()`, called once before warm-up fits.
 
 At `--warmup 0`, the reach setting, the first fit includes any lazy imports inside `fit`.
-Every adapter that imports a package declares a `setup()` except `xges.ges`, which imports numba
-and XGES inside `fit`. Account for those imports when comparing fit times.
+Every adapter that imports a package declares a `setup()` except the xges package's, which imports
+numba and XGES inside `fit`. Account for those imports when comparing fit times.
 
 `setup_s` records setup duration and is included in `warmup_s`. At `--warmup 0`, they are equal and
 provide no fit-time bound.
@@ -293,30 +383,24 @@ provide no fit-time bound.
 
 Andrey uses hardcoded thresholds for accelerated paths:
 
-- `ANDREY_GES_PARALLEL_MIN_WORK` and `ANDREY_HC_PARALLEL_MIN_WORK` select the worker pool.
+- `ANDREY_GES_PARALLEL_MIN_WORK` selects the worker pool.
 - `ANDREY_COV_GPU_THRESHOLD` and `ANDREY_ENTROPY_GPU_THRESHOLD` select the accelerator.
 
 Three thresholds were calibrated once on one machine. Later measurements found errors of 7x for GES,
 25x for `cov`, and 40x for entropy. Each error kept the faster path disabled.
 
-**The worker-pool defaults suit a single fit, not a campaign.** A campaign runs many fits in one
+**The worker-pool default suits a single fit, not a campaign.** A campaign runs many fits in one
 process, and after the first pool start (about 2 s) the pool pays off at smaller sizes. With 8
-workers, `andrey calibrate` measured about 1,100 for GES and 7,500 for HC, against the defaults of
-10,000 and 30,000. Repeated runs produce a range because other node activity affects pool
-round-trip time.
+workers, `andrey calibrate` measured about 1,100 for GES, against the default of 10,000. Repeated
+runs produce a range because other node activity affects pool round-trip time.
 
-HC's best pool size grows with `d`: 4 workers at `d = 150`, 8 at `d = 300`, 16 at `d = 500`. A
-campaign using the same budget for every solution reaches HC's peak performance only at the larger
-sizes.
-
-Measure both on the campaign node with the pool size used for fits, and **apply the measured
+Measure on the campaign node with the pool size used for fits, and **apply the measured
 thresholds**. Recording an unused calibration is worse than no calibration: it records a threshold
 that did not control the run.
 
-**Check the unit before setting a threshold.** GES uses candidate evaluations, HC uses moves per
-pass, `cov` uses `n * d`, and `entropy` uses batch width `B`. `andrey.spec.environment` lists these
-units, and `andrey --help --json` prints them. A value in the wrong unit silently selects the wrong
-path.
+**Check the unit before setting a threshold.** GES uses candidate evaluations, `cov` uses `n * d`,
+and `entropy` uses batch width `B`. `andrey.spec.environment` lists these units, and
+`andrey --help --json` prints them. A value in the wrong unit silently selects the wrong path.
 
 **Backend pins affect the gates differently.** Worker-pool gates run on each search pass and ignore
 the backend. Below the GES threshold, `ges.numpy.parallel` uses the serial path. Device thresholds
@@ -329,8 +413,8 @@ Check the adapter before treating a lane name as the measured device.
 Before a campaign:
 
 1. Measure the crossover on the campaign machine. Run `andrey calibrate --workers <pool size>` for
-   GES and HC. For a device threshold, compare the primitive with numpy across the sizes used by
-   the fits.
+   GES. For a device threshold, compare the primitive with numpy across the sizes used by the
+   fits.
 2. Set the environment variable and record it in `run_meta.json`. Declare every hyperparameter.
 3. Record which side of the threshold contains each rung. Keep one rung where the accelerated path
    is slower.
@@ -580,6 +664,10 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
+- `xges_cpu.py` - compares Andrey's XGES, with and without the extended search, with the xges
+  package's and with Andrey GES, by time, SHD, and BIC under one scorer.
+- `tabu_cpu.py` - compares tabu search and hill climbing with bnlearn, and scores each graph's
+  BIC.
 - `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
 - `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from

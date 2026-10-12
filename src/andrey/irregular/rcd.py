@@ -23,35 +23,11 @@ from dataclasses import dataclass, field
 from itertools import combinations
 
 import numpy as np
+from scipy.special import betaincc
 from scipy.stats import pearsonr, shapiro
 from sklearn.linear_model import LinearRegression
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
-
-# scipy's Pearson p-value machinery imported directly, to skip the general test wrapper's per-call
-# input validation. Older scipy lacks these private symbols, so fall back to its public beta law.
-try:
-    from scipy.stats._stats_py import _get_pvalue, _SimpleBeta
-except ImportError:  # pragma: no cover - exercised only on older scipy
-    from scipy.stats import beta as _scipy_beta
-
-    class _SimpleBeta:  # type: ignore[no-redef]
-        def __init__(self, a: float, b: float, loc: float = 0, scale: float = 1) -> None:
-            self._dist = _scipy_beta(a, b, loc=loc, scale=scale)
-
-        def cdf(self, x: float) -> float:
-            return self._dist.cdf(x)
-
-        def sf(self, x: float) -> float:
-            return self._dist.sf(x)
-
-    def _get_pvalue(statistic, distribution, alternative, symmetric=True, xp=None):  # type: ignore[no-redef]
-        if alternative == "two-sided":
-            return 2 * min(distribution.cdf(statistic), distribution.sf(statistic))
-        if alternative == "less":
-            return distribution.cdf(statistic)
-        return distribution.sf(statistic)
-
 
 # Memo tables keyed by column-index signatures, valid only while the data matrix stays fixed:
 # a residual/coefficient pair per ``(endog, exog-order)``, a Shapiro-Wilk p-value per
@@ -158,10 +134,12 @@ def _pearson_pvalue_fast(a: np.ndarray, b: np.ndarray) -> float | None:
     """Two-sided Pearson p-value of ``a`` and ``b`` via the beta tail, or ``None`` for edge inputs.
 
     Reproduces the value :func:`scipy.stats.pearsonr` returns while skipping its general-purpose
-    input wrapper: the correlation is formed with the same numerically stable normalization and the
-    p-value from the same symmetric beta law. ``None`` signals a degenerate or unsupported input
-    (not 1-D, mismatched or under-length, complex, or a near-constant column) for the caller to
-    resolve with the full test.
+    input wrapper: the correlation is formed with the same numerically stable normalization, and the
+    p-value is the same upper tail of the symmetric beta law on ``[-1, 1]``,
+    ``2 * betaincc(k, k, (|r| + 1) / 2)`` with ``k = n / 2 - 1``, evaluated as SciPy evaluates it,
+    so a correlation that rounds to 1 gives ``p = 0``. ``None`` signals a degenerate or
+    unsupported input (not 1-D, mismatched or under-length, complex, or a near-constant column) for
+    the caller to resolve with the full test.
     """
     a = np.asarray(a)
     b = np.asarray(b)
@@ -198,9 +176,8 @@ def _pearson_pvalue_fast(a: np.ndarray, b: np.ndarray) -> float | None:
     if n == 2:
         p_value = np.where(np.asarray(np.isnan(r)), np.nan * one, one)
     else:
-        beta_shape = n / 2 - 1
-        dist = _SimpleBeta(beta_shape, beta_shape, loc=-1, scale=2)
-        p_value = _get_pvalue(r, dist, "two-sided", xp=np)
+        k = n / 2 - 1
+        p_value = np.asarray(2 * betaincc(k, k, (np.abs(r) + 1) / 2))
     if getattr(p_value, "ndim", 0) == 0:
         return float(p_value[()])
     return None

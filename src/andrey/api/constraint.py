@@ -84,9 +84,13 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     removed together. A removed pair's separating set combines all conditioning sets that separated
     it. If two colliders conflict, the one found first in column order is kept.
 
-    Around 1,000 variables is a reasonable practical threshold. Feasibility depends on hardware,
-    sample size, and the largest remaining neighborhood. Runtime grows combinatorially with
-    neighborhood size, so sparse graphs with more variables can still be feasible.
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), from 20 to 400 variables with ten rows per variable: its median errors (SHD) stayed
+    below the empty graph's at every size, 357 against 400 at 400 variables. The median fit took
+    0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network with
+    1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
+    practical to roughly 1,000 variables on sparse data with ten rows per variable; runtime grows
+    combinatorially with the largest neighborhood, so sparser graphs can stay feasible beyond that.
 
     References
     ----------
@@ -201,9 +205,15 @@ def fci(
     Keep a fixed column order for reproducible results.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
-    including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent. An
-    implementation that checks only the inner part of the path [5]_ can orient differently where R5
-    applies.
+    including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2) with one variable in ten hidden, from 20 to 800 variables counting the hidden ones,
+    with ten rows per variable. Its median endpoint errors, each mismatched tail, arrowhead, or
+    circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at
+    800 (2,579 against 1,772). The median fit took 0.061 s at 20 variables and 72 s at 800, on 16
+    cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
+    passed the empty graph's (696 against 676).
 
     References
     ----------
@@ -216,7 +226,6 @@ def fci(
        1873-1896.
     .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
-    .. [5] causal-learn 0.1.4.8, ``ruleR5`` in ``causallearn/search/ConstraintBased/FCI.py``.
 
     Examples
     --------
@@ -310,8 +319,11 @@ def gfci(
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
-    An implementation that checks only the inner part of the path [4]_ can orient differently where
-    R5 applies.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
+    and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
+    so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
+    linear relations with Gaussian noise.
 
     References
     ----------
@@ -322,7 +334,6 @@ def gfci(
        1873-1896.
     .. [3] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
-    .. [4] causal-learn 0.1.4.8, ``ruleR5`` in ``causallearn/search/ConstraintBased/FCI.py``.
 
     Examples
     --------
@@ -411,6 +422,11 @@ def cdnod(
     shift follows the index's values. With two domains the coding does not matter. With three
     domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go undetected, and recoding the
     domains can change the result.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 500 rows,
+    and on 1,200 rows with 7 variables. It runs the PC search with the index as one more variable,
+    so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its Fisher-Z tests
+    assume linear relations with Gaussian noise.
 
     References
     ----------

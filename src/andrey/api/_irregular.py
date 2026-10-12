@@ -186,7 +186,9 @@ def _adapt_camuv(P: Any, U: Any, n_vars: int) -> StructureOutput:
             set_bidirected(M, a, b)
     confounded_pairs.sort()
     structure = GraphStructure.from_numpy(M, kind="pag")
-    return structure_output(structure, metadata={"confounded_pairs": confounded_pairs})
+    return structure_output(
+        structure, metadata={"algorithm": "CAMUV", "confounded_pairs": confounded_pairs}
+    )
 
 
 # ---- RCD (latent-confounder adjacency) ----------------------------------------------------------
@@ -207,7 +209,7 @@ def _adapt_rcd(model: Any) -> StructureOutput:
     return structure_output(
         structure,
         weighted_adjacency=_nan_to_zero(B).T,
-        metadata={"confounded_pairs": _nan_pairs(B)},
+        metadata={"algorithm": "RCD", "confounded_pairs": _nan_pairs(B)},
     )
 
 
@@ -227,10 +229,8 @@ def _adapt_bottom_up_parce(model: Any) -> StructureOutput:
     B = _adjacency(model)
     M = marks_from_signed(B, nan_mark="circle")
     structure = GraphStructure.from_numpy(M, kind="pag")
-    metadata: dict[str, Any] = {}
+    metadata: dict[str, Any] = {"algorithm": "BottomUpParceLiNGAM"}
     order = getattr(model, "causal_order_", None)
     if order is not None:
         metadata["causal_order"] = order  # json_safe (via structure_output) coerces the nesting
-    return structure_output(
-        structure, weighted_adjacency=_nan_to_zero(B).T, metadata=metadata or None
-    )
+    return structure_output(structure, weighted_adjacency=_nan_to_zero(B).T, metadata=metadata)

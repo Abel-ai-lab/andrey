@@ -138,7 +138,7 @@ shown = ("shd", "skeleton_precision", "skeleton_recall")
 - **SHD**, the structural Hamming distance, counts the links to add, remove, or reorient to reach
   the known network. Lower is better.
 
-PC finds 8 of the 17 links in the known signalling network, and none outside it.
+PC finds 8 of the 17 links in the known signaling network, and none outside it.
 
 A score means little on its own. The graph with no links is the baseline: a graph whose SHD is no
 lower has not improved on it by this measure, even if some of its links are right.
@@ -271,8 +271,8 @@ kind of result; `cdnod` also takes a domain index, and `multi_group_direct_linga
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
 `ANDREY_BACKEND` and `ANDREY_NUM_WORKERS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
-worker, GES, GIES, GFCI, and hill climbing scan each pass in worker processes, and GES returns the
-same graph as it does serially.
+worker, GES, GIES, and GFCI scan each pass in worker processes, and GES returns the same graph as it
+does serially.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_NUM_WORKERS` above 1, or `-1` for every core) must put its entry
@@ -297,9 +297,11 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-FCI and GFCI depend on column order, GES was more accurate with a stronger penalty on the large
-sparse benchmark graphs, and PC and FCI are practical to roughly 1,000 variables. See
-[Known limits](../benchmarks.md#known-limits).
+FCI and GFCI depend on column order, and GES was more accurate with a stronger penalty on the large
+sparse benchmark graphs. PC is practical to roughly 1,000 variables; FCI's errors passed the empty
+graph's at 800 ([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API
+page states the data and sizes it was measured on. See
+[Known limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 

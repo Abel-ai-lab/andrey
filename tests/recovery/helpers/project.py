@@ -12,6 +12,8 @@ _SCORE_GRAPH = frozenset({"GES", "GIES", "HC"})
 _GRAPH = frozenset({"PC", "FCI", "GFCI", "CDNOD", "ExactSearch", "BOSS", "GRaSP"}) | _SCORE_GRAPH
 # LiNGAM: candidate = ordering + weighted_adjacency, transposing native W back to the B layout.
 _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})
+# Hidden-confounder PAGs: candidate = graph + weighted_adjacency as returned.
+_CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
 
 
 def project_output(out: Any, algorithm: str) -> dict:
@@ -26,6 +28,14 @@ def project_output(out: Any, algorithm: str) -> dict:
             "causal_order": np.asarray(out.ordering),
             "weighted_adjacency": np.asarray(out.weighted_adjacency).T,
         }
+    if algorithm in _CONFOUNDED:
+        candidate = {
+            "graph": out.structure.to_numpy(),
+            "weighted_adjacency": np.asarray(out.weighted_adjacency),
+        }
+        if algorithm == "BottomUpParceLiNGAM":  # the order, unordered variables nested in a list
+            candidate["causal_order"] = out.metadata["causal_order"]
+        return candidate
     if algorithm == "MultiGroupDirectLiNGAM":
         if not out:
             raise ValueError("MultiGroupDirectLiNGAM projection needs a non-empty list of outputs")
@@ -50,5 +60,5 @@ def project_output(out: Any, algorithm: str) -> dict:
         }
     raise KeyError(
         f"no output projection registered for {algorithm!r} "
-        "(lossy layouts like Granger/CAMUV/RCD add their own in-slice)"
+        "(lossy layouts like Granger and CAM-UV add their own in-slice)"
     )
