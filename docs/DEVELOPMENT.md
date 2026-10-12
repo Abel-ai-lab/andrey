@@ -95,8 +95,8 @@ add a release:
 
 1. Move the current latest release to the top of "Earlier releases": copy a row and set its
    version, title, methods sentence, facts, release date, and links.
-2. Fill the latest block with the new release; the post placeholder becomes a link once the post is
-   out.
+2. Fill the latest block with the new release. Before the tag, set its status to Released with the
+   date, and turn the post placeholder into the post's link.
 3. Add the new card to the toctree, newest first.
 
 `_static/benchmarks.css` styles the page and loads on it only.

@@ -4,10 +4,10 @@ Compare Andrey with other causal discovery packages and older Andrey builds.
 
 ## Published measurements
 
-The site has a [benchmark report](../docs/docs/benchmarks.md) per release, and each report has its
-own folder under `published/` with the summary its numbers come from:
+The site has a [release card](../docs/docs/benchmarks.md) per release, and each card has its own
+folder under `published/` with the summary its numbers come from:
 
-| Release | Report | Summary |
+| Release | Release card | Summary |
 |---|---|---|
 | 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
 | 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |

@@ -103,7 +103,7 @@ def direct_lingam(
     number of variables. With the ``torch`` extra and a CUDA GPU, entropy computations move to the
     GPU once they are large enough.
 
-    **Feasibility.** Measured on simulated data from scale-free graphs with linear effects and
+    **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
     stayed below the empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20
     variables and 545 s at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300
@@ -205,7 +205,7 @@ def ica_lingam(
     orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
     converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
 
-    **Feasibility.** Measured on simulated data from scale-free graphs with linear effects and
+    **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
     passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at
     100. The median fit took 0.44 s at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's

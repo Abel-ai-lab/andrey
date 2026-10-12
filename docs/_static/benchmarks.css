@@ -123,7 +123,7 @@ html[data-theme="dark"] .release-cover {
 .release-cover .sd-card-text:nth-of-type(1) {
   padding-bottom: 0.7rem;
   border-bottom: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 24%, transparent);
-  color: color-mix(in srgb, var(--andrey-ground-ink) 70%, transparent);
+  color: color-mix(in srgb, var(--andrey-ground-ink) 82%, transparent);
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -562,7 +562,7 @@ html[data-theme="dark"] .release-tile {
   }
 
   .release-cover .sd-card-text:nth-of-type(1) {
-    font-size: 0.52rem;
+    font-size: 0.6rem;
   }
 
   .release-cover .sd-card-text:nth-of-type(2) {

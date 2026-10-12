@@ -267,7 +267,7 @@ fails. The pull request makes:
 
 - `status="supported"` in its `MethodSpec`, with the `warn_experimental` call and the docstring's
   `ExperimentalWarning` entry removed;
-- a **Feasibility.** paragraph in the docstring's Notes, from the campaign: the data and sizes
+- a **Limitations.** paragraph in the docstring's Notes, from the campaign: the data and sizes
   measured, the sizes where its median errors reach the empty graph's, its fit times with the core
   count, and the size where it stops being practical, if the report shows one;
 - the method under "Supported methods" in `docs/docs/code/index.md`;

@@ -84,7 +84,7 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     removed together. A removed pair's separating set combines all conditioning sets that separated
     it. If two colliders conflict, the one found first in column order is kept.
 
-    **Feasibility.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 400 variables with ten rows per variable: its median errors (SHD) stayed
     below the empty graph's at every size, 357 against 400 at 400 variables. The median fit took
     0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network with
@@ -207,7 +207,7 @@ def fci(
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
 
-    **Feasibility.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) with one variable in ten hidden, from 20 to 800 variables counting the hidden ones,
     with ten rows per variable. Its median endpoint errors, each mismatched tail, arrowhead, or
     circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at

@@ -404,15 +404,15 @@ def test_supported_method_has_an_example(name):
 
 
 @pytest.mark.parametrize("name", SUPPORTED)
-def test_supported_method_declares_its_feasibility(name):
-    """The docstring's Notes carry a **Feasibility.** paragraph: where the method was measured."""
+def test_supported_method_declares_its_limitations(name):
+    """The docstring's Notes carry a **Limitations.** paragraph: where the method was measured."""
     doc = inspect.getdoc(getattr(andrey, name)) or ""
     notes = re.search(
         r"^Notes\n-{3,}\n(.*?)(?=^\S[^\n]*\n-{3,}\n|\Z)", doc, re.MULTILINE | re.DOTALL
     )
     assert notes, f"{name}: no Notes section; {GRADUATE}"
-    assert re.search(r"^\*\*Feasibility\.\*\* ", notes.group(1), re.MULTILINE), (
-        f"{name}: no **Feasibility.** paragraph in Notes; {GRADUATE}"
+    assert re.search(r"^\*\*Limitations\.\*\* ", notes.group(1), re.MULTILINE), (
+        f"{name}: no **Limitations.** paragraph in Notes; {GRADUATE}"
     )
 
 

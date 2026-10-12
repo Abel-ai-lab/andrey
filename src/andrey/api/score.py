@@ -81,7 +81,7 @@ def ges(
     **How it works.** In the forward phase, a variable with more than ``n_variables / 2`` parents
     gets no new edges. The backward phase has no cap.
 
-    **Feasibility.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 200 variables with ten rows per variable and parents capped at 4 per
     variable rather than ``n_variables / 2``. At ``lambda_value=1.0`` its median errors (SHD) stayed
     below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against

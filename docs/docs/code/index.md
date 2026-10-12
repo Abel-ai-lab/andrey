@@ -82,7 +82,7 @@ in a process.
 A method becomes supported once it has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
-  in its release's [benchmark report](../benchmarks.md);
+  in its release's [release card](../benchmarks.md);
 - recovery baselines in `tests/recovery/baselines/`;
 - a place in the release quality gate, `qa/quality_gate.py`;
 - an example notebook.

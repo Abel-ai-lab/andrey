@@ -82,7 +82,7 @@ observed variables, in both packages.
 :::
 
 :::{div} release-body
-<h3><a href="benchmarks/0.1.0.html">The alpha benchmarks</a></h3>
+<h3>The alpha benchmarks</h3>
 
 PC, FCI, GES, BOSS, GRaSP, DirectLiNGAM, and ICA-LiNGAM, compared with causal-learn, gCastle, and
 lingam.

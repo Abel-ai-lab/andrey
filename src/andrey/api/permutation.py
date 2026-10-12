@@ -98,7 +98,7 @@ def boss(
     shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties. The
     earliest order position wins; among candidate parents, the lowest column index wins.
 
-    **Feasibility.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 800 variables with ten rows per variable, at ``lambda_value=4.0``: its
     median errors (SHD) stayed below the empty graph's at every size, 24 against 800 at 800
     variables. The median fit took 0.031 s at 20 variables and 292 s at 800, on 16 cores. On the
@@ -222,7 +222,7 @@ def grasp(
     Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
     :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged.
 
-    **Feasibility.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 400 variables with ten rows per variable, at ``lambda_value=4.0``: its
     median errors (SHD) stayed below the empty graph's at every size, 0 against 400 at 400
     variables. The median fit took 0.037 s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16
