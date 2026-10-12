@@ -241,12 +241,6 @@ def xges(
         If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
         no constant column, or if ``lambda_value`` is negative or non-finite.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     See Also
     --------
     andrey.ges : Adds edges, then removes them, in two separate phases.
@@ -263,11 +257,18 @@ def xges(
     reruns the search. It keeps a result whose score is lower by more than ``2e-7 * n_samples``, and
     stops once a fresh pass over the edges keeps nothing. No variable has a parent limit.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 258 variables with 512 rows,
-    and on 10,000 rows with 10 variables. The extended search reruns the base search for each edge
-    it tries to delete and retries the edges after keeping a result, so its run time grows with the
-    number of edges and of results kept; ``extended_search=False`` skips it. Its BIC score assumes
-    linear relations with Gaussian noise.
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2) and denser ones (mean degree 4), from 25 to 1,000 variables with ten rows per
+    variable. At mean degree 4 its median errors (SHD) stayed below the empty graph's at every
+    size, 1,368 against 2,000 at 1,000 variables. At mean degree 2 they stayed below it up to 200
+    variables (190 against 200) and passed it at 500 and 1,000 (671 against 500, and 1,758 against
+    1,000; 663 and 1,688 with ``extended_search=False``), where the returned graphs still scored a
+    lower BIC than the true one. The median fit took 0.0718 s at 25 variables and 51.6 s at 1,000
+    at mean degree 2, and 289 s at 1,000 at mean degree 4, on one core; with
+    ``extended_search=False``, 1.54 s and 5.15 s at 1,000. The extended search reruns the base
+    search for each edge it tries to delete and retries the edges after keeping a result, so its
+    run time grows with the number of edges and of results kept. Its BIC score assumes linear
+    relations with Gaussian noise.
 
     References
     ----------
@@ -290,7 +291,6 @@ def xges(
     >>> xges(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
     """
-    warn_experimental("xges")
     from andrey.search.xges import xges as _xges
 
     X = data_matrix(data)
@@ -350,9 +350,6 @@ def hc(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     SearchLimitWarning
         When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
         graph.
@@ -362,10 +359,14 @@ def hc(
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 45 variables with 800 rows,
-    and on 40,000 rows with 24 variables. It has no move limit by default; run time grows with the
-    moves the search takes. A graph that no single move improves need not be the best-scoring one.
-    Its BIC score assumes linear relations with Gaussian noise.
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), from 10 to 3,200 variables with ten rows per variable. Its median errors (SHD)
+    equaled the empty graph's at 10 variables (10 against 10), stayed below it at 20 (12 against
+    20), and passed it at every size from 50 (55 against 50) to 3,200 (9,306 against 3,200);
+    bnlearn's hill climbing did the same up to 800 variables. TODO(0.3.0): the median fit times,
+    with the core count, from the rebuilt speed table. It has no move limit by default; run time
+    grows with the moves the search takes. A graph that no single move improves need not be the
+    best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
 
     References
     ----------
@@ -384,7 +385,6 @@ def hc(
     >>> hc(np.column_stack([x, y])).structure.kind
     'cpdag'
     """
-    warn_experimental("hc")
     from andrey.search.hc import hc as _hc
 
     X = data_matrix(data)
@@ -450,9 +450,6 @@ def tabu(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     SearchLimitWarning
         When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
         graph.
@@ -470,11 +467,15 @@ def tabu(
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
     moves break as they do for :func:`andrey.hc`.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 200 variables with 2,000 rows.
-    It takes hill climbing's moves plus up to ``max_tabu`` non-improving moves between new best
-    scores, with no move limit by default; run time grows with the moves taken. It avoids only the
-    last ``tabu_length`` DAGs, so a better DAG beyond that reach may be missed. Its BIC score
-    assumes linear relations with Gaussian noise.
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), from 10 to 3,200 variables with ten rows per variable. Its median errors (SHD)
+    equaled the empty graph's at 10 variables (10 against 10), stayed below it at 20 (14 against
+    20), and passed it at every size from 50 (54 against 50) to 3,200 (9,312 against 3,200);
+    bnlearn's tabu search did the same up to 800 variables. TODO(0.3.0): the median fit times, with
+    the core count, from the rebuilt speed table. It takes hill climbing's moves plus up to
+    ``max_tabu`` non-improving moves between new best scores, with no move limit by default; run
+    time grows with the moves taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG
+    beyond that reach may be missed. Its BIC score assumes linear relations with Gaussian noise.
 
     References
     ----------
@@ -496,7 +497,6 @@ def tabu(
     >>> tabu(np.column_stack([x, y])).structure.kind
     'cpdag'
     """
-    warn_experimental("tabu")
     from andrey.search.tabu import tabu as _tabu
 
     X = data_matrix(data)

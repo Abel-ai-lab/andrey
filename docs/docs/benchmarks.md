@@ -34,7 +34,8 @@ Score-based search
 ::::{div} release-tldr
 
 Three score-based searches on linear-Gaussian data: XGES, compared with xges, and Tabu search and
-hill climbing, compared with bnlearn. XGES and Tabu search are new in 0.3.0.
+hill climbing, compared with bnlearn. XGES and Tabu search are new in 0.3.0, and all three are
+supported.
 
 :::{div} release-stats
 

@@ -197,7 +197,6 @@ def test_gin_labels_name_each_column():
         andrey.gin(_data(d=4), labels=("a", "b"))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("fit", "max_iter", "error"),
     [
@@ -215,7 +214,6 @@ def test_max_iter_is_a_positive_int(fit, max_iter, error):
         fit(_data(), max_iter=max_iter)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_hc_stops_at_max_iter_and_warns():
     chain = np.cumsum(np.random.default_rng(0).standard_normal((500, 8)), axis=1)
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
@@ -224,7 +222,6 @@ def test_hc_stops_at_max_iter_and_warns():
     assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # runs to a local optimum
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_hc_sets_no_move_limit_by_default():
     # This dense graph takes over 200 moves: a limit of 200 stops the search, the default does not.
     x = sample_scm(d=30, n=800, seed=0, density=16.0).data
@@ -236,7 +233,6 @@ def test_hc_sets_no_move_limit_by_default():
     assert len(out.structure.oriented_edges()) > 200
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("settings", "named", "error"),
     [
@@ -255,7 +251,6 @@ def test_tabu_rejects_a_bad_setting(settings, named, error):
         andrey.tabu(_data(), **settings)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_tabu_stops_at_max_iter_and_warns():
     chain = np.cumsum(np.random.default_rng(0).standard_normal((500, 8)), axis=1)
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
@@ -276,7 +271,6 @@ def test_cdnod_rejects_nan_in_c_indx():
         andrey.cdnod(_data(), c_indx=np.r_[np.nan, np.zeros(59)])
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("setting", "value", "error"),
     [

@@ -59,7 +59,7 @@ def _default_pool_cutoff(monkeypatch):
 
 def _experimental(monkeypatch):
     data = np.random.default_rng(0).standard_normal((50, 3))
-    return lambda: andrey.hc(data)
+    return lambda: andrey.gies(data)
 
 
 def _search_limit(monkeypatch):

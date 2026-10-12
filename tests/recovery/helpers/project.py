@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 # A graph candidate also carries the scalar objective score (from metadata).
-_SCORE_GRAPH = frozenset({"GES", "GIES", "HC"})
+_SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu"})
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
 _GRAPH = frozenset({"PC", "FCI", "GFCI", "CDNOD", "ExactSearch", "BOSS", "GRaSP"}) | _SCORE_GRAPH
 # LiNGAM: candidate = ordering + weighted_adjacency, transposing native W back to the B layout.
