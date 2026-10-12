@@ -1,8 +1,9 @@
 /* The Release cards page: the latest release's cover beside its TL;DR, then the earlier releases
-   as a list. Loaded on that page only. Colors are --andrey-* tokens. */
+   as a list. A release card: its cover beside its opening, and its figures. Loaded on those pages
+   only. Colors are --andrey-* tokens. */
 
 /* ---------- the intro ---------- */
-.bd-article h1 + p {
+.bd-article section:has(> .release-latest) > h1 + p {
   max-width: 46rem;
   margin-bottom: 1.75rem;
   color: var(--andrey-muted);
@@ -368,6 +369,51 @@ html[data-theme="dark"] .release-tile {
   box-shadow: none;
 }
 
+/* ---------- a release card: the cover beside the opening, then the figures ---------- */
+/* The cover, at the size it takes on a narrow screen, floats at the start of the opening, and the
+   text wraps round it. The card keeps sphinx-design's bottom margin, so only the others are set. */
+.release-opening {
+  display: flow-root;
+  margin: 0.25rem 0 2rem;
+}
+
+.release-opening .release-cover {
+  float: left;
+  width: 13.5rem;
+  margin-top: 0.35rem;
+  margin-right: 2rem;
+}
+
+.bd-content .release-opening .sd-card.release-cover .sd-card-body {
+  padding: 1rem 1.3rem 1.5rem 1.6rem;
+}
+
+.release-opening .release-cover .sd-card-text:nth-of-type(1) {
+  font-size: 0.6rem;
+}
+
+.release-opening .release-cover .sd-card-text:nth-of-type(2) {
+  margin-top: 1.1rem;
+  font-size: 1.2rem;
+}
+
+.release-opening .release-cover .sd-card-text:nth-of-type(3) {
+  font-size: 3.4rem;
+}
+
+.release-opening-text > p:first-child {
+  margin-top: 0;
+}
+
+.release-opening-text > p:last-child {
+  margin-bottom: 0;
+}
+
+/* The race takes the article's spacing, as in a post. */
+.bd-article .race {
+  margin: 2rem 0;
+}
+
 /* ---------- earlier releases ---------- */
 .bd-article section:has(> .release-row) > h2 {
   margin: 2.75rem 0 0;
@@ -492,6 +538,11 @@ html[data-theme="dark"] .release-tile {
   .release-cover {
     justify-self: center;
     width: 13.5rem;
+  }
+
+  .release-opening .release-cover {
+    float: none;
+    margin: 0 auto;
   }
 
   .bd-content .sd-card.release-cover .sd-card-body {

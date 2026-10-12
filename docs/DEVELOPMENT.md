@@ -103,8 +103,13 @@ add a release:
    three times the cover's 288 px width, with its own glow and grain and a dark ground behind the
    title and the version. Point the `release-art` background in `_static/benchmarks.css` at it. A
    cover without the `release-art` class shows the stipple ground instead.
+5. Open the card with the same cover, without its link, beside the opening paragraphs in a
+   `release-opening` block.
 
-`_static/benchmarks.css` styles the page and loads on it only.
+A card's figures are finished HTML files in `docs/benchmarks/<release>/`, included with
+`{raw} html`, so later code never redraws a released card. `_static/benchmarks.css` styles the
+page and the cards' covers, and loads on those pages only; a card also loads `figures.css` and
+`figures.js`, the styles and script of the posts' figures.
 
 ## The Examples and Demos galleries
 

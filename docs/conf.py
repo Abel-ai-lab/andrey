@@ -418,6 +418,9 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
         css = ["examples.css"]
     elif pagename == "docs/benchmarks":
         css = ["benchmarks.css"]
+    elif pagename.startswith("docs/benchmarks/"):
+        # A release card: its cover and its figures.
+        css, js = ["benchmarks.css", "figures.css"], ["figures.js"]
     elif pagename == "docs/guides/graph-representation":
         js = ["graph-guides.js"]
     # The "Why Andrey is fast" scenes, on top of the page's own files: Motion, then its script.
