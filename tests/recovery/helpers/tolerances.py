@@ -80,4 +80,12 @@ SPEC: dict[str, dict] = {
     },
     # --- Irregular / pairwise & latent-confounder methods.
     # ANM/PNL payload is the two p-values (numeric); no structural graph.
+    "RCD": {
+        "structural": ["graph"],
+        "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
+    },
+    "BottomUpParceLiNGAM": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
+    },
 }

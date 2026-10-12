@@ -79,6 +79,33 @@ A post belongs to the release in its `version` front matter, and later builds le
 release rendered it: its numbers are typed text, and every file it includes (a figure, code, or
 output) is stored under `blog/<version>/`.
 
+## The release cards
+
+Each release has a release card, `docs/benchmarks/<release>.md`: its benchmarks, the methods it adds
+or promotes, their known limits, and how to rerun the measurements. The summary its numbers come
+from is `benchmarks/published/<label>/summary.json`, which the card links. Like a post, a released
+card and its summary never change: their numbers are typed text, and new measurements go into the
+next release's card.
+
+[`docs/benchmarks.md`](docs/benchmarks.md) is the Release cards page, at the address the README and
+the homepage link. The latest release leads as a cover (masthead, title, version) beside its TL;DR:
+the abstract, three numbers, a limit, and a button to the card.
+Earlier releases follow as a list, newest first, each with a square tile showing its version. To
+add a release:
+
+1. Move the current latest release to the top of "Earlier releases": copy a row and set its
+   version, title, methods sentence, facts, release date, and links.
+2. Fill the latest block with the new release, and add a link to the post after the card's button
+   once the post is out. The block states only what does not change: the published site is built
+   from release tags, so a reader never sees a card before its release.
+3. Add the new card to the toctree, newest first.
+4. Store the cover's art as `_static/release-cards/<release>.jpg`: a finished JPEG, 8.5 x 11 at
+   three times the cover's 288 px width, with its own glow and grain and a dark ground behind the
+   title and the version. Point the `release-art` background in `_static/benchmarks.css` at it. A
+   cover without the `release-art` class shows the stipple ground instead.
+
+`_static/benchmarks.css` styles the page and loads on it only.
+
 ## The Examples and Demos galleries
 
 [`docs/examples/index.md`](docs/examples/index.md) is a gallery of notebook cards.
@@ -170,6 +197,7 @@ To check external links: `uv run --group docs sphinx-build -b linkcheck docs doc
 | Wordmark (Inter outlines, light and dark ink) and its generator | `site/brand/`, `site/wordmark.py` |
 | Palette as CSS custom properties | `docs/palette_css.py` |
 | Blog posts and the post list | `docs/blog/` |
+| Release cards and the page that lists them | `docs/docs/benchmarks/`, `docs/docs/benchmarks.md`, `docs/_static/benchmarks.css` |
 | Docs landing page and section index | `docs/docs/index.md` |
 | API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/code/index.md` |
 | Guides (getting started, contributing) | `docs/docs/guides/` |

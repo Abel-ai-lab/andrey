@@ -9,7 +9,9 @@
       "BOSS": {"median_shd": 1, "reason": "No graph changed on the linear_gauss_er cells when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "GRaSP": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
       "DirectLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline ordering decision to differ on another host."},
-      "ICA-LiNGAM": {"median_shd": 2, "reason": "FastICA's causal order can flip on rounding. Under a relative 1e-12 input perturbation the median at d = 50 moved by 1, and 4 of 100 draws changed. Two covers that with one to spare."}
+      "ICA-LiNGAM": {"median_shd": 2, "reason": "FastICA's causal order can flip on rounding. Under a relative 1e-12 input perturbation the median at d = 50 moved by 1, and 4 of 100 draws changed. Two covers that with one to spare."},
+      "RCD": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "BottomUpParceLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."}
     },
     "baselines": {
       "PC": {
@@ -53,6 +55,14 @@
         "lingam_sf_d50": {"median_shd": 10.0, "empty_median_shd": 49.0, "shd": [10, 5, 7, 10, 94, 98, 53, 4, 8, 20]},
         "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 1, 0, 0, 0, 0, 0]},
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
+      },
+      "RCD": {
+        "latent_lingam_er_d10": {"median_shd": 9.5, "empty_median_shd": 20.0, "shd": [4, 8, 10, 11, 23, 19, 10, 5, 8, 9]},
+        "latent_lingam_er_d15": {"median_shd": 15.0, "empty_median_shd": 29.0, "shd": [9, 23, 6, 10, 16, 22, 14, 7, 38, 20]}
+      },
+      "BottomUpParceLiNGAM": {
+        "latent_lingam_er_d10": {"median_shd": 13.0, "empty_median_shd": 20.0, "shd": [22, 17, 3, 14, 16, 1, 12, 9, 9, 15]},
+        "latent_lingam_er_d15": {"median_shd": 25.0, "empty_median_shd": 29.0, "shd": [21, 41, 13, 24, 32, 31, 17, 26, 44, 22]}
       }
     }
   }

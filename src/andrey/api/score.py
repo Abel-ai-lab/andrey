@@ -81,6 +81,14 @@ def ges(
     **How it works.** In the forward phase, a variable with more than ``n_variables / 2`` parents
     gets no new edges. The backward phase has no cap.
 
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), from 20 to 200 variables with ten rows per variable and parents capped at 4 per
+    variable rather than ``n_variables / 2``. At ``lambda_value=1.0`` its median errors (SHD) stayed
+    below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against
+    200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
+    and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
+    the default parent cap, its median errors passed the empty graph's (612 against 338).
+
     References
     ----------
     .. [1] Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3,
@@ -148,6 +156,12 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 600 rows. It
+    takes observational data only, so it returns the graph and score that :func:`~andrey.ges`
+    returns on the same data, and the limitations of GES apply.
 
     References
     ----------
@@ -232,6 +246,10 @@ def hc(
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 45 variables with 800 rows,
+    and on 40,000 rows with 24 variables. A graph that no single move improves need not be the
+    best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
+
     References
     ----------
     .. [1] Chickering, D. M., Geiger, D., and Heckerman, D. (1995). Learning Bayesian networks:
@@ -291,6 +309,13 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 5 variables with 1,000 rows.
+    It scores every possible parent set of every variable, so its run time at least doubles with
+    each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
+    its memory doubles as well.
 
     References
     ----------
@@ -377,6 +402,14 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 6 variables with 800 rows, and
+    on 2,000 rows with 5 variables. Every optimizer step computes a determinant and a matrix power
+    of the full weight matrix, one row and one column per variable, so a step's cost grows with the
+    cube of the variable count; the defaults allow up to 75,000 steps (``max_outer`` times
+    ``subproblem_iter``).
 
     References
     ----------

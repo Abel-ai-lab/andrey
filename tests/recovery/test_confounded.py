@@ -4,7 +4,8 @@ Recovery tests run the public functions on SEMs where a hidden common cause driv
 variables that share no direct edge. With a direct edge as well (``confounded_6v``), whether a
 method marks the pair or orients the edge depends on its tests' power. The planted pair and
 the direct edges come from ``datagen.planted_structure``. Each case has a control with the same
-graph and the hidden variable observed, where no pair is confounded. Random models check execution,
+graph and the hidden variable observed, where no pair is confounded. RCD and BottomUpParceLiNGAM
+also match their recorded outputs on the linear case. Random models check execution,
 repeatability, and well-formed output; recovery rates are measured separately because they depend
 on sample size and regime.
 """
@@ -16,6 +17,7 @@ import pytest
 
 import andrey
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 
@@ -99,6 +101,16 @@ def test_bottom_up_parce_lingam_orders_everything_when_the_cause_is_observed(rep
     out = andrey.bottom_up_parce_lingam(x, alpha=0.01)
     _assert_pairs_and_edges(out, _FORK_OBSERVED, "circle", exact_edges=False)
     assert not any(isinstance(item, list) for item in out.metadata["causal_order"])
+
+
+def test_rcd_matches_its_recorded_output():
+    out = andrey.rcd(datagen.generate(_FORK))
+    assert_recorded_output(out, "RCD", case=_FORK)
+
+
+def test_bottom_up_parce_lingam_matches_its_recorded_output():
+    out = andrey.bottom_up_parce_lingam(datagen.generate(_FORK), alpha=0.01)
+    assert_recorded_output(out, "BottomUpParceLiNGAM", case=_FORK)
 
 
 def test_a_planted_pair_has_no_direct_edge():

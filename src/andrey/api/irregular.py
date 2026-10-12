@@ -78,6 +78,10 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     PNL fits each transform as a sum of smooth basis functions, so the fit is deterministic but can
     miss a sharply varying nonlinearity.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on pairs of at most 400 rows. Each HSIC
+    test builds kernel matrices with one row and one column per sample, so time and memory grow with
+    the square of the row count.
+
     References
     ----------
     .. [1] Zhang, K., and Hyvarinen, A. (2009). On the identifiability of the post-nonlinear
@@ -164,16 +168,16 @@ def rcd(
         If ``data`` has fewer than 6 rows, if ``max_explanatory_vars`` is less than 1, or if a
         significance level is not in ``(0, 1)``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     RCD assumes linear relations and non-Gaussian noise. It needs more rows than DirectLiNGAM: its
     tests compare residuals, and a weak hidden cause leaves only a small trace in them.
+
+    **Limitations.** Measured on linear data with uniform noise, one node in five hidden, and 2,000
+    rows, from 4 to 24 observed variables: its median directed-edge errors were below the empty
+    graph's at every size but 8 variables, where they equaled it. A fit took about 2 s at 4
+    variables and 18 s at 24, on two cores. Larger problems are untested; the work grows with the
+    number of variables and with ``max_explanatory_vars``.
 
     References
     ----------
@@ -193,7 +197,6 @@ def rcd(
     >>> out.metadata["confounded_pairs"]
     [[0, 1]]
     """
-    warn_experimental("rcd")
     from andrey.irregular.rcd import fit_rcd
 
     X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
@@ -256,6 +259,12 @@ def camuv(
     A ``<->`` pair may share a hidden common cause or be linked by a causal path through a hidden
     variable; CAM-UV does not tell the two apart. It estimates no edge weights.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 6 variables with 300 rows, and
+    on 1,000 rows with 5 variables. It searches every subset of up to ``max_explanatory_vars``
+    variables, and starts the search over after each parent it adds. Each HSIC test builds kernel
+    matrices with one row and one column per sample, so time and memory grow with the square of the
+    row count.
+
     References
     ----------
     .. [1] Maeda, T. N., and Shimizu, S. (2021). Causal additive models with unobserved variables.
@@ -315,12 +324,6 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
         If ``data`` has fewer than 6 rows or no more rows than columns, or if ``alpha`` is not in
         ``(0, 1)``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     The search finds sinks from the bottom up and stops at the first variable it cannot separate,
@@ -329,6 +332,12 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     share a cause, and edges among the block's variables stay unoriented. The edge weights come
     from an adaptive-Lasso regression of each variable on those before it, which needs more rows
     than columns.
+
+    **Limitations.** Suited to a few variables. Measured on linear data with uniform noise, one node
+    in five hidden, and 2,000 rows: its median directed-edge errors were below the empty graph's at
+    4 observed variables, and above it at every size from 8 to 24. From 16 variables it left none of
+    the confounded pairs unordered. A fit took about 2 s at 4 variables and 96 s at 24, on two
+    cores.
 
     References
     ----------
@@ -348,7 +357,6 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     >>> out.metadata["causal_order"]
     [[0, 1], 2, 3]
     """
-    warn_experimental("bottom_up_parce_lingam")
     from andrey.irregular.bottom_up_parce import bottom_up_parce_lingam as _native
 
     X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
