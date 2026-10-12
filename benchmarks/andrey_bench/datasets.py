@@ -72,6 +72,10 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # Cause-effect pairs: nonlinear additive noise on two nodes, where ANM is identifiable. At
     # ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "anm_pair": ("er", "anm", "gaussian", "standardized"),
+    # Cause-effect pairs: post-nonlinear ``y = g2(w * x + e)`` on two nodes with Laplace noise, where
+    # PNL is identifiable. The inner transform is linear and the outer one nonlinear and invertible.
+    # At ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
+    "pnl_pair": ("er", "pnl", "laplace", "standardized"),
 }
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
