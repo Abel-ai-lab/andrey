@@ -33,8 +33,7 @@ Hidden common causes
 
 ::::{div} release-tldr
 
-<p class="release-status"><span class="release-tag">Latest</span>
-<span class="release-badge">Pre-release</span> Measured 11 October 2026</p>
+<p class="release-status">Latest · Pre-release · Measured 11 October 2026</p>
 
 RCD and BottomUpParceLiNGAM, two methods for data with hidden common causes, compared with lingam,
 which implements both. Both are supported from 0.2.0.
@@ -51,17 +50,8 @@ which implements both. Both are supported from 0.2.0.
 observed variables, in both packages.
 :::
 
-:::{div} release-sections
-
-- [Benchmarks](benchmarks/0.2.0.md#summary)
-- [Methods](benchmarks/0.2.0.md#hidden-confounder-methods)
-- [Known limits](benchmarks/0.2.0.md#known-limits)
-- [Reproduce](benchmarks/0.2.0.md#reproduce)
-:::
-
 :::{div} release-actions
 [Read the release card](benchmarks/0.2.0.md)
-<span class="release-pending">Post: with the release</span>
 :::
 ::::
 :::::
