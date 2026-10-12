@@ -17,8 +17,9 @@ Every test reads one lagged design matrix: column ``lag * n + i`` holds ``X^i_{t
 0 .. 2 * tau_max``, over the ``T - 2 * tau_max`` time steps where all those lags exist, so every
 test uses the same samples. Every test is a partial-correlation test: ``indep_test="student_t"``
 (:class:`~andrey.core.ci.StudentT`, the default) or ``"fisherz"``
-(:class:`~andrey.core.ci.FisherZ`). Any object with
-``statistic_pvalue(x, y, condition_set) -> (statistic, p_value)`` over the design's column indices
+(:class:`~andrey.core.ci.FisherZ`). A PC1 round tests all of a target's candidates in one call, and
+MCI tests all links into a target together, grouped by conditioning-set size. Any object with
+``statistic_pvalues(x, y, conditions) -> (statistics, p_values)`` over the design's column indices
 can drive :func:`pc1` and :func:`mci`.
 
 References
@@ -31,12 +32,13 @@ eaau4996. https://doi.org/10.1126/sciadv.aau4996
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
 
+from andrey.core import backend
 from andrey.core.ci import FisherZ, StudentT
 
 # A lagged variable ``(i, lag)``: variable ``i`` at time ``t - lag``.
@@ -44,15 +46,21 @@ Link = tuple[int, int]
 
 
 class LinkTest(Protocol):
-    """A conditional-independence test that reports its statistic with the p-value.
+    """A conditional-independence test that reports its statistics with the p-values.
 
     Built once over the lagged design matrix and called with its column indices. A larger p-value
     means more independence; a larger absolute statistic means a stronger dependence.
     """
 
-    def statistic_pvalue(
-        self, x: int, y: int, condition_set: Iterable[int] = ()
-    ) -> tuple[float, float]: ...
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Test ``x[i]`` against ``y[i]`` given the columns ``conditions[i]``, for every row.
+
+        ``x`` and ``y`` have shape ``(N,)`` and ``conditions`` shape ``(N, m)``: every query has
+        ``m`` conditioners. Returns the ``(N,)`` statistics and p-values.
+        """
+        ...
 
 
 # The ``indep_test`` names: each builds a test over the lagged design.
@@ -95,30 +103,39 @@ def _column(link: Link, n_vars: int) -> int:
     return lag * n_vars + i
 
 
+def _strongest_others(columns: np.ndarray, p: int) -> np.ndarray:
+    """Row ``k`` holds the first ``p`` entries of ``columns`` without ``columns[k]``."""
+    others = np.broadcast_to(columns[:p], (len(columns), p)).copy()
+    for k in range(min(p, len(columns))):  # these rows lose one of the first p entries
+        others[k] = np.delete(columns[: p + 1], k)
+    return others
+
+
 def pc1(
     test: LinkTest, n_vars: int, target: int, tau_max: int, pc_alpha: float
 ) -> tuple[Link, ...]:
     """Select the lagged parents of variable ``target`` with the PC1 rounds; strongest first.
 
     Candidates start in variable-major order, ``(0, 1), (0, 2), ..., (1, 1), ...``, and each round
-    re-sorts the survivors stably, so equal strengths keep their earlier order.
+    re-sorts the survivors stably, so equal strengths keep their earlier order. Each round is one
+    ``test`` call over all remaining candidates.
     """
-    candidates = [(i, lag) for i in range(n_vars) for lag in range(1, tau_max + 1)]
-    strength = dict.fromkeys(candidates, math.inf)
+    columns = np.array(
+        [_column((i, lag), n_vars) for i in range(n_vars) for lag in range(1, tau_max + 1)],
+        dtype=np.intp,
+    )
+    strength = np.full(len(columns), math.inf)
     p = 0
-    while len(candidates) - 1 >= p:
-        removed = set()
-        for link in candidates:
-            conditions = [c for c in candidates if c != link][:p]
-            statistic, p_value = test.statistic_pvalue(
-                _column(link, n_vars), target, [_column(c, n_vars) for c in conditions]
-            )
-            strength[link] = min(strength[link], abs(statistic))
-            if p_value > pc_alpha:
-                removed.add(link)
-        candidates = sorted((c for c in candidates if c not in removed), key=lambda c: -strength[c])
+    while len(columns) - 1 >= p:
+        statistics, p_values = test.statistic_pvalues(
+            columns, np.full_like(columns, target), _strongest_others(columns, p)
+        )
+        strength = np.fmin(strength, np.abs(statistics))
+        kept = np.flatnonzero(~(p_values > pc_alpha))
+        kept = kept[np.argsort(-strength[kept], kind="stable")]
+        columns, strength = columns[kept], strength[kept]
         p += 1
-    return tuple(candidates)
+    return tuple((int(c) % n_vars, int(c) // n_vars) for c in columns)
 
 
 def mci(
@@ -127,20 +144,29 @@ def mci(
     """Run the MCI test on every link; return ``(statistics, p_values)``, each ``(tau_max, n, n)``.
 
     The link ``X^i_{t-lag} -> X^j_t`` is tested given ``parents[j]`` without ``(i, lag)`` and
-    ``parents[i]`` shifted ``lag`` steps back.
+    ``parents[i]`` shifted ``lag`` steps back. The links into each ``X^j_t`` are tested together,
+    one ``test`` call per conditioning-set size.
     """
     statistics = np.zeros((tau_max, n_vars, n_vars))
     p_values = np.ones((tau_max, n_vars, n_vars))
     for j in range(n_vars):
+        groups: dict[int, list[tuple[int, int, list[int]]]] = {}
         for i in range(n_vars):
             for lag in range(1, tau_max + 1):
                 conditions = {c for c in parents[j] if c != (i, lag)}
                 conditions.update((k, s + lag) for k, s in parents[i])
-                statistic, p_value = test.statistic_pvalue(
-                    _column((i, lag), n_vars), j, sorted(_column(c, n_vars) for c in conditions)
-                )
-                statistics[lag - 1, i, j] = statistic
-                p_values[lag - 1, i, j] = p_value
+                columns = sorted(_column(c, n_vars) for c in conditions)
+                groups.setdefault(len(columns), []).append((i, lag, columns))
+        for size, group in groups.items():
+            causes = np.array([i for i, _, _ in group], dtype=np.intp)
+            lags = np.array([lag for _, lag, _ in group], dtype=np.intp)
+            x = lags * n_vars + causes
+            conditions = np.array([columns for _, _, columns in group], dtype=np.intp)
+            group_statistics, group_p_values = test.statistic_pvalues(
+                x, np.full_like(x, j), conditions.reshape(len(group), size)
+            )
+            statistics[lags - 1, causes, j] = group_statistics
+            p_values[lags - 1, causes, j] = group_p_values
     return statistics, p_values
 
 
@@ -161,8 +187,9 @@ def pcmci(
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
     test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
-    parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
-    statistics, p_values = mci(test, n_vars, parents, tau_max)
+    with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
+        parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
+        statistics, p_values = mci(test, n_vars, parents, tau_max)
     return PCMCIResult(
         parents=parents, statistics=statistics, p_values=p_values, graph=p_values <= alpha_level
     )

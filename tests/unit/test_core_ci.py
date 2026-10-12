@@ -1,11 +1,11 @@
 """Fisher-Z and Student-t conditional-independence tests: equivalence, error, and known values.
 
-Covers the :class:`FisherZ` contract: exact scalar-vs-batched agreement,
-argument-order independence, no per-query state retained, fail-fast error paths, an
-independently derived closed-form p-value for the empty conditioning set, and a small inline
-baseline pinning current outputs. The numpy path is pinned as the exact float64 oracle.
-:class:`StudentT` reports the same partial correlation with a Student-t p-value, checked against
-a direct scipy computation.
+Covers the contract both tests share through :class:`PartialCorrelationTest`: exact agreement of
+the scalar, batched, many-query, all-pairs, and first-order paths, argument-order independence, no
+per-query state retained, and fail-fast error paths. :class:`FisherZ` adds an independently derived
+closed-form p-value for the empty conditioning set and a small inline baseline pinning current
+outputs. The numpy path is pinned as the exact float64 oracle. :class:`StudentT` reports the same
+partial correlation with a Student-t p-value, checked against a direct scipy computation.
 """
 
 from __future__ import annotations
@@ -28,6 +28,9 @@ def force_numpy(monkeypatch):
     monkeypatch.setenv("ANDREY_DEVICE", "numpy")
 
 
+PARTIAL_CORRELATION_TESTS = [FisherZ, StudentT]
+
+
 @pytest.fixture
 def data():
     """A moderate Gaussian sample: enough rows to invert every submatrix up to |S| = 3."""
@@ -38,8 +41,9 @@ def data():
 # ---- scalar-vs-batched agreement --------------------------------------------------------
 
 
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
 @pytest.mark.parametrize("seed", range(15))
-def test_batched_matches_scalar_exactly(seed):
+def test_batched_matches_scalar_exactly(test_class, seed):
     # Separate instances exercise each path's arithmetic without sharing any computed p-values.
     data = np.random.default_rng(seed).standard_normal((200, 10))
     rng = np.random.default_rng(11)
@@ -54,8 +58,8 @@ def test_batched_matches_scalar_exactly(seed):
         cond = tuple(sorted(int(c) for c in rng.choice(pool, size=k, replace=False)))
         queries.setdefault((x, y), []).append(cond)
 
-    scalar_test = FisherZ(data)
-    batched_test = FisherZ(data)
+    scalar_test = test_class(data)
+    batched_test = test_class(data)
     scalar_p: list[float] = []
     batched_p: list[float] = []
     for (x, y), conds in queries.items():
@@ -65,10 +69,11 @@ def test_batched_matches_scalar_exactly(seed):
     np.testing.assert_array_equal(batched_p, scalar_p)
 
 
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
 @pytest.mark.parametrize("seed", range(15))
-def test_prescreen_pvalues_match_canonical_scalar_exactly(seed):
+def test_prescreen_pvalues_match_canonical_scalar_exactly(test_class, seed):
     data = np.random.default_rng(seed).standard_normal((200, 10))
-    test = FisherZ(data)
+    test = test_class(data)
     marginal = test.marginal_pvalues()
     for x, y in combinations(range(data.shape[1]), 2):
         assert marginal[x, y] == test(x, y)
@@ -78,12 +83,57 @@ def test_prescreen_pvalues_match_canonical_scalar_exactly(seed):
         )
 
 
-def test_no_per_query_state_is_retained(data):
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("seed", range(5))
+def test_many_query_path_matches_scalar_exactly(test_class, seed):
+    # Each row has its own pair (in either order) and conditioning set (unsorted); the statistic
+    # and the p-value of row i equal the scalar answer for that row, bit for bit.
+    data = np.random.default_rng(seed).standard_normal((120, 9))
+    test = test_class(data)
+    rng = np.random.default_rng(50 + seed)
+    for size in range(5):
+        rows = []
+        for _ in range(60):
+            x, y, *cond = (int(v) for v in rng.permutation(9)[: 2 + size])
+            rows.append((x, y, cond))
+        x = np.array([row[0] for row in rows])
+        y = np.array([row[1] for row in rows])
+        conditions = np.array([row[2] for row in rows], dtype=np.intp).reshape(len(rows), size)
+        statistics, pvalues = test.statistic_pvalues(x, y, conditions)
+        scalar = [test.statistic_pvalue(*row) for row in rows]
+        np.testing.assert_array_equal(statistics, [r for r, _ in scalar])
+        np.testing.assert_array_equal(pvalues, [p for _, p in scalar])
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_many_query_path_error_paths(test_class):
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((100, 5))
+    X[:, 4] = X[:, 0]
+    one = np.array([1])
+    with pytest.raises(ValueError, match="singular"):
+        test_class(X).statistic_pvalues(one, one + 1, np.array([[0, 4]]))
+    with pytest.raises(ValueError, match="degrees of freedom"):
+        test_class(X[:3]).statistic_pvalues(one, one + 1, np.array([[0, 3]]))
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_from_corr_rebuilds_an_equal_test_of_the_same_class(test_class, data):
+    test = test_class(data)
+    rebuilt = test_class.from_corr(*test.to_seed())
+    assert type(rebuilt) is test_class
+    for query in [(0, 1, ()), (1, 4, (2,)), (4, 2, (0, 1, 3))]:
+        assert rebuilt(*query) == test(*query)
+    np.testing.assert_array_equal(rebuilt.marginal_pvalues(), test.marginal_pvalues())
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_no_per_query_state_is_retained(test_class, data):
     # A skeleton search issues one query per conditioning subset it visits -- combinatorially many
     # at large d -- so the test object must hold exactly the same state after answering them as
     # before (the correlation matrix and the sample size). Any per-query memo would grow with the
     # subsets visited and take the search's memory with it.
-    test = FisherZ(data)
+    test = test_class(data)
 
     def footprint() -> dict[str, tuple[type, int]]:
         return {
@@ -102,8 +152,9 @@ def test_no_per_query_state_is_retained(data):
     assert footprint() == before
 
 
-def test_empty_batch_returns_empty_list(data):
-    assert FisherZ(data).batched_call(0, 1, []) == []
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_empty_batch_returns_empty_list(test_class, data):
+    assert test_class(data).batched_call(0, 1, []) == []
 
 
 # ---- argument-order independence ---------------------------------------------------------
@@ -251,6 +302,28 @@ def test_student_t_p_value_is_the_t_tail_of_the_residual_correlation(data, x, y,
     assert StudentT(data)(x, y, condition_set) == p
 
 
+def test_student_t_fast_paths_are_the_t_tail_of_the_partial_correlation(data):
+    test = StudentT(data)
+    n, d = data.shape
+
+    def expected(x, y, condition_set):
+        r = _residual_correlation(data, x, y, condition_set)
+        df = n - len(condition_set) - 2
+        return 2 * stats.t.sf(abs(r * np.sqrt(df / (1 - r * r))), df)
+
+    sets = [(), (2,), (3,), (2, 3), (3, 4), (2, 3, 4)]
+    np.testing.assert_allclose(
+        test.batched_call(0, 1, sets), [expected(0, 1, s) for s in sets], rtol=1e-10
+    )
+    marginal = test.marginal_pvalues()
+    first_order = test.first_order_pvalues(0, 5, [1, 2, 3, 4])
+    for x, y in combinations(range(d), 2):
+        assert marginal[x, y] == pytest.approx(expected(x, y, ()), rel=1e-10)
+    np.testing.assert_allclose(
+        first_order, [expected(0, 5, (z,)) for z in (1, 2, 3, 4)], rtol=1e-10
+    )
+
+
 def test_student_t_reports_the_statistic_fisher_z_reports(data):
     for x, y, condition_set in [(0, 1, ()), (1, 4, (2,)), (4, 2, (0, 1, 3))]:
         assert (
@@ -264,9 +337,10 @@ def test_student_t_p_value_is_independent_of_argument_order(data):
     assert test(4, 1, (3, 2)) == test(1, 4, (2, 3, 3))
 
 
-def test_student_t_is_not_a_registered_indep_test():
-    assert "student_t" not in ci.available_indep_tests()
-    assert "student_t" not in ci.SHIPPED_INDEP_TESTS
+def test_student_t_is_a_registered_indep_test(data):
+    assert "student_t" in ci.available_indep_tests()
+    assert "student_t" in ci.SHIPPED_INDEP_TESTS
+    assert isinstance(ci.make_indep_test("student_t", data), StudentT)
 
 
 def test_student_t_needs_more_samples_than_conditions_plus_two():

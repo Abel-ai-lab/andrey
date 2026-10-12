@@ -1,16 +1,27 @@
 """PCMCI engine: the lagged design, the PC1 rounds, and the MCI conditioning sets on hand cases.
 
 A scripted test answers each query from a table, so the expected parents and conditioning sets
-follow from the algorithm alone, with no data.
+follow from the algorithm alone, with no data. The batched PC1 rounds and MCI groups are checked
+against plain loops that issue one scalar test per query, on fixed cases.
 """
 
 from __future__ import annotations
+
+import math
 
 import numpy as np
 import pytest
 from scipy import stats
 
-from andrey.temporal.pcmci import lagged_design, mci, pc1, pcmci
+from andrey.temporal.pcmci import (
+    INDEP_TESTS,
+    _column,
+    _strongest_others,
+    lagged_design,
+    mci,
+    pc1,
+    pcmci,
+)
 
 
 class Scripted:
@@ -20,10 +31,14 @@ class Scripted:
         self.answers = answers
         self.queries: list[tuple[int, int, tuple[int, ...]]] = []
 
-    def statistic_pvalue(self, x, y, condition_set=()):
-        conditions = tuple(sorted(condition_set))
-        self.queries.append((x, y, conditions))
-        return self.answers.get((x, conditions), (0.0, 1.0))
+    def statistic_pvalues(self, x, y, conditions):
+        rows = []
+        for x_i, y_i, condition_set in zip(x, y, conditions):
+            key = tuple(sorted(int(c) for c in condition_set))
+            self.queries.append((int(x_i), int(y_i), key))
+            rows.append(self.answers.get((int(x_i), key), (0.0, 1.0)))
+        statistics, p_values = zip(*rows)
+        return np.array(statistics), np.array(p_values)
 
 
 def test_lagged_design_puts_variable_i_at_lag_k_in_column_k_n_plus_i():
@@ -167,6 +182,78 @@ def test_both_tests_give_the_same_graph_on_the_fixed_cases(n_steps, alpha_level)
     np.testing.assert_array_equal(student_t.graph, fisherz.graph)
     assert student_t.parents == fisherz.parents
     assert not np.array_equal(student_t.p_values, fisherz.p_values)
+
+
+def _pc1_by_scalar_loop(test, n_vars, target, tau_max, pc_alpha):
+    """PC1 with one scalar test per candidate and round."""
+    candidates = [(i, lag) for i in range(n_vars) for lag in range(1, tau_max + 1)]
+    strength = dict.fromkeys(candidates, math.inf)
+    p = 0
+    while len(candidates) - 1 >= p:
+        removed = set()
+        for link in candidates:
+            conditions = [c for c in candidates if c != link][:p]
+            statistic, p_value = test.statistic_pvalue(
+                _column(link, n_vars), target, [_column(c, n_vars) for c in conditions]
+            )
+            strength[link] = min(strength[link], abs(statistic))
+            if p_value > pc_alpha:
+                removed.add(link)
+        candidates = sorted((c for c in candidates if c not in removed), key=lambda c: -strength[c])
+        p += 1
+    return tuple(candidates)
+
+
+def _mci_by_scalar_loop(test, n_vars, parents, tau_max):
+    """MCI with one scalar test per link."""
+    statistics = np.zeros((tau_max, n_vars, n_vars))
+    p_values = np.ones((tau_max, n_vars, n_vars))
+    for j in range(n_vars):
+        for i in range(n_vars):
+            for lag in range(1, tau_max + 1):
+                conditions = {c for c in parents[j] if c != (i, lag)}
+                conditions.update((k, s + lag) for k, s in parents[i])
+                statistic, p_value = test.statistic_pvalue(
+                    _column((i, lag), n_vars), j, sorted(_column(c, n_vars) for c in conditions)
+                )
+                statistics[lag - 1, i, j] = statistic
+                p_values[lag - 1, i, j] = p_value
+    return statistics, p_values
+
+
+def test_strongest_others_drops_the_candidate_itself_from_the_first_p():
+    columns = np.array([10, 11, 12, 13])
+    assert _strongest_others(columns, 0).shape == (4, 0)
+    np.testing.assert_array_equal(
+        _strongest_others(columns, 2), [[11, 12], [10, 12], [10, 11], [10, 11]]
+    )
+    np.testing.assert_array_equal(
+        _strongest_others(columns, 3), [[11, 12, 13], [10, 12, 13], [10, 11, 13], [10, 11, 12]]
+    )
+
+
+_EQUIVALENCE_CASES = [
+    pytest.param(_chain(600), 2, 0.2, id="chain600-tau2"),
+    pytest.param(_chain(300, seed=1), 3, 0.4, id="chain300-tau3-wide"),
+    pytest.param(np.random.default_rng(5).standard_normal((300, 5)), 3, 0.9, id="noise-keeps-all"),
+    pytest.param(np.random.default_rng(6).standard_normal((120, 4)), 2, 0.05, id="noise-strict"),
+    pytest.param(_chain(400, seed=2)[:, :1], 4, 0.2, id="one-variable-tau4"),
+]
+
+
+@pytest.mark.parametrize("indep_test", ["student_t", "fisherz"])
+@pytest.mark.parametrize(("data", "tau_max", "pc_alpha"), _EQUIVALENCE_CASES)
+def test_batched_pc1_and_mci_equal_the_scalar_loops_exactly(indep_test, data, tau_max, pc_alpha):
+    n_vars = data.shape[1]
+    test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
+    parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
+    assert parents == tuple(
+        _pc1_by_scalar_loop(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars)
+    )
+    statistics, p_values = mci(test, n_vars, parents, tau_max)
+    expected_statistics, expected_p_values = _mci_by_scalar_loop(test, n_vars, parents, tau_max)
+    np.testing.assert_array_equal(statistics, expected_statistics)
+    np.testing.assert_array_equal(p_values, expected_p_values)
 
 
 def test_an_unknown_indep_test_raises_naming_the_choices():
