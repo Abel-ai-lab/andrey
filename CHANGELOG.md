@@ -21,8 +21,7 @@ change names its pull request.
 
 ### Changed
 
-- `hc` gives the same graphs in less time: a fit on 200 variables runs about 60 times faster.
-  ([#56])
+- `hc` returns the same graphs in less time. ([#56])
 
 ## [0.2.0] - 2026-10-12
 
