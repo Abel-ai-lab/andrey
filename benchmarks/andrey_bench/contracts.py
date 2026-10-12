@@ -9,7 +9,7 @@ from typing import Any, Mapping, Protocol, runtime_checkable
 
 import numpy as np
 
-from andrey import GraphStructure
+from andrey import GraphStructure, TemporalStructure
 
 
 class Status(str, Enum):
@@ -98,7 +98,7 @@ class SolutionAdapter(Protocol):
     package_version: str
     backend: str  # numpy | numba | torch-cpu | torch-cuda | native
     mode: str  # serial | parallel
-    output_type: str  # cpdag | dag | pag | order
+    output_type: str  # cpdag | dag | pag | order | temporal
 
     def params(self) -> Mapping[str, Any]:
         """Return the search parameters used by this solution.
@@ -112,12 +112,13 @@ class SolutionAdapter(Protocol):
         """Run the algorithm and return a picklable numpy structural array.
 
         Competitors return 0/1 adjacency matrices. Andrey adapters return endpoint-mark matrices
-        tagged by ``output_type``. This method is the only timed region.
+        tagged by ``output_type``. A ``temporal`` solution returns a ``(tau_max, n, n)`` 0/1 link
+        stack (:func:`temporal_from_links`). This method is the only timed region.
         """
         ...
 
-    def to_structure(self, native: np.ndarray) -> GraphStructure:
-        """Convert a native array to an Andrey ``GraphStructure`` outside the timed region."""
+    def to_structure(self, native: np.ndarray) -> GraphStructure | TemporalStructure:
+        """Convert a native array to an Andrey structure outside the timed region."""
         ...
 
 
@@ -154,7 +155,7 @@ class RunRecord:
     package_version: str
     backend: str
     mode: str
-    output_type: str  # cpdag | dag | pag | order
+    output_type: str  # cpdag | dag | pag | order | temporal
     # --- environment, as the parent declared it ---
     machine_id: str
     cores: int  # per-task core budget; split_cores(cores, mode) recovers threads/num_workers
@@ -174,6 +175,9 @@ class RunRecord:
     status: str
     # Dataset coordinate with a default: hidden nodes included in `d` but absent from the data.
     latents: int = 0
+    # The largest lag a temporal solution searched, from its params; `None` for a static solution.
+    # Its estimate covers lags 1 to `tau_max`, the lags its lag-resolved scores are taken over.
+    tau_max: int | None = None
     wall_s: float | None = None
     cpu_s: float | None = None  # fit-scoped self+children CPU
     child_cpu_s: float | None = None  # CPU attributed to the (parallel) worker pool alone
@@ -257,6 +261,53 @@ def structure_from_adjacency(adj: np.ndarray, *, kind: str) -> GraphStructure:
     marks[directed] = _TAIL  # tail at the source
     marks[directed.T] = _ARROW  # arrow at the target (marks[j,i] for each i -> j)
     return GraphStructure.from_numpy(marks, kind=kind)  # type: ignore[arg-type]
+
+
+def lag_marks(links: np.ndarray) -> np.ndarray:
+    """Convert a ``(L, n, n)`` 0/1 link stack to per-lag endpoint marks.
+
+    ``links[k - 1, i, j]`` is the link ``X_i(t-k) -> X_j(t)``. Each lag is a directed graph that
+    allows 2-cycles and self-loops: ``i -> j`` puts ``TAIL`` at ``i`` and ``ARROW`` at ``j``, links
+    both ways put ``ARROW`` at both ends, and a self-loop is ``marks[k - 1, i, i] = ARROW``.
+    """
+    a = np.asarray(links)
+    if a.ndim != 3 or a.shape[1] != a.shape[2]:
+        raise ValueError(f"a link stack must have shape (n_lags, n, n), got {a.shape}")
+    a = a != 0
+    at = a.transpose(0, 2, 1)
+    return np.where(at, _ARROW, np.where(a, _TAIL, _NULL)).astype(np.int8)
+
+
+def temporal_from_lag_marks(marks: np.ndarray) -> TemporalStructure:
+    """Build a ``TemporalStructure`` with lags ``1..L`` from a ``(L, n, n)`` stack of lag marks."""
+    graphs = [
+        GraphStructure.from_numpy(np.asarray(m), kind="digraph", allow_self_loops=True)
+        for m in marks
+    ]
+    return TemporalStructure.from_lag_graphs(graphs, lags=range(1, len(graphs) + 1))
+
+
+def temporal_from_links(links: np.ndarray) -> TemporalStructure:
+    """Convert a ``(L, n, n)`` 0/1 link stack to a ``TemporalStructure`` with lags ``1..L``.
+
+    The link stack is what a ``temporal`` solution's ``fit`` returns, in every package's adapter.
+    """
+    return temporal_from_lag_marks(lag_marks(links))
+
+
+def links_from_temporal(structure: TemporalStructure) -> np.ndarray:
+    """Return the ``(L, n, n)`` int8 link stack of `structure`, inverting :func:`temporal_from_links`.
+
+    Raises ``ValueError`` unless the lags are exactly ``1..L``: a lag-0 block or a gap has no place
+    in the stack.
+    """
+    lags = tuple(structure.lags)
+    if lags != tuple(range(1, len(lags) + 1)):
+        raise ValueError(f"a link stack holds lags 1..L, got lags {lags}")
+    # The arrowhead of `i -> j` is the mark at j, `marks[j, i]`, so the links are the transpose.
+    return np.stack([(np.asarray(structure.lag(k).to_numpy()) == _ARROW).T for k in lags]).astype(
+        np.int8
+    )
 
 
 # BLAS / numeric thread env vars
