@@ -4,7 +4,7 @@ description: "Score-based search in Andrey 0.3.0: Tabu search and XGES are new a
 meta:
   type: post
 blogpost: true
-date: 2026-10-16
+date: 2026-10-12
 author: Shu Wan
 version: 0.3.0
 cover: contour
@@ -124,50 +124,44 @@ The script prints each result in full:
 
 ## Benchmarks
 
-We compared XGES with xges, a Python package that implements it. We compared Tabu search and
-hill climbing with bnlearn, an R package. We simulated linear-Gaussian data from random graphs,
+We compared XGES with xges, a Python package that implements it, and Tabu search and hill
+climbing with bnlearn, an R package. The data are linear-Gaussian, simulated from random graphs
 with ten rows per variable.
 
-| Method | Compared with | Variables | Andrey's speedup | Same graph |
-|---|---|---|---|---|
-| XGES | xges | 25-200 | 3.95-140x | 40 of 40 datasets |
-| Tabu search | bnlearn | 10-800 | 2.38-561x | 31 of 35 datasets |
-| Hill climbing | bnlearn | 10-800 | 3.60-906x | 31 of 35 datasets |
+| Method | Compared with | Andrey's speedup | Same graph |
+|---|---|---|---|
+| XGES | xges | up to 140x | on every dataset |
+| Tabu search | bnlearn | up to 561x | on most datasets |
+| Hill climbing | bnlearn | up to 906x | on most datasets |
 
-The [0.3.0 release card](../docs/benchmarks/0.3.0.md) reports every measurement.
-XGES ran on graphs with a mean degree of 2 and 4, on an AMD EPYC 7713 with 1 core per fit.
-Tabu search and hill climbing ran on graphs with a mean degree of 2, on an Intel Core i7-7820X
-with 4 cores per fit. Hill climbing ran to a local optimum and Tabu search until it stopped on its
-own, both with no move limit.
-Without the extended search, XGES returns the same graph as xges on every dataset.
-At a mean degree of 2, it runs 1.34-6.35x faster.
+The [0.3.0 release card](../docs/benchmarks/0.3.0.md) reports every measurement, with the sizes,
+machines, and settings. Hill climbing ran to a local optimum and Tabu search until it stopped on
+its own, both with no move limit. Without the extended search, XGES still returns the same graph
+as xges on every dataset, and runs faster at every size.
 
 ```{raw} html
 :file: 0.3.0/speedup.html
 ```
 
-On these data, XGES's graphs had a lower median BIC than GES's at every size and both mean
-degrees. They also had fewer errors at the median. At a mean degree of 4, the extended search
-left fewer errors than XGES without it at every size: 45 against 88 at 50 variables.
+On these data, XGES's graphs scored better than GES's and had fewer errors, at every size. On
+the denser graphs, the extended search cut XGES's errors at every size, nearly by half at 50
+variables.
 
-Agreement between packages does not establish accuracy. From 50 variables, Tabu search's and
-hill climbing's median errors exceed the empty graph's, in both packages. Tabu search's BIC was
-lower than hill climbing's at every size, by a median of 15.4 at 50 variables and 53.9 at 400.
-Yet at 400 variables, its errors were higher: 615 against 605.
-A better score is not always a better graph.
+Agreement between packages does not establish accuracy. From 50 variables on, Tabu search's and
+hill climbing's graphs have more errors than the empty graph, in both packages. Tabu search finds
+better-scoring graphs than hill climbing at every size, yet at 400 variables its graphs have more
+errors. A better score is not always a better graph.
 
-At a mean degree of 2, XGES's graphs have a lower median BIC than the true graph at every size.
-With ten rows per variable, the best-scoring graph is not the true one.
+On the sparser graphs, XGES's graphs score better than the true graph at every size. With ten
+rows per variable, the best-scoring graph is not the true one.
 A larger `lambda_value` penalizes each parent more and favors sparser graphs.
 
 ```{raw} html
 :file: 0.3.0/errors.html
 ```
 
-Andrey's XGES alone also ran at 500 and 1,000 variables. At a mean degree of 2, its graphs at
-these sizes have more errors than the empty graph's. Andrey alone also ran Tabu search and hill
-climbing at 1,600 and 3,200 variables. Their graphs at these sizes also have more errors than the
-empty graph's.
+Andrey alone also ran XGES at up to 1,000 variables, and Tabu search and hill climbing at up to
+3,200. On the sparser graphs, their graphs at these sizes have more errors than the empty graph.
 
 Speed and accuracy depend on your data, settings, and hardware.
 
@@ -181,8 +175,8 @@ Speed and accuracy depend on your data, settings, and hardware.
   This change breaks scripts that set either one.
   `ANDREY_NUM_WORKERS` still sets the workers for GES, GIES, and GFCI.
 - **XGES without the extended search.** `andrey.xges(data, extended_search=False)` returns the
-  graph where the first search stops. At 200 variables and a mean degree of 2, it took 0.164 s,
-  against 1.64 s with the extended search. These are medians over five datasets on 1 core.
+  graph where the first search stops. On the sparser graphs at 200 variables, it took a tenth of
+  the time of the full search.
 - **Shorter summaries.** Since 0.2.1, a result's summary shows the length of a long metadata list
   instead of printing it in full.
 
