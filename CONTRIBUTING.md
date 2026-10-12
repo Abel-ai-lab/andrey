@@ -62,3 +62,31 @@ gitleaks, to this checkout, so they run on every commit; `prek run --all-files` 
   and may change without notice; do not import them from outside the package.
 - Code, data, and assets copied from another project keep their license notice, as
   `site/brand/fonts/OFL.txt` does for the site's fonts.
+
+## Labels, milestones, and the changelog
+
+Every pull request has exactly one type label, which also gives its section in the release notes:
+
+| Label | For | Release-notes section |
+|---|---|---|
+| `enhancement` | a new method, option, or speed-up | Added |
+| `bug` | a fix | Fixed |
+| `documentation` | docs, the website, and the blog | Documentation |
+| `chore` | CI, tests, build, and refactors | Chores |
+| `dependencies` | dependency updates; Dependabot sets it | Dependencies |
+
+Two optional flags put a change first: `highlight` lists it under Highlights and `breaking` under
+Breaking. Every pull request also has a milestone, the release it ships in.
+
+The `pr-meta` check (`scripts/check_pr_meta.py`) runs on every pull request event, including label
+and milestone changes, and fails when:
+
+- the pull request has no milestone (Dependabot's are exempt);
+- it does not have exactly one type label (other labels do not count);
+- an `enhancement` or `bug` pull request adds no bullet under `## [Unreleased]` in `CHANGELOG.md`
+  that ends with a link to its pull request, `([#<number>])`, defined at the end of the file;
+- the `highlight` label and a bullet linking the pull request under `### Highlights` do not come
+  together, or `breaking` and `### Breaking` do not.
+
+`CHANGELOG.md` is the record of each release. GitHub generates the release notes from the labels
+(`.github/release.yml`), and at release time they are checked against the CHANGELOG section.
