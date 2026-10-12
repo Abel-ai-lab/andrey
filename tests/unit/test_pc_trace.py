@@ -37,8 +37,8 @@ def replay(trace, d):
         for r in (r for r in tests if r["depth"] == depth):
             x, y, S = r["x"], r["y"], r["S"]
             assert x < y and snapshot[x, y] and len(S) == depth
-            neighbours = [set(np.flatnonzero(snapshot[v]).tolist()) for v in (x, y)]
-            assert set(S) <= neighbours[0] - {y} or set(S) <= neighbours[1] - {x}
+            neighbors = [set(np.flatnonzero(snapshot[v]).tolist()) for v in (x, y)]
+            assert set(S) <= neighbors[0] - {y} or set(S) <= neighbors[1] - {x}
             assert (x, y, S) not in tried
             tried.add((x, y, S))
             assert r["removed"] == (r["p"] > ALPHA)

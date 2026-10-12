@@ -209,7 +209,7 @@ def ica_lingam(
     uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
     passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at
     100. The median fit took 0.44 s at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's
-    protein-signalling data (853 rows, 11 variables), its errors were below the empty graph's (14
+    protein-signaling data (853 rows, 11 variables), its errors were below the empty graph's (14
     against 17).
 
     References

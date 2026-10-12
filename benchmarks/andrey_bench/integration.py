@@ -69,7 +69,6 @@ def assemble_record(
         "threads": measures["env_threads"],
         "num_workers": measures["env_num_workers"],
         "ges_min_work": measures["env_ges_min_work"],
-        "hc_min_work": measures["env_hc_min_work"],
     }
     return RunRecord(
         run_id=run_id(dataset_id=key.digest, name=adapter.name, repeat=repeat, env=env),
@@ -117,7 +116,6 @@ def assemble_record(
         output_hash=measures.get("output_hash"),
         structure_hash=measures.get("structure_hash"),
         ges_min_work=measures.get("env_ges_min_work"),
-        hc_min_work=measures.get("env_hc_min_work"),
         varsortability=(sort or {}).get("varsortability"),
         r2_sortability=(sort or {}).get("r2_sortability"),
         # Child-observed, so they stay None when the child never reported (timeout / oom / error).
@@ -157,7 +155,6 @@ def _unit_environment(
         "threads": fields["env_threads"],
         "num_workers": fields["env_num_workers"],
         "ges_min_work": fields["env_ges_min_work"],
-        "hc_min_work": fields["env_hc_min_work"],
     }
 
 

@@ -77,8 +77,8 @@ in a `dag` or `digraph`.
 - `weighted_adjacency` - dense `float64` weights from `calm` and the static LiNGAM methods.
   `W[i, j]` is the weight of `i -> j`, so rows are causes. This is the transpose of lingam's
   `adjacency_matrix_`, where `B[i, j]` is the effect of $x_j$ on $x_i$ in $x = Bx + e$.
-- `metadata` - JSON-safe, method-specific values. GES, GIES, HC, BOSS, and GRaSP report `score`;
-  CALM reports `objective`. ExactSearch does not report a score. PNL reports its two directional
+- `metadata` - JSON-safe, method-specific values. GES, GIES, XGES, HC, BOSS, and GRaSP report
+  `score`; CALM reports `objective`. ExactSearch does not report a score. PNL reports its two directional
   p-values; its two-node graph holds the direction they decide, by the rule its `alpha` parameter
   selects. PCMCI reports each lagged link's MCI `p_values` and `statistics`, and the `parents`
   its first step selected; PCMCI+ reports the same for every lag from 0, plus the same-step

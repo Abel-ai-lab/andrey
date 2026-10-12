@@ -92,8 +92,8 @@ def _reference_skeleton(
 
     size = 0
     while True:
-        neighbours = [np.flatnonzero(adj[i] != NULL).tolist() for i in range(d)]
-        if size > max((len(nb) for nb in neighbours), default=0) - 1:
+        neighbors = [np.flatnonzero(adj[i] != NULL).tolist() for i in range(d)]
+        if size > max((len(nb) for nb in neighbors), default=0) - 1:
             break
         remove: list[tuple[int, int]] = []
         for x in range(d):
@@ -103,7 +103,7 @@ def _reference_skeleton(
                 separating: set[int] = set()
                 found = False
                 for a, b in ((x, y), (y, x)):
-                    candidates = [c for c in neighbours[a] if c != b]
+                    candidates = [c for c in neighbors[a] if c != b]
                     if len(candidates) < size:
                         continue
                     for subset in combinations(candidates, size):

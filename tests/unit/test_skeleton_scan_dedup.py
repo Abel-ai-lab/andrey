@@ -28,14 +28,14 @@ def _force_numpy(monkeypatch):
     monkeypatch.setenv("ANDREY_DEVICE", "numpy")
 
 
-def _unfiltered_scan_pairs(test, pairs, neighbours, size, alpha):
+def _unfiltered_scan_pairs(test, pairs, neighbors, size, alpha):
     """Both directions scanned in full, no subset skipped."""
     removals = []
     for x, y in pairs:
         separating: set[int] = set()
         found = False
         for a, b in ((x, y), (y, x)):
-            candidates = neighbours[a][neighbours[a] != b]
+            candidates = neighbors[a][neighbors[a] != b]
             if candidates.size < size:
                 continue
             if scan_conditioning_sets(test, a, b, candidates.tolist(), size, alpha, separating):
@@ -54,9 +54,9 @@ def _dense_case(seed: int, d: int = 9, n: int = 300, p: float = 0.7):
     X[:, 3] += 0.6 * X[:, 0] + 0.5 * X[:, 2]
     upper = np.triu(rng.random((d, d)) < p, 1)
     adj = upper | upper.T
-    neighbours = [np.flatnonzero(adj[i]) for i in range(d)]
+    neighbors = [np.flatnonzero(adj[i]) for i in range(d)]
     pairs = [(x, y) for x in range(d) for y in range(x + 1, d) if adj[x, y]]
-    return X, pairs, neighbours
+    return X, pairs, neighbors
 
 
 class _CountingTest:
@@ -79,33 +79,33 @@ class _CountingTest:
 @pytest.mark.parametrize("size", [2, 3, 4])
 @pytest.mark.parametrize("seed", range(4))
 def test_dense_scan_matches_unfiltered_scan(seed, size):
-    X, pairs, neighbours = _dense_case(seed)
-    shared = [len(set(neighbours[x].tolist()) & set(neighbours[y].tolist())) for x, y in pairs]
+    X, pairs, neighbors = _dense_case(seed)
+    shared = [len(set(neighbors[x].tolist()) & set(neighbors[y].tolist())) for x, y in pairs]
     assert max(shared) >= size, "the case must offer subsets both endpoints share"
-    got = scan_pairs(FisherZ(X), pairs, neighbours, size, ALPHA)
-    want = _unfiltered_scan_pairs(FisherZ(X), pairs, neighbours, size, ALPHA)
+    got = scan_pairs(FisherZ(X), pairs, neighbors, size, ALPHA)
+    want = _unfiltered_scan_pairs(FisherZ(X), pairs, neighbors, size, ALPHA)
     assert got == want
     assert got, "the case must remove something"
 
 
 @pytest.mark.parametrize("size", [2, 3])
 def test_shared_subsets_are_tested_once(size):
-    X, pairs, neighbours = _dense_case(0)
+    X, pairs, neighbors = _dense_case(0)
     counting = _CountingTest(FisherZ(X))
-    scan_pairs(counting, pairs, neighbours, size, ALPHA)
+    scan_pairs(counting, pairs, neighbors, size, ALPHA)
     expected = 0
     for x, y in pairs:
-        from_x = set(neighbours[x].tolist()) - {y}
-        from_y = set(neighbours[y].tolist()) - {x}
+        from_x = set(neighbors[x].tolist()) - {y}
+        from_y = set(neighbors[y].tolist()) - {x}
         expected += comb(len(from_x), size) + comb(len(from_y), size)
         expected -= comb(len(from_x & from_y), size)
     assert counting.queries == expected
 
 
 def test_skip_within_below_size_is_a_no_op():
-    X, pairs, neighbours = _dense_case(1)
+    X, pairs, neighbors = _dense_case(1)
     x, y = pairs[0]
-    candidates = neighbours[x][neighbours[x] != y].tolist()
+    candidates = neighbors[x][neighbors[x] != y].tolist()
     test = FisherZ(X)
     plain: set[int] = set()
     skipped: set[int] = set()
