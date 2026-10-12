@@ -86,7 +86,11 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     depend on the units of either variable. The regression is a Gaussian process with a scaled RBF
     kernel plus a white-noise term, its hyperparameters fitted by maximum marginal likelihood. The
     HSIC test uses Gaussian kernels and a gamma approximation of its null distribution. The fit is
-    deterministic, and its time grows with the cube of ``n_samples``.
+    deterministic.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on pairs of 200 rows. Each regression and
+    HSIC test builds matrices with one row and one column per sample, so memory grows with the
+    square of ``n_samples`` and the regression's time with its cube.
 
     References
     ----------
