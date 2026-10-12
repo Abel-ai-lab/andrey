@@ -57,29 +57,33 @@ def test_pairwise_decision_rules(forward, backward, alpha, edge):
 
 
 # (pval_forward, pval_backward, stat_forward, stat_backward, alpha) -> the edge; None for no edge.
+# Each statistic is an HSIC statistic over its mean under independence.
 TIE_BREAKS = [
-    (0.0, 0.0, 1051.6, 1105.8, None, (0, 1)),  # both p-values zero: the smaller statistic wins
-    (0.0, 0.0, 1105.8, 1051.6, None, (1, 0)),
-    (0.0, 0.0, 1105.8, 1105.8, None, None),  # the statistics tie too: no edge
-    (0.60, 0.30, 900.0, 100.0, None, (0, 1)),  # unequal p-values decide whatever the statistics
-    (0.30, 0.60, 100.0, 900.0, None, (1, 0)),
-    (0.0, 0.0, 100.0, 900.0, 0.05, None),  # with a level, only the p-values decide
+    (0.0, 0.0, 16.3, 17.0, None, (0, 1)),  # both p-values zero: the smaller statistic wins
+    (0.0, 0.0, 17.0, 16.3, None, (1, 0)),
+    (0.0, 0.0, 17.0, 17.0, None, None),  # the statistics tie too: no edge
+    (0.60, 0.30, 9.0, 1.1, None, (0, 1)),  # unequal p-values decide whatever the statistics
+    (0.30, 0.60, 1.1, 9.0, None, (1, 0)),
+    (0.0, 0.0, 1.1, 9.0, 0.05, None),  # with a level, only the p-values decide
 ]
 
 
+@pytest.mark.parametrize("adapt", [_adapt_anm, _adapt_pnl], ids=["anm", "pnl"])
 @pytest.mark.parametrize(("forward", "backward", "stat_f", "stat_b", "alpha", "edge"), TIE_BREAKS)
-def test_pnl_breaks_a_pvalue_tie_by_the_statistic(forward, backward, stat_f, stat_b, alpha, edge):
-    out = _adapt_pnl(forward, backward, stat_forward=stat_f, stat_backward=stat_b, alpha=alpha)
+def test_pairwise_breaks_a_pvalue_tie_by_the_statistic(
+    adapt, forward, backward, stat_f, stat_b, alpha, edge
+):
+    out = adapt(forward, backward, stat_forward=stat_f, stat_backward=stat_b, alpha=alpha)
     expected = [] if edge is None else [(*edge, "directed")]
     assert out.structure.oriented_edges() == expected
 
 
 def test_pnl_keeps_the_statistics_as_floats(tmp_path):
     out = _adapt_pnl(
-        np.array([0.0]), 0.0, stat_forward=np.float64(1105.8), stat_backward=np.array([1051.6])
+        np.array([0.0]), 0.0, stat_forward=np.float64(17.0), stat_backward=np.array([16.3])
     )
     md = out.metadata
-    assert (md["stat_forward"], md["stat_backward"]) == (1105.8, 1051.6)
+    assert (md["stat_forward"], md["stat_backward"]) == (17.0, 16.3)
     assert type(md["stat_forward"]) is float and type(md["stat_backward"]) is float
     assert out.structure.oriented_edges() == [(1, 0, "directed")]
     _roundtrips(out, tmp_path, "pnl-stats")

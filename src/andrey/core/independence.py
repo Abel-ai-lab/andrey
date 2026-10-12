@@ -4,10 +4,10 @@ Both tests map the two variables through Gaussian kernels, center the kernel mat
 the HSIC statistic to a gamma distribution for a closed-form p-value; a larger p-value means more
 independent.
 
-- :func:`hsic_test`, used by ANM, z-scores each variable (``ddof=1``; a constant column becomes
-  zero) and sets the bandwidth by the empirical rule, or by the median heuristic on request.
-  :func:`hsic_statistic_test`, used by PNL, runs the same test and returns the statistic with the
-  p-value.
+- :func:`hsic_test` z-scores each variable (``ddof=1``; a constant column becomes zero) and sets
+  the bandwidth by the empirical rule, or by the median heuristic on request.
+  :func:`hsic_statistic_test`, used by ANM and PNL, runs the same test and returns the statistic,
+  divided by its mean under independence, with the p-value.
 - :func:`hsic_gamma_test`, used by RCD and ParceLiNGAM, sets the bandwidth by the median distance
   over the first rows without z-scoring, corrects the variance for bias, and returns the statistic
   with the p-value.
@@ -156,7 +156,7 @@ def hsic_statistic_test(
     kernel_width_x: float | None = None,
     kernel_width_y: float | None = None,
 ) -> tuple[float, float]:
-    """Return ``(statistic, p_value)`` of the HSIC independence test between ``x`` and ``y``.
+    """Return ``(T / mean, p_value)`` of the HSIC independence test between ``x`` and ``y``.
 
     Each variable is z-scored (``ddof=1``), mapped through a Gaussian kernel whose bandwidth follows
     the empirical rule (``est_width='empirical'``, the ANM default) or the median heuristic, and
@@ -168,8 +168,10 @@ def hsic_statistic_test(
 
     and the p-value is the gamma upper tail ``1 - P(shape, T / scale)`` with ``P`` the regularized
     lower incomplete gamma function (equivalently ``scipy.stats.gamma.sf(T, shape, scale=scale)``).
-    A larger p-value means more independent; a larger statistic means more dependent. Accepts 1-D
-    vectors or ``(n, d)`` matrices.
+    A larger p-value means more independent. ``T / mean`` is the statistic relative to its mean
+    under independence, the gamma null's ``shape * scale``: near 1 for independent variables and
+    larger the more dependent they are. It still orders two tests whose p-values are both zero.
+    Accepts 1-D vectors or ``(n, d)`` matrices.
     """
     n = _as_columns(x).shape[0]
     kxc = _centered_kernel(_as_columns(x), est_width, kernel_width_x)
@@ -180,7 +182,7 @@ def hsic_statistic_test(
     var_appr = 2 * np.sum(kxc**2) * np.sum(kyc**2) / n / n
     shape = mean_appr**2 / var_appr
     scale = var_appr / mean_appr
-    return float(statistic), float(1.0 - gammainc(shape, statistic / scale))
+    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
 
 
 # ---- LiNGAM-family HSIC (median-distance bandwidth, biased V-statistic) --------------------------

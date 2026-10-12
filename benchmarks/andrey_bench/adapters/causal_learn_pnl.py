@@ -4,7 +4,7 @@ Calls ``PNL().cause_or_effect(x, y)`` on the two columns, which returns the p-va
 directions and decides nothing. The adapter decides the edge with the function that decides Andrey's,
 so both solutions apply the same rule to their p-values: with ``alpha=None``, the direction with the
 larger p-value. causal-learn reports no test statistic, so equal p-values give no edge, where Andrey
-takes the direction with the smaller HSIC statistic.
+takes the direction with the smaller HSIC statistic relative to its mean under independence.
 
 The two packages fit the same model by different means and test it differently. causal-learn trains
 two small neural networks per direction with Adam, 3000 epochs in batches of 128 rows that drop the

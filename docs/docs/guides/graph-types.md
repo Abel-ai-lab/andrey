@@ -159,8 +159,8 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 `multi_group_direct_lingam` returns a list of results, one per group. GIN includes explicit latent
 nodes, marked by `node_types` (`OBSERVED=0`, `LATENT=1`). ANM and PNL are direction tests on two
-variables: each returns a two-node `dag` with the direction its p-values decide, or no edge, and
-both p-values in `metadata`.
+variables: each returns a two-node `dag` with the direction its tests decide, or no edge, and
+both p-values and test statistics in `metadata`.
 
 Draw any `GraphStructure`, including a temporal lag or summary, with `andrey.viz.draw`:
 

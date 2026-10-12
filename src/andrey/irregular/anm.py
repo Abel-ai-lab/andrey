@@ -3,8 +3,9 @@
 Under ``effect = f(cause) + noise`` with the noise independent of the cause, a regression's
 residual is independent of its input only in the causal direction. ANM fits a Gaussian process (a
 scaled RBF kernel plus white noise, tuned by marginal likelihood) in each direction and tests the
-residual against the input with :func:`~andrey.core.independence.hsic_test`. The direction with
-the larger p-value is the inferred cause.
+residual against the input with :func:`~andrey.core.independence.hsic_statistic_test`. The
+direction with the larger p-value is the inferred cause; on equal p-values, the one with the smaller
+HSIC statistic relative to its mean under independence.
 
 The regression is scikit-learn's ``GaussianProcessRegressor`` with its L-BFGS-B hyperparameter
 search; only the gradient that search follows is computed here, from the inverse kernel matrix of
@@ -31,7 +32,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel, Kernel, WhiteKernel
 
-from andrey.core.independence import hsic_test
+from andrey.core.independence import hsic_statistic_test
 
 #: ``GaussianProcessRegressor``'s default ``alpha``, added to the kernel matrix's diagonal.
 _JITTER = 1e-10
@@ -124,23 +125,25 @@ def _regress_residual(cause: np.ndarray, effect: np.ndarray) -> np.ndarray:
     return effect - prediction
 
 
-def anm(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
-    """Return ``(pval_forward, pval_backward)`` for the ANM direction test on the pair ``x, y``.
+def anm(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
+    """Return ``(pval_forward, pval_backward, stat_forward, stat_backward)`` for the pair ``x, y``.
 
     ``pval_forward`` is the HSIC independence p-value between ``x`` and the residual of the
     Gaussian process regressing ``y`` on ``x`` (the ``x -> y`` hypothesis); ``pval_backward`` is
     the same quantity with the roles swapped (the ``y -> x`` hypothesis). A larger p-value means
-    the input and residual are more independent, so it favors that direction. ``x`` and ``y`` are
-    1-D arrays of equal length.
+    the input and residual are more independent, so it favors that direction. ``stat_forward`` and
+    ``stat_backward`` are the HSIC statistics of the same two tests, each divided by its mean under
+    independence; a smaller value means weaker dependence. ``x`` and ``y`` are 1-D arrays of equal
+    length.
     """
     # Contiguous, as the regressor stores its training data, so the objective's sums run alike.
     cause = np.ascontiguousarray(x, dtype=np.float64).reshape(-1, 1)
     effect = np.ascontiguousarray(y, dtype=np.float64).reshape(-1, 1)
 
     residual_effect = _regress_residual(cause, effect)
-    pval_forward = hsic_test(cause, residual_effect)
+    stat_forward, pval_forward = hsic_statistic_test(cause, residual_effect)
 
     residual_cause = _regress_residual(effect, cause)
-    pval_backward = hsic_test(effect, residual_cause)
+    stat_backward, pval_backward = hsic_statistic_test(effect, residual_cause)
 
-    return pval_forward, pval_backward
+    return pval_forward, pval_backward, stat_forward, stat_backward

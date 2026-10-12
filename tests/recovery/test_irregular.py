@@ -79,13 +79,14 @@ def test_pnl_output_contract():
     assert tuple(out.metadata[key] for key in keys) == pnl(x[:, 0], x[:, 1])
 
 
-def test_pnl_breaks_a_zero_pvalue_tie_by_the_statistic():
+@pytest.mark.parametrize("method", ["anm", "pnl"])
+def test_a_zero_pvalue_tie_is_broken_by_the_statistic(method):
     # Both coordinates of a noiseless circle are functions of its angle, so neither direction fits
-    # and both p-values round to zero; the smaller HSIC statistic decides.
-    from andrey.api.irregular import pnl as pnl_facade
+    # and both p-values round to zero; the smaller HSIC statistic over its null mean decides.
+    from andrey.api import irregular
 
     angle = np.pi * np.random.default_rng(0).uniform(-1, 1, 200)
-    out = pnl_facade(np.column_stack([np.cos(angle), np.sin(angle)]))
+    out = getattr(irregular, method)(np.column_stack([np.cos(angle), np.sin(angle)]))
     md = out.metadata
     assert md["pval_forward"] == md["pval_backward"] == 0.0
     assert md["stat_forward"] != md["stat_backward"]
@@ -150,15 +151,18 @@ def test_anm_resolves_the_planted_direction():
     from andrey.api._irregular import _adapt_anm
 
     x = datagen.generate("anm_pair_cubic")
-    pval_forward, pval_backward = anm(x[:, 0], x[:, 1])
+    pval_forward, pval_backward, stat_forward, stat_backward = anm(x[:, 0], x[:, 1])
     assert pval_forward > pval_backward
     # Loosely pinned as well: the direction alone would survive a numerical regression in the GP
     # residual path that still left the forward p-value above zero.
     assert np.allclose((pval_forward, pval_backward), _ANM_CUBIC_PVALUES, atol=1e-4)
-    out = _adapt_anm(pval_forward, pval_backward)
+    out = _adapt_anm(
+        pval_forward, pval_backward, stat_forward=stat_forward, stat_backward=stat_backward
+    )
     assert out.structure.type == "graph"
     assert out.structure.oriented_edges() == [(0, 1, "directed")]
-    assert set(out.metadata) == {"algorithm", "pval_forward", "pval_backward"}
+    keys = {"pval_forward", "pval_backward", "stat_forward", "stat_backward"}
+    assert set(out.metadata) == {"algorithm", *keys}
 
 
 def test_anm_hyperparameter_objective_is_scikit_learns():
@@ -195,7 +199,7 @@ def test_anm_matches_scikit_learns_own_search():
             warnings.simplefilter("ignore", ConvergenceWarning)
             gp = GaussianProcessRegressor(kernel=_kernel()).fit(cause, effect)
         expected.append(hsic_test(cause, effect - gp.predict(cause).reshape(-1, 1)))
-    assert np.allclose(anm(x[:, 0], x[:, 1]), expected, rtol=0, atol=1e-8)
+    assert np.allclose(anm(x[:, 0], x[:, 1])[:2], expected, rtol=0, atol=1e-8)
 
 
 def test_anm_names_the_planted_direction_in_any_units_and_column_order():
@@ -206,7 +210,8 @@ def test_anm_names_the_planted_direction_in_any_units_and_column_order():
     planted = datagen.generate("anm_pair_cubic")
     first = anm_facade(planted)
     assert first.structure.oriented_edges() == [(0, 1, "directed")]
-    assert set(first.metadata) == {"algorithm", "pval_forward", "pval_backward"}
+    keys = {"pval_forward", "pval_backward", "stat_forward", "stat_backward"}
+    assert set(first.metadata) == {"algorithm", *keys}
     pvalues = (first.metadata["pval_forward"], first.metadata["pval_backward"])
     for scale in (100.0, 0.01, 1e-200):  # 1e-200: squared deviations would underflow
         out = anm_facade(planted * np.array([scale, 1 / scale]))
