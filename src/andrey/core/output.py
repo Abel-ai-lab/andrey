@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 _FORMAT_VERSION = 0
 _TIME_FORMAT_VERSION = 1
 _SUPPORTED_FORMAT_VERSIONS = frozenset({_FORMAT_VERSION, _TIME_FORMAT_VERSION})
+SUMMARY_WIDTH = 100  # a metadata list printing longer than this shows as its length
 
 JSONScalar = str | bool | int | float | None
 JSONValue = JSONScalar | list | dict
@@ -190,11 +191,7 @@ class StructureOutput:
             labels = s.labels
             order = " -> ".join(labels[i] if labels else str(i) for i in self._ordering)
             lines += ["", f"  order: {order}"]
-        meta = [
-            f"  {k}: {v:.4g}" if isinstance(v, float) else f"  {k}: {v}"
-            for k, v in self._metadata.items()
-            if k != "algorithm"
-        ]
+        meta = [f"  {k}: {_brief(k, v)}" for k, v in self._metadata.items() if k != "algorithm"]
         if meta:
             lines += ["", *meta]
         return lines
@@ -599,3 +596,13 @@ def _check_json_safe(obj: object, path: str) -> None:
             _check_json_safe(value, f"{path}.{key}")
         return
     raise TypeError(f"non-JSON-safe metadata value of type {type(obj).__name__} at {path}")
+
+
+def _brief(key: str, value: object) -> str:
+    """A metadata value as summary text: a float to 4 digits, a list too long for a line by size."""
+    if isinstance(value, float):
+        return f"{value:.4g}"
+    text = str(value)
+    if isinstance(value, list) and len(text) > SUMMARY_WIDTH:
+        return f"a list of {len(value)}, too long to print; read metadata[{key!r}]"
+    return text

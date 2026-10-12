@@ -164,7 +164,7 @@ def test_ties_are_exercised_by_the_sweep():
     from andrey.search.ges import _reach_factory
 
     adj = np.zeros((n, n), dtype=np.int8)
-    state = pg.neighbourhood_state(adj, n)
+    state = pg.neighborhood_state(adj, n)
     reachable = _reach_factory(n)(adj)
     deltas: list[float] = []
     for y in range(n):
@@ -385,8 +385,8 @@ def test_forward_work_estimate_is_density_aware():
     for i in range(8):  # an undirected clique among the first 8 nodes
         for j in range(i + 1, 8):
             dense[i, j] = dense[j, i] = TAIL
-    w_sparse = pg.estimate_forward_work(n, pg.neighbourhood_state(sparse, n), None)
-    w_dense = pg.estimate_forward_work(n, pg.neighbourhood_state(dense, n), None)
+    w_sparse = pg.estimate_forward_work(n, pg.neighborhood_state(sparse, n), None)
+    w_dense = pg.estimate_forward_work(n, pg.neighborhood_state(dense, n), None)
     assert w_dense > 10 * w_sparse  # 2^7 per clique candidate dwarfs the sparse all-singleton scan
 
 
@@ -395,7 +395,7 @@ def test_work_estimate_never_overflows_at_high_degree():
     n = 60
     adj = np.ones((n, n), dtype=np.int8)  # every off-diagonal TAIL -> undirected near-clique
     np.fill_diagonal(adj, 0)
-    state = pg.neighbourhood_state(adj, n)
+    state = pg.neighborhood_state(adj, n)
     assert isinstance(pg.estimate_forward_work(n, state, None), int)
     assert isinstance(pg.estimate_backward_work(n, state), int)
 

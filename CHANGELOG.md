@@ -23,6 +23,10 @@ change names its pull request.
 
 - `hc` returns the same graphs in less time. ([#56])
 
+### Fixed
+
+- Result summaries show a long metadata list as its length instead of printing it in full. ([#59])
+
 ## [0.2.0] - 2026-10-12
 
 ### Highlights
@@ -90,3 +94,4 @@ First alpha release.
 [#33]: https://github.com/Abel-ai-lab/andrey/pull/33
 [#53]: https://github.com/Abel-ai-lab/andrey/pull/53
 [#56]: https://github.com/Abel-ai-lab/andrey/pull/56
+[#59]: https://github.com/Abel-ai-lab/andrey/pull/59

@@ -107,7 +107,7 @@ def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
     alt = " ".join(readme.split("<img alt=\"Andrey's speedup", 1)[1].split('"', 1)[0].split())
     for name, d, bars in slides:
         assert f"{name} {build.speedup_text(dict(bars)['Andrey'])} at {d:,} variables" in alt
-    assert 'https://andrey.abel.ai/docs/benchmarks.html">Benchmark report</a>' in readme
+    assert 'https://andrey.abel.ai/docs/benchmarks.html">Release cards</a>' in readme
 
 
 def test_the_launch_post_is_a_published_page():
