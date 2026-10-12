@@ -171,3 +171,16 @@ def test_bottom_up_numpy_int_order_is_json_safe(tmp_path):
     assert out.metadata["causal_order"] == [0, 1]
     assert all(type(x) is int for x in out.metadata["causal_order"])
     _roundtrips(out, tmp_path, "bottom_up_flat")
+
+
+def test_hidden_cause_methods_record_their_name():
+    B = np.array([[0.0, np.nan], [np.nan, 0.0]])
+    named = {
+        "CAMUV": _adapt_camuv([[], []], U=[[0, 1]], n_vars=2),
+        "RCD": _adapt_rcd(SimpleNamespace(adjacency_matrix_=B)),
+        "BottomUpParceLiNGAM": _adapt_bottom_up_parce(
+            SimpleNamespace(adjacency_matrix_=B, causal_order_=[[0, 1]])
+        ),
+    }
+    for algorithm, out in named.items():
+        assert out.metadata["algorithm"] == algorithm
