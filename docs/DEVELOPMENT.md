@@ -110,8 +110,11 @@ add a release:
 3. Add the new card to the toctree, newest first.
 4. Store the cover's art as `_static/release-cards/<release>.jpg`: a finished JPEG, 8.5 x 11 at
    three times the cover's 288 px width, with its own glow and grain and a dark ground behind the
-   title and the version. Point the `release-art` background in `_static/benchmarks.css` at it. A
-   cover without the `release-art` class shows the stipple ground instead.
+   title and the version. Add a `release-art-<release>` rule (dots as dashes) in
+   `_static/benchmarks.css` that points at it, and give the new card's cover and the Release cards
+   page's featured cover both classes, `release-art release-art-<release>`. The bare `release-art`
+   rule keeps 0.2.0's art, which its released card uses. A cover without the `release-art` class
+   shows the stipple ground instead.
 5. Open the card with the same cover, without its link, beside the opening paragraphs in a
    `release-opening` block.
 6. Add the summary's folder to `RELEASES` in `site/build.py`, so the homepage's speed and accuracy

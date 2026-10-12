@@ -35,8 +35,7 @@ from andrey.search.xges import (
 )
 from andrey.search.xges import xges as xges_search
 from tests.recovery.helpers import datagen
-
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 
 @pytest.fixture(autouse=True)
@@ -72,6 +71,10 @@ def test_recovers_the_cpdag_of_gauss_7v(replicate, extended_search):
     x = datagen.generate("gauss_7v", replicate=replicate)
     out = andrey.xges(x, extended_search=extended_search)
     assert shd(out.structure, truth) == 0
+
+
+def test_matches_the_recorded_output_on_gauss_5v():
+    assert_recorded_output(andrey.xges(datagen.generate("gauss_5v")), "XGES", case="gauss_5v")
 
 
 def test_output_contract():

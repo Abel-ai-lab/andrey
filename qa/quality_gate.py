@@ -180,11 +180,11 @@ def _sizes(regime: str) -> tuple[str, ...]:
     return tuple(f"{regime}_d{d}" for d, _ in sizes(regime))
 
 
-# A method applies where its assumptions hold. PC, GES, BOSS, and GRaSP assume no hidden variables,
-# FCI allows them, and the LiNGAM methods need non-Gaussian noise. Sachs is measured data that fits
-# each only approximately. RCD and BottomUpParceLiNGAM run on their benchmark regime only: on ASIA's
-# 1,000 rows RCD marks most pairs <-> and scores worse than the empty graph, and on Sachs
-# BottomUpParceLiNGAM does.
+# A method applies where its assumptions hold. PC and the score searches (GES, XGES, HC, Tabu, BOSS,
+# GRaSP) assume no hidden variables, FCI allows them, and the LiNGAM methods need non-Gaussian
+# noise. Sachs is measured data that fits each only approximately. RCD and BottomUpParceLiNGAM run
+# on their benchmark regime only: on ASIA's 1,000 rows RCD marks most pairs <-> and scores worse
+# than the empty graph, and on Sachs BottomUpParceLiNGAM does.
 CPDAG_DATA = (*_sizes("linear_gauss_er"), "asia_gauss", "sachs")
 PAG_DATA = (*_sizes("latent_gauss_er"), "asia_gauss", "sachs")
 LINGAM_DATA = (*_sizes("lingam_sf"), "asia_lingam", "sachs")
@@ -195,6 +195,9 @@ SUPPORTED: dict[str, Method] = {
     "PC": Method(lambda x: andrey.pc(x), "cpdag", CPDAG_DATA),
     "FCI": Method(lambda x: andrey.fci(x), "pag", PAG_DATA),
     "GES": Method(lambda x: andrey.ges(x), "cpdag", CPDAG_DATA),
+    "XGES": Method(lambda x: andrey.xges(x), "cpdag", CPDAG_DATA),
+    "HC": Method(lambda x: andrey.hc(x), "cpdag", CPDAG_DATA),
+    "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
     "BOSS": Method(lambda x: andrey.boss(x, seed=0), "cpdag", CPDAG_DATA),
     "GRaSP": Method(lambda x: andrey.grasp(x, seed=0), "cpdag", CPDAG_DATA),
     "DirectLiNGAM": Method(lambda x: andrey.direct_lingam(x), "dag", LINGAM_DATA),

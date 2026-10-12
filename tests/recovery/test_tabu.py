@@ -20,8 +20,7 @@ from andrey.core import backend
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent, to_cpdag
 from tests.recovery.helpers import datagen
-
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 
 @pytest.fixture(autouse=True)
@@ -48,7 +47,8 @@ def _bic(x: np.ndarray, dag) -> float:
 
 
 def test_tabu_recovers_gauss_5v():
-    """The CPDAG of ``gauss_5v``: 0 -> 1, 0 -> 2, 1 -> 3 <- 2, 3 -> 4, with the collider at 3."""
+    """The CPDAG of ``gauss_5v``: 0 -> 1, 0 -> 2, 1 -> 3 <- 2, 3 -> 4, with the collider at 3. The
+    graph and score match the recorded output."""
     out = andrey.tabu(datagen.generate("gauss_5v"))
     assert out.structure.kind == "cpdag"
     assert out.structure.oriented_edges() == [
@@ -58,6 +58,7 @@ def test_tabu_recovers_gauss_5v():
         (2, 3, "directed"),
         (3, 4, "directed"),
     ]
+    assert_recorded_output(out, "Tabu", case="gauss_5v")
 
 
 def test_tabu_finds_no_edges_between_independent_columns():
@@ -68,6 +69,7 @@ def test_tabu_finds_no_edges_between_independent_columns():
     assert out.metadata["score"] == _bic(x, out.structure)
 
 
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")  # exact_search
 @pytest.mark.parametrize("seed", range(12))
 def test_tabu_score_lies_between_the_optimum_and_hill_climbing(seed):
     x = _er_sample(8, seed).data
