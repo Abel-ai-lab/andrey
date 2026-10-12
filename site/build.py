@@ -782,9 +782,11 @@ def methods(summary: dict) -> tuple[str, str]:
 
 # ---- the README chart ------------------------------------------------------------------------
 README_CHART = "benchmark-chart-{theme}.svg"  # in .github/readme/; the README links both themes
-# Methods a later release made supported, after the panel's: their release's published summary
-# and the methods it adds, each as its own card.
+# The README chart: two rows of three cards, never more. The panel's methods it keeps, then the
+# methods later releases made supported, each with its release's published summary.
+README_METHODS = ("PC", "FCI", "GES", "DirectLiNGAM")
 README_LATER = (("hidden-confounders-2026-10", ("RCD", "BottomUpParceLiNGAM")),)
+README_COLUMNS, README_ROWS = 3, 2
 CHART_FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 
 
@@ -794,12 +796,13 @@ def speedup_text(speed: float) -> str:
 
 
 def readme_slides(summary: dict) -> list[tuple[str, str, list[tuple[str, float]]]]:
-    """The README chart's cards: the homepage panel's slides, then ``README_LATER``'s.
+    """The README chart's cards: ``README_METHODS`` from the panel's summary, then later ones.
 
     Each card carries its size as it prints: the variables, or for data with hidden variables,
     the observed ones, which are the columns a method gets.
     """
-    slides = [(name, f"{d:,} variables", bars) for name, d, bars in speedup_slides(summary)]
+    panel = speedup_slides(summary, README_METHODS)
+    slides = [(name, f"{d:,} variables", bars) for name, d, bars in panel]
     for folder, methods in README_LATER:
         path = PUBLISHED / folder / "summary.json"
         later = json.loads(path.read_text(encoding="utf-8"))
@@ -808,6 +811,11 @@ def readme_slides(summary: dict) -> list[tuple[str, str, list[tuple[str, float]]
             row = next(r for r in rows if r["d"] == d)
             size = f"{row['observed']:,} observed" if "observed" in row else f"{d:,}"
             slides.append((name, f"{size} variables", bars))
+    if len(slides) > README_COLUMNS * README_ROWS:
+        raise ValueError(
+            f"the README chart holds {README_ROWS} rows of {README_COLUMNS} cards; "
+            "replace a method in README_METHODS instead of adding one"
+        )
     return slides
 
 
@@ -815,12 +823,11 @@ def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
     """The homepage's speedup panel as a standalone SVG: one card per method, Andrey accented.
 
     A README can show only an image, so the panel's slides become cards side by side, from the
-    same :func:`speedup_slides`, followed by the cards of methods later releases made
-    supported (:func:`readme_slides`). The chart sits on an opaque card, so it stays legible
-    where a renderer shows the light file on a dark page.
+    same :func:`speedup_slides`, for the methods :func:`readme_slides` picks. The chart sits on an
+    opaque card, so it stays legible where a renderer shows the light file on a dark page.
     """
     slides = readme_slides(summary)
-    width, pad, gap, columns = 960, 24, 16, 3
+    width, pad, gap, columns = 960, 24, 16, README_COLUMNS
     card_w = (width - 2 * pad - gap * (columns - 1)) / columns
     rows = max(len(bars) for _, _, bars in slides)
     card_h = 70 + rows * 30

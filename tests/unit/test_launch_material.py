@@ -87,14 +87,16 @@ def test_readme_quickstart_runs_as_printed(capsys, offline_datasets):
 
 def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
     # The README shows both themes' charts from .github/readme/, with the numbers of the
-    # homepage's speedup panel, then the later releases' methods, and an alt text that lists them.
+    # homepage's speedup panel for the methods it keeps, then the later releases' methods, two rows
+    # at most, and an alt text that lists them.
     readme = README.read_text()
     summary = build.load_summary(SUMMARY)
     slides = build.readme_slides(summary)
-    panel_slides = [(n, f"{d:,} variables", b) for n, d, b in build.speedup_slides(summary)]
-    assert slides[: len(build.SPEEDUP_METHODS)] == panel_slides
+    kept = build.speedup_slides(summary, build.README_METHODS)
+    assert slides[: len(kept)] == [(n, f"{d:,} variables", b) for n, d, b in kept]
     later = [name for _, methods in build.README_LATER for name in methods]
-    assert [name for name, _, _ in slides] == [*build.SPEEDUP_METHODS, *later]
+    assert [name for name, _, _ in slides] == [*build.README_METHODS, *later]
+    assert len(slides) <= build.README_COLUMNS * build.README_ROWS
     for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         name = build.README_CHART.format(theme=theme)
         assert f'"{IMAGES}/{name}"' in readme
