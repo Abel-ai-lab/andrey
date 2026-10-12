@@ -468,7 +468,8 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
 
 def _post_cover(app, docname: str) -> str:  # noqa: ANN001
     """Draw the post's cover (site/cards.py) and return its figure. The front matter's ``cover``
-    names it (``pair`` or ``graph``, the default); ``cover_caption`` adds a caption."""
+    names it (``pair``, ``iceberg``, or ``graph``, the default); ``cover_caption`` adds a
+    caption."""
     meta = app.env.metadata.get(docname, {})
     kind = meta.get("cover", "graph")
     image = f"assets/covers/{docname.removeprefix('blog/')}.jpg"
