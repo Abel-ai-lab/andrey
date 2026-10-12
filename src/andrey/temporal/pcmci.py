@@ -15,9 +15,11 @@ tau_max``:
 
 Every test reads one lagged design matrix: column ``lag * n + i`` holds ``X^i_{t-lag}`` for ``lag =
 0 .. 2 * tau_max``, over the ``T - 2 * tau_max`` time steps where all those lags exist, so every
-test uses the same samples. A test is any object with
-``statistic_pvalue(x, y, condition_set) -> (statistic, p_value)`` over the design's column indices;
-:class:`~andrey.core.ci.FisherZ` (partial correlation) is the default.
+test uses the same samples. Every test is a partial-correlation test: ``indep_test="student_t"``
+(:class:`~andrey.core.ci.StudentT`, the default) or ``"fisherz"``
+(:class:`~andrey.core.ci.FisherZ`). Any object with
+``statistic_pvalue(x, y, condition_set) -> (statistic, p_value)`` over the design's column indices
+can drive :func:`pc1` and :func:`mci`.
 
 References
 ----------
@@ -35,7 +37,7 @@ from typing import Protocol
 
 import numpy as np
 
-from andrey.core.ci import FisherZ
+from andrey.core.ci import FisherZ, StudentT
 
 # A lagged variable ``(i, lag)``: variable ``i`` at time ``t - lag``.
 Link = tuple[int, int]
@@ -51,6 +53,13 @@ class LinkTest(Protocol):
     def statistic_pvalue(
         self, x: int, y: int, condition_set: Iterable[int] = ()
     ) -> tuple[float, float]: ...
+
+
+# The ``indep_test`` names: each builds a test over the lagged design.
+INDEP_TESTS: dict[str, Callable[[np.ndarray], LinkTest]] = {
+    "student_t": StudentT,
+    "fisherz": FisherZ,
+}
 
 
 @dataclass(frozen=True)
@@ -141,12 +150,17 @@ def pcmci(
     tau_max: int = 1,
     pc_alpha: float = 0.2,
     alpha_level: float = 0.05,
-    ci_test: Callable[[np.ndarray], LinkTest] = FisherZ,
+    indep_test: str = "student_t",
 ) -> PCMCIResult:
-    """Run PC1 and MCI on a ``(T, n)`` series; ``ci_test`` builds the test on the lagged design."""
+    """Run PC1 and MCI on a ``(T, n)`` series with the ``indep_test`` partial-correlation test.
+
+    Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
+    """
+    if indep_test not in INDEP_TESTS:
+        raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
-    test = ci_test(lagged_design(data, tau_max))
+    test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
     parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
     statistics, p_values = mci(test, n_vars, parents, tau_max)
     return PCMCIResult(

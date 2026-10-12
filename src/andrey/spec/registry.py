@@ -610,6 +610,15 @@ _add(
                 doc="Significance level of the MCI test; a link is kept when its p-value is at "
                 "most this.",
             ),
+            ParamSpec(
+                name="indep_test",
+                type="str",
+                default="student_t",
+                choices=("student_t", "fisherz"),
+                doc="Partial-correlation test behind every p-value: student_t = Student-t "
+                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
+                "z-transform.",
+            ),
         ),
         references=("Runge et al. 2019",),
     )

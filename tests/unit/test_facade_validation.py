@@ -164,6 +164,7 @@ def test_varma_lingam_checks_order(order, error):
         ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
         ({"alpha_level": 0.0}, ValueError, "alpha_level"),
         ({"alpha_level": 1.5}, ValueError, "alpha_level"),
+        ({"indep_test": "spearman"}, ValueError, "indep_test"),
     ],
 )
 def test_pcmci_checks_its_parameters(params, error, name):

@@ -284,15 +284,18 @@ def test_every_env_var_has_one_parser():
     assert set(SETTINGS) == {v.name for v in ENV_VARS}
 
 
-def test_indep_test_choices_track_the_shipped_ci_registry():
-    """Every method's ``indep_test`` choices are the shipped CI-registry names, so the CLI/JSON
-    schema the registry renders cannot drift from what the facades actually dispatch."""
+def test_indep_test_choices_track_the_tests_each_method_dispatches():
+    """Every method's ``indep_test`` choices are the names it dispatches, so the CLI/JSON schema
+    the registry renders cannot drift from what the facades actually accept: the shipped CI-registry
+    names for the constraint methods, and PCMCI's own test table."""
     from andrey.core.ci import SHIPPED_INDEP_TESTS
+    from andrey.temporal.pcmci import INDEP_TESTS
 
     params = {s.name: p for s in REGISTRY.values() for p in s.params if p.name == "indep_test"}
     assert params
     for name, p in params.items():
-        assert p.choices == SHIPPED_INDEP_TESTS, name
+        expected = tuple(INDEP_TESTS) if name == "pcmci" else SHIPPED_INDEP_TESTS
+        assert p.choices == expected, name
 
 
 # --- support status -------------------------------------------------------------------------------

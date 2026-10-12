@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from scipy import stats
 
 from andrey.temporal.pcmci import lagged_design, mci, pc1, pcmci
 
@@ -108,3 +109,67 @@ def test_pcmci_finds_the_chain_links_and_the_self_dependence():
 def test_the_graph_is_the_p_values_at_most_alpha_level(alpha_level):
     result = pcmci(_chain(300), tau_max=2, alpha_level=alpha_level)
     np.testing.assert_array_equal(result.graph, result.p_values <= alpha_level)
+
+
+def _partial_correlation(design, x, y, conditions):
+    """Correlation of the least-squares residuals of columns ``x`` and ``y`` on the conditions."""
+    z = np.column_stack([np.ones(len(design)), design[:, conditions]])
+    residuals = [design[:, k] - z @ np.linalg.lstsq(z, design[:, k])[0] for k in (x, y)]
+    return np.corrcoef(*residuals)[0, 1]
+
+
+def test_default_p_values_are_the_student_t_tail_of_each_links_partial_correlation():
+    data, tau_max, n_vars = _chain(300), 2, 3
+    result = pcmci(data, tau_max=tau_max, pc_alpha=0.2)
+    design = lagged_design(data, tau_max)
+    for lag in range(1, tau_max + 1):
+        for i in range(n_vars):
+            for j in range(n_vars):
+                conditions = {c for c in result.parents[j] if c != (i, lag)}
+                conditions.update((k, s + lag) for k, s in result.parents[i])
+                columns = sorted(s * n_vars + k for k, s in conditions)
+                r = _partial_correlation(design, lag * n_vars + i, j, columns)
+                df = len(design) - len(columns) - 2
+                p = 2 * stats.t.sf(abs(r) * np.sqrt(df / (1 - r * r)), df)
+                assert result.statistics[lag - 1, i, j] == pytest.approx(r, abs=1e-10)
+                assert result.p_values[lag - 1, i, j] == pytest.approx(p, rel=1e-6, abs=1e-300)
+
+
+# Fisher-Z results recorded on _chain(300) before the Student-t test existed:
+# {(lag - 1, cause, effect): p_value}.
+FISHER_Z_BASELINE = {
+    (0, 1, 0): 0.06821704538462758,
+    (0, 1, 1): 4.9960036108132044e-14,
+    (0, 2, 1): 0.02602403693306332,
+    (1, 0, 1): 0.19187550024330813,
+    (1, 1, 1): 0.5452899840069427,
+    (1, 2, 2): 0.7140314703736454,
+}
+
+
+def test_fisherz_reproduces_the_recorded_results():
+    result = pcmci(_chain(300), tau_max=2, pc_alpha=0.2, alpha_level=0.01, indep_test="fisherz")
+    assert result.parents == (
+        ((0, 1), (2, 1), (1, 1)),
+        ((0, 1), (1, 1), (0, 2), (2, 2)),
+        ((1, 2), (2, 1)),
+    )
+    for index, p_value in FISHER_Z_BASELINE.items():
+        assert result.p_values[index] == pytest.approx(p_value, abs=1e-12)
+
+
+@pytest.mark.parametrize(("n_steps", "alpha_level"), [(600, 0.01), (300, 0.01), (300, 0.2)])
+def test_both_tests_give_the_same_graph_on_the_fixed_cases(n_steps, alpha_level):
+    data = _chain(n_steps)
+    student_t, fisherz = (
+        pcmci(data, tau_max=2, alpha_level=alpha_level, indep_test=name)
+        for name in ("student_t", "fisherz")
+    )
+    np.testing.assert_array_equal(student_t.graph, fisherz.graph)
+    assert student_t.parents == fisherz.parents
+    assert not np.array_equal(student_t.p_values, fisherz.p_values)
+
+
+def test_an_unknown_indep_test_raises_naming_the_choices():
+    with pytest.raises(ValueError, match=r"indep_test must be one of \['fisherz', 'student_t'\]"):
+        pcmci(_chain(100), indep_test="spearman")

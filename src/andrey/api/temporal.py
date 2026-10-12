@@ -227,6 +227,7 @@ def pcmci(
     tau_max: int = 1,
     pc_alpha: float = 0.2,
     alpha_level: float = 0.05,
+    indep_test: str = "student_t",
 ) -> StructureOutput:
     """Learn the lagged causal links of one multivariate time series with PCMCI.
 
@@ -250,6 +251,10 @@ def pcmci(
     alpha_level : float, default=0.05
         Significance level of the MCI step, in ``(0, 1)``: a link is in the graph when its p-value
         is at most ``alpha_level``.
+    indep_test : {"student_t", "fisherz"}, default="student_t"
+        The partial-correlation test behind every p-value. Both report the same partial
+        correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
+        ``"fisherz"`` from Fisher's z-transform.
 
     Returns
     -------
@@ -269,9 +274,10 @@ def pcmci(
     TypeError
         If ``tau_max`` is not an int.
     ValueError
-        If ``tau_max`` is below 1, if ``pc_alpha`` or ``alpha_level`` is not in ``(0, 1)``, or if
-        ``data`` is not a usable 2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3``
-        rows, the length at which every test keeps one degree of freedom.
+        If ``tau_max`` is below 1, if ``pc_alpha`` or ``alpha_level`` is not in ``(0, 1)``, if
+        ``indep_test`` is neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is not a usable
+        2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the length at which
+        every test keeps a degree of freedom.
 
     Warns
     -----
@@ -281,13 +287,17 @@ def pcmci(
 
     Notes
     -----
-    Every test is the Fisher-Z partial-correlation test. All tests use the same time steps, the
-    last ``n_samples - 2 * tau_max``, where every lag a test can condition on exists: the MCI test
-    of a link at lag ``k`` conditions on the cause's parents, which reach back ``k + tau_max``
-    steps. PC1 runs in rounds ``p = 0, 1, ...``: each round tests every remaining candidate given
-    the ``p`` strongest other candidates, one conditioning set per candidate, then drops those
-    that test independent. A candidate's strength is the smallest absolute partial correlation it
-    has had so far.
+    Every test is a partial-correlation test. The default, ``"student_t"``, takes the p-value from
+    the Student-t distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions, as
+    the authors' reference implementation does. ``"fisherz"`` uses Fisher's z-transform instead; its
+    p-values differ slightly, so a link close to ``alpha_level`` can flip.
+
+    All tests use the same time steps, the last ``n_samples - 2 * tau_max``, where every lag a test
+    can condition on exists: the MCI test of a link at lag ``k`` conditions on the cause's parents,
+    which reach back ``k + tau_max`` steps. PC1 runs in rounds ``p = 0, 1, ...``: each round tests
+    every remaining candidate given the ``p`` strongest other candidates, one conditioning set per
+    candidate, then drops those that test independent. A candidate's strength is the smallest
+    absolute partial correlation it has had so far.
 
     **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over 5
     variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no hidden
@@ -323,12 +333,14 @@ def pcmci(
     alpha_level = open_unit_interval(alpha_level, "alpha_level")
     X = data_matrix(data)
     # An MCI test conditions on up to 2 * n * tau_max - 1 lagged columns of the last
-    # n_samples - 2 * tau_max steps; this keeps one degree of freedom in every Fisher-Z test.
+    # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
     min_rows = 2 * tau_max * (X.shape[1] + 1) + 3
     if X.shape[0] < min_rows:
         raise ValueError(
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
-    result = _native(X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level)
+    result = _native(
+        X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level, indep_test=indep_test
+    )
     return with_labels(_adapt_pcmci(result), column_labels(data))
