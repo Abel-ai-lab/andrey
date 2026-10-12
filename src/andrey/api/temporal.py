@@ -435,8 +435,9 @@ def pcmciplus(
     between every two variables at the same step. Round ``p = 0, 1, ...`` tests each linked pair
     given each subset of ``p`` same-step neighbors of the later end, with the lagged parents of
     both ends added, and removes the link at the first p-value above ``pc_alpha``. A same-step
-    pair is tested from both ends, and the neighbor sets stay fixed during a round, so the links
-    found do not depend on the order of the variables. The collider phase orients the
+    pair is tested from both ends, first given the neighbors of its higher-numbered variable, and
+    the neighbor sets stay fixed during a round, so the links found do not depend on the order of
+    the variables. The collider phase orients the
     unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules R1 to R3 to
     the same-step links until none applies. Each collider or rule pass collects its orientations
     before applying them, and marks a link that gets both orientations as a conflict. With the

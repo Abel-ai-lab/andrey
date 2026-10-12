@@ -10,9 +10,10 @@ PCMCI+ extends PCMCI to links within one time step (lag 0). It works on the copi
    ``(X^i_{t-tau}, X^j_t)`` given each subset ``S`` of ``p`` lag-0 neighbors of ``X^j_t``, with
    ``B(j)`` (without ``X^i_{t-tau}``) and ``B(i)`` shifted ``tau`` steps back added to every
    conditioning set. The first p-value above ``pc_alpha`` removes the link and stores ``S`` as its
-   separating set. A lag-0 pair is tested from both ends. The neighbor sets stay fixed during a
-   round and are re-sorted after it, strongest link first, by the smallest absolute statistic each
-   link has had. The rounds stop when no linked pair has ``p`` neighbors left to condition on.
+   separating set. A lag-0 pair is tested from both ends, the ordered pairs ``(X^i_t, X^j_t)`` in
+   order of ``(i, j)``. The neighbor sets stay fixed during a round and are re-sorted after it,
+   strongest link first, by the smallest absolute statistic each link has had. The rounds stop
+   when no linked pair has ``p`` neighbors left to condition on.
 3. **Colliders.** Each unshielded triple ``X^i_{t-tau} - X^k_t - X^j_t`` with a lag-0 link
    ``X^k_t - X^j_t`` is a collider, ``X^i_{t-tau} -> X^k_t <- X^j_t``, by ``collider_rule``:
    ``"none"`` when ``X^k_t`` is not in the separating set; ``"majority"`` and ``"conservative"``
@@ -179,9 +180,9 @@ def skeleton(
             for i, lag in parents[j]
             if adjacency[lag, i, j] and len(neighbors[j]) >= p
         ] + [
-            (i, 0, j)
+            (i, 0, j)  # in order of (i, j): a pair first meets its higher variable's neighbors
+            for i in range(n_vars)
             for j in range(n_vars)
-            for i in neighbors[j]
             if adjacency[0, i, j] and len(neighbors[j]) - 1 >= p
         ]
         if not pairs:
