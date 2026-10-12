@@ -511,7 +511,7 @@ def test_the_speedup_panel_has_a_slide_per_method_at_its_largest_claimed_size():
     )
     assert 'id="race-m-pc" checked' in html and html.count(" checked") == 1
     assert '<legend class="visually-hidden">Method</legend>' in html
-    assert '<a class="race-link" href="docs/benchmarks.html">Benchmark report</a>' in html
+    assert '<a class="race-link" href="docs/benchmarks.html">Release cards</a>' in html
 
 
 def test_every_speedup_bar_comes_from_andreys_paired_ratios():

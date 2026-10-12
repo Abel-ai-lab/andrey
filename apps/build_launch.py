@@ -225,7 +225,7 @@ def chart_block(summary):
             "  </picture>",
             "</p>",
             "",
-            f'<p align="center"><a href="{SITE_URL}/docs/benchmarks.html">Benchmark report</a></p>',
+            f'<p align="center"><a href="{SITE_URL}/docs/benchmarks.html">Release cards</a></p>',
             "",
             end,
         ]
