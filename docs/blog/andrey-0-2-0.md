@@ -1,6 +1,6 @@
 ---
 name: andrey-0-2-0
-description: "Andrey's six methods for data with hidden common causes, with RCD and BottomUpParceLiNGAM new and supported, and small fits several times faster."
+description: "Andrey's methods for data with hidden common causes, with RCD and BottomUpParceLiNGAM new and supported, and small fits several times faster."
 meta:
   type: post
 blogpost: true
@@ -14,9 +14,8 @@ cover: iceberg
 
 A hidden common cause, or latent confounder, is an unmeasured variable that affects two measured
 variables. This release adds RCD and BottomUpParceLiNGAM as supported methods and CAM-UV as an
-experimental one, bringing Andrey to six methods for data with hidden common causes. Below, we
-run five of them on one small dataset and report benchmark results. Other updates make small
-fits several times faster.
+experimental one. With FCI, they cover data with hidden common causes. Below, we run all four on
+one small dataset and report benchmark results. Other updates make small fits several times faster.
 
 ## Why hidden causes matter
 
@@ -36,15 +35,13 @@ this release.
 | Method | Status | Assumes |
 |---|---|---|
 | [FCI](../docs/code/generated/andrey.fci.rst) | Supported | Linear relations with roughly Gaussian noise, through its Fisher-z test |
-| [GFCI](../docs/code/generated/andrey.gfci.rst) | Experimental | Linear relations with Gaussian noise, through its BIC score and Fisher-z test |
 | [RCD](../docs/code/generated/andrey.rcd.rst) | Supported | Linear relations with non-Gaussian noise |
 | [BottomUpParceLiNGAM](../docs/code/generated/andrey.bottom_up_parce_lingam.rst) | Supported | Linear relations with non-Gaussian noise |
 | [CAM-UV](../docs/code/generated/andrey.camuv.rst) | Experimental | Each variable a sum of nonlinear functions of its causes, plus noise |
-| [GIN](../docs/code/generated/andrey.gin.rst) | Experimental | Linear relations with non-Gaussian noise; the measured variables are indicators of a few hidden ones |
 
 ## Reading a PAG
 
-All but GIN return a partial ancestral graph (PAG) over the variables you measured. Each end of
+All four return a partial ancestral graph (PAG) over the variables you measured. Each end of
 an edge carries a tail, an arrowhead, or a circle. A circle means that end is unresolved.
 
 - `x -> y`: `x` causes `y`.
@@ -52,7 +49,7 @@ an edge carries a tail, an arrowhead, or a circle. A circle means that end is un
 - `x o-> y`: `y` does not cause `x`; whether `x` causes `y` is unresolved.
 - `x o-o y`: both ends are unresolved.
 
-FCI and GFCI mark an end with a tail or an arrowhead only when every graph consistent with the
+FCI marks an end with a tail or an arrowhead only when every graph consistent with the
 data's conditional independences agrees on that mark. RCD, BottomUpParceLiNGAM, and CAM-UV use
 the same marks for their findings: `->` for a direct cause and `<->` for a pair linked by a hidden
 variable. BottomUpParceLiNGAM also uses `o-o` between variables it cannot order.
@@ -61,8 +58,8 @@ See [Graph types](../docs/guides/graph-types.md#pag-uncertainty-with-hidden-vari
 ## Example
 
 Here `h` causes `x0` and `x1` but is not in the data. Also, `x0` causes `x3`, and `x1` causes
-`x2`. The noise is uniform, so it is not Gaussian. GFCI and CAM-UV issue the experimental warning
-on their first call.
+`x2`. The noise is uniform, so it is not Gaussian. CAM-UV issues the experimental warning on its
+first call.
 
 ```{literalinclude} 0.2.0/example.py
 :language: python
@@ -79,7 +76,7 @@ on their first call.
 - BottomUpParceLiNGAM finds both direct edges. It cannot order `x0` and `x1`, which share `h`,
   so it groups them in one block joined by `o-o`. In `causal_order`, this block appears as the
   nested list `[0, 1]`.
-- FCI and GFCI find the three edges but leave every end a circle. Their orientations rely on
+- FCI finds the three edges but leaves every end a circle. Its orientations rely on
   conditional independences. These four variables have the same independences as a graph with
   no hidden cause and no collider (a variable that two arrows point into), such as
   `x3 <- x0 -> x1 -> x2`, so the independences cannot settle any mark. Given an observed cause
@@ -90,11 +87,6 @@ With non-Gaussian noise, this test settles the directions in this example. RCD a
 BottomUpParceLiNGAM also estimate the edge weights: 0.598 and 0.61, compared with the true 0.6.
 DirectLiNGAM assumes causal sufficiency. On the same data, it returns `x0 -> x1` (the last result
 above), an edge absent from the true graph.
-
-GIN answers a different question. If your measured variables are noisy indicators of a few
-hidden variables, GIN groups the indicators by hidden variable and orders the hidden variables.
-It returns a directed acyclic graph (DAG) whose nodes are the hidden variables. See its
-[API page](../docs/code/generated/andrey.gin.rst) for an example.
 
 ## Benchmarks
 
@@ -116,7 +108,7 @@ data with one variable in ten hidden and ten rows per variable, on 16 cores. At 
 Andrey is slower, but both packages take under 0.1 s. Their median endpoint errors are within
 two of each other. At 800 variables, both have more endpoint errors than the empty graph.
 
-GFCI, CAM-UV, and GIN have no published benchmarks yet. Speed and accuracy depend on your data,
+CAM-UV has no published benchmark yet. Speed and accuracy depend on your data,
 settings, and hardware.
 
 ## Other highlights
@@ -134,7 +126,7 @@ settings, and hardware.
   with `NaN` or infinity, a constant column, or fewer than 2 rows raises a `ValueError` that
   names the argument. An out-of-range setting raises the same error.
 
-The [changelog](../docs/changelog.md) lists every change.
+For more details, read the [changelog](../docs/changelog.md).
 
 ## Try it
 

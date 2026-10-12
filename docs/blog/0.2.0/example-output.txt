@@ -4,12 +4,6 @@ FCI  pag  |  4 nodes  |  3 edges (3 circle)
   x0 o-o x3
   x1 o-o x2
 
-GFCI  pag  |  4 nodes  |  3 edges (3 circle)
-
-  x0 o-o x1
-  x0 o-o x3
-  x1 o-o x2
-
 RCD  pag  |  4 nodes  |  3 edges (1 bidirected, 2 directed)
 
   x0 <-> x1
