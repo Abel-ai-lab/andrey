@@ -300,6 +300,14 @@ $ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-smoke --smoke
 $ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-cpu --cap-mem-mb 32000
 ```
 
+To run only some of the solutions, name them, comma-separated. A run without bnlearn's solutions
+does not need R:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py --out outputs/tabu-andrey --ladder 1600 3200 \
+    --repeats 1 --solutions andrey.tabu.numpy.serial,andrey.hc.numpy.serial,baseline.empty
+```
+
 Each fit also gets `bic`, the BIC of the graph it returned on its dataset, in Andrey's deviance
 units (lower is better); a CPDAG is scored through any of its DAGs, which all have the same BIC. The
 summary prints, per solution and `d`, the median `bic` minus `andrey.hc`'s on the same dataset:
