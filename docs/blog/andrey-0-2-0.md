@@ -7,7 +7,7 @@ blogpost: true
 date: 2026-10-16
 author: Shu Wan
 version: 0.2.0
-cover: graph
+cover: iceberg
 ---
 
 # Andrey 0.2.0: hidden common causes, and faster small fits
