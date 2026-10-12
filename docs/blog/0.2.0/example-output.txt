@@ -1,7 +1,35 @@
+FCI  pag  |  4 nodes  |  3 edges (3 circle)
+
+  x0 o-o x1
+  x0 o-o x3
+  x1 o-o x2
+
+GFCI  pag  |  4 nodes  |  3 edges (3 circle)
+
+  x0 o-o x1
+  x0 o-o x3
+  x1 o-o x2
+
 RCD  pag  |  4 nodes  |  3 edges (1 bidirected, 2 directed)
 
   x0 <-> x1
   x0 -> x3  (+0.598)
   x1 -> x2  (+0.61)
+
+  confounded_pairs: [[0, 1]]
+
+BottomUpParceLiNGAM  pag  |  4 nodes  |  3 edges (1 circle, 2 directed)
+
+  x0 o-o x1
+  x0 -> x3  (+0.598)
+  x1 -> x2  (+0.61)
+
+  causal_order: [[0, 1], 3, 2]
+
+CAMUV  pag  |  4 nodes  |  3 edges (1 bidirected, 2 directed)
+
+  x0 <-> x1
+  x0 -> x3
+  x1 -> x2
 
   confounded_pairs: [[0, 1]]
