@@ -152,9 +152,9 @@ def rcd(
     -------
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
-        ``i <-> j`` for a pair with a hidden common cause. ``metadata["confounded_pairs"]`` lists
-        the ``<->`` pairs as sorted ``[i, j]`` lists; ``weighted_adjacency`` holds the edge
-        coefficients.
+        ``i <-> j`` for a pair with a hidden common cause. ``metadata["algorithm"]`` is ``"RCD"``;
+        ``metadata["confounded_pairs"]`` lists the ``<->`` pairs as sorted ``[i, j]`` lists;
+        ``weighted_adjacency`` holds the edge coefficients.
 
     Raises
     ------
@@ -234,7 +234,8 @@ def camuv(
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
         ``i <-> j`` for a pair connected through an unobserved variable.
-        ``metadata["confounded_pairs"]`` lists the ``<->`` pairs as sorted ``[i, j]`` lists.
+        ``metadata["algorithm"]`` is ``"CAMUV"``; ``metadata["confounded_pairs"]`` lists the
+        ``<->`` pairs as sorted ``[i, j]`` lists.
 
     Raises
     ------
@@ -304,8 +305,9 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     StructureOutput
         A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
         ``i o-o j`` between variables whose order a hidden common cause leaves unresolved.
-        ``metadata["causal_order"]`` gives the order, with the unordered variables nested in one
-        list; ``weighted_adjacency`` holds the edge coefficients.
+        ``metadata["algorithm"]`` is ``"BottomUpParceLiNGAM"``; ``metadata["causal_order"]`` gives
+        the order, with the unordered variables nested in one list; ``weighted_adjacency`` holds
+        the edge coefficients.
 
     Raises
     ------
