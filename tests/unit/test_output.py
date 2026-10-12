@@ -207,6 +207,15 @@ def test_repr_heads_with_the_algorithm_and_adds_order_weights_and_metadata():
     assert str(out) == repr(out)
 
 
+def test_repr_shows_a_long_metadata_list_by_its_length():
+    g = GraphStructure.from_numpy(np.zeros((2, 2), dtype=np.int8), kind="dag")
+    out = StructureOutput.new(g, metadata={"orders": [0, 1], "p_values": [[0.5] * 30] * 2})
+    assert repr(out).splitlines()[-2:] == [
+        "  orders: [0, 1]",
+        "  p_values: a list of 2, too long to print; read metadata['p_values']",
+    ]
+
+
 def test_repr_two_cycles_use_each_direction_weight():
     M = np.array([[0, ARROW], [ARROW, 0]], dtype=np.int8)
     g = GraphStructure.from_numpy(M, kind="digraph", labels=("a", "b"))

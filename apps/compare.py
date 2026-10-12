@@ -122,7 +122,7 @@ MODEL = SCM(
 )
 
 
-def labelled(marks, kind="cpdag"):
+def labeled(marks, kind="cpdag"):
     """Attach the variable names to an endpoint-mark matrix."""
     return GraphStructure.from_numpy(np.asarray(marks, dtype=np.int8), kind=kind, labels=LABELS)
 
@@ -135,7 +135,7 @@ def dataset():
     # as a CSV would store them, give every machine the same bytes.
     data = np.round(sample.data, 6)
     data.flags.writeable = False
-    return data, labelled(sample.graph.to_numpy(), kind="dag")
+    return data, labeled(sample.graph.to_numpy(), kind="dag")
 
 
 def fingerprint(data):
@@ -148,8 +148,8 @@ def andrey_graphs():
     """Fit Andrey's PC and GES at their defaults."""
     data, _ = dataset()
     return {
-        "PC": labelled(andrey.pc(data, alpha=ALPHA, indep_test="fisherz").structure.to_numpy()),
-        "GES": labelled(andrey.ges(data).structure.to_numpy()),
+        "PC": labeled(andrey.pc(data, alpha=ALPHA, indep_test="fisherz").structure.to_numpy()),
+        "GES": labeled(andrey.ges(data).structure.to_numpy()),
     }
 
 
@@ -216,14 +216,14 @@ def causal_learn_graphs(recording=None):
             "python apps/compare.py --record"
         )
     return {
-        method: labelled(signed_marks(recording["methods"][method]["graph"])) for method in METHODS
+        method: labeled(signed_marks(recording["methods"][method]["graph"])) for method in METHODS
     }
 
 
 def truth_cpdag():
     """The true DAG's CPDAG: what observational data can identify."""
     _, dag = dataset()
-    return labelled(to_cpdag(dag).to_numpy())
+    return labeled(to_cpdag(dag).to_numpy())
 
 
 def edge_statuses(estimate, truth):

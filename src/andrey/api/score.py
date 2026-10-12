@@ -545,7 +545,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     """
     warn_experimental("calm")
     if backend.torch() is None:
-        raise ImportError("andrey.calm needs torch for its continuous optimiser; install '[torch]'")
+        raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
     X = data_matrix(data)

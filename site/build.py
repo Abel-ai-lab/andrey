@@ -324,7 +324,7 @@ def speedup_panel(summary: dict) -> str:
         '<figure class="race race--speedup" aria-labelledby="race-title">'
         '<figcaption class="race-head"><span class="race-title" id="race-title">Speedup'
         f'<span class="race-sizes-now"> <span aria-hidden="true">&middot;</span> {sizes}</span>'
-        '</span><a class="race-link" href="docs/benchmarks.html">Benchmark report</a></figcaption>'
+        '</span><a class="race-link" href="docs/benchmarks.html">Release cards</a></figcaption>'
         f'<fieldset class="race-sizes"><legend class="visually-hidden">Method</legend>{chips}'
         f'</fieldset><div class="race-panels">{"".join(panels)}</div></figure>'
     )

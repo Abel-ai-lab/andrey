@@ -29,7 +29,7 @@ def _require_torch():
         import torch
     except ImportError as exc:  # pragma: no cover - exercised only without the extra
         raise ImportError(
-            "andrey CALM's continuous optimiser is built on torch; install the '[torch]' extra"
+            "andrey CALM's continuous optimizer is built on torch; install the '[torch]' extra"
         ) from exc
     return torch
 
@@ -107,7 +107,7 @@ def moral_graph(data: np.ndarray, *, alpha: float = 0.01) -> np.ndarray:
 # --------------------------------------------------------------------------------------------
 
 
-def _optimise_gated_dag(
+def _optimize_gated_dag(
     cov: np.ndarray,
     moral_mask: np.ndarray,
     *,
@@ -293,7 +293,7 @@ def calm(
         gate_prob = np.zeros((d, d))
         weight = np.zeros((d, d))
     else:
-        gate_prob, weight = _optimise_gated_dag(
+        gate_prob, weight = _optimize_gated_dag(
             cov,
             mask,
             lambda1=lambda1,

@@ -200,7 +200,7 @@ div[class*="highlight-"].window pre {
   background: color-mix(in srgb, var(--andrey-muted) 12%, transparent);
 }
 
-/* Each fill runs along a gradient: pale to deeper grey for the other packages, and the accent
+/* Each fill runs along a gradient: pale to deeper gray for the other packages, and the accent
    to a lighter tint of it for Andrey. */
 .race-fill {
   display: block;
