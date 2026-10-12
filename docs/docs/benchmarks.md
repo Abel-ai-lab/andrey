@@ -20,7 +20,7 @@ rerun the measurements. A card keeps the numbers its release published.
 :link: benchmarks/0.2.0
 :link-type: doc
 :link-alt: The 0.2.0 release card: hidden common causes
-:class-card: release-cover
+:class-card: release-cover release-art
 :shadow: none
 :margin: 0
 

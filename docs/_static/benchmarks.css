@@ -116,6 +116,17 @@ html[data-theme="dark"] .release-cover {
     10px 22px 44px -14px color-mix(in srgb, var(--andrey-ground-cobalt) 32%, transparent);
 }
 
+/* The release's own art, `release-cards/<release>.jpg`, in place of the ground. It carries its own
+   glow and grain, so the grain layers are off; navy shows until it loads. */
+.bd-content .sd-card.release-cover.release-art {
+  background: url("release-cards/0.2.0.jpg") center / cover no-repeat, var(--andrey-ground-navy);
+}
+
+.release-cover.release-art::before,
+.release-cover.release-art::after {
+  content: none;
+}
+
 .bd-content .sd-card.release-cover .sd-card-body {
   padding: 1.2rem 1.7rem 1.9rem 2.05rem;
 }

@@ -24,6 +24,8 @@ so no color is transcribed here.
   Loaded on the gallery and the example pages only.
 - **`benchmarks.css`** - the Release cards page: the latest release's cover beside its TL;DR, and
   the earlier releases' rows with their tiles. Loaded on that page only.
+- **`release-cards/<release>.jpg`** - a release's cover art, the background of its cover on the
+  Release cards page. Stored finished; `benchmarks.css` names the latest one.
 
 Load order in `conf.py` is `andrey-tokens.css`, `andrey.css`, then `graph-guides.css`; a page's own
 stylesheets load after them. The homepage's stylesheets, and the timing comparison and charts it
