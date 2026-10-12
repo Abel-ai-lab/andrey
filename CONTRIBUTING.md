@@ -69,9 +69,9 @@ Every pull request has exactly one type label, which also gives its section in t
 
 | Label | For | Release-notes section |
 |---|---|---|
-| `enhancement` | a new method, option, or speed-up | Added |
+| `feature` | a new method, option, or speed-up | Added |
 | `bug` | a fix | Fixed |
-| `documentation` | docs, the website, and the blog | Documentation |
+| `docs` | docs, the website, and the blog | Documentation |
 | `chore` | CI, tests, build, and refactors | Chores |
 | `dependencies` | dependency updates; Dependabot sets it | Dependencies |
 
@@ -83,7 +83,7 @@ and milestone changes, and fails when:
 
 - the pull request has no milestone (Dependabot's are exempt);
 - it does not have exactly one type label (other labels do not count);
-- an `enhancement` or `bug` pull request adds no bullet under `## [Unreleased]` in `CHANGELOG.md`
+- a `feature` or `bug` pull request adds no bullet under `## [Unreleased]` in `CHANGELOG.md`
   that ends with a link to its pull request, `([#<number>])`, defined at the end of the file;
 - the `highlight` label and a bullet linking the pull request under `### Highlights` do not come
   together, or `breaking` and `### Breaking` do not.

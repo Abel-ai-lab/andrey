@@ -8,11 +8,11 @@ changelog:
     - title: Breaking
       labels: [breaking]
     - title: Added
-      labels: [enhancement]
+      labels: [feature]
     - title: Fixed
       labels: [bug]
     - title: Documentation
-      labels: [documentation]
+      labels: [docs]
     - title: Chores
       labels: [chore]
     - title: Dependencies

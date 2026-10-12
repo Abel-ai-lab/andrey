@@ -1,7 +1,7 @@
 """Pull-request check: one type label, a milestone, and the CHANGELOG bullets the labels call for.
 
 A pull request carries exactly one type label (``TYPE_LABELS``) and, unless Dependabot opened it,
-a milestone. An ``enhancement`` or ``bug`` pull request adds a bullet under ``## [Unreleased]`` in
+a milestone. A ``feature`` or ``bug`` pull request adds a bullet under ``## [Unreleased]`` in
 ``CHANGELOG.md`` that links it as ``[#<number>]``. The ``highlight`` label and a bullet linking the
 pull request under ``### Highlights`` come together, and so do ``breaking`` and ``### Breaking``.
 Other labels do not count.
@@ -19,8 +19,8 @@ import json
 from pathlib import Path
 
 # In release-notes order; .github/release.yml has one section for each.
-TYPE_LABELS = ("enhancement", "bug", "documentation", "chore", "dependencies")
-ENTRY_LABELS = ("enhancement", "bug")
+TYPE_LABELS = ("feature", "bug", "docs", "chore", "dependencies")
+ENTRY_LABELS = ("feature", "bug")
 FLAG_SECTIONS = {"highlight": "Highlights", "breaking": "Breaking"}
 MILESTONE_EXEMPT = ("dependabot[bot]",)
 

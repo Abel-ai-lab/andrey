@@ -23,7 +23,7 @@ change names its pull request.
 - Three methods for data with hidden common causes: `rcd`, `bottom_up_parce_lingam`, and the
   experimental `camuv`. Each returns a PAG over the observed variables. `rcd` and `camuv` list the
   pairs a hidden variable links in `metadata["confounded_pairs"]`; `bottom_up_parce_lingam` leaves
-  the variables whose order such a cause hides unordered. ([#18], [#31])
+  the variables whose order such a cause hides unordered. ([#18], [#31], [#53])
 - `hc` takes `max_iter`, its move limit, and warns with the new `andrey.SearchLimitWarning` when the
   search stops there. ([#14])
 
@@ -71,3 +71,4 @@ First alpha release.
 [#18]: https://github.com/Abel-ai-lab/andrey/pull/18
 [#31]: https://github.com/Abel-ai-lab/andrey/pull/31
 [#33]: https://github.com/Abel-ai-lab/andrey/pull/33
+[#53]: https://github.com/Abel-ai-lab/andrey/pull/53

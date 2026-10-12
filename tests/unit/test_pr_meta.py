@@ -77,7 +77,7 @@ def test_a_missing_milestone_fails_except_for_dependabot(check):
     ("labels", "expected"),
     [
         ((), 1),
-        (("documentation", "chore"), 1),
+        (("docs", "chore"), 1),
         (("good first issue",), 1),
         (("chore", "good first issue"), 0),
         (("dependencies", "python:uv"), 0),
@@ -88,7 +88,7 @@ def test_exactly_one_type_label_counts(check, labels, expected):
 
 
 @pytest.mark.parametrize(
-    ("label", "section"), [("enhancement", "Added"), ("bug", "Fixed"), ("bug", "Highlights")]
+    ("label", "section"), [("feature", "Added"), ("bug", "Fixed"), ("bug", "Highlights")]
 )
 def test_a_feature_or_fix_needs_its_own_unreleased_bullet(check, label, section):
     flags = ("highlight",) if section == "Highlights" else ()
@@ -105,7 +105,7 @@ def test_a_feature_or_fix_needs_its_own_unreleased_bullet(check, label, section)
     ],
 )
 def test_a_link_outside_an_added_unreleased_bullet_does_not_count(check, head):
-    assert _count(check, _pull("enhancement"), head) == 1
+    assert _count(check, _pull("feature"), head) == 1
 
 
 @pytest.mark.parametrize(
@@ -121,7 +121,7 @@ def test_an_amended_or_wrapped_bullet_counts(check, head):
 
 def test_a_bullet_already_on_the_base_branch_is_not_an_entry(check):
     base = _add("Added", "- A change. ([#7])")
-    assert len(check["problems"](_pull("enhancement"), base, base)) == 1
+    assert len(check["problems"](_pull("feature"), base, base)) == 1
 
 
 @pytest.mark.parametrize(
@@ -129,14 +129,14 @@ def test_a_bullet_already_on_the_base_branch_is_not_an_entry(check):
 )
 def test_a_flag_label_and_its_section_bullet_come_together(check, flag, section):
     in_section, in_added = _add(section, "- A change. ([#7])"), _add("Added", "- A change. ([#7])")
-    assert _count(check, _pull("enhancement", flag), in_section) == 0
-    assert _count(check, _pull("enhancement", flag), in_added) == 1
-    assert _count(check, _pull("enhancement"), in_section) == 1
+    assert _count(check, _pull("feature", flag), in_section) == 0
+    assert _count(check, _pull("feature", flag), in_added) == 1
+    assert _count(check, _pull("feature"), in_section) == 1
 
 
 def test_every_broken_rule_is_reported(check):
     assert _count(check, _pull("highlight", milestone=None)) == 3
-    assert _count(check, _pull("enhancement", "bug", "breaking", milestone=None)) == 4
+    assert _count(check, _pull("feature", "bug", "breaking", milestone=None)) == 4
 
 
 def test_main_reads_the_event_and_both_changelogs(check, tmp_path, capsys):
@@ -145,7 +145,7 @@ def test_main_reads_the_event_and_both_changelogs(check, tmp_path, capsys):
     head.write_text(_add("Added", "- A change. ([#7])"), encoding="utf-8")
     argv = ["--event", str(event), "--base", str(base), "--head", str(head)]
 
-    event.write_text(json.dumps({"pull_request": _pull("enhancement")}), encoding="utf-8")
+    event.write_text(json.dumps({"pull_request": _pull("feature")}), encoding="utf-8")
     assert check["main"](argv) == 0
     event.write_text(json.dumps({"pull_request": _pull("bug", "chore")}), encoding="utf-8")
     assert check["main"](argv) == 1
