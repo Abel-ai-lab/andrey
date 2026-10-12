@@ -87,10 +87,13 @@ def test_readme_quickstart_runs_as_printed(capsys, offline_datasets):
 
 def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
     # The README shows both themes' charts from .github/readme/, with the numbers of the
-    # homepage's speedup panel and an alt text that lists them.
+    # homepage's speedup panel, then the later releases' methods, and an alt text that lists them.
     readme = README.read_text()
     summary = build.load_summary(SUMMARY)
-    slides = build.speedup_slides(summary)
+    slides = build.readme_slides(summary)
+    assert slides[: len(build.SPEEDUP_METHODS)] == build.speedup_slides(summary)
+    later = [name for _, methods in build.README_LATER for name in methods]
+    assert [name for name, _, _ in slides] == [*build.SPEEDUP_METHODS, *later]
     for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         name = build.README_CHART.format(theme=theme)
         assert f'"{IMAGES}/{name}"' in readme
@@ -101,7 +104,7 @@ def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
         labels = re.findall(r'font-weight="600"[^>]*>([^<]+x)</text>', chart)
         assert labels == [build.speedup_text(v) for _, _, bars in slides for _, v in bars]
     panel = build.speedup_panel(summary)
-    for _, _, bars in slides:
+    for _, _, bars in build.speedup_slides(summary):
         for _, speed in bars:
             assert f'class="race-time">{build.speedup_text(speed)}<' in panel
     alt = " ".join(readme.split("<img alt=\"Andrey's speedup", 1)[1].split('"', 1)[0].split())

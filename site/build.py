@@ -250,7 +250,9 @@ def normalized(name: str) -> str:
 SPEEDUP_METHODS = ("PC", "FCI", "GES", "BOSS", "GRaSP", "DirectLiNGAM")
 
 
-def speedup_slides(summary: dict) -> list[tuple[str, int, list[tuple[str, float]]]]:
+def speedup_slides(
+    summary: dict, methods: tuple[str, ...] = SPEEDUP_METHODS
+) -> list[tuple[str, int, list[tuple[str, float]]]]:
     """Each method's speedups at its largest size with a published ratio, fastest first.
 
     The packages at that size come from the comparisons run with the same data, hardware, and
@@ -261,7 +263,7 @@ def speedup_slides(summary: dict) -> list[tuple[str, int, list[tuple[str, float]
     """
     keys = ("regime", "hardware", "build")
     slides = []
-    for name in SPEEDUP_METHODS:
+    for name in methods:
         comparisons = [m for m in summary["methods"] if m["method"] == name]
         claimed = [(row["d"], m) for m in comparisons for row in m["rows"] if row["ratio"]]
         if not claimed:
@@ -780,6 +782,9 @@ def methods(summary: dict) -> tuple[str, str]:
 
 # ---- the README chart ------------------------------------------------------------------------
 README_CHART = "benchmark-chart-{theme}.svg"  # in .github/readme/; the README links both themes
+# Methods a later release made supported, after the panel's: their release's published summary
+# and the methods it adds, each as its own card.
+README_LATER = (("hidden-confounders-2026-10", ("RCD", "BottomUpParceLiNGAM")),)
 CHART_FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 
 
@@ -788,14 +793,24 @@ def speedup_text(speed: float) -> str:
     return "1x" if speed == 1 else ratio_text(speed)
 
 
+def readme_slides(summary: dict) -> list[tuple[str, int, list[tuple[str, float]]]]:
+    """The README chart's cards: the homepage panel's slides, then ``README_LATER``'s."""
+    slides = speedup_slides(summary)
+    for folder, methods in README_LATER:
+        path = PUBLISHED / folder / "summary.json"
+        slides += speedup_slides(json.loads(path.read_text(encoding="utf-8")), methods)
+    return slides
+
+
 def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
     """The homepage's speedup panel as a standalone SVG: one card per method, Andrey accented.
 
     A README can show only an image, so the panel's slides become cards side by side, from the
-    same :func:`speedup_slides`. The chart sits on an opaque card, so it stays legible where a
-    renderer shows the light file on a dark page.
+    same :func:`speedup_slides`, followed by the cards of methods later releases made
+    supported (:func:`readme_slides`). The chart sits on an opaque card, so it stays legible
+    where a renderer shows the light file on a dark page.
     """
-    slides = speedup_slides(summary)
+    slides = readme_slides(summary)
     width, pad, gap, columns = 960, 24, 16, 3
     card_w = (width - 2 * pad - gap * (columns - 1)) / columns
     rows = max(len(bars) for _, _, bars in slides)
@@ -828,7 +843,8 @@ def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{card_w:.1f}" height="{card_h}" rx="12" '
             f'fill="{palette.surface}" stroke="{line}"/>'
         )
-        parts.append(text(x + 18, y + 26, name, size=16, weight=600))
+        # A long name steps down a size so it clears the size label on the right.
+        parts.append(text(x + 18, y + 26, name, size=16 if len(name) <= 14 else 14, weight=600))
         parts.append(
             text(x + card_w - 18, y + 26, f"{d:,} variables", size=12.5, fill=muted, anchor="end")
         )
@@ -855,7 +871,7 @@ def readme_chart_alt(summary: dict) -> str:
     """The README chart's alt text: each method's speedup, as its card shows it."""
     parts = [
         f"{name} {speedup_text(dict(bars)['Andrey'])} at {d:,} variables"
-        for name, d, bars in speedup_slides(summary)
+        for name, d, bars in readme_slides(summary)
     ]
     return "Andrey's speedup over the slowest package on the same data: " + ", ".join(parts)
 
