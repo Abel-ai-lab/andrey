@@ -83,6 +83,21 @@ def test_andrey_finds_the_planted_direction() -> None:
     assert structure.oriented_edges() == [(0, 1, "directed")]
 
 
+@pytest.fixture
+def torch_float32():
+    """Run with torch's default dtype at float32, as in a fresh fit process.
+
+    causal-learn's CALM module sets the default to float64 on import, and PNL's networks then
+    reject its float32 data. A benchmark fit runs in its own process, which never imports CALM.
+    """
+    torch = pytest.importorskip("torch")
+    before = torch.get_default_dtype()
+    torch.set_default_dtype(torch.float32)
+    yield
+    torch.set_default_dtype(before)
+
+
+@pytest.mark.usefixtures("torch_float32")
 def test_causal_learn_returns_a_two_node_dag() -> None:
     # Its decision rests on a t-test of means, so the test asserts the output's shape, not the
     # direction. 150 rows trains one batch per epoch.
