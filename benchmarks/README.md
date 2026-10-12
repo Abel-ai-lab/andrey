@@ -29,6 +29,8 @@ Packages:
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
+- [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
+  and is compared by its outputs only; see below
 
 ## Setup
 
@@ -74,6 +76,14 @@ An adapter selects another environment by setting `python_env` to the name of th
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and
 scoring remain in `.venv-bench`, so every solution uses the same graph model and scorer. An unset
 declared variable stops the run at launch.
+
+tigramite is GPL-licensed, so it is installed only in an environment of its own, and the harness
+calls its public API there and compares the graphs it returns:
+
+```shell
+benchmarks/start_tigramite.sh
+export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
+```
 
 Drivers pass each additional environment to `rundir.provenance_once(..., extra_venvs={...})`.
 `run_id` excludes interpreter identity; `provenance.json` records every environment used, and
@@ -137,6 +147,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
+| PCMCI | Andrey (Student-t, Fisher-z), tigramite |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -230,6 +241,59 @@ The two CAM-UV implementations differ inside, so the same settings can give diff
 Andrey regresses with spline features and least squares where lingam fits pygam's `LinearGAM`, and
 their HSIC tests use different kernel bandwidths and null approximations. Report this beside the
 CAM-UV results.
+
+### PCMCI on lagged series
+
+`pcmci_cpu.py` compares Andrey's PCMCI with tigramite's on the `var_lagged` regime, with the empty
+lag stack as the floor. A rung is one variable count `d` and one series length `T`; the driver runs
+every `d` in its ladder at every `T` in its lengths, and a dataset is one series of `T` time steps,
+stored with `n = T`. The series comes from `andrey.data`'s VAR(1) at density 0, so the
+instantaneous graph is empty and every true link has lag 1: each variable keeps its own past, and
+each other variable is a lag-1 parent with probability 0.3. The process is scaled to stay
+stationary, so coefficients shrink as `d` grows. The truth is stored as the marks of lags `1..L`; a
+temporal key whose instantaneous graph has an edge fails to generate rather than lose that edge.
+
+Every solution tests lags 1 to `tau_max`, at `pc_alpha=0.2` and `alpha_level=0.05`:
+
+| solution | test |
+|---|---|
+| `andrey.pcmci.student_t.tau<k>` | partial correlation, Student-t p-value (Andrey's default) |
+| `andrey.pcmci.fisherz.tau<k>` | partial correlation, Fisher-z p-value |
+| `tigramite.pcmci.parcorr.tau<k>` | `ParCorr(significance="analytic")`, Student-t p-value |
+| `baseline.empty.temporal.tau<k>` | none: no link at any lag |
+
+tigramite runs `run_pcmci` with `tau_min=1` and `fdr_method="none"` and its other defaults; its own
+`tau_min=0` would also test lag 0, which is PCMCI+'s scope. `tau_max` is in every name because
+`params` are not part of a `run_id`, and the record carries it as `tau_max`. Andrey's PCMCI runs
+its tests with one BLAS thread whatever the core budget, while tigramite's fits get the budget's
+BLAS threads; set the core budget to 1 to compare one core with one core. Andrey's Student-t test
+and tigramite's analytic `ParCorr` share their test, so their graphs should match; the driver ends
+by listing, per dataset, the solutions that returned identical graphs (`structure_hash`).
+
+A temporal estimate is scored lag by lag with `andrey.metrics.temporal_scores`; its CPDAG and PAG
+columns (`shd`, `skeleton_*`, `arrowhead_*`) stay empty. Each lag is a directed graph, so a link in
+the wrong direction counts 2:
+
+| columns | what they score |
+|---|---|
+| `lag<k>_shd`, `lag<k>_precision`, `lag<k>_recall`, `lag<k>_f1` | the links at lag `k`, for every lag in the estimate or the truth |
+| `temporal_shd` | the lag-resolved SHD: the per-lag SHDs summed |
+| `lagged_*` | the lags merged into one graph, self-loops included |
+| `summary_*` | the lags merged into one graph, self-loops left out |
+
+A lag with no true link has recall 1, and a lag with no estimated link precision 1, so read them
+beside the SHD: with every true link at lag 1, the columns of lag 2 and above count false links
+only. A smoke run covers every solution on one series of 200 steps over five variables:
+
+```shell
+ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python \
+    $ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py --out outputs/pcmci-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py --out outputs/pcmci \
+    --ladder 5 10 20 --lengths 500 1000 --tau-max 2 --cores 1
+```
+
+The driver refuses a series shorter than `2 * tau_max * (d + 1) + 3` steps, the shortest Andrey's
+PCMCI accepts.
 
 ### Where the clock starts
 
@@ -408,7 +472,8 @@ runner removes the directory after the fit.
 A record stores its data (`d`, `n`, `latents`, regime coordinates, `data_seed`, `repeat`), run
 settings (`cap_wall_s`, `cap_mem_mb`, `cores`, `device`, `dtype`, `backend`, `mode`, `machine_id`, `params`),
 and results (`status`, `wall_s`, `cpu_s`, `warmup_s`, `setup_s`, `peak_rss_mb`, `output_hash`,
-`shd`, `skeleton_f1`, `arrowhead_f1`).
+`shd`, `skeleton_f1`, `arrowhead_f1`). A temporal solution's record also carries `tau_max`, and its
+scores are the lag columns of [PCMCI on lagged series](#pcmci-on-lagged-series).
 
 `device_id` records `cpu` or the CUDA device index and name. The backend determines the device, so a
 pin inside `fit` outranks `ANDREY_DEVICE`; the record keeps the request separately as `device`.
@@ -532,12 +597,15 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.
 - `lingam_cpu.py` - compares DirectLiNGAM and ICA-LiNGAM with causal-learn on CPU.
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
+- `pcmci_cpu.py` - compares PCMCI with tigramite on lagged series, over variables and series
+  lengths.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.
 - `start_r.sh` - builds the R package library and installs `rpy2`.
+- `start_xges.sh`, `start_tigramite.sh` - build the separate xges and tigramite environments.
 - `andrey_bench/contracts.py` - adapter protocol, record schema, dataset and run identity.
 - `andrey_bench/adapters/` - one adapter per package, method, backend, and mode.
 - `andrey_bench/rsession.py` - embedded R interpreter, data transfer, and result retrieval within
