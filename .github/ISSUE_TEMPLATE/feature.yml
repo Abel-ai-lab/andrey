@@ -1,6 +1,6 @@
 name: Feature request
 description: A method, an option, or a data format Andrey should support.
-labels: [enhancement]
+labels: [feature]
 body:
   - type: textarea
     id: need
