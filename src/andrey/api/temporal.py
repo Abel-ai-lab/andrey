@@ -401,8 +401,9 @@ def pcmciplus(
         ``i < j``. ``structure.lag(k)``, ``k >= 1``, is a ``digraph`` whose edge ``i -> j`` is
         the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a
         self-loop is a variable's dependence on its own past. The structure has no
-        ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value among the tests
-        of the link between variable ``i`` at ``t - k`` and variable ``j`` at ``t``, and
+        ``lag_weights``. ``metadata["p_values"][k][i][j]`` is the largest p-value among the
+        skeleton-phase tests of the link between variable ``i`` at ``t - k`` and variable ``j``
+        at ``t`` (the first step's tests for a lagged link that step removed), and
         ``metadata["statistics"][k][i][j]`` the partial correlation of that test; lag ``0`` is
         symmetric with ``1`` and ``0`` on the diagonal. ``metadata["parents"][j]`` lists the
         ``[i, k]`` pairs (variable ``i`` at lag ``k``) the first step selected for variable
@@ -434,11 +435,14 @@ def pcmciplus(
     between every two variables at the same step. Round ``p = 0, 1, ...`` tests each linked pair
     given each subset of ``p`` same-step neighbors of the later end, with the lagged parents of
     both ends added, and removes the link at the first p-value above ``pc_alpha``. A same-step
-    pair is tested from both ends, and the neighbor sets stay fixed during a round, so the
-    result does not depend on the order of the variables. The collider phase orients the
+    pair is tested from both ends, and the neighbor sets stay fixed during a round, so the links
+    found do not depend on the order of the variables. The collider phase orients the
     unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules R1 to R3 to
     the same-step links until none applies. Each collider or rule pass collects its orientations
-    before applying them, and marks a link that gets both orientations as a conflict.
+    before applying them, and marks a link that gets both orientations as a conflict. With the
+    ``"majority"`` or ``"conservative"`` rule the orientations do not depend on the order of the
+    variables either; ``"none"`` reads the one separating set the skeleton phase stored, which
+    can change with the order.
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``. The default test,
     ``"student_t"``, takes the p-value from the Student-t distribution with ``n - |S| - 2``

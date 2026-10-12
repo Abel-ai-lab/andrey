@@ -257,7 +257,7 @@ def _separating_subsets(
     return separating
 
 
-def _apply(marks: np.ndarray, requests: Iterable[tuple[int, int]]) -> bool:
+def apply_orientations(marks: np.ndarray, requests: Iterable[tuple[int, int]]) -> bool:
     """Orient each requested ``(source, target)`` lag-0 link; a link asked both ways is a conflict.
 
     Return whether any link changed.
@@ -307,7 +307,7 @@ def colliders(
                         cache[key] = _separating_subsets(
                             test, n_vars, parents, adjacency, pc_alpha, *key
                         )
-                    verdict = _verdict(cache[key], k, collider_rule)
+                    verdict = collider_verdict(cache[key], k, collider_rule)
                 if verdict == "collider":
                     requests.append((j, k))
                     if lag == 0:
@@ -316,11 +316,11 @@ def colliders(
                     ambiguous.add((i, lag, k, j))
                     if lag == 0:
                         ambiguous.add((j, 0, k, i))
-    _apply(marks, requests)
+    apply_orientations(marks, requests)
     return marks, frozenset(ambiguous)
 
 
-def _verdict(separating: list[frozenset[int]], k: int, collider_rule: str) -> str:
+def collider_verdict(separating: list[frozenset[int]], k: int, collider_rule: str) -> str:
     """``"collider"``, ``"non-collider"``, or ``"ambiguous"``, by the share of subsets with k."""
     if not separating:
         return "ambiguous"
@@ -397,9 +397,9 @@ def orient(marks: np.ndarray, adjacency: np.ndarray, ambiguous: frozenset[Triple
     """Phase 4: apply R1, R2, and R3 in turn to ``marks`` in place until no rule orients a link."""
     changed = True
     while changed:
-        changed = _apply(marks, _rule_1(marks, adjacency, ambiguous))
-        changed |= _apply(marks, _rule_2(marks))
-        changed |= _apply(marks, _rule_3(marks, adjacency, ambiguous))
+        changed = apply_orientations(marks, _rule_1(marks, adjacency, ambiguous))
+        changed |= apply_orientations(marks, _rule_2(marks))
+        changed |= apply_orientations(marks, _rule_3(marks, adjacency, ambiguous))
 
 
 def pcmciplus(

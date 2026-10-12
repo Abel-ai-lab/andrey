@@ -1,4 +1,4 @@
-"""PCMCI+ engine: the four phases on hand cases.
+"""PCMCI+ engine and adapter: the four phases on hand cases, and the mapping to a structure.
 
 An oracle test reads the exact stationary covariance of a linear process
 ``x_t = B0 x_t + sum_k A_k x_{t-k} + e_t``, so every independence it reports holds in the
@@ -11,12 +11,13 @@ import numpy as np
 import pytest
 from scipy.linalg import solve_discrete_lyapunov
 
+from andrey.api._temporal import _adapt_pcmciplus
 from andrey.core import ARROW, NULL, TAIL
 from andrey.temporal.pcmciplus import (
     COLLIDER_RULES,
     PCMCIPlusResult,
-    _apply,
-    _verdict,
+    apply_orientations,
+    collider_verdict,
     pcmciplus,
     run_phases,
 )
@@ -154,12 +155,30 @@ def test_p_values_are_the_largest_phase_2_test_of_each_link():
 def test_opposite_requests_mark_a_conflict():
     marks = np.full((3, 3), TAIL, dtype=np.int8)
     np.fill_diagonal(marks, NULL)
-    assert _apply(marks, [(0, 1), (1, 0), (1, 2), (1, 2)])
+    assert apply_orientations(marks, [(0, 1), (1, 0), (1, 2), (1, 2)])
     assert marks[0, 1] == marks[1, 0] == ARROW  # both ways: conflict
     assert (marks[1, 2], marks[2, 1]) == (TAIL, ARROW)
-    assert not _apply(marks, [])
+    assert not apply_orientations(marks, [])
     result = PCMCIPlusResult((), np.zeros((1, 3, 3), bool), marks, None, None, {}, ())
     assert result.conflicts == ((0, 1),)
+
+
+def test_a_conflict_is_an_undirected_lag_0_link_listed_in_the_metadata():
+    marks = np.zeros((3, 3), dtype=np.int8)
+    marks[0, 1] = marks[1, 0] = ARROW  # conflict
+    marks[1, 2], marks[2, 1] = TAIL, ARROW  # 1 -> 2
+    adjacency = np.zeros((2, 3, 3), dtype=bool)
+    adjacency[0] = marks != NULL
+    adjacency[1, 2, 0] = True  # X2_{t-1} -> X0_t
+    result = PCMCIPlusResult(
+        ((), (), ((2, 1),)), adjacency, marks, np.ones((2, 3, 3)), np.zeros((2, 3, 3)), {}, ()
+    )
+    out = _adapt_pcmciplus(result)
+    assert out.structure.lags == (0, 1)
+    assert out.structure.lag(0).kind == "cpdag"
+    assert out.structure.lag(0).oriented_edges() == [(0, 1, "undirected"), (1, 2, "directed")]
+    assert out.structure.lag(1).oriented_edges() == [(2, 0, "directed")]
+    assert out.metadata["conflicts"] == [[0, 1]]
 
 
 @pytest.mark.parametrize(
@@ -178,9 +197,9 @@ def test_collider_rules_read_the_share_of_separating_subsets_holding_the_middle(
     separating = [frozenset({7, s}) for s in range(holding)] + [
         frozenset({s}) for s in range(10, 14 - holding)
     ]
-    assert _verdict(separating, 7, "majority") == majority
-    assert _verdict(separating, 7, "conservative") == conservative
-    assert _verdict([], 7, "majority") == "ambiguous"
+    assert collider_verdict(separating, 7, "majority") == majority
+    assert collider_verdict(separating, 7, "conservative") == conservative
+    assert collider_verdict([], 7, "majority") == "ambiguous"
 
 
 def _chain_series(n_steps: int = 800, seed: int = 0) -> np.ndarray:
