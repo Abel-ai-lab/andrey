@@ -778,17 +778,26 @@ def accuracy_tally(summaries: list[dict]) -> tuple[int, int]:
     return sum(c["kind"] != "more" for c in scored), len(scored)
 
 
+def accuracy_share(summaries: list[dict]) -> str:
+    """The accuracy tally as a headline reads it: "every", or the share rounded down to tens of
+    percent, "over 90%" when the share is above that floor."""
+    as_good, total = accuracy_tally(summaries)
+    if as_good == total:
+        return "every"
+    tens = 10 * (10 * as_good // total)
+    return f"over {tens}% of" if 100 * as_good > tens * total else f"{tens}% of"
+
+
 def quality_intro(summaries: list[dict]) -> str:
     """Say what an error is in each count the comparisons use, how often Andrey has as few as the
     other package, and that releases are tested against true graphs (the quality gate, which
     every publish job needs)."""
-    as_good, total = accuracy_tally(summaries)
     kinds = dict.fromkeys(m["error_kind"] for m in claimed_comparisons(summaries))
     errors = ", or, ".join(ERRORS[kind][1] for kind in kinds)
     return (
         f"An error is {errors}. At each size, Andrey's graph has the same number of errors as "
-        f"the other package's, or fewer, in {as_good} of {total} comparisons, and every release "
-        "is tested against the true graphs that generated the data."
+        f"the other package's, or fewer, in {accuracy_share(summaries)} comparisons, and every "
+        "release is tested against the true graphs that generated the data."
     )
 
 
@@ -1371,7 +1380,6 @@ def pillars(summaries: list[dict]) -> str:
     its own size, so opening one moves nothing else on the page.
     """
     lead, rest = speed_claim(summaries)
-    as_good, total = accuracy_tally(summaries)
     packages = sorted({m["comparator"] for m in claimed_comparisons(summaries)}, key=str.lower)
     items = (
         (
@@ -1385,9 +1393,9 @@ def pillars(summaries: list[dict]) -> str:
         (
             "target",
             "<em>Just as accurate</em> as other popular packages.",
-            f"Andrey's graph has the same number of errors or fewer in {as_good} of {total} "
-            "comparisons, and every release is tested against the true graphs that generated the "
-            "data.",
+            f"Andrey's graph has the same number of errors or fewer in "
+            f"{accuracy_share(summaries)} comparisons, and every release is tested against the "
+            "true graphs that generated the data.",
             "#accuracy",
             "Errors across methods",
         ),
