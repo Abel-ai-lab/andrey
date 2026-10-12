@@ -23,12 +23,6 @@ seven of them to the Sachs data too, and the release is published only when ever
 | macOS arm64 | install, import, the command line, PC and GES fits, worker processes, and the unit tests with PyTorch on the CPU |
 | Windows x86_64 | install, import, the command line, PC and GES fits, and worker processes, on the CPU |
 
-Every pull request also carries a milestone and one type label, which sorts it into the release
-notes, and a new feature or fix adds its entry to the changelog. The `pr-meta` check confirms both
-whenever the code, the labels, or the milestone change;
-[CONTRIBUTING](https://github.com/Abel-ai-lab/andrey/blob/main/CONTRIBUTING.md#labels-milestones-and-the-changelog)
-has the rules.
-
 ## GPUs
 
 No hosted runner has a GPU, so the CUDA and MPS paths are checked on our own machines: a parity

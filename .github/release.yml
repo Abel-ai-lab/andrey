@@ -1,6 +1,6 @@
 # Sections of a GitHub release's generated notes, by pull request label. A pull request appears in
 # the first section whose label it has. The CHANGELOG section is the record; the generated notes
-# are checked against it. Every pull request has one type label; scripts/check_pr_meta.py checks.
+# are checked against it. CONTRIBUTING.md lists the labels.
 changelog:
   categories:
     - title: Highlights

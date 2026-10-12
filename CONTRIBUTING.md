@@ -76,17 +76,13 @@ Every pull request has exactly one type label, which also gives its section in t
 | `dependencies` | dependency updates; Dependabot sets it | Dependencies |
 
 Two optional flags put a change first: `highlight` lists it under Highlights and `breaking` under
-Breaking. Every pull request also has a milestone, the release it ships in.
+Breaking. Every pull request also has a milestone, the release it ships in. The labels and the
+milestone are set when the pull request is opened or reviewed, and a `feature` or `bug` pull
+request adds a bullet under `## [Unreleased]` in `CHANGELOG.md` that ends with a link to it,
+`([#<number>])`, defined at the end of the file.
 
-The `pr-meta` check (`scripts/check_pr_meta.py`) runs on every pull request event, including label
-and milestone changes, and fails when:
-
-- the pull request has no milestone (Dependabot's are exempt);
-- it does not have exactly one type label (other labels do not count);
-- a `feature` or `bug` pull request adds no bullet under `## [Unreleased]` in `CHANGELOG.md`
-  that ends with a link to its pull request, `([#<number>])`, defined at the end of the file;
-- the `highlight` label and a bullet linking the pull request under `### Highlights` do not come
-  together, or `breaking` and `### Breaking` do not.
-
-`CHANGELOG.md` is the record of each release. GitHub generates the release notes from the labels
-(`.github/release.yml`), and at release time they are checked against the CHANGELOG section.
+`CHANGELOG.md` is the record of each release. Before the release pull request merges, the
+maintainer (or an agent) lists the milestone's pull requests with
+`gh pr list --search "milestone:<version>" --state all`, fixes missing type labels, milestones, and
+CHANGELOG links, and drafts the GitHub release notes from the CHANGELOG section, checked against
+the notes GitHub generates by label (`.github/release.yml`).
