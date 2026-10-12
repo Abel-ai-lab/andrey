@@ -15,9 +15,16 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from andrey import GraphStructure
+from andrey import GraphStructure, TemporalStructure
 from andrey_bench import datasets, rundir, scoring
-from andrey_bench.contracts import RunRecord, SolutionAdapter, Status, environment_id, run_id
+from andrey_bench.contracts import (
+    RunRecord,
+    SolutionAdapter,
+    Status,
+    environment_id,
+    run_id,
+    temporal_from_lag_marks,
+)
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.oracle import OracleGES
 from andrey_bench.runner import (
@@ -29,13 +36,18 @@ from andrey_bench.runner import (
 )
 
 
-def _truth(marks: np.ndarray, kind: str = "dag", latents: int = 0) -> GraphStructure:
+def _truth(
+    marks: np.ndarray, kind: str = "dag", latents: int = 0
+) -> GraphStructure | TemporalStructure:
     """Convert endpoint marks for the true graph into a ``GraphStructure``.
 
     Flag the last ``latents`` nodes as hidden. Scoring then projects the truth onto the observed
-    nodes present in the data.
+    nodes present in the data. A ``temporal`` truth is a stack of lag marks and becomes a
+    ``TemporalStructure`` with lags ``1..L``.
     """
     marks = np.asarray(marks)
+    if kind == "temporal":
+        return temporal_from_lag_marks(marks)
     types = datasets.latent_node_types(len(marks), latents)
     return GraphStructure.from_numpy(marks, kind=kind, node_types=types)
 
@@ -56,6 +68,7 @@ def assemble_record(
     ``run_id`` identifies the dataset, solution, repeat, and execution environment. Solution
     parameters are serialized with sorted keys.
     """
+    params = dict(adapter.params())
     # Required keys: missing values indicate runner/record schema drift.
     env = {
         "backend": adapter.backend,
@@ -81,7 +94,7 @@ def assemble_record(
         backend=adapter.backend,
         mode=adapter.mode,
         output_type=adapter.output_type,
-        params=json.dumps(dict(adapter.params()), sort_keys=True),
+        params=json.dumps(params, sort_keys=True),
         machine_id=machine_id,
         cores=cores,
         device=measures["env_device"],
@@ -97,6 +110,7 @@ def assemble_record(
         repeat=repeat,
         status=measures.get("status", Status.OK.value),
         latents=key.latents,
+        tau_max=params.get("tau_max"),
         wall_s=measures.get("wall_s"),
         cpu_s=measures.get("cpu_s"),
         child_cpu_s=measures.get("child_cpu_s"),
