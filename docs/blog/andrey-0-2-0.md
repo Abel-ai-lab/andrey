@@ -4,7 +4,7 @@ description: "Andrey's methods for data with hidden common causes, with RCD and 
 meta:
   type: post
 blogpost: true
-date: 2026-10-16
+date: 2026-10-12
 author: Shu Wan
 version: 0.2.0
 cover: iceberg

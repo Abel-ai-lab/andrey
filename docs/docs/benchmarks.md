@@ -50,6 +50,7 @@ observed variables, in both packages.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.2.0.md)
+[Read the post](../blog/andrey-0-2-0.md)
 :::
 ::::
 :::::

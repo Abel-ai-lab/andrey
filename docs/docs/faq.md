@@ -217,7 +217,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: A very fast causal discovery package},
   year = {2026},
-  version = {0.1.0},
+  version = {0.2.0},
   url = {https://andrey.abel.ai},
 }
 ```
