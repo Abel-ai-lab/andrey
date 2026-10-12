@@ -359,11 +359,10 @@ def tabu(
     moves break as they do for :func:`andrey.hc`.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 200 variables with 2,000
-    rows. It takes hill climbing's moves plus up to ``max_tabu`` non-improving moves after each
-    local optimum, and by default no move limit, so its run time grows with the moves it takes. It
-    leaves a local optimum for at most ``max_tabu`` moves and avoids only the last ``tabu_length``
-    DAGs, so a better DAG farther away is not reached. Its BIC score assumes linear relations with
-    Gaussian noise.
+    rows. It takes hill climbing's moves plus up to ``max_tabu`` non-improving moves between new
+    best scores, and by default no move limit, so its run time grows with the moves it takes. It
+    avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be missed. Its
+    BIC score assumes linear relations with Gaussian noise.
 
     References
     ----------
