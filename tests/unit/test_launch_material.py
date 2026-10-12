@@ -11,6 +11,8 @@ import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import pytest
+
 import andrey
 import andrey.viz
 
@@ -39,9 +41,12 @@ def test_readme_blocks_match_summary_and_registry(monkeypatch, offline_datasets)
     readme = README.read_text()
     start, end = launch["markers"]("PITCH")
     pitch = readme[readme.index(start) : readme.index(end)]
-    # The claims sit above the fold, before any table or code.
+    # The claims sit above the fold, before any table or code, and are the homepage's.
     assert readme.index(end) < readme.index("```")
-    assert summary["headline"] in pitch
+    summaries = build.release_summaries(summary)
+    assert f"- **Fast**: {build.claim_sentence(summaries)}" in pitch
+    as_good, total = build.accuracy_tally(summaries)
+    assert f"in {as_good} of {total} comparisons" in pitch
 
 
 def readme_targets(readme):
@@ -86,17 +91,14 @@ def test_readme_quickstart_runs_as_printed(capsys, offline_datasets):
 
 
 def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
-    # The README shows both themes' charts from .github/readme/, with the numbers of the
-    # homepage's speedup panel for the methods it keeps, then the later releases' methods, two rows
-    # at most, and an alt text that lists them.
+    # The README shows both themes' charts from .github/readme/: the homepage's speedup panel, a
+    # card per slide, two rows of three at most, and an alt text that lists them.
     readme = README.read_text()
     summary = build.load_summary(SUMMARY)
+    summaries = build.release_summaries(summary)
     slides = build.readme_slides(summary)
-    kept = build.speedup_slides(summary, build.README_METHODS)
-    assert slides[: len(kept)] == [(n, f"{d:,} variables", b) for n, d, b in kept]
-    later = [name for _, methods in build.README_LATER for name in methods]
-    assert [name for name, _, _ in slides] == [*build.README_METHODS, *later]
-    assert len(slides) <= build.README_COLUMNS * build.README_ROWS
+    assert slides == build.speedup_slides(summaries)
+    assert len(slides) == 6 == build.README_COLUMNS * build.README_ROWS
     for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         name = build.README_CHART.format(theme=theme)
         assert f'"{IMAGES}/{name}"' in readme
@@ -104,16 +106,27 @@ def test_readme_chart_is_the_homepage_panel_as_one_card_per_method():
         assert (ROOT / IMAGES / name).read_text() == chart
         assert ET.fromstring(chart).tag == "{http://www.w3.org/2000/svg}svg"
         assert not re.search(r"href=|url\(|@import", chart)
+        names = re.findall(r'font-size="1[46]" font-weight="600"[^>]*>([^<]+)</text>', chart)
+        assert names == [name for name, _, _ in slides]
         labels = re.findall(r'font-weight="600"[^>]*>([^<]+x)</text>', chart)
-        assert labels == [build.speedup_text(v) for _, _, bars in slides for _, v in bars]
-    panel = build.speedup_panel(summary)
-    for _, _, bars in build.speedup_slides(summary):
-        for _, speed in bars:
-            assert f'class="race-time">{build.speedup_text(speed)}<' in panel
+        assert labels == [build.escape(label) for _, _, bars in slides for _, _, label in bars]
+    panel = build.speedup_panel(summaries)
+    for _, _, bars in slides:
+        for _, _, label in bars:
+            assert f'class="race-time">{build.escape(label)}<' in panel
     alt = " ".join(readme.split("<img alt=\"Andrey's speedup", 1)[1].split('"', 1)[0].split())
     for name, size, bars in slides:
-        assert f"{name} {build.speedup_text(dict(bars)['Andrey'])} at {size}" in alt
+        ours = next(label for package, _, label in bars if package == "Andrey")
+        assert f"{name} {ours} at {size}" in alt
     assert 'https://andrey.abel.ai/docs/benchmarks.html">Release cards</a>' in readme
+
+
+def test_the_readme_chart_refuses_a_seventh_card(monkeypatch):
+    summary = build.load_summary(SUMMARY)
+    slides = build.speedup_slides(build.release_summaries(summary))
+    monkeypatch.setattr(build, "speedup_slides", lambda summaries: [*slides, slides[0]])
+    with pytest.raises(ValueError, match="2 rows of 3 cards"):
+        build.readme_slides(summary)
 
 
 def test_the_launch_post_is_a_published_page():

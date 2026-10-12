@@ -401,11 +401,39 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
 WHY_FAST_PAGES = {"index", "blog/why-andrey-is-fast"}
 
 
+def _newest_post(posts: list[tuple[str, str, str]]) -> tuple[str, str]:
+    """The newest of ``posts``, each (docname, ISO date, version): its docname and version. A
+    later version breaks a tie in date; posts that tie in both fail, rather than let file order
+    pick one."""
+
+    def key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...]]:
+        return post[1], tuple(int(part) for part in post[2].split("."))
+
+    newest = max(posts, key=key)
+    tied = sorted(post[0] for post in posts if key(post) == key(newest))
+    if len(tied) > 1:
+        raise ValueError(f"{', '.join(tied)} are all the newest post; date one of them later")
+    return newest[0], newest[2]
+
+
+def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
+    """The post about the latest release, which the alpha banner links: the newest dated blog post
+    with a version, as its docname and version."""
+    posts = [
+        (post.docname, f"{post.date:%Y-%m-%d}", str(version))
+        for post in Blog(app).posts
+        if post.date and (version := app.env.metadata[post.docname].get("version"))
+    ]
+    return _newest_post(posts)
+
+
 def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
     """Give each page the context and files it needs beyond the shared ones.
 
     Page styles load after the shared ones (priority 900), so they win a tie.
     """
+    # The alpha banner on every page (_templates/sections/announcement.html) links this post.
+    context["release_post"], context["release_version"] = _release_post(app)
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home

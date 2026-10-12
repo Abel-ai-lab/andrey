@@ -73,6 +73,12 @@ def placeholder_page():
     return render_homepage(build.load_summary(PLACEHOLDER, placeholder=True))
 
 
+def placeholder_summaries() -> list[dict]:
+    """Every release's summary, the placeholder standing in for the first, as the preview loads
+    them."""
+    return build.release_summaries(build.load_summary(PLACEHOLDER, placeholder=True))
+
+
 def _row(d, andrey_s, comparator_s, ratio, andrey_shd, comparator_shd, empty_shd):
     return {
         "d": d,
@@ -157,16 +163,16 @@ def _speed_up(summary: dict, method: str, ratio: float) -> None:
 def test_the_claim_rounds_down_and_says_how_many_other_methods_are_faster():
     summary = copy.deepcopy(SUMMARY)
     # PC's 941x rounds down to 100x; FCI and DirectLiNGAM are both faster.
-    assert build.speed_claim(summary) == (
+    assert build.speed_claim([summary]) == (
         "Over 100x faster on PC",
         "faster on the other supported methods",
     )
     # One of the two not faster at its largest size: no majority, so the claim stops at PC.
     _speed_up(summary, "FCI", 0.98)
-    assert build.speed_claim(summary) == ("Over 100x faster on PC", "")
+    assert build.speed_claim([summary]) == ("Over 100x faster on PC", "")
     # A ratio that is exactly a power of ten is not "over" it.
     _speed_up(summary, "PC", 100.0)
-    assert build.speed_claim(summary)[0] == "At least 100x faster on PC"
+    assert build.speed_claim([summary])[0] == "At least 100x faster on PC"
 
 
 def test_the_published_claim_says_most_when_one_method_is_not_faster():
@@ -175,7 +181,21 @@ def test_the_published_claim_says_most_when_one_method_is_not_faster():
         {**summary["methods"][1], "method": "GES", "rows": [_row(150, 1.0, 4.3, 4.3, 5, 5, 150)]}
     )
     _speed_up(summary, "FCI", 0.98)
-    assert build.speed_claim(summary)[1] == "faster on most other supported methods"
+    assert build.speed_claim([summary])[1] == "faster on most other supported methods"
+
+
+def test_only_supported_methods_count_toward_the_claim(monkeypatch):
+    summary = copy.deepcopy(SUMMARY)
+    _speed_up(summary, "FCI", 0.98)
+    assert build.speed_claim([summary])[1] == ""
+    # FCI, the one method not faster, is experimental here: the rest are all faster.
+    specs = [
+        s.model_copy(update={"status": "experimental"}) if s.name == "fci" else s
+        for s in list_specs()
+    ]
+    monkeypatch.setattr(build, "list_specs", lambda: specs)
+    assert build.speed_claim([summary])[1] == "faster on the other supported methods"
+    assert "FCI" not in build.speed_chart([summary])
 
 
 def test_notes_cover_every_cell_without_a_speedup():
@@ -189,7 +209,7 @@ def test_notes_cover_every_cell_without_a_speedup():
 
 
 def test_charts_cover_only_comparisons_with_a_published_ratio():
-    chart = build.speed_chart(SUMMARY)
+    chart = build.speed_chart([SUMMARY])
     # One chart per method with a paired ratio, each titled with its largest one. The belt repeats
     # them once, hidden from assistive technology, so the loop is seamless.
     assert chart.count('<figure class="tchart">') == 3  # PC, FCI, DirectLiNGAM
@@ -201,14 +221,14 @@ def test_charts_cover_only_comparisons_with_a_published_ratio():
     # Sizes without a ratio are plotted hollow: DirectLiNGAM 200 (Andrey only; lingam passed its
     # time cap).
     assert chart.count("is-open") == 1 * 2
-    assert "ICA-LiNGAM" not in chart and "ICA-LiNGAM" not in build.accuracy_chart(SUMMARY)
+    assert "ICA-LiNGAM" not in chart and "ICA-LiNGAM" not in build.accuracy_chart([SUMMARY])
     # A comparison the charts skip is in the table, not in the notes.
     assert not any("ICA-LiNGAM" in note for note in build.exceptions(SUMMARY))
     assert "ICA-LiNGAM" in build.speed_table(SUMMARY)
 
 
 def test_speed_intro_names_the_packages_and_leaves_accuracy_out():
-    intro = build.speed_intro(SUMMARY)
+    intro = build.speed_intro([SUMMARY])
     assert "alongside causal-learn and lingam" in intro
     assert "errors" not in intro
 
@@ -216,29 +236,29 @@ def test_speed_intro_names_the_packages_and_leaves_accuracy_out():
 def test_quality_counts_every_scored_size():
     # PC 357/357, FCI 12/12, 30/31, 450/452, 900/905, DirectLiNGAM 6.7/6.3: five as good. At
     # DirectLiNGAM 200 lingam passed its time cap, so it has no graph to count.
-    intro = build.quality_intro(SUMMARY)
+    intro = build.quality_intro([SUMMARY])
     assert "or fewer, in 5 of 6 comparisons, and every release is tested" in intro
-    assert build.accuracy_tally(SUMMARY) == (5, 6)
+    assert build.accuracy_tally([SUMMARY]) == (5, 6)
 
 
 def test_the_release_promise_is_the_quality_gate():
     # The intro says every release is tested against true graphs. The quality gate is that test,
     # and tests/unit/test_release_gates.py holds every PyPI publish job to needing it.
-    assert "every release is tested against the true graphs" in build.quality_intro(SUMMARY)
+    assert "every release is tested against the true graphs" in build.quality_intro([SUMMARY])
     gate = (ROOT / ".github" / "workflows" / "quality-gate.yml").read_text()
     assert "workflow_call:" in gate and "python -m qa.quality_gate" in gate
 
 
 def test_errors_compare_as_a_share_rounded_against_andrey():
-    exact = {"d": 50, "seeds": 3, "andrey_s": 1.0, "comparator_s": 2.0, "ratio": 2.0}
-    exact |= {"andrey_shd": 0, "comparator_shd": 0, "empty_shd": 50}
+    exact = {"d": 50, "andrey_s": 1.0, "comparator_s": 2.0, "ratio": 2.0, "at_least": False}
+    exact |= {"andrey_errors": 0, "comparator_errors": 0}
     rows = [
         exact,
-        dict(exact, d=100, andrey_shd=2, comparator_shd=0),  # no share of no errors: a count
-        dict(exact, d=200, andrey_shd=30, comparator_shd=31),  # 3.2% fewer rounds down
-        dict(exact, d=400, andrey_shd=450, comparator_shd=452),  # 0.4% fewer
-        dict(exact, d=800, andrey_shd=6.7, comparator_shd=6.3),  # 6.3% more rounds up
-        dict(exact, d=1600, andrey_shd=12, comparator_shd=None),  # past the time cap: no row
+        dict(exact, d=100, andrey_errors=2, comparator_errors=0),  # no share of none: a count
+        dict(exact, d=200, andrey_errors=30, comparator_errors=31),  # 3.2% fewer rounds down
+        dict(exact, d=400, andrey_errors=450, comparator_errors=452),  # 0.4% fewer
+        dict(exact, d=800, andrey_errors=6.7, comparator_errors=6.3),  # 6.3% more rounds up
+        dict(exact, d=1600, andrey_errors=12, comparator_errors=None),  # past the time cap
     ]
     compared = build.error_comparisons([{"comparator": "other", "rows": rows}])
     assert [(c["d"], c["kind"], c["label"]) for c in compared] == [
@@ -251,16 +271,19 @@ def test_errors_compare_as_a_share_rounded_against_andrey():
 
 
 def test_methods_list_every_registered_method():
-    title, html = build.methods(build.load_summary(PLACEHOLDER, placeholder=True))
+    summaries = placeholder_summaries()
+    title, html = build.methods(summaries)
     specs = list_specs()
     assert title.startswith(f"{len(specs)} methods in ")
     assert html.count('class="method"') == len(specs)
     for spec in specs:
         assert f"docs/code/generated/andrey.{spec.name}.html" in html
-    # PC, FCI, GES, BOSS, GRaSP, and DirectLiNGAM are in the placeholder summary: each has the
-    # seal, and a tooltip that describes it.
-    assert html.count('class="method-bench"') == 6
-    assert html.count('role="tooltip"') == 6 and "Benchmarked</a>" not in html
+    # Each supported method a release's summary compares with another package has the seal, and a
+    # tooltip that describes it.
+    measured = {build.registry_name(m) for s in summaries for m in s["methods"]}
+    sealed = sorted(re.findall(r'aria-describedby="bench-(\w+)"', html))
+    assert sealed == sorted(n for n in measured if get_spec(n).status == "supported")
+    assert html.count('role="tooltip"') == len(sealed) and "Benchmarked</a>" not in html
     experimental = [s for s in specs if s.status == "experimental"]
     assert html.count('class="method-status"') == len(experimental)
     assert "Experimental Score-then-FCI hybrid" in re.sub(r"<[^>]+>", "", html)  # read as text
@@ -294,14 +317,21 @@ def test_unpublished_summary_needs_the_placeholder_flag():
 
 
 def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_page):
-    summary = build.load_summary(PLACEHOLDER, placeholder=True)
+    summaries = placeholder_summaries()
     page = placeholder_page
-    # Each chart's largest speedup, as "up to"; every size is on the benchmarks page.
-    for _, methods in build.time_groups(summary):
-        claimed = [r["ratio"] for m in methods for r in m["rows"] if r["ratio"] is not None]
-        assert f"up to <b>{build.ratio_text(max(claimed))}</b>" in page
-    assert build.escape(build.home_claim(summary)) in page
+    # Each chart's largest speedup, as "up to"; every size is on the release cards.
+    for _, methods in build.time_groups(summaries):
+        if all(build.faster(m) for m in methods):
+            claimed = [r for m in methods for r in m["rows"] if r["ratio"] is not None]
+            best = max(claimed, key=lambda r: r["ratio"])
+            assert f"up to <b>{build.ratio_label(best)}</b>" in page
+    assert build.escape(build.home_claim(summaries)) in page
     assert not re.search(r"/scratch/|/home/|\bsc\d{3}\b|\bsol\b", page, re.IGNORECASE)
+    # A summary's notes on its runs stay on the release cards.
+    for summary in summaries:
+        for method in summary["methods"]:
+            for text in [method.get("timing_note"), *(r.get("note") for r in method["rows"])]:
+                assert not text or text not in page
 
 
 def test_example_prints_the_recovered_edges():
@@ -386,7 +416,7 @@ def test_numbers_read_as_written():
 
 def test_intro_claims_one_machine_per_size_not_per_comparison():
     # Two comparisons list two CPU models across their sizes, so the pairing holds within a size.
-    intro = build.speed_intro(SUMMARY)
+    intro = build.speed_intro([SUMMARY])
     assert "on the same datasets and the same machine at each size" in intro
     assert "Each comparison ran both packages" not in intro
 
@@ -405,7 +435,17 @@ def test_the_headline_is_the_slogan_and_the_claim_drops_what_it_says(placeholder
     # The heading says "causal discovery", so the claim under it leaves those words out.
     found = re.search(r'<h1 id="headline">(.*?)</h1>\s*<p class="claim">([^<]*)<', placeholder_page)
     assert re.sub(r"<[^>]+>", "", found[1]) == "Causal discovery, fast."
-    assert found[2] == "Over 100x faster on PC, and faster on the other supported methods."
+    assert found[2] == build.claim_sentence(placeholder_summaries())
+    assert found[2].startswith("Over 100x faster on PC, and faster on ")
+
+
+def test_the_lede_names_every_registry_family_in_one_sentence(placeholder_page):
+    lede = build.lede()
+    families = dict.fromkeys(spec.family for spec in list_specs())
+    for family in families:
+        assert build.FAMILY_TERMS[family] in lede
+    assert lede.count(". ") == 0 and lede.endswith(" methods.")
+    assert lede in " ".join(placeholder_page.split())
 
 
 def test_the_page_title_is_the_one_line_description(placeholder_page):
@@ -417,10 +457,10 @@ def test_the_page_title_is_the_one_line_description(placeholder_page):
 # methods follows the registry.
 @pytest.mark.parametrize("dropped", [None, "gin"])
 def test_the_description_states_the_speed_claim_and_the_method_count(monkeypatch, dropped):
+    summaries = placeholder_summaries()
     specs = [s for s in list_specs() if s.name != dropped]
     monkeypatch.setattr(build, "list_specs", lambda: specs)
-    summary = build.load_summary(PLACEHOLDER, placeholder=True)
-    description = build.page_description(summary)
+    description = build.page_description(summaries)
     assert "over 100x faster on PC than other popular packages" in description
     assert f"with PC, GES, FCI and {len(specs) - 3} more methods" in description
     # Search results cut a description at about 160 characters.
@@ -429,10 +469,10 @@ def test_the_description_states_the_speed_claim_and_the_method_count(monkeypatch
 
 @pytest.mark.parametrize("name", ["pc", "ges", "fci"])
 def test_the_description_names_only_registered_methods(monkeypatch, name):
-    summary = build.load_summary(PLACEHOLDER, placeholder=True)
+    summaries = placeholder_summaries()
     monkeypatch.setattr(build, "list_specs", lambda: [s for s in list_specs() if s.name != name])
     with pytest.raises(ValueError, match=f"unregistered methods: {name.upper()}$"):
-        build.page_description(summary)
+        build.page_description(summaries)
 
 
 @pytest.fixture(scope="module")
@@ -494,29 +534,94 @@ def _labels(html, method):
     return dict(zip(names, values)), panel
 
 
-def test_the_speedup_panel_has_a_slide_per_method_at_its_largest_claimed_size():
-    summary = build.load_summary(build.SUMMARY) if build.SUMMARY.exists() else SUMMARY
-    html = build.speedup_panel(summary)
-    sizes = re.findall(r'id="race-size-([\w-]+)">([\d,]+) variables', html)
-    assert sizes == [
-        ("pc", "400"),
-        ("fci", "800"),
-        ("ges", "150"),
-        ("boss", "800"),
-        ("grasp", "400"),
-        ("directlingam", "200"),
-    ]
-    assert re.findall(r'<label for="race-m-[\w-]+">([^<]+)</label>', html) == list(
-        build.SPEEDUP_METHODS
-    )
-    assert 'id="race-m-pc" checked' in html and html.count(" checked") == 1
+@pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
+def test_the_speedup_panel_has_six_slides_each_a_published_ratio():
+    summaries = build.release_summaries(build.load_summary(build.SUMMARY))
+    html = build.speedup_panel(summaries)
+    slides = build.speedup_slides(summaries)
+    assert len(slides) == len(build.PANEL) == 6
+    by_release = dict(zip(build.RELEASES, summaries, strict=True))
+    for (release, name), (shown, size, bars) in zip(build.PANEL, slides, strict=True):
+        assert shown == name
+        # The slide is the method's largest size with a published ratio, at the panel's mean
+        # degree, and Andrey's bar prints that ratio, "≥" before a lower bound.
+        rows = [
+            r
+            for m in by_release[release]["methods"]
+            if m["method"] == name
+            for r in m["rows"]
+            if r["ratio"] is not None and r.get("mean_degree", build.MEAN_DEGREE) == 2.0
+        ]
+        largest = max(r.get("observed", r["d"]) for r in rows)
+        assert size == f"{largest:,} variables"
+        ratio, at_least = max(
+            build.claimed_ratio(r) for r in rows if r.get("observed", r["d"]) == largest
+        )
+        andrey = next(label for package, _, label in bars if package == "Andrey")
+        assert andrey == ("\u2265" if at_least else "") + build.ratio_text(ratio)
+        assert bars[-1][2] == "1x" and andrey == bars[0][2]
+        assert f'id="race-size-{build.slug(name)}">{size}<' in html
+    labels = re.findall(r'<label for="race-m-[\w-]+">([^<]+)</label>', html)
+    assert labels == [name for _, name in build.PANEL]
+    assert html.count(" checked") == 1 and f'id="race-m-{build.slug(labels[0])}" checked' in html
     assert '<legend class="visually-hidden">Method</legend>' in html
     assert '<a class="race-link" href="docs/benchmarks.html">Release cards</a>' in html
 
 
+def test_the_panel_takes_rows_at_its_mean_degree():
+    summaries = placeholder_summaries()
+    release, name = build.PANEL[0]
+    summary = summaries[build.RELEASES.index(release)]
+    method = next(m for m in summary["methods"] if m["method"] == name)
+    # The same sizes again at a denser mean degree, each with a larger ratio: the panel keeps the
+    # rows at MEAN_DEGREE.
+    denser = [dict(r, mean_degree=4.0, ratio=r["ratio"] * 2) for r in method["rows"]]
+    before = build.speedup_slides(summaries)[0]
+    method["rows"] = [dict(r, mean_degree=build.MEAN_DEGREE) for r in method["rows"]] + denser
+    assert build.speedup_slides(summaries)[0] == before
+    kept = {r["ratio"] for m in build.comparisons(summary) for r in m["rows"]}
+    assert kept.isdisjoint(r["ratio"] for r in denser)
+
+
+def _lower_bound(summaries, name, bound):
+    """Flag ``name``'s largest row with a ratio, in every comparison, as a lower bound."""
+    for summary in summaries:
+        for method in summary["methods"]:
+            if method["method"] == name:
+                row = max((r for r in method["rows"] if r["ratio"]), key=lambda r: r["d"])
+                row.update(ratio_is_lower_bound=True, ratio_lower_bound=bound)
+
+
+def test_a_lower_bound_prints_as_one():
+    summaries = placeholder_summaries()
+    # FCI's largest size; its largest ratio is at a smaller one, so the bound tops its chart too.
+    _lower_bound(summaries, "FCI", 20.0)
+    slide = next(s for s in build.speedup_slides(summaries) if s[0] == "FCI")
+    assert slide[2][0] == ("Andrey", 20.0, "\u226520x")
+    assert "up to <b>\u226520x</b>" in build.speed_chart(summaries)
+    # A bound divides into no other package's bar: PC is compared with two packages.
+    _lower_bound(summaries, "PC", 1000.0)
+    with pytest.raises(ValueError, match="lower bound"):
+        build.speedup_slides(summaries)
+
+
+def test_the_panel_shows_only_supported_methods(monkeypatch):
+    summaries = placeholder_summaries()
+    _, name = build.PANEL[1]
+    spec = build.registry_name({"method": name})
+    specs = [
+        s.model_copy(update={"status": "experimental"}) if s.name == spec else s
+        for s in list_specs()
+    ]
+    monkeypatch.setattr(build, "list_specs", lambda: specs)
+    with pytest.raises(ValueError, match=f"{name} is not"):
+        build.speedup_slides(summaries)
+
+
 def test_every_speedup_bar_comes_from_andreys_paired_ratios():
-    summary = build.load_summary(PLACEHOLDER, placeholder=True)
-    labels, panel = _labels(build.speedup_panel(summary), "pc")
+    summaries = placeholder_summaries()
+    summary = summaries[0]
+    labels, panel = _labels(build.speedup_panel(summaries), "pc")
     pc = {m["comparator"]: m for m in summary["methods"] if m["method"] == "PC"}
     row = {name: next(r for r in m["rows"] if r["d"] == 400) for name, m in pc.items()}
     # Andrey's bar is its paired ratio against the slowest package (median times give 756x);
@@ -531,29 +636,33 @@ def test_every_speedup_bar_comes_from_andreys_paired_ratios():
 
 def test_every_timed_package_needs_a_published_ratio():
     """No silent fallback to a time quotient for a package without a paired ratio."""
-    summary = build.load_summary(PLACEHOLDER, placeholder=True)
-    grasp = next(m for m in summary["methods"] if m["method"] == "GRaSP")
-    row = next(r for r in grasp["rows"] if r["d"] == 400)
-    other = copy.deepcopy(grasp)
+    summaries = placeholder_summaries()
+    release, name = build.PANEL[2]
+    summary = summaries[build.RELEASES.index(release)]
+    method = next(m for m in summary["methods"] if m["method"] == name)
+    row = max((r for r in method["rows"] if r["ratio"]), key=lambda r: r["d"])
+    other = copy.deepcopy(method)
     other["comparator"] = "slower package"
     other["rows"] = [dict(row, comparator_s=row["comparator_s"] * 10, ratio=None)]
     summary["methods"].append(other)
     with pytest.raises(ValueError, match="no published ratio against slower package"):
-        build.speedup_panel(summary)
+        build.speedup_panel(summaries)
 
 
 def test_without_has_every_panel_is_captioned_and_the_header_drops_the_size():
-    css = build.speedup_css(build.load_summary(PLACEHOLDER, placeholder=True))
+    css = build.speedup_css(placeholder_summaries())
     fallback = css[css.index("@supports not selector(:has(a))") :]
     assert ".race-sizes-now { display: none; }" in fallback
     assert "content: attr(aria-label)" in fallback
 
 
 def test_the_speedup_panel_needs_every_method():
-    summary = build.load_summary(PLACEHOLDER, placeholder=True)
-    summary["methods"] = [m for m in summary["methods"] if m["method"] != "GRaSP"]
-    with pytest.raises(ValueError, match="GRaSP"):
-        build.speedup_panel(summary)
+    summaries = placeholder_summaries()
+    release, name = build.PANEL[-1]
+    summary = summaries[build.RELEASES.index(release)]
+    summary["methods"] = [m for m in summary["methods"] if m["method"] != name]
+    with pytest.raises(ValueError, match=name):
+        build.speedup_panel(summaries)
 
 
 def test_the_speedup_panel_plays_only_without_reduced_motion():
@@ -577,8 +686,7 @@ def test_the_speedup_bars_grow_on_every_page_that_shows_them():
     # The homepage and the launch post share figures.css; the homepage's sheet keeps the growth.
     site = (ROOT / "site" / "assets" / "site.css").read_text(encoding="utf-8")
     assert not re.search(r"race-fill\s*\{[^}]*animation:\s*none", site)
-    summary = build.load_summary(PLACEHOLDER, placeholder=True)
-    assert 'style="--i: 1"' in build.speedup_panel(summary)
+    assert 'style="--i: 1"' in build.speedup_panel(placeholder_summaries())
 
 
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
@@ -803,12 +911,12 @@ def test_the_homepage_keeps_every_note_at_its_foot(placeholder_page):
     refs = re.findall(r'<a href="#fn-(\d+)" id="fn-ref-\1">', page)
     notes = re.findall(r'<li id="fn-(\d+)">', page)
     assert refs == notes == [str(n) for n in range(1, len(notes) + 1)]
-    assert len(notes) == 2  # the headline's source, then the comparison's
-    assert 'href="docs/benchmarks.html"' in page and 'href="blog/introducing-andrey.html"' in page
+    assert len(notes) == 1  # the comparison table's sources
+    assert 'href="docs/benchmarks.html"' in page
 
 
 def test_the_accuracy_cards_show_every_scored_comparison():
-    chart = build.accuracy_chart(SUMMARY)
+    chart = build.accuracy_chart([SUMMARY])
     shown = chart.split('<div class="tc-copy" aria-hidden="true">')[0]
     # A card per speed chart, repeated once on the belt and hidden from assistive technology.
     assert shown.count('<figure class="tchart rtable">') == 3  # PC, FCI, DirectLiNGAM
@@ -901,8 +1009,28 @@ def test_the_card_ground_is_the_same_on_every_build(cards):
     assert first.tobytes() == second.tobytes()
 
 
+def test_the_alpha_banner_links_the_newest_release_post(conf):
+    newest = conf["_newest_post"]
+    posts = [
+        ("blog/introducing-andrey", "2026-10-08", "0.1.0"),
+        ("blog/why-andrey-is-fast", "2026-10-08", "0.1.0"),
+        ("blog/andrey-0-2-0", "2026-10-12", "0.2.0"),
+    ]
+    assert newest(posts) == ("blog/andrey-0-2-0", "0.2.0")
+    # A later version breaks a tie in date; a tie in both names the posts.
+    assert newest([*posts, ("blog/andrey-0-2-1", "2026-10-12", "0.2.1")])[1] == "0.2.1"
+    with pytest.raises(ValueError, match="introducing-andrey, blog/why-andrey-is-fast"):
+        newest(posts[:2])
+    banner = (ROOT / "docs" / "_templates" / "sections" / "announcement.html").read_text()
+    assert '<a href="{{ pathto(release_post) }}">Read the {{ release_version }} release post.' in (
+        banner
+    )
+    assert "introducing-andrey" not in banner
+
+
 def test_the_homepage_has_no_latest_strip(placeholder_page):
-    # The alpha banner links the launch post, and the header links the blog and the FAQ.
+    # The alpha banner links the latest release's post, and the header links the blog and the
+    # FAQ.
     assert 'class="latest' not in placeholder_page
     assert "latest" not in (ROOT / "site" / "homepage.html").read_text()
 
@@ -997,10 +1125,11 @@ def test_the_published_summary_gives_every_paired_ratio():
     assert (
         summary["headline"] == "Over 100x faster on PC, and faster on most other supported methods."
     )
-    for method in summary["methods"]:
-        for row in method["rows"]:
-            timed = row["andrey_s"] is not None and row["comparator_s"] is not None
-            assert (row["ratio"] is not None) == timed, (method["method"], method["comparator"])
+    for release in build.release_summaries(summary):
+        for method in release["methods"]:
+            for row in method["rows"]:
+                timed = row["andrey_s"] is not None and row["comparator_s"] is not None
+                assert (row["ratio"] is not None) == timed, (method["method"], row["d"])
 
 
 def test_no_speed_cell_is_withheld_in_the_reports_or_the_readme():
@@ -1020,10 +1149,11 @@ def test_every_hand_written_copy_of_the_headline_is_the_summarys():
         ROOT / "examples" / "speed_on_your_machine.ipynb",
     ):
         assert summary["headline"] in page.read_text(encoding="utf-8"), page.name
+    claim = build.home_claim(build.release_summaries(summary))
     app = (ROOT / "apps" / "live-discovery" / "app.py").read_text(encoding="utf-8")
-    assert "<h1>Causal discovery, fast.</h1>" in app and build.home_claim(summary) in app
+    assert "<h1>Causal discovery, fast.</h1>" in app and claim in app
     space = (ROOT / "apps" / "live-discovery" / "README.md").read_text(encoding="utf-8")
-    assert f"Causal discovery, fast. {build.home_claim(summary)}" in space
+    assert f"Causal discovery, fast. {claim}" in space
     assert 'title="Andrey | Causal discovery, fast"' in app
 
 
