@@ -36,6 +36,13 @@ from . import stats
 # deterministic or tiny-sample data.
 _ONE_MINUS_EPS = 1.0 - np.finfo(np.float64).eps
 
+# A correlation submatrix is singular when its smallest eigenvalue is at most this fraction of its
+# largest.
+_SINGULAR_RTOL = 1e-12
+# How far the inverse bound in _invert_nonsingular stays above that threshold; the factor absorbs
+# the rounding of the computed inverse and of the eigenvalues.
+_BOUND_MARGIN = 1e4
+
 
 @runtime_checkable
 class CITest(Protocol):
@@ -130,17 +137,7 @@ class PartialCorrelationTest:
             r = (rxy - rxz * ryz) / math.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
             var = (x_int, y_int, *cond)
-            sub = corr[np.ix_(var, var)]
-            # A singular submatrix must raise, but np.linalg.inv only raises under some BLAS
-            # backends (OpenBLAS yes; Apple Accelerate no -- it returns a garbage inverse, and its
-            # LU-solve residual is still small, so checking sub @ inv is not enough). The symmetric
-            # spectrum exposes the rank deficiency (a zero eigenvalue) reliably on every backend.
-            w = np.linalg.eigvalsh(sub)
-            if w[0] <= w[-1] * 1e-12:
-                raise ValueError(
-                    "correlation matrix is singular; cannot run a partial-correlation test"
-                )
-            inv = np.linalg.inv(sub)
+            inv = _invert_nonsingular(corr[np.ix_(var, var)][None])[0]
             r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
         return (
             -_ONE_MINUS_EPS if r < -_ONE_MINUS_EPS else _ONE_MINUS_EPS if r > _ONE_MINUS_EPS else r
@@ -217,16 +214,7 @@ class PartialCorrelationTest:
             var[:, 0] = lo
             var[:, 1] = hi
             var[:, 2:] = conds
-            stack = corr[var[:, :, None], var[:, None, :]]
-            # Detect rank-deficiency via the symmetric spectrum (a zero eigenvalue), reliable on
-            # every BLAS backend -- unlike np.linalg.inv, which raises on OpenBLAS but not Apple
-            # Accelerate.
-            w = np.linalg.eigvalsh(stack)  # (N, dim), ascending per row
-            if (w[:, 0] <= w[:, -1] * 1e-12).any():
-                raise ValueError(
-                    "correlation matrix is singular; cannot run a partial-correlation test"
-                )
-            inv = np.linalg.inv(stack)
+            inv = _invert_nonsingular(corr[var[:, :, None], var[:, None, :]])
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
@@ -364,6 +352,55 @@ def make_indep_test(name: str, data: np.ndarray) -> CITest:
             f"unknown indep_test {name!r}; registered: {available_indep_tests()}"
         ) from None
     return factory(data)
+
+
+def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:
+    """Invert a ``(N, k, k)`` stack of correlation submatrices; raise if any is singular.
+
+    A submatrix is singular when its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its
+    largest; :class:`ValueError` reports it. ``np.linalg.inv`` alone does not decide this: it raises
+    only on an exactly zero pivot, which OpenBLAS reaches on a duplicated column while Apple
+    Accelerate can return a finite inverse instead. The eigenvalues decide on every backend.
+
+    Most rows are settled from the inverse without eigenvalues. Each submatrix ``A`` is a principal
+    submatrix of a sample correlation matrix: unit diagonal, positive semidefinite up to rounding.
+    So ``lambda_max(A) <= trace(A) <= k``. The eigenvalue of smallest magnitude is
+    ``1 / ||A^-1||_2 >= 1 / (k * max |A^-1_ij|)``, and when that is far above the rounding it is
+    positive, so it is ``lambda_min(A)``. With ``c = _BOUND_MARGIN * _SINGULAR_RTOL``, a row whose
+    inverse has every entry below ``1 / (c * k**2)`` thus has ``lambda_min > c * lambda_max`` and
+    passes the eigenvalue test. The bound reads every entry of the computed inverse, not only its
+    trace or diagonal, so a NaN, an infinity, or a single huge entry fails it. The LU inverse is
+    backward stable on every LAPACK, so the computed inverse of a nearly singular matrix has
+    entries of order ``1 / lambda_min`` and fails the bound. ``_BOUND_MARGIN`` absorbs the rounding
+    of the inverse and the eigenvalues.
+
+    The rows that fail the bound take the eigenvalue test. When ``np.linalg.inv`` raises, the
+    whole stack takes it, and the inversion raises again if no row is singular.
+    """
+    try:
+        inv = np.linalg.inv(stack)
+    except np.linalg.LinAlgError:
+        inv = None
+    if inv is None:
+        _raise_if_singular(stack)
+        return np.linalg.inv(stack)
+    size = stack.shape[-1]
+    limit = 1.0 / (_BOUND_MARGIN * _SINGULAR_RTOL * size * size)
+    unsettled = ~(np.abs(inv).max(axis=(1, 2)) < limit)  # NaN fails the comparison too
+    if unsettled.any():
+        _raise_if_singular(stack[unsettled])
+    return inv
+
+
+def _raise_if_singular(stack: np.ndarray) -> None:
+    """Raise :class:`ValueError` if a matrix of the ``(N, k, k)`` stack is singular.
+
+    A matrix is singular when its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its
+    largest.
+    """
+    w = np.linalg.eigvalsh(stack)  # (N, k), ascending per row
+    if (w[:, 0] <= w[:, -1] * _SINGULAR_RTOL).any():
+        raise ValueError("correlation matrix is singular; cannot run a partial-correlation test")
 
 
 def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, list[int]]:

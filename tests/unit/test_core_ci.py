@@ -223,6 +223,167 @@ def test_variable_in_condition_set_is_assertion_error(data):
         test.batched_call(0, 1, [(2,), (1, 3)])
 
 
+# ---- singularity guard -------------------------------------------------------------------
+
+
+def _equicorrelation(size: int, smallest: float) -> np.ndarray:
+    """A unit-diagonal correlation matrix whose smallest eigenvalue is ``smallest``.
+
+    ``(1 - a) I + a J`` has the eigenvalue ``1 - a`` (``size - 1`` times) and ``1 + a (size - 1)``.
+    """
+    a = -(1.0 - smallest) / (size - 1)
+    return (1.0 - a) * np.eye(size) + a * np.ones((size, size))
+
+
+def _eigenvalue_checks(monkeypatch) -> list[np.ndarray]:
+    """Record every stack the guard hands to its eigenvalue test."""
+    seen: list[np.ndarray] = []
+    check = ci._raise_if_singular
+
+    def spy(stack):
+        seen.append(stack.copy())
+        check(stack)
+
+    monkeypatch.setattr(ci, "_raise_if_singular", spy)
+    return seen
+
+
+def _eigenvalues_first(corr, x, y, conditions):
+    """Whether the eigenvalue test rejects some query row, else the rows' partial correlations."""
+    var = np.column_stack([np.minimum(x, y), np.maximum(x, y), np.sort(conditions, axis=1)])
+    stack = corr[var[:, :, None], var[:, None, :]]
+    w = np.linalg.eigvalsh(stack)
+    if (w[:, 0] <= w[:, -1] * 1e-12).any():
+        return True, None
+    inv = np.linalg.inv(stack)
+    r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
+    return False, np.clip(r, -ci._ONE_MINUS_EPS, ci._ONE_MINUS_EPS)
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("kind", ["duplicate", "combination"])
+@pytest.mark.parametrize("scale", [0.0, 1e-13, 1e-9, 1e-5, 1e-3])
+def test_guard_raises_exactly_when_the_eigenvalues_find_a_singular_row(test_class, kind, scale):
+    # A column that duplicates another or combines three others, plus noise of relative size
+    # `scale`: exactly singular (an inversion that raises, or one that returns huge finite values),
+    # rejected, or near-singular but accepted. Small batches mix singular and healthy rows. A batch
+    # raises the singular ValueError, never a LinAlgError, exactly when the eigenvalue test rejects
+    # one of its rows; otherwise it returns the partial correlations of the inverse. Each row on
+    # the scalar path decides on its own.
+    rng = np.random.default_rng(7)
+    X = rng.standard_normal((150, 7))
+    base = X[:, 2] if kind == "duplicate" else X[:, 1] + 2.0 * X[:, 3] - 0.5 * X[:, 5]
+    noisy = base + scale * np.std(base) * rng.standard_normal(150)
+    test = test_class(np.column_stack([X, noisy]))
+    corr = test.to_seed()[0]
+    outcomes = set()
+    for size in (2, 3, 4):
+        for _ in range(15):
+            rows = np.array([rng.permutation(8)[: size + 2] for _ in range(4)])
+            x, y, conditions = rows[:, 0], rows[:, 1], rows[:, 2:]
+            raises, r = _eigenvalues_first(corr, x, y, conditions)
+            outcomes.add(raises)
+            if raises:
+                with pytest.raises(ValueError, match="singular") as info:
+                    test.statistic_pvalues(x, y, conditions)
+                assert type(info.value) is ValueError
+            else:
+                np.testing.assert_array_equal(test.statistic_pvalues(x, y, conditions)[0], r)
+            for row in rows:
+                row_raises, row_r = _eigenvalues_first(corr, row[:1], row[1:2], row[None, 2:])
+                if row_raises:
+                    with pytest.raises(ValueError, match="singular") as info:
+                        test.statistic_pvalue(row[0], row[1], row[2:])
+                    assert type(info.value) is ValueError
+                else:
+                    assert test.statistic_pvalue(row[0], row[1], row[2:])[0] == row_r[0]
+    assert outcomes == ({True, False} if scale <= 1e-9 else {False})
+
+
+def test_guard_settles_healthy_rows_without_eigenvalues(monkeypatch, data):
+    seen = _eigenvalue_checks(monkeypatch)
+    test = StudentT(data)
+    rng = np.random.default_rng(2)
+    for size in (2, 3, 4):
+        rows = np.array([rng.permutation(6)[: size + 2] for _ in range(30)])
+        test.statistic_pvalues(rows[:, 0], rows[:, 1], rows[:, 2:])
+        test.statistic_pvalue(rows[0, 0], rows[0, 1], rows[0, 2:])
+    assert seen == []
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_guard_bound_edge(test_class, monkeypatch):
+    # The largest entry of the equicorrelation inverse is about 1 / (size * smallest), so these two
+    # matrices sit just inside and just outside the inverse bound. Only the outside one takes the
+    # eigenvalue test; both pass it, since the bound stays far above the eigenvalue threshold.
+    size = 4
+    limit = 1.0 / (ci._BOUND_MARGIN * ci._SINGULAR_RTOL * size * size)
+    edge = 1.0 / (size * limit)
+    inside, outside = _equicorrelation(size, 1.1 * edge), _equicorrelation(size, 0.9 * edge)
+    assert np.abs(np.linalg.inv(inside)).max() < limit < np.abs(np.linalg.inv(outside)).max()
+    seen = _eigenvalue_checks(monkeypatch)
+    stack = np.stack([inside, outside, inside])
+    np.testing.assert_array_equal(ci._invert_nonsingular(stack), np.linalg.inv(stack))
+    assert len(seen) == 1
+    np.testing.assert_array_equal(seen[0], outside[None])
+    test_class.from_corr(inside, 100).statistic_pvalue(0, 1, (2, 3))
+    assert len(seen) == 1
+    test_class.from_corr(outside, 100).statistic_pvalue(0, 1, (2, 3))
+    assert len(seen) == 2
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_guard_keeps_the_eigenvalue_threshold(test_class, monkeypatch):
+    # Block-diagonal correlation: columns 0-3 are healthy, 4-7 have a smallest eigenvalue just above
+    # the threshold, 8-11 just below it. Rows from the first two blocks pass; a batch holding a row
+    # from the last block raises, whatever else it holds.
+    size = 4
+    largest = 1.0 + 1.0 / (size - 1)  # the largest eigenvalue, to within the smallest
+    corr = np.zeros((3 * size, 3 * size))
+    for block, smallest in enumerate((0.5, 2e-12 * largest, 0.5e-12 * largest)):
+        span = slice(block * size, (block + 1) * size)
+        corr[span, span] = _equicorrelation(size, smallest)
+    test = test_class.from_corr(corr, 100)
+    healthy, just_above, just_below = ([4 * b, 4 * b + 1, 4 * b + 2, 4 * b + 3] for b in range(3))
+    seen = _eigenvalue_checks(monkeypatch)
+
+    def query(*rows):
+        rows = np.array(rows)
+        return test.statistic_pvalues(rows[:, 0], rows[:, 1], rows[:, 2:])
+
+    query(healthy, just_above, healthy)
+    assert [len(stack) for stack in seen] == [1]
+    for rows in [(just_below,), (healthy, just_below), (just_below, healthy, just_above)]:
+        with pytest.raises(ValueError, match="singular"):
+            query(*rows)
+    with pytest.raises(ValueError, match="singular"):
+        test.statistic_pvalue(just_below[0], just_below[1], just_below[2:])
+
+
+def test_guard_decides_by_eigenvalues_whatever_the_inversion_returns(monkeypatch):
+    # An exactly singular stack can make np.linalg.inv raise (an exactly zero pivot) or return the
+    # huge inverse of a nearby nonsingular matrix, depending on the BLAS. Either way the guard
+    # raises the singular ValueError; and when the inversion raises on a stack the eigenvalues
+    # accept, the LinAlgError propagates.
+    healthy = _equicorrelation(4, 0.5)
+    singular = np.stack([healthy, _equicorrelation(4, 1e-15)])
+    exact_inv = np.linalg.inv
+
+    def raising_inv(a):
+        raise np.linalg.LinAlgError("Singular matrix")
+
+    monkeypatch.setattr(np.linalg, "inv", raising_inv)
+    with pytest.raises(ValueError, match="singular") as info:
+        ci._invert_nonsingular(singular)
+    assert type(info.value) is ValueError
+    with pytest.raises(np.linalg.LinAlgError):
+        ci._invert_nonsingular(healthy[None])
+
+    monkeypatch.setattr(np.linalg, "inv", lambda a: exact_inv(a + 1e-14 * np.eye(a.shape[-1])))
+    with pytest.raises(ValueError, match="singular"):
+        ci._invert_nonsingular(singular)
+
+
 # ---- independently verifiable known value ------------------------------------------------
 
 
