@@ -11,8 +11,7 @@ change names its pull request.
 
 ### Fixed
 
-- A result summary shows a metadata list that would print longer than 100 characters as its
-  length and the key to read it from, instead of printing it in full. ([#59])
+- Result summaries show a long metadata list as its length instead of printing it in full. ([#59])
 
 ## [0.2.0] - 2026-10-12
 
