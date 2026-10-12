@@ -11,9 +11,8 @@ change names its pull request.
 
 ### Added
 
-- `xges`, an experimental method: extremely greedy equivalence search, which applies GES's moves
-  with deletions first and then retries deleting each edge. It returns a CPDAG and its BIC
-  score; `extended_search=False` skips the retries. ([#57])
+- `xges`, an experimental method: extremely greedy equivalence search, returning a CPDAG and its
+  BIC score. ([#57])
 
 ## [0.2.0] - 2026-10-12
 
