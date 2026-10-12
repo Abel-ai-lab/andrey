@@ -259,16 +259,14 @@ def xges(
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) and denser ones (mean degree 4), from 25 to 1,000 variables with ten rows per
-    variable. At mean degree 4 its median errors (SHD) stayed below the empty graph's at every
-    size, 1,368 against 2,000 at 1,000 variables. At mean degree 2 they stayed below it up to 200
-    variables (190 against 200) and passed it at 500 and 1,000 (671 against 500, and 1,758 against
-    1,000; 663 and 1,688 with ``extended_search=False``), where the returned graphs still scored a
-    lower BIC than the true one. The median fit took 0.0718 s at 25 variables and 51.6 s at 1,000
-    at mean degree 2, and 289 s at 1,000 at mean degree 4, on one core; with
-    ``extended_search=False``, 1.54 s and 5.15 s at 1,000. The extended search reruns the base
-    search for each edge it tries to delete and retries the edges after keeping a result, so its
-    run time grows with the number of edges and of results kept. Its BIC score assumes linear
-    relations with Gaussian noise.
+    variable. On the denser graphs its median errors (SHD) stayed below the empty graph's at every
+    size. On the sparse graphs they exceeded it from 500 variables on, where the BIC score still
+    preferred the returned graphs to the true one. At 1,000 variables, the median fit took under a
+    minute on the sparse graphs and under five minutes on the denser ones, on one core; with
+    ``extended_search=False``, a few seconds. The extended search reruns the base search for each
+    edge it tries to delete and retries the edges after keeping a result, so its run time grows
+    with the number of edges and of results kept. Its BIC score assumes linear relations with
+    Gaussian noise.
 
     References
     ----------
@@ -359,13 +357,12 @@ def hc(
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 10 to 3,200 variables with ten rows per variable. Its median errors (SHD)
-    equaled the empty graph's at 10 variables (10 against 10), stayed below it at 20 (12 against
-    20), and passed it at every size from 50 (55 against 50) to 3,200 (9,306 against 3,200). The
-    median fit took 0.967 s at 800 variables and 19.3 s at 3,200, on 4 cores. It has no move limit
-    by default; run time grows with the moves the search takes. A graph that no single move improves
-    need not be the best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
+    to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
+    exceeded the empty graph's. The median fit took under a second at 800 variables and about 20 s
+    at 3,200, on 4 cores. It has no move limit by default; run time grows with the moves the search
+    takes. A graph that no single move improves need not be the best-scoring one. Its BIC score
+    assumes linear relations with Gaussian noise.
 
     References
     ----------
@@ -466,15 +463,13 @@ def tabu(
     so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
     moves break as they do for :func:`andrey.hc`.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 10 to 3,200 variables with ten rows per variable. Its median errors (SHD)
-    equaled the empty graph's at 10 variables (10 against 10), stayed below it at 20 (14 against
-    20), and passed it at every size from 50 (54 against 50) to 3,200 (9,312 against 3,200). The
-    median fit took 1.74 s at 800 variables and 58.3 s at 3,200, on 4 cores. It takes hill
-    climbing's moves plus up to ``max_tabu`` non-improving moves between new best scores, with no
-    move limit by default; run time grows with the moves taken. It avoids only the last
-    ``tabu_length`` DAGs, so a better DAG beyond that reach may be missed. Its BIC score assumes
-    linear relations with Gaussian noise.
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
+    to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
+    exceeded the empty graph's. The median fit took under 2 s at 800 variables and under a minute
+    at 3,200, on 4 cores. It takes hill climbing's moves plus up to ``max_tabu`` non-improving
+    moves between new best scores, with no move limit by default; run time grows with the moves
+    taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be
+    missed. Its BIC score assumes linear relations with Gaussian noise.
 
     References
     ----------

@@ -40,8 +40,8 @@ supported.
 :::{div} release-stats
 
 - **40 of 40** datasets with the same graph as xges
-- **3.95-140x** XGES speedup over xges
-- **2.38-561x** Tabu search speedup over bnlearn up to 800 variables
+- **Up to 140x** XGES speedup over xges
+- **Up to 561x** Tabu search speedup over bnlearn
 :::
 
 :::{div} release-limit
