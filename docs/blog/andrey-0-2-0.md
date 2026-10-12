@@ -13,9 +13,9 @@ cover: iceberg
 # Hidden common causes
 
 A hidden common cause, or latent confounder, is an unmeasured variable that affects two measured
-variables. This release adds RCD and BottomUpParceLiNGAM as supported methods and CAM-UV as an
-experimental one. With FCI, they cover data with hidden common causes. Below, we run all four on
-one small dataset and report benchmark results. Other updates make small fits several times faster.
+variables. This release adds RCD and BottomUpParceLiNGAM as supported methods. With FCI, they
+cover data with hidden common causes. Below, we run all three on one small dataset and report
+benchmark results. Other updates make small fits several times faster.
 
 ## Why hidden causes matter
 
@@ -28,20 +28,17 @@ that allow hidden common causes can mark the pair or leave the edge's ends unres
 ## Methods
 
 We benchmark each supported method against another package and check its results on known graphs
-before each release. Experimental methods pass recovery tests but have no published
-benchmark yet. They warn on their first call. RCD, BottomUpParceLiNGAM, and CAM-UV are new in
-this release.
+before each release. RCD and BottomUpParceLiNGAM are new in this release.
 
 | Method | Status | Assumes |
 |---|---|---|
 | [FCI](../docs/code/generated/andrey.fci.rst) | Supported | Linear relations with roughly Gaussian noise, through its Fisher-z test |
 | [RCD](../docs/code/generated/andrey.rcd.rst) | Supported | Linear relations with non-Gaussian noise |
 | [BottomUpParceLiNGAM](../docs/code/generated/andrey.bottom_up_parce_lingam.rst) | Supported | Linear relations with non-Gaussian noise |
-| [CAM-UV](../docs/code/generated/andrey.camuv.rst) | Experimental | Each variable a sum of nonlinear functions of its causes, plus noise |
 
 ## Reading a PAG
 
-All four return a partial ancestral graph (PAG) over the variables you measured. Each end of
+All three return a partial ancestral graph (PAG) over the variables you measured. Each end of
 an edge carries a tail, an arrowhead, or a circle. A circle means that end is unresolved.
 
 - `x -> y`: `x` causes `y`.
@@ -50,7 +47,7 @@ an edge carries a tail, an arrowhead, or a circle. A circle means that end is un
 - `x o-o y`: both ends are unresolved.
 
 FCI marks an end with a tail or an arrowhead only when every graph consistent with the
-data's conditional independences agrees on that mark. RCD, BottomUpParceLiNGAM, and CAM-UV use
+data's conditional independences agrees on that mark. RCD and BottomUpParceLiNGAM use
 the same marks for their findings: `->` for a direct cause and `<->` for a pair linked by a hidden
 variable. BottomUpParceLiNGAM also uses `o-o` between variables it cannot order.
 See [Graph types](../docs/guides/graph-types.md#pag-uncertainty-with-hidden-variables) for details.
@@ -58,8 +55,7 @@ See [Graph types](../docs/guides/graph-types.md#pag-uncertainty-with-hidden-vari
 ## Example
 
 Here `h` causes `x0` and `x1` but is not in the data. Also, `x0` causes `x3`, and `x1` causes
-`x2`. The noise is uniform, so it is not Gaussian. CAM-UV issues the experimental warning on its
-first call.
+`x2`. The noise is uniform, so it is not Gaussian.
 
 ```{literalinclude} 0.2.0/example.py
 :language: python
@@ -70,7 +66,7 @@ first call.
 :file: 0.2.0/graphs.html
 ```
 
-- RCD and CAM-UV return the true graph: `x0 <-> x1` for the pair linked by `h`, and both direct
+- RCD returns the true graph: `x0 <-> x1` for the pair linked by `h`, and both direct
   edges.
 - BottomUpParceLiNGAM finds both direct edges. It cannot order `x0` and `x1`, which share `h`,
   so it groups them in one block joined by `o-o`. In `causal_order`, this block appears as the
@@ -81,7 +77,7 @@ first call.
   `x3 <- x0 -> x1 -> x2`, so the independences cannot settle any mark. Given an observed cause
   of `x0` and another of `x1`, FCI can mark the pair `x0 <-> x1`.
 
-RCD, BottomUpParceLiNGAM, and CAM-UV also test whether regression residuals are independent.
+RCD and BottomUpParceLiNGAM also test whether regression residuals are independent.
 With non-Gaussian noise, this test settles the directions in this example. RCD and
 BottomUpParceLiNGAM also estimate the edge weights: 0.598 and 0.61, compared with the true 0.6.
 DirectLiNGAM assumes causal sufficiency. On the same data, it returns `x0 -> x1` (the last graph
@@ -124,8 +120,7 @@ data with one variable in ten hidden and ten rows per variable, on 16 cores. At 
 Andrey is slower, but both packages take under 0.1 s. Their median endpoint errors are within
 two of each other. At 800 variables, both have more endpoint errors than the empty graph.
 
-CAM-UV has no published benchmark yet. Speed and accuracy depend on your data,
-settings, and hardware.
+Speed and accuracy depend on your data, settings, and hardware.
 
 ## Other highlights
 
