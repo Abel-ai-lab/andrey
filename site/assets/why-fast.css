@@ -332,7 +332,7 @@ dialog.wf-dialog::backdrop {
 .wf-play[data-state="playing"] .i-pause,
 .wf-play[data-state="paused"] .i-play,
 .wf-play[data-state="ended"] .i-replay { opacity: 1; }
-/* On the homepage the section's paragraph measure reaches the note too; centred, it stays readable. */
+/* On the homepage the section's paragraph measure reaches the note too; centered, it stays readable. */
 .wf .wf-note {
   margin: 18px auto 0;
   text-align: center;

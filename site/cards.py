@@ -153,8 +153,8 @@ def _accent(word: str, x: float, y: float, size: int, key: str) -> tuple[str, st
     )
 
 
-def _title(lines: list[str], size: int, middles: list[float], centre: float, accent: str) -> str:
-    """``lines`` in white, each centred on ``centre`` at its middle in ``middles``; each word equal
+def _title(lines: list[str], size: int, middles: list[float], center: float, accent: str) -> str:
+    """``lines`` in white, each centered on ``center`` at its middle in ``middles``; each word equal
     to ``accent`` drawn as the accent, with its trace's space added after it."""
     space = _width(" ", size, "SemiBold")
     defs, drawing = [], []
@@ -162,7 +162,7 @@ def _title(lines: list[str], size: int, middles: list[float], centre: float, acc
         words = line.split(" ")
         widths = [_width(word, size, "SemiBold") for word in words]
         rooms = [size * ROOM if accent and word == accent else 0 for word in words]
-        x = centre - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
+        x = center - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
         for i, (word, width, room) in enumerate(zip(words, widths, rooms, strict=True)):
             if accent and word == accent:
                 more, drawn = _accent(word, x, y, size, f"accent-{row}-{i}")
@@ -294,11 +294,11 @@ def _png_href(image: Image.Image) -> str:
     return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 
-def _marker(name: str, colour: str) -> str:
+def _marker(name: str, color: str) -> str:
     return (
         f'<marker id="{name}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
         f'markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" '
-        f'fill="{colour}"/></marker>'
+        f'fill="{color}"/></marker>'
     )
 
 

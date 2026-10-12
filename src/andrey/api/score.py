@@ -1,7 +1,8 @@
 """Score-based facade adapters.
 
-``ges``, ``gies``, ``exact_search``, and ``hc`` use :mod:`andrey.core` for BIC scoring and
-orientation; ``hc`` uses the Schur delta-BIC. Reported objectives are stored in ``metadata``.
+``ges``, ``gies``, ``xges``, ``exact_search``, ``hc``, and ``tabu`` use :mod:`andrey.core` for BIC
+scoring and orientation; ``xges``, ``hc``, and ``tabu`` use the Schur delta-BIC. Reported objectives
+are stored in ``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -12,7 +13,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from andrey.api._adapt import column_labels, data_matrix, int_in_range, json_safe, structure_output
+from andrey.api._adapt import (
+    column_labels,
+    data_matrix,
+    flag,
+    int_in_range,
+    json_safe,
+    structure_output,
+)
 from andrey.api._experimental import warn_experimental
 from andrey.core import backend
 from andrey.core.seeding import resolve_seed
@@ -188,18 +196,124 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
+def xges(
+    data: npt.ArrayLike,
+    *,
+    score_func: str = "local_score_BIC",
+    lambda_value: float = 1.0,
+    extended_search: bool = True,
+) -> StructureOutput:
+    """Learn a CPDAG from observational data with extremely greedy equivalence search (XGES).
+
+    XGES searches the equivalence classes that GES searches [2]_, with GES's moves, the turning move
+    of GIES [3]_, and the BIC score, but applies them in a different order [1]_ (see Notes). On
+    linear-Gaussian data it often finds a graph with a better score than GES.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    score_func : {"local_score_BIC"}, default="local_score_BIC"
+        Only the Gaussian BIC score is supported.
+    lambda_value : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+    extended_search : bool, default=True
+        Run the extended search after the base search (see Notes). ``False`` returns the base
+        search's graph, which is faster.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"XGES"`` and ``metadata["score"]`` the BIC score, computed as for :func:`andrey.ges`;
+        lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
+        the equivalence class leaves open.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``score_func`` is not ``"local_score_BIC"``.
+    TypeError
+        If ``extended_search`` is not a bool.
+    ValueError
+        If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
+        no constant column, or if ``lambda_value`` is negative or non-finite.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+
+    See Also
+    --------
+    andrey.ges : Adds edges, then removes them, in two separate phases.
+
+    Notes
+    -----
+    **When to use it.** XGES makes the assumptions of :func:`~andrey.ges`: continuous data, no
+    unmeasured common causes, and linear relations with Gaussian noise. It returns the equivalence
+    class.
+
+    **How it works.** Each step takes the best improving deletion, else reversal of a directed edge,
+    else addition; the search stops when no move improves the score [1]_. The extended search then
+    deletes each edge of that graph, best score first, forbids adding it back in that direction, and
+    reruns the search. It keeps a result whose score is lower by more than ``2e-7 * n_samples``, and
+    stops once a fresh pass over the edges keeps nothing. No variable has a parent limit.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 258 variables with 512 rows,
+    and on 10,000 rows with 10 variables. The extended search reruns the base search for each edge
+    it tries to delete and retries the edges after keeping a result, so its run time grows with the
+    number of edges and of results kept; ``extended_search=False`` skips it. Its BIC score assumes
+    linear relations with Gaussian noise.
+
+    References
+    ----------
+    .. [1] Nazaret, A., and Blei, D. (2024). Extremely greedy equivalence search. Proceedings of
+       the Fortieth Conference on Uncertainty in Artificial Intelligence, PMLR 244, 2716-2745.
+    .. [2] Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3,
+       507-554.
+    .. [3] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
+       interventional Markov equivalence classes of directed acyclic graphs. JMLR 13, 2409-2464.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from andrey import xges
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = rng.standard_normal(500)
+    >>> z = x + y + 0.5 * rng.standard_normal(500)
+    >>> xges(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
+    [('x', 'z', 'directed'), ('y', 'z', 'directed')]
+    """
+    warn_experimental("xges")
+    from andrey.search.xges import xges as _xges
+
+    X = data_matrix(data)
+    extended_search = flag(extended_search, "extended_search")
+    labels = column_labels(data)
+    cpdag, score = _xges(
+        X, score_func=score_func, lambda_value=lambda_value, extended_search=extended_search
+    )
+    metadata = {"algorithm": "XGES", "score": json_safe(score)}
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
 def hc(
     data: npt.ArrayLike,
     *,
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
-    max_iter: int = 200,
+    max_iter: int | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with hill-climbing search.
 
-    Hill-climbing is a lightweight greedy baseline [1]_ [2]_. It repeatedly adds, removes, or
-    reverses the edge that most improves a covariance-based delta-BIC, then converts the DAG to its
-    Markov equivalence class.
+    The search repeatedly adds, removes, or reverses the edge that most improves a covariance-based
+    delta-BIC, then converts the DAG to its Markov equivalence class [1]_ [2]_.
 
     Parameters
     ----------
@@ -207,30 +321,32 @@ def hc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Local score objective; a covariance-based Gaussian BIC.
+        Covariance-based Gaussian BIC objective.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
-    max_iter : int, default=200
-        Most moves the search takes, at least ``1``. Each move adds at most one edge, so the result
-        has at most ``max_iter`` edges.
+    max_iter : int or None, default=None
+        Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
+        each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
+        adds at most one edge.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"HC"`` and ``metadata["score"]`` the BIC score of the DAG found, computed as for
-        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open.
+        ``"HC"`` and ``metadata["score"]`` the DAG's BIC score, computed as for :func:`andrey.ges`;
+        lower is better. Directed marks (``->``) are oriented edges, undirected (``--``) the ones
+        the equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``.
     TypeError
-        If ``max_iter`` is not an int.
+        If a given ``max_iter`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if ``max_iter`` is less than ``1``.
+        If ``lambda_value`` is negative or non-finite, or if a given ``max_iter`` is less than
+        ``1``.
 
     Warns
     -----
@@ -238,17 +354,18 @@ def hc(
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
     SearchLimitWarning
-        When the search takes ``max_iter`` moves: it stopped at the limit, and a larger
-        ``max_iter`` may find a better graph.
+        When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
+        graph.
 
     Notes
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
-    after ``max_iter`` moves.
+    after ``max_iter`` moves when set.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 45 variables with 800 rows,
-    and on 40,000 rows with 24 variables. A graph that no single move improves need not be the
-    best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
+    and on 40,000 rows with 24 variables. It has no move limit by default; run time grows with the
+    moves the search takes. A graph that no single move improves need not be the best-scoring one.
+    Its BIC score assumes linear relations with Gaussian noise.
 
     References
     ----------
@@ -271,10 +388,133 @@ def hc(
     from andrey.search.hc import hc as _hc
 
     X = data_matrix(data)
-    max_iter = int_in_range(max_iter, "max_iter", 1)
+    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     cpdag, score = _hc(X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter)
     metadata = {"algorithm": "HC", "score": json_safe(score)}
+    return structure_output(cpdag, labels=labels, metadata=metadata)
+
+
+def tabu(
+    data: npt.ArrayLike,
+    *,
+    score_func: str = "local_score_BIC_from_cov",
+    lambda_value: float = 1.0,
+    tabu_length: int = 10,
+    max_tabu: int | None = None,
+    max_iter: int | None = None,
+) -> StructureOutput:
+    """Learn a CPDAG from observational data with tabu search.
+
+    Tabu search is hill climbing that also takes non-improving moves and never returns to a recently
+    visited DAG [1]_ [2]_ [3]_. Moves are scored as in :func:`andrey.hc`. The result is the CPDAG of
+    the best-scoring DAG visited.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
+        Covariance-based Gaussian BIC objective.
+    lambda_value : float, default=1.0
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+    tabu_length : int, default=10
+        Number of most recently visited DAGs a move may not return to. At least ``1``.
+    max_tabu : int or None, default=None
+        Non-improving moves allowed without a better DAG, from ``1`` to ``tabu_length``. ``None``
+        uses ``tabu_length``.
+    max_iter : int or None, default=None
+        Maximum moves, improving or not, at least ``1``; ``None`` sets no limit. The search still
+        terminates: non-improving runs are bounded by ``max_tabu``, and each new best DAG scores
+        strictly lower.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"Tabu"`` and ``metadata["score"]`` the best DAG's BIC score, computed as for
+        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+    TypeError
+        If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int.
+    ValueError
+        If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
+        less than ``1``, or if ``max_tabu`` is outside ``1..tabu_length``.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+    SearchLimitWarning
+        When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
+        graph.
+
+    Notes
+    -----
+    The search starts from the empty graph. Each step adds the current DAG to the tabu list, which
+    keeps the last ``tabu_length`` DAGs visited, then takes the best improving move outside the
+    list. Without one, it stops if ``max_tabu`` non-improving moves have occurred since the best
+    score last improved; otherwise it takes the best non-improving move, leaving the score unchanged
+    or worse. It also stops when every legal move leads into the list, or after ``max_iter`` moves
+    when set.
+
+    Until it leaves its first local optimum, the search takes the same moves as :func:`andrey.hc`,
+    so with the same ``max_iter`` its score is never worse than hill climbing's. Ties between
+    moves break as they do for :func:`andrey.hc`.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 200 variables with 2,000 rows.
+    It takes hill climbing's moves plus up to ``max_tabu`` non-improving moves between new best
+    scores, with no move limit by default; run time grows with the moves taken. It avoids only the
+    last ``tabu_length`` DAGs, so a better DAG beyond that reach may be missed. Its BIC score
+    assumes linear relations with Gaussian noise.
+
+    References
+    ----------
+    .. [1] Glover, F. (1986). Future paths for integer programming and links to artificial
+       intelligence. Computers & Operations Research 13(5), 533-549.
+       https://doi.org/10.1016/0305-0548(86)90048-1
+    .. [2] Russell, S. J., and Norvig, P. (2009). Artificial Intelligence: A Modern Approach,
+       3rd edition. Prentice Hall.
+    .. [3] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
+       Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import tabu
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = x + 0.1 * rng.standard_normal(500)
+    >>> tabu(np.column_stack([x, y])).structure.kind
+    'cpdag'
+    """
+    warn_experimental("tabu")
+    from andrey.search.tabu import tabu as _tabu
+
+    X = data_matrix(data)
+    tabu_length = int_in_range(tabu_length, "tabu_length", 1)
+    max_tabu = int_in_range(
+        tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
+    )
+    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
+    labels = column_labels(data)
+    cpdag, score = _tabu(
+        X,
+        score_func=score_func,
+        lambda_value=lambda_value,
+        tabu_length=tabu_length,
+        max_tabu=max_tabu,
+        max_iter=max_iter,
+    )
+    metadata = {"algorithm": "Tabu", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
@@ -430,7 +670,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     """
     warn_experimental("calm")
     if backend.torch() is None:
-        raise ImportError("andrey.calm needs torch for its continuous optimiser; install '[torch]'")
+        raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm
 
     X = data_matrix(data)

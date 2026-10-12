@@ -170,7 +170,7 @@ def quickstart_block():
     )
     empty_shd = score_graph(empty, sachs.graph)["shd"]
     intro = (
-        f"Learn the protein-signalling network of Sachs et al. (2005) from {cells} cells, and score"
+        f"Learn the protein-signaling network of Sachs et al. (2005) from {cells} cells, and score"
         " it against the known network:"
     )
     among = "all" if found == n_learned else f"{found} of them"
@@ -225,7 +225,7 @@ def chart_block(summary):
             "  </picture>",
             "</p>",
             "",
-            f'<p align="center"><a href="{SITE_URL}/docs/benchmarks.html">Benchmark report</a></p>',
+            f'<p align="center"><a href="{SITE_URL}/docs/benchmarks.html">Release cards</a></p>',
             "",
             end,
         ]

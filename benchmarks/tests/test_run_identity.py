@@ -77,7 +77,6 @@ def _measures(**overrides) -> dict:
         "env_threads": 16,
         "env_num_workers": 1,
         "env_ges_min_work": None,
-        "env_hc_min_work": None,
     }
     return {**base, **overrides}
 
@@ -115,7 +114,6 @@ _MEASURES_FIELDS = {
     "env_threads": 1,
     "env_num_workers": 8,
     "env_ges_min_work": 5_000,
-    "env_hc_min_work": 20_000,
     "env_device": "cuda",
     "cap_mem_mb": 4096.0,
     "cap_wall_s": 60.0,
@@ -199,7 +197,6 @@ def test_an_env_overlay_moves_the_legs_the_arguments_would_have_missed():
         "env_threads": 16,
         "env_num_workers": 1,
         "env_ges_min_work": None,
-        "env_hc_min_work": None,
         "env_device": "cpu",
     }
     # ``extra_env`` is overlaid last in the child env, so these are what the child really gets.

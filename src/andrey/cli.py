@@ -1128,11 +1128,11 @@ def cmd_calibrate(
         help="Pool size to measure; default: ANDREY_NUM_WORKERS if above 1, else all usable CPUs.",
     ),
     method: Optional[list[str]] = typer.Option(
-        None, "--method", help="Measure only this method (ges or hc); repeatable."
+        None, "--method", help="Measure only this method (ges); repeatable."
     ),
     as_json: bool = typer.Option(False, "--json", help="Use JSON even on a terminal."),
 ) -> None:
-    """Measure the GES and HC worker-pool cutoffs on this machine and print the settings to use.
+    """Measure the GES worker-pool cutoff on this machine and print the setting to use.
 
     Times serial fits against pooled ones for a few sizes and sets nothing. It takes a minute or
     two, and several minutes when the pool never wins (the search then runs up to 256 variables).
@@ -1141,12 +1141,10 @@ def cmd_calibrate(
     from andrey.search import calibrate as cal
 
     check_environment()
-    methods = method or ["ges", "hc"]
+    methods = method or ["ges"]
     unknown = sorted(set(methods) - set(cal.CUTOFFS))
     if unknown:
-        raise CliError(
-            "unsupported_value", f"--method must be ges or hc, got {unknown[0]!r}", EXIT_USAGE
-        )
+        raise CliError("unsupported_value", f"--method must be ges, got {unknown[0]!r}", EXIT_USAGE)
     if workers is not None and workers < 2:
         raise CliError("unsupported_value", "--workers must be at least 2", EXIT_USAGE)
     configured = backend.worker_count()
