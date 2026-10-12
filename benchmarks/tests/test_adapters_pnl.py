@@ -98,9 +98,16 @@ def torch_float32():
 
 
 @pytest.mark.usefixtures("torch_float32")
-def test_causal_learn_returns_a_two_node_dag() -> None:
+def test_causal_learn_returns_a_two_node_dag(monkeypatch) -> None:
     # Its decision rests on a t-test of means, so the test asserts the output's shape, not the
-    # direction. 150 rows trains one batch per epoch.
+    # direction. Ten epochs of one batch each stand in for the default 3000.
+    module = importlib.import_module("causallearn.search.FCMBased.PNL.PNL")
+
+    class Short(module.PNL):
+        def __init__(self) -> None:
+            super().__init__(epochs=10)
+
+    monkeypatch.setattr(module, "PNL", Short)
     adapter = CausalLearnPNL()
     adapter.setup()
     structure = adapter.to_structure(np.asarray(adapter.fit(_pair(150), adapter.params())))
