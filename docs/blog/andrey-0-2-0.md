@@ -52,7 +52,7 @@ lingam on 25 of 25 datasets. RCD runs 1.7-2.9x faster, and BottomUpParceLiNGAM 2
 
 Matching graphs do not guarantee accuracy. From 8 observed variables, BottomUpParceLiNGAM's
 directed edges have more errors than the empty graph's, in both packages. The
-[0.2.0 release card](https://andrey.abel.ai/docs/benchmarks/0.2.0.html) gives the numbers for each
+[0.2.0 release card](../docs/benchmarks/0.2.0.md) gives the numbers for each
 size.
 
 A third method for hidden common causes, CAM-UV (`andrey.camuv`), allows nonlinear relations.
