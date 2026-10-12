@@ -12,7 +12,7 @@ Keep a Changelog does not define, Highlights and Breaking, and each change names
 
 - Small fits run several times faster. At 10 variables, PC and FCI take about a twelfth of the
   time, hill climbing an eighth, and GES two fifths. Larger fits are no slower, and graphs are
-  unchanged.
+  unchanged. ([#33])
 
 ### Added
 
@@ -65,3 +65,4 @@ First alpha release.
 [0.1.0]: https://github.com/Abel-ai-lab/andrey/releases/tag/v0.1.0
 [#14]: https://github.com/Abel-ai-lab/andrey/pull/14
 [#18]: https://github.com/Abel-ai-lab/andrey/pull/18
+[#33]: https://github.com/Abel-ai-lab/andrey/pull/33
