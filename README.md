@@ -51,7 +51,7 @@ uv add andrey-core
   </picture>
 </p>
 
-<p align="center"><a href="https://andrey.abel.ai/docs/benchmarks.html">Benchmark report</a></p>
+<p align="center"><a href="https://andrey.abel.ai/docs/benchmarks.html">Release cards</a></p>
 
 <!-- CHART:END -->
 
