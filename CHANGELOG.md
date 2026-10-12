@@ -9,6 +9,15 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- `hc`, `tabu`, and `xges` are supported: on linear-Gaussian data, XGES returns the same graphs as
+  xges, and Tabu search and hill climbing return the same equivalence classes as bnlearn on most
+  datasets. TODO(0.3.0): the speedup ranges over xges and bnlearn, from the final summary. The
+  0.3.0 release card gives the numbers and each method's limits, among them that Tabu search and
+  hill climbing score worse than the empty graph from 50 variables at ten rows per variable.
+  ([#64])
+
 ### Breaking
 
 - `hc` runs in one process: its worker processes were slower at every measured size.
@@ -16,10 +25,9 @@ change names its pull request.
 
 ### Added
 
-- `tabu`, an experimental method: hill climbing that keeps searching past a local optimum and
-  returns the best DAG it visits, as a CPDAG. ([#56])
-- `xges`, an experimental method: extremely greedy equivalence search, returning a CPDAG and its
-  BIC score. ([#57])
+- `tabu`: hill climbing that keeps searching past a local optimum and returns the best DAG it
+  visits, as a CPDAG. ([#56])
+- `xges`: extremely greedy equivalence search, returning a CPDAG and its BIC score. ([#57])
 
 ### Changed
 
@@ -103,3 +111,4 @@ First alpha release.
 [#56]: https://github.com/Abel-ai-lab/andrey/pull/56
 [#57]: https://github.com/Abel-ai-lab/andrey/pull/57
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59
+[#64]: https://github.com/Abel-ai-lab/andrey/pull/64
