@@ -1,0 +1,261 @@
+{
+  "release": "0.2.0",
+  "generated": "2026-10-11",
+  "change": "the BLAS libraries found once per process instead of on every fit",
+  "builds": {
+    "without": "the commit before the change",
+    "with": "the same commit with the change"
+  },
+  "paired_fits": 410,
+  "same_output": 410,
+  "methods": [
+    {
+      "method": "PC",
+      "status": "supported",
+      "solution": "andrey.pc.numpy",
+      "regime": "linear_gauss_er",
+      "hardware": "AMD EPYC 7713 64-Core Processor, 4 cores",
+      "build": "pre-release Andrey 0.2.0 builds without and with the change, 11 October 2026",
+      "rows": [
+        {
+          "d": 10,
+          "n": 100,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.0304,
+          "with_s": 0.00261,
+          "ratio": 12.2,
+          "same_output": 10
+        },
+        {
+          "d": 20,
+          "n": 200,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.0598,
+          "with_s": 0.00652,
+          "ratio": 8.72,
+          "same_output": 10
+        },
+        {
+          "d": 50,
+          "n": 500,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.299,
+          "with_s": 0.0943,
+          "ratio": 3.22,
+          "same_output": 10
+        },
+        {
+          "d": 100,
+          "n": 1000,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.379,
+          "with_s": 0.216,
+          "ratio": 1.56,
+          "same_output": 10
+        },
+        {
+          "d": 200,
+          "n": 2000,
+          "seeds": 5,
+          "pairs": 40,
+          "without_s": 0.345,
+          "with_s": 0.214,
+          "ratio": 1.59,
+          "same_output": 40,
+          "rechecked": true
+        },
+        {
+          "d": 400,
+          "n": 4000,
+          "seeds": 5,
+          "pairs": 40,
+          "without_s": 1.02,
+          "with_s": 0.801,
+          "ratio": 1.3,
+          "same_output": 40,
+          "rechecked": true
+        }
+      ]
+    },
+    {
+      "method": "FCI",
+      "status": "supported",
+      "solution": "andrey.fci.numpy",
+      "regime": "latent_gauss_er",
+      "hardware": "AMD EPYC 7713 64-Core Processor, 4 cores",
+      "build": "pre-release Andrey 0.2.0 builds without and with the change, 11 October 2026",
+      "rows": [
+        {
+          "d": 10,
+          "n": 100,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.0291,
+          "with_s": 0.00229,
+          "ratio": 12.6,
+          "same_output": 10,
+          "latents": 1
+        },
+        {
+          "d": 20,
+          "n": 200,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.0569,
+          "with_s": 0.00572,
+          "ratio": 7.27,
+          "same_output": 10,
+          "latents": 2
+        },
+        {
+          "d": 50,
+          "n": 500,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.264,
+          "with_s": 0.092,
+          "ratio": 3.14,
+          "same_output": 10,
+          "latents": 5
+        },
+        {
+          "d": 100,
+          "n": 1000,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.486,
+          "with_s": 0.271,
+          "ratio": 1.73,
+          "same_output": 10,
+          "latents": 10
+        },
+        {
+          "d": 200,
+          "n": 2000,
+          "seeds": 5,
+          "pairs": 40,
+          "without_s": 1.34,
+          "with_s": 1.14,
+          "ratio": 1.18,
+          "same_output": 40,
+          "latents": 20,
+          "rechecked": true
+        }
+      ]
+    },
+    {
+      "method": "GES",
+      "status": "supported",
+      "solution": "andrey.ges.numpy.serial",
+      "regime": "linear_gauss_er",
+      "hardware": "AMD EPYC 7713 64-Core Processor, 4 cores",
+      "build": "pre-release Andrey 0.2.0 builds without and with the change, 11 October 2026",
+      "rows": [
+        {
+          "d": 10,
+          "n": 100,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.0495,
+          "with_s": 0.0199,
+          "ratio": 2.49,
+          "same_output": 10
+        },
+        {
+          "d": 20,
+          "n": 200,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.177,
+          "with_s": 0.151,
+          "ratio": 1.18,
+          "same_output": 10
+        },
+        {
+          "d": 50,
+          "n": 500,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 1.96,
+          "with_s": 1.9,
+          "ratio": 1.03,
+          "same_output": 10
+        },
+        {
+          "d": 100,
+          "n": 1000,
+          "seeds": 5,
+          "pairs": 5,
+          "without_s": 10.7,
+          "with_s": 10.6,
+          "ratio": 1.01,
+          "same_output": 5
+        }
+      ]
+    },
+    {
+      "method": "hill climbing",
+      "status": "experimental",
+      "solution": "andrey.hc.numpy.serial",
+      "regime": "linear_gauss_er",
+      "hardware": "AMD EPYC 7713 64-Core Processor, 4 cores",
+      "build": "pre-release Andrey 0.2.0 builds without and with the change, 11 October 2026",
+      "rows": [
+        {
+          "d": 10,
+          "n": 100,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.0325,
+          "with_s": 0.00427,
+          "ratio": 7.74,
+          "same_output": 10
+        },
+        {
+          "d": 20,
+          "n": 200,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.0451,
+          "with_s": 0.0173,
+          "ratio": 2.62,
+          "same_output": 10
+        },
+        {
+          "d": 50,
+          "n": 500,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 0.315,
+          "with_s": 0.268,
+          "ratio": 1.23,
+          "same_output": 10
+        },
+        {
+          "d": 100,
+          "n": 1000,
+          "seeds": 5,
+          "pairs": 10,
+          "without_s": 1.29,
+          "with_s": 1.26,
+          "ratio": 1.05,
+          "same_output": 10
+        },
+        {
+          "d": 400,
+          "n": 4000,
+          "seeds": 5,
+          "pairs": 5,
+          "without_s": 96.0,
+          "with_s": 98.6,
+          "ratio": 1.0,
+          "same_output": 5
+        }
+      ]
+    }
+  ]
+}

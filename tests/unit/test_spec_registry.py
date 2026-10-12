@@ -312,12 +312,20 @@ def _normalized(name: str) -> str:
 
 
 def _published() -> set[str]:
-    """Methods in the published summaries, one per benchmark report (``benchmarks/published/``)."""
-    summaries = (ROOT / "benchmarks" / "published").glob("*/summary.json")
+    """Methods in the published summaries, one per benchmark report (``benchmarks/published/``).
+
+    A summary with ``builds`` times two Andrey builds against each other, not another package, so
+    its methods do not count.
+    """
+    summaries = (
+        json.loads(p.read_text())
+        for p in (ROOT / "benchmarks" / "published").glob("*/summary.json")
+    )
     return {
         _normalized(m["method"])
-        for path in summaries
-        for m in json.loads(path.read_text())["methods"]
+        for summary in summaries
+        if "builds" not in summary
+        for m in summary["methods"]
     }
 
 
