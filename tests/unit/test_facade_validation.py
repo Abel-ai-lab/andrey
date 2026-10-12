@@ -6,10 +6,13 @@ Direct Python calls (not the CLI, which validates inputs of its own) must not le
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
 import andrey
+from andrey.data import sample_scm
 
 
 def test_direct_lingam_rejects_non_2d():
@@ -49,6 +52,7 @@ SINGLE = {
     "gies": andrey.gies,
     "xges": andrey.xges,
     "hc": andrey.hc,
+    "tabu": andrey.tabu,
     "exact_search": andrey.exact_search,
     "calm": andrey.calm,
     "boss": andrey.boss,
@@ -200,6 +204,8 @@ def test_gin_labels_name_each_column():
         (andrey.hc, 0, ValueError),
         (andrey.hc, 2.5, TypeError),
         (andrey.hc, True, TypeError),
+        (andrey.tabu, 0, ValueError),
+        (andrey.tabu, 2.5, TypeError),
         (andrey.ica_lingam, 0, ValueError),
         (andrey.ica_lingam, 1.5, TypeError),
     ],
@@ -215,7 +221,46 @@ def test_hc_stops_at_max_iter_and_warns():
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
         out = andrey.hc(chain, max_iter=3)
     assert len(out.structure.oriented_edges()) == 3
-    assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # finished before 200 moves
+    assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # runs to a local optimum
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_hc_sets_no_move_limit_by_default():
+    # This dense graph takes over 200 moves: a limit of 200 stops the search, the default does not.
+    x = sample_scm(d=30, n=800, seed=0, density=16.0).data
+    with pytest.warns(andrey.SearchLimitWarning, match="max_iter=200"):
+        andrey.hc(x, max_iter=200)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.SearchLimitWarning)
+        out = andrey.hc(x)
+    assert len(out.structure.oriented_edges()) > 200
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("settings", "named", "error"),
+    [
+        ({"tabu_length": 0}, "tabu_length", ValueError),
+        ({"tabu_length": 2.5}, "tabu_length", TypeError),
+        ({"max_tabu": 0}, "max_tabu", ValueError),
+        ({"max_tabu": 11}, "max_tabu", ValueError),  # longer than the default tabu list
+        ({"tabu_length": 3, "max_tabu": 4}, "max_tabu", ValueError),
+        ({"max_tabu": True}, "max_tabu", TypeError),
+        ({"lambda_value": -1.0}, "lambda_value", ValueError),
+        ({"score_func": "local_score_BDeu"}, "score_func", NotImplementedError),
+    ],
+)
+def test_tabu_rejects_a_bad_setting(settings, named, error):
+    with pytest.raises(error, match=named):
+        andrey.tabu(_data(), **settings)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_tabu_stops_at_max_iter_and_warns():
+    chain = np.cumsum(np.random.default_rng(0).standard_normal((500, 8)), axis=1)
+    with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
+        out = andrey.tabu(chain, max_iter=3)
+    assert len(out.structure.oriented_edges()) == 3
 
 
 def test_cdnod_with_one_domain_gives_the_pc_graph():

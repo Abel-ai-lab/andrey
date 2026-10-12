@@ -27,6 +27,7 @@ from .api import (
     pc,
     pnl,
     rcd,
+    tabu,
     varma_lingam,
     xges,
 )
@@ -41,7 +42,7 @@ from .core.warning_policy import (
     SearchLimitWarning,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "__version__",
@@ -70,6 +71,7 @@ __all__ = [
     "gies",
     "xges",
     "hc",
+    "tabu",
     "exact_search",
     "calm",
     "boss",

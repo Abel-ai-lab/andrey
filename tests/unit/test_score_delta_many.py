@@ -4,8 +4,8 @@
 base)`` for a batch of single add/remove moves. Unlike the chained ``score_many_with_base`` (HC /
 BOSS), it is *pure*: it shares only the condition-gated ``inv(cov[S, S])`` cache (a pure function of
 ``S``), recomputes each residual fresh from that inverse, and never writes a chained residual or
-a derived score. This file pins three contracts, and the first two for its vector form
-``add_deltas`` (every add to one base at once):
+a derived score. This file pins three contracts, and the first two for its vector forms
+``add_deltas`` and ``remove_deltas`` (every add or every removal against one base at once):
 
 * **units** -- each raw delta is within ``1e-9`` relative of two full ``BICScore.score`` calls, for
   adds and removes, empty and non-empty bases;
@@ -140,29 +140,35 @@ def test_purity_repeated_interleaved_query_is_bit_identical() -> None:
         assert delta.delta_many_with_base(*q1) == a1
 
 
-@pytest.mark.parametrize("base", [(), (2,), (1, 3, 5, 7)])
-def test_add_deltas_vector_matches_two_full_scores(base: tuple[int, ...]) -> None:
-    """``add_deltas`` gives each add's delta within 1e-9 relative, and ``inf`` where none exists."""
-    x = _well_conditioned(4, 600, 9)
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_row_deltas_match_two_full_scores(seed: int) -> None:
+    """``add_deltas`` and ``remove_deltas`` score every candidate as two full scores do."""
+    x = _well_conditioned(seed, 600, 9)
     score = BICScore(x, lambda_value=2.0)
     v = 0
-    got = score_delta.add_deltas(score, v, base)
-    assert got.shape == (9,)
-    for u in range(9):
-        if u == v or u in base:
-            assert got[u] == np.inf
-            continue
-        want = _full_delta(score, v, base, u, "add")
-        assert abs(got[u] - want) <= 1e-9 * max(1.0, abs(want)), (base, u, got[u], want)
+    for base in [(), (2,), (1, 3), (1, 3, 5, 7)]:
+        add = score_delta.add_deltas(score, v, base)
+        remove = score_delta.remove_deltas(score, v, base)
+        for u in range(9):
+            for op, got, applies in (
+                ("add", add, u != v and u not in base),
+                ("remove", remove, u in base),
+            ):
+                if not applies:
+                    assert got[u] == np.inf, (op, base, u)
+                    continue
+                want = _full_delta(score, v, base, u, op)
+                assert abs(got[u] - want) <= 1e-9 * max(1.0, abs(want)), (op, base, u, got[u], want)
 
 
-def test_add_deltas_falls_back_on_an_ill_conditioned_base() -> None:
-    """A near-singular base gives every add from two full scores, exactly."""
+def test_row_deltas_are_two_full_scores_on_ill_conditioned_base() -> None:
+    """A near-singular base gives every row entry from two full scores, exactly."""
     rng = np.random.default_rng(0)
     base_cols = rng.standard_normal((400, 4))
-    collinear = base_cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))
-    x = np.hstack([base_cols, collinear])  # column 4 ~= column 0
+    x = np.hstack([base_cols, base_cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))])
     score = BICScore(x, lambda_value=2.0)
-    got = score_delta.add_deltas(score, 1, (0, 4))
-    assert got[2] == _full_delta(score, 1, (0, 4), 2, "add")
-    assert got[3] == _full_delta(score, 1, (0, 4), 3, "add")
+    base = (0, 4)  # columns 0 and 4 are collinear
+    add = score_delta.add_deltas(score, 1, base)
+    remove = score_delta.remove_deltas(score, 1, base)
+    assert [add[u] for u in (2, 3)] == [_full_delta(score, 1, base, u, "add") for u in (2, 3)]
+    assert [remove[u] for u in base] == [_full_delta(score, 1, base, u, "remove") for u in base]

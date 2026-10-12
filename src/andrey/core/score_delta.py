@@ -11,8 +11,8 @@ O(|S|^3) for two :func:`~andrey.core.score.local_score_bic` calls. With
 The delta is ``n * (log R_new - log R_old) +/- log_n * lambda`` (``+`` for an add). A near-singular
 ``cov[S,S]`` falls back to two full scores (:func:`_get_inv_with_cond`), so the fast path stays
 within ``1e-9`` of the exact difference. :func:`local_score_bic_delta` scores one move,
-:func:`score_many_with_base` many, :func:`add_deltas` every add to one base at once, and
-:class:`DeltaBICScore` keeps the caches a search reuses.
+:func:`score_many_with_base` many, :func:`add_deltas` and :func:`remove_deltas` every add or every
+removal against one base at once, and :class:`DeltaBICScore` keeps the caches a search reuses.
 """
 
 from __future__ import annotations
@@ -796,6 +796,61 @@ def add_deltas(
     for u in exact:
         if u != i and u not in S_sorted:
             out[u] = _delta_two_scores(score_obj, i, S_sorted, u, "add")
+    return out
+
+
+def remove_deltas(
+    score_obj: BICScore,
+    i: int,
+    base_parents: Iterable[int],
+    *,
+    cond_threshold: float = _COND_THRESHOLD,
+) -> np.ndarray:
+    """Return ``score(i, base - u) - score(i, base)`` for every ``u`` in ``base``, as one array.
+
+    The removal counterpart of :func:`add_deltas`. With ``M = inv(cov[base, base])`` and
+    ``b = M cov[base, i]``, dropping position ``j`` raises the residual by ``b_j^2 / M_jj``; one
+    inverse serves every removal. A near-singular base or a residual that is not positive and finite
+    triggers two full scores. Entries outside ``base`` are ``inf``.
+
+    Parameters
+    ----------
+    score_obj : BICScore
+        The base score supplying ``cov``, ``n``, ``log_n``, and ``lambda_value``.
+    i : int
+        Target node whose local score is differenced.
+    base_parents : sequence of int
+        The parent set each member is removed from.
+    cond_threshold : float
+        Conditioning-gate threshold routing a near-singular base to the two-full-score fallback.
+    """
+    cov = score_obj.cov
+    i = int(i)
+    S_sorted = tuple(sorted(base_parents))
+    S_list = list(S_sorted)
+    out = np.full(cov.shape[0], np.inf)
+    if not S_list:
+        return out
+    inv_cov_cache = _delta_caches(score_obj)[0]
+    M, _ = _get_inv_with_cond(inv_cov_cache, S_sorted, cov, S_list, cond_threshold)
+    inv_cov_cache.move_to_end(S_sorted)
+    _evict_inv(inv_cov_cache)
+    if M is None:  # ill-conditioned
+        for u in S_list:
+            out[u] = _delta_two_scores(score_obj, i, S_sorted, u, "remove")
+        return out
+    cs_i = cov[S_list, i]
+    b = M @ cs_i
+    R_v = float(cov[i, i] - cs_i @ b)
+    M_diag = np.diag(M)
+    penalty = score_obj.log_n * score_obj.lambda_value
+    with np.errstate(divide="ignore", invalid="ignore"):
+        R_v_new = R_v + b * b / M_diag
+        deltas = score_obj.n * (_log(R_v_new) - _log(R_v)) - penalty
+    # A finite delta implies positive R(i | base) and R(i | base - u); M_jj > 0 keeps the sign.
+    exact = ~((M_diag > 0.0) & np.isfinite(deltas))
+    for j, u in enumerate(S_list):
+        out[u] = _delta_two_scores(score_obj, i, S_sorted, u, "remove") if exact[j] else deltas[j]
     return out
 
 

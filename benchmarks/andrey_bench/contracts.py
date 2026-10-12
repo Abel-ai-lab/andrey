@@ -42,7 +42,7 @@ RUN_ENV_FIELDS: tuple[str, ...] = (
 
 #: Environment fields appended as ``name=value`` only when set. Unset fields preserve existing
 #: digests; ``None`` remains a value for the unconditional fields above.
-RUN_ENV_FIELDS_IF_SET: tuple[str, ...] = ("ges_min_work", "hc_min_work")
+RUN_ENV_FIELDS_IF_SET: tuple[str, ...] = ("ges_min_work",)
 
 
 def _identity_key(value: Any) -> str:
@@ -202,7 +202,6 @@ class RunRecord:
     warmup: int | None = None  # untimed fits per repeat; parent-declared, and a run_id field
     elapsed_at_kill_s: float | None = None
     ges_min_work: int | None = None  # ANDREY_GES_PARALLEL_MIN_WORK as the child saw it
-    hc_min_work: int | None = None  # ANDREY_HC_PARALLEL_MIN_WORK as the child saw it
     output_hash: str | None = None  # of the native encoding; comparable only within a package
     structure_hash: str | None = None  # of the normalized graph; comparable across packages
     # The solution's search parameters as JSON with sorted keys. They are determined by ``name`` and

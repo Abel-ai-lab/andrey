@@ -6,18 +6,19 @@ Compare speed, accuracy, and the largest graph each search finishes on the same 
 Each job runs one lane. Their graph-size limits differ by an order of magnitude, so a shared
 ladder would miss larger GES sizes or exhaust its time limit on FCI timeouts:
 
-    --lane score  Andrey GES (3 builds) and HC (2), pcalg ges, bnlearn hc and tabu
+    --lane score  Andrey GES (3 builds), HC and tabu, pcalg ges, bnlearn hc and tabu
     --lane pc     Andrey PC, pcalg pc, bnlearn pc.stable
     --lane fci    Andrey FCI, pcalg fci and rfci
 
-The score lane pairs `pcalg.ges` with Andrey GES and bnlearn hill climbers with Andrey HC.
+The score lane pairs `pcalg.ges` with Andrey GES, `bnlearn.hc` with Andrey HC, and
+`bnlearn.tabu` with Andrey tabu.
 Every lane measures `baseline.empty`.
 
 Before running R solutions, load the R modules and export `R_LIBS_USER` using the commands from
 `benchmarks/start_r.sh --env`. The driver starts R and records its environment before fitting;
 an invalid environment fails once, rather than per unit.
 
-`bnlearn.hc` and `bnlearn.tabu` return DAGs; GES, HC and PC return CPDAGs. Their `shd` units differ:
+`bnlearn.hc` and `bnlearn.tabu` return DAGs; GES, HC, tabu and PC return CPDAGs. Their `shd` units differ:
 compare a DAG row's `mec_shd` with a CPDAG row's `shd`.
 
 Use `--seed-start` for one job per seed. Keep the lane's full solution list in each task: ratios
@@ -44,6 +45,7 @@ from andrey_bench.adapters.andrey_fci import AndreyFCI
 from andrey_bench.adapters.andrey_ges import andrey_ges_adapters
 from andrey_bench.adapters.andrey_hc import andrey_hc_adapters
 from andrey_bench.adapters.andrey_pc import AndreyPC
+from andrey_bench.adapters.andrey_tabu import andrey_tabu_adapters
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
@@ -58,9 +60,10 @@ from andrey_bench.runner import available_cores
 
 
 def _score_solutions() -> list:
-    """Return paired GES and hill-climbing solutions in one lane for within-run ratios.
+    """Return paired GES, hill-climbing, and tabu solutions in one lane for within-run ratios.
 
-    Pair pcalg's `ges` with Andrey's GES, and bnlearn's `hc` and `tabu` with `andrey.hc`.
+    Pair pcalg's `ges` with Andrey's GES, bnlearn's `hc` with `andrey.hc`, and bnlearn's
+    `tabu` with `andrey.tabu`.
     Hill climbing changes one DAG edge at a time; GES searches CPDAG space over neighbor subsets.
     Include all Andrey GES builds to cover every backend. Allow for the `numba` reachability
     kernel's first-call compilation during warm-up in `--cap-wall-s`.
@@ -68,6 +71,7 @@ def _score_solutions() -> list:
     return [
         *andrey_ges_adapters(),
         *andrey_hc_adapters(),
+        *andrey_tabu_adapters(),
         PcalgGES(),
         BnlearnHC(),
         BnlearnTabu(),
@@ -85,12 +89,8 @@ LANES: dict[str, tuple] = {
     "fci": (lambda: [AndreyFCI(), PcalgFCI(), PcalgRFCI(), BaselineEmpty()], ("pcalg",)),
 }
 
-#: Algorithm-specific parallel thresholds. GES and HC each read their own variable; assigning
-#: one to both algorithms would record an unused setting.
-WORK_GATE_ENV: dict[str, str] = {
-    "ges": "ANDREY_GES_PARALLEL_MIN_WORK",
-    "hc": "ANDREY_HC_PARALLEL_MIN_WORK",
-}
+#: The algorithms with a parallel work threshold, and the variable each reads.
+WORK_GATE_ENV: dict[str, str] = {"ges": "ANDREY_GES_PARALLEL_MIN_WORK"}
 
 #: The canonical sparse slice: linear-Gaussian on Erdos-Renyi at average degree 2, where GES, PC and
 #: FCI are all identifiable and every solution above can run.
@@ -140,8 +140,8 @@ def groups(solutions: list, min_work: Mapping[str, int | None]):
     """Group solutions by environment as `(solutions, extra_env)` pairs.
 
     Work thresholds apply only to parallel Andrey solutions; serial fits use one worker and R
-    solutions have no threshold. GES and HC read separate variables, so each algorithm with a
-    threshold gets its own group and environment overlay.
+    solutions have no threshold. Each algorithm with a threshold gets its own group and
+    environment overlay.
     """
     gated: dict[str, list] = {}
     for adapter in solutions:
@@ -216,14 +216,6 @@ def main(argv: list[str] | None = None) -> int:
         "refuses a continuation under a different value rather than pooling two gates in one table",
     )
     p.add_argument(
-        "--hc-min-work",
-        type=int,
-        default=None,
-        help="parallel work gate for andrey's parallel HC, in scanned moves per pass - a different "
-        "unit and a different environment variable from the GES gate. The shipped default has "
-        "never been measured on any host, so a campaign should declare one",
-    )
-    p.add_argument(
         "--machine-id",
         default=socket.gethostname(),
         help="machine id stamped on every record and in run_id (default: this host's name)",
@@ -239,10 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(args.out)
     build_solutions, r_packages = LANES[args.lane]
     solutions = select(build_solutions(), args.only)
-    work_gates = {
-        "ANDREY_GES_PARALLEL_MIN_WORK": args.ges_min_work,
-        "ANDREY_HC_PARALLEL_MIN_WORK": args.hc_min_work,
-    }
+    work_gates = {"ANDREY_GES_PARALLEL_MIN_WORK": args.ges_min_work}
     # Check R availability and record its environment before materializing or measuring.
     r_environment = rsession.check_environment(*r_packages)
 
@@ -254,9 +243,7 @@ def main(argv: list[str] | None = None) -> int:
         "params": {a.name: dict(a.params()) for a in solutions},
         "r environment": r_environment,
         # `aggregate.STAMPS` uses this name to group pooled results by GES threshold.
-        # Record the HC threshold alongside it.
         "ges_min_work": args.ges_min_work,
-        "hc_min_work": args.hc_min_work,
         "slice": SLICE,
         "ladder": args.ladder,
         "seeds": args.seeds,

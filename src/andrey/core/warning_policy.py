@@ -44,7 +44,7 @@ class BackendFallbackWarning(AndreyWarning):
 class SearchLimitWarning(AndreyWarning):
     """A search stopped at its move limit, so a longer search might find a better graph.
 
-    ``hc`` warns when it takes ``max_iter`` moves.
+    ``hc`` and ``tabu`` warn when they take ``max_iter`` moves.
     """
 
 
