@@ -14,9 +14,9 @@ Three settings keep the pair on the same search:
 * `tabu_length=10` and `max_tabu=10` are bnlearn's `tabu` and `max.tabu` defaults. bnlearn 5.2.1
   stops after `tabu` non-improving moves whatever `max.tabu` is, so the two must stay equal for the
   pair to stop by the same rule.
-* `max_iter` caps all moves, improving or not, so the shipped 200 binds on smaller graphs than it
-  does for `hc`. bnlearn's `max.iter` is unbounded, so this is set high enough never to bind and the
-  value is declared in `params`.
+* `max_iter` caps all moves, improving or not. The shipped default sets no limit, and bnlearn's
+  `max.iter` is unbounded; this is set high enough never to bind and the value is declared in
+  `params`.
 * Andrey has no parent cap, so bnlearn's `maxp` stays at its unbounded default.
 """
 
@@ -36,7 +36,7 @@ _DEFAULT_LAMBDA = 1.0
 #: bnlearn's defaults: a tabu list of 10 DAGs, and 10 non-improving moves without a new best.
 _DEFAULT_TABU_LENGTH = 10
 _DEFAULT_MAX_TABU = 10
-#: High enough never to bind: the search stops by the tabu rule. The shipped default is 200.
+#: High enough never to bind: the search stops by the tabu rule. The shipped default is None.
 _DEFAULT_MAX_ITER = 100_000
 
 

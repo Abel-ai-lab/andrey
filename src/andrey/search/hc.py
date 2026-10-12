@@ -1,9 +1,8 @@
 """Hill climbing over DAGs, the engine behind :func:`andrey.hc`.
 
 Candidate moves use Schur-complement deltas from :mod:`andrey.core.score_delta`;
-:class:`MoveScanner` caches them between passes, recomputing only changed targets. The move budget
-regularizes large, dense graphs by stopping before weaker, noise-fitting edges are added. Output is
-the DAG's CPDAG and total BIC; lower is better.
+:class:`MoveScanner` caches them between passes, recomputing only changed targets. Output is the
+DAG's CPDAG and total BIC; lower is better.
 """
 
 from __future__ import annotations
@@ -304,14 +303,14 @@ def hc(
     *,
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
-    max_iter: int = 200,
+    max_iter: int | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Hill-Climbing over the linear-Gaussian BIC score.
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
-    BIC or ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its CPDAG. Returns
-    the CPDAG and the DAG's total BIC objective (lower is better), the sum of the final per-node
-    local scores.
+    BIC or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
+    CPDAG. Returns the CPDAG and the DAG's total BIC objective (lower is better), the sum of the
+    final per-node local scores.
 
     Parameters
     ----------
@@ -321,11 +320,9 @@ def hc(
         Local score; ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC) is supported.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
-    max_iter : int
-        Maximum number of accepted edge moves (default 200). The cap bounds
-        the ascent so a large, dense problem does not overfit the recovered graph with spurious
-        edges; small or sparse problems reach the local optimum first and never hit it. Taking
-        ``max_iter`` moves warns with ``SearchLimitWarning``.
+    max_iter : int or None
+        Maximum moves; ``None`` sets no limit. Taking ``max_iter`` moves warns with
+        ``SearchLimitWarning``.
 
     Returns
     -------
@@ -349,13 +346,13 @@ def hc(
     with backend.one_blas_thread():
         scanner = MoveScanner(delta, d)
         moves = 0
-        for _ in range(max_iter):
+        while max_iter is None or moves < max_iter:
             best = scanner.best(adj_int, parents_of)
             if best is None:
                 break
             _apply_move(adj_int, parents_of, best[4])
             moves += 1
-    if moves == max_iter:
+    if max_iter is not None and moves == max_iter:
         warn_once(
             f"hc stopped at its limit of max_iter={max_iter} moves; a longer search may find a "
             "better graph, so raise max_iter",

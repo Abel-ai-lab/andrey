@@ -224,8 +224,8 @@ _add(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
-        "BIC score improves; a simple greedy baseline. Stops after max_iter moves (default 200), "
-        "so at most that many edges. Returns the CPDAG of the final DAG and its score.",
+        "BIC score improves; a simple greedy baseline. Stops at a local optimum, or after max_iter "
+        "moves when set. Returns the CPDAG of the final DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -245,9 +245,10 @@ _add(
             ParamSpec(
                 name="max_iter",
                 type="int",
-                default=200,
-                doc="Most moves the search takes, at least 1; reaching it warns with "
-                "SearchLimitWarning.",
+                default=None,
+                doc="Most moves the search takes, at least 1; null sets no limit (the search still "
+                "ends). Reaching a set limit warns with SearchLimitWarning.",
+                nullable=True,
             ),
         ),
         references=("Chickering, Geiger & Heckerman 1995", "Scutari 2010"),

@@ -12,9 +12,8 @@ and `arrowhead_f1`.
 
 Two settings keep the pair on the same search:
 
-* `max_iter` caps *accepted moves*, and the shipped 200 binds from about `d = 200` up, where the
-  true graph already has that many edges. bnlearn's `max.iter` is unbounded, so this is set high
-  enough never to bind and the value is declared in `params`.
+* `max_iter` caps *accepted moves*. The shipped default sets no limit, and bnlearn's `max.iter` is
+  unbounded; this is set high enough never to bind and the value is declared in `params`.
 * Andrey has no parent cap, so bnlearn's `maxp` is left at its own unbounded default rather than
   pinned to a number Andrey cannot honor.
 """
@@ -29,7 +28,7 @@ import numpy as np
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
 #: Deviance units, matching bnlearn's `bic-g` at `k = log(n)/2` and pcalg's `0.5*log(n)`.
 _DEFAULT_LAMBDA = 1.0
-#: High enough never to bind: the search stops when no move improves. The shipped default is 200.
+#: High enough never to bind: the search stops when no move improves. The shipped default is None.
 _DEFAULT_MAX_ITER = 100_000
 
 
@@ -76,8 +75,8 @@ class AndreyHC:
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run Andrey hill climbing and return CPDAG endpoint marks. The only timed region.
 
-        Calls the search directly to set `max_iter`. The `andrey.hc` facade fixes it at the
-        shipped default, which would limit this search while bnlearn's remains unbounded.
+        Calls the search directly with the declared `max_iter`, high enough never to bind, so the
+        search is as unbounded as bnlearn's.
         """
         import andrey
         from andrey.search.hc import hc as _hc

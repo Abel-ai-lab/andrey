@@ -6,10 +6,13 @@ Direct Python calls (not the CLI, which validates inputs of its own) must not le
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
 import andrey
+from andrey.data import sample_scm
 
 
 def test_direct_lingam_rejects_non_2d():
@@ -211,7 +214,19 @@ def test_hc_stops_at_max_iter_and_warns():
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
         out = andrey.hc(chain, max_iter=3)
     assert len(out.structure.oriented_edges()) == 3
-    assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # finished before 200 moves
+    assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # runs to a local optimum
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_hc_sets_no_move_limit_by_default():
+    # This dense graph takes over 200 moves: a limit of 200 stops the search, the default does not.
+    x = sample_scm(d=30, n=800, seed=0, density=16.0).data
+    with pytest.warns(andrey.SearchLimitWarning, match="max_iter=200"):
+        andrey.hc(x, max_iter=200)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", andrey.SearchLimitWarning)
+        out = andrey.hc(x)
+    assert len(out.structure.oriented_edges()) > 200
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

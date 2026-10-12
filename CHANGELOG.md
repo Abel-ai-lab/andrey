@@ -22,6 +22,8 @@ change names its pull request.
 ### Changed
 
 - `hc` returns the same graphs in less time. ([#56])
+- `hc` sets no move limit by default (`max_iter=None`), so large graphs are searched to a local
+  optimum. ([#56])
 
 ### Fixed
 

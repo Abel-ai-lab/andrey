@@ -194,7 +194,7 @@ def hc(
     *,
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
-    max_iter: int = 200,
+    max_iter: int | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with hill-climbing search.
 
@@ -211,9 +211,10 @@ def hc(
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
-    max_iter : int, default=200
-        Maximum moves, at least ``1``. Each move adds at most one edge, so the result has at most
-        ``max_iter`` edges.
+    max_iter : int or None, default=None
+        Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
+        each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
+        adds at most one edge.
 
     Returns
     -------
@@ -228,9 +229,10 @@ def hc(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``.
     TypeError
-        If ``max_iter`` is not an int.
+        If a given ``max_iter`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if ``max_iter`` is less than ``1``.
+        If ``lambda_value`` is negative or non-finite, or if a given ``max_iter`` is less than
+        ``1``.
 
     Warns
     -----
@@ -238,16 +240,18 @@ def hc(
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
     SearchLimitWarning
-        When the search takes ``max_iter`` moves; a larger ``max_iter`` may find a better graph.
+        When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
+        graph.
 
     Notes
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
-    after ``max_iter`` moves.
+    after ``max_iter`` moves when set.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 45 variables with 800 rows,
-    and on 40,000 rows with 24 variables. A graph that no single move improves need not be the
-    best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
+    and on 40,000 rows with 24 variables. It has no move limit by default; run time grows with the
+    moves the search takes. A graph that no single move improves need not be the best-scoring one.
+    Its BIC score assumes linear relations with Gaussian noise.
 
     References
     ----------
@@ -270,7 +274,7 @@ def hc(
     from andrey.search.hc import hc as _hc
 
     X = data_matrix(data)
-    max_iter = int_in_range(max_iter, "max_iter", 1)
+    max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     cpdag, score = _hc(X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter)
     metadata = {"algorithm": "HC", "score": json_safe(score)}
