@@ -98,25 +98,6 @@ def test_num_workers_resolution(monkeypatch):
         andrey.config.num_workers = -2
 
 
-def test_one_blas_thread_limits_then_restores():
-    from threadpoolctl import threadpool_info, threadpool_limits
-
-    # The libraries loaded at the first call; one loaded later, as by another test, is not limited.
-    known = {pool["filepath"] for pool in backend._thread_pools().info()}
-
-    def pools() -> list[int]:
-        return [pool["num_threads"] for pool in threadpool_info() if pool["filepath"] in known]
-
-    if not pools():
-        pytest.skip("threadpoolctl finds no thread pool in this process")
-    with threadpool_limits(limits=2):  # an ambient limit the block must change and restore
-        ambient = pools()
-        for _ in range(2):  # the second call reuses the libraries found by the first
-            with backend.one_blas_thread():
-                assert set(pools()) == {1}
-            assert pools() == ambient
-
-
 def test_bad_backend_value_raises():
     with pytest.raises(ValueError, match="backend"):
         andrey.config.backend = "quantum"
@@ -367,3 +348,19 @@ def test_fork_reset_frees_a_held_dispatch_lock():
     finally:
         backend._recording.reset(token)
         held.release()
+
+
+def test_one_blas_thread_limits_inside_and_restores_after():
+    from threadpoolctl import threadpool_info, threadpool_limits
+
+    def counts():
+        return [lib["num_threads"] for lib in threadpool_info()]
+
+    if not threadpool_info():
+        pytest.skip("no thread pool that threadpoolctl can control")
+    backend._thread_pools.cache_clear()  # pools loaded by earlier tests are found again
+    with threadpool_limits(limits=2):  # a count other than 1, set after the pools were found
+        before = counts()
+        with backend.one_blas_thread():
+            assert set(counts()) == {1}
+        assert counts() == before

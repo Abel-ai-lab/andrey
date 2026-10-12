@@ -520,9 +520,7 @@ def _thread_pools():
 def one_blas_thread() -> contextlib.AbstractContextManager:
     """Limit the loaded BLAS and OpenMP thread pools to one thread inside a ``with`` block.
 
-    The limit of ``threadpoolctl.threadpool_limits(limits=1)``, but the libraries are found once
-    per process rather than on every call, which takes milliseconds; a library loaded after the
-    first call is not limited.
+    The libraries are found once per process; one loaded after the first call is not limited.
     """
     return _thread_pools().limit(limits=1)
 

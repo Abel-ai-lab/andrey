@@ -1,8 +1,8 @@
 """The homepage's content, generated from the benchmark summary and the method registry.
 
 ``docs/conf.py`` fills the homepage template (``site/homepage.html``) with
-:func:`homepage_context` and the launch post's figures with :func:`launch_post_context`, and draws
-the README's chart with :func:`readme_chart`. ``docs/DEVELOPMENT.md`` has the build command.
+:func:`homepage_context`, and ``apps/build_launch.py`` draws the README's chart with
+:func:`readme_chart`. ``docs/DEVELOPMENT.md`` has the build command.
 
 Every number on the homepage comes from the benchmark summary. The speedup panel shows one slide
 per method, and the headline must be the claim :func:`claim_sentence` words from the summary. The
@@ -1443,31 +1443,3 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "abel_mark": abel_mark(),
         "style": speedup_css(summary) + "\n" + homepage_code_css(),
     }
-
-
-# ---- the launch post -------------------------------------------------------------------------
-def launch_post_context(summary: dict) -> tuple[dict[str, str], dict[str, str]]:
-    """The launch post's numbers, as text for its sentences, and its one figure, as HTML.
-
-    The figure is the homepage's speedup panel. The post sits one level below the site root, so
-    its link gains a ``../``.
-    """
-    method, top = fastest(summary)
-    lead, _ = speed_claim(summary)
-    as_good, total = accuracy_tally(summary)
-    methods_title, _ = methods(summary)
-    text = {
-        "method_count": methods_title.split(" in ")[0],
-        "speed_claim": claim_sentence(summary),
-        # "over 100x on PC", for the post's first sentence.
-        "speed_short": (lead[0].lower() + lead[1:]).replace(" faster on ", " on "),
-        "as_good": f"{as_good} of {total}",
-        # The slowest fit behind the headline, as the post's motivation cites it.
-        "slow_fit": f"{method['method']} on {top['d']:,} variables took "
-        f"{seconds_text(top['comparator_s'])} in {method['comparator']}",
-    }
-    figures = {
-        "speedup": f"<style>{speedup_css(summary)}</style>"
-        + speedup_panel(summary).replace('href="docs/', 'href="../docs/'),
-    }
-    return text, figures

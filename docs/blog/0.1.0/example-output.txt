@@ -1,0 +1,10 @@
+PC  cpdag  |  11 nodes  |  8 edges (6 undirected, 2 directed)
+
+  raf -- mek
+  plc -- pip3
+  pip2 -- pip3
+  erk -- akt
+  erk -- pka
+  akt -- pka
+  p38 -> pkc
+  jnk -> pkc
