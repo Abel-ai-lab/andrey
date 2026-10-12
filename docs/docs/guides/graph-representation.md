@@ -90,13 +90,14 @@ in a `dag` or `digraph`.
 `TemporalStructure` is a stack of `GraphStructure` objects, one per lag. `lags` lists the lag
 values, `lag(k)` selects a graph by lag value, and `lag_weights` holds the `(n_lags, n, n)`
 coefficients (`lag_weights_ma` adds the moving-average stack for VARMA); a `pcmci` result has lags 1
-to `tau_max` and no weights, and a `pcmciplus` result adds lag 0 as a `cpdag`. An autoregressive edge `X(t-k) -> X(t)` is a self-loop in its lag
-graph. A panel result from `longitudinal_lingam` adds a time axis: `times`, `at(time, lag)`, and
-`time_weights`, where `NaN` marks a block that cannot be computed. `summary_graph()` merges the lags
-into one `digraph`, and its `lags_of(i, j)` returns the lags at which `i -> j` appears. For a panel,
-`lag(k)`, `lag_weights`, and `summary_graph()` refer to the **final occasion**; use `at(time, lag)`
-and `time_weights` to inspect earlier occasions. The [temporal
-diagrams](graph-types.md#temporal-graphs) show how collapsing time can create cycles.
+to `tau_max` and no weights, and a `pcmciplus` result adds lag 0 as a `cpdag`. An autoregressive
+edge `X(t-k) -> X(t)` is a self-loop in its lag graph. A panel result from `longitudinal_lingam`
+adds a time axis: `times`, `at(time, lag)`, and `time_weights`, where `NaN` marks a block that
+cannot be computed. `summary_graph()` merges the lags into one `digraph`, and its `lags_of(i, j)`
+returns the lags at which `i -> j` appears. For a panel, `lag(k)`, `lag_weights`, and
+`summary_graph()` refer to the **final occasion**; use `at(time, lag)` and `time_weights` to inspect
+earlier occasions. The [temporal diagrams](graph-types.md#temporal-graphs) show how collapsing time
+can create cycles.
 
 ## Reading and converting
 

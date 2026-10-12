@@ -30,7 +30,7 @@ PCMCI+ extends PCMCI to links within one time step (lag 0). It works on the copi
 
 Lagged links always point forward in time. Phases 3 and 4 collect the orientations of a pass from
 the graph as it stood before the pass, then apply them together; a link that gets both orientations
-is a conflict and stays unoriented. Every test reads the lagged design of
+is marked as a conflict and takes no part in later rules. Every test reads the lagged design of
 :func:`~andrey.temporal.pcmci.lagged_design`, as in PCMCI.
 
 References
@@ -96,14 +96,19 @@ class _Recorder:
         self.test = test
         self.largest: dict[tuple[int, int], tuple[float, float]] = {}
 
-    def statistic_pvalue(
-        self, x: int, y: int, condition_set: Iterable[int] = ()
-    ) -> tuple[float, float]:
-        statistic, p_value = self.test.statistic_pvalue(x, y, condition_set)
-        best = self.largest.get((x, y))
-        if best is None or p_value > best[1]:
-            self.largest[(x, y)] = (statistic, p_value)
-        return statistic, p_value
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        statistics, p_values = self.test.statistic_pvalues(x, y, conditions)
+        for pair, statistic, p_value in zip(
+            zip(np.asarray(x).tolist(), np.asarray(y).tolist()),
+            statistics.tolist(),
+            p_values.tolist(),
+        ):
+            best = self.largest.get(pair)
+            if best is None or p_value > best[1]:
+                self.largest[pair] = (statistic, p_value)
+        return statistics, p_values
 
 
 def lagged_parents(
@@ -126,6 +131,22 @@ def _conditions(
     columns.update(s * n_vars + k for k, s in parents[j] if (k, s) != (i, lag))
     columns.update((s + lag) * n_vars + k for k, s in parents[i])
     return sorted(columns)
+
+
+def _test_subsets(
+    test: LinkTest,
+    n_vars: int,
+    parents: tuple[tuple[Link, ...], ...],
+    i: int,
+    lag: int,
+    j: int,
+    subsets: list[tuple[int, ...]],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Test ``X^i_{t-lag}`` against ``X^j_t`` given each subset, all one size, in one call."""
+    rows = [_conditions(parents, n_vars, i, lag, j, subset) for subset in subsets]
+    conditions = np.array(rows, dtype=np.intp).reshape(len(rows), len(rows[0]))
+    x = np.full(len(rows), lag * n_vars + i, dtype=np.intp)
+    return test.statistic_pvalues(x, np.full_like(x, j), conditions)
 
 
 def skeleton(
@@ -166,24 +187,28 @@ def skeleton(
         if not pairs:
             break
         for i, lag, j in pairs:
-            others = [k for k in neighbors[j] if lag or k != i]
-            for subset in combinations(others, p):
-                if not adjacency[lag, i, j]:
-                    break  # removed from its other end in this round
-                statistic, p_value = test.statistic_pvalue(
-                    lag * n_vars + i, j, _conditions(parents, n_vars, i, lag, j, subset)
-                )
-                ends = ((lag, i, j), (0, j, i)) if lag == 0 else ((lag, i, j),)
+            if not adjacency[lag, i, j]:
+                continue  # removed from its other end in this round
+            subsets = list(combinations([k for k in neighbors[j] if lag or k != i], p))
+            tested_statistics, tested_p_values = _test_subsets(
+                test, n_vars, parents, i, lag, j, subsets
+            )
+            # The subsets count as tested in order up to the first that separates.
+            separating = np.flatnonzero(tested_p_values > pc_alpha)
+            tested = separating[0] + 1 if separating.size else len(subsets)
+            largest = int(np.argmax(tested_p_values[:tested]))
+            ends = ((lag, i, j), (0, j, i)) if lag == 0 else ((lag, i, j),)
+            for index in ends:
+                strength[index] = min(strength[index], np.abs(tested_statistics[:tested]).min())
+                if tested_p_values[largest] > p_values[index]:
+                    p_values[index] = tested_p_values[largest]
+                    statistics[index] = tested_statistics[largest]
+            if separating.size:
                 for index in ends:
-                    strength[index] = min(strength[index], abs(statistic))
-                    if p_value > p_values[index]:
-                        p_values[index], statistics[index] = p_value, statistic
-                if p_value > pc_alpha:
-                    for index in ends:
-                        adjacency[index] = False
-                    sepsets[(i, lag, j)] = subset
-                    if lag == 0:
-                        sepsets[(j, 0, i)] = subset
+                    adjacency[index] = False
+                sepsets[(i, lag, j)] = subsets[separating[0]]
+                if lag == 0:
+                    sepsets[(j, 0, i)] = subsets[separating[0]]
         p += 1
         neighbors = [
             tuple(
@@ -217,20 +242,18 @@ def _separating_subsets(
     added, gives a p-value above ``pc_alpha``.
     """
     families = [_neighbors(adjacency, j)] + ([_neighbors(adjacency, i)] if lag == 0 else [])
-    seen: set[frozenset[int]] = set()
     separating = []
-    for family in families:
-        for size in range(len(family) + 1):
-            for subset in combinations(family, size):
-                key = frozenset(subset)
-                if key in seen:
-                    continue
-                seen.add(key)
-                _, p_value = test.statistic_pvalue(
-                    lag * n_vars + i, j, _conditions(parents, n_vars, i, lag, j, subset)
-                )
-                if p_value > pc_alpha:
-                    separating.append(key)
+    for size in range(max(len(family) for family in families) + 1):
+        subsets = list(
+            dict.fromkeys(
+                tuple(sorted(subset))
+                for family in families
+                for subset in combinations(family, size)
+            )
+        )
+        if subsets:
+            _, p_values = _test_subsets(test, n_vars, parents, i, lag, j, subsets)
+            separating += [frozenset(subsets[k]) for k in np.flatnonzero(p_values > pc_alpha)]
     return separating
 
 

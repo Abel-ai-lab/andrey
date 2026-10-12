@@ -46,14 +46,14 @@ class Oracle:
                 for a in range(width)
             ]
         )
-        self.queries = 0
 
-    def statistic_pvalue(self, x, y, condition_set=()):
-        self.queries += 1
-        index = [x, y, *condition_set]
-        precision = np.linalg.inv(self.cov[np.ix_(index, index)])
-        r = -precision[0, 1] / np.sqrt(precision[0, 0] * precision[1, 1])
-        return r, 0.0 if abs(r) > 1e-8 else 1.0
+    def statistic_pvalues(self, x, y, conditions):
+        statistics = []
+        for index in np.column_stack([x, y, conditions]):
+            precision = np.linalg.inv(self.cov[np.ix_(index, index)])
+            statistics.append(-precision[0, 1] / np.sqrt(precision[0, 0] * precision[1, 1]))
+        statistics = np.array(statistics)
+        return statistics, np.where(np.abs(statistics) > 1e-8, 0.0, 1.0)
 
 
 def _run(b0, a_stack, tau_max=1, collider_rule="majority") -> PCMCIPlusResult:
