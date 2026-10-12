@@ -16,9 +16,8 @@ change names its pull request.
 
 ### Added
 
-- An experimental method, `tabu`: tabu search, hill climbing that keeps going past a local optimum
-  and returns the best DAG it visits, as a CPDAG. With the same settings its BIC score is never
-  worse than `hc`'s. ([#56])
+- `tabu`, an experimental method: hill climbing that keeps searching past a local optimum and
+  returns the best DAG it visits, as a CPDAG. ([#56])
 
 ### Changed
 
