@@ -27,9 +27,10 @@ linear relations and non-Gaussian noise, and both return a PAG over the variable
 - `andrey.bottom_up_parce_lingam` orders the variables from the last effect up, and leaves the
   variables a hidden cause keeps it from ordering in one block, joined by `o-o`.
 
-Use them when you suspect a hidden cause and your noise is not Gaussian. Both need many rows: a weak
-hidden cause leaves only a small trace in the data. Without hidden causes, DirectLiNGAM returns a
-full DAG; with Gaussian noise, FCI returns the PAG that the data's independences support.
+Use them when you suspect a hidden cause and your noise is not Gaussian. RCD needs many rows: a
+weak hidden cause leaves only a small trace in the residuals it tests. Without hidden causes,
+DirectLiNGAM returns a full DAG; with Gaussian noise, FCI returns the PAG that the data's
+independences support.
 
 Here `h` drives `x0` and `x1`, and the data leave it out:
 
@@ -45,7 +46,7 @@ Here `h` drives `x0` and `x1`, and the data leave it out:
 
 RCD marks `x0 <-> x1`, the pair that `h` links, and finds both direct edges with their weights.
 
-We measured both methods against lingam, which implements both, on 25 datasets with hidden common
+We compared both methods with lingam, which implements both, on 25 datasets with hidden common
 causes: 4 to 24 observed variables and 2,000 rows each, on 2 cores. Both return the same graph as
 lingam on 25 of 25 datasets. RCD runs 1.7-2.9x faster, and BottomUpParceLiNGAM 2.5-10.8x faster.
 
