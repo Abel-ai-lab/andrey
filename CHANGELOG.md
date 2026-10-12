@@ -13,7 +13,7 @@ change names its pull request.
 
 - `xges`, an experimental method: extremely greedy equivalence search, which applies GES's moves
   with deletions first and then retries deleting each edge. It returns a CPDAG and its BIC
-  score; `extended_search=False` skips the retries.
+  score; `extended_search=False` skips the retries. ([#57])
 
 ## [0.2.0] - 2026-10-12
 
@@ -81,3 +81,4 @@ First alpha release.
 [#31]: https://github.com/Abel-ai-lab/andrey/pull/31
 [#33]: https://github.com/Abel-ai-lab/andrey/pull/33
 [#53]: https://github.com/Abel-ai-lab/andrey/pull/53
+[#57]: https://github.com/Abel-ai-lab/andrey/pull/57
