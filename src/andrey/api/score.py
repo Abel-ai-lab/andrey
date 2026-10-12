@@ -157,6 +157,12 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
 
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 600 rows. It
+    takes observational data only, so it returns the graph and score that :func:`~andrey.ges`
+    returns on the same data, and the limitations of GES apply.
+
     References
     ----------
     .. [1] Hauser, A., and Buhlmann, P. (2012). Characterization and greedy learning of
@@ -240,6 +246,10 @@ def hc(
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 45 variables with 800 rows,
+    and on 40,000 rows with 24 variables. A graph that no single move improves need not be the
+    best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
+
     References
     ----------
     .. [1] Chickering, D. M., Geiger, D., and Heckerman, D. (1995). Learning Bayesian networks:
@@ -299,6 +309,13 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 5 variables with 1,000 rows.
+    It scores every possible parent set of every variable, so its run time at least doubles with
+    each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
+    its memory doubles as well.
 
     References
     ----------
@@ -385,6 +402,14 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 6 variables with 800 rows, and
+    on 2,000 rows with 5 variables. Every optimizer step computes a determinant and a matrix power
+    of the full weight matrix, one row and one column per variable, so a step's cost grows with the
+    cube of the variable count; the defaults allow up to 75,000 steps (``max_outer`` times
+    ``subproblem_iter``).
 
     References
     ----------

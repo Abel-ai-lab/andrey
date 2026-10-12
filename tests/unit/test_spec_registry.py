@@ -303,6 +303,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")
 EXPERIMENTAL = sorted(n for n, s in REGISTRY.items() if s.status == "experimental")
 GRADUATE = "mark it experimental until it meets the criteria in docs/docs/code/index.md"
+LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the paragraph holds"
 
 
 def _normalized(name: str) -> str:
@@ -403,16 +404,16 @@ def test_supported_method_has_an_example(name):
     assert name in called, f"{name}: no example notebook calls it; {GRADUATE}"
 
 
-@pytest.mark.parametrize("name", SUPPORTED)
-def test_supported_method_declares_its_limitations(name):
-    """The docstring's Notes carry a **Limitations.** paragraph: where the method was measured."""
+@pytest.mark.parametrize("name", _SPEC_NAMES)
+def test_method_declares_its_limitations(name):
+    """The docstring's Notes carry a **Limitations.** paragraph: what is measured or tested."""
     doc = inspect.getdoc(getattr(andrey, name)) or ""
     notes = re.search(
         r"^Notes\n-{3,}\n(.*?)(?=^\S[^\n]*\n-{3,}\n|\Z)", doc, re.MULTILINE | re.DOTALL
     )
-    assert notes, f"{name}: no Notes section; {GRADUATE}"
+    assert notes, f"{name}: no Notes section; {LIMITATIONS}"
     assert re.search(r"^\*\*Limitations\.\*\* ", notes.group(1), re.MULTILINE), (
-        f"{name}: no **Limitations.** paragraph in Notes; {GRADUATE}"
+        f"{name}: no **Limitations.** paragraph in Notes; {LIMITATIONS}"
     )
 
 

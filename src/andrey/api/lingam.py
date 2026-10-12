@@ -285,6 +285,13 @@ def multi_group_direct_lingam(
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
 
+    Notes
+    -----
+    **Limitations.** Not benchmarked yet. Its tests run it on two groups of 5 variables with 800
+    rows each, and on three groups of 3 variables. It assumes linear effects and non-Gaussian noise
+    in every group, and it gives every group the one shared causal order, even when a group's own
+    order differs.
+
     References
     ----------
     .. [1] Shimizu, S. (2012). Joint estimation of linear non-Gaussian acyclic models.

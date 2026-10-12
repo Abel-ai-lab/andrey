@@ -320,6 +320,11 @@ def gfci(
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
+    and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
+    so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
+    linear relations with Gaussian noise.
+
     References
     ----------
     .. [1] Ogarrio, J. M., Spirtes, P., and Ramsey, J. (2016). A hybrid causal search algorithm
@@ -417,6 +422,11 @@ def cdnod(
     shift follows the index's values. With two domains the coding does not matter. With three
     domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go undetected, and recoding the
     domains can change the result.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 500 rows,
+    and on 1,200 rows with 7 variables. It runs the PC search with the index as one more variable,
+    so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its Fisher-Z tests
+    assume linear relations with Gaussian noise.
 
     References
     ----------

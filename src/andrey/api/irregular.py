@@ -78,6 +78,10 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     PNL fits each transform as a sum of smooth basis functions, so the fit is deterministic but can
     miss a sharply varying nonlinearity.
 
+    **Limitations.** Not benchmarked yet. Its tests run it on pairs of at most 400 rows. Each HSIC
+    test builds kernel matrices with one row and one column per sample, so time and memory grow with
+    the square of the row count.
+
     References
     ----------
     .. [1] Zhang, K., and Hyvarinen, A. (2009). On the identifiability of the post-nonlinear
@@ -253,6 +257,12 @@ def camuv(
     -----
     A ``<->`` pair may share a hidden common cause or be linked by a causal path through a hidden
     variable; CAM-UV does not tell the two apart. It estimates no edge weights.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 6 variables with 300 rows, and
+    on 1,000 rows with 5 variables. It searches every subset of up to ``max_explanatory_vars``
+    variables, and starts the search over after each parent it adds. Each HSIC test builds kernel
+    matrices with one row and one column per sample, so time and memory grow with the square of the
+    row count.
 
     References
     ----------
