@@ -362,11 +362,10 @@ def hc(
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 10 to 3,200 variables with ten rows per variable. Its median errors (SHD)
     equaled the empty graph's at 10 variables (10 against 10), stayed below it at 20 (12 against
-    20), and passed it at every size from 50 (55 against 50) to 3,200 (9,306 against 3,200);
-    bnlearn's hill climbing did the same up to 800 variables. The median fit took 0.967 s at 800
-    variables and 19.3 s at 3,200, on 4 cores. It has no move limit by default; run time grows with
-    the moves the search takes. A graph that no single move improves need not be the best-scoring
-    one. Its BIC score assumes linear relations with Gaussian noise.
+    20), and passed it at every size from 50 (55 against 50) to 3,200 (9,306 against 3,200). The
+    median fit took 0.967 s at 800 variables and 19.3 s at 3,200, on 4 cores. It has no move limit
+    by default; run time grows with the moves the search takes. A graph that no single move improves
+    need not be the best-scoring one. Its BIC score assumes linear relations with Gaussian noise.
 
     References
     ----------
@@ -470,12 +469,12 @@ def tabu(
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 10 to 3,200 variables with ten rows per variable. Its median errors (SHD)
     equaled the empty graph's at 10 variables (10 against 10), stayed below it at 20 (14 against
-    20), and passed it at every size from 50 (54 against 50) to 3,200 (9,312 against 3,200);
-    bnlearn's tabu search did the same up to 800 variables. The median fit took 1.74 s at 800
-    variables and 58.3 s at 3,200, on 4 cores. It takes hill climbing's moves plus up to
-    ``max_tabu`` non-improving moves between new best scores, with no move limit by default; run
-    time grows with the moves taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG
-    beyond that reach may be missed. Its BIC score assumes linear relations with Gaussian noise.
+    20), and passed it at every size from 50 (54 against 50) to 3,200 (9,312 against 3,200). The
+    median fit took 1.74 s at 800 variables and 58.3 s at 3,200, on 4 cores. It takes hill
+    climbing's moves plus up to ``max_tabu`` non-improving moves between new best scores, with no
+    move limit by default; run time grows with the moves taken. It avoids only the last
+    ``tabu_length`` DAGs, so a better DAG beyond that reach may be missed. Its BIC score assumes
+    linear relations with Gaussian noise.
 
     References
     ----------
