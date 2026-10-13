@@ -60,7 +60,7 @@ Choose a method for your data:
 - **ANM** when the effect is a smooth function of the cause plus independent noise. Its regression
   time grows with the cube of the number of rows, so it suits up to a few thousand rows.
 - **PNL** when the effect may pass through a distortion or you have more rows. In our benchmarks,
-  its median fit took under 2 s at 5,000 rows on 4 cores.
+  its median fit took under 2 s at 5,000 rows.
 
 Both assume that no hidden common cause links the pair. When one is plausible, use the methods in
 the [0.2.0 post](andrey-0-2-0.md).

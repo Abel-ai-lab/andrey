@@ -43,7 +43,7 @@ pair, and PNL runs up to 1,470x faster and names the true direction on more pair
 
 - **95 of 95** pairs with the same ANM direction as causal-learn
 - **Up to 1,470x** PNL speedup over causal-learn
-- **94 of 100** pairs with the true PNL direction, against 45 for causal-learn
+- **94%** of pairs with the true PNL direction, against 45% for causal-learn
 :::
 
 :::{div} release-actions
