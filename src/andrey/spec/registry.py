@@ -9,6 +9,8 @@ and JSON schema render.
 from __future__ import annotations
 
 from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.search.boss import PERMUTATION_SCORES
+from andrey.search.exact import EXACT_SCORES
 from andrey.search.ges import GES_SCORES
 from andrey.search.hc import HC_SCORES
 
@@ -382,7 +384,8 @@ _add(
         family="score",
         summary="Globally optimal BIC search over DAGs (A* or dynamic programming). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
-        "the best-scoring equivalence class.",
+        "the best-scoring equivalence class. score_func=local_score_DG or local_score_CG for "
+        "mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(structure_type="graph", graph_kind="dag"),
         determinism="deterministic",
@@ -396,6 +399,15 @@ _add(
                 doc="Exact search strategy: A* or dynamic programming.",
                 choices=("astar", "dp"),
             ),
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC",
+                doc="Local score: local_score_BIC = linear-Gaussian BIC; local_score_DG and "
+                "local_score_CG = degenerate and conditional Gaussian BIC, for mixed data.",
+                choices=EXACT_SCORES,
+            ),
+            _CATEGORICAL,
         ),
         references=("Yuan & Malone 2013", "Silander & Myllymaki 2006"),
     )
@@ -439,15 +451,17 @@ _BOSS_SCORE = ParamSpec(
     name="score_func",
     type="str",
     default="local_score_BIC_from_cov",
-    doc="Local score objective (covariance-based BIC).",
-    choices=("local_score_BIC_from_cov",),
+    doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; local_score_DG "
+    "and local_score_CG = degenerate and conditional Gaussian BIC, for mixed data (experimental).",
+    choices=PERMUTATION_SCORES,
 )
 _add(
     MethodSpec(
         name="boss",
         family="permutation",
         summary="Best-order score search: a permutation search over the linear-Gaussian BIC, fast "
-        "and accurate on linear-Gaussian data. Returns a CPDAG + score.",
+        "and accurate on linear-Gaussian data; score_func=local_score_DG or local_score_CG for "
+        "mixed data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -456,7 +470,7 @@ _add(
         accel="numpy",
         status="supported",
         seeded=True,
-        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED),
+        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
     )
 )
@@ -465,7 +479,8 @@ _add(
         name="grasp",
         family="permutation",
         summary="Greedy relaxation of the sparsest permutation: a permutation search over the "
-        "linear-Gaussian BIC, like BOSS with a different move (tucks). Returns a CPDAG + score.",
+        "linear-Gaussian BIC, like BOSS with a different move (tucks); score_func=local_score_DG "
+        "or local_score_CG for mixed data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -484,6 +499,7 @@ _add(
                 doc="Maximum number of tucks in one chain of moves. Only 3 is supported.",
             ),
             _SEED,
+            _CATEGORICAL,
         ),
         references=("Lam, Andrews & Ramsey 2022",),
     )

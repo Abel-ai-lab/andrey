@@ -2,9 +2,11 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.exact_search`.
 
-A node's local score is ``n * log(resid / n) + len(parents) * log(n)``, where ``resid`` is the
-residual sum of squares of the centered node on its centered parents, solved from the Gram matrix
-(a pseudo-inverse when the parents' block is singular). Both searches run over the order graph,
+Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + len(parents) *
+log(n)``, where ``resid`` is the residual sum of squares of the centered node on its centered
+parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is singular). The
+mixed-data scores are :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`
+with ``lambda_value=1``. Both searches run over the order graph,
 whose nodes are variable subsets: the shortest path from the empty set to the full set gives each
 variable its best parent set among the variables before it. The result is the optimal DAG itself,
 not its CPDAG, and each search breaks score ties deterministically.
@@ -21,7 +23,10 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import to_structure
-from andrey.core.score import Score
+from andrey.core.score import Score, make_score
+
+#: The local scores :func:`exact_search` accepts.
+EXACT_SCORES: tuple[str, ...] = ("local_score_BIC", "local_score_DG", "local_score_CG")
 
 # One node of a variable's parent graph: its parent set, that set's local score, and the set as a
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.
@@ -207,7 +212,13 @@ def _dp_shortest_path(
     return tuple(structures)
 
 
-def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStructure:
+def exact_search(
+    data: np.ndarray,
+    *,
+    search_method: str = "astar",
+    score_func: str = "local_score_BIC",
+    categorical: np.ndarray | None = None,
+) -> GraphStructure:
     """Return the globally BIC-optimal DAG for ``data`` as a ``dag`` structure.
 
     Scores candidates with the linear-Gaussian BIC (``lambda=1``) on mean-centered data.
@@ -222,6 +233,10 @@ def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStru
         Data matrix; rows are observations, columns are variables.
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
+    score_func : str
+        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC or a mixed-data BIC.
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score.
 
     Returns
     -------
@@ -231,11 +246,19 @@ def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStru
     X = np.asarray(data, dtype=np.float64)
     if search_method not in ("astar", "dp"):
         raise ValueError(f"unknown search method {search_method!r}; use 'astar' or 'dp'")
+    if score_func not in EXACT_SCORES:
+        raise NotImplementedError(
+            f"unsupported score_func {score_func!r}; use one of {EXACT_SCORES}"
+        )
     n_vars = X.shape[1]
     if n_vars <= 1:  # no candidate parents -- the optimum is the edgeless graph
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
 
-    score = _GramBICScore(X)
+    score: Score = (
+        _GramBICScore(X)
+        if score_func == "local_score_BIC"
+        else make_score(score_func, X, categorical=categorical)
+    )
     parent_graphs = [_generate_parent_graph(score, i, n_vars) for i in range(n_vars)]
 
     if search_method == "astar":

@@ -16,7 +16,7 @@ import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BDeuScore, BICScore, CGScore, DGScore, LocalScore, penalty_weight
+from andrey.core.score import BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
@@ -369,23 +369,10 @@ def hc(
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
 
-    score: LocalScore
-    delta: DeltaBICScore | FullScoreDelta
-    if score_func == "local_score_BIC_from_cov":
-        score = BICScore(X, lambda_value=lambda_value)
-        delta = DeltaBICScore(score)
-    elif score_func == "local_score_BDeu":
-        penalty_weight(lambda_value)  # BDeu has no penalty, but the setting keeps its range
-        score = BDeuScore(X)
-        delta = FullScoreDelta(score)
-    elif score_func == "local_score_DG":
-        score = DGScore(X, categorical, lambda_value=lambda_value)
-        delta = FullScoreDelta(score)
-    elif score_func == "local_score_CG":
-        score = CGScore(X, categorical, lambda_value=lambda_value)
-        delta = FullScoreDelta(score)
-    else:
+    if score_func not in HC_SCORES:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
+    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
 
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}

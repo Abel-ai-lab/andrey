@@ -1,9 +1,9 @@
-"""Best-Order Score Search (BOSS) over a linear-Gaussian BIC score.
+"""Best-Order Score Search (BOSS) over a linear-Gaussian or mixed-data BIC score.
 
 Each variable owns a grow-shrink tree; sweeps slide variables to their best order position
-(:func:`_better_mutation`) until no move improves the total. Scores are negated
-:class:`~andrey.core.score.BICScore` local scores, so the search maximizes. The algorithm and its
-reference are described on :func:`andrey.boss`.
+(:func:`_better_mutation`) until no move improves the total. Scores are negated local scores, so
+the search maximizes; BIC moves take the Schur update, the mixed-data scores two full scores. The
+algorithm and its reference are described on :func:`andrey.boss`.
 """
 
 from __future__ import annotations
@@ -15,8 +15,15 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore
+from andrey.core.score import BICScore, LocalScore, make_score
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+
+#: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
+PERMUTATION_SCORES: tuple[str, ...] = (
+    "local_score_BIC_from_cov",
+    "local_score_DG",
+    "local_score_CG",
+)
 
 # Fixed absolute BIC-score tolerance for numerical ties.
 _SCORE_EPS = 1e-6
@@ -134,7 +141,13 @@ class _GrowShrinkTree:
 
     __slots__ = ("vertex", "score", "delta", "n_features", "empty_score", "root")
 
-    def __init__(self, vertex: int, score: BICScore, delta: DeltaBICScore, n_features: int) -> None:
+    def __init__(
+        self,
+        vertex: int,
+        score: LocalScore,
+        delta: DeltaBICScore | FullScoreDelta,
+        n_features: int,
+    ) -> None:
         self.vertex = vertex
         self.score = score
         self.delta = delta
@@ -214,9 +227,14 @@ def _better_mutation(
 
 
 def boss(
-    data: np.ndarray, *, lambda_value: float = 1.0, random_state: int = 0
+    data: np.ndarray,
+    *,
+    lambda_value: float = 1.0,
+    random_state: int = 0,
+    score_func: str = "local_score_BIC_from_cov",
+    categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Learn a CPDAG from ``data`` by best-order score search and return it with its total BIC.
+    """Learn a CPDAG from ``data`` by best-order score search and return it with its total score.
 
     Parameters
     ----------
@@ -226,13 +244,18 @@ def boss(
         Weight on the BIC complexity term of the deviance the search minimizes.
     random_state : int
         Seed for the sweep-order RNG.
+    score_func : str
+        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC or a mixed-data
+        BIC (:class:`~andrey.core.score.DGScore`, :class:`~andrey.core.score.CGScore`).
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score.
 
     Returns
     -------
     GraphStructure
         The learned CPDAG (``kind="cpdag"``).
     float
-        The total negated BIC of the learned order's DAG -- the sum of each variable's local score
+        The total score of the learned order's DAG -- the sum of each variable's local score
         given its traced parents (lower is better, matching :meth:`BICScore.score`).
 
     Notes
@@ -244,8 +267,12 @@ def boss(
     if p == 0:
         return to_structure(np.zeros((0, 0), dtype=np.int8), kind="cpdag"), 0.0
 
-    score = BICScore(X, lambda_value=lambda_value)
-    delta = DeltaBICScore(score)
+    if score_func not in PERMUTATION_SCORES:
+        raise NotImplementedError(
+            f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
+        )
+    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
 
     order = list(range(p))

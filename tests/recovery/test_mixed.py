@@ -55,6 +55,10 @@ CPDAG_FITS = {
     "ges-cg": lambda x, c: andrey.ges(x, score_func="local_score_CG", categorical=c),
     "hc-dg": lambda x, c: andrey.hc(x, score_func="local_score_DG", categorical=c),
     "hc-cg": lambda x, c: andrey.hc(x, score_func="local_score_CG", categorical=c),
+    "boss-dg": lambda x, c: andrey.boss(x, score_func="local_score_DG", categorical=c),
+    "boss-cg": lambda x, c: andrey.boss(x, score_func="local_score_CG", categorical=c),
+    "grasp-dg": lambda x, c: andrey.grasp(x, score_func="local_score_DG", categorical=c),
+    "grasp-cg": lambda x, c: andrey.grasp(x, score_func="local_score_CG", categorical=c),
     "cdnod-cg": lambda x, c: andrey.cdnod(x, np.zeros(len(x)), indep_test="cg", categorical=c),
 }
 PAG_FITS = {
@@ -88,6 +92,15 @@ def test_pag_methods_find_the_skeleton_and_the_collider(fit):
     assert {(a, b) for a, b, _ in out.structure.oriented_edges()} == DIRECTED | UNDIRECTED
     marks = out.structure.to_numpy()
     assert marks[2, 0] == ARROW and marks[2, 1] == ARROW  # M[i, j] is the mark at i
+
+
+@pytest.mark.parametrize("score_func", ["local_score_DG", "local_score_CG"])
+def test_exact_search_finds_a_dag_in_the_true_class(score_func):
+    out = andrey.exact_search(_network(), score_func=score_func, categorical=CATEGORICAL)
+    assert out.structure.kind == "dag"
+    cpdag = to_cpdag(out.structure)
+    assert {(a, b) for a, b, k in cpdag.oriented_edges() if k == "directed"} == DIRECTED
+    assert {(a, b) for a, b, k in cpdag.oriented_edges() if k == "undirected"} == UNDIRECTED
 
 
 @pytest.mark.parametrize("fit", [*CPDAG_FITS, *PAG_FITS])
@@ -158,7 +171,7 @@ def random_network():
     return sample_mixed(**_RANDOM)
 
 
-@pytest.mark.parametrize("fit", ["pc-dg", "pc-cg", "ges-dg", "ges-cg"])
+@pytest.mark.parametrize("fit", ["pc-dg", "pc-cg", "ges-dg", "ges-cg", "boss-dg", "boss-cg"])
 def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
     truth = to_cpdag(random_network.graph)
     assert shd(np.zeros((_RANDOM["d"],) * 2), truth) == 10

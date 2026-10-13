@@ -17,8 +17,13 @@ from scipy.stats import chi2, kstest, multivariate_normal
 from andrey.core.ci import CGTest, ChiSquare, DGTest, make_indep_test
 from andrey.core.mixed import ConditionalGaussian, column_mask
 from andrey.core.score import BICScore, CGScore, DGScore
+from andrey.core.score_delta import FullScoreDelta
 from andrey.data import sample_scm
+from andrey.metrics import to_cpdag
+from andrey.search.boss import boss
+from andrey.search.exact import exact_search
 from andrey.search.ges import ges
+from andrey.search.grasp import grasp
 from andrey.search.hc import hc
 
 
@@ -166,7 +171,13 @@ def test_dg_score_equals_the_bic_on_continuous_columns():
 
 
 @pytest.mark.parametrize(
-    ("search", "bic"), [(ges, "local_score_BIC"), (hc, "local_score_BIC_from_cov")]
+    ("search", "bic"),
+    [
+        (ges, "local_score_BIC"),
+        (hc, "local_score_BIC_from_cov"),
+        (boss, "local_score_BIC_from_cov"),
+        (grasp, "local_score_BIC_from_cov"),
+    ],
 )
 def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
     x = sample_scm(d=8, n=1000, seed=0, density=2.0).data
@@ -174,6 +185,20 @@ def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
     bic_graph, bic_score = search(x, score_func=bic)
     assert np.array_equal(dg_graph.to_numpy(), bic_graph.to_numpy())
     assert dg_score == bic_score
+
+
+def test_exact_search_with_dg_on_continuous_columns_finds_the_bic_equivalence_class():
+    x = sample_scm(d=5, n=1000, seed=0, density=2.0).data
+    dg = to_cpdag(exact_search(x, score_func="local_score_DG"))
+    assert np.array_equal(dg.to_numpy(), to_cpdag(exact_search(x)).to_numpy())
+
+
+def test_full_score_batches_are_the_local_scores():
+    x, mask = _mixed()
+    score = CGScore(x, mask)
+    moves = [("add", 1), ("add", 2), ("remove", 0)]
+    expected = [score.score(3, [0, 1]), score.score(3, [0, 2]), score.score(3, [])]
+    assert FullScoreDelta(score).score_many_with_base(3, [0], moves) == expected
 
 
 @pytest.mark.parametrize(("node", "parents"), [(0, ()), (0, (1,)), (0, (1, 2)), (3, (0, 2))])

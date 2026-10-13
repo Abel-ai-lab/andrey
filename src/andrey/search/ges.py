@@ -12,15 +12,7 @@ import numpy as np
 
 from andrey.core import GraphStructure, _bitset, backend
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
-from andrey.core.score import (
-    BDeuScore,
-    BICScore,
-    CGScore,
-    DGScore,
-    LocalScore,
-    Score,
-    penalty_weight,
-)
+from andrey.core.score import Score, make_score
 from andrey.search import operators as ops
 
 
@@ -160,18 +152,9 @@ def ges(
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
     max_parents = n / 2 if maxP is None else maxP
-    score: LocalScore
-    if score_func == "local_score_BIC":
-        score = BICScore(X, lambda_value=lambda_value)
-    elif score_func == "local_score_BDeu":
-        penalty_weight(lambda_value)  # BDeu has no penalty, but the setting keeps its range
-        score = BDeuScore(X)
-    elif score_func == "local_score_DG":
-        score = DGScore(X, categorical, lambda_value=lambda_value)
-    elif score_func == "local_score_CG":
-        score = CGScore(X, categorical, lambda_value=lambda_value)
-    else:
+    if score_func not in GES_SCORES:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {GES_SCORES}")
+    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
 
     adj = np.zeros((n, n), dtype=np.int8)
     # Local import breaks the ges <-> _parallel_ges cycle.

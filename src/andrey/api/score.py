@@ -608,7 +608,13 @@ def tabu(
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
-def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> StructureOutput:
+def exact_search(
+    data: npt.ArrayLike,
+    *,
+    search_method: str = "astar",
+    score_func: str = "local_score_BIC",
+    categorical: Sequence[str | int] | None = None,
+) -> StructureOutput:
     """Learn the globally optimal DAG for the BIC score by exact search.
 
     The optimum is identified up to its Markov equivalence class. A* (``search_method="astar"``)
@@ -622,6 +628,14 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
         become the structure's ``labels``.
     search_method : {"astar", "dp"}, default="astar"
         Exact search strategy: A* search or dynamic programming.
+    score_func : {"local_score_BIC", "local_score_DG", "local_score_CG"}, default="local_score_BIC"
+        Local score: the linear-Gaussian BIC, or the degenerate or conditional Gaussian BIC for
+        mixed data, as for :func:`~andrey.ges`. Each uses the standard penalty,
+        ``lambda_value=1``.
+    categorical : sequence of str or int, optional
+        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
+        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
+        columns, as for :func:`~andrey.ges`. The BIC rejects it.
 
     Returns
     -------
@@ -631,8 +645,13 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
 
     Raises
     ------
+    NotImplementedError
+        If ``score_func`` names no available score.
+    TypeError
+        If ``categorical`` is not a list of column names and positions.
     ValueError
-        If ``search_method`` is not ``"astar"`` or ``"dp"``.
+        If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical``
+        does not suit the score, as for :func:`~andrey.ges`.
 
     Warns
     -----
@@ -642,7 +661,13 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
 
     Notes
     -----
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 5 variables with 1,000 rows.
+    **Mixed data.** ``"local_score_DG"`` [3]_ and ``"local_score_CG"`` [4]_ score data with
+    continuous and categorical columns, as :func:`~andrey.ges` describes, and read the categorical
+    columns as :func:`~andrey.pc` does. Both give equivalent graphs the same score, so the optimum
+    is again identified up to its equivalence class.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 5 variables with 1,000 rows,
+    and with a mixed-data score on 5 variables with 3,000 rows.
     It scores every possible parent set of every variable, so its run time at least doubles with
     each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
     its memory doubles as well.
@@ -653,6 +678,10 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
        perspective. https://doi.org/10.1613/jair.4039
     .. [2] Silander, T., and Myllymaki, P. (2006). A simple approach for finding the globally
        optimal Bayesian network structure. https://arxiv.org/abs/1206.6875
+    .. [3] Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed
+       acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
+    .. [4] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
+       variables. International Journal of Data Science and Analytics 6(1), 3-18.
 
     Examples
     --------
@@ -666,11 +695,14 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     'dag'
     """
     warn_experimental("exact_search")
+    from andrey.search.exact import EXACT_SCORES
     from andrey.search.exact import exact_search as _exact
 
-    X = data_matrix(data)
+    if score_func not in EXACT_SCORES:
+        raise NotImplementedError(f"exact_search supports {EXACT_SCORES}, not {score_func!r}")
+    X, mask = checked_data(data, categorical, "score_func", score_func)
     labels = column_labels(data)
-    dag = _exact(X, search_method=search_method)
+    dag = _exact(X, search_method=search_method, score_func=score_func, categorical=mask)
     return structure_output(dag, labels=labels, metadata={"algorithm": "ExactSearch"})
 
 

@@ -2,19 +2,22 @@
 
 ``boss`` and ``grasp`` are native -- they run a permutation/score search on the :mod:`andrey.core`
 compute substrate and return a CPDAG ``GraphStructure`` with its objective score. Both score
-candidate parent additions through the batched Schur delta-BIC surface over the linear-Gaussian
-BIC (:class:`andrey.core.score.BICScore`). Their search order is drawn from a private RNG seeded by
-``seed`` (or the global ``ANDREY_SEED``), so a run is reproducible.
+candidate parent additions through the batched Schur delta-BIC surface over the linear-Gaussian BIC
+(:class:`andrey.core.score.BICScore`), or by full local scores over a mixed-data BIC. Their search
+order is drawn from a private RNG seeded by ``seed`` (or the global ``ANDREY_SEED``), so a run is
+reproducible.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from andrey.api._adapt import column_labels, data_matrix, json_safe, structure_output
+from andrey.api._adapt import checked_data, column_labels, json_safe, structure_output
 from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
@@ -26,6 +29,7 @@ def boss(
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
     seed: int | None = None,
+    categorical: Sequence[str | int] | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG with BOSS (Best Order Score Search).
 
@@ -38,31 +42,41 @@ def boss(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Local score objective (covariance-based BIC). Only this option is supported.
+    score_func : {"local_score_BIC_from_cov", "local_score_DG", "local_score_CG"}
+        Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
+        linear-Gaussian BIC; ``"local_score_DG"`` and ``"local_score_CG"`` are the degenerate and
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
-        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
+        be finite and non-negative.
     seed : int or None, default=None
         Seed for the random order in which the search visits variables. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
         the same graph. Different seeds can reach different graphs.
+    categorical : sequence of str or int, optional
+        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
+        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
+        columns, as for :func:`~andrey.ges`. The BIC rejects it.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"BOSS"`` and ``metadata["score"]`` the BIC score of the DAG read off the final order,
-        the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
+        ``"BOSS"`` and ``metadata["score"]`` the score of the DAG read off the final order; for
+        the BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n)
+        * n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+        If ``score_func`` names no available score.
+    TypeError
+        If ``categorical`` is not a list of column names and positions.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
+        suit the score, as for :func:`~andrey.ges`.
 
     See Also
     --------
@@ -98,12 +112,18 @@ def boss(
     shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties. The
     earliest order position wins; among candidate parents, the lowest column index wins.
 
+    **Mixed data.** ``"local_score_DG"`` [3]_ and ``"local_score_CG"`` [4]_ score data with
+    continuous and categorical columns, as :func:`~andrey.ges` describes, and read the categorical
+    columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full local scores,
+    without the Schur update the BIC search uses.
+
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 800 variables with ten rows per variable, at ``lambda_value=4.0``: its
     median errors (SHD) stayed below the empty graph's at every size, 24 against 800 at 800
     variables. The median fit took 0.031 s at 20 variables and 292 s at 800, on 16 cores. On the
     223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``, its median errors
-    passed the empty graph's (506 against 338).
+    passed the empty graph's (506 against 338). The mixed-data scores are experimental and not
+    benchmarked yet; their tests run BOSS on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -112,6 +132,10 @@ def boss(
        Shrink Trees. NeurIPS 36. https://doi.org/10.52202/075280-2794
     .. [2] Lam, W.-Y., Andrews, B., and Ramsey, J. (2022). Greedy Relaxations of the Sparsest
        Permutation Algorithm. UAI, PMLR 180:1052-1062. https://proceedings.mlr.press/v180/lam22a.html
+    .. [3] Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed
+       acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
+    .. [4] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
+       variables. International Journal of Data Science and Analytics 6(1), 3-18.
 
     Examples
     --------
@@ -125,13 +149,20 @@ def boss(
     >>> boss(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
     """
+    from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.boss import boss as _boss
 
-    if score_func != "local_score_BIC_from_cov":
-        raise NotImplementedError(f"BOSS supports 'local_score_BIC_from_cov', not {score_func!r}")
-    X = data_matrix(data)
+    if score_func not in PERMUTATION_SCORES:
+        raise NotImplementedError(f"BOSS supports {PERMUTATION_SCORES}, not {score_func!r}")
+    X, mask = checked_data(data, categorical, "score_func", score_func)
     labels = column_labels(data)
-    cpdag, score = _boss(X, lambda_value=lambda_value, random_state=resolve_seed(seed))
+    cpdag, score = _boss(
+        X,
+        lambda_value=lambda_value,
+        random_state=resolve_seed(seed),
+        score_func=score_func,
+        categorical=mask,
+    )
     metadata = {"algorithm": "BOSS", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -143,6 +174,7 @@ def grasp(
     lambda_value: float = 1.0,
     depth: int = 3,
     seed: int | None = None,
+    categorical: Sequence[str | int] | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG with GRaSP (Greedy Relaxation of the Sparsest Permutation).
 
@@ -156,33 +188,43 @@ def grasp(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Local score objective (covariance-based BIC). Only this option is supported.
+    score_func : {"local_score_BIC_from_cov", "local_score_DG", "local_score_CG"}
+        Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
+        linear-Gaussian BIC; ``"local_score_DG"`` and ``"local_score_CG"`` are the degenerate and
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
-        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
+        be finite and non-negative.
     depth : int, default=3
         Maximum number of tucks in one chain of moves. Only ``3`` is supported.
     seed : int or None, default=None
         Seed for the random starting order and the order in which the search visits variables.
         ``None`` uses the ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so
         repeated calls return the same graph. Different seeds can reach different graphs.
+    categorical : sequence of str or int, optional
+        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
+        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
+        columns, as for :func:`~andrey.ges`. The BIC rejects it.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GRaSP"`` and ``metadata["score"]`` the BIC score of the DAG read off the final order,
-        the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
+        ``"GRaSP"`` and ``metadata["score"]`` the score of the DAG read off the final order; for
+        the BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n)
+        * n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC_from_cov"``, or ``depth`` is not ``3``.
+        If ``score_func`` names no available score, or ``depth`` is not ``3``.
+    TypeError
+        If ``categorical`` is not a list of column names and positions.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
+        suit the score, as for :func:`~andrey.ges`.
 
     See Also
     --------
@@ -222,12 +264,19 @@ def grasp(
     Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
     :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged.
 
+    **Mixed data.** ``"local_score_DG"`` [3]_ and ``"local_score_CG"`` [4]_ score data with
+    continuous and categorical columns, as :func:`~andrey.ges` describes, and read the categorical
+    columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full local scores,
+    without the Schur update the BIC search uses.
+
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 400 variables with ten rows per variable, at ``lambda_value=4.0``: its
     median errors (SHD) stayed below the empty graph's at every size, 0 against 400 at 400
     variables. The median fit took 0.037 s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16
     cores; larger graphs were not measured. On the 223-variable ANDES network with 1,000 simulated
-    rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338).
+    rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338). The
+    mixed-data scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables
+    with 3,000 rows.
 
     References
     ----------
@@ -236,6 +285,10 @@ def grasp(
     .. [2] Andrews, B., Ramsey, J., Sanchez Romero, R., Camchong, J., and Kummerfeld, E. (2023).
        Fast Scalable and Accurate Discovery of DAGs Using the Best Order Score Search and Grow
        Shrink Trees. NeurIPS 36. https://doi.org/10.52202/075280-2794
+    .. [3] Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed
+       acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
+    .. [4] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
+       variables. International Journal of Data Science and Analytics 6(1), 3-18.
 
     Examples
     --------
@@ -249,14 +302,21 @@ def grasp(
     >>> grasp(pd.DataFrame({"x": x, "y": y, "z": z})).structure.oriented_edges()
     [('x', 'z', 'directed'), ('y', 'z', 'directed')]
     """
+    from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.grasp import grasp as _grasp
 
-    if score_func != "local_score_BIC_from_cov":
-        raise NotImplementedError(f"GRaSP supports 'local_score_BIC_from_cov', not {score_func!r}")
+    if score_func not in PERMUTATION_SCORES:
+        raise NotImplementedError(f"GRaSP supports {PERMUTATION_SCORES}, not {score_func!r}")
     if depth != 3:
         raise NotImplementedError(f"GRaSP supports depth=3, not {depth!r}")
-    X = data_matrix(data)
+    X, mask = checked_data(data, categorical, "score_func", score_func)
     labels = column_labels(data)
-    cpdag, score = _grasp(X, lambda_value=lambda_value, random_state=resolve_seed(seed))
+    cpdag, score = _grasp(
+        X,
+        lambda_value=lambda_value,
+        random_state=resolve_seed(seed),
+        score_func=score_func,
+        categorical=mask,
+    )
     metadata = {"algorithm": "GRaSP", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)

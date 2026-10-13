@@ -947,3 +947,13 @@ class FullScoreDelta:
         """Return RAW deltas ``[score(i, base +/- u_k) - score(i, base)]`` for single moves."""
         base = tuple(sorted(int(p) for p in base_parents))
         return [_delta_two_scores(self.score_obj, int(i), base, u, op) for op, u in deltas]
+
+    def score_many_with_base(
+        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+    ) -> list[float]:
+        """Return absolute scores ``[score(i, base +/- u_k)]`` for single moves."""
+        base = [int(p) for p in base_parents]
+        return [
+            self.score_obj.score(int(i), [*base, u] if op == "add" else [p for p in base if p != u])
+            for op, u in deltas
+        ]

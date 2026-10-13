@@ -371,6 +371,11 @@ MIXED = {
     ),
     ("ges", "local_score_CG"): lambda x, **kw: andrey.ges(x, score_func="local_score_CG", **kw),
     ("hc", "local_score_DG"): lambda x, **kw: andrey.hc(x, score_func="local_score_DG", **kw),
+    ("boss", "local_score_CG"): lambda x, **kw: andrey.boss(x, score_func="local_score_CG", **kw),
+    ("grasp", "local_score_DG"): lambda x, **kw: andrey.grasp(x, score_func="local_score_DG", **kw),
+    ("exact_search", "local_score_CG"): lambda x, **kw: andrey.exact_search(
+        x, score_func="local_score_CG", **kw
+    ),
 }
 
 
@@ -416,12 +421,15 @@ def test_categorical_lists_columns_the_data_has(data, categorical, error, messag
         andrey.pc(x, indep_test="dg", categorical=categorical)
 
 
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     "fit",
     [
         lambda x: andrey.pc(x, categorical=[0]),
         lambda x: andrey.pc(x, indep_test="chisq", categorical=[0]),
         lambda x: andrey.ges(x, categorical=[0]),
+        lambda x: andrey.boss(x, categorical=[0]),
+        lambda x: andrey.exact_search(x, categorical=[0]),
     ],
 )
 def test_a_setting_that_reads_no_column_types_rejects_categorical(fit):
