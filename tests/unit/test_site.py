@@ -764,13 +764,24 @@ def test_every_partial_mark_says_what_it_covers():
     assert table.count(" title=") == len(notes) and "compare-note-" not in table
     for _, _, _, note in notes:
         assert f"Partly: {build.escape(note)}</span>" in table
-    bad = list(build.COMPARISON) + [("Methods", "Unexplained", ("yes", "part", "no", "no"), {})]
+    bad = list(build.COMPARISON) + [("Coverage", "Unexplained", ("yes", "part", "no", "no"), {})]
     original, build.COMPARISON = build.COMPARISON, tuple(bad)
     try:
         with pytest.raises(ValueError, match="in part"):
             build.comparison_notes()
     finally:
         build.COMPARISON = original
+
+
+def test_the_comparison_table_has_three_groups_with_a_mark_for_every_package():
+    groups = list(dict.fromkeys(group for group, *_ in build.COMPARISON))
+    assert groups == ["Interface", "Coverage", "Speed"]
+    # A group's rows sit together, so each group heads the table once.
+    table = build.comparison_table()
+    assert table.count('<tr class="compare-group">') == len(groups)
+    for _, feature, marks, _ in build.COMPARISON:
+        assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
+    assert table.count('<th scope="col">') == len(build.PEERS)
 
 
 def test_interface_example_returns_three_graph_types():

@@ -90,7 +90,8 @@ package on the same true graphs, so compare accuracy there rather than edge by e
 
 The [benchmarks](benchmarks.md) show Andrey side by side with causal-learn, gCastle, and lingam
 on the same data and machines: fit time, error counts, and where Andrey is not faster. The
-[homepage](https://andrey.abel.ai/#compare) compares their interfaces and methods.
+[homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and
+speed support.
 
 ### Why is it faster?
 
