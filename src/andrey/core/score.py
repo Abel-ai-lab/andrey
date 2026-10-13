@@ -455,9 +455,10 @@ class CGScore:
 
     The variables are fit as :class:`~andrey.core.mixed.ConditionalGaussian` describes: the rows
     split into the cells of the categorical variables' joint categories, the continuous variables
-    Gaussian within each cell. With ``l(A)`` the maximized log-likelihood of the set ``A`` and
-    ``k(A)`` its parameter count, a node is scored given its parents by the model of the node and
-    its parents together divided by the model of the parents alone [1]_. With ``F`` the node and its
+    Gaussian within each cell, with a covariance shrunk toward that of all rows. With ``l(A)`` the
+    log-likelihood of the set ``A`` and ``k(A)`` its parameter count, a node is scored given its
+    parents by the model of the node and its parents together divided by the model of the parents
+    alone [1]_. With ``F`` the node and its
     parents and ``P`` the parents,
 
     ``-2 * (l(F) - l(P)) + lambda_value * log(n) * (k(F) - k(P))``

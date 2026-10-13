@@ -436,9 +436,10 @@ class CGTest:
 
     The variables are fit as :class:`~andrey.core.mixed.ConditionalGaussian` describes: the rows
     split into the cells of the categorical variables' joint categories, the continuous variables
-    Gaussian within each cell [1]_. With ``l(A)`` the maximized log-likelihood of the set ``A`` and
-    ``k(A)`` its parameter count, the test of ``x`` and ``y`` given ``S`` compares the model of
-    ``x`` given ``y`` and ``S`` with the model of ``x`` given ``S`` [1]_:
+    Gaussian within each cell, with a covariance shrunk toward that of all rows [1]_. With ``l(A)``
+    the log-likelihood of the set ``A`` and ``k(A)`` its parameter count, the test of ``x`` and
+    ``y`` given ``S`` compares the model of ``x`` given ``y`` and ``S`` with the model of ``x``
+    given ``S`` [1]_:
 
     ``2 * (l(x, y, S) - l(y, S) - l(x, S) + l(S))``
 

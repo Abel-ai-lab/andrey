@@ -3,7 +3,7 @@
 Each likelihood is checked against an independent computation: SciPy's multivariate normal density
 on the rows of each joint category, least-squares regressions on indicator columns written out by
 hand, and the partial correlation of two residuals. The tests' p-values are checked to be uniform
-on simulated data where the independence holds.
+on simulated data where the independence holds, a category of two rows included.
 """
 
 from __future__ import annotations
@@ -47,17 +47,33 @@ def _cells(x: np.ndarray, columns: list[int]) -> list[np.ndarray]:
 
 
 def _cg_loglik(x: np.ndarray, mask: np.ndarray, variables: list[int]) -> float:
-    """The conditional Gaussian log-likelihood, one multivariate normal per joint category."""
+    """The conditional Gaussian log-likelihood, one multivariate normal per joint category.
+
+    Each category's normal has the category's mean and its covariance shrunk toward the covariance
+    of all rows by one pseudo-row, ``(n_c S_c + R) / (n_c + 1)``.
+    """
     discrete = [v for v in variables if mask[v]]
     continuous = [v for v in variables if not mask[v]]
+    if continuous:
+        overall = np.atleast_2d(np.cov(x[:, continuous], rowvar=False, ddof=0))
     total = 0.0
     for rows in _cells(x, discrete):
         total += len(rows) * math.log(len(rows) / len(x))
         if continuous:
             values = x[np.ix_(rows, continuous)]
-            cov = np.atleast_2d(np.cov(values, rowvar=False, ddof=0))
-            total += multivariate_normal(values.mean(axis=0), cov).logpdf(values).sum()
+            mean = values.mean(axis=0)
+            own = (values - mean).T @ (values - mean)  # n_c times the cell's covariance
+            cov = (own + overall) / (len(rows) + 1)
+            total += multivariate_normal(mean, cov).logpdf(values).sum()
     return total
+
+
+def _with_rare_category(x: np.ndarray) -> np.ndarray:
+    """Give the first two rows a fourth category of column 0, too few rows for its own
+    two-variable covariance."""
+    x = x.copy()
+    x[:2, 0] = 7.0
+    return x
 
 
 def _embed(x: np.ndarray, mask: np.ndarray, variables: list[int]) -> np.ndarray:
@@ -82,29 +98,28 @@ def _log_det_mle(residuals: np.ndarray) -> float:
     return float(np.linalg.slogdet(residuals.T @ residuals / len(residuals))[1])
 
 
+@pytest.mark.parametrize("rare", [False, True], ids=["common categories", "a two-row category"])
 @pytest.mark.parametrize("variables", [[0], [1], [0, 2], [1, 3], [0, 1], [0, 1, 2, 3], []])
-def test_cg_loglik_is_a_gaussian_per_joint_category(variables):
+def test_cg_loglik_is_a_gaussian_per_joint_category(variables, rare):
     x, mask = _mixed()
+    x = _with_rare_category(x) if rare else x
     assert ConditionalGaussian(x, mask).loglik(variables) == pytest.approx(
         _cg_loglik(x, mask, variables), rel=1e-12, abs=1e-9
     )
 
 
-def test_cg_cell_with_too_few_rows_takes_the_mean_and_covariance_of_all_rows():
-    x, mask = _mixed(n=300)
-    x[:2, 0] = 7.0  # a fourth category of two rows: too few for a two-variable covariance
-    model = ConditionalGaussian(x, mask)
-    rare = np.arange(2)
-    common = np.arange(2, len(x))
-    values = x[:, [1, 3]]
-    pooled = multivariate_normal(values.mean(axis=0), np.cov(values, rowvar=False, ddof=0))
-    expected = 2 * math.log(2 / len(x)) + pooled.logpdf(values[rare]).sum()
-    for rows in _cells(x[common], [0]):
-        rows = common[rows]
-        expected += len(rows) * math.log(len(rows) / len(x))
-        cov = np.cov(values[rows], rowvar=False, ddof=0)
-        expected += multivariate_normal(values[rows].mean(axis=0), cov).logpdf(values[rows]).sum()
-    assert model.loglik([0, 1, 3]) == pytest.approx(expected, rel=1e-12)
+def test_cg_covers_a_cell_too_small_for_its_own_covariance():
+    """The two-row category's covariance of two variables is singular on its own; shrunk toward
+    all rows it is not, so the likelihood is finite."""
+    x, mask = _mixed()
+    assert np.isfinite(ConditionalGaussian(_with_rare_category(x), mask).loglik([0, 1, 3]))
+
+
+def test_cg_rejects_collinear_continuous_columns():
+    x, mask = _mixed()
+    x[:, 3] = 2.0 * x[:, 1] + 1.0
+    with pytest.raises(ValueError, match="collinear"):
+        ConditionalGaussian(x, mask).loglik([1, 3])
 
 
 def test_cg_counts_parameters_for_every_joint_category():
@@ -127,11 +142,12 @@ def test_cg_score_is_the_family_likelihood_over_the_parents_likelihood():
         assert score.score(node, parents) == pytest.approx(expected, rel=1e-10)
 
 
-def test_cg_score_of_a_conditional_gaussian_network_is_its_bic():
+def test_cg_score_of_a_conditional_gaussian_network_is_close_to_its_bic():
     """On the DAG ``a -> x -> y <- b``, where no categorical variable has a continuous parent, the
-    total score is ``-2`` times the log-likelihood of each variable's own model, plus the penalty:
-    category frequencies for ``a`` and ``b``, a regression per category of ``a`` for ``x``, and one
-    per category of ``b`` for ``y`` on ``x``."""
+    total score is close to ``-2`` times the maximized log-likelihood of each variable's own model,
+    plus the penalty: category frequencies for ``a`` and ``b``, a regression per category of ``a``
+    for ``x``, and one per category of ``b`` for ``y`` on ``x``. The pseudo-row moves each
+    category, of more than 100 rows here, off its maximum by little."""
     x, mask = _mixed()
     n = len(x)
     loglik, dof = 0.0, 0
@@ -147,14 +163,15 @@ def test_cg_score_of_a_conditional_gaussian_network_is_its_bic():
             dof += len(regressors) + 2  # intercept, slopes, variance
     score = CGScore(x, mask)
     total = sum(score.score(v, p) for v, p in [(0, ()), (1, (0,)), (2, ()), (3, (1, 2))])
-    assert total == pytest.approx(-2.0 * loglik + math.log(n) * dof, rel=1e-12)
+    assert total == pytest.approx(-2.0 * loglik + math.log(n) * dof, abs=0.1)
 
 
+@pytest.mark.parametrize("rare", [False, True], ids=["common categories", "a two-row category"])
 @pytest.mark.parametrize("make", [CGScore, DGScore])
-def test_equivalent_graphs_score_the_same(make):
+def test_equivalent_graphs_score_the_same(make, rare):
     """``a -> x -> y`` and ``a <- x <- y`` differ by reversing covered edges."""
     x, mask = _mixed()
-    score = make(x, mask)
+    score = make(_with_rare_category(x) if rare else x, mask)
     forward = score.score(0, ()) + score.score(1, (0,)) + score.score(3, (1,))
     backward = score.score(3, ()) + score.score(1, (3,)) + score.score(0, (1,))
     assert forward == pytest.approx(backward, rel=1e-12)
@@ -288,6 +305,11 @@ def _null(case: str, rng: np.random.Generator, n: int):
     if case == "category and continuous":
         x = rng.integers(0, 4, n)
         return np.column_stack([x, rng.standard_normal(n)]), np.array([True, False]), (0, 1, ())
+    if case == "continuous pair given a category of two rows":
+        z = np.r_[np.full(2, 3), rng.integers(0, 3, n - 2)]
+        a = np.array([0.0, 1.5, -1.0, 0.5])[z] + rng.standard_normal(n)
+        b = np.array([0.5, -1.0, 1.0, 0.0])[z] + rng.standard_normal(n)
+        return np.column_stack([a, b, z]), np.array([False, False, True]), (0, 1, (2,))
     raise KeyError(case)
 
 
@@ -299,6 +321,7 @@ def _null(case: str, rng: np.random.Generator, n: int):
         "category and continuous given continuous",
         "two categories given continuous",
         "category and continuous",
+        "continuous pair given a category of two rows",
     ],
 )
 def test_p_values_are_uniform_when_the_independence_holds(make, case):

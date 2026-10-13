@@ -10,7 +10,8 @@ matrix of these embedded columns answers every query.
 
 :class:`ConditionalGaussian` splits the rows into cells, one per joint category of a set's
 categorical variables that occurs, and fits the set's continuous variables in each cell with a
-Gaussian of the cell's own mean and covariance; the cell sizes follow a multinomial [2]_.
+Gaussian of the cell's own mean and a covariance shrunk toward that of all rows; the cell sizes
+follow a multinomial [2]_ [3]_.
 
 References
 ----------
@@ -19,6 +20,8 @@ References
 .. [2] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
    variables. International Journal of Data Science and Analytics 6(1), 3-18.
    https://doi.org/10.1007/s41060-017-0085-7
+.. [3] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
+   Statistical Association 84(405), 165-175.
 """
 
 from __future__ import annotations
@@ -33,7 +36,7 @@ import numpy.typing as npt
 from . import categorical as categories
 from . import stats
 
-# A cell's covariance, on the scale of the standardized columns, counts as singular when its least
+# A fitted covariance, on the scale of the standardized columns, counts as singular when its least
 # eigenvalue is at most this.
 _SINGULAR = 1e-12
 _LOG_2PI = math.log(2.0 * math.pi)
@@ -120,20 +123,26 @@ class DegenerateGaussian:
 
 
 class ConditionalGaussian:
-    """Maximized conditional Gaussian log-likelihoods and parameter counts of variable sets.
+    """Conditional Gaussian log-likelihoods and parameter counts of variable sets.
 
     For a set of variables, the rows split into cells, one per joint category of the set's
-    categorical variables that occurs in the data. With ``n_c`` rows in cell ``c`` and ``d``
-    continuous variables in the set, the log-likelihood is [1]_
+    categorical variables that occurs in the data [1]_. With ``n_c`` rows in cell ``c`` and ``d``
+    continuous variables in the set, the cell's continuous variables are fit with a Gaussian of
+    the cell's mean and the covariance
 
-    ``sum_c [n_c log(n_c / n) - n_c / 2 (log det S_c + d log(2 pi) + d)]``
+    ``C_c = (n_c S_c + R) / (n_c + 1)``
 
-    where ``S_c`` is the cell's maximum-likelihood covariance of the continuous variables, about
-    the cell's mean. A cell whose covariance is singular, such as one with ``d`` rows or fewer,
-    instead takes the mean and covariance of all the rows. The parameter count is
-    ``K (d (d + 3) / 2 + 1) - 1``, with ``K`` the product of the categorical variables' numbers of
-    categories: a mean, a covariance, and a weight for every joint category, whether it occurs or
-    not, less one weight, since the weights sum to one.
+    where ``S_c`` is the cell's maximum-likelihood covariance, about its mean, and ``R`` the
+    covariance of all the rows: the cell's estimate shrunk toward ``R`` by one pseudo-row, as in
+    regularized discriminant analysis [2]_. A large cell keeps nearly its own estimate, and a cell
+    with too few rows for its own, such as one with ``d`` rows or fewer, takes mostly ``R``'s, so
+    every set has a finite log-likelihood, and nested sets are fit alike. The log-likelihood is
+
+    ``sum_c [n_c log(n_c / n) - n_c / 2 (log det C_c + d log(2 pi) + tr(C_c^-1 S_c))]``
+
+    and the parameter count is ``K (d (d + 3) / 2 + 1) - 1``, with ``K`` the product of the
+    categorical variables' numbers of categories: a mean, a covariance, and a weight for every joint
+    category, whether it occurs or not, less one weight, since the weights sum to one.
 
     Log-likelihoods are memoized by the sorted set of variables.
 
@@ -150,12 +159,15 @@ class ConditionalGaussian:
     Raises
     ------
     ValueError
-        If a continuous column is constant.
+        If a continuous column is constant; :meth:`loglik` also raises one for a set whose
+        continuous columns are collinear.
 
     References
     ----------
     .. [1] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
+    .. [2] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
+       Statistical Association 84(405), 165-175.
     """
 
     def __init__(
@@ -186,7 +198,7 @@ class ConditionalGaussian:
         self._loglik = lru_cache(maxsize=cache_size)(self._loglik_impl)
 
     def loglik(self, variables: Sequence[int]) -> float:
-        """Return the maximized log-likelihood of the set ``variables``; ``0`` for the empty set."""
+        """Return the log-likelihood of the set ``variables``; ``0`` for the empty set."""
         return self._loglik(tuple(sorted({int(v) for v in variables})))
 
     def dof(self, variables: Sequence[int]) -> int:
@@ -216,23 +228,12 @@ class ConditionalGaussian:
                 scatter[:, a, b] = scatter[:, b, a] = np.bincount(
                     cell, resid[:, a] * resid[:, b], minlength=m
                 )
-        eig = np.linalg.eigvalsh(scatter / counts[:, None, None])
-        own = (counts > d) & (eig[:, 0] > _SINGULAR)
-        log_det = np.sum(np.log(eig[own]), axis=1)
-        loglik -= 0.5 * float(np.sum(counts[own] * (log_det + d * (_LOG_2PI + 1.0))))
-        if not own.all():
-            # The rest take the mean (zero, the columns are centered) and covariance of all rows.
-            w, u = np.linalg.eigh(z.T @ z / n)
-            if w[0] <= _SINGULAR:
-                raise ValueError(
-                    f"continuous columns {continuous} are collinear; cannot fit a cell with too "
-                    "few rows to estimate its own covariance"
-                )
-            rest = ~own
-            second = scatter[rest] + counts[rest, None, None] * (
-                means[rest, :, None] * means[rest, None, :]
-            )
-            quad = np.einsum("ij,cji->c", (u / w) @ u.T, second)
-            pooled = float(np.sum(np.log(w))) + d * _LOG_2PI
-            loglik -= 0.5 * float(np.sum(counts[rest] * pooled + quad))
+        # Each cell's covariance, shrunk toward that of all rows (the columns are centered).
+        fitted = (scatter + z.T @ z / n) / (counts + 1.0)[:, None, None]
+        eig = np.linalg.eigvalsh(fitted)
+        if (eig[:, 0] <= _SINGULAR).any():
+            raise ValueError(f"continuous columns {continuous} are collinear; cannot fit them")
+        log_det = np.sum(np.log(eig), axis=1)
+        quad = np.trace(np.linalg.solve(fitted, scatter), axis1=1, axis2=2)
+        loglik -= 0.5 * float(np.sum(counts * (log_det + d * _LOG_2PI) + quad))
         return loglik - n * float(np.sum(self._log_scale[continuous]))

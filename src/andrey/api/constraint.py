@@ -141,10 +141,11 @@ def pc(
     so it suits effects that are linear in the continuous variables and add up across categories.
     ``"cg"``, the conditional Gaussian test [8]_, fits the continuous variables in each joint
     category of the categorical ones with a Gaussian of that category's own mean and covariance, so
-    a category can change a variance as well as a mean. It needs several rows in every joint
-    category of a test's categorical variables; one with too few rows to estimate its own covariance
-    takes the mean and covariance of all rows. Each compares the likelihoods of the models with and
-    without the dependence, a chi-square statistic on the difference in their numbers of parameters.
+    a category can change a variance as well as a mean. Each category's covariance is shrunk toward
+    that of all rows by one pseudo-row [9]_, so a joint category with few rows takes mostly the
+    covariance of all rows; to tell its own apart, a test needs several rows in each joint category
+    of its categorical variables. Each compares the likelihoods of the models with and without the
+    dependence, a chi-square statistic on the difference in their numbers of parameters.
 
     References
     ----------
@@ -164,6 +165,8 @@ def pc(
        acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
     .. [8] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
+    .. [9] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
+       Statistical Association 84(405), 165-175.
 
     Examples
     --------
