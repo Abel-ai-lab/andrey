@@ -191,6 +191,55 @@ def test_singular_correlation_raises_value_error():
         test(1, 2, (0, 4))
 
 
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_the_residual_path_gives_the_inverse_paths_partial_correlation(test_class, data):
+    # On a well-conditioned design both paths compute the same residual correlation.
+    test = test_class(data)
+    x, y = np.array([0, 1, 2]), np.array([3, 4, 5])
+    conditions = np.array([[1, 2], [0, 5], [1, 3]])
+    r, p = test.statistic_pvalues(x, y, conditions)
+    r_res, p_res = test.residual_statistic_pvalues(data, x, y, conditions)
+    np.testing.assert_allclose(r_res, r, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(p_res, p, rtol=1e-9)
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_the_residual_path_answers_a_query_whose_conditions_are_collinear(test_class):
+    # A conditioning column that repeats another makes the submatrix singular; the residuals are
+    # those of the fit on the distinct columns, so the partial correlation is that one's, and the
+    # degrees of freedom still count every conditioning column.
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((300, 5))
+    X[:, 1] += 0.5 * X[:, 0]
+    X[:, 4] = 2.0 * X[:, 0] + 1.0  # an affine copy of column 0
+    test = test_class(X)
+    with pytest.raises(ci.SingularCorrelationError):
+        test.statistic_pvalues(np.array([1]), np.array([2]), np.array([[0, 4]]))
+    r, p = test.residual_statistic_pvalues(X, np.array([1]), np.array([2]), np.array([[0, 4]]))
+    r_one, _ = test.statistic_pvalues(np.array([1]), np.array([2]), np.array([[0]]))
+    np.testing.assert_allclose(r, r_one, rtol=0, atol=1e-12)
+    np.testing.assert_array_equal(p, test._pvalue(r, test._degrees_of_freedom(2)))
+
+
+def test_the_residual_path_refuses_a_column_in_the_span_of_its_conditions():
+    rng = np.random.default_rng(1)
+    X = rng.standard_normal((100, 4))
+    X[:, 0] = X[:, 2] - 3.0 * X[:, 3]
+    test = StudentT(X)
+    with pytest.raises(ci.SingularCorrelationError, match="span"):
+        test.residual_statistic_pvalues(X, np.array([0]), np.array([1]), np.array([[2, 3]]))
+
+
+def test_a_singular_submatrix_raises_the_singular_error_type():
+    # Callers catch the type to answer such a query another way; it stays a ValueError.
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((100, 5))
+    X[:, 4] = X[:, 0]
+    with pytest.raises(ci.SingularCorrelationError):
+        StudentT(X).statistic_pvalues(np.array([1]), np.array([2]), np.array([[0, 4]]))
+    assert issubclass(ci.SingularCorrelationError, ValueError)
+
+
 def test_too_few_samples_raises_value_error():
     # With n - |S| - 3 < 0 the Fisher-Z degrees of freedom go negative; the test refuses rather than
     # taking a square root of a negative number.
@@ -286,7 +335,7 @@ def test_guard_raises_exactly_when_the_eigenvalues_find_a_singular_row(test_clas
             if raises:
                 with pytest.raises(ValueError, match="singular") as info:
                     test.statistic_pvalues(x, y, conditions)
-                assert type(info.value) is ValueError
+                assert type(info.value) is ci.SingularCorrelationError
             else:
                 np.testing.assert_array_equal(test.statistic_pvalues(x, y, conditions)[0], r)
             for row in rows:
@@ -294,7 +343,7 @@ def test_guard_raises_exactly_when_the_eigenvalues_find_a_singular_row(test_clas
                 if row_raises:
                     with pytest.raises(ValueError, match="singular") as info:
                         test.statistic_pvalue(row[0], row[1], row[2:])
-                    assert type(info.value) is ValueError
+                    assert type(info.value) is ci.SingularCorrelationError
                 else:
                     assert test.statistic_pvalue(row[0], row[1], row[2:])[0] == row_r[0]
     assert outcomes == ({True, False} if scale <= 1e-9 else {False})
@@ -375,7 +424,7 @@ def test_guard_decides_by_eigenvalues_whatever_the_inversion_returns(monkeypatch
     monkeypatch.setattr(np.linalg, "inv", raising_inv)
     with pytest.raises(ValueError, match="singular") as info:
         ci._invert_nonsingular(singular)
-    assert type(info.value) is ValueError
+    assert type(info.value) is ci.SingularCorrelationError
     with pytest.raises(np.linalg.LinAlgError):
         ci._invert_nonsingular(healthy[None])
 

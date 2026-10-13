@@ -44,6 +44,15 @@ _SINGULAR_RTOL = 1e-12
 _BOUND_MARGIN = 1e4
 
 
+class SingularCorrelationError(ValueError):
+    """A ``[x, y, *S]`` correlation submatrix is singular to working precision.
+
+    Its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its largest, so its inverse cannot
+    give the partial correlation. :meth:`PartialCorrelationTest.residual_statistic_pvalues` gives it
+    from the data instead.
+    """
+
+
 @runtime_checkable
 class CITest(Protocol):
     """A conditional-independence test callable over fixed data.
@@ -216,6 +225,50 @@ class PartialCorrelationTest:
             var[:, 2:] = conds
             inv = _invert_nonsingular(corr[var[:, :, None], var[:, None, :]])
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
+        r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
+        return r, np.asarray(self._pvalue(r, df))
+
+    def residual_statistic_pvalues(
+        self, data: np.ndarray, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Partial correlations and p-values of many queries, from least-squares residuals.
+
+        ``data`` is the matrix the test was built from, and ``x``, ``y``, and ``conditions`` are
+        as in :meth:`statistic_pvalues`. Each column is centered and scaled to unit variance; the
+        partial correlation is the correlation of the residuals of ``x`` and of ``y`` after a
+        least-squares fit on the conditioning columns, clamped just inside ``(-1, 1)``, and the
+        p-value uses the degrees of freedom of :meth:`statistic_pvalues`. Without rounding it
+        equals the partial correlation :meth:`statistic_pvalues` takes from the inverse of the
+        correlation submatrix. It stays defined when the conditioning columns are collinear, where
+        that inverse does not exist, because the residuals of a least-squares fit do not depend
+        on which of the equivalent solutions it returns. Raises :class:`SingularCorrelationError`
+        when the residual norm of ``x`` or ``y`` is at most ``eps * max(n, k)`` times the column's
+        norm, for ``n`` rows, ``k`` conditioning columns, and the float64 machine epsilon
+        ``eps``: the rank cutoff of the least-squares fit, below which the residual is rounding
+        and the column lies in the span of the conditioning columns.
+        """
+        arr = np.asarray(data, dtype=np.float64)
+        x = np.asarray(x, dtype=np.intp)
+        y = np.asarray(y, dtype=np.intp)
+        conds = np.asarray(conditions, dtype=np.intp).reshape(len(x), -1)
+        df = self._degrees_of_freedom(conds.shape[1])
+        r = np.empty(len(x), dtype=np.float64)
+        # Columns are scaled to a squared norm of n, so a residual's squared norm at the cutoff is
+        # n * (eps * max(n, k))**2.
+        cutoff = len(arr) * (np.finfo(np.float64).eps * max(len(arr), conds.shape[1])) ** 2
+        for k in range(len(x)):
+            columns = arr[:, [int(x[k]), int(y[k]), *conds[k].tolist()]]
+            columns = columns - columns.mean(axis=0)
+            columns = columns / np.sqrt((columns * columns).mean(axis=0))
+            pair, fit = columns[:, :2], columns[:, 2:]
+            residual = pair - fit @ np.linalg.lstsq(fit, pair, rcond=None)[0]
+            spread = (residual * residual).sum(axis=0)
+            if not (spread > cutoff).all():
+                raise SingularCorrelationError(
+                    "a tested column lies in the span of its conditioning columns; cannot run a "
+                    "partial-correlation test"
+                )
+            r[k] = (residual[:, 0] @ residual[:, 1]) / math.sqrt(spread[0] * spread[1])
         r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))
 
@@ -400,7 +453,9 @@ def _raise_if_singular(stack: np.ndarray) -> None:
     """
     w = np.linalg.eigvalsh(stack)  # (N, k), ascending per row
     if (w[:, 0] <= w[:, -1] * _SINGULAR_RTOL).any():
-        raise ValueError("correlation matrix is singular; cannot run a partial-correlation test")
+        raise SingularCorrelationError(
+            "correlation matrix is singular; cannot run a partial-correlation test"
+        )
 
 
 def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, list[int]]:

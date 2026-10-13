@@ -50,7 +50,7 @@ from itertools import combinations
 import numpy as np
 
 from andrey.core.structure import ARROW, NULL, TAIL
-from andrey.temporal.pcmci import INDEP_TESTS, Link, LinkTest, lagged_design, pc1
+from andrey.temporal.pcmci import INDEP_TESTS, Link, LinkTest, design_test, pc1
 
 COLLIDER_RULES: tuple[str, ...] = ("majority", "conservative", "none")
 
@@ -424,7 +424,7 @@ def pcmciplus(
             f"collider_rule must be one of {list(COLLIDER_RULES)}, got {collider_rule!r}"
         )
     data = np.asarray(data, dtype=np.float64)
-    test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
+    test = design_test(indep_test, data, tau_max)
     return run_phases(test, data.shape[1], tau_max, pc_alpha, collider_rule)
 
 

@@ -22,6 +22,12 @@ MCI tests all links into a target together, grouped by conditioning-set size. An
 ``statistic_pvalues(x, y, conditions) -> (statistics, p_values)`` over the design's column indices
 can drive :func:`pc1` and :func:`mci`.
 
+A partial correlation is the correlation of the residuals of ``x`` and ``y`` after a least-squares
+fit on the conditioning columns. The test takes it from the inverse of the ``[x, y, *S]``
+correlation submatrix; when that submatrix is singular to working precision, as lagged copies of a
+strongly autocorrelated series can make it, :class:`DesignTest` takes it from the residuals of the
+design instead (:func:`design_test`).
+
 References
 ----------
 Runge, J., Nowack, P., Kretschmer, M., Flaxman, S., and Sejdinovic, D. (2019). Detecting and
@@ -32,14 +38,13 @@ eaau4996. https://doi.org/10.1126/sciadv.aau4996
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
 
 from andrey.core import backend
-from andrey.core.ci import FisherZ, StudentT
+from andrey.core.ci import FisherZ, PartialCorrelationTest, SingularCorrelationError, StudentT
 
 # A lagged variable ``(i, lag)``: variable ``i`` at time ``t - lag``.
 Link = tuple[int, int]
@@ -64,7 +69,7 @@ class LinkTest(Protocol):
 
 
 # The ``indep_test`` names: each builds a test over the lagged design.
-INDEP_TESTS: dict[str, Callable[[np.ndarray], LinkTest]] = {
+INDEP_TESTS: dict[str, type[PartialCorrelationTest]] = {
     "student_t": StudentT,
     "fisherz": FisherZ,
 }
@@ -84,6 +89,52 @@ class PCMCIResult:
     statistics: np.ndarray
     p_values: np.ndarray
     graph: np.ndarray
+
+
+class DesignTest:
+    """A partial-correlation test over a lagged design that answers every query it can.
+
+    A call goes to ``test.statistic_pvalues`` first. When it raises
+    :class:`~andrey.core.ci.SingularCorrelationError`, each query of that call is asked alone, and a
+    query whose ``[x, y, *S]`` correlation submatrix is singular gets its partial correlation from
+    the least-squares residuals of ``design``
+    (:meth:`~andrey.core.ci.PartialCorrelationTest.residual_statistic_pvalues`). A call that does
+    not raise returns ``test``'s results unchanged.
+    """
+
+    def __init__(self, test: PartialCorrelationTest, design: np.ndarray) -> None:
+        self.test = test
+        self.design = design
+
+    def statistic_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Test ``x[i]`` against ``y[i]`` given the columns ``conditions[i]``, for every row."""
+        try:
+            return self.test.statistic_pvalues(x, y, conditions)
+        except SingularCorrelationError:
+            pass
+        statistics = np.empty(len(x), dtype=np.float64)
+        p_values = np.empty(len(x), dtype=np.float64)
+        for k in range(len(x)):
+            query = (x[k : k + 1], y[k : k + 1], conditions[k : k + 1])
+            try:
+                statistic, p_value = self.test.statistic_pvalues(*query)
+            except SingularCorrelationError:
+                statistic, p_value = self.test.residual_statistic_pvalues(self.design, *query)
+            statistics[k], p_values[k] = statistic[0], p_value[0]
+        return statistics, p_values
+
+
+def design_test(indep_test: str, data: np.ndarray, tau_max: int) -> DesignTest:
+    """The ``indep_test`` partial-correlation test over the lagged design of ``data``.
+
+    Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
+    """
+    if indep_test not in INDEP_TESTS:
+        raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
+    design = lagged_design(data, tau_max)
+    return DesignTest(INDEP_TESTS[indep_test](design), design)
 
 
 def lagged_design(data: np.ndarray, tau_max: int) -> np.ndarray:
@@ -182,11 +233,9 @@ def pcmci(
 
     Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
     """
-    if indep_test not in INDEP_TESTS:
-        raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
-    test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
+    test = design_test(indep_test, data, tau_max)
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
         parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
         statistics, p_values = mci(test, n_vars, parents, tau_max)

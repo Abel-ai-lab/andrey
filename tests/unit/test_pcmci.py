@@ -13,8 +13,10 @@ import numpy as np
 import pytest
 from scipy import stats
 
+from andrey.core.ci import SingularCorrelationError, StudentT
 from andrey.temporal.pcmci import (
     INDEP_TESTS,
+    DesignTest,
     _column,
     _strongest_others,
     lagged_design,
@@ -259,3 +261,47 @@ def test_batched_pc1_and_mci_equal_the_scalar_loops_exactly(indep_test, data, ta
 def test_an_unknown_indep_test_raises_naming_the_choices():
     with pytest.raises(ValueError, match=r"indep_test must be one of \['fisherz', 'student_t'\]"):
         pcmci(_chain(100), indep_test="spearman")
+
+
+def _repeated_series(steps: int = 400, seed: int = 0) -> np.ndarray:
+    """Three autoregressive series and a fourth that repeats the first, scaled and shifted."""
+    rng = np.random.default_rng(seed)
+    x = rng.standard_normal((steps, 3))
+    for t in range(1, steps):
+        x[t] += 0.6 * x[t - 1]
+        x[t, 1] += 0.5 * x[t - 1, 0]
+    return np.column_stack([x, 3.0 * x[:, 0] - 1.0])
+
+
+def test_a_design_test_returns_its_tests_results_when_nothing_is_singular():
+    design = lagged_design(np.random.default_rng(0).standard_normal((300, 3)), 2)
+    test = StudentT(design)
+    wrapped = DesignTest(test, design)
+    x, y, conditions = np.array([3, 4]), np.array([0, 1]), np.array([[6, 7], [6, 8]])
+    for got, want in zip(
+        wrapped.statistic_pvalues(x, y, conditions), test.statistic_pvalues(x, y, conditions)
+    ):
+        np.testing.assert_array_equal(got, want)
+
+
+def test_a_design_test_answers_a_singular_query_from_the_residuals():
+    # Columns lag * 4 + i: variable 3 repeats variable 0, so conditioning on both at lag 1 (columns
+    # 4 and 7) makes the submatrix singular; the residuals are those of the fit on one of them.
+    design = lagged_design(_repeated_series(), 1)
+    test = StudentT(design)
+    x, y = np.array([1, 2]), np.array([5, 6])
+    conditions = np.array([[4, 7], [4, 7]])
+    with pytest.raises(SingularCorrelationError):
+        test.statistic_pvalues(x, y, conditions)
+    statistics, p_values = DesignTest(test, design).statistic_pvalues(x, y, conditions)
+    single, _ = test.statistic_pvalues(x, y, np.array([[4], [4]]))
+    np.testing.assert_allclose(statistics, single, rtol=0, atol=1e-12)
+    expected = test.residual_statistic_pvalues(design, x, y, conditions)
+    np.testing.assert_array_equal(statistics, expected[0])
+    np.testing.assert_array_equal(p_values, expected[1])
+    # A healthy query in the same call keeps the test's own answer.
+    mixed = DesignTest(test, design).statistic_pvalues(
+        np.array([1, 1]), np.array([5, 5]), np.array([[4, 7], [4, 6]])
+    )
+    alone = test.statistic_pvalues(np.array([1]), np.array([5]), np.array([[4, 6]]))
+    assert mixed[0][1] == alone[0][0] and mixed[1][1] == alone[1][0]

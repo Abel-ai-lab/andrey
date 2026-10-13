@@ -299,7 +299,11 @@ def pcmci(
     Every test is a partial-correlation test. The default, ``"student_t"``, takes the p-value from
     the Student-t distribution with ``n - |S| - 2`` degrees of freedom, for ``|S|`` conditions, as
     the authors' reference implementation does. ``"fisherz"`` uses Fisher's z-transform instead; its
-    p-values differ slightly, so a link close to ``alpha_level`` can flip.
+    p-values differ slightly, so a link close to ``alpha_level`` can flip. The partial correlation
+    is the correlation of the least-squares residuals of the two tested values given the
+    conditions. It is computed from the correlation matrix, and from the residuals themselves when
+    the conditions are collinear to working precision, as lagged copies of a strongly
+    autocorrelated series can be.
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``, where every lag a test
     can condition on exists: the MCI test of a link at lag ``k`` conditions on the cause's parents,
@@ -451,7 +455,10 @@ def pcmciplus(
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``. The default test,
     ``"student_t"``, takes the p-value from the Student-t distribution with ``n - |S| - 2``
-    degrees of freedom, for ``|S|`` conditions.
+    degrees of freedom, for ``|S|`` conditions. The partial correlation is the correlation of the
+    least-squares residuals of the two tested values given the conditions. It is computed from the
+    correlation matrix, and from the residuals themselves when the conditions are collinear to
+    working precision, as lagged copies of a strongly autocorrelated series can be.
 
     **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over
     5 variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no hidden
@@ -598,9 +605,11 @@ def lpcmci(
     its group of links starts, so the order in which a group's links are tested changes nothing.
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``, and every node a test
-    conditions on lies within ``tau_max`` steps of the later end. The defaults are the authors'
-    published defaults. The earlier end of a lagged link is searched with the empty set only, since
-    time order already rules out the later end as its cause.
+    conditions on lies within ``tau_max`` steps of the later end. A test's partial correlation is
+    computed from the correlation matrix, and from the least-squares residuals when the conditions
+    are collinear to working precision. The defaults are the authors' published defaults. The
+    earlier end of a lagged link is searched with the empty set only, since time order already
+    rules out the later end as its cause.
 
     **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over 5
     variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no selection

@@ -84,7 +84,7 @@ import numpy as np
 
 from andrey.core import backend
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
-from andrey.temporal.pcmci import INDEP_TESTS, LinkTest, lagged_design
+from andrey.temporal.pcmci import INDEP_TESTS, LinkTest, design_test
 
 CONFLICT = 4  # an edge mark the rules oriented both as a tail and as an arrowhead
 
@@ -1040,7 +1040,7 @@ def lpcmci(
     if indep_test not in INDEP_TESTS:
         raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     data = np.asarray(data, dtype=np.float64)
-    test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
+    test = design_test(indep_test, data, tau_max)
     with backend.one_blas_thread():
         return run(test, data.shape[1], tau_max, pc_alpha, n_preliminary_iterations)
 
