@@ -1,15 +1,17 @@
-"""Temporal-family facades: VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, PCMCI+, and LPCMCI.
+"""Temporal-family facades: VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, PCMCI+, LPCMCI, and Granger.
 
 Each callable runs the native engine and returns one uniform ``StructureOutput`` wrapping a
 :class:`~andrey.core.TemporalStructure` (a per-lag stack of graphs, plus the lossless coefficient
-weights for the LiNGAM methods). The mapping onto the public core contract lives in the private
-``_temporal`` adapters.
+weights for the LiNGAM and Granger methods). The mapping onto the public core contract lives in
+the private ``_temporal`` adapters.
 """
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 from ._adapt import (
     column_labels,
@@ -21,6 +23,7 @@ from ._adapt import (
 )
 from ._experimental import warn_experimental
 from ._temporal import (
+    _adapt_granger,
     _adapt_longitudinal_lingam,
     _adapt_lpcmci,
     _adapt_pcmci,
@@ -652,3 +655,106 @@ def lpcmci(
         indep_test=indep_test,
     )
     return with_labels(_adapt_lpcmci(result), column_labels(data))
+
+
+def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOutput:
+    """Learn the lagged causal graph of a multivariate time series by lasso Granger causality.
+
+    A variable Granger-causes another when its past improves the prediction of the other's
+    present [1]_. Each variable is regressed on the past ``maxlag`` steps of every variable by the
+    lasso [2]_, with the penalty chosen by cross-validation; a nonzero coefficient is a lagged
+    edge. Use it for one multivariate series whose effects take at least one time step.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        A multivariate time series, one row per time step. Coerced to ``float64``. A DataFrame's
+        column names become the structure's ``labels``.
+    maxlag : int, default=2
+        Number of past time steps each regression uses, at least 1.
+    cv : int, default=5
+        Number of cross-validation folds that choose each regression's penalty, at least 2.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``1`` to ``maxlag``
+        and no lag 0. ``structure.lag(k)`` is a ``digraph`` with the edge ``i -> j`` when
+        ``x_i(t - k)`` has a nonzero coefficient in the regression of ``x_j(t)``, self-loops
+        included; ``structure.lag_weights[k - 1][i, j]`` is that coefficient, in the data's units.
+        ``ordering`` is ``None``, and ``metadata["algorithm"]`` is ``"granger"``.
+
+    Raises
+    ------
+    TypeError
+        If ``maxlag`` or ``cv`` is not an int.
+    ValueError
+        If ``maxlag`` is less than 1, if ``cv`` is less than 2, if ``data`` has fewer than
+        ``maxlag + cv`` rows, so that some fold would hold no time step, or if ``data`` has fewer
+        than 2 columns.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    An edge says that the past of one variable helps predict another beyond the past of every
+    variable in ``data``. Granger causality misses effects within one time step, and a common
+    cause left out of ``data`` can produce edges.
+
+    Each regression is fitted on standardized variables, so the edges do not depend on the units of
+    any variable; the coefficients are converted back to the data's units. Cross-validation chooses
+    the penalty that predicts best, which often keeps small coefficients on lags with no effect:
+    judge the edges by the size of their weights. The folds are consecutive blocks of time steps,
+    and the fit is deterministic. With ``andrey.config(num_workers=k)``, the regressions run on
+    ``k`` threads and return the same coefficients.
+
+    The penalty is the plain lasso of Arnold et al. [2]_. Shojaie and Michailidis [3]_ propose a
+    truncating lasso penalty that also selects the lag order; it is not implemented here.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 4 variables with 500 time
+    steps, and on 1,000 time steps with 3 variables. It assumes linear effects. Each variable's
+    regression takes ``maxlag`` lags of every variable as inputs, so the work grows with ``maxlag``
+    and with the square of the number of variables.
+
+    References
+    ----------
+    .. [1] Granger, C. W. J. (1969). Investigating causal relations by econometric models and
+       cross-spectral methods. Econometrica 37(3), 424-438.
+    .. [2] Arnold, A., Liu, Y., and Abe, N. (2007). Temporal causal modeling with graphical Granger
+       methods. KDD, 66-75.
+    .. [3] Shojaie, A., and Michailidis, G. (2010). Discovering graphical Granger causality using
+       the truncating lasso penalty. Bioinformatics 26(18), i517-i523.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import granger
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = np.r_[0.0, 0.8 * x[:-1]] + rng.standard_normal(500)
+    >>> out = granger(np.column_stack([x, y]), maxlag=1)
+    >>> round(float(out.structure.lag_weights[0][0, 1]), 1)
+    0.8
+    """
+    warn_experimental("granger")
+    from andrey.temporal.granger import granger_lasso
+
+    maxlag = int_in_range(maxlag, "maxlag", 1)
+    cv = int_in_range(cv, "cv", 2)
+    X = data_matrix(data, min_rows=maxlag + cv)  # LassoCV needs a time step in every fold
+    if X.shape[1] < 2:
+        raise ValueError(f"data needs at least 2 columns (variables), got {X.shape[1]}")
+    peak = np.abs(X).max(axis=0)  # divide first, so tiny or huge units cannot underflow the std
+    spread = (X / peak).std(axis=0)  # data_matrix rejects a constant column
+    coeff = granger_lasso((X / peak - (X / peak).mean(axis=0)) / spread, maxlag=maxlag, cv=cv)
+    scale = spread * peak
+    # coeff[i, j + d*k] weights standardized x_j(t-k-1) in standardized x_i(t): rescale to units.
+    # Units far apart can overflow the ratio; a zero weight stays zero rather than becoming NaN.
+    with np.errstate(over="ignore", invalid="ignore"):
+        ratio = scale[:, None] / np.tile(scale, maxlag)[None, :]
+        coeff = np.where(coeff == 0, 0.0, coeff * ratio)
+    return with_labels(_adapt_granger(coeff, X.shape[1], maxlag), column_labels(data))

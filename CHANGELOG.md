@@ -20,6 +20,9 @@ change names its pull request.
   returns the best DAG it visits, as a CPDAG. ([#56])
 - `xges`, an experimental method: extremely greedy equivalence search, returning a CPDAG and its
   BIC score. ([#57])
+- `granger`, experimental lasso Granger causality for a multivariate time series: it returns a
+  temporal structure with lags 1 to `maxlag` and the coefficients as weights, and does not depend
+  on the units of any variable.
 
 ### Changed
 

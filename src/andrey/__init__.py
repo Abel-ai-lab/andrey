@@ -19,6 +19,7 @@ from .api import (
     gfci,
     gies,
     gin,
+    granger,
     grasp,
     hc,
     ica_lingam,
@@ -91,6 +92,7 @@ __all__ = [
     "pcmci",
     "pcmciplus",
     "lpcmci",
+    "granger",
     # Pairwise direction test.
     "pnl",
     # Hidden common causes: a PAG over the observed variables.

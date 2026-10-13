@@ -121,7 +121,8 @@ does this must put its entry point under `if __name__ == "__main__":`, because s
 re-imports the script; [Getting started](guides/getting-started.md#backends-and-parallelism) shows
 how. A pass uses the workers only above a work cutoff. GES's default suits one fit per process; for
 a process that runs many fits, `andrey calibrate` measures the cutoff on your machine and prints
-the setting.
+the setting. With the same setting, `granger` fits its variables on worker threads, which need no
+`__main__` guard, and returns the same coefficients.
 
 ## Data
 
@@ -139,9 +140,9 @@ BIC; and the LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
-`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, and `lpcmci` learn graphs over time
-lags; `lpcmci` also allows hidden common causes. `multi_group_direct_lingam` fits several datasets
-that share one causal order, and `cdnod` takes data from several domains. All seven are
+`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, and `granger` learn graphs
+over time lags; `lpcmci` also allows hidden common causes. `multi_group_direct_lingam` fits several
+datasets that share one causal order, and `cdnod` takes data from several domains. All eight are
 experimental.
 
 ## Command line and agents
