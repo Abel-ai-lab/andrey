@@ -1471,8 +1471,7 @@ COMPARISON = (
     ),
     (
         "Speed",
-        "Speed measured against other packages on the same data, published with each feature "
-        "release",
+        "Speed against other packages, published with each feature release",
         ("yes", "no", "no", "no"),
         {},
     ),
