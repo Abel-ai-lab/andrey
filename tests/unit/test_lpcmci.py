@@ -7,13 +7,17 @@ independence it reports holds in the population and the expected graph follows f
 
 from __future__ import annotations
 
+from itertools import combinations
+
 import numpy as np
 import pytest
 from scipy.linalg import solve_discrete_lyapunov
 
+import andrey.temporal.lpcmci as engine
 from andrey.api._temporal import _adapt_lpcmci
 from andrey.core import ARROW, CIRCLE, NULL, TAIL
 from andrey.temporal.lpcmci import CONFLICT, LPCMCIResult, lpcmci, run
+from andrey.temporal.pcmci import INDEP_TESTS, lagged_design
 
 # A link ``(cause, lag, effect)`` and its weight.
 Links = dict[tuple[int, int, int], float]
@@ -198,3 +202,131 @@ def test_no_preliminary_round_runs_the_final_round_alone():
 def test_an_unknown_test_name_is_refused():
     with pytest.raises(ValueError, match="indep_test"):
         lpcmci(_hidden_cause_series(), indep_test="kci")
+
+
+# ---- bounded test calls, cache, and vote ------------------------------------------------------
+
+
+class Counting:
+    """Passes queries to ``test`` and records how many it receives per call."""
+
+    def __init__(self, test) -> None:
+        self.test, self.calls = test, []
+
+    def statistic_pvalues(self, x, y, conditions):
+        self.calls.append(len(x))
+        return self.test.statistic_pvalues(x, y, conditions)
+
+
+def _data_search(test_wrapper=lambda test: test) -> engine._Search:
+    """A search over four variables of white noise, ``tau_max=1``, with the Student-t test."""
+    data = np.random.default_rng(0).standard_normal((300, 4))
+    test = INDEP_TESTS["student_t"](lagged_design(data, 1))
+    return engine._Search(test_wrapper(test), 4, 1, 0.05)
+
+
+# The pair X0_{t-1}, X0_t and the 15 two-node sets of the other window nodes.
+PAIR = ((0, 1), (0, 0))
+SETS = [frozenset(s) for s in combinations([(1, 0), (2, 0), (3, 0), (1, 1), (2, 1), (3, 1)], 2)]
+
+
+def test_a_call_over_the_batch_limit_is_split_without_changing_results(monkeypatch):
+    whole = _data_search().run_tests(*PAIR, SETS, rank=False, report=False)
+    monkeypatch.setattr(engine, "BATCH", 4)
+    counting = Counting(None)
+    search = _data_search(lambda test: setattr(counting, "test", test) or counting)
+    assert search.run_tests(*PAIR, SETS, rank=False, report=False) == whole
+    assert counting.calls == [4, 4, 4, 3]
+
+
+def test_evicting_cached_results_does_not_change_them(monkeypatch):
+    calls = [SETS[:3], SETS[1:3] + SETS[5:9], SETS[:3]]  # read cached, add, then re-read evicted
+    unbounded = [_data_search().run_tests(*PAIR, sets) for sets in calls]
+    monkeypatch.setattr(engine, "CACHE_SIZE", 4)
+    counting = Counting(None)
+    bounded = _data_search(lambda test: setattr(counting, "test", test) or counting)
+    for sets, expected in zip(calls, unbounded):
+        tested = len(counting.calls)
+        assert bounded.run_tests(*PAIR, sets) == expected
+        assert len(bounded.cache) <= 4
+    assert len(counting.calls) > tested  # the last call recomputed evicted results
+
+
+class HashTest:
+    """A test whose p-value is a fixed pseudo-random function of the queried design columns."""
+
+    def statistic_pvalues(self, x, y, conditions):
+        rows = np.column_stack([x, y, conditions]).astype(np.int64)
+        weights = 7919 * np.arange(1, rows.shape[1] + 1)
+        p_values = ((((rows + 3) ** 2) * weights).sum(axis=1) % 1009 + 0.5) / 1009
+        return 1.0 - p_values, p_values
+
+
+def test_a_split_search_finds_the_same_separating_set(monkeypatch):
+    unbounded = engine._Search(HashTest(), 4, 1, 0.85)
+    expected = unbounded.separating(*PAIR, iter(SETS))
+    monkeypatch.setattr(engine, "BATCH", 2)
+    split = engine._Search(HashTest(), 4, 1, 0.85)
+    assert split.separating(*PAIR, iter(SETS)) == expected
+    assert SETS.index(expected) >= 2  # found after the first batch
+    assert (split.imin, split.best) == (unbounded.imin, unbounded.best)
+
+
+def _listed_vote(search: engine._Search, key) -> list[frozenset]:
+    """Every distinct separating set of the pair ``key`` for the vote, as one list."""
+    i, j, lag = key
+    start, end = (i, lag), (j, 0)
+    sdef = (search.parents(start) | search.parents(end)) - {start, end}
+    found = list(search.sepsets.get(key, []))
+    for anchor, other in ((start, end), (end, start)):
+        pool = [] if anchor == start and lag > 0 else sorted(search.apds(anchor, other) - sdef)
+        for size in range(len(pool) + 1):
+            for subset in combinations(pool, size):
+                conditions = frozenset(subset) | sdef
+                _, (p_value,) = search.run_tests(start, end, [conditions], rank=False)
+                if p_value > search.alpha and conditions not in found:
+                    found.append(conditions)
+    return found
+
+
+def _listed_share(search: engine._Search, a, b, c) -> float:
+    key, _ = engine._key(a, c)
+    found = _listed_vote(search, key)
+    frame = min(a[1], c[1])
+    return sum((b[0], b[1] - frame) in s for s in found) / len(found) if found else 0.5
+
+
+# Outer pairs ``(a, c)``: a same-step pair in two frames and a lagged pair.
+OUTER = [((0, 0), (1, 0)), ((0, 1), (1, 1)), ((0, 1), (2, 0))]
+
+
+def _shares(search: engine._Search, listed: bool) -> list[float]:
+    share = (lambda a, b, c: _listed_share(search, a, b, c)) if listed else search.share
+    return [share(a, b, c) for a, c in OUTER for b in search.window if b not in (a, c)]
+
+
+def test_the_counted_vote_matches_the_listed_vote_before_and_after_a_change():
+    search = engine._Search(HashTest(), 4, 1, 0.5)
+    search.initialize()
+    for a, c in OUTER[::2]:
+        search.remove(engine._key(a, c)[0])
+    # Stored sets for the same-step pair: one the vote also finds from both ends, one it cannot.
+    same_step = engine._key(*OUTER[0])[0]
+    found = _listed_vote(search, same_step)
+    shared = next(
+        s for s in found if s <= search.apds((0, 0), (1, 0)) & search.apds((1, 0), (0, 0))
+    )
+    search.add_sepset(same_step, shared, 0)
+    search.add_sepset(same_step, frozenset({(2, 0), (3, 0), (1, 1), (2, 1)}), 0)
+    before = _shares(search, listed=False)
+    assert before == _shares(search, listed=True)
+    # X1_t -> X2_t makes X1_t a parent of X2_t and X2_t a non-ancestor of X1_t; X3_{t-1} -> X0_t.
+    marks = {
+        ((1, 2, 0), True): {TAIL},
+        ((1, 2, 0), False): {ARROW},
+        ((3, 0, 1), True): {TAIL},
+    }
+    assert search._apply(marks, {}, {}, lagged_only=False)
+    after = _shares(search, listed=False)
+    assert after == _shares(search, listed=True)
+    assert after != before
