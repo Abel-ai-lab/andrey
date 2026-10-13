@@ -5,7 +5,9 @@ website itself. The colors are the `Palette` objects `andrey.viz.LIGHT` and `and
 [`src/andrey/viz/theme.py`](src/andrey/viz/theme.py), and
 [`docs/palette_css.py`](docs/palette_css.py) writes the website's CSS variables from the same
 objects, so a figure and the page around it match. Change a color in `theme.py`; never type a hex
-value into CSS or a figure.
+value into CSS or a figure. Drawn art (a post's banner art in `site/brand/art-*.jpg`, a release
+card's cover in `docs/_static/release-cards/`) is stored after `brand_tones` in `site/cards.py`
+recolors it to the same palette, and a site test fails on art stored in other blues or ambers.
 
 ## Principles
 

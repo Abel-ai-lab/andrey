@@ -76,10 +76,11 @@ Every pull request has exactly one type label, which also gives its section in t
 | `dependencies` | dependency updates; Dependabot sets it | Dependencies |
 
 Two optional flags put a change first: `highlight` lists it under Highlights and `breaking` under
-Breaking. Every pull request also has a milestone, the release it ships in. The labels and the
-milestone are set when the pull request is opened or reviewed, and a `feature` or `bug` pull
-request adds a bullet under `## [Unreleased]` in `CHANGELOG.md` that ends with a link to it,
-`([#<number>])`, defined at the end of the file.
+Breaking. A third, `release`, marks a release's pull request and the issue that tracks its
+checklist; the release notes leave the release pull request out. Every pull request also has a
+milestone, the release it ships in. The labels and the milestone are set when the pull request is
+opened or reviewed, and a `feature` or `bug` pull request adds a bullet under `## [Unreleased]` in
+`CHANGELOG.md` that ends with a link to it, `([#<number>])`, defined at the end of the file.
 
 `CHANGELOG.md` is the record of each release. Before the release pull request merges, the
 maintainer (or an agent) lists the milestone's pull requests with

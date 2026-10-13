@@ -81,7 +81,7 @@ linear-Gaussian data.
 Released 12 October 2026
 
 - [Release card<span class="visually-hidden"> 0.3.0</span>](benchmarks/0.3.0.md)
-- [Post: Score-based search](../blog/andrey-0-3-0.md)
+- [Post: Score-based search](../blog/20261012-andrey-0-3-0.md)
 :::
 ::::
 
@@ -91,7 +91,7 @@ Released 12 October 2026
 :link: benchmarks/0.2.0
 :link-type: doc
 :link-alt: The 0.2.0 release card: hidden common causes
-:class-card: release-tile
+:class-card: release-tile release-art-0-2-0
 :shadow: none
 :margin: 0
 
@@ -108,10 +108,10 @@ RCD and BottomUpParceLiNGAM, two methods for data with hidden common causes, com
 :::
 
 :::{div} release-meta
-Released 12 October 2026
+Released October 12, 2026
 
 - [Release card<span class="visually-hidden"> 0.2.0</span>](benchmarks/0.2.0.md)
-- [Post: Hidden common causes](../blog/andrey-0-2-0.md)
+- [Post: Hidden common causes](../blog/20261012-andrey-0-2-0.md)
 :::
 ::::
 
@@ -139,10 +139,10 @@ lingam.
 :::
 
 :::{div} release-meta
-Released 8 October 2026
+Released October 8, 2026
 
 - [Release card<span class="visually-hidden"> 0.1.0</span>](benchmarks/0.1.0.md)
-- [Post: Introducing Andrey](../blog/introducing-andrey.md)
+- [Post: Introducing Andrey](../blog/20261008-introducing-andrey.md)
 :::
 ::::
 

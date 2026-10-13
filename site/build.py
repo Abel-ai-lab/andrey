@@ -518,7 +518,8 @@ def speedup_panel(summaries: list[dict]) -> str:
 
 
 def speedup_css(summaries: list[dict]) -> str:
-    """Show only the checked method's panel and size.
+    """Show only the checked method's panel and size. A hidden panel takes no space, so the panel
+    is as tall as the shown method's bars.
 
     Without ``:has()`` every panel shows, one under another, each captioned with its method and
     size, and the header drops the size.
@@ -528,9 +529,8 @@ def speedup_css(summaries: list[dict]) -> str:
         f".race:has(#race-m-{n}:checked) :is(#race-panel-{n}, #race-size-{n})" for n in names
     )
     return (
-        "@supports selector(:has(a)) { .race-panels { display: grid; } "
-        ".race-panel { grid-area: 1 / 1; visibility: hidden; } .race-size { display: none; } "
-        f"{shown} {{ visibility: visible; display: revert; }} }} "
+        "@supports selector(:has(a)) { .race-panel, .race-size { display: none; } "
+        f"{shown} {{ display: revert; }} }} "
         "@supports not selector(:has(a)) { .race--speedup .race-sizes-now { display: none; } "
         ".race--speedup .race-panel::before { content: attr(aria-label); display: block; "
         "margin-top: 1rem; font-size: 0.85rem; font-weight: 600; } }"
@@ -1393,7 +1393,7 @@ def pillars(summaries: list[dict]) -> str:
             "The <code>andrey</code> command never prompts and answers in JSON, and <code>andrey "
             "--skill</code> prints a guide an agent loads as a skill.",
             "#agents",
-            "The command line and the skill",
+            "Command line and skill",
         ),
     )
     return "".join(
@@ -1408,7 +1408,9 @@ def pillars(summaries: list[dict]) -> str:
 
 
 # ---- compared with other packages ------------------------------------------------------------
-# Checked against each package's released code: causal-learn 0.1.4.8, gCastle 1.0.4, lingam 1.13.0.
+# Checked against each package's released code (causal-learn 0.1.4.8, gCastle 1.0.4, lingam
+# 1.13.0); the published-speed row against its README, documentation, and release notes. A family
+# counts every method a package ships, experimental or not.
 PEERS = ("Andrey", "causal-learn", "gCastle", "lingam")
 PEER_VERSIONS = "causal-learn 0.1.4.8, gCastle 1.0.4, and lingam 1.13.0"
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
@@ -1424,12 +1426,13 @@ COMPARISON = (
         "One result type from every method, with its graph type and edge marks",
         ("yes", "part", "part", "part"),
         {
-            "causal-learn": "A GeneralGraph with endpoint marks from PC, FCI, GES, BOSS, and "
-            "GRaSP, each returned in a different wrapper; a fitted model from the LiNGAM family.",
+            "causal-learn": "PC, FCI, GES, BOSS, and GRaSP give a GeneralGraph with endpoint "
+            "marks, bare or inside an object, a tuple, or a dict; the LiNGAM family gives a "
+            "fitted model.",
             "gCastle": "Every method gives an adjacency matrix, without a graph type or edge "
             "marks.",
-            "lingam": "Every method gives weighted adjacency matrices, without a graph type; RCD "
-            "marks hidden confounding with NaN.",
+            "lingam": "Every method gives weighted adjacency matrices, without a graph type; RCD, "
+            "CAM-UV, and BottomUpParceLiNGAM mark hidden confounding with NaN.",
         },
     ),
     ("Interface", "Command line with JSON output", ("yes", "no", "no", "no"), {}),
@@ -1439,17 +1442,39 @@ COMPARISON = (
         ("yes", "no", "no", "no"),
         {},
     ),
-    ("Methods", "PC and FCI", ("yes", "yes", "part", "no"), {"gCastle": "PC only."}),
-    ("Methods", "GES", ("yes", "yes", "yes", "no"), {}),
-    ("Methods", "BOSS and GRaSP", ("yes", "yes", "no", "no"), {}),
-    ("Methods", "DirectLiNGAM and ICA-LiNGAM", ("yes", "yes", "yes", "yes"), {}),
     (
-        "Methods",
+        "Coverage",
+        "Constraint-, score-, and permutation-based search",
+        ("yes", "yes", "part", "no"),
+        {"gCastle": "PC and GES; no permutation-based search."},
+    ),
+    ("Coverage", "LiNGAM family", ("yes", "yes", "yes", "yes"), {}),
+    (
+        "Coverage",
         "Time series",
         ("yes", "yes", "part", "yes"),
         {"gCastle": "Event sequences only (TTPM)."},
     ),
-    ("Methods", "Hidden variables", ("yes", "yes", "no", "yes"), {}),
+    ("Coverage", "Hidden variables", ("yes", "yes", "no", "yes"), {}),
+    (
+        "Speed",
+        "CPU-parallel and GPU backends",
+        ("yes", "part", "part", "part"),
+        {
+            "causal-learn": "A GPU for CALM only, through its device argument; several CPU cores "
+            "for RLCD and the FastKCI test only.",
+            "gCastle": "A GPU for the PyTorch-based methods only, through device_type; several "
+            "CPU cores for PC's parallel variant only.",
+            "lingam": "A GPU for DirectLiNGAM only, through its pwling_fast measure and the "
+            "separate culingam package; no search runs on several CPU cores.",
+        },
+    ),
+    (
+        "Speed",
+        "Speed against other packages, published with each feature release",
+        ("yes", "no", "no", "no"),
+        {},
+    ),
 )
 
 
@@ -1507,7 +1532,10 @@ def comparison_table() -> str:
 
 def comparison_source() -> str:
     """What the table's marks were read from."""
-    return f"Read from each package's released code: {PEER_VERSIONS}."
+    return (
+        "Read from each package's released code, and the published-speed row from its README, "
+        f"documentation, and release notes: {PEER_VERSIONS}."
+    )
 
 
 def comparison_footnote() -> str:
@@ -1614,7 +1642,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "hero_chips": hero_chips(),
         "race": speedup_panel(summaries),
         "pillars": pillars(summaries),
-        "speed_title": "Faster on the same data and machines",
+        "speed_title": "Speed comparison",
         "speed_intro": speed_intro(summaries),
         "speed_chart": speed_chart(summaries),
         "why_fast": _why_fast["dialog"](),

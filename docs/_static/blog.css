@@ -35,7 +35,99 @@
   font-size: 0.95rem;
 }
 
-/* ABlog's post list: each post's title, its date under it, then its excerpt. */
+/* ---------- the blog's front page (docs/conf.py, _blog_index) ---------- */
+/* The Release cards page's blocks (benchmarks.css), with each post's own cover in place of the
+   stipple ground: whole beside the newest post's TL;DR, and as a small square tile, cropped at
+   build time, in an earlier post's row (site/cards.py, tile_jpeg). */
+.blog-tile {
+  display: block;
+  position: relative;
+  overflow: hidden;
+}
+
+.blog-tile::before,
+.blog-tile::after {
+  content: none;
+}
+
+.blog-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blog-latest .blog-tile {
+  aspect-ratio: auto;
+}
+
+/* The cover is wide, so it shares the width with the TL;DR; a narrow screen stacks them. */
+@media (width > 760px) {
+  .release-latest.blog-latest {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+}
+
+.bd-article .blog-latest h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.blog-latest h2 a {
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.blog-latest h2 a:hover {
+  color: var(--andrey-accent);
+}
+
+/* A post's tags, each a link to the posts that share it. */
+.blog-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.release-body .blog-tags {
+  margin-top: 0.55rem;
+}
+
+.blog-tags li {
+  margin: 0;
+}
+
+.blog-tags a {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  color: var(--andrey-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.blog-tags a:hover {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-accent);
+}
+
+.blog-latest .blog-date {
+  margin-top: -0.65rem;
+  color: var(--andrey-muted);
+  font-size: 0.88rem;
+}
+
+/* ABlog's post list, on the archive and author pages: each post's title, its date under it, then
+   its excerpt. */
 .postlist {
   padding-left: 0;
   list-style: none;
