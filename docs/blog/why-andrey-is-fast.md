@@ -6,8 +6,9 @@ meta:
 blogpost: true
 date: 2026-10-08
 author: Shu Wan
+tags: [Engineering, Speed]
 version: 0.1.0
-cover: graph
+cover: turbine
 ---
 
 # Why Andrey is fast

@@ -1105,7 +1105,7 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     assert cards.TAGLINE == "A very fast causal discovery package"
 
 
-@pytest.mark.parametrize("kind", ["pair", "iceberg", "contour", "graph"])
+@pytest.mark.parametrize("kind", ["pair", "iceberg", "contour", "turbine", "graph"])
 def test_a_post_cover_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
     import io
 
@@ -1118,6 +1118,21 @@ def test_a_post_cover_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
     assert len(data) <= cards.MAX_BYTES
     assert cards.cover_jpeg(kind) == data
     assert cards.cover_alt(kind).strip()
+
+
+@pytest.mark.parametrize("kind", ["pair", "iceberg", "contour", "turbine", "graph"])
+def test_a_post_tile_is_a_small_square_jpeg_drawn_the_same_every_build(cards, kind):
+    import io
+
+    from PIL import Image
+
+    pytest.importorskip("resvg_py")
+    data = cards.tile_jpeg(kind)
+    with Image.open(io.BytesIO(data)) as image:
+        assert (image.format, image.size) == ("JPEG", (cards.TILE, cards.TILE))
+    # The front page loads every earlier post's tile, so each is a small part of one cover.
+    assert len(data) <= len(cards.cover_jpeg(kind)) // 4
+    assert cards.tile_jpeg(kind) == data
 
 
 def test_a_post_cover_is_named_in_front_matter_and_fails_on_a_bad_name(cards):

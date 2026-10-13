@@ -6,6 +6,7 @@ meta:
 blogpost: true
 date: 2026-10-12
 author: Shu Wan
+tags: [Release, Latent variables]
 version: 0.2.0
 cover: iceberg
 ---

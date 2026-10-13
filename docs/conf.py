@@ -511,12 +511,21 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
 
 def _cover_file(app, docname: str) -> tuple[str, str]:  # noqa: ANN001
     """Write the post's cover (site/cards.py) into the build: its path from the site's root, and
-    its kind. The front matter's ``cover`` names the kind (``pair``, ``iceberg``, ``contour``, or
-    ``graph``, the default). The post and the blog's front page both show it."""
+    its kind. The front matter's ``cover`` names the kind (``cards.COVERS``; ``graph`` is the
+    default). The post and the blog's front page both show it."""
     kind = app.env.metadata.get(docname, {}).get("cover", "graph")
     image = f"assets/covers/{docname.removeprefix('blog/')}.jpg"
     _write_bytes(pathlib.Path(app.outdir) / image, cards.cover_jpeg(kind))
     return image, kind
+
+
+def _tile_file(app, docname: str) -> str:  # noqa: ANN001
+    """Write the post's cover as a square tile (site/cards.py) into the build: its path from the
+    site's root."""
+    kind = app.env.metadata.get(docname, {}).get("cover", "graph")
+    image = f"assets/tiles/{docname.removeprefix('blog/')}.jpg"
+    _write_bytes(pathlib.Path(app.outdir) / image, cards.tile_jpeg(kind))
+    return image
 
 
 def _post_cover(app, docname: str) -> str:  # noqa: ANN001
@@ -545,8 +554,9 @@ class _BlogIndex(Directive):
 
 def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
     """List the dated posts in place of ``blog-index``, newest first (``_newest_first``): the
-    newest beside its cover, with its description as its TL;DR, then the others as rows, each
-    with a square tile of its cover. The Release cards page's blocks style both
+    newest beside its whole cover, with its description as its TL;DR, then the others as rows,
+    each with a small square tile of its cover (``_tile_file``), loaded as the reader scrolls to
+    it. Every post lists its front matter's ``tags``. The Release cards page's blocks style both
     (``_static/benchmarks.css``)."""
     places = [node for node in doctree.findall(nodes.container) if "blog-index" in node["classes"]]
     if app.builder.format != "html" or not places:
@@ -572,24 +582,37 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             f"{post.date.strftime(app.config.post_date_format)}</time>"
         )
         read = f'<a href="{href}">Read the post<span class="visually-hidden">: {title}</span></a>'
-        # The title links to the post, so the cover's link is for the pointer only.
-        image, kind = _cover_file(app, name)
-        cover = (
-            f'<a class="release-tile blog-tile" href="{href}" tabindex="-1" aria-hidden="true">'
-            f'<img class="dark-light" src="{posixpath.relpath(image, posixpath.dirname(docname))}" '
-            f'alt="" width="{cards.COVER_W}" height="{cards.COVER_H}" '
-            f'style="object-position: {cards.COVER_FOCUS.get(kind, "center")}"></a>'
+        # Each tag links to ABlog's page of the posts that share it.
+        tags = "".join(
+            f'<li><a href="{app.builder.get_relative_uri(docname, tag.docname)}">'
+            f"{html.escape(tag.name)}</a></li>"
+            for tag in post.tags
         )
+        tags = f'<ul class="blog-tags" aria-label="Tags">{tags}</ul>' if tags else ""
+        # The title links to the post, so the cover's link is for the pointer only.
+        link = f'<a class="release-tile blog-tile" href="{href}" tabindex="-1" aria-hidden="true">'
         if not latest:
+            image, _ = _cover_file(app, name)
+            cover = (
+                f'{link}<img class="dark-light" '
+                f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
+                f'width="{cards.COVER_W}" height="{cards.COVER_H}"></a>'
+            )
             latest = (
                 f'<div class="release-latest blog-latest">{cover}<div class="release-tldr">'
-                f'<h2><a href="{href}">{title}</a></h2><p class="blog-date">{day}</p>'
+                f'<h2><a href="{href}">{title}</a></h2><p class="blog-date">{day}</p>{tags}'
                 f'<p>{description}</p><div class="release-actions"><p>{read}</p></div></div></div>'
             )
             continue
+        image = _tile_file(app, name)
+        cover = (
+            f'{link}<img class="dark-light" '
+            f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
+            f'width="{cards.TILE}" height="{cards.TILE}" loading="lazy" decoding="async"></a>'
+        )
         rows.append(
             f'<div class="release-row">{cover}<div class="release-body">'
-            f'<h3><a href="{href}">{title}</a></h3><p>{description}</p></div>'
+            f'<h3><a href="{href}">{title}</a></h3><p>{description}</p>{tags}</div>'
             f'<div class="release-meta"><p>{day}</p><ul><li>{read}</li></ul></div></div>'
         )
     earlier = f"<section><h2>Earlier posts</h2>{''.join(rows)}</section>" if rows else ""

@@ -345,34 +345,51 @@ def graph_cover_svg() -> str:
     )
 
 
-# The pair, iceberg, and contour covers are stored JPEGs, each drawn once from a source kept outside
-# the repository.
+# Every cover but the graph is a stored JPEG, drawn once from a source kept outside the repository.
 STORED_COVERS = {
     "pair": BRAND / "cover-pair.jpg",
     "iceberg": BRAND / "cover-iceberg.jpg",
     "contour": BRAND / "cover-contour.jpg",
+    "turbine": BRAND / "cover-turbine.jpg",
 }
 COVERS = {
     "pair": "portraits of Andrey Kolmogorov and Andrey Markov",
     "iceberg": "an iceberg whose two peaks join into one mass under the waterline",
     "contour": "a contour map with two summits, one dotted path ending on each",
+    "turbine": "the fan of a jet engine seen head-on",
     "graph": "the letters of Andrey as a graph",
 }
-# Where a crop of a cover keeps its subject, as a CSS object-position: the blog's front page shows
-# each earlier post's cover as a square tile. The pair's portraits sit at its two ends, so its tile
-# keeps the left one; every other cover keeps its center.
-COVER_FOCUS = {"pair": "left"}
+# The blog's front page shows each earlier post's cover as a square tile of TILE px, cropped from
+# the cover's left end, middle, or right end (COVER_FOCUS, else the middle). The pair's tile keeps
+# Markov, on the right. 240 px stays sharp at three times the rows' 76 px.
+TILE = 240
+TILE_QUALITY = 75
+COVER_FOCUS = {"pair": "right"}
 
 
 def cover_jpeg(kind: str, quality: int = COVER_QUALITY) -> bytes:
-    """A post's cover as a JPEG: ``kind`` is ``pair``, ``iceberg``, ``contour``, or ``graph``, the
-    default. The pair, iceberg, and contour covers are stored, so ``quality`` applies to the graph
+    """A post's cover as a JPEG: ``kind`` is ``pair``, ``iceberg``, ``contour``, ``turbine``, or
+    ``graph``, the default. Every cover but the graph is stored, so ``quality`` applies to the graph
     cover only."""
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
     if kind in STORED_COVERS:
         return STORED_COVERS[kind].read_bytes()
     return _jpeg(graph_cover_svg(), quality)
+
+
+def tile_jpeg(kind: str) -> bytes:
+    """A post's cover as a square tile (``TILE``), cropped where ``COVER_FOCUS`` says."""
+    with Image.open(io.BytesIO(cover_jpeg(kind))) as cover:
+        left = {"left": 0, "right": COVER_W - COVER_H}.get(
+            COVER_FOCUS.get(kind, ""), (COVER_W - COVER_H) // 2
+        )
+        tile = cover.convert("RGB").crop((left, 0, left + COVER_H, COVER_H))
+    out = io.BytesIO()
+    tile.resize((TILE, TILE), Image.Resampling.LANCZOS).save(
+        out, "JPEG", quality=TILE_QUALITY, subsampling=0, optimize=True
+    )
+    return out.getvalue()
 
 
 def cover_alt(kind: str) -> str:
@@ -386,4 +403,6 @@ def cover_alt(kind: str) -> str:
             "A contour map drawn in navy lines: from one start, a white dotted path ends on the "
             "smaller summit and an amber one on the larger summit, marked with a star"
         )
+    if kind == "turbine":
+        return "The fan of a jet engine seen head-on, drawn in navy lines, with an amber center"
     return "The letters a, n, d, r, e, y as a small directed graph, with a dashed arc from a to y"

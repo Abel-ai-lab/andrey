@@ -88,8 +88,11 @@ their front matter: the `blog-index` directive in `blog/index.md`, which `_blog_
 `conf.py` fills. The newest post leads with its cover beside its title, its date, its
 `description` as its TL;DR, and a button to the post. The earlier posts follow, newest first, each
 in a row with a square tile of its cover, its description, and its date. Newest means the latest
-date, a later version breaking a tie, as for the alpha banner below. A tile crops the cover around
-its middle, or where `COVER_FOCUS` in `site/cards.py` says. A new post needs no change to the page.
+date, a later version breaking a tie, as for the alpha banner below. A tile is a small JPEG that
+`tile_jpeg` in `site/cards.py` crops from the cover's middle, or from the end `COVER_FOCUS` names,
+so the page loads the newest cover and a few small tiles. Each post lists its front matter's
+`tags`, each linking to ABlog's page of the posts that share it. A new post needs no change to the
+page.
 
 A post belongs to the release in its `version` front matter, and later builds leave it as that
 release rendered it: its numbers are typed text, and every file it includes (a figure, code, or

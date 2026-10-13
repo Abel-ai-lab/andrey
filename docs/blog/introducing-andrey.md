@@ -6,6 +6,7 @@ meta:
 blogpost: true
 date: 2026-10-08
 author: Shu Wan
+tags: [Release, Speed]
 version: 0.1.0
 cover: pair
 cover_caption: "Andrey Kolmogorov and Andrey Markov."

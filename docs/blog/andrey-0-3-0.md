@@ -6,6 +6,7 @@ meta:
 blogpost: true
 date: 2026-10-12
 author: Shu Wan
+tags: [Release, Score-based]
 version: 0.3.0
 cover: contour
 ---
