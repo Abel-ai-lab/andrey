@@ -462,9 +462,10 @@ class CGScore:
 
     ``-2 * (l(F) - l(P)) + lambda_value * log(n) * (k(F) - k(P))``
 
-    Lower is better. The value is ``-2`` times a BIC, so a categorical node with continuous parents
-    is scored as well as a continuous one. Each term reads a set of variables, so two graphs with
-    the same equivalence class score the same. Scores are memoized by ``(node, sorted parents)``.
+    Lower is better; the value is ``-2`` times a BIC. Each term models a set of variables jointly,
+    so a categorical node with continuous parents is scored as well as a continuous one, and two
+    graphs with the same equivalence class score the same. Scores are memoized by
+    ``(node, sorted parents)``.
 
     Parameters
     ----------

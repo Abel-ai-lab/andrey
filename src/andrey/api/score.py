@@ -125,17 +125,18 @@ def ges(
     the worker processes the BIC search can use.
 
     **Mixed data.** ``"local_score_DG"`` and ``"local_score_CG"`` score data with continuous and
-    categorical columns; the categorical columns are read as :func:`~andrey.pc` describes. Each
-    scores a variable given its parents by ``-2`` times the maximized log-likelihood plus
-    ``lambda_value * log(n)`` per parameter, and equivalent graphs score the same. The degenerate
-    Gaussian score [4]_ replaces a categorical column of ``k`` categories by ``k - 1`` indicator
-    columns and scores every column as Gaussian, by the residual covariance of a linear
-    regression on the parents' columns; on continuous columns only, it equals
-    ``"local_score_BIC"``. The conditional Gaussian score [5]_ fits the continuous variables of a
-    variable and its parents with a Gaussian of its own mean and covariance in each joint category
-    of their categorical ones, and divides by the same fit of the parents alone, so a categorical
-    variable can have continuous parents. It counts parameters for every joint category, so a
-    parent with many categories costs many parameters. Moves are scored in this process.
+    categorical columns; the categorical columns are read as :func:`~andrey.pc` describes. Each is a
+    BIC: ``-2`` times the maximized log-likelihood of a variable given its parents, plus
+    ``lambda_value * log(n)`` per parameter; the degenerate Gaussian's leaves out a constant per
+    variable, which does not change which graph scores best. Equivalent graphs score the same. The
+    degenerate Gaussian score [4]_ replaces a categorical column of ``k`` categories by ``k - 1``
+    indicator columns and scores every column as Gaussian, by the residual covariance of a linear
+    regression on the parents' columns; on continuous columns only, it equals ``"local_score_BIC"``.
+    The conditional Gaussian score [5]_ fits the continuous variables of a variable and its parents
+    in each joint category of their categorical ones, with a Gaussian of that category's own mean
+    and covariance, and divides by the same fit of the parents alone, so a categorical variable can
+    have continuous parents. It counts parameters for every joint category, so a parent with many
+    categories costs many parameters. Moves are scored in this process.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 200 variables with ten rows per variable and parents capped at 4 per

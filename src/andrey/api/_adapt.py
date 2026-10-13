@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
+from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES
 from andrey.core.structure import relabel
 
 if TYPE_CHECKING:
@@ -85,9 +87,6 @@ def data_kind(name: str) -> str:
     The value is ``"categorical"``, ``"mixed"``, or ``"continuous"``. Any name the categorical and
     mixed-data lists leave out, a registered test included, reads continuous data.
     """
-    from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
-    from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES
-
     if name in DISCRETE_INDEP_TESTS or name in DISCRETE_SCORES:
         return "categorical"
     if name in MIXED_INDEP_TESTS or name in MIXED_SCORES:
@@ -150,14 +149,18 @@ def mixed_matrix(
     with ``require_categorical``, when no column is categorical.
     """
     columns = getattr(data, "columns", None)
-    names = None if columns is None else list(columns)
-    d = len(names) if names is not None else int(np.shape(data)[-1]) if np.ndim(data) == 2 else 0
-    if categorical is None:
-        mask = _categorical_dtypes(data, d)
+    if columns is None:
+        X = data_matrix(data, name=name)
+        mask = np.zeros(X.shape[1], dtype=bool)
+        if categorical is not None:
+            mask = _column_mask(categorical, None, X.shape[1])
     else:
-        mask = _column_mask(categorical, names, d)
-    table = data if names is None else _encode_categories(data, mask, setting, name)
-    X = data_matrix(table, name=name)
+        names = list(columns)
+        if categorical is None:
+            mask = _categorical_dtypes(data)
+        else:
+            mask = _column_mask(categorical, names, len(names))
+        X = data_matrix(_encode_categories(data, mask, setting, name), name=name)
     check_categories(np.where(mask, X, 0.0), data, setting, name=name)
     if require_categorical and not mask.any():
         raise ValueError(
@@ -168,11 +171,8 @@ def mixed_matrix(
     return X, mask
 
 
-def _categorical_dtypes(data: object, d: int) -> np.ndarray:
+def _categorical_dtypes(data: object) -> np.ndarray:
     """Mark a pandas DataFrame's ``category``, ``bool``, ``object``, and ``string`` columns."""
-    dtypes = getattr(data, "dtypes", None)
-    if dtypes is None or not hasattr(data, "columns"):
-        return np.zeros(d, dtype=bool)
     import pandas as pd
 
     def categorical(dtype: object) -> bool:
@@ -183,7 +183,8 @@ def _categorical_dtypes(data: object, d: int) -> np.ndarray:
             or pd.api.types.is_string_dtype(dtype)
         )
 
-    return np.array([categorical(dtype) for dtype in list(dtypes)], dtype=bool).reshape(d)
+    dtypes = pd.DataFrame(data).dtypes
+    return np.array([categorical(dtype) for dtype in dtypes], dtype=bool)
 
 
 def _column_mask(categorical: object, names: list | None, d: int) -> np.ndarray:

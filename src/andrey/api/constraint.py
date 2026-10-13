@@ -139,12 +139,12 @@ def pc(
     categories needs no coding. ``"dg"``, the degenerate Gaussian test [7]_, replaces a categorical
     column of ``k`` categories by ``k - 1`` indicator columns and treats every column as Gaussian,
     so it suits effects that are linear in the continuous variables and add up across categories.
-    ``"cg"``, the conditional Gaussian test [8]_, fits the continuous variables with a Gaussian of
-    its own mean and covariance in each joint category of the categorical ones, so a category can
-    change a variance as well as a mean. It needs several rows in every joint category of a test's
-    categorical variables; one with too few rows to estimate its own covariance takes the mean and
-    covariance of all rows. Each compares the likelihoods of the models with and without the
-    dependence, a chi-square statistic on the difference in their numbers of parameters.
+    ``"cg"``, the conditional Gaussian test [8]_, fits the continuous variables in each joint
+    category of the categorical ones with a Gaussian of that category's own mean and covariance, so
+    a category can change a variance as well as a mean. It needs several rows in every joint
+    category of a test's categorical variables; one with too few rows to estimate its own covariance
+    takes the mean and covariance of all rows. Each compares the likelihoods of the models with and
+    without the dependence, a chi-square statistic on the difference in their numbers of parameters.
 
     References
     ----------
