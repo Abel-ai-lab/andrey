@@ -121,8 +121,9 @@ add a release:
 3. Add the new card to the toctree, newest first.
 4. Store the cover's art as `_static/release-cards/<release>.jpg`: a finished JPEG, 8.5 x 11 at
    three times the cover's 288 px width, with its own glow and grain and a dark ground behind the
-   title and the version, recolored with `brand_tones` in `site/cards.py` so its cobalt and amber
-   match the other covers. Add a `release-art-<release>` rule (dots as dashes) in
+   title and the version: the art recolored with `brand_tones` in `site/cards.py`, so its cobalt,
+   amber, and lightness match the other covers, with a soft navy shade under the masthead, the
+   title, and the version. Add a `release-art-<release>` rule (dots as dashes) in
    `_static/benchmarks.css` that points at it, and give the new card's cover and the Release cards
    page's featured cover both classes, `release-art release-art-<release>`. The bare `release-art`
    rule keeps 0.2.0's art, which its released card uses. A cover without the `release-art` class
