@@ -9,7 +9,7 @@ author: Shu Wan
 tags: [Release, Speed]
 version: 0.1.0
 cover: pair
-cover_caption: "Andrey Kolmogorov and Andrey Markov."
+cover_caption: "Andrey Markov and Andrey Kolmogorov."
 ---
 
 # Introducing Andrey

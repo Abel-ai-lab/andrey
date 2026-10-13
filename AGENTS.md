@@ -35,7 +35,9 @@ right, make it fast." For algorithm implementations:
   guides in the same change.
 - A blog post (`docs/blog/`) also sets ABlog's `blogpost`, `date`, and `author`, a
   `description`, which the blog index shows, and two `tags`: its kind (`Release` or `Engineering`)
-  and its topic (a method family as the README's method table names it, or `Speed`).
+  and its topic (a method family as the README's method table names it, or `Speed`). Its `cover`
+  names an art in `site/brand/art-<cover>.jpg`, its subject on the right; the banner adds the
+  title and the release from the front matter.
 
 ## Documentation style
 

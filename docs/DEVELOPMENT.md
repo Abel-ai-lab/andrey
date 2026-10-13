@@ -85,12 +85,12 @@ not keep a post private.
 
 The blog's front page, `/blog/`, lists the dated posts in the Release cards page's blocks, from
 their front matter: the `blog-index` directive in `blog/index.md`, which `_blog_index` in
-`conf.py` fills. The newest post leads with its cover beside its title, its date, its
+`conf.py` fills. The newest post leads with its banner beside its title, its date, its
 `description` as its TL;DR, and a button to the post. The earlier posts follow, newest first, each
-in a row with a square tile of its cover, its description, and its date. Newest means the latest
+in a row with a square tile of its art, its description, and its date. Newest means the latest
 date, a later version breaking a tie, as for the alpha banner below. A tile is a small JPEG that
-`tile_jpeg` in `site/cards.py` crops from the cover's middle, or from the end `COVER_FOCUS` names,
-so the page loads the newest cover and a few small tiles. Each post lists its front matter's
+`tile_jpeg` in `site/cards.py` crops from the art, so the page loads the newest banner and a few
+small tiles. Each post lists its front matter's
 `tags`, each linking to ABlog's page of the posts that share it. A new post needs no change to the
 page.
 
@@ -121,7 +121,8 @@ add a release:
 3. Add the new card to the toctree, newest first.
 4. Store the cover's art as `_static/release-cards/<release>.jpg`: a finished JPEG, 8.5 x 11 at
    three times the cover's 288 px width, with its own glow and grain and a dark ground behind the
-   title and the version. Add a `release-art-<release>` rule (dots as dashes) in
+   title and the version, recolored with `brand_tones` in `site/cards.py` so its cobalt and amber
+   match the other covers. Add a `release-art-<release>` rule (dots as dashes) in
    `_static/benchmarks.css` that points at it, and give the new card's cover and the Release cards
    page's featured cover both classes, `release-art release-art-<release>`. The bare `release-art`
    rule keeps 0.2.0's art, which its released card uses. A cover without the `release-art` class

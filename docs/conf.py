@@ -509,22 +509,39 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     title.parent.insert(at + 2, nodes.raw("", byline, format="html"))
 
 
+def _cover_kind(app, docname: str) -> str:  # noqa: ANN001
+    """The post's art: its front matter's ``cover`` (``cards.COVERS``), else the stipple ground."""
+    return app.env.metadata.get(docname, {}).get("cover", "ground")
+
+
+def _cover_line(app, docname: str) -> str:  # noqa: ANN001
+    """The banner's short line: "Release <version>" for a release post, else the post's kind (its
+    first tag)."""
+    meta = app.env.metadata.get(docname, {})
+    tags = meta.get("tags") or []
+    if isinstance(tags, str):
+        tags = [tag.strip(" \"'") for tag in tags.strip("[]").split(",") if tag.strip()]
+    kind = tags[0] if tags else ""
+    version = str(meta.get("version") or "")
+    return f"{kind} {version}" if kind == "Release" and version else kind
+
+
 def _cover_file(app, docname: str) -> tuple[str, str]:  # noqa: ANN001
-    """Write the post's cover (site/cards.py) into the build: its path from the site's root, and
-    its kind. The front matter's ``cover`` names the kind (``cards.COVERS``; ``graph`` is the
-    default). The post and the blog's front page both show it."""
-    kind = app.env.metadata.get(docname, {}).get("cover", "graph")
+    """Write the post's banner (site/cards.py) into the build: its path from the site's root, and
+    its kind. The post and the blog's front page both show it."""
+    kind = _cover_kind(app, docname)
+    title = app.env.titles[docname].astext()
     image = f"assets/covers/{docname.removeprefix('blog/')}.jpg"
-    _write_bytes(pathlib.Path(app.outdir) / image, cards.cover_jpeg(kind))
+    cover = cards.cover_jpeg(kind, title, _cover_line(app, docname))
+    _write_bytes(pathlib.Path(app.outdir) / image, cover)
     return image, kind
 
 
 def _tile_file(app, docname: str) -> str:  # noqa: ANN001
-    """Write the post's cover as a square tile (site/cards.py) into the build: its path from the
+    """Write the post's art as a square tile (site/cards.py) into the build: its path from the
     site's root."""
-    kind = app.env.metadata.get(docname, {}).get("cover", "graph")
     image = f"assets/tiles/{docname.removeprefix('blog/')}.jpg"
-    _write_bytes(pathlib.Path(app.outdir) / image, cards.tile_jpeg(kind))
+    _write_bytes(pathlib.Path(app.outdir) / image, cards.tile_jpeg(_cover_kind(app, docname)))
     return image
 
 

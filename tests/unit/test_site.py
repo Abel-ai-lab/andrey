@@ -1105,22 +1105,22 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     assert cards.TAGLINE == "A very fast causal discovery package"
 
 
-@pytest.mark.parametrize("kind", ["pair", "iceberg", "contour", "lanes", "graph"])
-def test_a_post_cover_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
+@pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "ground"])
+def test_a_post_banner_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
     import io
 
     from PIL import Image
 
     pytest.importorskip("resvg_py")  # the docs group's renderer; CI's extras jobs lack it
-    data = cards.cover_jpeg(kind)
+    data = cards.cover_jpeg(kind, "Hidden common causes", "Release 0.2.0")
     with Image.open(io.BytesIO(data)) as image:
         assert (image.format, image.size) == ("JPEG", (cards.COVER_W, cards.COVER_H))
     assert len(data) <= cards.MAX_BYTES
-    assert cards.cover_jpeg(kind) == data
+    assert cards.cover_jpeg(kind, "Hidden common causes", "Release 0.2.0") == data
     assert cards.cover_alt(kind).strip()
 
 
-@pytest.mark.parametrize("kind", ["pair", "iceberg", "contour", "lanes", "graph"])
+@pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "ground"])
 def test_a_post_tile_is_a_small_square_jpeg_drawn_the_same_every_build(cards, kind):
     import io
 
@@ -1130,17 +1130,33 @@ def test_a_post_tile_is_a_small_square_jpeg_drawn_the_same_every_build(cards, ki
     data = cards.tile_jpeg(kind)
     with Image.open(io.BytesIO(data)) as image:
         assert (image.format, image.size) == ("JPEG", (cards.TILE, cards.TILE))
-    # The front page loads every earlier post's tile, so each is a small part of one cover.
-    assert len(data) <= len(cards.cover_jpeg(kind)) // 4
+    # The front page loads every earlier post's tile, so each is a small part of one banner.
+    assert len(data) <= len(cards.cover_jpeg(kind, "A title")) // 4
     assert cards.tile_jpeg(kind) == data
+
+
+def test_every_art_takes_the_brand_tones(cards):
+    import numpy as np
+    from PIL import Image
+
+    pytest.importorskip("resvg_py")
+    ground = cards._ground_lightness()[1]
+    for kind in cards.ART:
+        light = np.asarray(cards._art(kind), float) @ cards.LUMA
+        # Every art sits at the stipple ground's middle lightness, whatever it was drawn at.
+        assert abs(np.median(light) - ground) < 4, kind
+    # Pure blue and pure amber come back as the palette's tones at their own lightness.
+    swatch = Image.new("RGB", (40, 10), (40, 60, 200))
+    swatch.paste((230, 150, 40), (20, 0, 40, 10))
+    toned = np.asarray(cards.brand_tones(swatch), float)
+    assert toned[0, 0, 2] > toned[0, 0, 0] and toned[0, 39, 0] > toned[0, 39, 2]
 
 
 def test_a_post_cover_is_named_in_front_matter_and_fails_on_a_bad_name(cards):
     with pytest.raises(ValueError, match="unknown cover"):
-        cards.cover_jpeg("photo")
+        cards.cover_jpeg("photo", "A title")
     post = (ROOT / "docs" / "blog" / "introducing-andrey.md").read_text()
     assert "cover: pair" in post
-    assert 'cover_caption: "Andrey Kolmogorov and Andrey Markov."' in post
 
 
 def test_the_launch_post_links_where_the_name_comes_from():

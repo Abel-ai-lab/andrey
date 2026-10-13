@@ -1,15 +1,19 @@
 # Brand files
 
-- `cover-pair.jpg`: the launch post's cover, portraits of Andrey Kolmogorov and Andrey Markov drawn
-  as navy line screens (Markov from his 1886 portrait, public domain, Wikimedia Commons
-  `File:Andrei_Markov.jpg`). It is stored as drawn; the portraits are not part of the repository.
-- `cover-iceberg.jpg`: the 0.2.0 post's cover, an iceberg whose two peaks join into one mass under
-  the waterline, drawn as the same navy line screen from an original illustration. It is stored as
-  drawn; the illustration is not part of the repository.
-- `cover-contour.jpg`: the 0.3.0 post's cover, a contour map with two summits: from one start, a
-  white dotted path ends on the smaller summit and an amber one on the larger summit, marked with a
-  star, in navy lines on the covers' ground. It is stored as drawn; its source is not part of the
-  repository.
+- `art-<cover>.jpg`: each blog post's art, 1600 x 640, its subject on the right where the banner
+  leaves room for the text; `site/cards.py` recolors it to the brand's tones and adds the
+  wordmark, the title, and the release at build time. Each is stored as drawn.
+  - `art-pair.jpg`: the launch post's, portraits of Andrey Markov and Andrey Kolmogorov drawn as
+    navy line screens, overlapping, Kolmogorov mirrored to face left (Markov from his 1886
+    portrait, public domain, Wikimedia Commons `File:Andrei_Markov.jpg`).
+  - `art-lanes.jpg`: "Why Andrey is fast", lanes rising like a bridge into a starry sky, the
+    others moving in short steps while one amber streak runs far ahead.
+  - `art-iceberg.jpg`: 0.2.0, an iceberg whose two peaks rise out of the frame and join into one
+    faint mass under the waterline, a dim amber light at its center.
+  - `art-contour.jpg`: 0.3.0, two summits drawn in navy contour lines: from one trailhead, a white
+    dotted trail ends on the lower summit and an amber one climbs to a glowing star on the higher.
+- The release cards' covers (`docs/_static/release-cards/<release>.jpg`) are tall versions of the
+  same art, in the same tones, with calm areas where the card's text sits.
 - `abel-logo-white.svg`: the Abel AI Lab logotype, from Abel's brand kit. Its last path is the
   mark, which the homepage's footer draws beside Abel's name.
 - `wordmark-light.svg`, `wordmark-dark.svg`, `favicon.svg`: Andrey's wordmark and icon.
