@@ -1,6 +1,7 @@
 /* The Release cards page: the latest release's cover beside its TL;DR, then the earlier releases
-   as a list. A release card: its cover beside its opening, and its figures. Loaded on those pages
-   only. Colors are --andrey-* tokens. */
+   as a list. A release card: its cover beside its opening, and its figures. Loaded on those pages,
+   and on the blog's front page, which lists the posts in the same blocks (blog.css). Colors are
+   --andrey-* tokens. */
 
 /* ---------- the intro ---------- */
 .bd-article section:has(> .release-latest) > h1 + p {
@@ -10,66 +11,19 @@
   font-size: 1.05rem;
 }
 
-/* ---------- the cover and the tile: the homepage hero's stipple ground ---------- */
-/* Navy lit cobalt from the top left and amber from the bottom right, the same in both themes, with
-   the hero's grain tiles over it. `.bd-content .sd-card` is the theme's selector; the extra class
-   wins over it. */
+/* ---------- the cover and the tile: the brand's stipple ground ---------- */
+/* A release without its own art shows the stipple ground in the covers' tones, shaded where the
+   text sits (`release-ground.jpg`, site/cards.py), so it matches the art covers. `.bd-content
+   .sd-card` is the theme's selector; the extra class wins over it. */
 .bd-content .sd-card.release-cover,
 .bd-content .sd-card.release-tile {
   isolation: isolate;
   overflow: hidden;
   border: 0;
   background:
-    radial-gradient(
-      circle at 14% 0%,
-      color-mix(in srgb, var(--andrey-ground-cobalt) 82%, var(--andrey-ground-navy)) 0,
-      transparent 68%
-    ),
-    radial-gradient(
-      circle at 104% 112%,
-      color-mix(in srgb, var(--andrey-ground-amber) 34%, transparent),
-      transparent 44%
-    ),
+    url("release-ground.jpg") center / cover no-repeat,
     var(--andrey-ground-navy);
   color: var(--andrey-ground-ink);
-}
-
-.release-cover::before,
-.release-cover::after,
-.release-tile::before,
-.release-tile::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* A mask reads only alpha, so the navy here only sets how much of each tile shows. */
-.release-cover::before,
-.release-tile::before {
-  --fade: radial-gradient(
-    circle at 14% 0%,
-    var(--andrey-ground-navy) 0,
-    color-mix(in srgb, var(--andrey-ground-navy) 50%, transparent) 42%,
-    transparent 80%
-  );
-  background: url("grain-noise.png") 0 0 / 128px, url("grain-cobalt.png") 0 0 / 128px;
-  -webkit-mask-image: var(--fade);
-  mask-image: var(--fade);
-}
-
-.release-cover::after,
-.release-tile::after {
-  --fade: radial-gradient(
-    circle at 104% 112%,
-    var(--andrey-ground-navy) 0,
-    color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent) 24%,
-    transparent 50%
-  );
-  background: url("grain-amber.png") 64px 64px / 128px;
-  -webkit-mask-image: var(--fade);
-  mask-image: var(--fade);
 }
 
 .bd-content .sd-card.release-cover .sd-card-body,
@@ -86,7 +40,9 @@
 }
 
 /* The card's link covers it; the ring goes round the cover, outside its clipped edge. */
-.bd-content .sd-card:is(.release-cover, .release-tile) .sd-stretched-link:focus-visible::after {
+.bd-content
+  .sd-card:is(.release-cover, .release-tile)
+  .sd-stretched-link:focus-visible::after {
   outline: none;
 }
 
@@ -113,24 +69,30 @@ html[data-theme="dark"] .release-cover {
   box-shadow:
     inset 5px 0 6px -3px color-mix(in srgb, var(--andrey-ground-navy) 75%, transparent),
     inset 6px 0 0 -5px color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--andrey-ground-cobalt-light) 22%, transparent),
+    0 0 0 1px
+      color-mix(in srgb, var(--andrey-ground-cobalt-light) 22%, transparent),
     10px 22px 44px -14px color-mix(in srgb, var(--andrey-ground-cobalt) 32%, transparent);
 }
 
-/* The release's own art, `release-cards/<release>.jpg`, in place of the ground. It carries its own
-   glow and grain, so the grain layers are off; navy shows until it loads. The bare class keeps
-   0.2.0's art, which its released card uses; each later card adds `release-art-<release>`. */
+/* The release's own art, `release-cards/<release>.jpg`, in place of the ground; navy shows until it
+   loads. The bare class keeps 0.2.0's art, which its released card uses; each later card, and
+   each earlier release's tile, adds `release-art-<release>`. A tile shows the art's middle. */
 .bd-content .sd-card.release-cover.release-art {
-  background: url("release-cards/0.2.0.jpg") center / cover no-repeat, var(--andrey-ground-navy);
+  background:
+    url("release-cards/0.2.0.jpg") center / cover no-repeat,
+    var(--andrey-ground-navy);
 }
 
-.bd-content .sd-card.release-cover.release-art.release-art-0-3-0 {
-  background: url("release-cards/0.3.0.jpg") center / cover no-repeat, var(--andrey-ground-navy);
+.bd-content .sd-card:is(.release-cover, .release-tile).release-art-0-2-0 {
+  background:
+    url("release-cards/0.2.0.jpg") center 62% / cover no-repeat,
+    var(--andrey-ground-navy);
 }
 
-.release-cover.release-art::before,
-.release-cover.release-art::after {
-  content: none;
+.bd-content .sd-card:is(.release-cover, .release-tile).release-art-0-3-0 {
+  background:
+    url("release-cards/0.3.0.jpg") center 62% / cover no-repeat,
+    var(--andrey-ground-navy);
 }
 
 .bd-content .sd-card.release-cover .sd-card-body {
@@ -139,7 +101,8 @@ html[data-theme="dark"] .release-cover {
 
 .release-cover .sd-card-text:nth-of-type(1) {
   padding-bottom: 0.7rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 24%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--andrey-ground-ink) 24%, transparent);
   color: color-mix(in srgb, var(--andrey-ground-ink) 82%, transparent);
   font-size: 0.62rem;
   font-weight: 600;
@@ -174,7 +137,7 @@ html[data-theme="dark"] .release-cover {
   background: var(--andrey-ground-amber);
 }
 
-/* An earlier release's tile: the same ground, square, the version at the bottom left. */
+/* An earlier release's tile: its art or the ground, square, the version at the bottom left. */
 .release-tile {
   aspect-ratio: 1;
   border-radius: var(--andrey-radius-md);
@@ -184,7 +147,8 @@ html[data-theme="dark"] .release-cover {
 }
 
 html[data-theme="dark"] .release-tile {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--andrey-ground-cobalt-light) 22%, transparent);
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--andrey-ground-cobalt-light) 22%, transparent);
 }
 
 .bd-content .sd-card.release-tile .sd-card-body {
@@ -208,8 +172,7 @@ html[data-theme="dark"] .release-tile {
   padding: 1.9rem 1.9rem 1.9rem 2.1rem;
   border: 1px solid var(--andrey-line);
   border-radius: var(--andrey-radius-lg);
-  background:
-    radial-gradient(
+  background: radial-gradient(
       36rem 26rem at 0% 0%,
       color-mix(in srgb, var(--andrey-accent) 8%, transparent),
       transparent 70%
@@ -305,8 +268,9 @@ html[data-theme="dark"] .release-tile {
 .release-actions a {
   background: var(--andrey-surface);
   color: var(--andrey-ink);
-  transition: background-color var(--andrey-dur) var(--andrey-ease),
-              border-color var(--andrey-dur) var(--andrey-ease);
+  transition:
+    background-color var(--andrey-dur) var(--andrey-ease),
+    border-color var(--andrey-dur) var(--andrey-ease);
 }
 
 .release-actions a:hover {
@@ -324,7 +288,11 @@ html[data-theme="dark"] .release-tile {
 
 .release-actions a:first-child:hover {
   border-color: var(--andrey-ground-navy);
-  background: color-mix(in srgb, var(--andrey-ground-cobalt) 82%, var(--andrey-ground-navy));
+  background: color-mix(
+    in srgb,
+    var(--andrey-ground-cobalt) 82%,
+    var(--andrey-ground-navy)
+  );
   color: var(--andrey-ground-ink);
 }
 

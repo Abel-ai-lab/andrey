@@ -1,14 +1,16 @@
 ---
-name: introducing-andrey
+name: 20261008-introducing-andrey
 description: "Introducing Andrey, a very fast causal discovery package for Python."
 meta:
   type: post
 blogpost: true
 date: 2026-10-08
 author: Shu Wan
+tags: [Release, Speed]
+redirect: blog/introducing-andrey
 version: 0.1.0
 cover: pair
-cover_caption: "Andrey Kolmogorov and Andrey Markov."
+cover_caption: "Andrey Markov and Andrey Kolmogorov."
 ---
 
 # Introducing Andrey
@@ -38,7 +40,7 @@ We built Andrey to make causal discovery fast and easy to use. It runs the same 
 :file: 0.1.0/speedup.html
 ```
 
-[Why Andrey is fast](why-andrey-is-fast.md) explains the four ideas behind the speed. Andrey
+[Why Andrey is fast](20261008-why-andrey-is-fast.md) explains the four ideas behind the speed. Andrey
 is free and open source, and so are its [benchmarks](../docs/benchmarks.md), which you can rerun
 yourself.
 

@@ -9,6 +9,7 @@ size WhatsApp still previews.
 from __future__ import annotations
 
 import base64
+import functools
 import html
 import importlib.util
 import io
@@ -16,6 +17,7 @@ import itertools
 import re
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageFont
 
 import andrey.viz
@@ -277,109 +279,195 @@ def readme_banner(quality: int = BANNER_QUALITY) -> str:
 
 
 # ---- blog post covers ---------------------------------------------------------------------------
-# A cover sits under a post's title: 1600 x 640, a JPEG under MAX_BYTES, drawn once per build.
+# A post's cover is a banner, 1600 x 640, under the post's title: on the left, over a navy fade,
+# the wordmark, the title, and a short line (its release, or its kind); on the right, the post's
+# art. Each art (``ART``), its subject on the right, is stored already recolored to the brand's
+# tones (``brand_tones``), so the file is what the page shows and cobalt and amber match across
+# posts; a test fails on art stored otherwise. A post without art shows the stipple ground. The
+# JPEG takes the first quality in ``COVER_QUALITIES`` under MAX_BYTES.
 COVER_W, COVER_H = 1600, 640
-# 60 leaves about 40 KB under MAX_BYTES on both covers; 65 leaves 7 KB on the graph. No banding.
-COVER_QUALITY = 60
-# The graph cover: a n d r e y as a W of white nodes, each edge directed, with a dashed amber
-# two-headed arc from a to y.
-LETTERS = {"a": (450, 183), "n": (600, 457), "d": (730, 269), "r": (870, 269), "e": (1000, 457)}
-LETTERS["y"] = (1150, 183)
-CHAIN = (("a", "n"), ("n", "d"), ("d", "r"), ("r", "e"), ("e", "y"))
-
-
-def _png_href(image: Image.Image) -> str:
-    buffer = io.BytesIO()
-    image.save(buffer, "PNG")
-    return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
-
-
-def _marker(name: str, color: str) -> str:
-    return (
-        f'<marker id="{name}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
-        f'markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" '
-        f'fill="{color}"/></marker>'
-    )
-
-
-def graph_cover_svg() -> str:
-    """The graph cover: the letters of Andrey as a small directed graph on the cards' ground."""
-    ground = grain.stipple(COVER_W, COVER_H, (grain.Band(600, 320, 420, 240, 0.35),))
-    ink, navy, amber = "#ffffff", grain.NAVY, andrey.viz.LIGHT.categorical[1]
-    radius = 40
-    parts = [
-        f"<defs>{_marker('ink', ink)}{_marker('amber', amber)}"
-        '<filter id="shade" x="-50%" y="-50%" width="200%" height="200%">'
-        '<feGaussianBlur stdDeviation="6"/></filter></defs>'
-    ]
-    for u, v in CHAIN:
-        (x0, y0), (x1, y1) = LETTERS[u], LETTERS[v]
-        length = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
-        ux, uy = (x1 - x0) / length, (y1 - y0) / length
-        parts.append(
-            f'<line x1="{x0 + ux * (radius + 6):.1f}" y1="{y0 + uy * (radius + 6):.1f}" '
-            f'x2="{x1 - ux * (radius + 10):.1f}" y2="{y1 - uy * (radius + 10):.1f}" stroke="{ink}" '
-            'stroke-width="4" stroke-linecap="round" marker-end="url(#ink)"/>'
-        )
-    (ax, ay), (yx, yy) = LETTERS["a"], LETTERS["y"]
-    parts.append(
-        f'<path d="M{ax + 30},{ay - 26} Q{(ax + yx) / 2},{ay - 170} {yx - 30},{yy - 26}" '
-        f'fill="none" stroke="{amber}" stroke-width="3" stroke-dasharray="10 9" '
-        'marker-start="url(#amber)" marker-end="url(#amber)" opacity="0.95"/>'
-    )
-    for letter, (x, y) in LETTERS.items():
-        parts.append(
-            f'<circle cx="{x}" cy="{y + 5}" r="{radius}" fill="{navy}" opacity="0.3" '
-            'filter="url(#shade)"/>'
-            f'<circle cx="{x}" cy="{y}" r="{radius}" fill="{ink}"/>'
-            f'<text x="{x}" y="{y + 2}" text-anchor="middle" dominant-baseline="middle" '
-            f'font-family="Inter" font-weight="600" font-size="42" fill="{navy}">{letter}</text>'
-        )
-    # Drawn at 1.3x around the graph's middle, so it spans about two thirds of the cover's width.
-    cx, cy = 800, 291
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{COVER_W}" height="{COVER_H}">'
-        f'<image href="{_png_href(ground)}" width="{COVER_W}" height="{COVER_H}"/>'
-        f'<g transform="translate({cx} {cy}) scale(1.3) translate({-cx} {-cy})">'
-        f"{''.join(parts)}</g></svg>"
-    )
-
-
-# The pair, iceberg, and contour covers are stored JPEGs, each drawn once from a source kept outside
-# the repository.
-STORED_COVERS = {
-    "pair": BRAND / "cover-pair.jpg",
-    "iceberg": BRAND / "cover-iceberg.jpg",
-    "contour": BRAND / "cover-contour.jpg",
-}
+COVER_QUALITIES = (75, 70, 65, 60, 55)
+ART = {kind: BRAND / f"art-{kind}.jpg" for kind in ("pair", "lanes", "iceberg", "contour")}
 COVERS = {
-    "pair": "portraits of Andrey Kolmogorov and Andrey Markov",
-    "iceberg": "an iceberg whose two peaks join into one mass under the waterline",
-    "contour": "a contour map with two summits, one dotted path ending on each",
-    "graph": "the letters of Andrey as a graph",
+    "pair": "portraits of Andrey Markov and Andrey Kolmogorov, side by side",
+    "lanes": "lanes rising into the sky, one amber streak far ahead",
+    "iceberg": "an iceberg whose two peaks join into one faint mass under the waterline",
+    "contour": "two summits drawn in contour lines, one dotted trail ending on each",
+    "ground": "the stipple ground",
 }
+BANNER_LEFT = 104  # the text column's left edge
+BANNER_FADE = 0.55  # the navy fade behind the text ends at this share of the width
+BANNER_FADE_PEAK = 0.6  # its opacity at the left edge
+BANNER_TITLE = (64, 560, 2)  # the title's size, its widest line, and its most lines
+# The blog's front page shows each earlier post's art as a square tile of TILE px: the art's
+# square centered at TILE_CENTER of its width, where every art's subject sits. 240 px stays sharp
+# at three times the rows' 76 px.
+TILE = 240
+TILE_QUALITY = 75
+TILE_CENTER = 0.72
+# Lightness and warmth of the brand's tones. LUMA weighs red, green, and blue into lightness.
+LUMA = np.array([0.299, 0.587, 0.114])
 
 
-def cover_jpeg(kind: str, quality: int = COVER_QUALITY) -> bytes:
-    """A post's cover as a JPEG: ``kind`` is ``pair``, ``iceberg``, ``contour``, or ``graph``, the
-    default. The pair, iceberg, and contour covers are stored, so ``quality`` applies to the graph
-    cover only."""
+def _rgb(color: str) -> np.ndarray:
+    return np.array([int(color[i : i + 2], 16) for i in (1, 3, 5)], float)
+
+
+@functools.cache
+def _ground_lightness() -> tuple[float, float, float]:
+    """The stipple ground's 10th, 50th, and 90th percentiles of lightness."""
+    ground = np.asarray(grain.stipple(400, 160).convert("RGB"), float) @ LUMA
+    return tuple(np.percentile(ground, [10, 50, 90]))
+
+
+def brand_tones(image: Image.Image, match_ground: bool = True) -> Image.Image:
+    """``image`` in the brand's tones, its drawing unchanged.
+
+    With ``match_ground``, lightness moves to the stipple ground's: the image's 10th, 50th, and
+    90th percentiles map to the ground's, and its brightest highlights stay bright. Without it (a
+    release card's art, dark where its text sits), lightness stays.
+
+    A cool pixel takes the blue of its lightness along navy, the palette's ramp, and white. A warm
+    pixel takes amber at the lightness it was drawn with. Warmth is how far red exceeds blue,
+    against the image's own blue ground, so a soft haze of amber stays dim; pale, colorless pixels
+    (white dots and trails) stay cool."""
+    pixels = np.asarray(image.convert("RGB"), float)
+    drawn = pixels @ LUMA
+    knots = np.percentile(drawn, [10, 50, 90, 99.5])
+    top = max(knots[3], knots[2] + 1)
+    target = [0, *_ground_lightness(), max(top, 200), 255]
+    light = np.interp(drawn, [0, *knots[:3], top, 255], target) if match_ground else drawn
+    ramp = andrey.viz.LIGHT.ramp  # palest first
+    colors = np.array(
+        [np.zeros(3), _rgb(grain.NAVY), *(_rgb(c) for c in ramp[::-1][1:]), np.full(3, 255.0)]
+    )
+    cool = np.stack([np.interp(light, colors @ LUMA, colors[:, c]) for c in range(3)], -1)
+    amber = _rgb(grain.AMBER)
+    amber_light = amber @ LUMA
+    above = np.clip((drawn - amber_light) / (255 - amber_light), 0, 1)[..., None]
+    warm = np.where(
+        (drawn <= amber_light)[..., None],
+        amber * (drawn / amber_light)[..., None],
+        amber * (1 - above) + 255 * above,
+    )
+    red_minus_blue = pixels[..., 0] - pixels[..., 2]
+    ground = np.percentile(red_minus_blue, 50)
+    warmest = max(np.percentile(red_minus_blue, 99.7), ground + 60)
+    warmth = np.clip((red_minus_blue - ground) / (warmest - ground), 0, 1) ** 2.2
+    colorfulness = (pixels.max(-1) - pixels.min(-1)) / np.maximum(pixels.max(-1), 1)
+    warmth *= 1 - np.clip((drawn - 185) / 45, 0, 1) * (colorfulness < 0.25)
+    out = cool * (1 - warmth[..., None]) + warm * warmth[..., None]
+    return Image.fromarray(out.clip(0, 255).astype(np.uint8))
+
+
+# A release card's cover art, 8.5 x 11 at three times the cover's 288 px width: the art in the
+# brand's tones, with a soft navy shade where the card's text sits, the masthead and title across
+# the top and the version at the bottom left. A release without art, and every earlier release's
+# tile, shows the stipple ground under the same shade (``release_ground_jpeg``).
+RELEASE_W, RELEASE_H = 864, 1119
+RELEASE_SHADE = (0.55, 0.5)  # the shade's depth at the top edge and at the bottom left corner
+
+
+def release_art(image: Image.Image) -> Image.Image:
+    """``image`` as a release card's cover: the brand's tones at the cover's size, shaded for its
+    text."""
+    art = np.asarray(
+        brand_tones(image.convert("RGB").resize((RELEASE_W, RELEASE_H), Image.LANCZOS)), float
+    )
+    y = np.arange(RELEASE_H)[:, None] / RELEASE_H
+    x = np.arange(RELEASE_W)[None, :] / RELEASE_W
+    top = RELEASE_SHADE[0] * np.clip(1 - y / 0.36, 0, 1) ** 1.4
+    corner = RELEASE_SHADE[1] * np.clip(1 - np.hypot(x / 0.62, (1 - y) / 0.34), 0, 1) ** 1.2
+    shade = np.maximum(top, corner)[..., None]
+    out = art * (1 - shade) + _rgb(grain.NAVY) * shade
+    return Image.fromarray(out.clip(0, 255).astype(np.uint8))
+
+
+def release_ground_jpeg() -> bytes:
+    """The stipple ground as a release cover (``release_art``), for a release without art."""
+    out = io.BytesIO()
+    release_art(grain.stipple(RELEASE_W, RELEASE_H).convert("RGB")).save(
+        out, "JPEG", quality=60, subsampling=0, optimize=True
+    )
+    return out.getvalue()
+
+
+def _art(kind: str) -> Image.Image:
+    """The post's art as stored (already in the brand's tones), or the stipple ground."""
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
-    if kind in STORED_COVERS:
-        return STORED_COVERS[kind].read_bytes()
-    return _jpeg(graph_cover_svg(), quality)
+    if kind == "ground":
+        return grain.stipple(COVER_W, COVER_H).convert("RGB")
+    with Image.open(ART[kind]) as art:
+        return art.convert("RGB").resize((COVER_W, COVER_H), Image.LANCZOS)
+
+
+def _jpeg_href(image: Image.Image) -> str:
+    buffer = io.BytesIO()
+    image.save(buffer, "JPEG", quality=92)
+    return f"data:image/jpeg;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+
+def cover_svg(kind: str, title: str, line: str) -> str:
+    """The banner as SVG: ``kind``'s art, and over its left side the wordmark, ``title``, and
+    ``line`` after a short amber rule."""
+    size, width, most = BANNER_TITLE
+    lines = _lines(title, size, width, most) or [title]
+    top = 268 if len(lines) == most else 300
+    navy = grain.NAVY
+    stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
+    fade = "".join(
+        f'<stop offset="{offset:.2f}" stop-color="{navy}" stop-opacity="{opacity:.2f}"/>'
+        for offset, opacity in stops
+    )
+    title_text = "".join(
+        f'<text x="{BANNER_LEFT}" y="{top + i * 76}" font-family="Inter" font-weight="600" '
+        f'font-size="{size}" letter-spacing="-1.5" fill="#ffffff">{html.escape(text)}</text>'
+        for i, text in enumerate(lines)
+    )
+    rule_y = top + (len(lines) - 1) * 76 + 66
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{COVER_W}" height="{COVER_H}">'
+        f'<defs><linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">{fade}</linearGradient>'
+        f'</defs><image href="{_jpeg_href(_art(kind))}" width="{COVER_W}" height="{COVER_H}"/>'
+        f'<rect width="{COVER_W}" height="{COVER_H}" fill="url(#fade)"/>'
+        + _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 104, 44)
+        + title_text
+        + (
+            f'<rect x="{BANNER_LEFT}" y="{rule_y}" width="34" height="4" fill="{grain.AMBER}"/>'
+            f'<text x="{BANNER_LEFT + 50}" y="{rule_y + 16}" font-family="Inter" '
+            f'font-weight="600" font-size="30" fill="#ffffff" opacity="0.9">'
+            f"{html.escape(line)}</text>"
+            if line
+            else ""
+        )
+        + "</svg>"
+    )
+
+
+def cover_jpeg(kind: str, title: str, line: str = "") -> bytes:
+    """The banner (``cover_svg``) as a JPEG under MAX_BYTES."""
+    image = _render(cover_svg(kind, title, line)).convert("RGB")
+    for quality in COVER_QUALITIES:
+        out = io.BytesIO()
+        image.save(out, "JPEG", quality=quality, subsampling=0, optimize=True)
+        if out.tell() <= MAX_BYTES:
+            break
+    return out.getvalue()
+
+
+def tile_jpeg(kind: str) -> bytes:
+    """The post's art, without the banner's text, as a square tile (``TILE``)."""
+    art = _art(kind)
+    left = min(max(round(TILE_CENTER * COVER_W - COVER_H / 2), 0), COVER_W - COVER_H)
+    tile = art.crop((left, 0, left + COVER_H, COVER_H)).resize((TILE, TILE), Image.LANCZOS)
+    out = io.BytesIO()
+    tile.save(out, "JPEG", quality=TILE_QUALITY, subsampling=0, optimize=True)
+    return out.getvalue()
 
 
 def cover_alt(kind: str) -> str:
-    """The cover's alt text."""
-    if kind == "pair":
-        return "Portraits of Andrey Kolmogorov and Andrey Markov drawn in navy lines"
-    if kind == "iceberg":
-        return "An iceberg drawn in navy lines: two peaks above the waterline, one mass below it"
-    if kind == "contour":
-        return (
-            "A contour map drawn in navy lines: from one start, a white dotted path ends on the "
-            "smaller summit and an amber one on the larger summit, marked with a star"
-        )
-    return "The letters a, n, d, r, e, y as a small directed graph, with a dashed arc from a to y"
+    """The cover's alt text: its art, in a sentence."""
+    if kind not in COVERS:
+        raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
+    return f"Banner: {COVERS[kind]}, drawn in navy lines"

@@ -164,7 +164,7 @@ def fragment(key: str) -> str:
 
 
 def dialog(
-    benchmarks: str = "docs/benchmarks.html", post: str = "blog/why-andrey-is-fast.html"
+    benchmarks: str = "docs/benchmarks.html", post: str = "blog/20261008-why-andrey-is-fast.html"
 ) -> str:
     """The pill that opens the scenes, as a dialog that plays one scene at a time.
 

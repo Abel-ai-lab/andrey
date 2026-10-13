@@ -733,7 +733,7 @@ def test_the_navbar_names_only_the_page_being_read_as_current():
     assert marks("docs/demos/index") == (["Demos"], ["Demos"])
     assert marks("docs/demos/pc-replay") == (["Demos"], [])
     assert marks("blog/index") == (["Blog"], ["Blog"])
-    assert marks("blog/introducing-andrey") == (["Blog"], [])
+    assert marks("blog/20261008-introducing-andrey") == (["Blog"], [])
     assert marks("docs/faq") == (["FAQ"], ["FAQ"])
 
 
@@ -880,7 +880,7 @@ def test_code_and_its_output_sit_in_windows_named_for_the_file(placeholder_page)
     assert 'class="term-bar window-bar"' in placeholder_page
     # In the launch post a captioned code block is a window, its caption the title; the install
     # command's window has no title.
-    post = (ROOT / "docs" / "blog" / "introducing-andrey.md").read_text(encoding="utf-8")
+    post = (ROOT / "docs" / "blog" / "20261008-introducing-andrey.md").read_text(encoding="utf-8")
     quick_start = post.split("## Try Andrey", 1)[1].split("\n## ", 1)[0]
     assert re.findall(r":caption: (.*)", quick_start) == ["example.py", "example.py"]
     blocks = re.findall(r"```\{code-block\} shell\n(?::[^\n]*\n)*\n(.*?)\n```", quick_start, re.S)
@@ -1004,20 +1004,45 @@ def test_the_card_ground_is_the_same_on_every_build(cards):
 def test_the_alpha_banner_links_the_newest_release_post(conf):
     newest = conf["_newest_post"]
     posts = [
-        ("blog/introducing-andrey", "2026-10-08", "0.1.0"),
-        ("blog/why-andrey-is-fast", "2026-10-08", "0.1.0"),
-        ("blog/andrey-0-2-0", "2026-10-12", "0.2.0"),
+        ("blog/20261008-introducing-andrey", "2026-10-08", "0.1.0"),
+        ("blog/20261008-why-andrey-is-fast", "2026-10-08", "0.1.0"),
+        ("blog/20261012-andrey-0-2-0", "2026-10-12", "0.2.0"),
     ]
-    assert newest(posts) == ("blog/andrey-0-2-0", "0.2.0")
+    assert newest(posts) == ("blog/20261012-andrey-0-2-0", "0.2.0")
     # A later version breaks a tie in date; a tie in both names the posts.
     assert newest([*posts, ("blog/andrey-0-2-1", "2026-10-12", "0.2.1")])[1] == "0.2.1"
-    with pytest.raises(ValueError, match="introducing-andrey, blog/why-andrey-is-fast"):
+    with pytest.raises(ValueError, match="introducing-andrey, blog/20261008-why-andrey-is-fast"):
         newest(posts[:2])
     banner = (ROOT / "docs" / "_templates" / "sections" / "announcement.html").read_text()
     assert '<a href="{{ pathto(release_post) }}">Read the {{ release_version }} release post.' in (
         banner
     )
-    assert "introducing-andrey" not in banner
+    assert "20261008-introducing-andrey" not in banner
+
+
+def test_the_blog_lists_the_newest_post_first(conf):
+    newest_first = conf["_newest_first"]
+    posts = [
+        ("blog/20261008-why-andrey-is-fast", "2026-10-08", "0.1.0"),
+        ("blog/20261008-introducing-andrey", "2026-10-08", "0.1.0"),
+        ("blog/20261012-andrey-0-2-0", "2026-10-12", "0.2.0"),
+        ("blog/a-note", "2026-10-10", ""),
+        ("blog/20261012-andrey-0-3-0", "2026-10-12", "0.3.0"),
+    ]
+    # By date, then version; posts that tie in both keep their order.
+    assert newest_first(posts) == [
+        "blog/20261012-andrey-0-3-0",
+        "blog/20261012-andrey-0-2-0",
+        "blog/a-note",
+        "blog/20261008-why-andrey-is-fast",
+        "blog/20261008-introducing-andrey",
+    ]
+    # A post without a version leads when it is the newest, and follows one with a version on the
+    # same day.
+    assert newest_first([*posts, ("blog/later", "2026-10-13", "")])[0] == "blog/later"
+    assert newest_first([*posts, ("blog/same-day", "2026-10-12", "")])[2] == "blog/same-day"
+    with pytest.raises(ValueError, match="introducing-andrey, blog/20261008-why-andrey-is-fast"):
+        newest_first(posts[:2])
 
 
 def test_the_homepage_has_no_latest_strip(placeholder_page):
@@ -1080,33 +1105,79 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     assert cards.TAGLINE == "A very fast causal discovery package"
 
 
-@pytest.mark.parametrize("kind", ["pair", "iceberg", "contour", "graph"])
-def test_a_post_cover_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
+@pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "ground"])
+def test_a_post_banner_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
     import io
 
     from PIL import Image
 
     pytest.importorskip("resvg_py")  # the docs group's renderer; CI's extras jobs lack it
-    data = cards.cover_jpeg(kind)
+    data = cards.cover_jpeg(kind, "Hidden common causes", "Release 0.2.0")
     with Image.open(io.BytesIO(data)) as image:
         assert (image.format, image.size) == ("JPEG", (cards.COVER_W, cards.COVER_H))
     assert len(data) <= cards.MAX_BYTES
-    assert cards.cover_jpeg(kind) == data
+    assert cards.cover_jpeg(kind, "Hidden common causes", "Release 0.2.0") == data
     assert cards.cover_alt(kind).strip()
+
+
+@pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "ground"])
+def test_a_post_tile_is_a_small_square_jpeg_drawn_the_same_every_build(cards, kind):
+    import io
+
+    from PIL import Image
+
+    pytest.importorskip("resvg_py")
+    data = cards.tile_jpeg(kind)
+    with Image.open(io.BytesIO(data)) as image:
+        assert (image.format, image.size) == ("JPEG", (cards.TILE, cards.TILE))
+    # The front page loads every earlier post's tile, so each is a small part of one banner.
+    assert len(data) <= len(cards.cover_jpeg(kind, "A title")) // 4
+    assert cards.tile_jpeg(kind) == data
+
+
+def test_every_published_art_is_stored_in_the_brand_tones(cards):
+    import numpy as np
+    from PIL import Image
+
+    pytest.importorskip("resvg_py")
+
+    def drift(path, match_ground):
+        with Image.open(path) as image:
+            art = image.convert("RGB")
+        toned = cards.brand_tones(art, match_ground=match_ground)
+        return np.abs(np.asarray(art, float) - np.asarray(toned, float)).mean()
+
+    # Art already in the tones moves a few levels when recolored again (JPEG noise); art drawn in
+    # other blues or ambers moves tens of levels. A failure: store the file through
+    # cards.brand_tones (match_ground=False for a release card's art).
+    ground = cards._ground_lightness()[1]
+    for path in cards.ART.values():
+        assert drift(path, True) < 8, path.name
+        with Image.open(path) as image:
+            light = np.asarray(image.convert("RGB"), float) @ cards.LUMA
+        assert abs(np.median(light) - ground) < 4, path.name
+    cards_art = sorted((ROOT / "docs" / "_static" / "release-cards").glob("*.jpg"))
+    assert cards_art
+    for path in cards_art:
+        assert drift(path, False) < 8, path.name
+    # Pure blue and pure amber come back as the palette's tones at their own lightness.
+    swatch = Image.new("RGB", (40, 10), (40, 60, 200))
+    swatch.paste((230, 150, 40), (20, 0, 40, 10))
+    toned = np.asarray(cards.brand_tones(swatch), float)
+    assert toned[0, 0, 2] > toned[0, 0, 0] and toned[0, 39, 0] > toned[0, 39, 2]
 
 
 def test_a_post_cover_is_named_in_front_matter_and_fails_on_a_bad_name(cards):
     with pytest.raises(ValueError, match="unknown cover"):
-        cards.cover_jpeg("photo")
-    post = (ROOT / "docs" / "blog" / "introducing-andrey.md").read_text()
+        cards.cover_jpeg("photo", "A title")
+    post = (ROOT / "docs" / "blog" / "20261008-introducing-andrey.md").read_text()
     assert "cover: pair" in post
-    assert 'cover_caption: "Andrey Kolmogorov and Andrey Markov."' in post
 
 
 def test_the_launch_post_links_where_the_name_comes_from():
     faq = (ROOT / "docs" / "docs" / "faq.md").read_text()
     assert '### Where does the name "Andrey" come from?' in faq
-    post = (ROOT / "docs" / "blog" / "introducing-andrey.md").read_text()
+    post = (ROOT / "docs" / "blog" / "20261008-introducing-andrey.md").read_text()
     assert "(../docs/faq.md#where-does-the-name-andrey-come-from)" in post
 
 
