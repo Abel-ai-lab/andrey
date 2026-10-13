@@ -85,14 +85,16 @@ not keep a post private.
 
 The blog's front page, `/blog/`, lists the dated posts in the Release cards page's blocks, from
 their front matter: the `blog-index` directive in `blog/index.md`, which `_blog_index` in
-`conf.py` fills. The newest post leads with its banner beside its title, its date, its
-`description` as its TL;DR, and a button to the post. The earlier posts follow, newest first, each
-in a row with a square tile of its art, its description, and its date. Newest means the latest
-date, a later version breaking a tie, as for the alpha banner below. A tile is a small JPEG that
-`tile_jpeg` in `site/cards.py` crops from the art, so the page loads the newest banner and a few
-small tiles. Each post lists its front matter's
-`tags`, each linking to ABlog's page of the posts that share it. A new post needs no change to the
-page.
+`conf.py` fills. The newest post leads with its cover across the block, then its title, date,
+tags, its `description` as its TL;DR, and a button to the post. The earlier posts follow, newest
+first, each in a row with a small copy of its art (`thumb_jpeg` in `site/cards.py`), its
+description, tags, and date, under a button that reverses their order. Newest means the latest
+date, a later version breaking a tie, as for the alpha banner below. Each tag links to ABlog's
+page of the posts that share it. A new post needs no change to the page.
+
+A post's cover is its art alone: the page's title and byline (authors, date, version, tags) sit
+around it. Its link preview is the banner, the art with the wordmark, title, and release drawn
+over its left side (`preview_jpeg`), the image a shared link shows.
 
 A post belongs to the release in its `version` front matter, and later builds leave it as that
 release rendered it: its numbers are typed text, and every file it includes (a figure, code, or

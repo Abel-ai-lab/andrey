@@ -279,12 +279,14 @@ def readme_banner(quality: int = BANNER_QUALITY) -> str:
 
 
 # ---- blog post covers ---------------------------------------------------------------------------
-# A post's cover is a banner, 1600 x 640, under the post's title: on the left, over a navy fade,
-# the wordmark, the title, and a short line (its release, or its kind); on the right, the post's
-# art. Each art (``ART``), its subject on the right, is stored already recolored to the brand's
-# tones (``brand_tones``), so the file is what the page shows and cobalt and amber match across
-# posts; a test fails on art stored otherwise. A post without art shows the stipple ground. The
-# JPEG takes the first quality in ``COVER_QUALITIES`` under MAX_BYTES.
+# A post's cover is its art, 1600 x 640, under the post's title and on the blog's front page, where
+# a small copy (``THUMB_W`` wide) marks each earlier post. Its link preview is the banner: on the
+# left, over a navy fade, the wordmark, the title, and a short line (its release, or its kind); on
+# the right, the art, at the card size (``W`` x ``H``) link previews expect. Each art (``ART``), its
+# subject on the right, is stored already recolored to the brand's tones (``brand_tones``), so the
+# file is what the page shows and cobalt and amber match across posts; a test fails on art stored
+# otherwise. A post without art shows the stipple ground. A JPEG takes the first quality in
+# ``COVER_QUALITIES`` under MAX_BYTES.
 COVER_W, COVER_H = 1600, 640
 COVER_QUALITIES = (75, 70, 65, 60, 55)
 ART = {kind: BRAND / f"art-{kind}.jpg" for kind in ("pair", "lanes", "iceberg", "contour")}
@@ -295,16 +297,14 @@ COVERS = {
     "contour": "two summits drawn in contour lines, one dotted trail ending on each",
     "ground": "the stipple ground",
 }
-BANNER_LEFT = 104  # the text column's left edge
+BANNER_LEFT = 104  # the text column's left edge, at the cover's height
 BANNER_FADE = 0.55  # the navy fade behind the text ends at this share of the width
 BANNER_FADE_PEAK = 0.6  # its opacity at the left edge
 BANNER_TITLE = (64, 560, 2)  # the title's size, its widest line, and its most lines
-# The blog's front page shows each earlier post's art as a square tile of TILE px: the art's
-# square centered at TILE_CENTER of its width, where every art's subject sits. 240 px stays sharp
-# at three times the rows' 76 px.
-TILE = 240
-TILE_QUALITY = 75
-TILE_CENTER = 0.72
+# An earlier post's thumbnail on the blog's front page: the art, THUMB_W wide, sharp at three
+# times the rows' 10 rem.
+THUMB_W = 480
+THUMB_QUALITY = 75
 # Lightness and warmth of the brand's tones. LUMA weighs red, green, and blue into lightness.
 LUMA = np.array([0.299, 0.587, 0.114])
 
@@ -408,11 +408,13 @@ def _jpeg_href(image: Image.Image) -> str:
     return f"data:image/jpeg;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 
-def cover_svg(kind: str, title: str, line: str) -> str:
-    """The banner as SVG: ``kind``'s art, and over its left side the wordmark, ``title``, and
-    ``line`` after a short amber rule."""
-    size, width, most = BANNER_TITLE
-    lines = _lines(title, size, width, most) or [title]
+def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = H) -> str:
+    """The banner as SVG, ``width`` x ``height``: ``kind``'s art filling the height, its right edge
+    on the banner's, and over its left side the wordmark, ``title``, and ``line`` after a short
+    amber rule. Text sizes follow the height."""
+    k = height / COVER_H
+    size, line_width, most = BANNER_TITLE
+    lines = _lines(title, size, line_width, most) or [title]
     top = 268 if len(lines) == most else 300
     navy = grain.NAVY
     stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
@@ -426,12 +428,9 @@ def cover_svg(kind: str, title: str, line: str) -> str:
         for i, text in enumerate(lines)
     )
     rule_y = top + (len(lines) - 1) * 76 + 66
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{COVER_W}" height="{COVER_H}">'
-        f'<defs><linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">{fade}</linearGradient>'
-        f'</defs><image href="{_jpeg_href(_art(kind))}" width="{COVER_W}" height="{COVER_H}"/>'
-        f'<rect width="{COVER_W}" height="{COVER_H}" fill="url(#fade)"/>'
-        + _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 104, 44)
+    art_w = round(height * COVER_W / COVER_H)
+    text = (
+        _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 104, 44)
         + title_text
         + (
             f'<rect x="{BANNER_LEFT}" y="{rule_y}" width="34" height="4" fill="{grain.AMBER}"/>'
@@ -441,13 +440,19 @@ def cover_svg(kind: str, title: str, line: str) -> str:
             if line
             else ""
         )
-        + "</svg>"
+    )
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
+        f'<defs><linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">{fade}</linearGradient>'
+        f'</defs><image href="{_jpeg_href(_art(kind))}" x="{width - art_w}" y="0" '
+        f'width="{art_w}" height="{height}" preserveAspectRatio="none"/>'
+        f'<rect width="{width}" height="{height}" fill="url(#fade)"/>'
+        f'<g transform="scale({k:.4f})">{text}</g></svg>'
     )
 
 
-def cover_jpeg(kind: str, title: str, line: str = "") -> bytes:
-    """The banner (``cover_svg``) as a JPEG under MAX_BYTES."""
-    image = _render(cover_svg(kind, title, line)).convert("RGB")
+def _jpeg_under_cap(image: Image.Image) -> bytes:
+    """``image`` as a JPEG at the first quality in ``COVER_QUALITIES`` under MAX_BYTES."""
     for quality in COVER_QUALITIES:
         out = io.BytesIO()
         image.save(out, "JPEG", quality=quality, subsampling=0, optimize=True)
@@ -456,13 +461,21 @@ def cover_jpeg(kind: str, title: str, line: str = "") -> bytes:
     return out.getvalue()
 
 
-def tile_jpeg(kind: str) -> bytes:
-    """The post's art, without the banner's text, as a square tile (``TILE``)."""
-    art = _art(kind)
-    left = min(max(round(TILE_CENTER * COVER_W - COVER_H / 2), 0), COVER_W - COVER_H)
-    tile = art.crop((left, 0, left + COVER_H, COVER_H)).resize((TILE, TILE), Image.LANCZOS)
+def preview_jpeg(kind: str, title: str, line: str = "") -> bytes:
+    """A post's link preview: the banner (``preview_svg``) at the card size."""
+    return _jpeg_under_cap(_render(preview_svg(kind, title, line)).convert("RGB"))
+
+
+def cover_jpeg(kind: str) -> bytes:
+    """A post's cover: its art at the cover's size."""
+    return _jpeg_under_cap(_art(kind))
+
+
+def thumb_jpeg(kind: str) -> bytes:
+    """An earlier post's thumbnail on the blog's front page: its art, ``THUMB_W`` wide."""
+    thumb = _art(kind).resize((THUMB_W, THUMB_W * COVER_H // COVER_W), Image.LANCZOS)
     out = io.BytesIO()
-    tile.save(out, "JPEG", quality=TILE_QUALITY, subsampling=0, optimize=True)
+    thumb.save(out, "JPEG", quality=THUMB_QUALITY, subsampling=0, optimize=True)
     return out.getvalue()
 
 
@@ -470,4 +483,4 @@ def cover_alt(kind: str) -> str:
     """The cover's alt text: its art, in a sentence."""
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
-    return f"Banner: {COVERS[kind]}, drawn in navy lines"
+    return f"Cover: {COVERS[kind]}, drawn in navy lines"
