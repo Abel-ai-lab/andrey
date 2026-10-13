@@ -345,19 +345,25 @@ def graph_cover_svg() -> str:
     )
 
 
-# The pair and iceberg covers are stored JPEGs, each drawn once from a source kept outside the
-# repository.
-STORED_COVERS = {"pair": BRAND / "cover-pair.jpg", "iceberg": BRAND / "cover-iceberg.jpg"}
+# The pair, iceberg, and contour covers are stored JPEGs, each drawn once from a source kept outside
+# the repository.
+STORED_COVERS = {
+    "pair": BRAND / "cover-pair.jpg",
+    "iceberg": BRAND / "cover-iceberg.jpg",
+    "contour": BRAND / "cover-contour.jpg",
+}
 COVERS = {
     "pair": "portraits of Andrey Kolmogorov and Andrey Markov",
     "iceberg": "an iceberg whose two peaks join into one mass under the waterline",
+    "contour": "a contour map with two summits, one dotted path ending on each",
     "graph": "the letters of Andrey as a graph",
 }
 
 
 def cover_jpeg(kind: str, quality: int = COVER_QUALITY) -> bytes:
-    """A post's cover as a JPEG: ``kind`` is ``pair``, ``iceberg``, or ``graph``, the default. The
-    pair and iceberg covers are stored, so ``quality`` applies to the graph cover only."""
+    """A post's cover as a JPEG: ``kind`` is ``pair``, ``iceberg``, ``contour``, or ``graph``, the
+    default. The pair, iceberg, and contour covers are stored, so ``quality`` applies to the graph
+    cover only."""
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
     if kind in STORED_COVERS:
@@ -371,4 +377,9 @@ def cover_alt(kind: str) -> str:
         return "Portraits of Andrey Kolmogorov and Andrey Markov drawn in navy lines"
     if kind == "iceberg":
         return "An iceberg drawn in navy lines: two peaks above the waterline, one mass below it"
+    if kind == "contour":
+        return (
+            "A contour map drawn in navy lines: from one start, a white dotted path ends on the "
+            "smaller summit and an amber one on the larger summit, marked with a star"
+        )
     return "The letters a, n, d, r, e, y as a small directed graph, with a dashed arc from a to y"
