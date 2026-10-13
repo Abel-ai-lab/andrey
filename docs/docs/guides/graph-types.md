@@ -155,7 +155,7 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `gin` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp` |
 | `pag` | `fci`, `gfci`, `rcd`, `camuv`, `bottom_up_parce_lingam` |
-| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus` |
+| `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci` |
 
 `multi_group_direct_lingam` returns a list of results, one per group. GIN includes explicit latent
 nodes, marked by `node_types` (`OBSERVED=0`, `LATENT=1`). PNL is a direction test on two variables:

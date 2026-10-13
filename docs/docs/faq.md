@@ -139,9 +139,10 @@ BIC; and the LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
-`varma_lingam`, `longitudinal_lingam`, `pcmci`, and `pcmciplus` learn graphs over time lags.
-`multi_group_direct_lingam` fits several datasets that share one causal order, and `cdnod` takes
-data from several domains. All six are experimental.
+`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, and `lpcmci` learn graphs over time
+lags; `lpcmci` also allows hidden common causes. `multi_group_direct_lingam` fits several datasets
+that share one causal order, and `cdnod` takes data from several domains. All seven are
+experimental.
 
 ## Command line and agents
 

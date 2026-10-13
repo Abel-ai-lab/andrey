@@ -62,6 +62,7 @@ SINGLE = {
     "varma_lingam": andrey.varma_lingam,
     "pcmci": andrey.pcmci,
     "pcmciplus": andrey.pcmciplus,
+    "lpcmci": andrey.lpcmci,
     "gin": andrey.gin,
     "rcd": andrey.rcd,
     "camuv": andrey.camuv,
@@ -100,7 +101,8 @@ def test_a_dataframe_error_names_the_constant_column():
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
-    "method", [m for m in SINGLE if m not in ("calm", "varma_lingam", "pcmci", "pcmciplus")]
+    "method",
+    [m for m in SINGLE if m not in ("calm", "varma_lingam", "pcmci", "pcmciplus", "lpcmci")],
 )
 def test_one_column_gives_a_one_node_graph(method):
     structure = SINGLE[method](_data(d=1)).structure
@@ -224,6 +226,41 @@ def test_pcmciplus_takes_one_variable():
     out = andrey.pcmciplus(_data(d=1))
     assert out.structure.n_nodes == 1
     assert out.structure.lag(0).oriented_edges() == []
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("params", "error", "name"),
+    [
+        ({"tau_max": 0}, ValueError, "tau_max"),
+        ({"tau_max": 1.5}, TypeError, "tau_max"),
+        ({"pc_alpha": 0.0}, ValueError, "pc_alpha"),
+        ({"pc_alpha": 1.0}, ValueError, "pc_alpha"),
+        ({"n_preliminary_iterations": -1}, ValueError, "n_preliminary_iterations"),
+        ({"n_preliminary_iterations": 1.5}, TypeError, "n_preliminary_iterations"),
+        ({"indep_test": "spearman"}, ValueError, "indep_test"),
+    ],
+)
+def test_lpcmci_checks_its_parameters(params, error, name):
+    with pytest.raises(error, match=name):
+        andrey.lpcmci(_data(), **params)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_lpcmci_needs_enough_time_steps_for_every_test():
+    # n_variables * (tau_max + 1) + 2 * tau_max + 1 = 19 rows for tau_max=3 over 3 variables.
+    with pytest.raises(ValueError, match="data needs at least 19 rows"):
+        andrey.lpcmci(_data(n=18), tau_max=3, pc_alpha=0.99)
+    out = andrey.lpcmci(_data(n=19), tau_max=3, pc_alpha=0.99)  # keeps links: large tests run
+    assert out.structure.lags == (0, 1, 2, 3)
+    assert len(out.structure.lag(0).oriented_edges()) == 3
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_lpcmci_takes_one_variable():
+    out = andrey.lpcmci(_data(d=1))
+    assert out.structure.n_nodes == 1
+    assert out.metadata["parents"] == [[]]
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

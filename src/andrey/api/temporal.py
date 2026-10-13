@@ -1,4 +1,4 @@
-"""Temporal-family facades: VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, and PCMCI+.
+"""Temporal-family facades: VARMA-LiNGAM, Longitudinal LiNGAM, PCMCI, PCMCI+, and LPCMCI.
 
 Each callable runs the native engine and returns one uniform ``StructureOutput`` wrapping a
 :class:`~andrey.core.TemporalStructure` (a per-lag stack of graphs, plus the lossless coefficient
@@ -22,6 +22,7 @@ from ._adapt import (
 from ._experimental import warn_experimental
 from ._temporal import (
     _adapt_longitudinal_lingam,
+    _adapt_lpcmci,
     _adapt_pcmci,
     _adapt_pcmciplus,
     _adapt_varma_lingam,
@@ -498,3 +499,156 @@ def pcmciplus(
         indep_test=indep_test,
     )
     return with_labels(_adapt_pcmciplus(result), column_labels(data))
+
+
+def lpcmci(
+    data: npt.ArrayLike,
+    *,
+    tau_max: int = 1,
+    pc_alpha: float = 0.05,
+    n_preliminary_iterations: int = 1,
+    indep_test: str = "student_t",
+) -> StructureOutput:
+    """Learn a time-series partial ancestral graph that allows hidden common causes with LPCMCI.
+
+    LPCMCI [1]_ finds the lagged and same-step links of one multivariate time series when some
+    variables that drive several observed ones are not measured. Like FCI it returns a partial
+    ancestral graph: an arrowhead says an end is not a cause of the other, a tail that it is, and a
+    circle leaves it open, so a link with arrowheads at both ends is a hidden common cause. It
+    orients links while it removes them and conditions every test on the parents found so far,
+    which keeps true links in strongly autocorrelated series. Use it on one series when an
+    unmeasured variable may confound the measured ones.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        A multivariate time series, one row per time step. Coerced to ``float64``. A DataFrame's
+        column names become the structure's ``labels``.
+    tau_max : int, default=1
+        The largest lag, at least ``1``: the graph covers the time steps ``t - tau_max`` to ``t``,
+        and links at lags ``0`` to ``tau_max`` are tested.
+    pc_alpha : float, default=0.05
+        Significance level of every test, in ``(0, 1)``: a link is removed when a test gives it a
+        p-value above ``pc_alpha``.
+    n_preliminary_iterations : int, default=1
+        How many preliminary rounds run before the final one, at least ``0``. Each round learns
+        parents that the next one conditions on from its first test.
+    indep_test : {"student_t", "fisherz"}, default="student_t"
+        The partial-correlation test behind every p-value. Both report the same partial
+        correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
+        ``"fisherz"`` from Fisher's z-transform.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``temporal`` :class:`~andrey.core.TemporalStructure` with lags ``0`` to
+        ``tau_max``. ``structure.lag(0)`` is a ``pag`` of the same-step links: ``i -> j``,
+        ``i o-> j``, ``i <-> j`` (a hidden common cause), and ``i o-o j``. ``structure.lag(k)``,
+        ``k >= 1``, is a ``digraph`` of the lagged links whose earlier end is a tail, the definite
+        causes: its edge ``i -> j`` says variable ``i`` at time ``t - k`` causes variable ``j`` at
+        time ``t``, and a self-loop is a variable's effect on its own future. The structure has no
+        ``lag_weights``. ``metadata["links"][k][i][j]`` holds every link between variable ``i``
+        at ``t - k`` and variable ``j`` at ``t`` as three characters, ``""`` when there is none:
+        the mark at ``i`` (``-`` tail, ``<`` arrowhead, ``o`` circle, ``x`` conflict), ``-``,
+        and the mark at ``j`` (``>``, ``-``, ``o``, or ``x``), such as ``"o->"``, ``"<->"``, or
+        ``"-->"``; lag ``0`` lists both orders. ``metadata["conflicts"]`` lists the ``[i, k, j]``
+        links with a conflict mark, which ``structure.lag(0)`` shows as a circle and
+        ``structure.lag(k)`` leaves out. ``metadata["p_values"][k][i][j]`` is the largest p-value
+        of the final round's tests of that pair, and ``metadata["statistics"][k][i][j]`` the
+        partial correlation of that test; lag ``0`` is symmetric with ``1`` and ``0`` on the
+        diagonal. ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag
+        ``k``) the last preliminary round found to be parents of variable ``j``. ``ordering`` is
+        ``None``, and ``metadata["algorithm"]`` is ``"lpcmci"``.
+
+    Raises
+    ------
+    TypeError
+        If ``tau_max`` or ``n_preliminary_iterations`` is not an int.
+    ValueError
+        If ``tau_max`` is below 1, ``n_preliminary_iterations`` below 0, ``pc_alpha`` not in
+        ``(0, 1)``, ``indep_test`` neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is
+        not a usable 2-D matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1``
+        rows, the length at which every test keeps a degree of freedom.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process, because the method is experimental: it has no published
+        benchmark, and its API may change without deprecation.
+
+    Notes
+    -----
+    The graph starts complete, with every lagged link ``o->`` (time order rules out the later end
+    as a cause of the earlier one) and every same-step link ``o-o``. A round removes links in
+    steps ``p = 0, 1, ...``: it tests a link given ``p`` of the neighbors of its later end that are
+    not known non-causes of it, plus the parents of both ends, and tests the autodependency links
+    first, then the cross links lag by lag. A same-step link is also tested from its other end.
+    After each step that removes a link, orientation rules mark new tails and arrowheads on the
+    lagged links; once nothing is left to test, the full set of rules runs, including the collider
+    rule, which first tests the two links of a triple again given each stored separating set of
+    the outer pair plus the parents of their ends. A preliminary round keeps only the parents it
+    found and starts over from the complete graph. The final round also tests the links that may
+    join two variables neither of which causes the other, given subsets of a wider neighborhood.
+    Whether a node lies outside the separating set of two others is a majority vote over the
+    distinct separating sets stored and found among the neighbors of the two. A mark that rules
+    orient both ways is a conflict. The candidates of a step are ordered by statistics frozen when
+    its group of links starts, so the order in which a group's links are tested changes nothing.
+
+    All tests use the same time steps, the last ``n_samples - 2 * tau_max``, and every node a test
+    conditions on lies within ``tau_max`` steps of the later end. The defaults are the authors'
+    published defaults. The earlier end of a lagged link is searched with the empty set only, since
+    time order already rules out the later end as its cause.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over 5
+    variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no selection
+    bias; hidden common causes are allowed. The graph covers ``tau_max + 1`` time steps, and a
+    hidden cause that acts through earlier steps can add links within that window. The removal and
+    rule steps test subsets of a node's neighbors, so the number of tests grows exponentially with
+    the number of links at one node. A test conditions on up to ``n_variables * (tau_max + 1) -
+    2`` values, so the series needs many more time steps than that.
+
+    References
+    ----------
+    .. [1] Gerhardus, A., and Runge, J. (2020). High-recall causal discovery for autocorrelated
+       time series with latent confounders. Advances in Neural Information Processing Systems 33
+       (NeurIPS 2020), 12615-12625.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey import lpcmci
+    >>> rng = np.random.default_rng(0)
+    >>> hidden = rng.standard_normal(1000)
+    >>> x, y = np.zeros(1000), np.zeros(1000)
+    >>> for t in range(1, 1000):
+    ...     x[t] = 0.5 * x[t - 1] + 0.7 * hidden[t] + rng.standard_normal()
+    ...     y[t] = 0.6 * y[t - 1] + 0.6 * hidden[t] + rng.standard_normal()
+    >>> out = lpcmci(np.column_stack([x, y]), tau_max=2)
+    >>> out.metadata["links"][0][0][1]
+    '<->'
+    >>> out.structure.lag(1).oriented_edges()
+    [(0, 0, 'directed'), (1, 1, 'directed')]
+    """
+    warn_experimental("lpcmci")
+    from andrey.temporal.lpcmci import lpcmci as _native
+
+    tau_max = int_in_range(tau_max, "tau_max", 1)
+    n_preliminary_iterations = int_in_range(n_preliminary_iterations, "n_preliminary_iterations", 0)
+    pc_alpha = open_unit_interval(pc_alpha, "pc_alpha")
+    X = data_matrix(data)
+    # A test conditions on up to n * (tau_max + 1) - 2 nodes of the window, over the last
+    # n_samples - 2 * tau_max steps; this keeps a degree of freedom in every test.
+    min_rows = X.shape[1] * (tau_max + 1) + 2 * tau_max + 1
+    if X.shape[0] < min_rows:
+        raise ValueError(
+            f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
+            f"{X.shape[1]} variables, got {X.shape[0]}"
+        )
+    result = _native(
+        X,
+        tau_max=tau_max,
+        pc_alpha=pc_alpha,
+        n_preliminary_iterations=n_preliminary_iterations,
+        indep_test=indep_test,
+    )
+    return with_labels(_adapt_lpcmci(result), column_labels(data))

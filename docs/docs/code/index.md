@@ -78,6 +78,7 @@ in a process.
    longitudinal_lingam
    pcmci
    pcmciplus
+   lpcmci
    pnl
    gin
    camuv

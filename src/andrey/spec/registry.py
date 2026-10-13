@@ -778,6 +778,65 @@ _add(
         references=("Runge 2020",),
     )
 )
+_add(
+    MethodSpec(
+        name="lpcmci",
+        family="temporal",
+        summary="LPCMCI for a single multivariate time series with possible hidden common causes: "
+        "lagged and same-step links as a partial ancestral graph over a time window, where a "
+        "two-headed link marks a hidden common cause. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="a pag at lag 0 and the definite lagged causes for lags 1..tau_max; every link "
+            "with its marks, p_values, statistics, the preliminary parents, and the conflicting "
+            "marks in metadata.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        params=(
+            ParamSpec(
+                name="tau_max",
+                type="int",
+                default=1,
+                doc="The largest lag; the graph covers time steps t - tau_max to t.",
+            ),
+            ParamSpec(
+                name="pc_alpha",
+                type="float",
+                default=0.05,
+                doc="Significance level of every test; a link is removed when a test gives it a "
+                "p-value above this.",
+            ),
+            ParamSpec(
+                name="n_preliminary_iterations",
+                type="int",
+                default=1,
+                doc="Preliminary rounds before the final one; each passes the parents it found "
+                "to the next as conditions.",
+            ),
+            ParamSpec(
+                name="indep_test",
+                type="str",
+                default="student_t",
+                choices=("student_t", "fisherz"),
+                doc="Partial-correlation test behind every p-value: student_t = Student-t "
+                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
+                "z-transform.",
+            ),
+        ),
+        references=("Gerhardus & Runge 2020",),
+    )
+)
 
 # --- pairwise family ------------------------------------------------------------------------------
 
