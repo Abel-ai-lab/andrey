@@ -76,6 +76,7 @@ with latent confounders. Advances in Neural Information Processing Systems 33 (N
 
 from __future__ import annotations
 
+from collections import Counter, OrderedDict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import combinations, islice
@@ -87,6 +88,8 @@ from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
 from andrey.temporal.pcmci import INDEP_TESTS, LinkTest, design_test
 
 CONFLICT = 4  # an edge mark the rules oriented both as a tail and as an arrowhead
+BATCH = 4096  # tests per call to the test object: bounds its stack of correlation submatrices
+CACHE_SIZE = 1 << 18  # test results kept for reuse, least recently used dropped first
 
 # A node ``(i, lag)``: variable ``i`` at time ``t - lag``.
 Node = tuple[int, int]
@@ -181,8 +184,10 @@ class _Search:
         self.sepsets: dict[Key, list[frozenset[Node]]] = {}
         self.ever_directed: set[tuple[Key, bool]] = set()
         self.version = 0
-        self.cache: dict[tuple[int, int, tuple[int, ...]], tuple[float, float]] = {}
-        self.vote_cache: dict[tuple[Key, int], list[frozenset[Node]]] = {}
+        self.cache: OrderedDict[tuple[int, int, tuple[int, ...]], tuple[float, float]]
+        self.cache = OrderedDict()
+        self.votes: dict[Key, tuple[int, Counter[Node]]] = {}
+        self.votes_version = -1
 
     # ---- the graph -----------------------------------------------------------------------
 
@@ -296,7 +301,8 @@ class _Search:
     ) -> tuple[list[float], list[float]]:
         """Test ``a`` against ``b`` given each set, all one size; return statistics and p-values.
 
-        The pair is moved so its later node is at time ``t`` first, and results are cached.
+        The pair is moved so its later node is at time ``t`` first. At most :data:`BATCH` sets
+        are tested in one call, and the last :data:`CACHE_SIZE` results are kept for reuse.
         ``rank`` updates the smallest absolute statistic that orders search sets, ``report`` the
         largest p-value the result reports.
         """
@@ -304,17 +310,26 @@ class _Search:
         a, b = (a[0], a[1] + shift), (b[0], b[1] + shift)
         x, y = self._column(a), self._column(b)
         rows = [tuple(sorted(self._column((v, lag + shift)) for v, lag in s)) for s in conditions]
-        missing = sorted({row for row in rows if (x, y, row) not in self.cache})
-        if missing:
-            width = len(missing[0])
+        found: dict[tuple[int, ...], tuple[float, float]] = {}
+        for row in rows:
+            cached = self.cache.get((x, y, row))
+            if cached is not None:
+                self.cache.move_to_end((x, y, row))
+                found[row] = cached
+        missing = sorted({row for row in rows if row not in found})
+        for start in range(0, len(missing), BATCH):
+            chunk = missing[start : start + BATCH]
             statistics, p_values = self.test.statistic_pvalues(
-                np.full(len(missing), x, dtype=np.intp),
-                np.full(len(missing), y, dtype=np.intp),
-                np.array(missing, dtype=np.intp).reshape(len(missing), width),
+                np.full(len(chunk), x, dtype=np.intp),
+                np.full(len(chunk), y, dtype=np.intp),
+                np.array(chunk, dtype=np.intp).reshape(len(chunk), len(chunk[0])),
             )
-            for row, statistic, p_value in zip(missing, statistics.tolist(), p_values.tolist()):
+            for row, statistic, p_value in zip(chunk, statistics.tolist(), p_values.tolist()):
+                found[row] = (statistic, p_value)
                 self.cache[(x, y, row)] = (statistic, p_value)
-        results = [self.cache[(x, y, row)] for row in rows]
+                if len(self.cache) > CACHE_SIZE:
+                    self.cache.popitem(last=False)
+        results = [found[row] for row in rows]
         statistics = [r[0] for r in results]
         p_values = [r[1] for r in results]
         if rank or report:
@@ -338,7 +353,8 @@ class _Search:
         """Test the sets, all one size, in order until one separates; return it.
 
         The tests made, up to the separating one, update the link's memories. The sets are tested
-        in batches that double in size, so a search that separates early stops early.
+        in batches that double in size up to :data:`BATCH`, so a search that separates early stops
+        early.
         """
         key, _ = _key(a, b)
         sets = iter(conditions)
@@ -351,7 +367,7 @@ class _Search:
                 self._record(key, statistic, p_value, rank=True, report=True)
             if first is not None:
                 return batch[first]
-            size *= 2
+            size = min(2 * size, BATCH)
         return None
 
     def add_sepset(self, key: Key, sepset: frozenset[Node], frame: int) -> None:
@@ -369,38 +385,57 @@ class _Search:
 
     # ---- separating-set queries -------------------------------------------------------------
 
-    def vote(self, a: Node, c: Node) -> list[frozenset[Node]]:
-        """Separating sets of ``a`` and ``c`` for a majority vote, in the frame of the window.
+    def vote(self, key: Key) -> tuple[int, Counter[Node]]:
+        """The separating sets of the pair ``key`` for a majority vote, counted.
 
-        The stored sets, then the separating sets among the subsets of ``apds_t`` of each node,
-        given the parents of both; the earlier node of a lagged pair contributes the empty subset
-        only. Each distinct set counts once.
+        The sets are the stored ones and the separating sets among the subsets of ``apds_t`` of
+        each node, given the parents of both; the earlier node of a lagged pair contributes the
+        empty subset only. Each distinct set counts once. Return how many sets there are and, for
+        each node, how many hold it, in the frame of ``key``. The counts last until the graph
+        changes.
         """
-        key, _ = _key(a, c)
-        frame = min(a[1], c[1])
-        found = self.vote_cache.get((key, self.version))
-        if found is None:
-            i, j, lag = key
-            start, end = (i, lag), (j, 0)
-            sdef = (self.parents(start) | self.parents(end)) - {start, end}
-            found = list(self.sepsets.get(key, []))
-            for anchor, other in ((start, end), (end, start)):
-                candidates = sorted(self.apds(anchor, other) - sdef, key=_order)
-                if anchor == start and lag > 0:
-                    candidates = []
-                for size in range(len(candidates) + 1):
-                    sets = [frozenset(s) | sdef for s in combinations(candidates, size)]
+        if self.votes_version != self.version:
+            self.votes, self.votes_version = {}, self.version
+        counted = self.votes.get(key)
+        if counted is not None:
+            return counted
+        i, j, lag = key
+        start, end = (i, lag), (j, 0)
+        sdef = (self.parents(start) | self.parents(end)) - {start, end}
+        stored = set(self.sepsets.get(key, []))
+        total, holding = len(stored), Counter(node for s in stored for node in s)
+        tested: frozenset[Node] | None = None  # subsets of these were tested from ``start``
+        for anchor, other in ((start, end), (end, start)):
+            candidates = sorted(self.apds(anchor, other) - sdef, key=_order)
+            if anchor == start and lag > 0:
+                candidates = []
+            fresh = (
+                frozenset(s)
+                for size in range(len(candidates) + 1)
+                for s in combinations(candidates, size)
+                if tested is None or not tested.issuperset(s)
+            )
+            while batch := [s | sdef for s in islice(fresh, BATCH)]:
+                by_size: dict[int, list[frozenset[Node]]] = {}
+                for s in batch:
+                    by_size.setdefault(len(s), []).append(s)
+                for sets in by_size.values():
                     _, p_values = self.run_tests(start, end, sets, rank=False)
                     for s, p_value in zip(sets, p_values):
-                        if p_value > self.alpha and s not in found:
-                            found.append(s)
-            self.vote_cache[(key, self.version)] = found
-        return [_shift(s, frame) for s in found]
+                        if p_value > self.alpha and s not in stored:
+                            total += 1
+                            holding.update(s)
+            if anchor == start:
+                tested = frozenset(candidates)
+        self.votes[key] = (total, holding)
+        return total, holding
 
     def share(self, a: Node, b: Node, c: Node) -> float:
         """The share of the voting separating sets of ``a`` and ``c`` that contain ``b``."""
-        sets = self.vote(a, c)
-        return sum(b in s for s in sets) / len(sets) if sets else 0.5
+        key, _ = _key(a, c)
+        total, holding = self.vote(key)
+        frame = min(a[1], c[1])
+        return holding[(b[0], b[1] - frame)] / total if total else 0.5
 
     def outside_sepset(self, a: Node, b: Node, c: Node) -> bool:
         """Whether ``b`` is outside the separating set of ``a`` and ``c``, by majority."""
