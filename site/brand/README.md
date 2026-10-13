@@ -4,8 +4,9 @@
   leaves room for the text; `site/cards.py` recolors it to the brand's tones and adds the
   wordmark, the title, and the release at build time. Each is stored as drawn.
   - `art-pair.jpg`: the launch post's, portraits of Andrey Markov and Andrey Kolmogorov drawn as
-    navy line screens, overlapping, Kolmogorov mirrored to face left (Markov from his 1886
-    portrait, public domain, Wikimedia Commons `File:Andrei_Markov.jpg`).
+    navy line screens, overlapping, Kolmogorov mirrored to face left and scaled so both heads read
+    the same size (Markov from his 1886 portrait, public domain, Wikimedia Commons
+    `File:Andrei_Markov.jpg`).
   - `art-lanes.jpg`: "Why Andrey is fast", lanes rising like a bridge into a starry sky, the
     others moving in short steps while one amber streak runs far ahead.
   - `art-iceberg.jpg`: 0.2.0, an iceberg whose two peaks rise out of the frame and join into one
