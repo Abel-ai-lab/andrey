@@ -1614,7 +1614,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "hero_chips": hero_chips(),
         "race": speedup_panel(summaries),
         "pillars": pillars(summaries),
-        "speed_title": "Speed on the same data",
+        "speed_title": "Speed comparison",
         "speed_intro": speed_intro(summaries),
         "speed_chart": speed_chart(summaries),
         "why_fast": _why_fast["dialog"](),
