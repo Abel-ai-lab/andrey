@@ -6,6 +6,7 @@ meta:
 blogpost: true
 date: 2026-10-13
 author: Shu Wan
+tags: [Release, Pairwise direction]
 version: 0.4.0
 cover: graph
 ---
