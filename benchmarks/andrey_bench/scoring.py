@@ -259,6 +259,83 @@ def coefficient_scores(estimate: object, truth: object) -> dict[str, Any]:
     return columns
 
 
+def _window_links(structure: object) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The links of a time-series graph as ``(lagged, adjacent, directed)`` boolean stacks.
+
+    ``lagged[s, k - 1, i, j]`` is the link from variable ``i`` at ``t - k`` to ``j`` at ``t``;
+    ``adjacent[s, i, j]``, symmetric, is a same-step link between ``i`` and ``j`` whatever its
+    marks, and ``directed[s, i, j]`` a same-step link oriented ``i -> j``. ``s`` indexes the time
+    points a panel is scored at (from its second), and is a single slot otherwise.
+    """
+    if isinstance(structure, TemporalStructure):
+        lagged = links_from_temporal(structure).astype(bool)[None]
+        n = structure.n_nodes
+        none = np.zeros((1, n, n), dtype=bool)
+        return lagged, none, none
+    if isinstance(structure, W.WindowGraph):
+        marks = structure.marks
+        lag0 = marks[0]
+        directed = (lag0 == W.TAIL) & (lag0.T == W.ARROW)
+        return (
+            (marks[1:] != W.NULL)[None],
+            ((lag0 != W.NULL) | (lag0.T != W.NULL))[None],
+            directed[None],
+        )
+    if isinstance(structure, CoefficientStack):
+        # Blocks are [effect, cause]: transpose to [cause, effect]. A panel is scored from t = 1.
+        stack = structure.stack[None, :2] if structure.kind == "varma" else structure.stack[1:]
+        links = np.isfinite(stack) & (stack != 0)
+        directed = links[:, 0].transpose(0, 2, 1)
+        lagged = links[:, 1:].transpose(0, 1, 3, 2)
+        return lagged, directed | directed.transpose(0, 2, 1), directed
+    raise TypeError(f"no time-series links for {type(structure).__name__}")
+
+
+def cross_link_scores(estimate: object, truth: object) -> dict[str, float]:
+    """Precision, recall, and F1 of the window causal graph over its cross-links.
+
+    A cross-link joins two different variables: a lagged link from ``i`` at ``t - k`` to ``j`` at
+    ``t``, ``i != j``, or a same-step link between ``i`` and ``j``. Autodependencies (``i`` at
+    ``t - k`` to ``i`` at ``t``) are left out. A lagged link is found when the estimate holds it at
+    the same lag; time order orients it. A same-step link is found when the estimate joins the same
+    two variables (``cross_*``), and, in the ``cross_oriented_*`` columns, only when it also points
+    the same way: an unoriented same-step link then finds nothing. A panel pools its time points
+    from the second. ``cross_n_true``, ``cross_n_est``, and ``cross_tp`` count the ``cross_*``
+    links. A ratio with no denominator is 1, as :func:`window_scores` scores it. Raises
+    ``ValueError`` when a truth has unobserved variables: its estimate covers the observed ones,
+    and the true graph over them is not computed here.
+    """
+    if isinstance(truth, W.WindowGraph) and truth.latents:
+        raise ValueError("cross_link_scores needs a truth without unobserved variables")
+    est_lag, est_adj, est_dir = _window_links(estimate)
+    true_lag, true_adj, true_dir = _window_links(truth)
+    lags = max(est_lag.shape[1], true_lag.shape[1])
+    est_lag, true_lag = (
+        np.concatenate([a, np.zeros((a.shape[0], lags - a.shape[1], *a.shape[2:]), bool)], axis=1)
+        for a in (est_lag, true_lag)
+    )
+    n = true_adj.shape[-1]
+    off = ~np.eye(n, dtype=bool)
+    upper = np.triu(off)
+
+    def prf(prefix: str, pairs: list[tuple[np.ndarray, np.ndarray]]) -> dict[str, float]:
+        tp = sum(int((e & t).sum()) for e, t in pairs)
+        n_est = sum(int(e.sum()) for e, _ in pairs)
+        n_true = sum(int(t.sum()) for _, t in pairs)
+        precision = tp / n_est if n_est else 1.0
+        recall = tp / n_true if n_true else 1.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        columns = {f"{prefix}precision": precision, f"{prefix}recall": recall, f"{prefix}f1": f1}
+        if prefix == "cross_":
+            columns.update(cross_n_true=float(n_true), cross_n_est=float(n_est), cross_tp=float(tp))
+        return columns
+
+    lagged = (est_lag & off, true_lag & off)
+    scores = prf("cross_", [lagged, (est_adj & upper, true_adj & upper)])
+    scores.update(prf("cross_oriented_", [lagged, (est_dir & off, true_dir & off)]))
+    return scores
+
+
 def _has_hidden(truth: GraphStructure) -> bool:
     types = truth.node_types
     return types is not None and bool((types == LATENT).any())
