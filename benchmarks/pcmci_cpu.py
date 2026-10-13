@@ -1,17 +1,25 @@
 #!/usr/bin/env python
-"""Benchmark Andrey PCMCI and tigramite PCMCI on lagged series over a ladder of sizes, on CPU.
+"""Benchmark Andrey's PCMCI, PCMCI+, or LPCMCI against tigramite's over a ladder of sizes, on CPU.
 
-The rungs are the product of the variable counts (``--ladder``) and the series lengths
-(``--lengths``): each ``(d, T)`` pair is one rung, and each seed one series of ``T`` time steps
-from :data:`SLICE`, the ``var_lagged`` regime (``andrey.data``'s VAR(1) on an empty instantaneous
+``--method`` picks the method, its regime, and its solutions (:data:`METHODS`). The rungs are the
+product of the variable counts (``--ladder``) and the series lengths (``--lengths``): each ``(d, T)``
+pair is one rung, and each seed one series of ``T`` time steps.
+
+``pcmci`` runs on the ``var_lagged`` regime (``andrey.data``'s VAR(1) on an empty instantaneous
 graph, so every true link has lag 1). Every solution tests lags ``1..tau_max`` and is scored lag by
-lag against that truth.
+lag against that truth. Andrey runs both of its partial-correlation tests: ``student_t`` uses the
+p-value of tigramite's ``ParCorr(significance="analytic")``, and ``fisherz`` Fisher's z-transform.
+The empty lag stack is the floor. Both packages run ``pc_alpha=0.2`` and ``alpha_level=0.05``.
 
-Andrey runs both of its partial-correlation tests: ``student_t`` uses the p-value of tigramite's
-``ParCorr(significance="analytic")``, and ``fisherz`` Fisher's z-transform. The empty lag stack is
-the floor. Both packages run ``pc_alpha=0.2`` and ``alpha_level=0.05``; ``--tau-max`` sets the lag
-window for all of them and is in every solution name, because ``params`` are not part of a
-``run_id``.
+``pcmciplus`` and ``lpcmci`` run on the ``var_same_step`` regime, the same VAR(1) on an ER
+instantaneous graph of mean degree 1, so links act within a time step and at lag 1. Every solution
+tests lags ``0..tau_max`` with the Student-t test and returns window marks, scored link by link
+(:func:`andrey_bench.scoring.window_scores`); the empty window is the floor. Both packages run the
+method's defaults: PCMCI+ ``pc_alpha=0.01`` with the majority collider rule, LPCMCI
+``pc_alpha=0.05`` with one preliminary round.
+
+``--tau-max`` sets the lag window for every solution and is in every solution name, because
+``params`` are not part of a ``run_id``.
 
 **tigramite fits run in their own interpreter.** tigramite is GPL-licensed, so it is installed only
 in the environment ``benchmarks/start_tigramite.sh`` builds, the adapter names
@@ -20,7 +28,7 @@ recorded in ``provenance.json``. A run whose solution list needs it fails at lau
 unset.
 
     ANDREY_BENCH_TIGRAMITE_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py \\
-        --out outputs/pcmci --ladder 5 10 20 --lengths 500 1000
+        --method pcmciplus --out outputs/pcmciplus --ladder 5 10 20 --lengths 500 1000
 """
 
 from __future__ import annotations
@@ -30,13 +38,26 @@ import os
 import socket
 import statistics
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from andrey_bench import datasets, memcap, rundir
-from andrey_bench.adapters.andrey_pcmci import DEFAULT_TAU_MAX, andrey_pcmci_adapters
-from andrey_bench.adapters.baseline_empty import baseline_empty_temporal
-from andrey_bench.adapters.tigramite_pcmci import PYTHON_ENV_VAR, tigramite_adapter
+from andrey_bench.adapters.andrey_pcmci import (
+    DEFAULT_TAU_MAX,
+    SAME_STEP_TAU_MAX,
+    andrey_lpcmci_adapter,
+    andrey_pcmci_adapters,
+    andrey_pcmciplus_adapter,
+)
+from andrey_bench.adapters.baseline_empty import baseline_empty_temporal, baseline_empty_window
+from andrey_bench.adapters.tigramite_pcmci import (
+    PYTHON_ENV_VAR,
+    tigramite_adapter,
+    tigramite_lpcmci_adapter,
+    tigramite_pcmciplus_adapter,
+)
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import BENCH_ROOT, available_cores, check_interpreters
@@ -45,16 +66,22 @@ from andrey_bench.runner import BENCH_ROOT, available_cores, check_interpreters
 #: error message: what runs is whatever ``$ANDREY_BENCH_TIGRAMITE_PYTHON`` names.
 DEFAULT_TIGRAMITE_VENV = BENCH_ROOT / ".venv-tigramite"
 
-#: The ``var_lagged`` regime, spelled out: lag-only linear-Gaussian VAR(1) series at raw scale.
+
+def slice_of(regime: str) -> dict:
+    """The dataset coordinates of a temporal regime, spelled out."""
+    topology, functional, noise, standardize = datasets.REGIMES[regime]
+    return {
+        "topology": topology,
+        "functional": functional,
+        "noise": noise,
+        "standardize": standardize,
+        "density": datasets.TEMPORAL_REGIMES[regime],
+    }
+
+
+#: PCMCI's regime, spelled out: lag-only linear-Gaussian VAR(1) series at raw scale.
 REGIME = "var_lagged"
-_TOPOLOGY, _FUNCTIONAL, _NOISE, _STANDARDIZE = datasets.REGIMES[REGIME]
-SLICE = {
-    "topology": _TOPOLOGY,
-    "functional": _FUNCTIONAL,
-    "noise": _NOISE,
-    "standardize": _STANDARDIZE,
-    "density": datasets.TEMPORAL_REGIMES[REGIME],
-}
+SLICE = slice_of(REGIME)
 
 #: Untimed fits before each timed one.
 WARMUP = 1
@@ -104,10 +131,63 @@ def min_length(d: int, tau_max: int) -> int:
     return 2 * tau_max * (d + 1) + 3
 
 
-def ladder_keys(ladder: list[int], lengths: list[int], seeds: int) -> list[DatasetKey]:
-    """One series per ``(d, T, seed)`` on :data:`SLICE`, with ``n = T`` time steps."""
+def pcmciplus_solutions(tau_max: int) -> list:
+    """Andrey's PCMCI+, tigramite's, and the empty window, all over lags ``0..tau_max``."""
     return [
-        DatasetKey(**SLICE, d=d, n=length, seed=seed)
+        andrey_pcmciplus_adapter(tau_max),
+        tigramite_pcmciplus_adapter(tau_max),
+        baseline_empty_window(tau_max),
+    ]
+
+
+def pcmciplus_min_length(d: int, tau_max: int) -> int:
+    """The shortest series ``andrey.pcmciplus`` accepts."""
+    return 2 * tau_max * (d + 1) + d + 1
+
+
+def lpcmci_solutions(tau_max: int) -> list:
+    """Andrey's LPCMCI, tigramite's, and the empty window, all over lags ``0..tau_max``."""
+    return [
+        andrey_lpcmci_adapter(tau_max),
+        tigramite_lpcmci_adapter(tau_max),
+        baseline_empty_window(tau_max),
+    ]
+
+
+def lpcmci_min_length(d: int, tau_max: int) -> int:
+    """The shortest series ``andrey.lpcmci`` accepts."""
+    return d * (tau_max + 1) + 2 * tau_max + 1
+
+
+@dataclass(frozen=True)
+class Method:
+    """What ``--method`` selects: the regime, the default lag window, the field, the shortest series."""
+
+    regime: str
+    tau_max: int
+    solutions: Callable[[int], list]
+    min_length: Callable[[int, int], int]
+    title: str
+
+
+METHODS = {
+    "pcmci": Method(REGIME, DEFAULT_TAU_MAX, solutions, min_length, "PCMCI"),
+    "pcmciplus": Method(
+        "var_same_step", SAME_STEP_TAU_MAX, pcmciplus_solutions, pcmciplus_min_length, "PCMCI+"
+    ),
+    "lpcmci": Method(
+        "var_same_step", SAME_STEP_TAU_MAX, lpcmci_solutions, lpcmci_min_length, "LPCMCI"
+    ),
+}
+
+
+def ladder_keys(
+    ladder: list[int], lengths: list[int], seeds: int, regime: str = REGIME
+) -> list[DatasetKey]:
+    """One series per ``(d, T, seed)`` on the regime's slice, with ``n = T`` time steps."""
+    coordinates = slice_of(regime)
+    return [
+        DatasetKey(**coordinates, d=d, n=length, seed=seed)
         for d in ladder
         for length in lengths
         for seed in range(seeds)
@@ -131,8 +211,14 @@ def _agreement(table) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Andrey PCMCI vs tigramite PCMCI, CPU")
+    p = argparse.ArgumentParser(description="Andrey against tigramite: PCMCI, PCMCI+, LPCMCI, CPU")
     p.add_argument("--out", required=True, help="output directory, created if absent")
+    p.add_argument(
+        "--method",
+        choices=sorted(METHODS),
+        default="pcmci",
+        help="the method, its regime, and its solutions (default: pcmci)",
+    )
     p.add_argument("--ladder", type=int, nargs="+", help="variable counts d, run in order")
     p.add_argument("--lengths", type=int, nargs="+", help="series lengths T, run in order per d")
     p.add_argument("--seeds", type=int, default=3, help="series per rung (default: 3)")
@@ -156,8 +242,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--tau-max",
         type=int,
-        default=DEFAULT_TAU_MAX,
-        help=f"largest lag every solution tests, in every solution name (default: {DEFAULT_TAU_MAX})",
+        default=None,
+        help=f"largest lag every solution tests, in every solution name (default: "
+        f"{DEFAULT_TAU_MAX} for pcmci, {SAME_STEP_TAU_MAX} for pcmciplus and lpcmci)",
     )
     p.add_argument(
         "--solutions",
@@ -182,6 +269,9 @@ def main(argv: list[str] | None = None) -> int:
         "the same run_meta.json, so pass the flags the first run was given",
     )
     args = p.parse_args(argv)
+    method = METHODS[args.method]
+    if args.tau_max is None:
+        args.tau_max = method.tau_max
     if args.smoke:
         vars(args).update(SMOKE)
     if not args.ladder or not args.lengths:
@@ -194,19 +284,19 @@ def main(argv: list[str] | None = None) -> int:
         p.error(f"--tau-max must be at least 1, got {args.tau_max}")
     # Andrey rejects a shorter series, so every one of its fits at that rung would be an error.
     short = [
-        (d, length)
+        (d, length, method.min_length(d, args.tau_max))
         for d in args.ladder
         for length in args.lengths
-        if length < min_length(d, args.tau_max)
+        if length < method.min_length(d, args.tau_max)
     ]
     if short:
         p.error(
-            f"series too short for tau_max={args.tau_max} at (d, T) {short}: T must be at least "
-            "2 * tau_max * (d + 1) + 3"
+            f"series too short for {args.method} at tau_max={args.tau_max}: (d, T, shortest) "
+            f"{short}"
         )
 
     out = Path(args.out)
-    field = solutions(args.tau_max)
+    field = method.solutions(args.tau_max)
     if args.solutions:
         known = {a.name for a in field}
         unknown = sorted(set(args.solutions) - known)
@@ -222,11 +312,12 @@ def main(argv: list[str] | None = None) -> int:
     # Written before the first fit, so an interrupted benchmark still says what it was asked for.
     run_meta = {
         "driver": Path(__file__).name,
+        "method": args.method,
         "solution list": [a.name for a in field],
         "tigramite_python": {PYTHON_ENV_VAR: os.environ.get(PYTHON_ENV_VAR, "")},
         "params": {a.name: dict(a.params()) for a in field},
-        "regime": REGIME,
-        "slice": SLICE,
+        "regime": method.regime,
+        "slice": slice_of(method.regime),
         "tau_max": args.tau_max,
         # `ladder` counts rungs for STATUS.json, so it holds one entry per (d, T) rung.
         "ladder": [[d, length] for d in args.ladder for length in args.lengths],
@@ -247,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         extra_venvs={"tigramite": venv} if venv else None,
     )
 
-    _log(f"=== Andrey PCMCI vs tigramite PCMCI, CPU -> {out} ===")
+    _log(f"=== Andrey {method.title} vs tigramite {method.title}, CPU -> {out} ===")
     for name, value in run_meta.items():
         _log(f"{name:16s}: {value}")
     _log(f"{'git_sha':16s}: {prov['git_sha']}")
@@ -268,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
             result = run_batch(
                 datasets.store_dir(out),
                 field,
-                ladder_keys([d], [length], args.seeds),
+                ladder_keys([d], [length], args.seeds, method.regime),
                 machine_id=args.machine_id,
                 cap_wall_s=args.cap_wall_s,
                 cap_mem_mb=args.cap_mem_mb,

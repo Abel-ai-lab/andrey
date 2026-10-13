@@ -149,6 +149,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
 | PCMCI | Andrey (Student-t, Fisher-z), tigramite |
+| PCMCI+, LPCMCI | Andrey (Student-t), tigramite |
 | Granger (lasso) | Andrey (serial, parallel), causal-learn |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
@@ -378,6 +379,56 @@ $ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py --out outputs/pcmci \
 The driver refuses a series shorter than `2 * tau_max * (d + 1) + 3` steps, the shortest Andrey's
 PCMCI accepts.
 
+### PCMCI+ and LPCMCI on series with same-step links
+
+`pcmci_cpu.py --method pcmciplus` and `--method lpcmci` compare Andrey's PCMCI+ and LPCMCI with
+tigramite's on the `var_same_step` regime: the same VAR(1) as `var_lagged`, on an ER instantaneous
+graph of mean degree 1, so some links act within a time step. The truth is a window over lags 0 and
+1: the instantaneous DAG and the lag-1 links. `andrey.data` does not draw hidden variables in a
+series, so LPCMCI runs on the same data as PCMCI+, with every variable observed.
+
+Every solution tests lags 0 to `tau_max` (default 1) with the Student-t partial-correlation test
+and the method's defaults, which are both packages' defaults:
+
+| solution | settings |
+|---|---|
+| `andrey.pcmciplus.student_t.tau<k>` | `pc_alpha=0.01`, `collider_rule="majority"` |
+| `tigramite.pcmciplus.parcorr.tau<k>` | `run_pcmciplus(tau_min=0, pc_alpha=0.01, contemp_collider_rule="majority")` |
+| `andrey.lpcmci.student_t.tau<k>` | `pc_alpha=0.05`, `n_preliminary_iterations=1` |
+| `tigramite.lpcmci.parcorr.tau<k>` | `run_lpcmci(tau_min=0, pc_alpha=0.05, n_preliminary_iterations=1)` |
+| `baseline.empty.window.tau<k>` | none: no link at any lag |
+
+A link carries a mark at each end, so these solutions return window marks
+(`andrey_bench/window.py`), an `(L + 1, n, n)` int8 stack: lag 0 as endpoint marks, and at each
+lag `k >= 1` the mark at the earlier end of each link, whose later end is always an arrowhead. Both
+packages' marks come from the same three-character link strings (`-->`, `o->`, `<->`, `o-o`,
+`x-x`, ...): tigramite's `results["graph"]`, Andrey's LPCMCI `metadata["links"]`, and the same
+strings built from Andrey's PCMCI+ structure and its `metadata["conflicts"]`. Two solutions return
+the same graph when their marks are equal, conflicts included (`structure_hash`, `output_hash`).
+
+A window estimate is scored link by link against the truth (`scoring.window_scores`); a link is a
+same-step pair or a lagged pair, self-links included:
+
+| columns | what they score |
+|---|---|
+| `endpoint_shd`, `lag0_endpoint_shd`, `lagged_endpoint_shd` | marks that differ from the truth's: two for a missing or extra link, one per wrong end |
+| `adjacency_precision`, `adjacency_recall`, `adjacency_f1` | the links, whatever their marks |
+| `wrong_marks` | tails and arrowheads on true links that contradict the truth |
+| `lagged_tail`, `lagged_circle`, `lagged_arrow` | the true lagged links found, by the mark at their earlier end |
+
+The truth's lag 0 is the DAG, not the class of graphs the data can tell apart, so an unoriented
+PCMCI+ link or a PAG circle costs its open ends in `endpoint_shd`; `wrong_marks` counts only the
+marks a solution claims. A CPDAG's conflicting link is read as undirected and a PAG's conflict mark
+as a circle, as Andrey returns them.
+
+```shell
+ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python \
+    $ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py --method lpcmci --out outputs/lpcmci-smoke --smoke
+```
+
+The driver refuses a series shorter than the shortest Andrey's method accepts:
+`2 * tau_max * (d + 1) + d + 1` steps for PCMCI+, `d * (tau_max + 1) + 2 * tau_max + 1` for LPCMCI.
+
 ### Lasso Granger causality
 
 `granger_var.py` compares Andrey's `granger` with causal-learn's `Granger.granger_lasso` on
@@ -588,7 +639,8 @@ A record stores its data (`d`, `n`, `latents`, regime coordinates, `data_seed`, 
 settings (`cap_wall_s`, `cap_mem_mb`, `cores`, `device`, `dtype`, `backend`, `mode`, `machine_id`, `params`),
 and results (`status`, `wall_s`, `cpu_s`, `warmup_s`, `setup_s`, `peak_rss_mb`, `output_hash`,
 `shd`, `skeleton_f1`, `arrowhead_f1`). A temporal solution's record also carries `tau_max`, and its
-scores are the lag columns of [PCMCI on lagged series](#pcmci-on-lagged-series).
+scores are the lag columns of [PCMCI on lagged series](#pcmci-on-lagged-series), or the link columns
+of [PCMCI+ and LPCMCI](#pcmci-and-lpcmci-on-series-with-same-step-links) for a window.
 
 `device_id` records `cpu` or the CUDA device index and name. The backend determines the device, so a
 pin inside `fit` outranks `ANDREY_DEVICE`; the record keeps the request separately as `device`.
@@ -712,8 +764,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.
 - `lingam_cpu.py` - compares DirectLiNGAM and ICA-LiNGAM with causal-learn on CPU.
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
-- `pcmci_cpu.py` - compares PCMCI with tigramite on lagged series, over variables and series
-  lengths.
+- `pcmci_cpu.py` - compares PCMCI, PCMCI+, or LPCMCI with tigramite on series, over variables and
+  series lengths.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
 - `xges_cpu.py` - compares Andrey's XGES, with and without the extended search, with the xges
