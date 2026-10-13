@@ -46,6 +46,7 @@ return the same graphs on most datasets and run up to 906x faster.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.3.0.md)
+[Read the post](../blog/20261012-andrey-0-3-0.md)
 :::
 ::::
 :::::
