@@ -490,15 +490,15 @@ class CGTest:
 # :func:`register_indep_test` lets a downstream test or plugin add another under the same Protocol.
 # The discrete tests read category codes and the mixed tests a mask of the categorical columns as
 # well; the facades check both before a fit.
-SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz", "chisq", "gsq", "dg", "cg")
+SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz", "chisq", "gsq", "degen_gauss", "cond_gauss")
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
-MIXED_INDEP_TESTS: tuple[str, ...] = ("dg", "cg")
+MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
 _CI_REGISTRY: dict[str, Callable[..., CITest]] = {
     "fisherz": FisherZ,
     "chisq": ChiSquare,
     "gsq": lambda data: ChiSquare(data, g_square=True),
-    "dg": DGTest,
-    "cg": CGTest,
+    "degen_gauss": DGTest,
+    "cond_gauss": CGTest,
 }
 
 

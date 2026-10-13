@@ -3,10 +3,11 @@
 :func:`sample_mixed` draws a DAG and makes its first variables in causal order categorical, so no
 categorical variable has a continuous parent, as a conditional linear Gaussian network requires. A
 categorical variable has a conditional probability table, one Dirichlet-distributed row per
-configuration of its parents, as in :func:`~andrey.data.sample_discrete`. A continuous variable is
-a linear function of its continuous parents, plus a shift for each categorical parent's category,
-plus standard Gaussian noise. The data are the input of the mixed-data tests and scores
-(``indep_test="dg"`` or ``"cg"``, ``score_func="local_score_DG"`` or ``"local_score_CG"``).
+configuration of its parents, as in :func:`~andrey.data.sample_discrete`. A continuous variable is a
+linear function of its continuous parents, plus a shift for each categorical parent's category, plus
+standard Gaussian noise. The data are the input of the mixed-data tests and scores
+(``indep_test="degen_gauss"`` or ``"cond_gauss"``, ``score_func="local_score_degen_gauss"`` or
+``"local_score_cond_gauss"``).
 
 As in :mod:`andrey.data.scm`, the graph, the parameters, and the samples each come from their own
 stream of the seed, so a change to one leaves the others' draws unchanged.

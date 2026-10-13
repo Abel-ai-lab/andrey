@@ -22,8 +22,8 @@ Every method checks its data before the fit: a numeric `(n_samples, n_variables)
 least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column
 names. The categorical settings, `indep_test="chisq"` or `"gsq"` and
 `score_func="local_score_BDeu"`, also need whole numbers, each distinct value of a column one
-category. The mixed-data settings, `indep_test="dg"` or `"cg"` and `score_func="local_score_DG"` or
-`"local_score_CG"`, read the categorical columns that `categorical` lists, or a DataFrame's
+category. The mixed-data settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
+`"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or a DataFrame's
 `category`, `bool`, `object`, and `string` columns; a categorical column of numbers needs whole
 numbers. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
 column. A single column gives a one-node graph.

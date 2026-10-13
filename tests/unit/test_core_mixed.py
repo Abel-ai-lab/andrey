@@ -198,7 +198,7 @@ def test_dg_score_equals_the_bic_on_continuous_columns():
 )
 def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
     x = sample_scm(d=8, n=1000, seed=0, density=2.0).data
-    dg_graph, dg_score = search(x, score_func="local_score_DG")
+    dg_graph, dg_score = search(x, score_func="local_score_degen_gauss")
     bic_graph, bic_score = search(x, score_func=bic)
     assert np.array_equal(dg_graph.to_numpy(), bic_graph.to_numpy())
     assert dg_score == bic_score
@@ -206,7 +206,7 @@ def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
 
 def test_exact_search_with_dg_on_continuous_columns_finds_the_bic_equivalence_class():
     x = sample_scm(d=5, n=1000, seed=0, density=2.0).data
-    dg = to_cpdag(exact_search(x, score_func="local_score_DG"))
+    dg = to_cpdag(exact_search(x, score_func="local_score_degen_gauss"))
     assert np.array_equal(dg.to_numpy(), to_cpdag(exact_search(x)).to_numpy())
 
 
@@ -348,7 +348,7 @@ def test_a_test_finds_a_dependence(make):
 
 def test_only_the_mixed_tests_take_a_categorical_mask():
     x, mask = _mixed()
-    assert isinstance(make_indep_test("dg", x, categorical=mask), DGTest)
+    assert isinstance(make_indep_test("degen_gauss", x, categorical=mask), DGTest)
     with pytest.raises(ValueError, match="reads no column types"):
         make_indep_test("fisherz", x, categorical=mask)
 

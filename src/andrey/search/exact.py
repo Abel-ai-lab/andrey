@@ -26,7 +26,11 @@ from andrey.core.orient import to_structure
 from andrey.core.score import Score, make_score
 
 #: The local scores :func:`exact_search` accepts.
-EXACT_SCORES: tuple[str, ...] = ("local_score_BIC", "local_score_DG", "local_score_CG")
+EXACT_SCORES: tuple[str, ...] = (
+    "local_score_BIC",
+    "local_score_degen_gauss",
+    "local_score_cond_gauss",
+)
 
 # One node of a variable's parent graph: its parent set, that set's local score, and the set as a
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.

@@ -364,17 +364,25 @@ def test_xges_rejects_a_bad_setting(setting, value, error):
 
 # Every mixed-data setting of each facade that takes one, called on one data matrix.
 MIXED = {
-    ("pc", "dg"): lambda x, **kw: andrey.pc(x, indep_test="dg", **kw),
-    ("fci", "cg"): lambda x, **kw: andrey.fci(x, indep_test="cg", **kw),
-    ("gfci", "dg"): lambda x, **kw: andrey.gfci(
-        x, score_func="local_score_DG", indep_test="dg", **kw
+    ("pc", "degen_gauss"): lambda x, **kw: andrey.pc(x, indep_test="degen_gauss", **kw),
+    ("fci", "cond_gauss"): lambda x, **kw: andrey.fci(x, indep_test="cond_gauss", **kw),
+    ("gfci", "degen_gauss"): lambda x, **kw: andrey.gfci(
+        x, score_func="local_score_degen_gauss", indep_test="degen_gauss", **kw
     ),
-    ("ges", "local_score_CG"): lambda x, **kw: andrey.ges(x, score_func="local_score_CG", **kw),
-    ("hc", "local_score_DG"): lambda x, **kw: andrey.hc(x, score_func="local_score_DG", **kw),
-    ("boss", "local_score_CG"): lambda x, **kw: andrey.boss(x, score_func="local_score_CG", **kw),
-    ("grasp", "local_score_DG"): lambda x, **kw: andrey.grasp(x, score_func="local_score_DG", **kw),
-    ("exact_search", "local_score_CG"): lambda x, **kw: andrey.exact_search(
-        x, score_func="local_score_CG", **kw
+    ("ges", "local_score_cond_gauss"): lambda x, **kw: andrey.ges(
+        x, score_func="local_score_cond_gauss", **kw
+    ),
+    ("hc", "local_score_degen_gauss"): lambda x, **kw: andrey.hc(
+        x, score_func="local_score_degen_gauss", **kw
+    ),
+    ("boss", "local_score_cond_gauss"): lambda x, **kw: andrey.boss(
+        x, score_func="local_score_cond_gauss", **kw
+    ),
+    ("grasp", "local_score_degen_gauss"): lambda x, **kw: andrey.grasp(
+        x, score_func="local_score_degen_gauss", **kw
+    ),
+    ("exact_search", "local_score_cond_gauss"): lambda x, **kw: andrey.exact_search(
+        x, score_func="local_score_cond_gauss", **kw
     ),
 }
 
@@ -418,7 +426,7 @@ def test_categorical_lists_columns_the_data_has(data, categorical, error, messag
     x = _mixed_data()
     x = pd.DataFrame(x, columns=["a", "b", "c"]) if data == "frame" else x
     with pytest.raises(error, match=message):
-        andrey.pc(x, indep_test="dg", categorical=categorical)
+        andrey.pc(x, indep_test="degen_gauss", categorical=categorical)
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
@@ -443,17 +451,21 @@ def test_a_column_that_does_not_hold_numbers_must_be_categorical():
     frame = pd.DataFrame({"a": np.array(["p", "q", "r"])[x[:, 0].astype(int)], "b": x[:, 1]})
     frame["c"] = x[:, 2]
     with pytest.raises(ValueError, match="column 'a' does not hold numbers; list it"):
-        andrey.pc(frame, indep_test="dg", categorical=["c"])
-    assert andrey.pc(frame, indep_test="dg").structure.n_nodes == 3  # an object column
+        andrey.pc(frame, indep_test="degen_gauss", categorical=["c"])
+    assert andrey.pc(frame, indep_test="degen_gauss").structure.n_nodes == 3  # an object column
     frame.loc[5, "a"] = None
     with pytest.raises(ValueError, match="column 'a' has a missing value at row 5"):
-        andrey.pc(frame, indep_test="dg")
+        andrey.pc(frame, indep_test="degen_gauss")
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("score_func", "indep_test"),
-    [("local_score_DG", "fisherz"), ("local_score_BIC", "cg"), ("local_score_BDeu", "dg")],
+    [
+        ("local_score_degen_gauss", "fisherz"),
+        ("local_score_BIC", "cond_gauss"),
+        ("local_score_BDeu", "degen_gauss"),
+    ],
 )
 def test_gfci_rejects_a_mixed_score_or_test_without_its_pair(score_func, indep_test):
     with pytest.raises(ValueError, match="score and test must read the data alike"):
@@ -465,6 +477,6 @@ def test_cdnod_with_a_mixed_test_takes_continuous_data_and_rejects_a_fractional_
     """The index is the categorical variable, so the data may have no categorical column."""
     x = _mixed_data()[:, [1]]
     c_indx = np.repeat([0.0, 1.0], 100)
-    assert andrey.cdnod(x, c_indx, indep_test="dg").structure.n_nodes == 1
+    assert andrey.cdnod(x, c_indx, indep_test="degen_gauss").structure.n_nodes == 1
     with pytest.raises(ValueError, match=r"c_indx .* 0\.5 at row 0"):
-        andrey.cdnod(x, np.r_[0.5, c_indx[1:]], indep_test="cg")
+        andrey.cdnod(x, np.r_[0.5, c_indx[1:]], indep_test="cond_gauss")

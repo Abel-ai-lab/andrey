@@ -975,7 +975,7 @@ def test_categorical_names_header_columns_or_positions(capsys, tmp_path):
     v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(600)
     path = tmp_path / "mixed.csv"
     path.write_text("g,u,v\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(g, u, v)))
-    base = ["run", "pc", "--data", str(path), "indep_test=dg"]
+    base = ["run", "pc", "--data", str(path), "indep_test=degen_gauss"]
     code, by_name, _ = _run([*base, "categorical=[g]"], capsys)
     assert code == 0 and json.loads(by_name)["run"]["params"]["categorical"] == ["g"]
     code, by_position, _ = _run([*base, "categorical=[0]"], capsys)

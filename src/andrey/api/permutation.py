@@ -42,10 +42,10 @@ def boss(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov", "local_score_DG", "local_score_CG"}
+    score_func : {"local_score_BIC_from_cov", "local_score_degen_gauss", "local_score_cond_gauss"}
         Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
-        linear-Gaussian BIC; ``"local_score_DG"`` and ``"local_score_CG"`` are the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        linear-Gaussian BIC; ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the
+        degenerate and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
@@ -112,10 +112,10 @@ def boss(
     shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties. The
     earliest order position wins; among candidate parents, the lowest column index wins.
 
-    **Mixed data.** ``"local_score_DG"`` [3]_ and ``"local_score_CG"`` [4]_ score data with
-    continuous and categorical columns, as :func:`~andrey.ges` describes, and read the categorical
-    columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full local scores,
-    without the Schur update the BIC search uses.
+    **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
+    data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
+    categorical columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full
+    local scores, without the Schur update the BIC search uses.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 800 variables with ten rows per variable, at ``lambda_value=4.0``: its
@@ -188,10 +188,10 @@ def grasp(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov", "local_score_DG", "local_score_CG"}
+    score_func : {"local_score_BIC_from_cov", "local_score_degen_gauss", "local_score_cond_gauss"}
         Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
-        linear-Gaussian BIC; ``"local_score_DG"`` and ``"local_score_CG"`` are the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        linear-Gaussian BIC; ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the
+        degenerate and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
@@ -264,10 +264,10 @@ def grasp(
     Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
     :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged.
 
-    **Mixed data.** ``"local_score_DG"`` [3]_ and ``"local_score_CG"`` [4]_ score data with
-    continuous and categorical columns, as :func:`~andrey.ges` describes, and read the categorical
-    columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full local scores,
-    without the Schur update the BIC search uses.
+    **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
+    data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
+    categorical columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full
+    local scores, without the Schur update the BIC search uses.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 400 variables with ten rows per variable, at ``lambda_value=4.0``: its

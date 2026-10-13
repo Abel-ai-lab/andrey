@@ -98,8 +98,8 @@ def _recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
 GES_SCORES: tuple[str, ...] = (
     "local_score_BIC",
     "local_score_BDeu",
-    "local_score_DG",
-    "local_score_CG",
+    "local_score_degen_gauss",
+    "local_score_cond_gauss",
 )
 
 
@@ -130,8 +130,8 @@ def ges(
     score_func : str
         Local score: ``"local_score_BIC"`` (linear-Gaussian BIC), ``"local_score_BDeu"`` (BDeu
         on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors), or a
-        mixed-data BIC, ``"local_score_DG"`` (:class:`~andrey.core.score.DGScore`) or
-        ``"local_score_CG"`` (:class:`~andrey.core.score.CGScore`).
+        mixed-data BIC, ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
+        ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     maxP : float or None

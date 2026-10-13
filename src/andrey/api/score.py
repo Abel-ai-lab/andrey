@@ -53,12 +53,12 @@ def ges(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC", "local_score_BDeu", "local_score_DG", "local_score_CG"}
-        Local score objective, by default ``"local_score_BIC"``, the linear-Gaussian BIC, for
+    score_func : str, default="local_score_BIC"
+        Local score objective: ``"local_score_BIC"``, the linear-Gaussian BIC, for
         continuous data. ``"local_score_BDeu"`` is the BDeu score [3]_ for categorical data, coded
-        by whole numbers. ``"local_score_DG"`` (degenerate Gaussian) [4]_ and ``"local_score_CG"``
-        (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous and categorical
-        columns. See Notes.
+        by whole numbers. ``"local_score_degen_gauss"`` (degenerate Gaussian) [4]_ and
+        ``"local_score_cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed data,
+        continuous and categorical columns. See Notes.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
@@ -99,10 +99,10 @@ def ges(
     Notes
     -----
     **When to use it.** GES suits data with no unmeasured common causes. Its default BIC score
-    assumes continuous data, where each variable depends linearly on its causes with Gaussian
-    noise; in that setting it is a fast, accurate default. For categorical data, use
-    ``"local_score_BDeu"``, and for mixed data ``"local_score_DG"`` or ``"local_score_CG"``. It
-    returns the equivalence class.
+    assumes continuous data, where each variable depends linearly on its causes with Gaussian noise;
+    in that setting it is a fast, accurate default. For categorical data, use
+    ``"local_score_BDeu"``, and for mixed data ``"local_score_degen_gauss"`` or
+    ``"local_score_cond_gauss"``. It returns the equivalence class.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -124,20 +124,20 @@ def ges(
     Equivalent graphs score the same, as GES requires. Moves are scored in this process, without
     the worker processes the BIC search can use.
 
-    **Mixed data.** ``"local_score_DG"`` and ``"local_score_CG"`` score data with continuous and
-    categorical columns; the categorical columns are read as :func:`~andrey.pc` describes. Each is a
-    BIC: ``-2`` times the fitted log-likelihood of a variable given its parents, plus ``lambda_value
-    * log(n)`` per parameter; the degenerate Gaussian's leaves out a constant per variable, which
-    does not change which graph scores best. Equivalent graphs score the same. The degenerate
-    Gaussian score [4]_ replaces a categorical column of ``k`` categories by ``k - 1`` indicator
-    columns and scores every column as Gaussian, by the residual covariance of a linear regression
-    on the parents' columns; on continuous columns only, it equals ``"local_score_BIC"``. The
-    conditional Gaussian score [5]_ fits the continuous variables of a variable and its parents in
-    each joint category of their categorical ones, with a Gaussian of that category's own mean and a
-    covariance shrunk toward that of all rows by one pseudo-row [6]_, and divides by the same fit of
-    the parents alone, so a categorical variable can have continuous parents. It counts parameters
-    for every joint category, so a parent with many categories costs many parameters. Moves are
-    scored in this process.
+    **Mixed data.** ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` score data with
+    continuous and categorical columns; the categorical columns are read as :func:`~andrey.pc`
+    describes. Each is a BIC: ``-2`` times the fitted log-likelihood of a variable given its
+    parents, plus ``lambda_value * log(n)`` per parameter; the degenerate Gaussian's leaves out a
+    constant per variable, which does not change which graph scores best. Equivalent graphs score
+    the same. The degenerate Gaussian score [4]_ replaces a categorical column of ``k`` categories
+    by ``k - 1`` indicator columns and scores every column as Gaussian, by the residual covariance
+    of a linear regression on the parents' columns; on continuous columns only, it equals
+    ``"local_score_BIC"``. The conditional Gaussian score [5]_ fits the continuous variables of a
+    variable and its parents in each joint category of their categorical ones, with a Gaussian of
+    that category's own mean and a covariance shrunk toward that of all rows by one pseudo-row [6]_,
+    and divides by the same fit of the parents alone, so a categorical variable can have continuous
+    parents. It counts parameters for every joint category, so a parent with many categories costs
+    many parameters. Moves are scored in this process.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 200 variables with ten rows per variable and parents capped at 4 per
@@ -194,7 +194,7 @@ def ges(
     >>> u = rng.standard_normal(2000)
     >>> v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(2000)
     >>> data = pd.DataFrame({"g": pd.Categorical(g), "u": u, "v": v})
-    >>> ges(data, score_func="local_score_CG").structure.oriented_edges()
+    >>> ges(data, score_func="local_score_cond_gauss").structure.oriented_edges()
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.search.ges import ges as _ges
@@ -402,10 +402,10 @@ def hc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str, default="local_score_BIC_from_cov"
-        Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC
-        for continuous data; ``"local_score_BDeu"``, the BDeu score for categorical data, coded by
-        whole numbers; or ``"local_score_DG"`` and ``"local_score_CG"``, the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
+        continuous data; ``"local_score_BDeu"``, the BDeu score for categorical data, coded by whole
+        numbers; or ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"``, the degenerate
+        and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
@@ -631,9 +631,10 @@ def exact_search(
         become the structure's ``labels``.
     search_method : {"astar", "dp"}, default="astar"
         Exact search strategy: A* search or dynamic programming.
-    score_func : {"local_score_BIC", "local_score_DG", "local_score_CG"}, default="local_score_BIC"
-        Local score: the linear-Gaussian BIC, or the degenerate or conditional Gaussian BIC for
-        mixed data, as for :func:`~andrey.ges`. Each uses the standard penalty,
+    score_func : str, default="local_score_BIC"
+        Local score: ``"local_score_BIC"``, the linear-Gaussian BIC, or
+        ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or conditional
+        Gaussian BIC for mixed data, as for :func:`~andrey.ges`. Each uses the standard penalty,
         ``lambda_value=1``.
     categorical : sequence of str or int, optional
         The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
@@ -664,10 +665,10 @@ def exact_search(
 
     Notes
     -----
-    **Mixed data.** ``"local_score_DG"`` [3]_ and ``"local_score_CG"`` [4]_ score data with
-    continuous and categorical columns, as :func:`~andrey.ges` describes, and read the categorical
-    columns as :func:`~andrey.pc` does. Both give equivalent graphs the same score, so the optimum
-    is again identified up to its equivalence class.
+    **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
+    data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
+    categorical columns as :func:`~andrey.pc` does. Both give equivalent graphs the same score, so
+    the optimum is again identified up to its equivalence class.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 5 variables with 1,000 rows,
     and with a mixed-data score on 5 variables with 3,000 rows.

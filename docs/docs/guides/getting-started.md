@@ -273,9 +273,9 @@ the pair: `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`
 value of a column is one category, so the codes need not start at 0.
 
 For mixed data, with continuous and categorical columns, choose a mixed-data test or score and name
-the categorical columns: `andrey.pc(data, indep_test="dg", categorical=["smoker", "region"])` or
-`indep_test="cg"`, and `andrey.ges(data, score_func="local_score_DG", categorical=[...])` or
-`"local_score_CG"`, also for `hc`, `boss`, `grasp`, and `exact_search`. A DataFrame's `category`,
+the categorical columns: `andrey.pc(data, indep_test="degen_gauss", categorical=["smoker", "region"])` or
+`indep_test="cond_gauss"`, and `andrey.ges(data, score_func="local_score_degen_gauss", categorical=[...])` or
+`"local_score_cond_gauss"`, also for `hc`, `boss`, `grasp`, and `exact_search`. A DataFrame's `category`,
 `bool`, and text columns count as categorical without `categorical`, and their values need no
 coding. The degenerate Gaussian (`dg`) suits effects that are linear and add up across categories;
 the conditional Gaussian (`cg`) lets a category change a variable's spread as well as its mean, but

@@ -41,7 +41,7 @@ from .mixed import ConditionalGaussian, DegenerateGaussian
 
 #: The scores that read category codes, and those that read mixed data with a categorical mask.
 DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu",)
-MIXED_SCORES: tuple[str, ...] = ("local_score_CG", "local_score_DG")
+MIXED_SCORES: tuple[str, ...] = ("local_score_cond_gauss", "local_score_degen_gauss")
 
 
 def local_score_bic(
@@ -540,19 +540,19 @@ def make_score(
     """Build the local score ``score_func`` names over ``data``.
 
     ``"local_score_BIC"`` and ``"local_score_BIC_from_cov"`` name :class:`BICScore`,
-    ``"local_score_BDeu"`` :class:`BDeuScore` with its default priors, and ``"local_score_DG"`` and
-    ``"local_score_CG"`` :class:`DGScore` and :class:`CGScore` over the ``categorical`` mask. BDeu
-    has no penalty weight but still checks ``lambda_value``'s range. A search checks ``score_func``
-    against the names it takes before calling this. Raises :class:`NotImplementedError` for any
-    other name.
+    ``"local_score_BDeu"`` :class:`BDeuScore` with its default priors, and
+    ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` :class:`DGScore` and
+    :class:`CGScore` over the ``categorical`` mask. BDeu has no penalty weight but still checks
+    ``lambda_value``'s range. A search checks ``score_func`` against the names it takes before
+    calling this. Raises :class:`NotImplementedError` for any other name.
     """
     if score_func in ("local_score_BIC", "local_score_BIC_from_cov"):
         return BICScore(np.asarray(data, dtype=np.float64), lambda_value=lambda_value)
     if score_func == "local_score_BDeu":
         penalty_weight(lambda_value)
         return BDeuScore(np.asarray(data))
-    if score_func == "local_score_DG":
+    if score_func == "local_score_degen_gauss":
         return DGScore(data, categorical, lambda_value=lambda_value)
-    if score_func == "local_score_CG":
+    if score_func == "local_score_cond_gauss":
         return CGScore(data, categorical, lambda_value=lambda_value)
     raise NotImplementedError(f"unknown score_func {score_func!r}")

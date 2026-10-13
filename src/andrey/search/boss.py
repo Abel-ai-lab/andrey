@@ -21,8 +21,8 @@ from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 #: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
 PERMUTATION_SCORES: tuple[str, ...] = (
     "local_score_BIC_from_cov",
-    "local_score_DG",
-    "local_score_CG",
+    "local_score_degen_gauss",
+    "local_score_cond_gauss",
 )
 
 # Fixed absolute BIC-score tolerance for numerical ties.

@@ -49,26 +49,42 @@ def _independent(seed: int = 20261013, n: int = 3000) -> np.ndarray:
 
 # Each fit that learns a CPDAG from mixed data, by its mixed-data setting.
 CPDAG_FITS = {
-    "pc-dg": lambda x, c: andrey.pc(x, indep_test="dg", categorical=c),
-    "pc-cg": lambda x, c: andrey.pc(x, indep_test="cg", categorical=c),
-    "ges-dg": lambda x, c: andrey.ges(x, score_func="local_score_DG", categorical=c),
-    "ges-cg": lambda x, c: andrey.ges(x, score_func="local_score_CG", categorical=c),
-    "hc-dg": lambda x, c: andrey.hc(x, score_func="local_score_DG", categorical=c),
-    "hc-cg": lambda x, c: andrey.hc(x, score_func="local_score_CG", categorical=c),
-    "boss-dg": lambda x, c: andrey.boss(x, score_func="local_score_DG", categorical=c),
-    "boss-cg": lambda x, c: andrey.boss(x, score_func="local_score_CG", categorical=c),
-    "grasp-dg": lambda x, c: andrey.grasp(x, score_func="local_score_DG", categorical=c),
-    "grasp-cg": lambda x, c: andrey.grasp(x, score_func="local_score_CG", categorical=c),
-    "cdnod-cg": lambda x, c: andrey.cdnod(x, np.zeros(len(x)), indep_test="cg", categorical=c),
+    "pc-degen_gauss": lambda x, c: andrey.pc(x, indep_test="degen_gauss", categorical=c),
+    "pc-cond_gauss": lambda x, c: andrey.pc(x, indep_test="cond_gauss", categorical=c),
+    "ges-degen_gauss": lambda x, c: andrey.ges(
+        x, score_func="local_score_degen_gauss", categorical=c
+    ),
+    "ges-cond_gauss": lambda x, c: andrey.ges(
+        x, score_func="local_score_cond_gauss", categorical=c
+    ),
+    "hc-degen_gauss": lambda x, c: andrey.hc(
+        x, score_func="local_score_degen_gauss", categorical=c
+    ),
+    "hc-cond_gauss": lambda x, c: andrey.hc(x, score_func="local_score_cond_gauss", categorical=c),
+    "boss-degen_gauss": lambda x, c: andrey.boss(
+        x, score_func="local_score_degen_gauss", categorical=c
+    ),
+    "boss-cond_gauss": lambda x, c: andrey.boss(
+        x, score_func="local_score_cond_gauss", categorical=c
+    ),
+    "grasp-degen_gauss": lambda x, c: andrey.grasp(
+        x, score_func="local_score_degen_gauss", categorical=c
+    ),
+    "grasp-cond_gauss": lambda x, c: andrey.grasp(
+        x, score_func="local_score_cond_gauss", categorical=c
+    ),
+    "cdnod-cond_gauss": lambda x, c: andrey.cdnod(
+        x, np.zeros(len(x)), indep_test="cond_gauss", categorical=c
+    ),
 }
 PAG_FITS = {
-    "fci-dg": lambda x, c: andrey.fci(x, indep_test="dg", categorical=c),
-    "fci-cg": lambda x, c: andrey.fci(x, indep_test="cg", categorical=c),
-    "gfci-dg": lambda x, c: andrey.gfci(
-        x, score_func="local_score_DG", indep_test="dg", categorical=c
+    "fci-degen_gauss": lambda x, c: andrey.fci(x, indep_test="degen_gauss", categorical=c),
+    "fci-cond_gauss": lambda x, c: andrey.fci(x, indep_test="cond_gauss", categorical=c),
+    "gfci-degen_gauss": lambda x, c: andrey.gfci(
+        x, score_func="local_score_degen_gauss", indep_test="degen_gauss", categorical=c
     ),
-    "gfci-cg": lambda x, c: andrey.gfci(
-        x, score_func="local_score_CG", indep_test="cg", categorical=c
+    "gfci-cond_gauss": lambda x, c: andrey.gfci(
+        x, score_func="local_score_cond_gauss", indep_test="cond_gauss", categorical=c
     ),
 }
 
@@ -94,7 +110,7 @@ def test_pag_methods_find_the_skeleton_and_the_collider(fit):
     assert marks[2, 0] == ARROW and marks[2, 1] == ARROW  # M[i, j] is the mark at i
 
 
-@pytest.mark.parametrize("score_func", ["local_score_DG", "local_score_CG"])
+@pytest.mark.parametrize("score_func", ["local_score_degen_gauss", "local_score_cond_gauss"])
 def test_exact_search_finds_a_dag_in_the_true_class(score_func):
     out = andrey.exact_search(_network(), score_func=score_func, categorical=CATEGORICAL)
     assert out.structure.kind == "dag"
@@ -109,7 +125,9 @@ def test_independent_columns_give_no_edges(fit):
     assert out.structure.oriented_edges() == []
 
 
-@pytest.mark.parametrize("fit", ["pc-dg", "pc-cg", "ges-dg", "ges-cg"])
+@pytest.mark.parametrize(
+    "fit", ["pc-degen_gauss", "pc-cond_gauss", "ges-degen_gauss", "ges-cond_gauss"]
+)
 def test_the_graph_does_not_depend_on_codes_or_units(fit):
     """Each distinct value is a category, and a continuous column's units do not matter."""
     x = _network()
@@ -131,7 +149,7 @@ def test_a_dataframe_marks_its_categorical_columns_by_dtype():
             "flag": x[:, 4].astype(bool),
         }
     )
-    out = andrey.pc(frame, indep_test="dg")
+    out = andrey.pc(frame, indep_test="degen_gauss")
     assert set(out.structure.oriented_edges()) == {
         ("group", "v", "directed"),
         ("u", "v", "directed"),
@@ -139,7 +157,7 @@ def test_a_dataframe_marks_its_categorical_columns_by_dtype():
         ("group", "flag", "undirected"),
     }
     named = andrey.pc(
-        pd.DataFrame(x, columns=list("abcde")), indep_test="dg", categorical=["a", "e"]
+        pd.DataFrame(x, columns=list("abcde")), indep_test="degen_gauss", categorical=["a", "e"]
     )
     assert np.array_equal(named.structure.to_numpy(), out.structure.to_numpy())
 
@@ -153,7 +171,7 @@ def test_cdnod_with_a_mixed_test_finds_a_shift_in_one_domain_of_three():
     x0 = np.where(domain == 1, 1.5, 0.0) + rng.standard_normal(n)
     x1 = x0 + rng.standard_normal(n)
     x = np.column_stack([x0, x1])
-    for test in ("dg", "cg"):
+    for test in ("degen_gauss", "cond_gauss"):
         assert andrey.cdnod(x, domain, indep_test=test).structure.oriented_edges() == [
             (0, 1, "directed")
         ]
@@ -171,7 +189,17 @@ def random_network():
     return sample_mixed(**_RANDOM)
 
 
-@pytest.mark.parametrize("fit", ["pc-dg", "pc-cg", "ges-dg", "ges-cg", "boss-dg", "boss-cg"])
+@pytest.mark.parametrize(
+    "fit",
+    [
+        "pc-degen_gauss",
+        "pc-cond_gauss",
+        "ges-degen_gauss",
+        "ges-cond_gauss",
+        "boss-degen_gauss",
+        "boss-cond_gauss",
+    ],
+)
 def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
     truth = to_cpdag(random_network.graph)
     assert shd(np.zeros((_RANDOM["d"],) * 2), truth) == 10

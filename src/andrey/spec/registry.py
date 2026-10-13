@@ -34,8 +34,8 @@ _INDEP_TEST = ParamSpec(
     default="fisherz",
     doc="Conditional-independence test: fisherz = partial correlation (Fisher's z), for continuous "
     "data; chisq = Pearson's chi-square and gsq = G-square, for categorical data coded by whole "
-    "numbers; dg = degenerate Gaussian and cg = conditional Gaussian likelihood ratio, for mixed "
-    "data, with the categorical columns named by categorical (experimental).",
+    "numbers; degen_gauss = degenerate Gaussian and cond_gauss = conditional Gaussian likelihood "
+    "ratio, for mixed data, with the categorical columns named by categorical (experimental).",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _CATEGORICAL = ParamSpec(
@@ -98,7 +98,8 @@ _add(
         summary="General-purpose structure learning from i.i.d. observational data: "
         "conditional-independence tests remove edges, then orientation rules direct the edges the "
         "data determine; returns a CPDAG. A good first method when nothing is known about the "
-        "graph; indep_test=chisq or gsq for categorical data, dg or cg for mixed data.",
+        "graph; indep_test=chisq or gsq for categorical data, degen_gauss or cond_gauss for mixed "
+        "data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(structure_type="graph", graph_kind="cpdag"),
         determinism="deterministic",
@@ -152,8 +153,9 @@ _add(
                 default="local_score_BIC",
                 doc="Local score for the GES phase: local_score_BIC = linear-Gaussian BIC; "
                 "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
-                "local_score_DG and local_score_CG = degenerate and conditional Gaussian BIC, for "
-                "mixed data (experimental). The test must read the same kind of data.",
+                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
+                "Gaussian BIC, for mixed data (experimental). The test must read the same kind of "
+                "data.",
                 choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
@@ -202,8 +204,8 @@ _add(
         family="score",
         summary="Greedy equivalence search: a score-based greedy search over CPDAGs. Fast and "
         "accurate on linear-Gaussian data with the BIC; score_func=local_score_BDeu for "
-        "categorical data, local_score_DG or local_score_CG for mixed data. The score is in "
-        "metadata['score'].",
+        "categorical data, local_score_degen_gauss or local_score_cond_gauss for mixed data. The "
+        "score is in metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -218,8 +220,8 @@ _add(
                 default="local_score_BIC",
                 doc="Local score objective: local_score_BIC = linear-Gaussian BIC; "
                 "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
-                "local_score_DG and local_score_CG = degenerate and conditional Gaussian BIC, for "
-                "mixed data (experimental).",
+                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
+                "Gaussian BIC, for mixed data (experimental).",
                 choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
@@ -291,10 +293,10 @@ _add(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
-        "score improves; a simple greedy baseline. BIC by default; score_func=local_score_BDeu "
-        "for categorical data, local_score_DG or local_score_CG for mixed data. Stops at a local "
-        "optimum, or after max_iter moves when set. Returns the CPDAG of the final DAG and its "
-        "score.",
+        "score improves; a simple greedy baseline. BIC by default; score_func=local_score_BDeu for "
+        "categorical data, local_score_degen_gauss or local_score_cond_gauss for mixed data. Stops "
+        "at a local optimum, or after max_iter moves when set. Returns the CPDAG of the final DAG "
+        "and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -309,8 +311,8 @@ _add(
                 default="local_score_BIC_from_cov",
                 doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
                 "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
-                "local_score_DG and local_score_CG = degenerate and conditional Gaussian BIC, for "
-                "mixed data.",
+                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
+                "Gaussian BIC, for mixed data.",
                 choices=HC_SCORES,
             ),
             _LAMBDA_VALUE,
@@ -384,8 +386,8 @@ _add(
         family="score",
         summary="Globally optimal BIC search over DAGs (A* or dynamic programming). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
-        "the best-scoring equivalence class. score_func=local_score_DG or local_score_CG for "
-        "mixed data.",
+        "the best-scoring equivalence class. score_func=local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(structure_type="graph", graph_kind="dag"),
         determinism="deterministic",
@@ -403,8 +405,9 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score: local_score_BIC = linear-Gaussian BIC; local_score_DG and "
-                "local_score_CG = degenerate and conditional Gaussian BIC, for mixed data.",
+                doc="Local score: local_score_BIC = linear-Gaussian BIC; local_score_degen_gauss "
+                "and local_score_cond_gauss = degenerate and conditional Gaussian BIC, for mixed "
+                "data.",
                 choices=EXACT_SCORES,
             ),
             _CATEGORICAL,
@@ -451,8 +454,9 @@ _BOSS_SCORE = ParamSpec(
     name="score_func",
     type="str",
     default="local_score_BIC_from_cov",
-    doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; local_score_DG "
-    "and local_score_CG = degenerate and conditional Gaussian BIC, for mixed data (experimental).",
+    doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+    "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional Gaussian BIC, "
+    "for mixed data (experimental).",
     choices=PERMUTATION_SCORES,
 )
 _add(
@@ -460,8 +464,8 @@ _add(
         name="boss",
         family="permutation",
         summary="Best-order score search: a permutation search over the linear-Gaussian BIC, fast "
-        "and accurate on linear-Gaussian data; score_func=local_score_DG or local_score_CG for "
-        "mixed data. Returns a CPDAG + score.",
+        "and accurate on linear-Gaussian data; score_func=local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -479,8 +483,9 @@ _add(
         name="grasp",
         family="permutation",
         summary="Greedy relaxation of the sparsest permutation: a permutation search over the "
-        "linear-Gaussian BIC, like BOSS with a different move (tucks); score_func=local_score_DG "
-        "or local_score_CG for mixed data. Returns a CPDAG + score.",
+        "linear-Gaussian BIC, like BOSS with a different move (tucks); "
+        "score_func=local_score_degen_gauss or local_score_cond_gauss for mixed data. Returns a "
+        "CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
