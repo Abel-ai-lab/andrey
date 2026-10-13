@@ -1,7 +1,8 @@
-<!-- One image on its own dark ground reads on both GitHub themes; PyPI keeps a plain <img>. -->
+<!-- One image on its own dark ground reads on both GitHub themes; PyPI keeps a plain <img>. The
+banner links the website's homepage. -->
 <p align="center">
-  <img alt="Andrey, a very fast causal discovery package"
-    src=".github/readme/banner.svg" width="830">
+  <a href="https://andrey.abel.ai/"><img alt="Andrey, a very fast causal discovery package"
+    src=".github/readme/banner.svg" width="830"></a>
 </p>
 
 <p align="center">

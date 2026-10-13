@@ -360,6 +360,38 @@ def brand_tones(image: Image.Image, match_ground: bool = True) -> Image.Image:
     return Image.fromarray(out.clip(0, 255).astype(np.uint8))
 
 
+# A release card's cover art, 8.5 x 11 at three times the cover's 288 px width: the art in the
+# brand's tones, with a soft navy shade where the card's text sits, the masthead and title across
+# the top and the version at the bottom left. A release without art, and every earlier release's
+# tile, shows the stipple ground under the same shade (``release_ground_jpeg``).
+RELEASE_W, RELEASE_H = 864, 1119
+RELEASE_SHADE = (0.55, 0.5)  # the shade's depth at the top edge and at the bottom left corner
+
+
+def release_art(image: Image.Image) -> Image.Image:
+    """``image`` as a release card's cover: the brand's tones at the cover's size, shaded for its
+    text."""
+    art = np.asarray(
+        brand_tones(image.convert("RGB").resize((RELEASE_W, RELEASE_H), Image.LANCZOS)), float
+    )
+    y = np.arange(RELEASE_H)[:, None] / RELEASE_H
+    x = np.arange(RELEASE_W)[None, :] / RELEASE_W
+    top = RELEASE_SHADE[0] * np.clip(1 - y / 0.36, 0, 1) ** 1.4
+    corner = RELEASE_SHADE[1] * np.clip(1 - np.hypot(x / 0.62, (1 - y) / 0.34), 0, 1) ** 1.2
+    shade = np.maximum(top, corner)[..., None]
+    out = art * (1 - shade) + _rgb(grain.NAVY) * shade
+    return Image.fromarray(out.clip(0, 255).astype(np.uint8))
+
+
+def release_ground_jpeg() -> bytes:
+    """The stipple ground as a release cover (``release_art``), for a release without art."""
+    out = io.BytesIO()
+    release_art(grain.stipple(RELEASE_W, RELEASE_H).convert("RGB")).save(
+        out, "JPEG", quality=60, subsampling=0, optimize=True
+    )
+    return out.getvalue()
+
+
 def _art(kind: str) -> Image.Image:
     """The post's art as stored (already in the brand's tones), or the stipple ground."""
     if kind not in COVERS:

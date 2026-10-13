@@ -59,7 +59,7 @@ return the same graphs on most datasets and run up to 906x faster.
 :link: benchmarks/0.2.0
 :link-type: doc
 :link-alt: The 0.2.0 release card: hidden common causes
-:class-card: release-tile
+:class-card: release-tile release-art-0-2-0
 :shadow: none
 :margin: 0
 
