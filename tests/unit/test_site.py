@@ -1014,9 +1014,7 @@ def test_the_alpha_banner_links_the_newest_release_post(conf):
     with pytest.raises(ValueError, match="introducing-andrey, blog/why-andrey-is-fast"):
         newest(posts[:2])
     banner = (ROOT / "docs" / "_templates" / "sections" / "announcement.html").read_text()
-    assert '<a href="{{ pathto(release_post) }}">Read the {{ release_version }} release post.' in (
-        banner
-    )
+    assert '<a href="{{ pathto(release_post) }}">Read the {{ release_version }} post<' in (banner)
     assert "introducing-andrey" not in banner
 
 
