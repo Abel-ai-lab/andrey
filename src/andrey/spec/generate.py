@@ -326,12 +326,14 @@ def _data_types_section() -> str:
         f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "
         "and name the categorical columns with `categorical=[col,...]` (header names or 0-based "
         "positions), or `categorical=[]` for none. Without `categorical`, the setting infers them: "
-        "every column of at most `max_categories` "
-        f"(default {MAX_CATEGORIES}) distinct whole numbers. The result's `metadata.categorical` "
-        "lists the categorical columns read, and `run.warnings` holds a `DataTypeWarning` that "
-        "names the inferred columns, or says that none was found and the setting ran as its "
-        "linear-Gaussian form. Under a continuous setting, a `DataTypeWarning` names whole-number "
-        "columns that may be category codes: check them before reading the graph."
+        "a DataFrame's `category`, `bool`, and text columns, and every column of at most "
+        f"`max_categories` (default {MAX_CATEGORIES}) distinct whole numbers. `andrey run` reads "
+        "numbers only, so its data file codes each category as a whole number. The result's "
+        "`metadata.categorical` lists the categorical columns read, and `run.warnings` holds a "
+        "`DataTypeWarning` that names the inferred columns, or says that none was found and the "
+        "setting ran as its linear-Gaussian form. Under a continuous setting, a `DataTypeWarning` "
+        "names whole-number columns that may be category codes: check them before reading the "
+        "graph."
     )
 
 

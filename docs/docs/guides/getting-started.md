@@ -314,8 +314,9 @@ columns; if they are categories, choose a mixed-data setting.
 
 From the command line, the same settings are `key=value` arguments, such as
 `andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
-`max_categories=5`. The JSON result lists the categorical columns under `metadata.categorical`
-and the warnings under `run.warnings`.
+`max_categories=5`. The data file holds numbers only, so code each category as a whole number. The
+JSON result lists the categorical columns under `metadata.categorical` and the warnings under
+`run.warnings`.
 
 ## Backends and parallelism
 
