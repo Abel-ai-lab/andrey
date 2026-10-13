@@ -95,19 +95,25 @@ SCORE_COLUMNS = (
 )
 
 
-def rescore(out: Path, records_dir: Path, keys: Mapping[str, DatasetKey]) -> None:
-    """Recompute :data:`SCORE_COLUMNS` of every part file from its stored estimates.
+def rescore(
+    out: Path,
+    records_dir: Path,
+    keys: Mapping[str, DatasetKey],
+    columns: tuple[str, ...] = SCORE_COLUMNS,
+) -> None:
+    """Recompute `columns` of every part file from its stored estimates.
 
     `keys` maps each ``dataset_id`` of the run to its :class:`DatasetKey`. Each fit's estimate is
     read back and scored with :func:`scoring.score_result` against the true DAG; a fit with no
-    estimate keeps ``NaN``. Each part is rewritten atomically.
+    estimate, or a column its estimate's kind has no score for, keeps ``NaN``. Each part is
+    rewritten atomically.
     """
     store = datasets.store_dir(out)
     kinds = datasets.load_registry(store)["keys"]
     truths: dict[str, GraphStructure] = {}
     for part in sorted(records_dir.glob("*.parquet")):
         frame = pd.read_parquet(part)
-        for column in SCORE_COLUMNS:
+        for column in columns:
             frame[column] = float("nan")
         for index, record in frame.iterrows():
             estimate = rundir.read_structure(out, record.run_id) if record.status == "ok" else None
@@ -125,8 +131,8 @@ def rescore(out: Path, records_dir: Path, keys: Mapping[str, DatasetKey]) -> Non
                     marks, kind=kinds[key.label]["graph_kind"]
                 )
             metrics = scoring.score_result(estimate, truths[record.dataset_id])
-            for column in SCORE_COLUMNS:
-                frame.at[index, column] = float(metrics[column])
+            for column in columns:
+                frame.at[index, column] = float(metrics.get(column, float("nan")))
         scratch = part.with_name(f".{part.name}.tmp")
         frame.to_parquet(scratch, index=False)
         os.replace(scratch, part)
