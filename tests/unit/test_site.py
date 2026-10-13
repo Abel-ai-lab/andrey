@@ -1025,10 +1025,8 @@ def test_the_alpha_banner_links_the_newest_release_post(conf):
     with pytest.raises(ValueError, match="introducing-andrey, blog/20261008-why-andrey-is-fast"):
         newest(posts[:2])
     banner = (ROOT / "docs" / "_templates" / "sections" / "announcement.html").read_text()
-    assert '<a href="{{ pathto(release_post) }}">Read the {{ release_version }} release post.' in (
-        banner
-    )
-    assert "20261008-introducing-andrey" not in banner
+    assert '<a href="{{ pathto(release_post) }}">Read the {{ release_version }} post<' in (banner)
+    assert "introducing-andrey" not in banner
 
 
 def test_the_blog_lists_the_newest_post_first(conf):
@@ -1111,6 +1109,8 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     header = readme[: readme.index("</p>")]
     # One tagline: the banner carries the name and the line, so no heading repeats a slogan.
     assert 'src=".github/readme/banner.svg"' in header
+    # The banner links the website's homepage.
+    assert '<a href="https://andrey.abel.ai/"><img' in header
     assert 'alt="Andrey, a very fast causal discovery package"' in header
     assert "<picture" not in header and "<h1" not in readme
     assert cards.TAGLINE == "A very fast causal discovery package"

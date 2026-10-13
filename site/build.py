@@ -1393,7 +1393,7 @@ def pillars(summaries: list[dict]) -> str:
             "The <code>andrey</code> command never prompts and answers in JSON, and <code>andrey "
             "--skill</code> prints a guide an agent loads as a skill.",
             "#agents",
-            "The command line and the skill",
+            "Command line and skill",
         ),
     )
     return "".join(
@@ -1642,7 +1642,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "hero_chips": hero_chips(),
         "race": speedup_panel(summaries),
         "pillars": pillars(summaries),
-        "speed_title": "Faster on the same data and machines",
+        "speed_title": "Speed comparison",
         "speed_intro": speed_intro(summaries),
         "speed_chart": speed_chart(summaries),
         "why_fast": _why_fast["dialog"](),
