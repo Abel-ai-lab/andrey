@@ -12,7 +12,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from andrey.api._adapt import checked_data, column_labels, json_safe, structure_output
+from andrey.api._adapt import (
+    MAX_CATEGORIES,
+    categorical_metadata,
+    checked_data,
+    column_labels,
+    json_safe,
+    structure_output,
+)
 from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
@@ -30,6 +37,7 @@ def boss(
     lambda_value: float = 1.0,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn a CPDAG with BOSS (Best Order Score Search).
 
@@ -55,28 +63,44 @@ def boss(
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
         the same graph. Different seeds can reach different graphs.
     categorical : sequence of str or int, optional
-        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
-        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
-        columns, as for :func:`~andrey.ges`. The BIC rejects it.
+        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
+        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"BOSS"`` and ``metadata["score"]`` the score of the DAG read off the final order; for
-        the BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n)
-        * n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open.
+        ``"BOSS"`` and ``metadata["score"]`` the score of the DAG read off the final order; for the
+        BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
+        n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     NotImplementedError
         If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions.
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
         suit the score, as for :func:`~andrey.ges`.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
 
     See Also
     --------
@@ -154,7 +178,9 @@ def boss(
 
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(f"BOSS supports {PERMUTATION_SCORES}, not {score_func!r}")
-    X, mask = checked_data(data, categorical, "score_func", score_func)
+    X, mask = checked_data(
+        data, categorical, "score_func", score_func, max_categories=max_categories
+    )
     labels = column_labels(data)
     cpdag, score = _boss(
         X,
@@ -163,7 +189,7 @@ def boss(
         score_func=score_func,
         categorical=mask,
     )
-    metadata = {"algorithm": "BOSS", "score": json_safe(score)}
+    metadata = {"algorithm": "BOSS", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
@@ -175,6 +201,7 @@ def grasp(
     depth: int = 3,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn a CPDAG with GRaSP (Greedy Relaxation of the Sparsest Permutation).
 
@@ -203,28 +230,44 @@ def grasp(
         ``None`` uses the ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so
         repeated calls return the same graph. Different seeds can reach different graphs.
     categorical : sequence of str or int, optional
-        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
-        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
-        columns, as for :func:`~andrey.ges`. The BIC rejects it.
+        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
+        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GRaSP"`` and ``metadata["score"]`` the score of the DAG read off the final order; for
-        the BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n)
-        * n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open.
+        ``"GRaSP"`` and ``metadata["score"]`` the score of the DAG read off the final order; for the
+        BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
+        n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     NotImplementedError
         If ``score_func`` names no available score, or ``depth`` is not ``3``.
     TypeError
-        If ``categorical`` is not a list of column names and positions.
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
         suit the score, as for :func:`~andrey.ges`.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
 
     See Also
     --------
@@ -309,7 +352,9 @@ def grasp(
         raise NotImplementedError(f"GRaSP supports {PERMUTATION_SCORES}, not {score_func!r}")
     if depth != 3:
         raise NotImplementedError(f"GRaSP supports depth=3, not {depth!r}")
-    X, mask = checked_data(data, categorical, "score_func", score_func)
+    X, mask = checked_data(
+        data, categorical, "score_func", score_func, max_categories=max_categories
+    )
     labels = column_labels(data)
     cpdag, score = _grasp(
         X,
@@ -318,5 +363,5 @@ def grasp(
         score_func=score_func,
         categorical=mask,
     )
-    metadata = {"algorithm": "GRaSP", "score": json_safe(score)}
+    metadata = {"algorithm": "GRaSP", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)

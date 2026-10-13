@@ -43,9 +43,19 @@ _CATEGORICAL = ParamSpec(
     type="str_list",
     default=None,
     doc="The categorical columns, for a mixed-data test or score: column names from the data "
-    "file's header or 0-based positions, for example, categorical=[smoker,region]. null reads no "
-    "column types from a file. Other tests and scores reject it.",
+    "file's header or 0-based positions, for example, categorical=[smoker,region]; [] marks none. "
+    "null infers them: every column of at most max_categories distinct whole numbers, named in a "
+    "DataTypeWarning; with none, the setting runs as its linear-Gaussian form and warns. Other "
+    "tests and scores reject it.",
     nullable=True,
+)
+_MAX_CATEGORIES = ParamSpec(
+    name="max_categories",
+    type="int",
+    default=10,
+    doc="The most distinct whole numbers a column may hold to be inferred as categorical, at least "
+    "2. With a continuous test or score, such columns get a one-time DataTypeWarning that they may "
+    "be category codes.",
 )
 _COLLIDER_RULE = ParamSpec(
     name="collider_rule",
@@ -101,11 +111,15 @@ _add(
         "graph; indep_test=chisq or gsq for categorical data, degen_gauss or cond_gauss for mixed "
         "data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(structure_type="graph", graph_kind="cpdag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL),
+        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
         references=(
             "Spirtes & Glymour 1991",
             "Spirtes, Glymour & Scheines 2000",
@@ -122,11 +136,15 @@ _add(
         "PAG. A circle mark is an endpoint the data cannot determine; a bidirected edge (<->) "
         "marks a latent common cause. Use when unmeasured confounding is plausible.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(structure_type="graph", graph_kind="pag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        params=(_ALPHA, _INDEP_TEST, _COLLIDER_RULE, _CATEGORICAL),
+        params=(_ALPHA, _INDEP_TEST, _COLLIDER_RULE, _CATEGORICAL, _MAX_CATEGORIES),
         references=(
             "Spirtes, Meek & Richardson 1995",
             "Spirtes, Glymour & Scheines 2000",
@@ -142,7 +160,11 @@ _add(
         summary="Score-then-FCI hybrid: a GES-scored skeleton refined by FCI orientation. Latent-"
         "aware like FCI but usually more accurate on the skeleton. Returns a PAG.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(structure_type="graph", graph_kind="pag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="experimental",
@@ -163,6 +185,7 @@ _add(
             _ALPHA,
             _COLLIDER_RULE,
             _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Ogarrio, Spirtes & Ramsey 2016", "Colombo & Maathuis 2014"),
     )
@@ -187,11 +210,15 @@ _add(
             layout=_MATRIX_LAYOUT,
             notes="c_indx becomes a trailing pseudo-node, then projected out of the result.",
         ),
-        output=OutputSpec(structure_type="graph", graph_kind="cpdag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="experimental",
-        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL),
+        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
         references=("Huang et al. 2020",),
     )
 )
@@ -208,7 +235,10 @@ _add(
         "score is in metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="deterministic",
         accel="numba",
@@ -226,6 +256,7 @@ _add(
             ),
             _LAMBDA_VALUE,
             _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Chickering 2002",),
     )
@@ -299,7 +330,10 @@ _add(
         "and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -325,6 +359,7 @@ _add(
                 nullable=True,
             ),
             _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Chickering, Geiger & Heckerman 1995", "Scutari 2010"),
     )
@@ -389,7 +424,11 @@ _add(
         "the best-scoring equivalence class. score_func=local_score_degen_gauss or "
         "local_score_cond_gauss for mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(structure_type="graph", graph_kind="dag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="experimental",
@@ -411,6 +450,7 @@ _add(
                 choices=EXACT_SCORES,
             ),
             _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Yuan & Malone 2013", "Silander & Myllymaki 2006"),
     )
@@ -468,13 +508,16 @@ _add(
         "local_score_cond_gauss for mixed data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="stochastic",
         accel="numpy",
         status="supported",
         seeded=True,
-        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL),
+        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
     )
 )
@@ -488,7 +531,10 @@ _add(
         "CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="stochastic",
         accel="numpy",
@@ -505,6 +551,7 @@ _add(
             ),
             _SEED,
             _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Lam, Andrews & Ramsey 2022",),
     )

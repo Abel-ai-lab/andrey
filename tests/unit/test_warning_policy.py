@@ -67,12 +67,28 @@ def _search_limit(monkeypatch):
     return lambda: hc_module.hc(data, max_iter=1)  # the search itself: no experimental warning
 
 
+def _codes(monkeypatch):
+    return np.random.default_rng(0).integers(0, 3, (200, 3)).astype(float)
+
+
+def _inferred_categories(monkeypatch):
+    data = _codes(monkeypatch)
+    return lambda: andrey.pc(data, indep_test="cond_gauss")
+
+
+def _category_code_hint(monkeypatch):
+    data = _codes(monkeypatch)
+    return lambda: andrey.pc(data)
+
+
 TRIGGERS = {
     "backend fallback": (_backend_fallback, andrey.BackendFallbackWarning),
     "PC expensive pass": (_pc_expensive_pass, andrey.PerformanceWarning),
     "default pool cutoff": (_default_pool_cutoff, andrey.PerformanceWarning),
     "experimental method": (_experimental, andrey.ExperimentalWarning),
     "search limit": (_search_limit, andrey.SearchLimitWarning),
+    "inferred categorical columns": (_inferred_categories, andrey.DataTypeWarning),
+    "category code hint": (_category_code_hint, andrey.DataTypeWarning),
 }
 
 

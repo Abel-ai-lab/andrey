@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.api._adapt import (
+    MAX_CATEGORIES,
+    categorical_metadata,
     check_categories,
     checked_data,
     column_labels,
@@ -36,6 +38,7 @@ def pc(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with the PC algorithm.
 
@@ -58,35 +61,48 @@ def pc(
         Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
         categorical columns, by a likelihood ratio. See Notes.
     categorical : sequence of str or int, optional
-        The categorical columns, for ``"degen_gauss"`` and ``"cond_gauss"``: DataFrame column names
-        or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and
-        ``string`` columns. The other tests take no column types and reject it.
+        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
+        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"PC"``. Directed marks (``->``) are oriented edges, undirected (``--``) the ones the
-        equivalence class leaves open.
+        equivalence class leaves open. Under a mixed-data setting, ``metadata["categorical"]`` lists
+        the categorical columns it read, by name or 0-based position.
 
     Raises
     ------
     NotImplementedError
         If ``indep_test`` names no available test.
     TypeError
-        If ``categorical`` is not a list of column names and positions.
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
-        not in ``(0, 1)``, with ``"chisq"`` or ``"gsq"``, if ``data`` holds a value that is not a
-        whole number, or, with ``"degen_gauss"`` or ``"cond_gauss"``, if no column is categorical,
-        if ``categorical`` names a column ``data`` lacks, or if a categorical column holds a number
-        that is not whole or a missing value. Also if ``categorical`` is given with another test.
+        not in ``(0, 1)``, if ``max_categories`` is less than ``2``, with ``"chisq"`` or ``"gsq"``,
+        if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
+        ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
+        column holds a number that is not whole or a missing value. Also if ``categorical`` is given
+        with another test.
 
     Warns
     -----
     PerformanceWarning
         When a conditioning pass of size two or greater requires at least ten million CI tests;
         each message warns once per process. The warning does not limit the search.
+    DataTypeWarning
+        When a mixed-data test infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
 
     See Also
     --------
@@ -146,7 +162,9 @@ def pc(
     category with few rows takes mostly the covariance of all rows; to tell its own apart, a test
     needs several rows in each joint category of its categorical variables. Each compares the
     likelihoods of the models with and without the dependence, a chi-square statistic on the
-    difference in their numbers of parameters.
+    difference in their numbers of parameters. With no categorical column, both are the
+    likelihood-ratio form of the partial-correlation test, which agrees with ``"fisherz"`` as the
+    rows grow.
 
     References
     ----------
@@ -201,11 +219,15 @@ def pc(
     """
     from andrey.constraint.pc import pc as _pc
 
-    X, mask = checked_data(data, categorical, "indep_test", indep_test)
+    X, mask = checked_data(
+        data, categorical, "indep_test", indep_test, max_categories=max_categories
+    )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     cpdag = _pc(X, alpha=alpha, indep_test=indep_test, categorical=mask)
-    return structure_output(cpdag, labels=labels, metadata={"algorithm": "PC"})
+    return structure_output(
+        cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
+    )
 
 
 def fci(
@@ -215,6 +237,7 @@ def fci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -244,28 +267,43 @@ def fci(
         fewer than half of the separating subsets (``p >= alpha``) contain ``z`` [4]_; at exactly
         half the triple stays unoriented. Majority runs up to ``2**degree`` extra tests per triple.
     categorical : sequence of str or int, optional
-        The categorical columns, for ``"degen_gauss"`` and ``"cond_gauss"``: DataFrame column names
-        or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and
-        ``string`` columns, as for :func:`~andrey.pc`. The other tests take no column types and
-        reject it.
+        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
+        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``pag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"FCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
-        (``<->``) marks a probable latent common cause.
+        (``<->``) marks a probable latent common cause. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     NotImplementedError
         If ``indep_test`` names no available test.
     TypeError
-        If ``categorical`` is not a list of column names and positions.
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
         is not in ``(0, 1)``, if ``collider_rule`` is not a supported choice, or if ``data`` or
         ``categorical`` does not suit the test, as for :func:`~andrey.pc`.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data test infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
 
     See Also
     --------
@@ -336,11 +374,15 @@ def fci(
     """
     from andrey.constraint.fci import fci as _fci
 
-    X, mask = checked_data(data, categorical, "indep_test", indep_test)
+    X, mask = checked_data(
+        data, categorical, "indep_test", indep_test, max_categories=max_categories
+    )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     pag = _fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule, categorical=mask)
-    return structure_output(pag, labels=labels, metadata={"algorithm": "FCI"})
+    return structure_output(
+        pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
+    )
 
 
 def gfci(
@@ -352,6 +394,7 @@ def gfci(
     alpha: float = 0.05,
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -388,23 +431,32 @@ def gfci(
         fewer than half of the separating subsets (``p >= alpha``) contain ``z`` [3]_; at exactly
         half the triple stays unoriented. Majority runs up to ``2**degree`` extra tests per triple.
     categorical : sequence of str or int, optional
-        The categorical columns, for the mixed-data score and test: DataFrame column names or
-        0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and
-        ``string`` columns, as for :func:`~andrey.pc`. The other settings reject it.
+        The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
+        names or 0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and
+        text columns, and every column of at most ``max_categories`` distinct whole numbers, named
+        in a ``DataTypeWarning``. ``[]`` marks none. The other settings reject it. See *Data types*
+        in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``pag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"GFCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``); a bidirected edge
-        (``<->``) marks a probable latent common cause.
+        (``<->``) marks a probable latent common cause. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     NotImplementedError
         If ``score_func`` names no available score, or ``indep_test`` no available test.
     TypeError
-        If ``categorical`` is not a list of column names and positions.
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
         ``collider_rule`` is not a supported choice, if ``score_func`` and ``indep_test`` read
@@ -416,6 +468,10 @@ def gfci(
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+    DataTypeWarning
+        When the mixed-data score and test infers the categorical columns, or finds none and so runs
+        as the linear-Gaussian form, or when a continuous setting meets columns that look like
+        category codes; each message warns once per process.
 
     Notes
     -----
@@ -466,7 +522,9 @@ def gfci(
             "score with 'fisherz'; got "
             f"score_func={score_func!r}, indep_test={indep_test!r}"
         )
-    X, mask = checked_data(data, categorical, "indep_test", indep_test)
+    X, mask = checked_data(
+        data, categorical, "indep_test", indep_test, max_categories=max_categories
+    )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     pag = _gfci(
@@ -478,7 +536,9 @@ def gfci(
         collider_rule=collider_rule,
         categorical=mask,
     )
-    return structure_output(pag, labels=labels, metadata={"algorithm": "GFCI"})
+    return structure_output(
+        pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
+    )
 
 
 def cdnod(
@@ -488,6 +548,7 @@ def cdnod(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn a CPDAG over the data variables from nonstationary / multi-domain data with CDNOD.
 
@@ -515,24 +576,33 @@ def cdnod(
         ratio) test categorical data, coded by whole numbers, and ``"degen_gauss"`` and
         ``"cond_gauss"`` mixed data, as for :func:`~andrey.pc`; see Notes for the index.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for ``"degen_gauss"`` and ``"cond_gauss"``: DataFrame
-        column names or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``,
-        ``object``, and ``string`` columns, as for :func:`~andrey.pc`; none need be categorical,
-        since these tests take the index as categorical. The other tests reject it.
+        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The domain index is categorical too, so ``data`` may
+        have no categorical column. The other tests take no column types and reject it. See *Data
+        types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
         ``metadata["algorithm"]`` is ``"CDNOD"``. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open.
+        undirected (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     NotImplementedError
         If ``indep_test`` names no available test.
     TypeError
-        If ``categorical`` is not a list of column names and positions.
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int.
     ValueError
         If ``c_indx`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
         ``data`` has too few rows for a test, if ``alpha`` is not in ``(0, 1)``, if ``data`` or
@@ -544,6 +614,10 @@ def cdnod(
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+    DataTypeWarning
+        When a mixed-data test infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
 
     Notes
     -----
@@ -586,11 +660,20 @@ def cdnod(
     from andrey.constraint.cdnod import cdnod as _cdnod
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
-    X, mask = checked_data(data, categorical, "indep_test", indep_test, require_categorical=False)
+    X, mask = checked_data(
+        data,
+        categorical,
+        "indep_test",
+        indep_test,
+        max_categories=max_categories,
+        index_categorical=True,
+    )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     c = np.asarray(c_indx, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="c_indx")
     cpdag = _cdnod(X, c, alpha=alpha, indep_test=indep_test, categorical=mask)
-    return structure_output(cpdag, labels=labels, metadata={"algorithm": "CDNOD"})
+    return structure_output(
+        cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}
+    )

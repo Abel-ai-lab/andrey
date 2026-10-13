@@ -717,6 +717,12 @@ def execute_run(
         labels = None
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
+    if labels is not None and any(p.name == "categorical" for p in spec.params):
+        # A method that reads column types names the header's columns in its warnings and in
+        # metadata["categorical"].
+        import pandas as pd
+
+        positional = [pd.DataFrame(positional[0], columns=list(labels)), *positional[1:]]
 
     fn = getattr(andrey, spec.name)
     start = time.perf_counter()

@@ -36,7 +36,7 @@ def sample_mixed(
     n: int,
     seed: int,
     density: float = 2.0,
-    categorical: float = 0.5,
+    categorical_share: float = 0.5,
     categories: tuple[int, int] = (2, 3),
     concentration: float = 1.0,
 ) -> CausalDataset:
@@ -54,9 +54,9 @@ def sample_mixed(
         Root seed.
     density : float, default=2.0
         Mean total degree (``2 * |E| / d``) of the graph.
-    categorical : float, default=0.5
+    categorical_share : float, default=0.5
         The share of the variables that are categorical, from ``0`` to ``1``: the first
-        ``round(categorical * d)`` in causal order.
+        ``round(categorical_share * d)`` in causal order.
     categories : tuple of int, default=(2, 3)
         The least and the most categories a categorical variable has; each one's count is drawn
         uniformly between them, both included. The least is at least 2.
@@ -79,7 +79,7 @@ def sample_mixed(
     Raises
     ------
     ValueError
-        If ``categorical`` is not in ``[0, 1]``, ``categories`` is not a pair with
+        If ``categorical_share`` is not in ``[0, 1]``, ``categories`` is not a pair with
         ``2 <= least <= most``, ``concentration`` is not positive, or ``graph`` names no graph.
 
     Notes
@@ -105,15 +105,15 @@ def sample_mixed(
         raise ValueError(
             f"categories must be (least, most) with 2 <= least <= most, got {categories}"
         )
-    if not 0.0 <= categorical <= 1.0:
-        raise ValueError(f"categorical must be a share from 0 to 1, got {categorical}")
+    if not 0.0 <= categorical_share <= 1.0:
+        raise ValueError(f"categorical_share must be from 0 to 1, got {categorical_share}")
     if not (np.isfinite(concentration) and concentration > 0):
         raise ValueError(f"concentration must be finite and positive, got {concentration}")
     spec = named_graph(graph, d, density)
     root = np.random.SeedSequence(seed)
     truth, draw = spec.materialize(_component_rng(root, _GRAPH))
     is_categorical = np.zeros(draw.d, dtype=bool)
-    is_categorical[draw.topo_order[: round(categorical * draw.d)]] = True
+    is_categorical[draw.topo_order[: round(categorical_share * draw.d)]] = True
 
     rng = _component_rng(root, _WEIGHTS)
     cards = np.where(is_categorical, rng.integers(low, high + 1, size=draw.d), 0)

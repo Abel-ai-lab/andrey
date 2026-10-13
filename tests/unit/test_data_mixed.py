@@ -9,7 +9,7 @@ from andrey.data import sample_mixed
 
 
 def test_categorical_columns_hold_codes_and_have_only_categorical_parents():
-    ds = sample_mixed(d=12, n=500, seed=1, categorical=0.5, categories=(2, 4))
+    ds = sample_mixed(d=12, n=500, seed=1, categorical_share=0.5, categories=(2, 4))
     config = ds.provenance["config"]
     columns, cards = config["categorical"], config["categories"]
     assert len(columns) == 6 and all(2 <= k <= 4 for k in cards)
@@ -30,13 +30,18 @@ def test_the_same_seed_gives_the_same_data():
 
 @pytest.mark.parametrize("share", [0.0, 1.0])
 def test_the_share_of_categorical_columns_runs_from_none_to_all(share):
-    ds = sample_mixed(d=5, n=50, seed=0, categorical=share)
+    ds = sample_mixed(d=5, n=50, seed=0, categorical_share=share)
     assert len(ds.provenance["config"]["categorical"]) == round(5 * share)
 
 
 @pytest.mark.parametrize(
     "settings",
-    [{"categorical": 1.5}, {"categories": (1, 3)}, {"categories": (3, 2)}, {"concentration": 0.0}],
+    [
+        {"categorical_share": 1.5},
+        {"categories": (1, 3)},
+        {"categories": (3, 2)},
+        {"concentration": 0.0},
+    ],
 )
 def test_bad_settings_raise(settings):
     with pytest.raises(ValueError):

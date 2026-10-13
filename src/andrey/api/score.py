@@ -15,6 +15,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from andrey.api._adapt import (
+    MAX_CATEGORIES,
+    categorical_metadata,
     checked_data,
     column_labels,
     data_matrix,
@@ -41,6 +43,7 @@ def ges(
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with greedy equivalence search (GES).
 
@@ -64,32 +67,48 @@ def ges(
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
         be finite and non-negative. BDeu ignores it.
     categorical : sequence of str or int, optional
-        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
-        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
-        columns. The other scores take no column types and reject it.
+        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
+        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it
-        is the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; for BDeu, minus the log of the structure prior times the marginal
-        likelihood; for the mixed-data scores, see Notes. Directed marks (``->``) are oriented
-        edges, undirected (``--``) the ones the equivalence class leaves open.
+        ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it is
+        the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
+        n_parents``; for BDeu, minus the log of the structure prior times the marginal likelihood;
+        for the mixed-data scores, see Notes. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     NotImplementedError
         If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions.
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, with ``"local_score_BDeu"``, if ``data``
-        holds a value that is not a whole number, or, with a mixed-data score, if no column is
-        categorical, if ``categorical`` names a column ``data`` lacks, or if a categorical column
-        holds a number that is not whole or a missing value. Also if ``categorical`` is given with
-        another score.
+        If ``lambda_value`` is negative or non-finite, if ``max_categories`` is less than ``2``,
+        with ``"local_score_BDeu"``, if ``data`` holds a value that is not a whole number, or, with
+        a mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
+        column holds a number that is not whole or a missing value. Also if ``categorical`` is given
+        with another score.
+
+    Warns
+    -----
+    DataTypeWarning
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
 
     See Also
     --------
@@ -137,7 +156,8 @@ def ges(
     that category's own mean and a covariance shrunk toward that of all rows by one pseudo-row [6]_,
     and divides by the same fit of the parents alone, so a categorical variable can have continuous
     parents. It counts parameters for every joint category, so a parent with many categories costs
-    many parameters. Moves are scored in this process.
+    many parameters; on continuous columns only, it differs from ``"local_score_BIC"`` by a
+    constant per variable, so it finds the same graph. Moves are scored in this process.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 200 variables with ten rows per variable and parents capped at 4 per
@@ -199,13 +219,19 @@ def ges(
     """
     from andrey.search.ges import ges as _ges
 
-    X, mask = checked_data(data, categorical, "score_func", score_func)
+    X, mask = checked_data(
+        data, categorical, "score_func", score_func, max_categories=max_categories
+    )
     labels = column_labels(data)
     cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value, categorical=mask)
     return structure_output(
         cpdag,
         labels=labels,
-        metadata={"algorithm": "GES", "score": json_safe(score)},
+        metadata={
+            "algorithm": "GES",
+            "score": json_safe(score),
+            **categorical_metadata(mask, data),
+        },
     )
 
 
@@ -389,6 +415,7 @@ def hc(
     lambda_value: float = 1.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with hill-climbing search.
 
@@ -415,25 +442,33 @@ def hc(
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
         adds at most one edge.
     categorical : sequence of str or int, optional
-        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
-        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
-        columns, as for :func:`~andrey.ges`. The other scores reject it.
+        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
+        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"HC"`` and ``metadata["score"]`` the score of the DAG found, computed as for
-        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open.
+        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
+        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
+        position.
 
     Raises
     ------
     NotImplementedError
         If ``score_func`` names no available score.
     TypeError
-        If a given ``max_iter`` is not an int, or ``categorical`` is not a list of column names and
-        positions.
+        If a given ``max_iter`` is not an int, ``categorical`` is not a list of column names and
+        positions, or ``max_categories`` is not an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
         or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`.
@@ -446,6 +481,10 @@ def hc(
     SearchLimitWarning
         When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
         graph.
+    DataTypeWarning
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
 
     Notes
     -----
@@ -478,13 +517,15 @@ def hc(
     warn_experimental("hc")
     from andrey.search.hc import hc as _hc
 
-    X, mask = checked_data(data, categorical, "score_func", score_func)
+    X, mask = checked_data(
+        data, categorical, "score_func", score_func, max_categories=max_categories
+    )
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     cpdag, score = _hc(
         X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter, categorical=mask
     )
-    metadata = {"algorithm": "HC", "score": json_safe(score)}
+    metadata = {"algorithm": "HC", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
@@ -617,6 +658,7 @@ def exact_search(
     search_method: str = "astar",
     score_func: str = "local_score_BIC",
     categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
     """Learn the globally optimal DAG for the BIC score by exact search.
 
@@ -637,22 +679,31 @@ def exact_search(
         Gaussian BIC for mixed data, as for :func:`~andrey.ges`. Each uses the standard penalty,
         ``lambda_value=1``.
     categorical : sequence of str or int, optional
-        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
-        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
-        columns, as for :func:`~andrey.ges`. The BIC rejects it.
+        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
+        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
 
     Returns
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure` (one representative of the optimal
-        equivalence class); ``metadata["algorithm"]`` is ``"ExactSearch"``.
+        equivalence class); ``metadata["algorithm"]`` is ``"ExactSearch"``. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read, by name or
+        0-based position.
 
     Raises
     ------
     NotImplementedError
         If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions.
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int.
     ValueError
         If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical``
         does not suit the score, as for :func:`~andrey.ges`.
@@ -662,6 +713,10 @@ def exact_search(
     ExperimentalWarning
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
+    DataTypeWarning
+        When a mixed-data score infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
 
     Notes
     -----
@@ -704,10 +759,16 @@ def exact_search(
 
     if score_func not in EXACT_SCORES:
         raise NotImplementedError(f"exact_search supports {EXACT_SCORES}, not {score_func!r}")
-    X, mask = checked_data(data, categorical, "score_func", score_func)
+    X, mask = checked_data(
+        data, categorical, "score_func", score_func, max_categories=max_categories
+    )
     labels = column_labels(data)
     dag = _exact(X, search_method=search_method, score_func=score_func, categorical=mask)
-    return structure_output(dag, labels=labels, metadata={"algorithm": "ExactSearch"})
+    return structure_output(
+        dag,
+        labels=labels,
+        metadata={"algorithm": "ExactSearch", **categorical_metadata(mask, data)},
+    )
 
 
 def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> StructureOutput:

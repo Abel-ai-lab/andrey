@@ -397,10 +397,79 @@ def _mixed_data(n=200):
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
-def test_a_mixed_setting_needs_a_categorical_column(setting):
-    with pytest.raises(ValueError, match="no column of data is categorical"):
-        MIXED[setting](_mixed_data())
-    assert MIXED[setting](_mixed_data(), categorical=[0, 2]).structure.n_nodes == 3
+def test_a_mixed_setting_infers_whole_number_columns_and_says_so(setting):
+    """Columns 0 and 2 hold three and two whole numbers; column 1 is continuous."""
+    with pytest.warns(andrey.DataTypeWarning, match=r"columns 0 \(3 values\), 2 \(2 values\)"):
+        out = MIXED[setting](_mixed_data())
+    assert out.metadata["categorical"] == [0, 2]
+    named = MIXED[setting](_mixed_data(), categorical=[0, 2])
+    assert np.array_equal(named.structure.to_numpy(), out.structure.to_numpy())
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_without_categorical_columns_warns_and_runs(setting):
+    with pytest.warns(andrey.DataTypeWarning, match="with categorical=\\[\\], so it runs as the"):
+        out = MIXED[setting](_mixed_data(), categorical=[])
+    assert out.metadata["categorical"] == []
+    continuous = np.random.default_rng(1).standard_normal((200, 3))
+    with pytest.warns(andrey.DataTypeWarning, match="found no categorical column"):
+        MIXED[setting](continuous)
+
+
+@pytest.mark.parametrize(
+    ("max_categories", "inferred"), [(2, [2]), (3, [0, 2]), (10, [0, 2])], ids=str
+)
+def test_max_categories_bounds_the_inferred_columns(max_categories, inferred):
+    with pytest.warns(andrey.DataTypeWarning):
+        out = andrey.pc(_mixed_data(), indep_test="cond_gauss", max_categories=max_categories)
+    assert out.metadata["categorical"] == inferred
+
+
+@pytest.mark.parametrize(("value", "error"), [(1, ValueError), (2.5, TypeError), (True, TypeError)])
+def test_max_categories_is_an_int_of_at_least_two(value, error):
+    with pytest.raises(error, match="max_categories"):
+        andrey.pc(_mixed_data(), max_categories=value)
+
+
+def test_inference_reads_every_row():
+    """A column that is a code over the first rows and continuous after them is not categorical."""
+    x = _mixed_data()
+    x[150:, 0] += 0.5
+    with pytest.warns(andrey.DataTypeWarning) as caught:
+        out = andrey.pc(x, indep_test="degen_gauss")
+    assert out.metadata["categorical"] == [2]
+    assert "column 0" not in str(caught[0].message) and "0 (" not in str(caught[0].message)
+
+
+def test_a_dataframe_types_mark_columns_and_the_warning_names_why():
+    pd = pytest.importorskip("pandas")
+    x = _mixed_data()
+    frame = pd.DataFrame(
+        {
+            "group": pd.Categorical(x[:, 0].astype(int)),
+            "u": x[:, 1],
+            "flag": x[:, 2].astype(bool),
+            "label": np.array(["p", "q"])[x[:, 2].astype(int)],
+        }
+    )
+    with pytest.warns(andrey.DataTypeWarning) as caught:
+        out = andrey.ges(frame, score_func="local_score_cond_gauss")
+    message = str(caught[0].message)
+    assert "'group' (category)" in message and "'flag' (bool)" in message
+    assert "'label' (text)" in message
+    assert out.metadata["categorical"] == ["group", "flag", "label"]
+
+
+@pytest.mark.parametrize(
+    "fit",
+    [lambda x: andrey.pc(x), lambda x: andrey.ges(x), lambda x: andrey.boss(x)],
+    ids=["pc", "ges", "boss"],
+)
+def test_a_continuous_setting_hints_at_columns_that_look_like_codes(fit):
+    with pytest.warns(andrey.DataTypeWarning, match="columns 0, 2 hold at most 10 distinct whole"):
+        out = fit(_mixed_data())
+    assert "categorical" not in out.metadata
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

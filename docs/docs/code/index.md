@@ -22,11 +22,12 @@ Every method checks its data before the fit: a numeric `(n_samples, n_variables)
 least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column
 names. The categorical settings, `indep_test="chisq"` or `"gsq"` and
 `score_func="local_score_BDeu"`, also need whole numbers, each distinct value of a column one
-category. The mixed-data settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
-`"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or a DataFrame's
-`category`, `bool`, `object`, and `string` columns; a categorical column of numbers needs whole
-numbers. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
-column. A single column gives a one-node graph.
+category. The mixed-data settings, `indep_test="degen_gauss"` or `"cond_gauss"` and
+`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`, read the categorical columns
+that `categorical` lists, or infer them, as
+[Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
+needs whole numbers. Other data raises a `ValueError` that names the argument and, for a bad cell,
+its row and column. A single column gives a one-node graph.
 
 ### Supported methods
 
@@ -139,6 +140,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
+| {py:class}`~andrey.DataTypeWarning` | A mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -173,6 +175,7 @@ name.
    PerformanceWarning
    BackendFallbackWarning
    SearchLimitWarning
+   DataTypeWarning
 ```
 
 ## Datasets

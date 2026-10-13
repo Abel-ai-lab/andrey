@@ -12,6 +12,7 @@ from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES
 from andrey.core.structure import relabel
+from andrey.core.warning_policy import DataTypeWarning, warn_once
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -94,27 +95,43 @@ def data_kind(name: str) -> str:
     return "continuous"
 
 
+#: The default ``max_categories``: the most distinct whole numbers a column may hold to be inferred
+#: as categorical.
+MAX_CATEGORIES = 10
+
+
 def checked_data(
     data: npt.ArrayLike,
     categorical: object,
     option: str,
     value: str,
     *,
-    require_categorical: bool = True,
+    max_categories: int = MAX_CATEGORIES,
+    index_categorical: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Return ``data`` checked for the setting ``option=value``, and its categorical-column mask.
 
     The test or score ``value`` names decides what is checked (:func:`data_kind`): a mixed-data one
     reads ``categorical`` through :func:`mixed_matrix` and returns its mask; a categorical one
-    checks every value is a whole number; a continuous one, only :func:`data_matrix`'s checks. The
-    mask is ``None`` unless the data are mixed. Raises ``ValueError`` when ``categorical`` is given
-    for a setting that reads no column types; ``require_categorical`` passes to
-    :func:`mixed_matrix`.
+    checks every value is a whole number; a continuous one gets :func:`data_matrix`'s checks and a
+    one-time :class:`~andrey.DataTypeWarning` naming the columns that look like category codes:
+    at most ``max_categories`` distinct whole numbers. The mask is ``None`` unless the data are
+    mixed. ``index_categorical`` passes to :func:`mixed_matrix`.
+
+    Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
+    ``ValueError`` when ``categorical`` is given for a setting that reads no column types.
     """
     setting = f"{option}={value!r}"
     kind = data_kind(value)
+    max_categories = int_in_range(max_categories, "max_categories", 2)
     if kind == "mixed":
-        return mixed_matrix(data, categorical, setting, require_categorical=require_categorical)
+        return mixed_matrix(
+            data,
+            categorical,
+            setting,
+            max_categories=max_categories,
+            index_categorical=index_categorical,
+        )
     if categorical is not None:
         reads = "every column as categorical" if kind == "categorical" else "continuous data"
         raise ValueError(
@@ -124,6 +141,21 @@ def checked_data(
     X = data_matrix(data)
     if kind == "categorical":
         check_categories(X, data, setting)
+        return X, None
+    codes = np.flatnonzero(_category_counts(X, max_categories))
+    if codes.size:
+        mixed = (
+            "indep_test='cond_gauss' or 'degen_gauss'"
+            if option == "indep_test"
+            else "score_func='local_score_cond_gauss' or 'local_score_degen_gauss'"
+        )
+        warn_once(
+            f"data columns {', '.join(_column_name(data, int(j)) for j in codes)} hold at most "
+            f"{max_categories} distinct whole numbers each, so they may be category codes, which "
+            f"{setting} reads as numbers; if they are categories, choose {mixed} (see Data types "
+            "in the getting-started guide)",
+            DataTypeWarning,
+        )
     return X, None
 
 
@@ -133,42 +165,106 @@ def mixed_matrix(
     setting: str,
     *,
     name: str = "data",
-    require_categorical: bool = True,
+    max_categories: int = MAX_CATEGORIES,
+    index_categorical: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return mixed data as a float64 matrix and a boolean mask of its categorical columns.
 
-    ``categorical`` lists the categorical columns by DataFrame column name or 0-based position.
-    ``None`` takes a pandas DataFrame's ``category``, ``bool``, ``object``, and ``string`` columns,
-    and an array's none. A categorical column that does not hold numbers has its values numbered,
-    each distinct value one category; a numeric one must hold whole numbers, as
+    ``categorical`` lists the categorical columns by DataFrame column name or 0-based position;
+    ``[]`` lists none. ``None`` infers them: a pandas DataFrame's ``category``, ``bool``,
+    ``object``, and ``string`` columns, and every column whose values, over all its rows, are at
+    most ``max_categories`` distinct whole numbers. A :class:`~andrey.DataTypeWarning` names the
+    inferred columns and why. A categorical column that does not hold numbers has its values
+    numbered, each distinct value one category; a numeric one must hold whole numbers, as
     :func:`check_categories` checks. Then :func:`data_matrix` checks the whole matrix.
+
+    With no categorical column, the setting runs as its linear-Gaussian form, and a
+    :class:`~andrey.DataTypeWarning` says so, unless ``index_categorical``: a setting that adds a
+    categorical column of its own, such as CD-NOD's domain index.
 
     Raises ``TypeError`` when ``categorical`` is not a list of names and positions, and
     ``ValueError``, naming ``setting``, when it names a column the data lack, when a categorical
-    column has a missing value, when a column that is not categorical does not hold numbers, or,
-    with ``require_categorical``, when no column is categorical.
+    column has a missing value, or when a column that is not categorical does not hold numbers.
     """
     columns = getattr(data, "columns", None)
-    if columns is None:
+    names = None if columns is None else list(columns)
+    if categorical is None:
+        typed = np.zeros(0, dtype=bool) if names is None else _categorical_dtypes(data)
+        table = data if names is None else _encode_categories(data, typed, setting, name)
+        X = data_matrix(table, name=name)
+        counts = _category_counts(X, max_categories)
+        mask = (counts > 0) | (typed if typed.size else False)
+        if mask.any():
+            listed = ", ".join(
+                f"{_column_name(data, j)} ("
+                + (_dtype_word(data, j) if typed.size and typed[j] else f"{counts[j]} values")
+                + ")"
+                for j in np.flatnonzero(mask).tolist()
+            )
+            warn_once(
+                f"{setting} reads {name} columns {listed} as categorical, inferred from a "
+                "category, bool, or text type or from at most "
+                f"max_categories={max_categories} distinct whole numbers; name the categorical "
+                "columns with categorical=[...], or pass categorical=[] for none",
+                DataTypeWarning,
+            )
+    elif names is None:
         X = data_matrix(data, name=name)
-        mask = np.zeros(X.shape[1], dtype=bool)
-        if categorical is not None:
-            mask = _column_mask(categorical, None, X.shape[1])
+        mask = _column_mask(categorical, None, X.shape[1])
     else:
-        names = list(columns)
-        if categorical is None:
-            mask = _categorical_dtypes(data)
-        else:
-            mask = _column_mask(categorical, names, len(names))
+        mask = _column_mask(categorical, names, len(names))
         X = data_matrix(_encode_categories(data, mask, setting, name), name=name)
     check_categories(np.where(mask, X, 0.0), data, setting, name=name)
-    if require_categorical and not mask.any():
-        raise ValueError(
-            f"{setting} reads mixed data, but no column of {name} is categorical; list them with "
-            "categorical=[...] or pass a DataFrame with category columns. For continuous data "
-            "only, choose a continuous test or score"
+    if not mask.any() and not index_categorical:
+        what = "test" if setting.startswith("indep_test") else "score"
+        if categorical is None:
+            reason = (
+                f"found no categorical column in {name}: none has a category, bool, or text type "
+                f"or at most max_categories={max_categories} distinct whole numbers"
+            )
+        else:
+            reason = f"reads every column of {name} as continuous, with categorical=[]"
+        warn_once(
+            f"{setting} {reason}, so it runs as the linear-Gaussian {what}; name categorical "
+            "columns with categorical=[...] (see Data types in the getting-started guide)",
+            DataTypeWarning,
         )
     return X, mask
+
+
+def categorical_metadata(mask: np.ndarray | None, data: object) -> dict[str, list]:
+    """Return ``{"categorical": [...]}`` naming the columns ``mask`` marks; ``{}`` for no mask.
+
+    A DataFrame's columns are named, an array's numbered from 0.
+    """
+    if mask is None:
+        return {}
+    labels = column_labels(data)
+    marked = np.flatnonzero(mask).tolist()
+    return {"categorical": [labels[j] for j in marked] if labels is not None else marked}
+
+
+def _category_counts(X: np.ndarray, max_categories: int) -> np.ndarray:
+    """Count each column's values when they are at most ``max_categories`` whole numbers.
+
+    The count reads all the rows; any other column counts ``0``.
+    """
+    counts = np.zeros(X.shape[1], dtype=np.int64)
+    for j in np.flatnonzero(np.all(X == np.round(X), axis=0)).tolist():
+        k = np.unique(X[:, j]).size
+        if k <= max_categories:
+            counts[j] = k
+    return counts
+
+
+def _dtype_word(data: object, j: int) -> str:
+    """Name a DataFrame column's categorical type: ``category``, ``bool``, or ``text``."""
+    import pandas as pd
+
+    dtype = pd.DataFrame(data).dtypes.iloc[j]
+    if isinstance(dtype, pd.CategoricalDtype):
+        return "category"
+    return "bool" if pd.api.types.is_bool_dtype(dtype) else "text"
 
 
 def _categorical_dtypes(data: object) -> np.ndarray:
