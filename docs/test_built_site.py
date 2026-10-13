@@ -193,12 +193,49 @@ def test_every_page_has_a_built_favicon_and_link_preview_card(html):
     assert not problems, "\n".join(problems)
 
 
-def test_the_blog_lists_every_post_under_its_cover_and_byline(html):
+def _front_matter(path: pathlib.Path) -> dict[str, str]:
+    """A page's top-level front matter keys and their values, as written."""
+    head = path.read_text(encoding="utf-8").split("---\n", 2)[1]
+    return dict(re.findall(r"^(\w+): (.*)$", head, re.MULTILINE))
+
+
+def test_the_blog_features_the_newest_post_then_lists_the_others(html):
+    # The newest dated post, by date and then version, leads with its cover and its description;
+    # every other dated post follows once, in a row with its cover, newest first.
+    posts = {}
+    for path in (DOCS / "blog").glob("*.md"):
+        meta = _front_matter(path)
+        if meta.get("blogpost") == "true" and meta.get("date"):
+            version = tuple(int(part) for part in meta.get("version", "").split(".") if part)
+            posts[path.stem] = (meta["date"], version, meta["description"].strip('"'))
+    index = html / "blog" / "index.html"
+    parts = re.split(r'<div class="(release-latest|release-row)\b', index.read_text("utf-8"))[1:]
+    # Each block runs to the next one or to the end of its section.
+    blocks = [re.split(r"</?section\b", body, maxsplit=1)[0] for body in parts[1::2]]
+    kinds = parts[::2]
+    assert kinds == ["release-latest"] + ["release-row"] * (len(posts) - 1), kinds
+    shown = []
+    for kind, block in zip(kinds, blocks, strict=True):
+        linked = set(re.findall(r'href="([^"/#]+)\.html"', block))
+        assert len(linked) == 1 and linked <= posts.keys(), f"a {kind} block links {linked}"
+        shown.append(linked.pop())
+        cover = re.search(r'<img [^>]*src="([^"]+)"', block)
+        assert cover and _resolve(html, index, cover[1]).is_file(), f"{shown[-1]} has no cover"
+        assert posts[shown[-1]][2] in unescape(block), f"{shown[-1]} lacks its description"
+    assert sorted(shown) == sorted(posts)
+    assert shown[0] == max(posts, key=lambda post: posts[post][:2])
+    dates = [posts[post][:2] for post in shown[1:]]
+    assert dates == sorted(dates, reverse=True)
+    # The newest post's cover is the one under its title.
+    post = html / "blog" / f"{shown[0]}.html"
+    own = re.search(r'<figure class="post-cover"><img [^>]*src="([^"]+)"', post.read_text("utf-8"))
+    cover = re.search(r'<img [^>]*src="([^"]+)"', blocks[0])
+    assert _resolve(html, index, cover[1]).read_bytes() == _resolve(html, post, own[1]).read_bytes()
+
+
+def test_every_post_shows_its_cover_and_byline_under_its_title(html):
     problems = []
-    listing = (html / "blog" / "index.html").read_text(encoding="utf-8")
     for post in (p.stem for p in (DOCS / "blog").glob("*.md") if "blogpost: true" in p.read_text()):
-        if f'href="{post}.html"' not in listing:
-            problems.append(f"blog/index.html does not list blog/{post}.html")
         built = html / "blog" / f"{post}.html"
         text = built.read_text(encoding="utf-8")
         cover = re.search(r'</h1>\s*<figure class="post-cover">(<img [^>]*>)', text)

@@ -97,7 +97,7 @@ speed support.
 
 It batches independent tests and scores into array operations, reuses work across steps, skips
 work that cannot change the result, and uses compiled or GPU code where that helps.
-[Why Andrey is fast](../blog/why-andrey-is-fast.md) explains the four ideas.
+[Why Andrey is fast](../blog/20261008-why-andrey-is-fast.md) explains the four ideas.
 
 ### Do I need a GPU?
 

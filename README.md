@@ -59,7 +59,7 @@ uv add andrey-core
 <!-- Generated from site/why_fast.py by apps/build_launch.py; do not edit. -->
 
 Four ideas make it fast; each is animated in
-[a blog post](https://andrey.abel.ai/blog/why-andrey-is-fast.html):
+[a blog post](https://andrey.abel.ai/blog/20261008-why-andrey-is-fast.html):
 
 - **Do many things at once**: thousands of independence tests run as one array operation, with the
   same results.
@@ -148,7 +148,7 @@ andrey --skill                       # a guide an agent loads as a skill
 - [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
   browser.
 - [Benchmarks](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
-- [Launch post](https://andrey.abel.ai/blog/introducing-andrey.html),
+- [Launch post](https://andrey.abel.ai/blog/20261008-introducing-andrey.html),
   [FAQ](https://andrey.abel.ai/docs/faq.html), and
   [changelog](https://andrey.abel.ai/docs/changelog.html).
 - [Roadmap](https://andrey.abel.ai/docs/roadmap.html): the planned work, in order.

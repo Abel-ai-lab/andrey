@@ -89,7 +89,7 @@ def test_the_readme_gives_each_idea_in_one_line():
 def test_the_scenes_load_only_where_they_appear():
     conf = (ROOT / "docs" / "conf.py").read_text()
     pages = re.search(r"WHY_FAST_PAGES = \{(.*?)\}", conf).group(1)
-    assert set(re.findall(r'"([^"]+)"', pages)) == {"index", "blog/why-andrey-is-fast"}
+    assert set(re.findall(r'"([^"]+)"', pages)) == {"index", "blog/20261008-why-andrey-is-fast"}
     # Motion loads before the script that uses it.
     assert '"motion.js", "why-fast.js"' in conf
 

@@ -518,7 +518,8 @@ def speedup_panel(summaries: list[dict]) -> str:
 
 
 def speedup_css(summaries: list[dict]) -> str:
-    """Show only the checked method's panel and size.
+    """Show only the checked method's panel and size. A hidden panel takes no space, so the panel
+    is as tall as the shown method's bars.
 
     Without ``:has()`` every panel shows, one under another, each captioned with its method and
     size, and the header drops the size.
@@ -528,9 +529,8 @@ def speedup_css(summaries: list[dict]) -> str:
         f".race:has(#race-m-{n}:checked) :is(#race-panel-{n}, #race-size-{n})" for n in names
     )
     return (
-        "@supports selector(:has(a)) { .race-panels { display: grid; } "
-        ".race-panel { grid-area: 1 / 1; visibility: hidden; } .race-size { display: none; } "
-        f"{shown} {{ visibility: visible; display: revert; }} }} "
+        "@supports selector(:has(a)) { .race-panel, .race-size { display: none; } "
+        f"{shown} {{ display: revert; }} }} "
         "@supports not selector(:has(a)) { .race--speedup .race-sizes-now { display: none; } "
         ".race--speedup .race-panel::before { content: attr(aria-label); display: block; "
         "margin-top: 1rem; font-size: 0.85rem; font-weight: 600; } }"

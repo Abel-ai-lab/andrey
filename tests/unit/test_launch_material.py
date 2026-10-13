@@ -131,11 +131,11 @@ def test_the_readme_chart_refuses_a_seventh_card(monkeypatch):
 def test_the_launch_post_is_a_published_page():
     # Search indexing is the server's call (X-Robots-Tag on every host but production), so the
     # post itself carries no noindex, no preview banner, and no internal release checklist.
-    post = (POSTS / "introducing-andrey.md").read_text()
+    post = (POSTS / "20261008-introducing-andrey.md").read_text()
     assert "noindex" not in post and "placeholder-banner" not in post
     assert "preview" not in post.lower() and "tentative" not in post.lower()
-    # The blog's front page lists the posts, newest first, from ABlog.
-    assert "{postlist}" in (POSTS / "index.md").read_text()
+    # The blog's front page lists the posts, newest first, from their front matter.
+    assert "{blog-index}" in (POSTS / "index.md").read_text()
 
 
 def test_every_post_is_dated_once_and_names_its_version():
