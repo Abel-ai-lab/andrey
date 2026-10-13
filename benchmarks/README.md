@@ -435,8 +435,9 @@ The driver refuses a series shorter than the shortest Andrey's method accepts:
 vector-autoregressive series with known lagged edges, drawn by `andrey.data`: two lags, Gaussian
 noise, and no effects within a time step, so the true lagged edges are the nonzero entries of the
 lag matrices. Every variable keeps its own past, and each other variable enters a lag with
-probability `2 / (d - 1)`; the lag matrices are scaled so the series is stationary. Both packages
-fit with the same `maxlag` and `cv`. The data do not fit the dataset store, which holds one graph
+probability `2 / (d - 1)`; the lag matrices are scaled so the series is stationary. Each variable
+is z-scored before the fits, so both packages get the same standardized series, and both fit with
+the same `maxlag` and `cv`. The data do not fit the dataset store, which holds one graph
 per dataset, so the driver draws each series itself and calls the runner directly, as
 `public_datasets.py` does.
 
@@ -464,8 +465,9 @@ $ANDREY_BENCH_PYTHON benchmarks/granger_var.py --out outputs/granger-var --resco
 
 Both packages fit the same cross-validated lasso per variable. Andrey standardizes each variable
 first and returns the coefficients in the data's units, so its edges do not depend on the units;
-causal-learn fits the series as given. The generated variables differ in variance, so the two can
-keep different small coefficients: read `agree` beside the scores.
+causal-learn fits the series as given, so on raw series with unequal variances the two keep
+different small coefficients. The driver gives both the z-scored series, so `agree` compares the
+same fit.
 
 ### Where the clock starts
 

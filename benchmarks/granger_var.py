@@ -6,8 +6,8 @@ Runs Andrey's ``granger``, serially and on worker threads, and causal-learn's
 time series with known lagged edges: ``x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + e_t`` with Gaussian
 noise and no instantaneous effects, drawn by ``andrey.data`` (:func:`sample`). Every variable keeps
 its own lags, and each other variable enters a lag with probability ``LAG_DEGREE / (d - 1)``. The
-lag matrices are scaled so the process is stationary. Both packages fit with the same ``maxlag``
-and ``cv``.
+lag matrices are scaled so the process is stationary. Each variable is z-scored before the fits,
+so both packages fit the same standardized series, and both fit with the same ``maxlag`` and ``cv``.
 
 Each fit runs isolated, with the variables' count ``d`` as the ladder, under a per-fit wall cap; a
 fit past the cap is recorded as ``timeout`` and has no scores. A fit's lagged edges, the nonzero
@@ -47,6 +47,9 @@ LAGS = 2
 #: Expected number of other variables entering each lag of a variable.
 LAG_DEGREE = 2.0
 
+#: What both packages are given: each variable z-scored.
+INPUT = "standardized"
+
 #: Smallest run that touches every solution: one small series.
 SMOKE = {"ladder": [5], "seeds": 1, "n": 300, "cap_wall_s": 300.0}
 
@@ -56,7 +59,9 @@ RECORDS = "records.jsonl"
 def sample(d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
     """Return ``(data, truth)`` for one series: ``n`` time steps of ``d`` variables.
 
-    ``truth[k - 1, i, j]`` is true when ``x_i(t - k) -> x_j(t)``, for ``k`` from 1 to :data:`LAGS`.
+    ``data`` is z-scored per variable: causal-learn fits the series as given and Andrey
+    standardizes it first, so both get the same standardized input. ``truth[k - 1, i, j]`` is true
+    when ``x_i(t - k) -> x_j(t)``, for ``k`` from 1 to :data:`LAGS`; scaling a variable keeps it.
     """
     scm = SCM(
         graph=erdos_renyi(d, avg_degree=0.0),  # no instantaneous effects: lagged edges only
@@ -67,7 +72,8 @@ def sample(d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
     weights = np.asarray(ds.graph.lag_weights)  # (1 + LAGS, d, d), [cause, effect], lag 0 first
     if weights[0].any():
         raise AssertionError("the process has instantaneous effects")
-    return np.asarray(ds.data, dtype=np.float64), weights[1:] != 0
+    data = np.asarray(ds.data, dtype=np.float64)
+    return (data - data.mean(axis=0)) / data.std(axis=0), weights[1:] != 0
 
 
 def lag_support(coeff: np.ndarray) -> np.ndarray:
@@ -132,10 +138,11 @@ def _read(out: Path) -> list[dict]:
 def rescore(out: Path) -> list[dict]:
     """Recompute every record's scores from its stored coefficients and rewrite the records."""
     meta = json.loads((out / "run_meta.json").read_text())
-    if (meta["driver"], meta["lags"], meta["lag_degree"]) != (
+    if (meta["driver"], meta["lags"], meta["lag_degree"], meta.get("input")) != (
         Path(__file__).name,
         LAGS,
         LAG_DEGREE,
+        INPUT,
     ):
         raise SystemExit(
             f"--rescore: {out} was drawn with other process settings than this script's"
@@ -219,6 +226,7 @@ def main(argv: list[str] | None = None) -> int:
         "solution list": [a.name for a in LANE],
         "lags": LAGS,
         "lag_degree": LAG_DEGREE,
+        "input": INPUT,
         "ladder": args.ladder,
         "seeds": args.seeds,
         "n": args.n,
