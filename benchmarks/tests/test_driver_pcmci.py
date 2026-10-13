@@ -45,7 +45,7 @@ def test_the_rungs_are_every_size_at_every_length_on_the_lagged_regime() -> None
     assert [(k.d, k.n, k.seed) for k in keys] == [
         (d, n, s) for d in (5, 10) for n in (200, 500) for s in (0, 1)
     ]
-    assert {(k.functional, k.density, k.standardize) for k in keys} == {("var", 0.0, "raw")}
+    assert {(k.functional, k.density, k.standardize) for k in keys} == {("pcmci2019", 1.0, "raw")}
     assert driver.SLICE["functional"] == datasets.REGIMES[driver.REGIME][1]
 
 
@@ -106,12 +106,15 @@ def test_each_method_runs_its_own_field_on_its_own_regime() -> None:
         "tigramite.lpcmci.parcorr.tau1",
         "baseline.empty.window.tau1",
     ]
-    assert driver.METHODS["pcmci"].regime == "var_lagged"
-    for method in ("pcmciplus", "lpcmci"):
-        assert driver.METHODS[method].regime == "var_same_step"
-        assert driver.METHODS[method].tau_max == 1
-    keys = driver.ladder_keys([5], [200], seeds=1, regime="var_same_step")
-    assert [k.density for k in keys] == [datasets.TEMPORAL_REGIMES["var_same_step"]]
+    # Each method runs on its paper's simulation, with a window that covers its largest true lag.
+    regimes = {m: (driver.METHODS[m].regime, driver.METHODS[m].tau_max) for m in driver.METHODS}
+    assert regimes == {
+        "pcmci": ("pcmci_paper", 2),
+        "pcmciplus": ("pcmciplus_paper", 5),
+        "lpcmci": ("lpcmci_paper", 3),
+    }
+    keys = driver.ladder_keys([10], [200], seeds=1, regime="lpcmci_paper")
+    assert [(k.density, k.latents) for k in keys] == [(1.0, 3)]
 
 
 @pytest.mark.parametrize("method", ["pcmci", "pcmciplus", "lpcmci"])
@@ -128,16 +131,18 @@ def test_each_method_refuses_only_the_series_andrey_refuses(method: str) -> None
 @pytest.mark.parametrize("method", ["pcmciplus", "lpcmci"])
 def test_a_same_step_smoke_run_writes_a_window_scored_table(tmp_path: Path, method: str) -> None:
     out = tmp_path / "run"
-    ours, floor = f"andrey.{method}.student_t.tau1", "baseline.empty.window.tau1"
+    tau_max = driver.METHODS[method].tau_max
+    ours, floor = f"andrey.{method}.student_t.tau{tau_max}", f"baseline.empty.window.tau{tau_max}"
     code = driver.main(
         ["--out", str(out), "--method", method, "--smoke", "--solutions", ours, floor]
     )
     assert code == 0
 
     rows = pd.read_parquet(out / "runs.parquet").set_index("name")
-    assert set(rows["status"]) == {"ok"} and set(rows["tau_max"]) == {1}
+    assert set(rows["status"]) == {"ok"} and set(rows["tau_max"]) == {tau_max}
     assert set(rows["family"]) == {"temporal_window"}
-    assert rows.loc[ours, "endpoint_shd"] < rows.loc[floor, "endpoint_shd"]
-    assert rows.loc[floor, "endpoint_shd"] == 2 * rows.loc[floor, "n_true_links"]
+    if method == "pcmciplus":  # LPCMCI's series has unobserved variables and is not scored
+        assert rows.loc[ours, "endpoint_shd"] < rows.loc[floor, "endpoint_shd"]
+        assert rows.loc[floor, "endpoint_shd"] == 2 * rows.loc[floor, "n_true_links"]
     meta = json.loads((out / "run_meta.json").read_text())
-    assert (meta["method"], meta["regime"], meta["tau_max"]) == (method, "var_same_step", 1)
+    assert (meta["method"], meta["regime"]) == (method, f"{method}_paper")

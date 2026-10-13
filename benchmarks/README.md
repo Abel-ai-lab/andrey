@@ -328,14 +328,24 @@ removals, then reversals; Andrey ranks all moves by score change, then by the ed
 
 ### PCMCI on lagged series
 
-`pcmci_cpu.py` compares Andrey's PCMCI with tigramite's on the `var_lagged` regime, with the empty
-lag stack as the floor. A rung is one variable count `d` and one series length `T`; the driver runs
-every `d` in its ladder at every `T` in its lengths, and a dataset is one series of `T` time steps,
-stored with `n = T`. The series comes from `andrey.data`'s VAR(1) at density 0, so the
-instantaneous graph is empty and every true link has lag 1: each variable keeps its own past, and
-each other variable is a lag-1 parent with probability 0.3. The process is scaled to stay
-stationary, so coefficients shrink as `d` grows. The truth is stored as the marks of lags `1..L`; a
-temporal key whose instantaneous graph has an edge fails to generate rather than lose that edge.
+`pcmci_cpu.py` compares Andrey's PCMCI with tigramite's, with the empty lag stack as the floor. A
+rung is one variable count `d` and one series length `T`; the driver runs every `d` in its ladder at
+every `T` in its lengths, and a dataset is one series of `T` time steps, stored with `n = T`.
+
+Each method runs on the simulation of its own paper, drawn by `andrey_bench/temporal_models.py`,
+which keeps the expected number of cross-links per variable fixed as `d` grows. Every variable
+depends on its own previous step, and a model whose process is not stationary is drawn again:
+
+| regime | method | source | cross-links per variable | same-step share | lags |
+|---|---|---|---|---|---|
+| `pcmci_paper` | PCMCI | Runge et al. (2019), Supplementary Sect. S4.1 | 1 | 0 | 1-2 |
+| `pcmciplus_paper` | PCMCI+ | Runge (2020), Sect. 4 | 1.5 | 30% | 1-5 |
+| `lpcmci_paper` | LPCMCI | Gerhardus and Runge (2020), Sect. 4 | 1, 30% of series unobserved | 30% | 1-3 |
+
+The coefficients, autocorrelations, and noise follow each paper as well; the module docstring lists
+them. A truth without same-step links is stored as the marks of lags `1..L`. `var_lagged`, the
+earlier regime, draws each lag-1 cross-link with probability 0.3, so its links per variable grow
+with `d`.
 
 Every solution tests lags 1 to `tau_max`, at `pc_alpha=0.2` and `alpha_level=0.05`:
 
@@ -382,13 +392,15 @@ PCMCI accepts.
 ### PCMCI+ and LPCMCI on series with same-step links
 
 `pcmci_cpu.py --method pcmciplus` and `--method lpcmci` compare Andrey's PCMCI+ and LPCMCI with
-tigramite's on the `var_same_step` regime: the same VAR(1) as `var_lagged`, on an ER instantaneous
-graph of mean degree 1, so some links act within a time step. The truth is a window over lags 0 and
-1: the instantaneous DAG and the lag-1 links. `andrey.data` does not draw hidden variables in a
-series, so LPCMCI runs on the same data as PCMCI+, with every variable observed.
+tigramite's on `pcmciplus_paper` and `lpcmci_paper`, where some links act within a time step. The
+truth is a window over lags 0 to the largest true lag: the same-step DAG and the lagged links.
+`lpcmci_paper` generates `d` series and drops 30% of them, so its rows compare the two packages'
+graphs only; their errors against the truth would need the true PAG, which the harness does not
+compute.
 
-Every solution tests lags 0 to `tau_max` (default 1) with the Student-t partial-correlation test
-and the method's defaults, which are both packages' defaults:
+Every solution tests lags 0 to `tau_max` (default 5 for PCMCI+ and 3 for LPCMCI, each paper's
+largest true lag) with the Student-t partial-correlation test and the method's defaults, which are
+both packages' defaults:
 
 | solution | settings |
 |---|---|

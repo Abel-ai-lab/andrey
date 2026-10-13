@@ -87,6 +87,7 @@ def _lagged_dataset(
         d=d,
         n=steps,
         seed=seed,
+        latents=datasets.latents_for(regime, d),
     )
     datasets.materialize([key], tmp_path)
     return key
@@ -314,15 +315,14 @@ SAME_STEP_PAIRS = {
     [
         ("pcmciplus", 5, 300, 0),
         ("pcmciplus", 8, 500, 1),
-        ("lpcmci", 5, 300, 0),
-        ("lpcmci", 6, 500, 1),
+        ("lpcmci", 8, 500, 0),
     ],
 )
 def test_tigramite_and_andrey_find_the_same_window_graph(
     tigramite_env: Path, tmp_path: Path, method: str, d: int, steps: int, seed: int
 ) -> None:
-    """PCMCI+ and LPCMCI on the same-step regime: the same marks at every lag, both packages."""
-    key = _lagged_dataset(tmp_path, d=d, steps=steps, seed=seed, regime="var_same_step")
+    """PCMCI+ and LPCMCI on their papers' simulations: the same marks at every lag."""
+    key = _lagged_dataset(tmp_path, d=d, steps=steps, seed=seed, regime=f"{method}_paper")
     tigramite, ours = (make(1) for make in SAME_STEP_PAIRS[method])
     (measures,) = runner.run_task(
         tigramite,
@@ -336,6 +336,9 @@ def test_tigramite_and_andrey_find_the_same_window_graph(
     series, marks = datasets.load(tmp_path, key)
     window = ours.fit(series, ours.params())
     np.testing.assert_array_equal(measures["adj"], window)
-    assert window[0].any() and window[1].any()
-    scores = scoring.score_result(ours.to_structure(window), _truth(marks, datasets.WINDOW_KIND))
-    assert scores["adjacency_recall"] > 0.5
+    assert window[1:].any()  # a graph with links, not an empty agreement
+    truth = _truth(marks, datasets.WINDOW_KIND, key.latents)
+    scores = scoring.score_result(ours.to_structure(window), truth)
+    assert scores["family"] == "temporal_window"
+    if not key.latents:
+        assert scores["adjacency_recall"] > 0.3

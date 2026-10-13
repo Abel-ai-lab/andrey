@@ -5,18 +5,22 @@
 product of the variable counts (``--ladder``) and the series lengths (``--lengths``): each ``(d, T)``
 pair is one rung, and each seed one series of ``T`` time steps.
 
-``pcmci`` runs on the ``var_lagged`` regime (``andrey.data``'s VAR(1) on an empty instantaneous
-graph, so every true link has lag 1). Every solution tests lags ``1..tau_max`` and is scored lag by
-lag against that truth. Andrey runs both of its partial-correlation tests: ``student_t`` uses the
-p-value of tigramite's ``ParCorr(significance="analytic")``, and ``fisherz`` Fisher's z-transform.
-The empty lag stack is the floor. Both packages run ``pc_alpha=0.2`` and ``alpha_level=0.05``.
+Each method runs on the simulation of its own paper (:mod:`andrey_bench.temporal_models`), with
+the same expected number of cross-links per variable at every ``d``. ``pcmci`` runs on
+``pcmci_paper``, whose links all have lag 1 or 2. Every solution tests lags ``1..tau_max`` (default
+2) and is scored lag by lag. Andrey runs both of its partial-correlation tests: ``student_t`` uses
+the p-value of tigramite's ``ParCorr(significance="analytic")``, and ``fisherz`` Fisher's
+z-transform. The empty lag stack is the floor. Both packages run ``pc_alpha=0.2`` and
+``alpha_level=0.05``.
 
-``pcmciplus`` and ``lpcmci`` run on the ``var_same_step`` regime, the same VAR(1) on an ER
-instantaneous graph of mean degree 1, so links act within a time step and at lag 1. Every solution
-tests lags ``0..tau_max`` with the Student-t test and returns window marks, scored link by link
-(:func:`andrey_bench.scoring.window_scores`); the empty window is the floor. Both packages run the
-method's defaults: PCMCI+ ``pc_alpha=0.01`` with the majority collider rule, LPCMCI
-``pc_alpha=0.05`` with one preliminary round.
+``pcmciplus`` runs on ``pcmciplus_paper`` (30% of the cross-links within a time step, the rest at
+lags 1 to 5; default ``tau_max`` 5), and ``lpcmci`` on ``lpcmci_paper`` (30% within a time step,
+the rest at lags 1 to 3, 30% of the series unobserved; default ``tau_max`` 3). Every solution tests
+lags ``0..tau_max`` with the Student-t test and returns window marks, scored link by link
+(:func:`andrey_bench.scoring.window_scores`); the empty window is the floor. LPCMCI's estimates are
+not scored against the truth, which has unobserved series. Both packages run the method's defaults:
+PCMCI+ ``pc_alpha=0.01`` with the majority collider rule, LPCMCI ``pc_alpha=0.05`` with one
+preliminary round. ``--ladder`` counts every generated series, unobserved ones included.
 
 ``--tau-max`` sets the lag window for every solution and is in every solution name, because
 ``params`` are not part of a ``run_id``.
@@ -46,7 +50,6 @@ from pathlib import Path
 from andrey_bench import datasets, memcap, rundir
 from andrey_bench.adapters.andrey_pcmci import (
     DEFAULT_TAU_MAX,
-    SAME_STEP_TAU_MAX,
     andrey_lpcmci_adapter,
     andrey_pcmci_adapters,
     andrey_pcmciplus_adapter,
@@ -79,8 +82,8 @@ def slice_of(regime: str) -> dict:
     }
 
 
-#: PCMCI's regime, spelled out: lag-only linear-Gaussian VAR(1) series at raw scale.
-REGIME = "var_lagged"
+#: PCMCI's regime: the PCMCI paper's simulation, lag-only links at lags 1 and 2.
+REGIME = "pcmci_paper"
 SLICE = slice_of(REGIME)
 
 #: Untimed fits before each timed one.
@@ -172,12 +175,9 @@ class Method:
 
 METHODS = {
     "pcmci": Method(REGIME, DEFAULT_TAU_MAX, solutions, min_length, "PCMCI"),
-    "pcmciplus": Method(
-        "var_same_step", SAME_STEP_TAU_MAX, pcmciplus_solutions, pcmciplus_min_length, "PCMCI+"
-    ),
-    "lpcmci": Method(
-        "var_same_step", SAME_STEP_TAU_MAX, lpcmci_solutions, lpcmci_min_length, "LPCMCI"
-    ),
+    # tau_max covers each paper's largest true lag.
+    "pcmciplus": Method("pcmciplus_paper", 5, pcmciplus_solutions, pcmciplus_min_length, "PCMCI+"),
+    "lpcmci": Method("lpcmci_paper", 3, lpcmci_solutions, lpcmci_min_length, "LPCMCI"),
 }
 
 
@@ -187,7 +187,7 @@ def ladder_keys(
     """One series per ``(d, T, seed)`` on the regime's slice, with ``n = T`` time steps."""
     coordinates = slice_of(regime)
     return [
-        DatasetKey(**coordinates, d=d, n=length, seed=seed)
+        DatasetKey(**coordinates, d=d, n=length, seed=seed, latents=datasets.latents_for(regime, d))
         for d in ladder
         for length in lengths
         for seed in range(seeds)
@@ -244,7 +244,7 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         help=f"largest lag every solution tests, in every solution name (default: "
-        f"{DEFAULT_TAU_MAX} for pcmci, {SAME_STEP_TAU_MAX} for pcmciplus and lpcmci)",
+        f"{DEFAULT_TAU_MAX} for pcmci, 5 for pcmciplus, 3 for lpcmci)",
     )
     p.add_argument(
         "--solutions",
