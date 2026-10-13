@@ -1,0 +1,24 @@
+ANM  dag  |  2 nodes  |  1 edges (1 directed)
+
+  y -> x
+
+  pval_forward: 0
+  pval_backward: 1.695e-07
+  stat_forward: 21.66
+  stat_backward: 4.322
+
+PNL  dag  |  2 nodes  |  1 edges (1 directed)
+
+  x -> y
+
+  pval_forward: 0.5863
+  pval_backward: 2.091e-06
+  stat_forward: 0.8921
+  stat_backward: 3.344
+
+ANM  dag  |  2 nodes  |  0 edges (no edges)
+
+  pval_forward: 0
+  pval_backward: 1.695e-07
+  stat_forward: 21.66
+  stat_backward: 4.322
