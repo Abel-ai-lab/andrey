@@ -14,7 +14,9 @@
       "DirectLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline ordering decision to differ on another host."},
       "ICA-LiNGAM": {"median_shd": 2, "reason": "FastICA's causal order can flip on rounding. Under a relative 1e-12 input perturbation the median at d = 50 moved by 1, and 4 of 100 draws changed. Two covers that with one to spare."},
       "RCD": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
-      "BottomUpParceLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."}
+      "BottomUpParceLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "ANM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
+      "PNL": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."}
     },
     "baselines": {
       "PC": {
@@ -84,6 +86,12 @@
       "BottomUpParceLiNGAM": {
         "latent_lingam_er_d10": {"median_shd": 13.0, "empty_median_shd": 20.0, "shd": [22, 17, 3, 14, 16, 1, 12, 9, 9, 15]},
         "latent_lingam_er_d15": {"median_shd": 25.0, "empty_median_shd": 29.0, "shd": [21, 41, 13, 24, 32, 31, 17, 26, 44, 22]}
+      },
+      "ANM": {
+        "anm_pair_n1000": {"median_shd": 0.0, "empty_median_shd": 1.0, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+      },
+      "PNL": {
+        "pnl_pair_n1000": {"median_shd": 0.0, "empty_median_shd": 1.0, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
       }
     }
   }

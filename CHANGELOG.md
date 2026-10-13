@@ -15,6 +15,10 @@ change names its pull request.
   xges and runs up to 140x faster; Tabu search and hill climbing return the same equivalence
   classes as bnlearn on most datasets and run up to 561x and 906x faster. The 0.3.0 release card
   gives the numbers and each method's limits. ([#64])
+- `anm` and `pnl` are supported. On cause-effect pairs, ANM names the same direction as
+  causal-learn on every pair and runs about 2x faster; PNL runs up to 1,470x faster and names the
+  true direction on more pairs. The 0.4.0 release card gives the numbers and each method's limits.
+  ([#TBD])
 
 ### Breaking
 
@@ -26,15 +30,16 @@ change names its pull request.
 - `tabu`: hill climbing that keeps searching past a local optimum and returns the best DAG it
   visits, as a CPDAG. ([#56])
 - `xges`: extremely greedy equivalence search, returning a CPDAG and its BIC score. ([#57])
-- `anm`, an experimental direction test for a pair of variables under the additive noise model: it
-  returns a two-node DAG and both p-values, as `pnl` does, and does not depend on either variable's
-  units.
+- `anm`: a direction test for a pair of variables under the additive noise model, returning a
+  two-node DAG and both p-values, as `pnl` does. ([#TBD])
 
 ### Changed
 
 - `hc` returns the same graphs in less time. ([#56])
 - `hc` sets no move limit by default (`max_iter=None`), so large graphs are searched to a local
   optimum. ([#56])
+- With `alpha=None`, `pnl` breaks a tie between equal p-values by the HSIC statistics, which
+  `metadata` now holds, instead of drawing no edge. ([#TBD])
 
 ## [0.2.1] - 2026-10-12
 

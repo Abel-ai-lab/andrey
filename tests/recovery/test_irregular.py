@@ -3,9 +3,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+import andrey
 from andrey.irregular.anm import anm
 from andrey.irregular.pnl import pnl
 from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 
 @pytest.fixture(autouse=True)
@@ -57,6 +59,11 @@ def test_pnl_resolves_the_planted_direction():
     pval_forward, pval_backward, *_ = pnl(x[:, 0], x[:, 1])
     assert pval_forward > pval_backward  # anm_pair_cubic plants x -> y
     assert np.allclose((pval_forward, pval_backward), _PNL_CUBIC_PVALUES, atol=1e-6)
+
+
+def test_pnl_matches_the_recorded_output():
+    out = andrey.pnl(datagen.generate("anm_pair_cubic"))
+    assert_recorded_output(out, "PNL", case="anm_pair_cubic")
 
 
 def test_pnl_is_deterministic_over_varied_pairs():
@@ -163,6 +170,11 @@ def test_anm_resolves_the_planted_direction():
     assert out.structure.oriented_edges() == [(0, 1, "directed")]
     keys = {"pval_forward", "pval_backward", "stat_forward", "stat_backward"}
     assert set(out.metadata) == {"algorithm", *keys}
+
+
+def test_anm_matches_the_recorded_output():
+    out = andrey.anm(datagen.generate("anm_pair_cubic"))
+    assert_recorded_output(out, "ANM", case="anm_pair_cubic")
 
 
 def test_anm_hyperparameter_objective_is_scikit_learns():

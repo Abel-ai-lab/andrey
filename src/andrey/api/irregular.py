@@ -60,12 +60,6 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     ValueError
         If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
@@ -97,9 +91,12 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     HSIC test uses Gaussian kernels and a gamma approximation of its null distribution. The fit is
     deterministic.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on pairs of 200 rows. Each regression and
-    HSIC test builds matrices with one row and one column per sample, so memory grows with the
-    square of ``n_samples`` and the regression's time with its cube.
+    **Limitations.** Measured on simulated cause-effect pairs with a nonlinear additive-noise
+    mechanism and Gaussian noise, from 200 to 8,000 rows. It named the true direction on three pairs
+    in four at 200 rows and on every pair from 4,000 rows. The median fit took over three minutes at
+    8,000 rows, on 4 cores. Each regression and HSIC test builds matrices with one row and one
+    column per sample, so memory grows with the square of ``n_samples`` and the regression's time
+    with its cube.
 
     References
     ----------
@@ -124,7 +121,6 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
     True
     """
-    warn_experimental("anm")
     from andrey.irregular.anm import anm as _native
 
     if np.ndim(data) != 2 or np.shape(data)[1] != 2:
@@ -179,12 +175,6 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     ValueError
         If ``data`` does not have 2 columns, or if ``alpha`` is not in ``(0, 1)``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     With ``alpha=None``, the edge points in the direction with the larger p-value. On a large
@@ -213,9 +203,12 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     PNL fits each transform as a sum of smooth basis functions, so the fit is deterministic but can
     miss a sharply varying nonlinearity.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on pairs of at most 400 rows. Each HSIC
-    test builds kernel matrices with one row and one column per sample, so time and memory grow with
-    the square of the row count.
+    **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
+    linear inner transform and an invertible nonlinear outer one, and Laplace noise, from 200 to
+    5,000 rows. It named the true direction on three pairs in four at 200 rows and on every pair
+    from 1,000 rows. The median fit took under 2 s at 5,000 rows, on 4 cores. Each HSIC test builds
+    kernel matrices with one row and one column per sample, so time and memory grow with the square
+    of the row count.
 
     References
     ----------
@@ -242,7 +235,6 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     >>> out.metadata["pval_forward"] > 0.05 >= out.metadata["pval_backward"]
     True
     """
-    warn_experimental("pnl")
     from andrey.irregular.pnl import pnl as _native
 
     if np.ndim(data) != 2 or np.shape(data)[1] != 2:

@@ -50,6 +50,8 @@ and Tabu search do from 50 variables with ten rows per variable.
    grasp
    direct_lingam
    ica_lingam
+   anm
+   pnl
    rcd
    bottom_up_parce_lingam
 ```
@@ -77,8 +79,6 @@ in a process.
    multi_group_direct_lingam
    varma_lingam
    longitudinal_lingam
-   anm
-   pnl
    gin
    camuv
 ```

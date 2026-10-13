@@ -697,7 +697,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         references=("Hoyer et al. 2008", "Gretton et al. 2008", "Mooij et al. 2016"),
     )
 )
@@ -737,7 +737,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         references=(
             "Zhang & Hyvarinen 2009",
             "Zhang & Hyvarinen 2010",

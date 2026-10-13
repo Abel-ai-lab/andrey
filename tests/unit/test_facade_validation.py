@@ -24,7 +24,6 @@ def test_direct_lingam_rejects_non_2d():
 PAIRWISE = [andrey.pnl, andrey.anm]
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 @pytest.mark.parametrize("shape", [(100,), (100, 1), (100, 3)])
 def test_pairwise_tests_reject_anything_but_a_pair(fit, shape):
@@ -32,7 +31,6 @@ def test_pairwise_tests_reject_anything_but_a_pair(fit, shape):
         fit(np.random.default_rng(0).standard_normal(shape))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 @pytest.mark.parametrize("alpha", [0.0, 1.0, -0.1])
 def test_pairwise_tests_reject_an_alpha_outside_the_unit_interval(fit, alpha):
@@ -124,7 +122,6 @@ def test_varma_lingam_needs_two_variables():
         andrey.varma_lingam(_data(d=1))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 def test_pairwise_tests_reject_unusable_data(fit):
     with pytest.raises(ValueError, match=r"data .*row 2, column 0"):
