@@ -2,6 +2,9 @@
 # the first section whose label it has. The CHANGELOG section is the record; the generated notes
 # are checked against it. CONTRIBUTING.md lists the labels.
 changelog:
+  # The release's own pull request is the release; its notes list what it ships.
+  exclude:
+    labels: [release]
   categories:
     - title: Highlights
       labels: [highlight]
