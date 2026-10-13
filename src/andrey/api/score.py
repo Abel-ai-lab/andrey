@@ -2,7 +2,8 @@
 
 ``ges``, ``gies``, ``xges``, ``exact_search``, ``hc``, and ``tabu`` use :mod:`andrey.core` for BIC
 scoring and orientation; ``xges``, ``hc``, and ``tabu`` use the Schur delta-BIC. ``ges`` and ``hc``
-also score categorical data with BDeu. Reported objectives are stored in ``metadata``.
+also score categorical data with BDeu, and mixed data with the degenerate and conditional Gaussian
+BICs. Reported objectives are stored in ``metadata``.
 
 CALM lazily imports its stochastic continuous optimizer from the ``[torch]`` extra and returns a
 weighted DAG. Its output varies across torch versions, so determinism and quality tests replace a
@@ -14,7 +15,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from andrey.api._adapt import (
-    check_categories,
+    checked_data,
     column_labels,
     data_matrix,
     flag,
@@ -27,13 +28,19 @@ from andrey.core import backend
 from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     import numpy.typing as npt
 
     from andrey.core import StructureOutput
 
 
 def ges(
-    data: npt.ArrayLike, *, score_func: str = "local_score_BIC", lambda_value: float = 1.0
+    data: npt.ArrayLike,
+    *,
+    score_func: str = "local_score_BIC",
+    lambda_value: float = 1.0,
+    categorical: Sequence[str | int] | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with greedy equivalence search (GES).
 
@@ -46,14 +53,20 @@ def ges(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC", "local_score_BDeu"}, default="local_score_BIC"
-        Local score objective. ``"local_score_BIC"`` is the linear-Gaussian BIC, for continuous
-        data. ``"local_score_BDeu"`` is the BDeu score [3]_ for categorical data, coded by whole
-        numbers; see Notes.
+    score_func : {"local_score_BIC", "local_score_BDeu", "local_score_DG", "local_score_CG"}
+        Local score objective, by default ``"local_score_BIC"``, the linear-Gaussian BIC, for
+        continuous data. ``"local_score_BDeu"`` is the BDeu score [3]_ for categorical data, coded
+        by whole numbers. ``"local_score_DG"`` (degenerate Gaussian) [4]_ and ``"local_score_CG"``
+        (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous and categorical
+        columns. See Notes.
     lambda_value : float, default=1.0
-        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative. BDeu ignores
-        it.
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
+        be finite and non-negative. BDeu ignores it.
+    categorical : sequence of str or int, optional
+        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
+        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
+        columns. The other scores take no column types and reject it.
 
     Returns
     -------
@@ -62,16 +75,21 @@ def ges(
         ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it
         is the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
         n_parents``; for BDeu, minus the log of the structure prior times the marginal
-        likelihood. Directed marks (``->``) are oriented edges, undirected (``--``) the ones the
-        equivalence class leaves open.
+        likelihood; for the mixed-data scores, see Notes. Directed marks (``->``) are oriented
+        edges, undirected (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
         If ``score_func`` names no available score.
+    TypeError
+        If ``categorical`` is not a list of column names and positions.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or, with ``"local_score_BDeu"``, if
-        ``data`` holds a value that is not a whole number.
+        If ``lambda_value`` is negative or non-finite, with ``"local_score_BDeu"``, if ``data``
+        holds a value that is not a whole number, or, with a mixed-data score, if no column is
+        categorical, if ``categorical`` names a column ``data`` lacks, or if a categorical column
+        holds a number that is not whole or a missing value. Also if ``categorical`` is given with
+        another score.
 
     See Also
     --------
@@ -83,7 +101,8 @@ def ges(
     **When to use it.** GES suits data with no unmeasured common causes. Its default BIC score
     assumes continuous data, where each variable depends linearly on its causes with Gaussian
     noise; in that setting it is a fast, accurate default. For categorical data, use
-    ``"local_score_BDeu"``. It returns the equivalence class.
+    ``"local_score_BDeu"``, and for mixed data ``"local_score_DG"`` or ``"local_score_CG"``. It
+    returns the equivalence class.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -105,13 +124,29 @@ def ges(
     Equivalent graphs score the same, as GES requires. Moves are scored in this process, without
     the worker processes the BIC search can use.
 
+    **Mixed data.** ``"local_score_DG"`` and ``"local_score_CG"`` score data with continuous and
+    categorical columns; the categorical columns are read as :func:`~andrey.pc` describes. Each
+    scores a variable given its parents by ``-2`` times the maximized log-likelihood plus
+    ``lambda_value * log(n)`` per parameter, and equivalent graphs score the same. The degenerate
+    Gaussian score [4]_ replaces a categorical column of ``k`` categories by ``k - 1`` indicator
+    columns and scores every column as Gaussian, by the residual covariance of a linear
+    regression on the parents' columns; on continuous columns only, it equals
+    ``"local_score_BIC"``. The conditional Gaussian score [5]_ fits the continuous variables of a
+    variable and its parents with a Gaussian of its own mean and covariance in each joint category
+    of their categorical ones, and divides by the same fit of the parents alone, so a categorical
+    variable can have continuous parents. It counts parameters for every joint category, so a
+    parent with many categories costs many parameters. Moves are scored in this process.
+
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 200 variables with ten rows per variable and parents capped at 4 per
     variable rather than ``n_variables / 2``. At ``lambda_value=1.0`` its median errors (SHD) stayed
     below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against
     200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
     and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
-    the default parent cap, its median errors passed the empty graph's (612 against 338).
+    the default parent cap, its median errors passed the empty graph's (612 against 338). The
+    mixed-data scores are experimental and not benchmarked yet: their tests check each against a
+    direct likelihood computation, and run GES on simulated mixed networks of at most 10 variables
+    with 5,000 rows.
 
     References
     ----------
@@ -123,6 +158,10 @@ def ges(
        International Journal of Data Science and Analytics 3(2), 121-129.
     .. [3] Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks:
        the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
+    .. [4] Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed
+       acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
+    .. [5] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
+       variables. International Journal of Data Science and Analytics 6(1), 3-18.
 
     Examples
     --------
@@ -144,14 +183,21 @@ def ges(
     >>> data = pd.DataFrame({"a": a, "b": b, "c": c})
     >>> ges(data, score_func="local_score_BDeu").structure.oriented_edges()
     [('a', 'c', 'directed'), ('b', 'c', 'directed')]
+
+    On mixed data, with a category column and the conditional Gaussian score:
+
+    >>> g = rng.integers(0, 3, 2000)
+    >>> u = rng.standard_normal(2000)
+    >>> v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(2000)
+    >>> data = pd.DataFrame({"g": pd.Categorical(g), "u": u, "v": v})
+    >>> ges(data, score_func="local_score_CG").structure.oriented_edges()
+    [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.search.ges import ges as _ges
 
-    X = data_matrix(data)
-    if score_func == "local_score_BDeu":
-        check_categories(X, data, f"score_func={score_func!r}")
+    X, mask = checked_data(data, categorical, "score_func", score_func)
     labels = column_labels(data)
-    cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value)
+    cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value, categorical=mask)
     return structure_output(
         cpdag,
         labels=labels,
@@ -338,6 +384,7 @@ def hc(
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
     max_iter: int | None = None,
+    categorical: Sequence[str | int] | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with hill-climbing search.
 
@@ -350,18 +397,23 @@ def hc(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov", "local_score_BDeu"}
-        Local score objective, by default ``"local_score_BIC_from_cov"``, a covariance-based
-        Gaussian BIC for continuous data; ``"local_score_BDeu"`` is the BDeu score for
-        categorical data, coded by whole numbers, as for :func:`~andrey.ges`.
+    score_func : str, default="local_score_BIC_from_cov"
+        Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC
+        for continuous data; ``"local_score_BDeu"``, the BDeu score for categorical data, coded by
+        whole numbers; or ``"local_score_DG"`` and ``"local_score_CG"``, the degenerate and
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
-        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative. BDeu ignores
-        it.
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
+        finite and non-negative. BDeu ignores it.
     max_iter : int or None, default=None
         Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
         adds at most one edge.
+    categorical : sequence of str or int, optional
+        The categorical columns, for the mixed-data scores: DataFrame column names or 0-based
+        positions. ``None`` takes a DataFrame's ``category``, ``bool``, ``object``, and ``string``
+        columns, as for :func:`~andrey.ges`. The other scores reject it.
 
     Returns
     -------
@@ -376,10 +428,11 @@ def hc(
     NotImplementedError
         If ``score_func`` names no available score.
     TypeError
-        If a given ``max_iter`` is not an int.
+        If a given ``max_iter`` is not an int, or ``categorical`` is not a list of column names and
+        positions.
     ValueError
         If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
-        or, with ``"local_score_BDeu"``, if ``data`` holds a value that is not a whole number.
+        or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`.
 
     Warns
     -----
@@ -398,7 +451,8 @@ def hc(
     **Limitations.** Not benchmarked yet. Its tests run it on at most 45 variables with 800 rows,
     and on 40,000 rows with 24 variables. It has no move limit by default; run time grows with the
     moves the search takes. A graph that no single move improves need not be the best-scoring one.
-    Its BIC score assumes linear relations with Gaussian noise.
+    Its BIC score assumes linear relations with Gaussian noise. With a mixed-data score, its tests
+    run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -420,12 +474,12 @@ def hc(
     warn_experimental("hc")
     from andrey.search.hc import hc as _hc
 
-    X = data_matrix(data)
+    X, mask = checked_data(data, categorical, "score_func", score_func)
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
-    if score_func == "local_score_BDeu":
-        check_categories(X, data, f"score_func={score_func!r}")
     labels = column_labels(data)
-    cpdag, score = _hc(X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter)
+    cpdag, score = _hc(
+        X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter, categorical=mask
+    )
     metadata = {"algorithm": "HC", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 

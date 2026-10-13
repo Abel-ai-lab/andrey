@@ -17,6 +17,9 @@ from scipy.stats import chi2, kstest, multivariate_normal
 from andrey.core.ci import CGTest, ChiSquare, DGTest, make_indep_test
 from andrey.core.mixed import ConditionalGaussian, column_mask
 from andrey.core.score import BICScore, CGScore, DGScore
+from andrey.data import sample_scm
+from andrey.search.ges import ges
+from andrey.search.hc import hc
 
 
 def _mixed(seed: int = 0, n: int = 400) -> tuple[np.ndarray, np.ndarray]:
@@ -160,6 +163,17 @@ def test_dg_score_equals_the_bic_on_continuous_columns():
     bic, dg = BICScore(x, lambda_value=1.5), DGScore(x, lambda_value=1.5)
     for node, parents in [(1, ()), (1, (0,)), (3, (1, 2)), (3, (0, 1, 2)), (0, (3,))]:
         assert dg.score(node, parents) == bic.score(node, parents)
+
+
+@pytest.mark.parametrize(
+    ("search", "bic"), [(ges, "local_score_BIC"), (hc, "local_score_BIC_from_cov")]
+)
+def test_a_dg_search_on_continuous_columns_finds_the_bic_graph(search, bic):
+    x = sample_scm(d=8, n=1000, seed=0, density=2.0).data
+    dg_graph, dg_score = search(x, score_func="local_score_DG")
+    bic_graph, bic_score = search(x, score_func=bic)
+    assert np.array_equal(dg_graph.to_numpy(), bic_graph.to_numpy())
+    assert dg_score == bic_score
 
 
 @pytest.mark.parametrize(("node", "parents"), [(0, ()), (0, (1,)), (0, (1, 2)), (3, (0, 2))])

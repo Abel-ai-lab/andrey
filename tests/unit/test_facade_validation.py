@@ -360,3 +360,103 @@ def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
 def test_xges_rejects_a_bad_setting(setting, value, error):
     with pytest.raises(error, match=setting):
         andrey.xges(_data(), **{setting: value})
+
+
+# Every mixed-data setting of each facade that takes one, called on one data matrix.
+MIXED = {
+    ("pc", "dg"): lambda x, **kw: andrey.pc(x, indep_test="dg", **kw),
+    ("fci", "cg"): lambda x, **kw: andrey.fci(x, indep_test="cg", **kw),
+    ("gfci", "dg"): lambda x, **kw: andrey.gfci(
+        x, score_func="local_score_DG", indep_test="dg", **kw
+    ),
+    ("ges", "local_score_CG"): lambda x, **kw: andrey.ges(x, score_func="local_score_CG", **kw),
+    ("hc", "local_score_DG"): lambda x, **kw: andrey.hc(x, score_func="local_score_DG", **kw),
+}
+
+
+def _mixed_data(n=200):
+    """Columns: 3 categories, continuous, 2 categories."""
+    rng = np.random.default_rng(0)
+    return np.column_stack(
+        [rng.integers(0, 3, n), rng.standard_normal(n), rng.integers(0, 2, n)]
+    ).astype(np.float64)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_needs_a_categorical_column(setting):
+    with pytest.raises(ValueError, match="no column of data is categorical"):
+        MIXED[setting](_mixed_data())
+    assert MIXED[setting](_mixed_data(), categorical=[0, 2]).structure.n_nodes == 3
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_rejects_a_fractional_category(setting):
+    with pytest.raises(ValueError, match=r"reads data .* 0\.5 at row 7, column 2"):
+        MIXED[setting](_with(_mixed_data(), (7, 2), 0.5), categorical=[0, 2])
+
+
+@pytest.mark.parametrize(
+    ("data", "categorical", "error", "message"),
+    [
+        ("frame", ["a", "zz"], ValueError, "names column 'zz', which data does not have"),
+        ("array", ["a"], ValueError, "data has no column names"),
+        ("array", [3], ValueError, "lists column 3, but data has 3 columns"),
+        ("array", "a", TypeError, "list of column names or positions"),
+        ("array", [1.5], TypeError, "names or 0-based positions, got float"),
+        ("array", [True], TypeError, "names or 0-based positions, got bool"),
+    ],
+)
+def test_categorical_lists_columns_the_data_has(data, categorical, error, message):
+    pd = pytest.importorskip("pandas")
+    x = _mixed_data()
+    x = pd.DataFrame(x, columns=["a", "b", "c"]) if data == "frame" else x
+    with pytest.raises(error, match=message):
+        andrey.pc(x, indep_test="dg", categorical=categorical)
+
+
+@pytest.mark.parametrize(
+    "fit",
+    [
+        lambda x: andrey.pc(x, categorical=[0]),
+        lambda x: andrey.pc(x, indep_test="chisq", categorical=[0]),
+        lambda x: andrey.ges(x, categorical=[0]),
+    ],
+)
+def test_a_setting_that_reads_no_column_types_rejects_categorical(fit):
+    with pytest.raises(ValueError, match="leave categorical as None"):
+        fit(np.round(_mixed_data()))
+
+
+def test_a_column_that_does_not_hold_numbers_must_be_categorical():
+    pd = pytest.importorskip("pandas")
+    x = _mixed_data()
+    frame = pd.DataFrame({"a": np.array(["p", "q", "r"])[x[:, 0].astype(int)], "b": x[:, 1]})
+    frame["c"] = x[:, 2]
+    with pytest.raises(ValueError, match="column 'a' does not hold numbers; list it"):
+        andrey.pc(frame, indep_test="dg", categorical=["c"])
+    assert andrey.pc(frame, indep_test="dg").structure.n_nodes == 3  # an object column
+    frame.loc[5, "a"] = None
+    with pytest.raises(ValueError, match="column 'a' has a missing value at row 5"):
+        andrey.pc(frame, indep_test="dg")
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("score_func", "indep_test"),
+    [("local_score_DG", "fisherz"), ("local_score_BIC", "cg"), ("local_score_BDeu", "dg")],
+)
+def test_gfci_rejects_a_mixed_score_or_test_without_its_pair(score_func, indep_test):
+    with pytest.raises(ValueError, match="score and test must read the data alike"):
+        andrey.gfci(_mixed_data(), score_func=score_func, indep_test=indep_test, categorical=[0])
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_cdnod_with_a_mixed_test_takes_continuous_data_and_rejects_a_fractional_index():
+    """The index is the categorical variable, so the data may have no categorical column."""
+    x = _mixed_data()[:, [1]]
+    c_indx = np.repeat([0.0, 1.0], 100)
+    assert andrey.cdnod(x, c_indx, indep_test="dg").structure.n_nodes == 1
+    with pytest.raises(ValueError, match=r"c_indx .* 0\.5 at row 0"):
+        andrey.cdnod(x, np.r_[0.5, c_indx[1:]], indep_test="cg")

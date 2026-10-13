@@ -32,8 +32,18 @@ _INDEP_TEST = ParamSpec(
     default="fisherz",
     doc="Conditional-independence test: fisherz = partial correlation (Fisher's z), for continuous "
     "data; chisq = Pearson's chi-square and gsq = G-square, for categorical data coded by whole "
-    "numbers.",
+    "numbers; dg = degenerate Gaussian and cg = conditional Gaussian likelihood ratio, for mixed "
+    "data, with the categorical columns named by categorical (experimental).",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
+)
+_CATEGORICAL = ParamSpec(
+    name="categorical",
+    type="str_list",
+    default=None,
+    doc="The categorical columns, for a mixed-data test or score: column names from the data "
+    "file's header or 0-based positions, for example, categorical=[smoker,region]. null reads no "
+    "column types from a file. Other tests and scores reject it.",
+    nullable=True,
 )
 _COLLIDER_RULE = ParamSpec(
     name="collider_rule",
@@ -86,13 +96,13 @@ _add(
         summary="General-purpose structure learning from i.i.d. observational data: "
         "conditional-independence tests remove edges, then orientation rules direct the edges the "
         "data determine; returns a CPDAG. A good first method when nothing is known about the "
-        "graph; indep_test=chisq or gsq for categorical data.",
+        "graph; indep_test=chisq or gsq for categorical data, dg or cg for mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(structure_type="graph", graph_kind="cpdag"),
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        params=(_ALPHA, _INDEP_TEST),
+        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL),
         references=(
             "Spirtes & Glymour 1991",
             "Spirtes, Glymour & Scheines 2000",
@@ -113,7 +123,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        params=(_ALPHA, _INDEP_TEST, _COLLIDER_RULE),
+        params=(_ALPHA, _INDEP_TEST, _COLLIDER_RULE, _CATEGORICAL),
         references=(
             "Spirtes, Meek & Richardson 1995",
             "Spirtes, Glymour & Scheines 2000",
@@ -139,13 +149,16 @@ _add(
                 type="str",
                 default="local_score_BIC",
                 doc="Local score for the GES phase: local_score_BIC = linear-Gaussian BIC; "
-                "local_score_BDeu = BDeu, for categorical data coded by whole numbers.",
+                "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
+                "local_score_DG and local_score_CG = degenerate and conditional Gaussian BIC, for "
+                "mixed data (experimental). The test must read the same kind of data.",
                 choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
             _INDEP_TEST,
             _ALPHA,
             _COLLIDER_RULE,
+            _CATEGORICAL,
         ),
         references=("Ogarrio, Spirtes & Ramsey 2016", "Colombo & Maathuis 2014"),
     )
@@ -174,7 +187,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="experimental",
-        params=(_ALPHA, _INDEP_TEST),
+        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL),
         references=("Huang et al. 2020",),
     )
 )
@@ -187,7 +200,8 @@ _add(
         family="score",
         summary="Greedy equivalence search: a score-based greedy search over CPDAGs. Fast and "
         "accurate on linear-Gaussian data with the BIC; score_func=local_score_BDeu for "
-        "categorical data. The score is in metadata['score'].",
+        "categorical data, local_score_DG or local_score_CG for mixed data. The score is in "
+        "metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -201,10 +215,13 @@ _add(
                 type="str",
                 default="local_score_BIC",
                 doc="Local score objective: local_score_BIC = linear-Gaussian BIC; "
-                "local_score_BDeu = BDeu, for categorical data coded by whole numbers.",
+                "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
+                "local_score_DG and local_score_CG = degenerate and conditional Gaussian BIC, for "
+                "mixed data (experimental).",
                 choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
+            _CATEGORICAL,
         ),
         references=("Chickering 2002",),
     )
@@ -273,8 +290,9 @@ _add(
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
         "score improves; a simple greedy baseline. BIC by default; score_func=local_score_BDeu "
-        "for categorical data. Stops at a local optimum, or after max_iter moves when set. "
-        "Returns the CPDAG of the final DAG and its score.",
+        "for categorical data, local_score_DG or local_score_CG for mixed data. Stops at a local "
+        "optimum, or after max_iter moves when set. Returns the CPDAG of the final DAG and its "
+        "score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -288,7 +306,9 @@ _add(
                 type="str",
                 default="local_score_BIC_from_cov",
                 doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
-                "local_score_BDeu = BDeu, for categorical data coded by whole numbers.",
+                "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
+                "local_score_DG and local_score_CG = degenerate and conditional Gaussian BIC, for "
+                "mixed data.",
                 choices=HC_SCORES,
             ),
             _LAMBDA_VALUE,
@@ -300,6 +320,7 @@ _add(
                 "ends). Reaching a set limit warns with SearchLimitWarning.",
                 nullable=True,
             ),
+            _CATEGORICAL,
         ),
         references=("Chickering, Geiger & Heckerman 1995", "Scutari 2010"),
     )
