@@ -68,11 +68,11 @@ def benchmarks_page(summary, *, links=SITE_URL, race_tab=False, heading=True):
         "are medians of per-dataset ratios."
         + (" The Race tab identifies the server used for live timings." if race_tab else "")
         + "</p>"
-        + builder.speed_chart(summary)
+        + builder.speed_chart([summary])
         + builder.speed_table(summary)
         + "<h2>Accuracy</h2>"
-        + f"<p>{escape(builder.quality_intro(summary))}</p>"
-        + builder.accuracy_chart(summary)
+        + f"<p>{escape(builder.quality_intro([summary]))}</p>"
+        + builder.accuracy_chart([summary])
         + "<h2>Hardware, builds, and seeds</h2>"
     )
     for method in summary["methods"]:
@@ -149,7 +149,7 @@ def dsep_thumbnail():
 
 def benchmarks_thumbnail(summary):
     """The explorer's first chart: fit time against the number of variables."""
-    chart = site_builder().speed_chart(summary)
+    chart = site_builder().speed_chart([summary])
     svg = chart[chart.index("<svg") : chart.index("</svg>") + len("</svg>")]
     light = andrey.viz.LIGHT
     # The chart's classes resolve to the light palette; the image cannot read the page's tokens.

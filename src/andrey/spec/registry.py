@@ -232,7 +232,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="score_func",
@@ -273,7 +273,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="score_func",
@@ -309,7 +309,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="score_func",

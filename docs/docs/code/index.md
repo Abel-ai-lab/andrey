@@ -27,10 +27,11 @@ column. A single column gives a one-node graph.
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
-workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs) and
-[0.2.0](../benchmarks/0.2.0.md#known-limits) release cards show where a method scores worse
-than the empty graph, as ICA-LiNGAM does at the 0.1.0 card's sample size and BottomUpParceLiNGAM
-does from 8 observed variables.
+workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs),
+[0.2.0](../benchmarks/0.2.0.md#known-limits), and [0.3.0](../benchmarks/0.3.0.md#known-limits)
+release cards show where a method scores worse than the empty graph, as ICA-LiNGAM does at the
+0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, and hill climbing
+and Tabu search do from 50 variables with ten rows per variable.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -42,6 +43,9 @@ does from 8 observed variables.
    pc
    fci
    ges
+   xges
+   hc
+   tabu
    boss
    grasp
    direct_lingam
@@ -68,9 +72,6 @@ in a process.
    gfci
    cdnod
    gies
-   xges
-   hc
-   tabu
    exact_search
    calm
    multi_group_direct_lingam

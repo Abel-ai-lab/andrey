@@ -311,8 +311,8 @@ def _normalized(name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
-def _published() -> set[str]:
-    """Methods in the published summaries, one per benchmark report (``benchmarks/published/``).
+def _summary_methods() -> list[dict]:
+    """The methods of the published summaries, one summary per benchmark report.
 
     A summary with ``builds`` times two Andrey builds against each other, not another package, so
     its methods do not count.
@@ -321,12 +321,29 @@ def _published() -> set[str]:
         json.loads(p.read_text())
         for p in (ROOT / "benchmarks" / "published").glob("*/summary.json")
     )
-    return {
-        _normalized(m["method"])
-        for summary in summaries
-        if "builds" not in summary
-        for m in summary["methods"]
-    }
+    return [m for summary in summaries if "builds" not in summary for m in summary["methods"]]
+
+
+def _registry_name(method: dict) -> str:
+    """The registry name of the method a summary row measures.
+
+    A method with a ``solution`` (``andrey.<name>.<backend>...``) is the facade it names, so a
+    display name ("Tabu search") or a setting ("XGES without extended search") maps to its facade;
+    one without is its ``method``.
+    """
+    return _normalized(
+        method["solution"].split(".")[1] if "solution" in method else method["method"]
+    )
+
+
+def _published() -> set[str]:
+    """Methods in the published summaries (``benchmarks/published/``)."""
+    return {_registry_name(m) for m in _summary_methods()}
+
+
+def _section_names() -> dict[str, str]:
+    """A report's section name for a method, the summary's ``method``, to the registry name."""
+    return {_normalized(m["method"]): _registry_name(m) for m in _summary_methods()}
 
 
 def _calls(source: str) -> set[str]:
@@ -379,8 +396,9 @@ def test_supported_means_published():
 @pytest.mark.parametrize("name", SUPPORTED)
 def test_supported_method_has_a_benchmarks_section(name):
     reports = (ROOT / "docs" / "docs" / "benchmarks").glob("*.md")
+    names = _section_names()
     sections = {
-        _normalized(part)
+        names.get(_normalized(part), _normalized(part))
         for page in reports
         for heading in re.findall(r"^### (.+)$", page.read_text(), re.MULTILINE)
         for part in re.split(r",| and ", heading)

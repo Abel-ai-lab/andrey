@@ -7,6 +7,7 @@ an equivalence class, so a DAG row and a CPDAG row compare on it.
 
 from __future__ import annotations
 
+import json
 import warnings
 
 import numpy as np
@@ -92,6 +93,27 @@ def test_the_driver_scores_every_fit_against_hill_climbing(tmp_path, monkeypatch
         rescored.set_index("run_id")["bic"].sort_index(),
         table.set_index("run_id")["bic"].sort_index(),
     )
+
+
+def test_the_driver_runs_only_the_named_solutions_and_without_r(tmp_path, monkeypatch) -> None:
+    """An Andrey-only run, for sizes bnlearn does not reach, fits its solutions and starts no R."""
+    pytest.importorskip("pyarrow", reason="the harness environment is not installed")
+
+    def no_r(*packages):
+        raise AssertionError(f"started R for {packages}")
+
+    monkeypatch.setattr(tabu_cpu.rsession, "check_environment", no_r)
+    names = ["andrey.tabu.numpy.serial", "andrey.hc.numpy.serial", BaselineEmpty().name]
+    table = _run(tmp_path, "--solutions", ",".join(names))
+    assert set(table["name"]) == set(names)
+    assert (table["status"] == "ok").all()
+    assert json.loads((tmp_path / "run_meta.json").read_text())["solution list"] == names
+
+
+def test_an_unknown_solution_name_stops_the_run(tmp_path, capsys) -> None:
+    with pytest.raises(SystemExit):
+        tabu_cpu.main(["--out", str(tmp_path), "--solutions", "andrey.tabu.numpy.serial,tabu"])
+    assert "unknown solutions ['tabu']" in capsys.readouterr().err
 
 
 @needs_r()
