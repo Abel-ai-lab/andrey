@@ -45,13 +45,14 @@ def _truth(
     Flag the last ``latents`` nodes as hidden. Scoring then projects the truth onto the observed
     nodes present in the data. A ``temporal`` truth is a stack of lag marks and becomes a
     ``TemporalStructure`` with lags ``1..L``; a ``temporal_window`` truth is a stack of window marks
-    and becomes a :class:`~andrey_bench.window.WindowGraph` whose lag 0 is a DAG.
+    and becomes a :class:`~andrey_bench.window.WindowGraph` whose lag 0 is a DAG, its last
+    ``latents`` variables unobserved.
     """
     marks = np.asarray(marks)
     if kind == "temporal":
         return temporal_from_lag_marks(marks)
     if kind == datasets.WINDOW_KIND:
-        return WindowGraph(marks, lag0="dag")
+        return WindowGraph(marks, lag0="dag", latents=latents)
     types = datasets.latent_node_types(len(marks), latents)
     return GraphStructure.from_numpy(marks, kind=kind, node_types=types)
 

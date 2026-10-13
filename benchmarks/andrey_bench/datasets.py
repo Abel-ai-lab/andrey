@@ -5,11 +5,16 @@ once as a ``.npz`` containing ``float64`` samples and the true graph's int8 endp
 :class:`DatasetKey` supplies the ``dataset_id``; :func:`load` casts to ``float32`` for those fits
 outside timing, without storing another copy.
 
-A temporal dataset (functional ``var``) is one series of ``n`` time steps. A key at density 0 has
-no same-step links, and its truth is stored as the ``(L, d, d)`` int8 marks of lags ``1..L``
-(:func:`~andrey_bench.contracts.lag_marks`), with ``graph_kind`` ``"temporal"`` in the registry. A key
-with a positive density has same-step links, and its truth is stored as the ``(L + 1, d, d)`` window
-marks of lags ``0..L`` (:mod:`andrey_bench.window`), with ``graph_kind`` ``"temporal_window"``.
+A temporal dataset (functional ``var``) is one series of ``n`` time steps. Its truth is stored as
+the ``(L, d, d)`` int8 marks of lags ``1..L`` (:func:`~andrey_bench.contracts.lag_marks`), with
+``graph_kind`` ``"temporal"`` in the registry.
+
+The regimes of the PCMCI, PCMCI+, and LPCMCI papers are drawn by
+:mod:`andrey_bench.temporal_models` instead (functional ``pcmci2019``, ``pcmciplus2020``, or
+``lpcmci2020``; the key's density is the model's cross-links per variable). A model without
+same-step links stores its truth as lag marks with the kind ``"temporal"``; a model with them
+stores the ``(L + 1, d, d)`` window marks of lags ``0..L`` (:mod:`andrey_bench.window`) with the
+kind ``"temporal_window"``. Unobserved variables are the key's ``latents``, last in the truth.
 """
 
 from __future__ import annotations
@@ -28,8 +33,9 @@ import numpy as np
 
 import andrey.data as data
 from andrey import TemporalStructure
-from andrey.core import ARROW, LATENT, OBSERVED
-from andrey_bench.window import window_marks_of_dag_and_links
+from andrey.core import LATENT, OBSERVED
+from andrey_bench import temporal_models
+from andrey_bench.contracts import lag_marks
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
 CANONICAL_DTYPE = np.float64
@@ -82,19 +88,25 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # graph (the key sets density LAG_ONLY_DENSITY), so every true link has lag 1. Temporal
     # generation takes raw scale only.
     "var_lagged": ("er", "var", "gaussian", "raw"),
-    # The same VAR(1) on an ER instantaneous graph of mean degree SAME_STEP_DENSITY, for PCMCI+ and
-    # LPCMCI: links act within a time step and at lag 1.
-    "var_same_step": ("er", "var", "gaussian", "raw"),
+    # The simulations of the PCMCI, PCMCI+, and LPCMCI papers, which keep the expected number of
+    # cross-links per variable fixed at every d; andrey_bench.temporal_models gives each setup and
+    # its source: Runge et al. (2019), Supplementary Sect. S4.1; Runge (2020), Sect. 4; Gerhardus
+    # and Runge (2020), Sect. 4.
+    "pcmci_paper": ("random", "pcmci2019", "gaussian", "raw"),
+    "pcmciplus_paper": ("random", "pcmciplus2020", "gaussian", "raw"),
+    "lpcmci_paper": ("random", "lpcmci2020", "gaussian", "raw"),
 }
 
 #: Temporal regimes and the density their keys set. At density 0 the instantaneous graph has no
-#: edges, so the truth is lag-only: lag 1 holds every link. At a positive density the instantaneous
-#: graph is an ER DAG of that mean degree, and the truth is a window over lags 0 and 1.
+#: edges, so the truth is lag-only: lag 1 holds every link.
 LAG_ONLY_DENSITY = 0.0
-SAME_STEP_DENSITY = 1.0
 TEMPORAL_REGIMES: dict[str, float] = {
     "var_lagged": LAG_ONLY_DENSITY,
-    "var_same_step": SAME_STEP_DENSITY,
+    # The paper models' cross-links per variable.
+    **{
+        regime: temporal_models.MODELS[REGIMES[regime][1]].cross_degree
+        for regime in ("pcmci_paper", "pcmciplus_paper", "lpcmci_paper")
+    },
 }
 
 #: The registry's ``graph_kind`` for a truth stored as window marks.
@@ -149,6 +161,9 @@ def latents_for(regime: str, d: int) -> int:
     """Return how many of `d` nodes `regime` hides, or 0 for a regime without hidden nodes."""
     if regime not in REGIMES:
         raise KeyError(f"unknown regime {regime!r}; known: {sorted(REGIMES)}")
+    functional = REGIMES[regime][1]
+    if functional in temporal_models.MODELS:
+        return temporal_models.hidden_count(functional, d)
     per = LATENT_REGIMES.get(regime)
     return 0 if per is None else max(1, d // per)
 
@@ -227,8 +242,23 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
     """Return the ``andrey.data.sample_scm`` arguments for ``key``, including ``key.density``.
 
     The registry stores this call for reproduction. Unmapped labels raise ``KeyError`` or
-    ``ValueError``.
+    ``ValueError``. A paper model's call is :func:`andrey_bench.temporal_models.sample`'s, with the
+    model's whole setup, so a change to the setup is a new dataset.
     """
+    if key.functional in temporal_models.MODELS:
+        call: dict[str, object] = {
+            "generator": "andrey_bench.temporal_models.sample",
+            "model": key.functional,
+            "setup": temporal_models.model_params(key.functional),
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+        }
+        if key.density != temporal_models.MODELS[key.functional].cross_degree:
+            raise ValueError(f"{key.label}: density must be the model's cross-links per variable")
+        if key.latents != temporal_models.hidden_count(key.functional, key.d):
+            raise ValueError(f"{key.label}: latents must be the model's unobserved variables")
+        return call
     try:
         graph = TOPOLOGY_TO_GRAPH[key.topology]
         functional = FUNCTIONAL_TO_ANDREY[key.functional]
@@ -256,8 +286,15 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
     """Return ``{model, num_nodes, density, params}`` in the ``andrey.data`` provenance format.
 
     ``params_for_density`` maps the key's density to builder parameters. Keys match the sample's
-    ``config.graph`` block.
+    ``config.graph`` block. A paper model records its cross-links per variable.
     """
+    if key.functional in temporal_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": {"cross_links_per_variable": key.density},
+        }
     model = TOPOLOGY_TO_GRAPH[key.topology]
     return {
         "model": model,
@@ -273,17 +310,21 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
     Samples are contiguous canonical ``float64``. Truth uses ``ds.graph.to_numpy()`` endpoint marks,
     as consumed by the scorer and Andrey adapter. With hidden nodes, the truth covers all ``d``
     nodes. :func:`latent_node_types` rebuilds their types from the key. A temporal truth is
-    returned as :func:`lag_only_marks` with the kind ``"temporal"`` when the key's density is 0, and
-    as :func:`window_truth_marks` with the kind :data:`WINDOW_KIND` otherwise.
+    returned as :func:`lag_only_marks` with the kind ``"temporal"``. A paper model's series and
+    truth come from :mod:`andrey_bench.temporal_models`, as the module docstring says.
     """
     kwargs = generation_kwargs(key)
+    if key.functional in temporal_models.MODELS:
+        series, window = temporal_models.sample(key.functional, key.d, key.n, key.seed)
+        series = np.ascontiguousarray(series, dtype=CANONICAL_DTYPE)
+        if temporal_models.MODELS[key.functional].same_step:
+            return series, window, WINDOW_KIND
+        return series, lag_marks(window[1:] != 0), "temporal"
     ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
     data_arr = np.ascontiguousarray(ds.data, dtype=CANONICAL_DTYPE)
     graph = ds.graph
     if isinstance(graph, TemporalStructure):
-        if key.density == LAG_ONLY_DENSITY:
-            return data_arr, lag_only_marks(key, graph), "temporal"
-        return data_arr, window_truth_marks(key, graph), WINDOW_KIND
+        return data_arr, lag_only_marks(key, graph), "temporal"
     if not hasattr(graph, "to_numpy"):
         raise TypeError(
             f"graph for {key.label} has no to_numpy() (kind={type(graph).__name__}); "
@@ -312,21 +353,6 @@ def lag_only_marks(key: DatasetKey, truth: TemporalStructure) -> np.ndarray:
     if lags != list(range(1, len(lags) + 1)):
         raise ValueError(f"{key.label}: truth lags {lags} are not 1..L")
     return np.stack([np.asarray(truth.lag(lag).to_numpy(), dtype=np.int8) for lag in lags])
-
-
-def window_truth_marks(key: DatasetKey, truth: TemporalStructure) -> np.ndarray:
-    """Return the ``(L + 1, d, d)`` int8 window marks of a temporal truth with lags ``0..L``.
-
-    Lag 0 is the instantaneous DAG's endpoint marks; lag ``k`` marks a tail at the earlier end of
-    every link ``X_i(t-k) -> X_j(t)`` (:mod:`andrey_bench.window`). Raises ``ValueError`` when the
-    lags are not ``0..L``.
-    """
-    if list(truth.lags) != list(range(len(truth.lags))):
-        raise ValueError(f"{key.label}: truth lags {list(truth.lags)} are not 0..L")
-    lag0 = np.asarray(truth.lag(0).to_numpy(), dtype=np.int8)
-    # The arrowhead of `i -> j` is the mark at j, `marks[j, i]`, so the links are the transpose.
-    links = [np.asarray(truth.lag(k).to_numpy()).T == ARROW for k in truth.lags[1:]]
-    return window_marks_of_dag_and_links(lag0, np.asarray(links).reshape(-1, key.d, key.d))
 
 
 def _same_call(recorded: Any, wanted: Any) -> bool:
@@ -476,7 +502,6 @@ __all__ = [
     "LATENT_REGIMES",
     "TEMPORAL_REGIMES",
     "LAG_ONLY_DENSITY",
-    "SAME_STEP_DENSITY",
     "WINDOW_KIND",
     "DEFAULT_REGIME",
     "latents_for",
@@ -486,7 +511,6 @@ __all__ = [
     "generation_kwargs",
     "generate_one",
     "lag_only_marks",
-    "window_truth_marks",
     "graph_record",
     "materialize",
     "data_path",

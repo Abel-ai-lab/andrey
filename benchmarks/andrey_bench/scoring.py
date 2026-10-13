@@ -138,11 +138,15 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
     - ``lagged_tail``, ``lagged_circle``, ``lagged_arrow``: the true lagged links found, by the mark
       at their earlier end (a tail is the true one).
 
-    Conflicts are read by :func:`_scored_marks`. Raises ``TypeError`` unless both are window graphs
-    and ``ValueError`` unless the truth's lag 0 is a DAG and both cover the same variables.
+    Conflicts are read by :func:`_scored_marks`. A truth with unobserved variables is not scored:
+    its estimate is a PAG over the observed ones, and the true PAG is not computed here, so only
+    ``family`` is returned. Raises ``TypeError`` unless both are window graphs and ``ValueError``
+    unless the truth's lag 0 is a DAG and both cover the same variables.
     """
     if not isinstance(estimate, W.WindowGraph) or not isinstance(truth, W.WindowGraph):
         raise TypeError("window_scores needs a window estimate and a window truth")
+    if truth.latents:
+        return {"family": "temporal_window"}
     if truth.lag0 != "dag" or estimate.n_nodes != truth.n_nodes:
         raise ValueError("window_scores needs a DAG lag-0 truth over the estimate's variables")
     lags = max(estimate.tau_max, truth.tau_max) + 1

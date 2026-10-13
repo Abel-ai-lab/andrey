@@ -81,10 +81,12 @@ class WindowGraph:
     of a regime with same-step links (``lag0="dag"``). ``marks`` keeps every code the solution
     returned, conflicts included, so two estimates are the same graph exactly when their marks are
     equal; scoring reads conflicts as its kind does (:func:`andrey_bench.scoring.window_scores`).
+    A truth's last ``latents`` variables are unobserved, and an estimate covers the others.
     """
 
     marks: np.ndarray
     lag0: str
+    latents: int = 0
 
     def __post_init__(self) -> None:
         marks = np.asarray(self.marks)
@@ -103,13 +105,3 @@ class WindowGraph:
     def tau_max(self) -> int:
         """The largest lag the window covers."""
         return int(self.marks.shape[0]) - 1
-
-
-def window_marks_of_dag_and_links(lag0: np.ndarray, links: np.ndarray) -> np.ndarray:
-    """Stack a lag-0 endpoint-mark matrix and an ``(L, n, n)`` 0/1 link stack as window marks.
-
-    ``links[k - 1, i, j]`` is the link ``X_i(t-k) -> X_j(t)``; each becomes a tail at its earlier
-    end.
-    """
-    lagged = np.where(np.asarray(links) != 0, TAIL, NULL)
-    return np.concatenate([np.asarray(lag0)[None], lagged]).astype(np.int8)

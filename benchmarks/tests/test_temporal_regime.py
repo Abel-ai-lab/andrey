@@ -27,7 +27,6 @@ from andrey_bench.contracts import (
     temporal_from_links,
 )
 from andrey_bench.integration import _truth, run_batch, to_dataframe
-from andrey_bench.window import WindowGraph
 
 _TAIL, _ARROW = 1, 2
 
@@ -101,14 +100,10 @@ def test_a_lagged_key_is_a_sample_scm_call_of_its_own():
     assert key.digest != _lagged_key(seed=1).digest != _lagged_key(n=301).digest
 
 
-def test_the_lagged_datasets_keep_their_identity_beside_the_same_step_regime():
-    """The digests the lagged regime had before the same-step regime existed."""
+def test_the_lagged_datasets_keep_their_identity_beside_the_paper_regimes():
+    """The digests the lagged regime had before the paper regimes existed."""
     assert _lagged_key().digest == "d74ca17b53ba"
     assert _lagged_key(d=20, n=1000, seed=2).digest == "e09ae500537f"
-    same_step = _lagged_key(density=datasets.TEMPORAL_REGIMES["var_same_step"])
-    assert datasets.REGIMES["var_same_step"] == datasets.REGIMES["var_lagged"]
-    assert same_step.label == "er-var-gaussian-deg1-d5-n300-s0-raw"
-    assert same_step.digest != _lagged_key().digest
 
 
 # --- the stored truth ------------------------------------------------------------------------------
@@ -133,31 +128,10 @@ def test_a_lagged_key_stores_its_lag_only_truth_as_lag_marks(tmp_path):
     assert links_from_temporal(truth)[0].diagonal().all()
 
 
-def test_a_lag_only_stack_refuses_a_truth_with_instantaneous_edges():
-    """A lag-0 edge has no place in the lag-only stack, so it fails instead of losing the edge."""
-    key = _lagged_key(density=2.0)
-    truth = data.sample_scm(**datasets.generation_kwargs(key)).graph
+def test_a_lagged_key_with_instantaneous_edges_is_refused():
+    """A lag-0 edge has no place in the stored stack, so the key fails instead of losing it."""
     with pytest.raises(ValueError, match="instantaneous graph has edges"):
-        datasets.lag_only_marks(key, truth)
-
-
-def test_a_same_step_key_stores_its_truth_as_window_marks(tmp_path):
-    key = _lagged_key(d=6, density=datasets.TEMPORAL_REGIMES["var_same_step"])
-    registry = datasets.materialize([key], tmp_path)
-    entry = registry["keys"][key.label]
-    assert entry["graph_kind"] == datasets.WINDOW_KIND
-    assert entry["graph_shape"] == [2, key.d, key.d]
-
-    _, marks = datasets.load(tmp_path, key)
-    truth = _truth(marks, entry["graph_kind"])
-    generated = data.sample_scm(**datasets.generation_kwargs(key)).graph
-    assert isinstance(truth, WindowGraph) and truth.lag0 == "dag"
-    # Lag 0 is the instantaneous DAG, and it has edges; lag 1 marks a tail at every cause.
-    np.testing.assert_array_equal(truth.marks[0], generated.lag(0).to_numpy())
-    assert (truth.marks[0] == _TAIL).any()
-    lag1 = np.asarray(generated.lag(1).to_numpy()).T == _ARROW
-    np.testing.assert_array_equal(truth.marks[1], np.where(lag1, _TAIL, 0))
-    assert truth.marks[1].diagonal().all()
+        datasets.generate_one(_lagged_key(density=2.0))
 
 
 # --- links and marks -------------------------------------------------------------------------------

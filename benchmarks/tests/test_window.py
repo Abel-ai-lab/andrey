@@ -173,22 +173,27 @@ def test_a_window_estimate_survives_the_run_that_measured_it(tmp_path):
 # --- the pipeline ----------------------------------------------------------------------------------
 
 
-def test_a_same_step_run_records_its_window_and_link_scores(tmp_path):
-    """Through the real pipeline: the empty window's endpoint SHD is twice the truth's links."""
-    topology, functional, noise, standardize = datasets.REGIMES["var_same_step"]
-    key = datasets.DatasetKey(
+def _paper_key(regime: str, d: int = 6) -> datasets.DatasetKey:
+    topology, functional, noise, standardize = datasets.REGIMES[regime]
+    return datasets.DatasetKey(
         topology=topology,
         functional=functional,
         noise=noise,
         standardize=standardize,
-        density=datasets.TEMPORAL_REGIMES["var_same_step"],
-        d=5,
+        density=datasets.TEMPORAL_REGIMES[regime],
+        d=d,
         n=200,
         seed=0,
+        latents=datasets.latents_for(regime, d),
     )
+
+
+def test_a_same_step_run_records_its_window_and_link_scores(tmp_path):
+    """Through the real pipeline: the empty window's endpoint SHD is twice the truth's links."""
+    key = _paper_key("pcmciplus_paper")
     result = run_batch(
         tmp_path,
-        [baseline_empty_window(1)],
+        [baseline_empty_window(5)],
         [key],
         machine_id="tiny-cpu",
         cap_wall_s=240.0,
@@ -198,11 +203,30 @@ def test_a_same_step_run_records_its_window_and_link_scores(tmp_path):
     )
     assert result.errors == []
     (record,) = result.records
-    assert (record.status, record.output_type, record.tau_max) == ("ok", "temporal", 1)
+    assert (record.status, record.output_type, record.tau_max) == ("ok", "temporal", 5)
     _, marks = datasets.load(tmp_path, key)
     truth = _truth(marks, datasets.WINDOW_KIND)
     lag0_links = int(np.count_nonzero(truth.marks[0])) // 2
-    links = lag0_links + int(np.count_nonzero(truth.marks[1]))
+    links = lag0_links + int(np.count_nonzero(truth.marks[1:]))
     assert record.metrics["n_true_links"] == links
     assert record.metrics["endpoint_shd"] == 2 * links
     assert isinstance(rundir.read_structure(tmp_path, record.run_id), WindowGraph)
+
+
+def test_a_run_with_unobserved_series_records_no_score_against_the_truth(tmp_path):
+    """The estimate covers the observed series; without the true PAG there is nothing to score."""
+    key = _paper_key("lpcmci_paper", d=10)
+    result = run_batch(
+        tmp_path,
+        [baseline_empty_window(3)],
+        [key],
+        machine_id="tiny-cpu",
+        cap_wall_s=240.0,
+        repeats=1,
+        warmup=0,
+        run_dir=tmp_path,
+    )
+    assert result.errors == []
+    (record,) = result.records
+    assert record.status == "ok" and record.metrics == {"family": "temporal_window"}
+    assert rundir.read_structure(tmp_path, record.run_id).n_nodes == 10 - key.latents
