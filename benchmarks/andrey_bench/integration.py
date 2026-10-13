@@ -34,20 +34,24 @@ from andrey_bench.runner import (
     run_task,
     split_cores,
 )
+from andrey_bench.window import WindowGraph
 
 
 def _truth(
     marks: np.ndarray, kind: str = "dag", latents: int = 0
-) -> GraphStructure | TemporalStructure:
+) -> GraphStructure | TemporalStructure | WindowGraph:
     """Convert endpoint marks for the true graph into a ``GraphStructure``.
 
     Flag the last ``latents`` nodes as hidden. Scoring then projects the truth onto the observed
     nodes present in the data. A ``temporal`` truth is a stack of lag marks and becomes a
-    ``TemporalStructure`` with lags ``1..L``.
+    ``TemporalStructure`` with lags ``1..L``; a ``temporal_window`` truth is a stack of window marks
+    and becomes a :class:`~andrey_bench.window.WindowGraph` whose lag 0 is a DAG.
     """
     marks = np.asarray(marks)
     if kind == "temporal":
         return temporal_from_lag_marks(marks)
+    if kind == datasets.WINDOW_KIND:
+        return WindowGraph(marks, lag0="dag")
     types = datasets.latent_node_types(len(marks), latents)
     return GraphStructure.from_numpy(marks, kind=kind, node_types=types)
 

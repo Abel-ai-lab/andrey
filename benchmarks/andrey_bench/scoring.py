@@ -1,7 +1,8 @@
 """Scoring utilities for benchmark estimates.
 
-``score_result`` scores through ``andrey.metrics``, against the truth's PAG for a PAG estimate, and
-lag by lag for a temporal estimate (:func:`temporal_score_columns`).
+``score_result`` scores through ``andrey.metrics``, against the truth's PAG for a PAG estimate, lag
+by lag for a temporal estimate (:func:`temporal_score_columns`), and link by link for a window graph
+(:func:`window_scores`).
 
 ``confounded_pair_scores`` scores the pairs an estimate attributes to a hidden common cause.
 
@@ -22,17 +23,27 @@ import andrey.metrics as M
 from andrey import GraphStructure, TemporalStructure
 from andrey.core import LATENT
 from andrey.data.latent import marginal
+from andrey_bench import window as W
 from andrey_bench.contracts import links_from_temporal
 
 # Andrey endpoint-mark convention (mirrors contracts.py): mark AT node i on edge i-j is marks[i, j].
 _TAIL, _ARROW, _CIRCLE = 1, 2, 3
 
 
-def structure_hash(structure: GraphStructure | TemporalStructure) -> str:
+def structure_hash(structure: GraphStructure | TemporalStructure | W.WindowGraph) -> str:
     """A hash of the normalized graph, comparable across packages.
 
-    A temporal structure hashes its links as sorted ``(lag, cause, effect)`` triples.
+    A temporal structure hashes its links as sorted ``(lag, cause, effect)`` triples, and a window
+    graph its nonzero marks as sorted ``(lag, i, j, mark)`` tuples, conflicts included.
     """
+    if isinstance(structure, W.WindowGraph):
+        marks = sorted(
+            (int(k), int(i), int(j), int(structure.marks[k, i, j]))
+            for k, i, j in zip(*np.nonzero(structure.marks), strict=True)
+        )
+        return hashlib.sha1(
+            f"window:{structure.lag0}:{structure.n_nodes}:{marks}".encode()
+        ).hexdigest()
     if isinstance(structure, TemporalStructure):
         links = sorted(
             (int(lag) + 1, int(i), int(j))
@@ -44,7 +55,8 @@ def structure_hash(structure: GraphStructure | TemporalStructure) -> str:
 
 
 def score_result(
-    estimate: GraphStructure | TemporalStructure, truth: GraphStructure | TemporalStructure
+    estimate: GraphStructure | TemporalStructure | W.WindowGraph,
+    truth: GraphStructure | TemporalStructure | W.WindowGraph,
 ) -> dict[str, Any]:
     """Score an estimated graph against the ground truth.
 
@@ -58,8 +70,11 @@ def score_result(
     clustering.
 
     A temporal truth or estimate is scored by :func:`temporal_score_columns`, which raises
-    ``TypeError`` unless both are temporal.
+    ``TypeError`` unless both are temporal, and a window graph by :func:`window_scores`, which
+    raises ``TypeError`` unless both are window graphs.
     """
+    if isinstance(truth, W.WindowGraph) or isinstance(estimate, W.WindowGraph):
+        return window_scores(estimate, truth)
     if isinstance(truth, TemporalStructure) or isinstance(estimate, TemporalStructure):
         return temporal_score_columns(estimate, truth)
     if truth.kind == "dag" and (estimate.kind == "pag" or _has_hidden(truth)):
@@ -88,6 +103,96 @@ def temporal_score_columns(estimate: object, truth: object) -> dict[str, Any]:
         if block in scores:
             columns.update({f"{block}_{stat}": float(v) for stat, v in scores[block].items()})
     return columns
+
+
+def _scored_marks(graph: W.WindowGraph) -> np.ndarray:
+    """The window marks as scoring reads them, in the domain of the graph's lag-0 kind.
+
+    A ``cpdag`` has no circles: an unoriented (``o-o``) or conflicting (``x-x``) same-step link is
+    undirected, a tail at both ends, as Andrey's PCMCI+ returns it. A ``pag`` reads a conflict mark
+    as a circle, as Andrey's LPCMCI returns it.
+    """
+    marks = graph.marks.copy()
+    if graph.lag0 == "cpdag":
+        lag0 = marks[0]
+        unoriented = np.isin(lag0, (W.CIRCLE, W.CONFLICT)) | np.isin(lag0.T, (W.CIRCLE, W.CONFLICT))
+        lag0[unoriented & (lag0 != W.NULL)] = W.TAIL
+    marks[marks == W.CONFLICT] = W.CIRCLE
+    return marks
+
+
+def window_scores(estimate: object, truth: object) -> dict[str, Any]:
+    """Score a window graph link by link against a window truth whose lag 0 is a DAG.
+
+    A link is a same-step pair ``{i, j}`` or a lagged pair ``(X_i(t-k), X_j(t))``, ``k >= 1``,
+    self-links included. Columns, all over every link of lags ``0..L``:
+
+    - ``endpoint_shd``: the marks that differ from the truth's, two for a missing or an extra link
+      and one for each wrong end of a link both hold. A circle differs from the true tail or
+      arrowhead it leaves open, so an unoriented link costs its open ends. ``lag0_endpoint_shd`` and
+      ``lagged_endpoint_shd`` split it.
+    - ``adjacency_precision``, ``adjacency_recall``, ``adjacency_f1``: the links, whatever their
+      marks; ``n_true_links`` and ``n_est_links`` count them.
+    - ``wrong_marks``: tails and arrowheads, on links the truth holds, that contradict it; the ends
+      of an unoriented, conflicting, or circle-marked link claim nothing and are not counted.
+    - ``lagged_tail``, ``lagged_circle``, ``lagged_arrow``: the true lagged links found, by the mark
+      at their earlier end (a tail is the true one).
+
+    Conflicts are read by :func:`_scored_marks`. Raises ``TypeError`` unless both are window graphs
+    and ``ValueError`` unless the truth's lag 0 is a DAG and both cover the same variables.
+    """
+    if not isinstance(estimate, W.WindowGraph) or not isinstance(truth, W.WindowGraph):
+        raise TypeError("window_scores needs a window estimate and a window truth")
+    if truth.lag0 != "dag" or estimate.n_nodes != truth.n_nodes:
+        raise ValueError("window_scores needs a DAG lag-0 truth over the estimate's variables")
+    lags = max(estimate.tau_max, truth.tau_max) + 1
+    n = truth.n_nodes
+    raw, est, true_ = (
+        np.concatenate([m, np.zeros((lags - len(m), n, n), np.int8)])
+        for m in (estimate.marks, _scored_marks(estimate), truth.marks)
+    )
+    off = ~np.eye(n, dtype=bool)
+    upper = np.triu(off)
+    est0, true0 = est[0] != W.NULL, true_[0] != W.NULL
+    est_adj = np.concatenate([(est0 | est0.T)[upper], (est[1:] != W.NULL).ravel()])
+    true_adj = np.concatenate([(true0 | true0.T)[upper], (true_[1:] != W.NULL).ravel()])
+    tp = int((est_adj & true_adj).sum())
+    fp = int((est_adj & ~true_adj).sum())
+    fn = int((~est_adj & true_adj).sum())
+
+    lag0_shd = int((est[0] != true_[0])[off].sum())
+    lagged_est, lagged_true = est[1:] != W.NULL, true_[1:] != W.NULL
+    both = lagged_est & lagged_true
+    lagged_shd = 2 * int((lagged_est ^ lagged_true).sum()) + int(
+        (both & (est[1:] != true_[1:])).sum()
+    )
+
+    # A claim is a tail or an arrowhead the solution returned; an unoriented link claims nothing.
+    definite = np.isin(raw, (W.TAIL, W.ARROW))
+    held0 = (true0 | true0.T) & off
+    wrong0 = int((definite[0] & held0 & (est[0] != true_[0])).sum())
+    wrong_lagged = int((definite[1:] & both & (est[1:] != true_[1:])).sum())
+
+    found = est[1:][both]
+    # A ratio with no denominator scores 1, as andrey.metrics scores it.
+    precision = tp / (tp + fp) if tp + fp else 1.0
+    recall = tp / (tp + fn) if tp + fn else 1.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return {
+        "family": "temporal_window",
+        "endpoint_shd": float(lag0_shd + lagged_shd),
+        "lag0_endpoint_shd": float(lag0_shd),
+        "lagged_endpoint_shd": float(lagged_shd),
+        "adjacency_precision": precision,
+        "adjacency_recall": recall,
+        "adjacency_f1": f1,
+        "n_true_links": float(tp + fn),
+        "n_est_links": float(tp + fp),
+        "wrong_marks": float(wrong0 + wrong_lagged),
+        "lagged_tail": float((found == W.TAIL).sum()),
+        "lagged_circle": float((found == W.CIRCLE).sum()),
+        "lagged_arrow": float((found == W.ARROW).sum()),
+    }
 
 
 def _has_hidden(truth: GraphStructure) -> bool:
@@ -317,7 +422,7 @@ def sortability(data: np.ndarray, truth: GraphStructure | TemporalStructure) -> 
     is unavailable, or for a temporal truth: sortability is defined for i.i.d. rows, not a series.
 
     """
-    if isinstance(truth, TemporalStructure):
+    if isinstance(truth, (TemporalStructure, W.WindowGraph)):
         return {}
     try:
         import andrey.data as _data  # noqa: WPS433 (deliberately lazy — optional dependency probe)

@@ -18,6 +18,7 @@ import pandas as pd
 
 from andrey_bench import provenance
 from andrey_bench.contracts import RunRecord, links_from_temporal, temporal_from_links
+from andrey_bench.window import WindowGraph
 
 RECORDS_DIRNAME = "records"
 RUN_META_NAME = "run_meta.json"
@@ -34,12 +35,22 @@ def structure_path(out: str | Path, run_id: str) -> Path:
 def write_structure(out: str | Path, run_id: str, structure) -> None:
     """Write the graph a solution returned to ``structures/``, normalized, as its edge set.
 
-    A temporal structure is written as its ``(L, n, n)`` link stack, with the kind ``temporal``.
+    A temporal structure is written as its ``(L, n, n)`` link stack, with the kind ``temporal``, and
+    a window graph as its window marks, with the kind ``temporal_window``.
     """
     from andrey import TemporalStructure
 
     path = structure_path(out, run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(structure, WindowGraph):
+        np.savez_compressed(
+            path,
+            marks=structure.marks,
+            kind=np.asarray("temporal_window"),
+            lag0=np.asarray(structure.lag0),
+            n_nodes=np.asarray(structure.n_nodes),
+        )
+        return
     if isinstance(structure, TemporalStructure):
         np.savez_compressed(
             path,
@@ -66,6 +77,8 @@ def read_structure(out: str | Path, run_id: str):
     with np.load(path, allow_pickle=False) as z:
         if str(z["kind"]) == "temporal":
             return temporal_from_links(z["links"])
+        if str(z["kind"]) == "temporal_window":
+            return WindowGraph(z["marks"], lag0=str(z["lag0"]))
         return GraphStructure.from_edges(z["edges"], n_nodes=int(z["n_nodes"]), kind=str(z["kind"]))
 
 
