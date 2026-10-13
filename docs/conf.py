@@ -224,6 +224,9 @@ blog_title = "Andrey blog"
 blog_baseurl = SITE_URL
 blog_authors = {"Shu Wan": ("Shu Wan", None)}
 blog_feed_fulltext = True
+# A post renamed after release keeps its old address: front matter `redirect` names it, and the
+# page there sends the reader on at once.
+post_redirect_refresh = 0
 post_date_format = "%B %-d, %Y"
 post_date_format_short = "%B %-d, %Y"
 post_auto_image = 0
@@ -399,7 +402,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
 
 
 # The pages that show the "Why Andrey is fast" scenes.
-WHY_FAST_PAGES = {"index", "blog/why-andrey-is-fast"}
+WHY_FAST_PAGES = {"index", "blog/20261008-why-andrey-is-fast"}
 
 
 def _post_key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...]]:

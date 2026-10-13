@@ -281,10 +281,10 @@ def readme_banner(quality: int = BANNER_QUALITY) -> str:
 # ---- blog post covers ---------------------------------------------------------------------------
 # A post's cover is a banner, 1600 x 640, under the post's title: on the left, over a navy fade,
 # the wordmark, the title, and a short line (its release, or its kind); on the right, the post's
-# art. Each art is stored as drawn (``ART``), its subject on the right, and recolored at build time
-# to the brand's tones (``brand_tones``), so cobalt and amber match across posts. A post without
-# art shows the stipple ground. The JPEG takes the first quality in ``COVER_QUALITIES`` under
-# MAX_BYTES.
+# art. Each art (``ART``), its subject on the right, is stored already recolored to the brand's
+# tones (``brand_tones``), so the file is what the page shows and cobalt and amber match across
+# posts; a test fails on art stored otherwise. A post without art shows the stipple ground. The
+# JPEG takes the first quality in ``COVER_QUALITIES`` under MAX_BYTES.
 COVER_W, COVER_H = 1600, 640
 COVER_QUALITIES = (75, 70, 65, 60, 55)
 ART = {kind: BRAND / f"art-{kind}.jpg" for kind in ("pair", "lanes", "iceberg", "contour")}
@@ -361,13 +361,13 @@ def brand_tones(image: Image.Image, match_ground: bool = True) -> Image.Image:
 
 
 def _art(kind: str) -> Image.Image:
-    """The post's art in the brand's tones at the cover's size, or the stipple ground."""
+    """The post's art as stored (already in the brand's tones), or the stipple ground."""
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
     if kind == "ground":
         return grain.stipple(COVER_W, COVER_H).convert("RGB")
     with Image.open(ART[kind]) as art:
-        return brand_tones(art.convert("RGB").resize((COVER_W, COVER_H), Image.LANCZOS))
+        return art.convert("RGB").resize((COVER_W, COVER_H), Image.LANCZOS)
 
 
 def _jpeg_href(image: Image.Image) -> str:

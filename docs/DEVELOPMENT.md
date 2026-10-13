@@ -36,7 +36,7 @@ charts, which the launch post and the benchmark explorer show too.
 
 The speed section's "Why Andrey is fast" pill opens a dialog of four animated scenes, one per idea
 behind the speed, built by [`site/why_fast.py`](../site/why_fast.py). The blog post
-`docs/blog/why-andrey-is-fast.md` shows the same scenes under its own headings. Each scene compares
+`docs/blog/20261008-why-andrey-is-fast.md` shows the same scenes under its own headings. Each scene compares
 Andrey with a lane labeled Others and names no package. `site/assets/why-fast.js` plays them with
 Motion, vendored unmodified as `site/assets/motion.js` under its MIT license; the version is pinned
 in the file's banner and in `tests/unit/test_why_fast.py`. `conf.py` loads both scripts only on

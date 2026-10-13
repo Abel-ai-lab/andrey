@@ -1,8 +1,8 @@
 # Brand files
 
 - `art-<cover>.jpg`: each blog post's art, 1600 x 640, its subject on the right where the banner
-  leaves room for the text; `site/cards.py` recolors it to the brand's tones and adds the
-  wordmark, the title, and the release at build time. Each is stored as drawn.
+  leaves room for the text, stored after `brand_tones` in `site/cards.py` recolors it to the
+  brand's tones (a site test checks). The build adds the wordmark, the title, and the release.
   - `art-pair.jpg`: the launch post's, portraits of Andrey Markov and Andrey Kolmogorov drawn as
     navy line screens, overlapping, Kolmogorov mirrored to face left and scaled so both heads read
     the same size (Markov from his 1886 portrait, public domain, Wikimedia Commons

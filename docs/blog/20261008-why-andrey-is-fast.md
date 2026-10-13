@@ -1,5 +1,5 @@
 ---
-name: why-andrey-is-fast
+name: 20261008-why-andrey-is-fast
 description: "The four ideas behind Andrey's speed, each shown as a short animation."
 meta:
   type: post
@@ -7,6 +7,7 @@ blogpost: true
 date: 2026-10-08
 author: Shu Wan
 tags: [Engineering, Speed]
+redirect: blog/why-andrey-is-fast
 version: 0.1.0
 cover: lanes
 ---
