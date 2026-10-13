@@ -135,9 +135,13 @@ row names the nodes) or a `.npy` file.
 
 Discrete data, yes: code each category as a whole number. PC, FCI, GFCI, and CDNOD test
 independence on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, and hill
-climbing score it with `score_func="local_score_BDeu"`. Mixed data is not supported yet; it is part
-of stage 1 of the [roadmap](roadmap.md). The other methods assume continuous data: BOSS and GRaSP
-score with the linear-Gaussian BIC, and the LiNGAM methods assume continuous non-Gaussian noise.
+climbing score it with `score_func="local_score_BDeu"`. Mixed data, with continuous and categorical
+columns, is experimental: the same methods take the degenerate Gaussian and conditional Gaussian
+tests (`indep_test="dg"` or `"cg"`) and scores (`score_func="local_score_DG"` or
+`"local_score_CG"`), with the categorical columns named by `categorical` or read from a
+DataFrame's column types. We have not benchmarked them yet. The other methods assume continuous
+data: BOSS and GRaSP score with the linear-Gaussian BIC, and the LiNGAM methods assume continuous
+non-Gaussian noise.
 
 ### Time series and several datasets?
 

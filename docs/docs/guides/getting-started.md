@@ -272,6 +272,15 @@ For categorical data, code each category as a whole number and choose a categori
 the pair: `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`. Each distinct
 value of a column is one category, so the codes need not start at 0.
 
+For mixed data, with continuous and categorical columns, choose a mixed-data test or score and
+name the categorical columns: `andrey.pc(data, indep_test="dg", categorical=["smoker", "region"])`
+or `indep_test="cg"`, and `andrey.ges(data, score_func="local_score_DG", categorical=[...])` or
+`"local_score_CG"`. A DataFrame's `category`, `bool`, and text columns count as categorical
+without `categorical`, and their values need no coding. The degenerate Gaussian (`dg`) suits
+effects that are linear and add up across categories; the conditional Gaussian (`cg`) lets a
+category change a variable's spread as well as its mean, but it needs several rows for every
+combination of categories it conditions on. Both are experimental.
+
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
