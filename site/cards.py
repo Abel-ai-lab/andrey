@@ -358,6 +358,10 @@ COVERS = {
     "contour": "a contour map with two summits, one dotted path ending on each",
     "graph": "the letters of Andrey as a graph",
 }
+# Where a crop of a cover keeps its subject, as a CSS object-position: the blog's front page shows
+# each earlier post's cover as a square tile. The pair's portraits sit at its two ends, so its tile
+# keeps the left one; every other cover keeps its center.
+COVER_FOCUS = {"pair": "left"}
 
 
 def cover_jpeg(kind: str, quality: int = COVER_QUALITY) -> bytes:

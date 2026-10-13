@@ -35,7 +35,65 @@
   font-size: 0.95rem;
 }
 
-/* ABlog's post list: each post's title, its date under it, then its excerpt. */
+/* ---------- the blog's front page (docs/conf.py, _blog_index) ---------- */
+/* The Release cards page's blocks (benchmarks.css), with each post's own cover in place of the
+   stipple ground: whole beside the newest post's TL;DR, and cropped square in an earlier post's
+   tile (site/cards.py, COVER_FOCUS). */
+.blog-tile {
+  display: block;
+  position: relative;
+  overflow: hidden;
+}
+
+.blog-tile::before,
+.blog-tile::after {
+  content: none;
+}
+
+.blog-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blog-latest .blog-tile {
+  aspect-ratio: auto;
+}
+
+/* The cover is wide, so it shares the width with the TL;DR; a narrow screen stacks them. */
+@media (width > 760px) {
+  .release-latest.blog-latest {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+}
+
+.bd-article .blog-latest h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.blog-latest h2 a {
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.blog-latest h2 a:hover {
+  color: var(--andrey-accent);
+}
+
+.blog-latest .blog-date {
+  margin-top: -0.65rem;
+  color: var(--andrey-muted);
+  font-size: 0.88rem;
+}
+
+/* ABlog's post list, on the archive and author pages: each post's title, its date under it, then
+   its excerpt. */
 .postlist {
   padding-left: 0;
   list-style: none;

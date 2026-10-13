@@ -1,6 +1,7 @@
 /* The Release cards page: the latest release's cover beside its TL;DR, then the earlier releases
-   as a list. A release card: its cover beside its opening, and its figures. Loaded on those pages
-   only. Colors are --andrey-* tokens. */
+   as a list. A release card: its cover beside its opening, and its figures. Loaded on those pages,
+   and on the blog's front page, which lists the posts in the same blocks (blog.css). Colors are
+   --andrey-* tokens. */
 
 /* ---------- the intro ---------- */
 .bd-article section:has(> .release-latest) > h1 + p {

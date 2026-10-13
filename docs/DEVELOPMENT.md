@@ -77,11 +77,19 @@ draws the graphs they return.
 
 ## The blog
 
-ABlog builds the blog from [`blog/`](blog/index.md): the post list at `/blog/`, an archive, author
-pages, and an Atom feed at `/blog/atom.xml`. A post is a MyST page whose front matter sets
-`blogpost: true`, its `author`, and its `date`. A post without a date is a draft, which the post
-list leaves out. A dated post is published in every build, even before its date, so a future date
-does not keep a post private.
+ABlog builds the blog from [`blog/`](blog/index.md): the posts, an archive, author pages, and an
+Atom feed at `/blog/atom.xml`. A post is a MyST page whose front matter sets `blogpost: true`, its
+`author`, its `date`, and its `description`. A post without a date is a draft, which the blog
+leaves out. A dated post is published in every build, even before its date, so a future date does
+not keep a post private.
+
+The blog's front page, `/blog/`, lists the dated posts in the Release cards page's blocks, from
+their front matter: the `blog-index` directive in `blog/index.md`, which `_blog_index` in
+`conf.py` fills. The newest post leads with its cover beside its title, its date, its
+`description` as its TL;DR, and a button to the post. The earlier posts follow, newest first, each
+in a row with a square tile of its cover, its description, and its date. Newest means the latest
+date, a later version breaking a tie, as for the alpha banner below. A tile crops the cover around
+its middle, or where `COVER_FOCUS` in `site/cards.py` says. A new post needs no change to the page.
 
 A post belongs to the release in its `version` front matter, and later builds leave it as that
 release rendered it: its numbers are typed text, and every file it includes (a figure, code, or
@@ -198,8 +206,9 @@ shows:
 - The built pages: every page has one description, the same as its link preview's, at most 160
   characters, and neither empty nor only the project's name; its wordmark leads home and Docs,
   Examples, and Blog lead to their sections; its favicon and link-preview card were built. The
-  homepage's stylesheets carry a content version. The blog lists every post, and each post has a
-  built cover and a byline with its author and date. Every site address in the README, the
+  homepage's stylesheets carry a content version. The blog's front page leads with the newest post
+  and its cover and lists every other post once, newest first; each post has a built cover and a
+  byline with its author and date. Every site address in the README, the
   project URLs, and the citation is built.
 
 To check external links: `uv run --group docs sphinx-build -b linkcheck docs docs/_build/linkcheck`.
@@ -215,7 +224,7 @@ To check external links: `uv run --group docs sphinx-build -b linkcheck docs doc
 | Navbar: wordmark and sections | `docs/_templates/site-logo.html`, `docs/_templates/site-nav.html` |
 | Wordmark (Inter outlines, light and dark ink) and its generator | `site/brand/`, `site/wordmark.py` |
 | Palette as CSS custom properties | `docs/palette_css.py` |
-| Blog posts and the post list | `docs/blog/` |
+| Blog posts and the front page that lists them | `docs/blog/`, `docs/_static/blog.css` |
 | Release cards and the page that lists them | `docs/docs/benchmarks/`, `docs/docs/benchmarks.md`, `docs/_static/benchmarks.css` |
 | Docs landing page and section index | `docs/docs/index.md` |
 | API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/code/index.md` |

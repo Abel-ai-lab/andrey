@@ -9,8 +9,8 @@ orphan: true
 
 # Blog
 
-```{postlist}
-:excerpts:
-:format: "{title} {date}"
-:date: "%B %-d, %Y"
+% The newest post beside its cover, then the earlier posts, all from their front matter
+% (`_blog_index` in docs/conf.py).
+
+```{blog-index}
 ```

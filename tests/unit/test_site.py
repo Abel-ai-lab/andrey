@@ -1020,6 +1020,31 @@ def test_the_alpha_banner_links_the_newest_release_post(conf):
     assert "introducing-andrey" not in banner
 
 
+def test_the_blog_lists_the_newest_post_first(conf):
+    newest_first = conf["_newest_first"]
+    posts = [
+        ("blog/why-andrey-is-fast", "2026-10-08", "0.1.0"),
+        ("blog/introducing-andrey", "2026-10-08", "0.1.0"),
+        ("blog/andrey-0-2-0", "2026-10-12", "0.2.0"),
+        ("blog/a-note", "2026-10-10", ""),
+        ("blog/andrey-0-3-0", "2026-10-12", "0.3.0"),
+    ]
+    # By date, then version; posts that tie in both keep their order.
+    assert newest_first(posts) == [
+        "blog/andrey-0-3-0",
+        "blog/andrey-0-2-0",
+        "blog/a-note",
+        "blog/why-andrey-is-fast",
+        "blog/introducing-andrey",
+    ]
+    # A post without a version leads when it is the newest, and follows one with a version on the
+    # same day.
+    assert newest_first([*posts, ("blog/later", "2026-10-13", "")])[0] == "blog/later"
+    assert newest_first([*posts, ("blog/same-day", "2026-10-12", "")])[2] == "blog/same-day"
+    with pytest.raises(ValueError, match="introducing-andrey, blog/why-andrey-is-fast"):
+        newest_first(posts[:2])
+
+
 def test_the_homepage_has_no_latest_strip(placeholder_page):
     # The alpha banner links the latest release's post, and the header links the blog and the
     # FAQ.
