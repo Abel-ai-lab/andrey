@@ -23,6 +23,7 @@ import textwrap
 import ablog.blog
 from ablog.blog import Blog
 from docutils import nodes
+from docutils.parsers.rst import Directive
 from sphinx import addnodes
 from sphinx.errors import ConfigError
 
@@ -223,6 +224,9 @@ blog_title = "Andrey blog"
 blog_baseurl = SITE_URL
 blog_authors = {"Shu Wan": ("Shu Wan", None)}
 blog_feed_fulltext = True
+# A post renamed after release keeps its old address: front matter `redirect` names it, and the
+# page there sends the reader on at once.
+post_redirect_refresh = 0
 post_date_format = "%B %-d, %Y"
 post_date_format_short = "%B %-d, %Y"
 post_auto_image = 0
@@ -398,22 +402,33 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
 
 
 # The pages that show the "Why Andrey is fast" scenes.
-WHY_FAST_PAGES = {"index", "blog/why-andrey-is-fast"}
+WHY_FAST_PAGES = {"index", "blog/20261008-why-andrey-is-fast"}
+
+
+def _post_key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...]]:
+    """When a post, (docname, ISO date, version), was published: its date, then its version, so a
+    later version breaks a tie in date. A post without a version ("") comes before one with."""
+    return post[1], tuple(int(part) for part in post[2].split(".") if part)
 
 
 def _newest_post(posts: list[tuple[str, str, str]]) -> tuple[str, str]:
-    """The newest of ``posts``, each (docname, ISO date, version): its docname and version. A
-    later version breaks a tie in date; posts that tie in both fail, rather than let file order
-    pick one."""
-
-    def key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...]]:
-        return post[1], tuple(int(part) for part in post[2].split("."))
-
-    newest = max(posts, key=key)
-    tied = sorted(post[0] for post in posts if key(post) == key(newest))
+    """The newest of ``posts``, each (docname, ISO date, version): its docname and version, by
+    ``_post_key``. Posts that tie in both date and version fail, rather than let file order pick
+    one."""
+    newest = max(posts, key=_post_key)
+    tied = sorted(post[0] for post in posts if _post_key(post) == _post_key(newest))
     if len(tied) > 1:
         raise ValueError(f"{', '.join(tied)} are all the newest post; date one of them later")
     return newest[0], newest[2]
+
+
+def _newest_first(posts: list[tuple[str, str, str]]) -> list[str]:
+    """The docnames of ``posts``, each as for ``_newest_post``: the newest post, then the others
+    newest first by ``_post_key``. Others that tie in both date and version keep their order in
+    ``posts``."""
+    newest = _newest_post(posts)[0]
+    others = sorted((post for post in posts if post[0] != newest), key=_post_key, reverse=True)
+    return [newest, *(post[0] for post in others)]
 
 
 def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
@@ -438,6 +453,9 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     if pagename == "index":
         context["home"] = app.andrey_home
         css, js = ["figures.css", "site.css"], ["figures.js"]
+    elif pagename == "blog/index":
+        # The posts in the Release cards page's blocks.
+        css = ["benchmarks.css", "blog.css"]
     elif pagename == "blog" or pagename.startswith("blog/"):
         css, js = ["figures.css", "blog.css"], ["figures.js"]
     elif pagename in INTERACTIVE:
@@ -494,17 +512,47 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     title.parent.insert(at + 2, nodes.raw("", byline, format="html"))
 
 
-def _post_cover(app, docname: str) -> str:  # noqa: ANN001
-    """Draw the post's cover (site/cards.py) and return its figure. The front matter's ``cover``
-    names it (``pair``, ``iceberg``, ``contour``, or ``graph``, the default); ``cover_caption``
-    adds a caption."""
+def _cover_kind(app, docname: str) -> str:  # noqa: ANN001
+    """The post's art: its front matter's ``cover`` (``cards.COVERS``), else the stipple ground."""
+    return app.env.metadata.get(docname, {}).get("cover", "ground")
+
+
+def _cover_line(app, docname: str) -> str:  # noqa: ANN001
+    """The banner's short line: "Release <version>" for a release post, else the post's kind (its
+    first tag)."""
     meta = app.env.metadata.get(docname, {})
-    kind = meta.get("cover", "graph")
+    tags = meta.get("tags") or []
+    if isinstance(tags, str):
+        tags = [tag.strip(" \"'") for tag in tags.strip("[]").split(",") if tag.strip()]
+    kind = tags[0] if tags else ""
+    version = str(meta.get("version") or "")
+    return f"{kind} {version}" if kind == "Release" and version else kind
+
+
+def _cover_file(app, docname: str) -> tuple[str, str]:  # noqa: ANN001
+    """Write the post's banner (site/cards.py) into the build: its path from the site's root, and
+    its kind. The post and the blog's front page both show it."""
+    kind = _cover_kind(app, docname)
+    title = app.env.titles[docname].astext()
     image = f"assets/covers/{docname.removeprefix('blog/')}.jpg"
-    target = pathlib.Path(app.outdir) / image
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(cards.cover_jpeg(kind))
-    caption = meta.get("cover_caption")
+    cover = cards.cover_jpeg(kind, title, _cover_line(app, docname))
+    _write_bytes(pathlib.Path(app.outdir) / image, cover)
+    return image, kind
+
+
+def _tile_file(app, docname: str) -> str:  # noqa: ANN001
+    """Write the post's art as a square tile (site/cards.py) into the build: its path from the
+    site's root."""
+    image = f"assets/tiles/{docname.removeprefix('blog/')}.jpg"
+    _write_bytes(pathlib.Path(app.outdir) / image, cards.tile_jpeg(_cover_kind(app, docname)))
+    return image
+
+
+def _post_cover(app, docname: str) -> str:  # noqa: ANN001
+    """The post's cover figure (``_cover_file``); the front matter's ``cover_caption`` adds a
+    caption."""
+    image, kind = _cover_file(app, docname)
+    caption = app.env.metadata.get(docname, {}).get("cover_caption")
     src = posixpath.relpath(image, posixpath.dirname(docname))
     return (
         f'<figure class="post-cover"><img class="dark-light" src="{src}" '
@@ -513,6 +561,83 @@ def _post_cover(app, docname: str) -> str:  # noqa: ANN001
         + (f"<figcaption>{html.escape(caption)}</figcaption>" if caption else "")
         + "</figure>"
     )
+
+
+# ---- the blog's front page -------------------------------------------------------------------
+class _BlogIndex(Directive):
+    """``blog-index``: where a page lists the posts, which ``_blog_index`` fills once ABlog has
+    read every post."""
+
+    def run(self) -> list[nodes.Node]:
+        return [nodes.container(classes=["blog-index"])]
+
+
+def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
+    """List the dated posts in place of ``blog-index``, newest first (``_newest_first``): the
+    newest beside its whole cover, with its description as its TL;DR, then the others as rows,
+    each with a small square tile of its cover (``_tile_file``), loaded as the reader scrolls to
+    it. Every post lists its front matter's ``tags``. The Release cards page's blocks style both
+    (``_static/benchmarks.css``)."""
+    places = [node for node in doctree.findall(nodes.container) if "blog-index" in node["classes"]]
+    if app.builder.format != "html" or not places:
+        return
+    meta = app.env.metadata
+    posts = {post.docname: post for post in Blog(app).posts if post.date}
+    order = _newest_first(
+        [
+            (name, f"{post.date:%Y-%m-%d}", str(meta[name].get("version") or ""))
+            for name, post in posts.items()
+        ]
+    )
+    latest, rows = "", []
+    for name in order:
+        post = posts[name]
+        description = html.escape((meta[name].get("description") or "").strip())
+        if not description:
+            raise ValueError(f"{name} sets no description, which the blog's front page shows")
+        href = app.builder.get_relative_uri(docname, name)
+        title = html.escape(post.title)
+        day = (
+            f'<time datetime="{post.date:%Y-%m-%d}">'
+            f"{post.date.strftime(app.config.post_date_format)}</time>"
+        )
+        read = f'<a href="{href}">Read the post<span class="visually-hidden">: {title}</span></a>'
+        # Each tag links to ABlog's page of the posts that share it.
+        tags = "".join(
+            f'<li><a href="{app.builder.get_relative_uri(docname, tag.docname)}">'
+            f"{html.escape(tag.name)}</a></li>"
+            for tag in post.tags
+        )
+        tags = f'<ul class="blog-tags" aria-label="Tags">{tags}</ul>' if tags else ""
+        # The title links to the post, so the cover's link is for the pointer only.
+        link = f'<a class="release-tile blog-tile" href="{href}" tabindex="-1" aria-hidden="true">'
+        if not latest:
+            image, _ = _cover_file(app, name)
+            cover = (
+                f'{link}<img class="dark-light" '
+                f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
+                f'width="{cards.COVER_W}" height="{cards.COVER_H}"></a>'
+            )
+            latest = (
+                f'<div class="release-latest blog-latest">{cover}<div class="release-tldr">'
+                f'<h2><a href="{href}">{title}</a></h2><p class="blog-date">{day}</p>{tags}'
+                f'<p>{description}</p><div class="release-actions"><p>{read}</p></div></div></div>'
+            )
+            continue
+        image = _tile_file(app, name)
+        cover = (
+            f'{link}<img class="dark-light" '
+            f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
+            f'width="{cards.TILE}" height="{cards.TILE}" loading="lazy" decoding="async"></a>'
+        )
+        rows.append(
+            f'<div class="release-row">{cover}<div class="release-body">'
+            f'<h3><a href="{href}">{title}</a></h3><p>{description}</p>{tags}</div>'
+            f'<div class="release-meta"><p>{day}</p><ul><li>{read}</li></ul></div></div>'
+        )
+    earlier = f"<section><h2>Earlier posts</h2>{''.join(rows)}</section>" if rows else ""
+    for place in places:
+        place.parent.replace(place, nodes.raw("", latest + earlier, format="html"))
 
 
 # ---- the examples and demos galleries ------------------------------------------------------------
@@ -641,5 +766,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     app.connect("html-page-context", _page_assets)
     app.connect("doctree-resolved", _post_byline)
+    app.add_directive("blog-index", _BlogIndex)
+    app.connect("doctree-resolved", _blog_index)
     # Before sphinx_autodoc_typehints, which returns a signature of its own.
     app.connect("autodoc-process-signature", _hide_private_signature, priority=100)
