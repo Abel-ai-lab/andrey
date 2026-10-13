@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 """Benchmark the mixed-data tests and scores on CPU: Andrey against Tetrad and bnlearn.
 
-Runs PC with the degenerate and the conditional Gaussian test and GES with the degenerate and the
-conditional Gaussian score from Andrey, the same four from Tetrad (PC and FGES, through its
-causal-cmd jar), bnlearn's hill climbing with its conditional linear Gaussian BIC and its
-``pc.stable`` with the conditional Gaussian test, and the empty graph. The data come from the
+Runs PC with the degenerate and the conditional Gaussian test, and GES and hill climbing with the
+degenerate and the conditional Gaussian score, from Andrey; Tetrad's PC and FGES with the same four
+(through its causal-cmd jar); bnlearn's ``pc.stable`` with the conditional Gaussian test and its
+hill climbing with the conditional linear Gaussian BIC; and the empty graph. Each pair runs one
+algorithm: PC with PC, GES with FGES, hill climbing with hill climbing. The data come from the
 ``mixed_er`` regime: a conditional linear Gaussian network on an Erdos-Renyi DAG, with the
 ``--categorical-share`` of the variables categorical, each with between the two ``--categories``
 counts of categories. Every solution is serial and reads the categorical columns by one rule:
@@ -31,7 +32,7 @@ import pandas as pd
 from discrete_cpu import SCORE_COLUMNS, rescore
 
 from andrey_bench import datasets, memcap, rundir
-from andrey_bench.adapters.andrey_mixed import AndreyGESMixed, AndreyPCMixed
+from andrey_bench.adapters.andrey_mixed import AndreyGESMixed, AndreyHCMixed, AndreyPCMixed
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_mixed import BnlearnHCCondGauss, BnlearnPCStableCondGauss
 from andrey_bench.adapters.tetrad_cmd import TetradFGES, TetradPC
@@ -44,30 +45,41 @@ REGIME = "mixed_er"
 #: The score columns ``--rescore`` recomputes: the categorical lane's, then the DAG rows' MEC pair.
 MIXED_SCORE_COLUMNS = (*SCORE_COLUMNS, "mec_shd", "mec_arrowhead_f1")
 
-#: Andrey's and Tetrad's run of one method with one test or score, by method.
+_PC_DG, _PC_CG = AndreyPCMixed("degen_gauss"), AndreyPCMixed("cond_gauss")
+_GES_DG = AndreyGESMixed("local_score_degen_gauss")
+_GES_CG = AndreyGESMixed("local_score_cond_gauss")
+_HC_DG = AndreyHCMixed("local_score_degen_gauss")
+_HC_CG = AndreyHCMixed("local_score_cond_gauss")
+_TETRAD_PC_DG, _TETRAD_PC_CG = TetradPC("degen_gauss"), TetradPC("cond_gauss")
+_FGES_DG = TetradFGES("local_score_degen_gauss")
+_FGES_CG = TetradFGES("local_score_cond_gauss")
+_BNLEARN_PC, _BNLEARN_HC = BnlearnPCStableCondGauss(), BnlearnHCCondGauss()
+
+#: Andrey's run of one algorithm with one test or score, and a comparator's run of that algorithm,
+#: by ``"<algorithm> <setting> <package>"``. bnlearn's hill climbing has the conditional linear
+#: Gaussian BIC only, so it is the comparator for both of Andrey's hill-climbing scores.
 PAIRS = {
-    f"{method} {setting}": (mine, theirs)
-    for method, setting, mine, theirs in (
-        ("pc", "degen_gauss", AndreyPCMixed("degen_gauss"), TetradPC("degen_gauss")),
-        ("pc", "cond_gauss", AndreyPCMixed("cond_gauss"), TetradPC("cond_gauss")),
-        (
-            "ges",
-            "degen_gauss",
-            AndreyGESMixed("local_score_degen_gauss"),
-            TetradFGES("local_score_degen_gauss"),
-        ),
-        (
-            "ges",
-            "cond_gauss",
-            AndreyGESMixed("local_score_cond_gauss"),
-            TetradFGES("local_score_cond_gauss"),
-        ),
-    )
+    "pc degen_gauss tetrad": (_PC_DG, _TETRAD_PC_DG),
+    "pc cond_gauss tetrad": (_PC_CG, _TETRAD_PC_CG),
+    "pc cond_gauss bnlearn": (_PC_CG, _BNLEARN_PC),
+    "ges degen_gauss tetrad": (_GES_DG, _FGES_DG),
+    "ges cond_gauss tetrad": (_GES_CG, _FGES_CG),
+    "hc degen_gauss bnlearn": (_HC_DG, _BNLEARN_HC),
+    "hc cond_gauss bnlearn": (_HC_CG, _BNLEARN_HC),
 }
 SOLUTIONS = [
-    *(a for pair in PAIRS.values() for a in pair),
-    BnlearnPCStableCondGauss(),
-    BnlearnHCCondGauss(),
+    _PC_DG,
+    _TETRAD_PC_DG,
+    _PC_CG,
+    _TETRAD_PC_CG,
+    _GES_DG,
+    _FGES_DG,
+    _GES_CG,
+    _FGES_CG,
+    _BNLEARN_PC,
+    _BNLEARN_HC,
+    _HC_DG,
+    _HC_CG,
     BaselineEmpty(),
 ]
 
@@ -245,7 +257,7 @@ def graph_error(row: pd.Series) -> float:
 
 def _summarize(table: pd.DataFrame) -> None:
     """Print each solution's finished fits, median wall time, and median error per ``d``, then each
-    pair's speed ratio: Tetrad's median wall time over Andrey's where both finished."""
+    pair's speed ratio: the comparator's median wall time over Andrey's where both finished."""
     if table.empty:
         return
     ok = table[table["status"] == "ok"].copy()
@@ -259,7 +271,7 @@ def _summarize(table: pd.DataFrame) -> None:
             f"{done['error'].median():6.3g}"
         )
     _log("")
-    _log(f"{'method':22s} {'d':>3s} {'paired':>6s} {'speed-up':>8s}")
+    _log(f"{'pair':24s} {'d':>3s} {'paired':>6s} {'speed-up':>8s}")
     for method, (mine, theirs) in PAIRS.items():
         for d in sorted(ok["d"].unique()):
             a = ok[(ok["name"] == mine.name) & (ok["d"] == d)].set_index("dataset_id")["wall_s"]
@@ -267,7 +279,7 @@ def _summarize(table: pd.DataFrame) -> None:
             both = a.index.intersection(b.index)
             if not both.empty:
                 _log(
-                    f"{method:22s} {d:3d} {len(both):6d} {b[both].median() / a[both].median():8.3g}"
+                    f"{method:24s} {d:3d} {len(both):6d} {b[both].median() / a[both].median():8.3g}"
                 )
 
 

@@ -344,13 +344,14 @@ columns beside the speed-up: where the graphs differ, the difference is a result
 
 ### Mixed data
 
-`mixed_cpu.py` compares Andrey's PC with the degenerate and the conditional Gaussian test and GES
-with the two matching scores against Tetrad's PC and FGES with the same four, beside bnlearn's
-`pc.stable` with its conditional Gaussian test, bnlearn's hill climbing with its conditional linear
-Gaussian BIC, and the empty-graph baseline. It runs on `mixed_er`: a conditional linear Gaussian
-network on an Erdos-Renyi graph from `andrey.data.sample_mixed`. Two key fields set the data: the
-categorical share of the variables (0.5 by default) and the least and most categories of a
-categorical variable (2 and 3); each changes the dataset's digest and label, and other regimes'
+`mixed_cpu.py` compares Andrey's PC with the degenerate and the conditional Gaussian test, and GES
+and hill climbing with the two matching scores, against the same algorithm in another package:
+Tetrad's PC and FGES with the same four, bnlearn's `pc.stable` with its conditional Gaussian test,
+and bnlearn's hill climbing with its conditional linear Gaussian BIC, the comparator for both of
+Andrey's hill-climbing scores. The empty graph is the baseline. It runs on `mixed_er`: a conditional
+linear Gaussian network on an Erdos-Renyi graph from `andrey.data.sample_mixed`. Two key fields set
+the data: the categorical share of the variables (0.5 by default) and the least and most categories
+of a categorical variable (2 and 3); each changes the dataset's digest and label, and other regimes'
 keys stay as they were. The Dirichlet concentration of the categorical tables is
 `datasets.MIXED_SETTINGS`. Codes and values are never rescaled.
 
@@ -367,17 +368,21 @@ package's names for the settings map to Andrey's:
 | `indep_test="cond_gauss"` | `--test cg-lr-test` | `pc.stable(test = "mi-cg")` |
 | `score_func="local_score_degen_gauss"` | `--score dg-bic-score` | - |
 | `score_func="local_score_cond_gauss"` | `--score cg-bic-score` | `hc(score = "bic-cg")` |
+| `max_iter=None`, from the empty graph | - | the defaults `max.iter = Inf`, `start = NULL` |
 | `alpha=0.05` | `--alpha 0.05` | `alpha = 0.05` |
 | `lambda_value=1.0` | `--penaltyDiscount 1` | the default `k = log(n) / 2` |
 
 Tetrad's PC runs order-independent (`--stableFAS`), keeps the first of two conflicting colliders
 (`--conflictRule 1`), and has no depth cap, as Andrey's PC does. FGES runs with no structure prior
-(`--structurePrior 0`), since Andrey's GES has none. bnlearn's hill climbing returns a DAG, so its
-comparable error is `mec_shd`; every other row is a CPDAG, scored by `shd`. The two packages define
-some of these tests and scores differently from Andrey, so their graphs can differ on the same data:
-Tetrad's conditional Gaussian parameter count leaves out each category's means, its degenerate
-Gaussian test statistic is twice the likelihood ratio, and its degenerate Gaussian score sums one
-regression per category of a categorical child.
+(`--structurePrior 0`), since Andrey's GES has none. Both hill climbings take the best add, remove,
+or reverse move from the empty graph until none improves the score, with no restarts; bnlearn's
+networks give no categorical node a continuous parent, while Andrey's search lets one have
+continuous parents. bnlearn's hill climbing returns a DAG, so its comparable error is `mec_shd`;
+every other row is a CPDAG, scored by `shd`. The two packages define some of these tests and scores
+differently from Andrey, so their graphs can differ on the same data: Tetrad's conditional Gaussian
+parameter count leaves out each category's means, its degenerate Gaussian test statistic is twice
+the likelihood ratio, and its degenerate Gaussian score sums one regression per category of a
+categorical child.
 
 Tetrad runs as a black box: each fit writes the data to a CSV file, starts `java -jar` on the
 causal-cmd jar once, and reads its graph back, so every Tetrad time includes a Java start and the
@@ -395,10 +400,10 @@ export ANDREY_BENCH_TETRAD_JAR=$PWD/causal-cmd-1.12.0-jar-with-dependencies.jar
 
 The bnlearn rows need the R lane: see [The R lane](#the-r-lane). The defaults are 2000 rows, `d` of
 10, 20, and 40, five seeds, one repeat after one warm-up fit, and a wall cap of 1800 s. The summary
-prints each solution's median wall time and error per `d`, then each method's speed-up: Tetrad's
-median wall time over Andrey's on the datasets where both finished. A smoke run covers every
-solution on one small dataset, a run can keep to some solutions, and a rescore recomputes the score
-columns from the stored estimates; pass the first run's flags:
+prints each solution's median wall time and error per `d`, then each pair's speed-up: the
+comparator's median wall time over Andrey's on the datasets where both finished. A smoke run covers
+every solution on one small dataset, a run can keep to some solutions, and a rescore recomputes the
+score columns from the stored estimates; pass the first run's flags:
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-smoke --smoke
@@ -712,8 +717,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
   BIC.
 - `discrete_cpu.py` - compares PC with the chi-square and G-square tests and GES with BDeu with
   causal-learn on categorical data.
-- `mixed_cpu.py` - compares PC and GES with the degenerate and conditional Gaussian tests and scores
-  with Tetrad and bnlearn on mixed data.
+- `mixed_cpu.py` - compares PC, GES, and hill climbing with the degenerate and conditional Gaussian
+  tests and scores with Tetrad and bnlearn on mixed data.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.

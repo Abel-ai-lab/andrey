@@ -1,11 +1,14 @@
-"""Andrey's PC and GES on mixed data: the degenerate and conditional Gaussian tests and scores.
+"""Andrey's PC, GES, and hill climbing on mixed data: the degenerate and conditional Gaussian tests
+and scores.
 
 Each adapter calls the public facade as a user would, without ``categorical``: Andrey infers the
 categorical columns, every column of at most ``max_categories`` distinct whole numbers. On the
 ``mixed_er`` regime that reads exactly the generated categorical columns, since a categorical column
 holds at most five codes and a continuous one a distinct value per row. The other packages in the
 mixed lane read the columns by the same rule. GES runs uncapped, as the facade does, on the numpy
-backend in one process; its mixed-data moves are scored in that process.
+backend in one process; its mixed-data moves are scored in that process. Hill climbing starts from
+the empty graph and has no move limit, as bnlearn's ``hc`` by default; unlike bnlearn's conditional
+linear Gaussian networks, it lets a categorical node have continuous parents.
 """
 
 from __future__ import annotations
@@ -46,6 +49,7 @@ class _AndreyMixed:
         import andrey  # noqa: F401
         from andrey.constraint.pc import pc  # noqa: F401
         from andrey.search.ges import ges  # noqa: F401
+        from andrey.search.hc import hc  # noqa: F401
 
     def to_structure(self, native: np.ndarray) -> Any:
         """Endpoint-mark array -> ``GraphStructure``; untimed."""
@@ -118,11 +122,45 @@ class AndreyGESMixed(_AndreyMixed):
         return np.asarray(out.structure.to_numpy())
 
 
+class AndreyHCMixed(_AndreyMixed):
+    """Andrey's hill climbing with a mixed-data score: the empty start graph, no move limit."""
+
+    algorithm: str = "hc"
+
+    def __init__(self, score_func: str) -> None:
+        self.score_func = score_func
+        self.name = f"andrey.hc.{score_func.removeprefix('local_score_')}"
+
+    def params(self) -> dict[str, Any]:
+        """The score, its BIC weight, and the inference bound."""
+        return {
+            "score_func": self.score_func,
+            "lambda_value": _DEFAULT_LAMBDA,
+            "max_categories": MAX_CATEGORIES,
+        }
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Run ``andrey.hc``; return the CPDAG's endpoint marks. The only timed region."""
+        import andrey
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", andrey.DataTypeWarning)
+            out = andrey.hc(
+                np.asarray(data, dtype=np.float64),
+                score_func=str(params.get("score_func", self.score_func)),
+                lambda_value=float(params.get("lambda_value", _DEFAULT_LAMBDA)),
+                max_categories=int(params.get("max_categories", MAX_CATEGORIES)),
+            )
+        return np.asarray(out.structure.to_numpy())
+
+
 def andrey_mixed_adapters() -> list[_AndreyMixed]:
-    """PC with each mixed-data test, then GES with each mixed-data score."""
+    """PC with each mixed-data test, then GES and hill climbing with each mixed-data score."""
     return [
         AndreyPCMixed("degen_gauss"),
         AndreyPCMixed("cond_gauss"),
         AndreyGESMixed("local_score_degen_gauss"),
         AndreyGESMixed("local_score_cond_gauss"),
+        AndreyHCMixed("local_score_degen_gauss"),
+        AndreyHCMixed("local_score_cond_gauss"),
     ]

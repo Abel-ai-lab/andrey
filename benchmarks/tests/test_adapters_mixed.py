@@ -54,15 +54,21 @@ def test_every_solution_has_its_own_name() -> None:
     assert len(set(names)) == len(names)
 
 
-@pytest.mark.parametrize("method", list(mixed_cpu.PAIRS))
-def test_both_packages_run_one_method_with_one_setting(method: str) -> None:
-    mine, theirs = mixed_cpu.PAIRS[method]
-    assert (mine.algorithm, mine.output_type, mine.mode) == (
-        theirs.algorithm,
-        theirs.output_type,
-        theirs.mode,
-    )
-    assert mine.params() == theirs.params()
+@pytest.mark.parametrize("pair", list(mixed_cpu.PAIRS))
+def test_both_packages_run_one_algorithm_with_one_setting(pair: str) -> None:
+    mine, theirs = mixed_cpu.PAIRS[pair]
+    assert (mine.algorithm, mine.mode) == (theirs.algorithm, theirs.mode)
+    assert theirs.output_type in {mine.output_type, "dag"}  # a DAG is scored through its CPDAG
+    shared = mine.params().keys() & theirs.params().keys()
+    differ = {k for k in shared if mine.params()[k] != theirs.params()[k]}
+    # bnlearn's hill climbing has the conditional linear Gaussian BIC only.
+    assert differ == ({"score_func"} if pair == "hc degen_gauss bnlearn" else set())
+    assert mine.params().keys() - theirs.params().keys() <= {"lambda_value"}
+
+
+def test_every_comparator_solution_is_paired() -> None:
+    paired = {a.name for pair in mixed_cpu.PAIRS.values() for a in pair}
+    assert paired == {a.name for a in mixed_cpu.SOLUTIONS} - {"baseline.empty"}
 
 
 # --- the regime ------------------------------------------------------------------------------------
@@ -117,10 +123,11 @@ def test_an_andrey_fit_gives_a_cpdag(adapter) -> None:
 
 
 def test_setup_imports_the_searches_fit_defers() -> None:
-    for module in ("andrey.constraint.pc", "andrey.search.ges"):
+    searches = ("andrey.constraint.pc", "andrey.search.ges", "andrey.search.hc")
+    for module in searches:
         sys.modules.pop(module, None)
     andrey_mixed_adapters()[0].setup()
-    assert {"andrey.constraint.pc", "andrey.search.ges"} <= set(sys.modules)
+    assert set(searches) <= set(sys.modules)
 
 
 def test_tetrad_graph_text_reads_as_a_cpdag_adjacency() -> None:
