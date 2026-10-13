@@ -33,7 +33,8 @@ right, make it fast." For algorithm implementations:
   or removed updates its folder's `index.md` in the same change.
 - When the public API changes, update the docstrings, `docs/docs/code/index.md`, and the affected
   guides in the same change.
-- A blog post (`docs/blog/`) also sets ABlog's `blogpost`, `date`, and `author`.
+- A blog post (`docs/blog/`) also sets ABlog's `blogpost`, `date`, and `author`, and a
+  `description`, which the blog index shows.
 
 ## Documentation style
 

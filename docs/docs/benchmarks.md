@@ -80,7 +80,7 @@ RCD and BottomUpParceLiNGAM, two methods for data with hidden common causes, com
 :::
 
 :::{div} release-meta
-Released 12 October 2026
+Released October 12, 2026
 
 - [Release card<span class="visually-hidden"> 0.2.0</span>](benchmarks/0.2.0.md)
 - [Post: Hidden common causes](../blog/andrey-0-2-0.md)
@@ -111,7 +111,7 @@ lingam.
 :::
 
 :::{div} release-meta
-Released 8 October 2026
+Released October 8, 2026
 
 - [Release card<span class="visually-hidden"> 0.1.0</span>](benchmarks/0.1.0.md)
 - [Post: Introducing Andrey](../blog/introducing-andrey.md)
