@@ -76,9 +76,8 @@ linear-Gaussian data.
 - Hill climbing **906x** faster than bnlearn at 800 variables
 :::
 
-% TODO(0.4.0): confirm the 0.3.0 release date once v0.3.0 is tagged.
 :::{div} release-meta
-Released 12 October 2026
+Released October 13, 2026
 
 - [Release card<span class="visually-hidden"> 0.3.0</span>](benchmarks/0.3.0.md)
 - [Post: Score-based search](../blog/20261012-andrey-0-3-0.md)
