@@ -1,0 +1,44 @@
+GES  cpdag  |  4 nodes  |  4 edges (4 directed)
+
+  x2 -> x0
+  x3 -> x0
+  x1 -> x3
+  x2 -> x3
+
+  score: 18.22
+
+HC  cpdag  |  4 nodes  |  4 edges (4 directed)
+
+  x2 -> x0
+  x3 -> x0
+  x1 -> x3
+  x2 -> x3
+
+  score: 18.22
+
+Tabu  cpdag  |  4 nodes  |  4 edges (1 undirected, 3 directed)
+
+  x0 -- x1
+  x0 -> x3
+  x1 -> x3
+  x2 -> x3
+
+  score: 15.11
+
+XGES  cpdag  |  4 nodes  |  4 edges (1 undirected, 3 directed)
+
+  x0 -- x1
+  x0 -> x3
+  x1 -> x3
+  x2 -> x3
+
+  score: 15.11
+
+XGES  cpdag  |  4 nodes  |  4 edges (4 directed)
+
+  x2 -> x0
+  x3 -> x0
+  x1 -> x3
+  x2 -> x3
+
+  score: 18.22
