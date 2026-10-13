@@ -59,7 +59,7 @@ pair, and PNL runs up to 1,470x faster and names the true direction on more pair
 :link: benchmarks/0.3.0
 :link-type: doc
 :link-alt: The 0.3.0 release card: score-based search
-:class-card: release-tile
+:class-card: release-tile release-art-0-3-0
 :shadow: none
 :margin: 0
 
