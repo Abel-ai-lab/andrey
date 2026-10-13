@@ -26,7 +26,7 @@ from weakref import WeakKeyDictionary
 
 import numpy as np
 
-from .score import BDeuScore, BICScore, Score, local_score_bic
+from .score import BICScore, LocalScore, Score, local_score_bic
 
 # Conditioning threshold for the Schur fast path. The Schur identity loses ~log10(cond) digits;
 # at cond=1e10 the residual keeps ~6 digits in float64, well above HC's 1e-9 strict-improvement
@@ -926,15 +926,15 @@ class FullScoreDelta:
 
     Every delta is ``score(v, S +/- u) - score(v, S)`` from two memoized :meth:`Score.score` calls.
     GES's reference arm uses it on BIC, and GES and hill climbing use it on scores with no Schur
-    update, such as :class:`~andrey.core.score.BDeuScore`.
+    update, such as :class:`~andrey.core.score.BDeuScore` and the mixed-data scores.
 
     Parameters
     ----------
-    score : BICScore or BDeuScore
+    score : BICScore, BDeuScore, DGScore, or CGScore
         The local score; HC also reads its sample count, ``score.n``.
     """
 
-    def __init__(self, score: BICScore | BDeuScore) -> None:
+    def __init__(self, score: LocalScore) -> None:
         self.score_obj = score
 
     def delta(self, v: int, S_old_sorted: tuple[int, ...], u: int, op: str) -> float:

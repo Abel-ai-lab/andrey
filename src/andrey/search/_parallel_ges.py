@@ -21,7 +21,7 @@ from typing import Protocol
 import numpy as np
 
 from andrey.core import env
-from andrey.core.score import BDeuScore, BICScore
+from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.search import _parallel as par
 from andrey.search import calibrate
@@ -404,7 +404,7 @@ class _LazyWorkerSet:
 
 def run_ges(
     adj: np.ndarray,
-    score: BICScore | BDeuScore,
+    score: LocalScore,
     n: int,
     max_parents: float | None,
     *,
@@ -421,8 +421,8 @@ def run_ges(
     partition-invariant. Returns only the CPDAG; ``ges()`` recomputes the objective from it.
     ``full_scores`` swaps the in-process PURE Schur engine for the two-full-score reference (the
     quality gate's ``_full_scores`` arm); pooled workers only ever run Schur on BIC, so the
-    reference arm, like any score other than :class:`~andrey.core.score.BICScore` (BDeu), is held
-    in-process and never fans out.
+    reference arm, like any score other than :class:`~andrey.core.score.BICScore` (BDeu and the
+    mixed-data scores), is held in-process and never fans out.
     """
     workers = max(1, min(workers, n))
     w_min = _min_work()

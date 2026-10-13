@@ -21,7 +21,7 @@ from andrey.constraint._skeleton import (
     scan_pairs,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
-from andrey.core.ci import make_indep_test
+from andrey.core.ci import make_indep_test, pins_blas
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
 
@@ -33,14 +33,16 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    categorical: np.ndarray | None = None,
     _trace: list[dict] | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from ``data`` with the PC algorithm and the ``indep_test`` CI test.
 
     ``data`` is an ``(n_samples, n_features)`` array; ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
-    ``indep_test`` selects the conditional-independence test from the registry (``"fisherz"`` is the
-    only shipped one). Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
+    ``indep_test`` selects the conditional-independence test from the registry, and
+    ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test. Returns
+    the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -48,7 +50,9 @@ def pc(
     firing (``step="meek"``, with the fields :func:`~andrey.core.orient.meek` records).
     """
     X = np.asarray(data, dtype=np.float64)
-    skeleton, sepsets = _discover_skeleton(X, alpha, indep_test, warn_expensive=True, _trace=_trace)
+    skeleton, sepsets = _discover_skeleton(
+        X, alpha, indep_test, categorical=categorical, warn_expensive=True, _trace=_trace
+    )
     pdag = _orient_colliders_prioritize_existing(skeleton, sepsets, _trace=_trace)
     if _trace is None:
         return to_structure(meek(pdag), kind="cpdag")
@@ -130,6 +134,7 @@ def _discover_skeleton(
     alpha: float,
     indep_test: str = "fisherz",
     *,
+    categorical: np.ndarray | None = None,
     prescreen: bool = True,
     workers: int = 1,
     warn_expensive: bool = False,
@@ -141,7 +146,8 @@ def _discover_skeleton(
     against subsets of a start-of-size neighborhood snapshot (in both directions, as PC does), and
     edges found independent are removed together after the size completes. A removed pair's
     separating set is the union of every conditioning set that made it independent. ``indep_test``
-    selects the CI test (shared by PC and CDNOD, which pass the augmented matrix).
+    selects the CI test (shared by PC and CDNOD, which pass the augmented matrix); ``categorical``
+    marks the categorical columns for a mixed-data test.
 
     When ``prescreen`` is set and the test exposes the vectorized closed forms, the size-0 and
     size-1 passes read the correlation matrix directly (all-pairs marginal threshold, then one
@@ -159,7 +165,7 @@ def _discover_skeleton(
     trace needs every p-value in this process, so tracing scans serially.
     """
     d = X.shape[1]
-    test = make_indep_test(indep_test, X)
+    test = make_indep_test(indep_test, X, categorical=categorical)
     adj = np.full((d, d), TAIL, dtype=np.int8)
     np.fill_diagonal(adj, NULL)
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
@@ -203,10 +209,10 @@ def _discover_skeleton(
                 if pool is not None:
                     removals = pool.scan(pairs, adj != NULL, size, alpha)
                 else:
-                    # Pin BLAS to one thread for a test the workers can run: its conditioning-
-                    # submatrix inversions then match the (1-thread) parallel skeleton workers
-                    # regardless of the host thread count. The chi-square tests call no BLAS.
-                    with backend.one_blas_thread() if seedable else nullcontext():
+                    # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
+                    # match the (1-thread) parallel skeleton workers, where it has them, whatever
+                    # the host thread count.
+                    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
                         removals = scan_pairs(test, pairs, neighbors, size, alpha, _trace)
                 for x, y, separating in removals:
                     remove.append((x, y))

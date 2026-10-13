@@ -37,15 +37,21 @@ def gfci(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
+    categorical: np.ndarray | None = None,
 ) -> GraphStructure:
-    """Discover a PAG with GES adjacency and FCI orientation."""
+    """Discover a PAG with GES adjacency and FCI orientation.
+
+    ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data score and test.
+    """
     X = np.asarray(data, dtype=np.float64)
 
     _validate_collider_rule(collider_rule)
-    cpdag_structure, _score = ges(X, score_func=score_func, lambda_value=lambda_value)
+    cpdag_structure, _score = ges(
+        X, score_func=score_func, lambda_value=lambda_value, categorical=categorical
+    )
     cpdag = from_structure(cpdag_structure)
 
-    test = make_indep_test(indep_test, X)
+    test = make_indep_test(indep_test, X, categorical=categorical)
     sepsets = _derive_sepsets(cpdag, test, alpha)
 
     marks = _circle_pag(cpdag != NULL)

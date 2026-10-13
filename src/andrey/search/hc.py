@@ -1,8 +1,9 @@
 """Hill climbing over DAGs, the engine behind :func:`andrey.hc`.
 
 Under BIC, candidate moves use Schur-complement deltas from :mod:`andrey.core.score_delta`; under
-BDeu, the difference of two full local scores. :class:`MoveScanner` caches them between passes,
-recomputing only changed targets. Output is the DAG's CPDAG and total score; lower is better.
+BDeu and the mixed-data scores, the difference of two full local scores. :class:`MoveScanner`
+caches them between passes, recomputing only changed targets. Output is the DAG's CPDAG and total
+score; lower is better.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BDeuScore, BICScore, penalty_weight
+from andrey.core.score import BDeuScore, BICScore, CGScore, DGScore, LocalScore, penalty_weight
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
@@ -30,7 +31,12 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 __all__ = ["hc"]
 
 #: The local scores :func:`hc` accepts.
-HC_SCORES: tuple[str, ...] = ("local_score_BIC_from_cov", "local_score_BDeu")
+HC_SCORES: tuple[str, ...] = (
+    "local_score_BIC_from_cov",
+    "local_score_BDeu",
+    "local_score_DG",
+    "local_score_CG",
+)
 
 
 # (delta, u, v, op_rank, (op, u, v)). op_rank: remove 0 < reverse 1; add is 0 and never shares
@@ -65,9 +71,9 @@ class MoveScanner:
     ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
     ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
     ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
-    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC and
-    BDeu, both score-equivalent. Its delta is set to zero to prevent Schur rounding noise exceeding
-    ``_EPS_IMPROVE`` from creating a false improvement.
+    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, BDeu,
+    and the mixed-data scores, all score-equivalent. Its delta is set to zero to prevent rounding
+    noise exceeding ``_EPS_IMPROVE`` from creating a false improvement.
 
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
@@ -329,8 +335,9 @@ def hc(
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
     max_iter: int | None = None,
+    categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Hill-Climbing over the BIC or BDeu score.
+    """Discover a CPDAG by Hill-Climbing over a BIC, BDeu, or mixed-data score.
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
     score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
@@ -342,13 +349,17 @@ def hc(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC) or ``"local_score_BDeu"``
-        (BDeu on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors).
+        Local score: ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC), ``"local_score_BDeu"``
+        (BDeu on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors), or
+        a mixed-data BIC, ``"local_score_DG"`` (:class:`~andrey.core.score.DGScore`) or
+        ``"local_score_CG"`` (:class:`~andrey.core.score.CGScore`).
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     max_iter : int or None
         Maximum moves; ``None`` sets no limit. Taking ``max_iter`` moves warns with
         ``SearchLimitWarning``.
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score; the other scores ignore it.
 
     Returns
     -------
@@ -358,7 +369,7 @@ def hc(
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
 
-    score: BICScore | BDeuScore
+    score: LocalScore
     delta: DeltaBICScore | FullScoreDelta
     if score_func == "local_score_BIC_from_cov":
         score = BICScore(X, lambda_value=lambda_value)
@@ -366,6 +377,12 @@ def hc(
     elif score_func == "local_score_BDeu":
         penalty_weight(lambda_value)  # BDeu has no penalty, but the setting keeps its range
         score = BDeuScore(X)
+        delta = FullScoreDelta(score)
+    elif score_func == "local_score_DG":
+        score = DGScore(X, categorical, lambda_value=lambda_value)
+        delta = FullScoreDelta(score)
+    elif score_func == "local_score_CG":
+        score = CGScore(X, categorical, lambda_value=lambda_value)
         delta = FullScoreDelta(score)
     else:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")

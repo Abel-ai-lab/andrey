@@ -1,4 +1,4 @@
-"""Scoring substrate for structure search: the linear-Gaussian BIC and the discrete BDeu.
+"""Scoring substrate for structure search: linear-Gaussian BIC, discrete BDeu, and mixed-data BICs.
 
 The negative local BIC score (lower is better; proportional to ``-2 * BIC``) for a target node
 given a parent set, evaluated from the sample covariance. Uses the linear-Gaussian BIC closed
@@ -7,7 +7,9 @@ form, branching on parent-set size for the scalar fast paths.
 :func:`local_score_bic` is the pure per-node primitive; :class:`BICScore` precomputes the covariance
 once and memoizes scores behind the :class:`Score` protocol that structure-search engines consume.
 :class:`BDeuScore` scores category codes with the negative log BDeu marginal likelihood behind the
-same protocol.
+same protocol. :class:`DGScore` and :class:`CGScore` score mixed data, continuous and categorical
+columns marked by a mask, with the BIC of the degenerate Gaussian and conditional Gaussian models
+of :mod:`andrey.core.mixed`.
 
 References
 ----------
@@ -16,6 +18,12 @@ https://doi.org/10.1214/aos/1176344136
 
 Heckerman, Geiger & Chickering (1995). Learning Bayesian networks: the combination of knowledge
 and statistical data. Machine Learning 20(3):197-243. https://doi.org/10.1007/BF00994016
+
+Andrews, Ramsey & Cooper (2018). Scoring Bayesian networks of mixed variables. International
+Journal of Data Science and Analytics 6(1):3-18. https://doi.org/10.1007/s41060-017-0085-7
+
+Andrews, Ramsey & Cooper (2019). Learning high-dimensional directed acyclic graphs with mixed
+data-types. Proceedings of Machine Learning Research 104:4-21.
 """
 
 from __future__ import annotations
@@ -25,9 +33,15 @@ from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 import numpy as np
+import numpy.typing as npt
 from scipy.special import gammaln
 
 from . import categorical, stats
+from .mixed import ConditionalGaussian, DegenerateGaussian
+
+#: The scores that read category codes, and those that read mixed data with a categorical mask.
+DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu",)
+MIXED_SCORES: tuple[str, ...] = ("local_score_CG", "local_score_DG")
 
 
 def local_score_bic(
@@ -350,3 +364,165 @@ class BDeuScore:
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
         """Return the negative local BDeu scores for many parent sets, in request order."""
         return [self.score(node, parents) for parents in parent_sets]
+
+
+class DGScore:
+    """Degenerate Gaussian BIC score over mixed data.
+
+    The columns are embedded as :class:`~andrey.core.mixed.DegenerateGaussian` describes, a
+    categorical variable with ``k`` categories as the indicators of ``k - 1`` of them, and the
+    embedded columns are scored as Gaussian [1]_. With ``Y`` the node's embedded columns, ``X`` its
+    parents', and ``S`` the sample covariance of the embedded columns, the negative local score is
+
+    ``n * log det S(Y | X) + lambda_value * log(n) * |Y| * |X|``
+
+    where ``S(Y | X)`` is the residual covariance of ``Y`` regressed on ``X`` and ``|Y| * |X|``
+    counts the regression's coefficients. Lower is better. It is :class:`BICScore` on the embedded
+    columns, so on continuous columns only, the two scores are equal. Scores are memoized by
+    ``(node, sorted parents)``.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, d)
+        Finite values; categorical columns hold their categories as numbers, each distinct value of
+        a column one category.
+    categorical : array-like of bool, shape (d,), optional
+        Marks the categorical columns; ``None`` marks none.
+    lambda_value : float, default=1.0
+        Weight on the BIC complexity term.
+    cache_size : int or None, default=1_000_000
+        Memoization cache bound; ``None`` is unbounded.
+
+    References
+    ----------
+    .. [1] Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed
+       acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
+    """
+
+    def __init__(
+        self,
+        data: npt.ArrayLike,
+        categorical: npt.ArrayLike | None = None,
+        *,
+        lambda_value: float = 1.0,
+        cache_size: int | None = 1_000_000,
+    ) -> None:
+        self._dg = DegenerateGaussian(data, categorical)
+        self.n: int = self._dg.n
+        self.lambda_value = penalty_weight(lambda_value)
+        self.log_n = float(np.log(self.n))
+        self._cov_diag = np.diag(self._dg.cov)
+        self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
+
+    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
+        cov = self._dg.cov
+        ys = self._dg.columns([node])
+        xs = self._dg.columns(parents)
+        if ys.size == 1:
+            return local_score_bic(
+                cov,
+                self.n,
+                int(ys[0]),
+                xs.tolist(),
+                lambda_value=self.lambda_value,
+                log_n=self.log_n,
+                cov_diag=self._cov_diag,
+            )
+        residual = cov[np.ix_(ys, ys)]
+        if xs.size:
+            cross = cov[np.ix_(xs, ys)]
+            residual = residual - cross.T @ _solve(cov[np.ix_(xs, xs)], cross)
+        sign, log_det = np.linalg.slogdet(residual)
+        log_det = log_det if sign > 0 else -np.inf
+        return float(self.n * log_det + self.log_n * self.lambda_value * ys.size * xs.size)
+
+    def score(self, node: int, parents: Sequence[int]) -> float:
+        """Return the memoized negative local DG score for ``node`` given ``parents``.
+
+        The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
+        the lookup.
+        """
+        key = tuple(sorted(int(p) for p in parents))
+        return self._score_key(int(node), key)
+
+    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
+        """Return the negative local DG scores for many parent sets, in request order."""
+        return [self.score(node, parents) for parents in parent_sets]
+
+
+class CGScore:
+    """Conditional Gaussian BIC score over mixed data.
+
+    The variables are fit as :class:`~andrey.core.mixed.ConditionalGaussian` describes: the rows
+    split into the cells of the categorical variables' joint categories, the continuous variables
+    Gaussian within each cell. With ``l(A)`` the maximized log-likelihood of the set ``A`` and
+    ``k(A)`` its parameter count, a node is scored given its parents by the model of the node and
+    its parents together divided by the model of the parents alone [1]_. With ``F`` the node and its
+    parents and ``P`` the parents,
+
+    ``-2 * (l(F) - l(P)) + lambda_value * log(n) * (k(F) - k(P))``
+
+    Lower is better. The value is ``-2`` times a BIC, so a categorical node with continuous parents
+    is scored as well as a continuous one. Each term reads a set of variables, so two graphs with
+    the same equivalence class score the same. Scores are memoized by ``(node, sorted parents)``.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, d)
+        Finite values; categorical columns hold their categories as numbers, each distinct value of
+        a column one category.
+    categorical : array-like of bool, shape (d,), optional
+        Marks the categorical columns; ``None`` marks none.
+    lambda_value : float, default=1.0
+        Weight on the BIC complexity term.
+    cache_size : int or None, default=1_000_000
+        Memoization cache bound; ``None`` is unbounded.
+
+    Raises
+    ------
+    ValueError
+        If a continuous column is constant.
+
+    References
+    ----------
+    .. [1] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
+       variables. International Journal of Data Science and Analytics 6(1), 3-18.
+    """
+
+    def __init__(
+        self,
+        data: npt.ArrayLike,
+        categorical: npt.ArrayLike | None = None,
+        *,
+        lambda_value: float = 1.0,
+        cache_size: int | None = 1_000_000,
+    ) -> None:
+        self._cg = ConditionalGaussian(data, categorical, cache_size=cache_size)
+        self.n: int = self._cg.n
+        self.lambda_value = penalty_weight(lambda_value)
+        self.log_n = float(np.log(self.n))
+        self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
+
+    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
+        cg = self._cg
+        family = (*parents, node)
+        loglik = cg.loglik(family) - cg.loglik(parents)
+        dof = cg.dof(family) - cg.dof(parents)
+        return -2.0 * loglik + self.lambda_value * self.log_n * dof
+
+    def score(self, node: int, parents: Sequence[int]) -> float:
+        """Return the memoized negative local CG score for ``node`` given ``parents``.
+
+        The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
+        the lookup.
+        """
+        key = tuple(sorted(int(p) for p in parents))
+        return self._score_key(int(node), key)
+
+    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
+        """Return the negative local CG scores for many parent sets, in request order."""
+        return [self.score(node, parents) for parents in parent_sets]
+
+
+#: Every local score class; the searches that difference full scores take any of them.
+LocalScore = BICScore | BDeuScore | DGScore | CGScore
