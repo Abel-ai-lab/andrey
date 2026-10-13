@@ -9,7 +9,7 @@ change names its pull request.
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-10-12
+## [0.3.0] - 2026-10-13
 
 ### Highlights
 
