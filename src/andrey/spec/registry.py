@@ -272,8 +272,9 @@ _add(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
-        "BIC score improves; a simple greedy baseline. Stops at a local optimum, or after max_iter "
-        "moves when set. Returns the CPDAG of the final DAG and its score.",
+        "score improves; a simple greedy baseline. BIC by default; score_func=local_score_BDeu "
+        "for categorical data. Stops at a local optimum, or after max_iter moves when set. "
+        "Returns the CPDAG of the final DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
