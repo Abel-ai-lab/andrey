@@ -11,8 +11,9 @@ version: 0.4.0
 cover: graph
 ---
 
-% TODO(0.4.0): `date` is a placeholder for the release date, and `cover: graph` is the generic
-% cover until the 0.4.0 art is approved.
+% TODO(0.4.0): `date` is a placeholder for the release date. `cover: graph` stays until the post
+% banners are on main; then set `cover: hourglass` (`site/brand/art-hourglass.jpg`) and add
+% `hourglass` to `ART` and `COVERS` in `site/cards.py`.
 
 # Pairwise direction
 

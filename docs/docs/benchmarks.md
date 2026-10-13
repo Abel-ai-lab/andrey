@@ -16,13 +16,11 @@ rerun the measurements. A card keeps the numbers its release published.
 % release moves to the top of "Earlier releases" (docs/DEVELOPMENT.md, "The release cards").
 :::::{div} release-latest
 
-% TODO(0.4.0): no cover art is approved yet; without `release-art` the cover shows the stipple
-% ground. Add `release-art release-art-0-4-0` once the art is in `_static/release-cards/0.4.0.jpg`.
 :::{card}
 :link: benchmarks/0.4.0
 :link-type: doc
 :link-alt: The 0.4.0 release card: pairwise direction
-:class-card: release-cover
+:class-card: release-cover release-art release-art-0-4-0
 :shadow: none
 :margin: 0
 

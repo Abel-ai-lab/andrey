@@ -128,6 +128,10 @@ html[data-theme="dark"] .release-cover {
   background: url("release-cards/0.3.0.jpg") center / cover no-repeat, var(--andrey-ground-navy);
 }
 
+.bd-content .sd-card.release-cover.release-art.release-art-0-4-0 {
+  background: url("release-cards/0.4.0.jpg") center / cover no-repeat, var(--andrey-ground-navy);
+}
+
 .release-cover.release-art::before,
 .release-cover.release-art::after {
   content: none;
