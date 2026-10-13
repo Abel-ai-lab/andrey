@@ -91,3 +91,42 @@ class BaselineEmptyTemporal:
 def baseline_empty_temporal(tau_max: int = 2) -> BaselineEmptyTemporal:
     """A :class:`BaselineEmptyTemporal` named for its lag window."""
     return BaselineEmptyTemporal(name=f"baseline.empty.temporal.tau{tau_max}", tau_max=tau_max)
+
+
+@dataclass(frozen=True)
+class BaselineEmptyWindow:
+    """Empty window correctness floor for PCMCI+ and LPCMCI.
+
+    No link at any lag ``0..tau_max``, scored link by link like the solutions it bounds
+    (:func:`andrey_bench.scoring.window_scores`): its endpoint SHD is twice the truth's link count
+    within the window. ``tau_max`` is in the name because ``params`` are not part of a ``run_id``.
+    """
+
+    name: str = "baseline.empty.window.tau1"
+    tau_max: int = 1
+    package: str = "baseline"
+    package_version: str = "1.0"
+    backend: str = "native"
+    mode: str = "serial"
+    algorithm: str = "baseline"
+    output_type: str = "temporal"
+
+    def params(self) -> dict[str, Any]:
+        """The lag window the empty graph covers."""
+        return {"tau_max": self.tau_max}
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Return the all-zero ``(tau_max + 1, d, d)`` window marks. The timed region."""
+        d = int(np.asarray(data).shape[1])
+        return np.zeros((int(params["tau_max"]) + 1, d, d), dtype=np.int8)
+
+    def to_structure(self, native: np.ndarray) -> Any:
+        """All-zero window marks -> the empty ``WindowGraph``; untimed."""
+        from andrey_bench.window import WindowGraph
+
+        return WindowGraph(native, lag0="dag")
+
+
+def baseline_empty_window(tau_max: int = 1) -> BaselineEmptyWindow:
+    """A :class:`BaselineEmptyWindow` named for its lag window."""
+    return BaselineEmptyWindow(name=f"baseline.empty.window.tau{tau_max}", tau_max=tau_max)

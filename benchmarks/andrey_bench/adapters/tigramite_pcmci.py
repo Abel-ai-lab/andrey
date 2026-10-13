@@ -1,4 +1,4 @@
-"""Adapter for tigramite's PCMCI with the analytic partial-correlation test.
+"""Adapters for tigramite's PCMCI, PCMCI+, and LPCMCI with the analytic partial-correlation test.
 
 Calls tigramite's public API only:
 ``PCMCI(dataframe=DataFrame(X), cond_ind_test=ParCorr(significance="analytic"), verbosity=0)``
@@ -19,6 +19,14 @@ that environment unpickles the adapter from it.
 Orientation: ``results["graph"]`` has shape ``(N, N, tau_max + 1)``, and ``graph[i, j, tau] ==
 "-->"`` is the lagged link ``X_i(t-tau) -> X_j(t)``. The link stack is
 ``links[tau - 1, i, j]``, the layout of Andrey's adapter.
+
+PCMCI+ calls ``PCMCI(...).run_pcmciplus(tau_min=0, tau_max=..., pc_alpha=0.01,
+contemp_collider_rule="majority", conflict_resolution=True, reset_lagged_links=False,
+fdr_method="none")``, and LPCMCI ``LPCMCI(dataframe=..., cond_ind_test=ParCorr(significance=
+"analytic"), verbosity=0).run_lpcmci(tau_min=0, tau_max=..., pc_alpha=0.05,
+n_preliminary_iterations=1)``; every other argument keeps its default. Both return the link strings
+of ``results["graph"]`` as the window marks of :mod:`andrey_bench.window`, which Andrey's PCMCI+ and
+LPCMCI adapters also return.
 """
 
 from __future__ import annotations
@@ -152,4 +160,170 @@ def tigramite_adapter(tau_max: int = DEFAULT_TAU_MAX) -> TigramitePCMCI:
         name=f"tigramite.pcmci.parcorr.tau{tau_max}",
         tau_max=tau_max,
         package_version=_tigramite_version(python) if python else "unknown",
+    )
+
+
+#: tigramite's ``run_pcmciplus`` and ``run_lpcmci`` defaults, passed rather than left to the package;
+#: Andrey's PCMCI+ and LPCMCI defaults have the same values.
+PCMCIPLUS_PC_ALPHA = 0.01
+LPCMCI_PC_ALPHA = 0.05
+LPCMCI_PRELIMINARY_ITERATIONS = 1
+SAME_STEP_TAU_MAX = 1
+
+
+@dataclass(frozen=True)
+class TigramitePCMCIPlus:
+    """Benchmark adapter for tigramite's PCMCI+ with ``ParCorr(significance="analytic")``.
+
+    Satisfies :class:`andrey_bench.contracts.SolutionAdapter`, plus the optional ``python_env``.
+    Build it with :func:`tigramite_pcmciplus_adapter`, which names the lag window and reads the
+    version.
+    """
+
+    name: str = f"tigramite.pcmciplus.parcorr.tau{SAME_STEP_TAU_MAX}"
+    tau_max: int = SAME_STEP_TAU_MAX
+    package: str = "tigramite"
+    package_version: str = ""
+    backend: str = "numpy"
+    mode: str = "serial"
+    algorithm: str = "pcmciplus"
+    output_type: str = "temporal"
+    python_env: str = PYTHON_ENV_VAR
+
+    def setup(self) -> None:
+        """Import tigramite before timing; see `contracts.SetupAdapter`."""
+        from tigramite import data_processing  # noqa: F401
+        from tigramite.independence_tests.parcorr import ParCorr  # noqa: F401
+        from tigramite.pcmci import PCMCI  # noqa: F401
+
+    def params(self) -> dict[str, Any]:
+        """The ``run_pcmciplus`` arguments passed, and the test."""
+        return {
+            "tau_min": 0,
+            "tau_max": self.tau_max,
+            "pc_alpha": PCMCIPLUS_PC_ALPHA,
+            "contemp_collider_rule": "majority",
+            "conflict_resolution": True,
+            "reset_lagged_links": False,
+            "fdr_method": "none",
+            "cond_ind_test": "ParCorr",
+            "significance": "analytic",
+        }
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Run tigramite PCMCI+ and return its ``(tau_max + 1, n, n)`` window marks. Timed."""
+        from tigramite import data_processing
+        from tigramite.independence_tests.parcorr import ParCorr
+        from tigramite.pcmci import PCMCI
+
+        from andrey_bench.window import marks_from_link_strings
+
+        pcmci = PCMCI(
+            dataframe=data_processing.DataFrame(np.asarray(data, dtype=np.float64)),
+            cond_ind_test=ParCorr(significance=str(params["significance"])),
+            verbosity=0,
+        )
+        results = pcmci.run_pcmciplus(
+            tau_min=int(params["tau_min"]),
+            tau_max=int(params["tau_max"]),
+            pc_alpha=float(params["pc_alpha"]),
+            contemp_collider_rule=str(params["contemp_collider_rule"]),
+            conflict_resolution=bool(params["conflict_resolution"]),
+            reset_lagged_links=bool(params["reset_lagged_links"]),
+            fdr_method=str(params["fdr_method"]),
+        )
+        return marks_from_link_strings(results["graph"])
+
+    def to_structure(self, native: np.ndarray) -> Any:
+        """Window marks -> a ``WindowGraph`` whose lag 0 is a CPDAG. Runs in the parent; untimed."""
+        from andrey_bench.window import WindowGraph
+
+        return WindowGraph(native, lag0="cpdag")
+
+
+@dataclass(frozen=True)
+class TigramiteLPCMCI:
+    """Benchmark adapter for tigramite's LPCMCI with ``ParCorr(significance="analytic")``.
+
+    Satisfies :class:`andrey_bench.contracts.SolutionAdapter`, plus the optional ``python_env``.
+    Build it with :func:`tigramite_lpcmci_adapter`, which names the lag window and reads the
+    version.
+    """
+
+    name: str = f"tigramite.lpcmci.parcorr.tau{SAME_STEP_TAU_MAX}"
+    tau_max: int = SAME_STEP_TAU_MAX
+    package: str = "tigramite"
+    package_version: str = ""
+    backend: str = "numpy"
+    mode: str = "serial"
+    algorithm: str = "lpcmci"
+    output_type: str = "temporal"
+    python_env: str = PYTHON_ENV_VAR
+
+    def setup(self) -> None:
+        """Import tigramite before timing; see `contracts.SetupAdapter`."""
+        from tigramite import data_processing  # noqa: F401
+        from tigramite.independence_tests.parcorr import ParCorr  # noqa: F401
+        from tigramite.lpcmci import LPCMCI  # noqa: F401
+
+    def params(self) -> dict[str, Any]:
+        """The ``run_lpcmci`` arguments passed, and the test."""
+        return {
+            "tau_min": 0,
+            "tau_max": self.tau_max,
+            "pc_alpha": LPCMCI_PC_ALPHA,
+            "n_preliminary_iterations": LPCMCI_PRELIMINARY_ITERATIONS,
+            "cond_ind_test": "ParCorr",
+            "significance": "analytic",
+        }
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Run tigramite LPCMCI and return its ``(tau_max + 1, n, n)`` window marks. Timed."""
+        from tigramite import data_processing
+        from tigramite.independence_tests.parcorr import ParCorr
+        from tigramite.lpcmci import LPCMCI
+
+        from andrey_bench.window import marks_from_link_strings
+
+        lpcmci = LPCMCI(
+            dataframe=data_processing.DataFrame(np.asarray(data, dtype=np.float64)),
+            cond_ind_test=ParCorr(significance=str(params["significance"])),
+            verbosity=0,
+        )
+        results = lpcmci.run_lpcmci(
+            tau_min=int(params["tau_min"]),
+            tau_max=int(params["tau_max"]),
+            pc_alpha=float(params["pc_alpha"]),
+            n_preliminary_iterations=int(params["n_preliminary_iterations"]),
+        )
+        return marks_from_link_strings(results["graph"])
+
+    def to_structure(self, native: np.ndarray) -> Any:
+        """Window marks -> a ``WindowGraph`` whose lag 0 is a PAG. Runs in the parent; untimed."""
+        from andrey_bench.window import WindowGraph
+
+        return WindowGraph(native, lag0="pag")
+
+
+def _version() -> str:
+    """tigramite's version in the environment ``$ANDREY_BENCH_TIGRAMITE_PYTHON`` names."""
+    python = os.environ.get(PYTHON_ENV_VAR, "").strip()
+    return _tigramite_version(python) if python else "unknown"
+
+
+def tigramite_pcmciplus_adapter(tau_max: int = SAME_STEP_TAU_MAX) -> TigramitePCMCIPlus:
+    """A :class:`TigramitePCMCIPlus` named for its lag window, carrying its environment's version."""
+    return TigramitePCMCIPlus(
+        name=f"tigramite.pcmciplus.parcorr.tau{tau_max}",
+        tau_max=tau_max,
+        package_version=_version(),
+    )
+
+
+def tigramite_lpcmci_adapter(tau_max: int = SAME_STEP_TAU_MAX) -> TigramiteLPCMCI:
+    """A :class:`TigramiteLPCMCI` named for its lag window, carrying its environment's version."""
+    return TigramiteLPCMCI(
+        name=f"tigramite.lpcmci.parcorr.tau{tau_max}",
+        tau_max=tau_max,
+        package_version=_version(),
     )
