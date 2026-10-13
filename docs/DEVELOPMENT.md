@@ -36,7 +36,7 @@ charts, which the launch post and the benchmark explorer show too.
 
 The speed section's "Why Andrey is fast" pill opens a dialog of four animated scenes, one per idea
 behind the speed, built by [`site/why_fast.py`](../site/why_fast.py). The blog post
-`docs/blog/why-andrey-is-fast.md` shows the same scenes under its own headings. Each scene compares
+`docs/blog/20261008-why-andrey-is-fast.md` shows the same scenes under its own headings. Each scene compares
 Andrey with a lane labeled Others and names no package. `site/assets/why-fast.js` plays them with
 Motion, vendored unmodified as `site/assets/motion.js` under its MIT license; the version is pinned
 in the file's banner and in `tests/unit/test_why_fast.py`. `conf.py` loads both scripts only on
@@ -77,11 +77,22 @@ draws the graphs they return.
 
 ## The blog
 
-ABlog builds the blog from [`blog/`](blog/index.md): the post list at `/blog/`, an archive, author
-pages, and an Atom feed at `/blog/atom.xml`. A post is a MyST page whose front matter sets
-`blogpost: true`, its `author`, and its `date`. A post without a date is a draft, which the post
-list leaves out. A dated post is published in every build, even before its date, so a future date
-does not keep a post private.
+ABlog builds the blog from [`blog/`](blog/index.md): the posts, an archive, author pages, and an
+Atom feed at `/blog/atom.xml`. A post is a MyST page whose front matter sets `blogpost: true`, its
+`author`, its `date`, and its `description`. A post without a date is a draft, which the blog
+leaves out. A dated post is published in every build, even before its date, so a future date does
+not keep a post private.
+
+The blog's front page, `/blog/`, lists the dated posts in the Release cards page's blocks, from
+their front matter: the `blog-index` directive in `blog/index.md`, which `_blog_index` in
+`conf.py` fills. The newest post leads with its banner beside its title, its date, its
+`description` as its TL;DR, and a button to the post. The earlier posts follow, newest first, each
+in a row with a square tile of its art, its description, and its date. Newest means the latest
+date, a later version breaking a tie, as for the alpha banner below. A tile is a small JPEG that
+`tile_jpeg` in `site/cards.py` crops from the art, so the page loads the newest banner and a few
+small tiles. Each post lists its front matter's
+`tags`, each linking to ABlog's page of the posts that share it. A new post needs no change to the
+page.
 
 A post belongs to the release in its `version` front matter, and later builds leave it as that
 release rendered it: its numbers are typed text, and every file it includes (a figure, code, or
@@ -110,7 +121,9 @@ add a release:
 3. Add the new card to the toctree, newest first.
 4. Store the cover's art as `_static/release-cards/<release>.jpg`: a finished JPEG, 8.5 x 11 at
    three times the cover's 288 px width, with its own glow and grain and a dark ground behind the
-   title and the version. Add a `release-art-<release>` rule (dots as dashes) in
+   title and the version: the art recolored with `brand_tones` in `site/cards.py`, so its cobalt,
+   amber, and lightness match the other covers, with a soft navy shade under the masthead, the
+   title, and the version. Add a `release-art-<release>` rule (dots as dashes) in
    `_static/benchmarks.css` that points at it, and give the new card's cover and the Release cards
    page's featured cover both classes, `release-art release-art-<release>`. The bare `release-art`
    rule keeps 0.2.0's art, which its released card uses. A cover without the `release-art` class
@@ -198,8 +211,9 @@ shows:
 - The built pages: every page has one description, the same as its link preview's, at most 160
   characters, and neither empty nor only the project's name; its wordmark leads home and Docs,
   Examples, and Blog lead to their sections; its favicon and link-preview card were built. The
-  homepage's stylesheets carry a content version. The blog lists every post, and each post has a
-  built cover and a byline with its author and date. Every site address in the README, the
+  homepage's stylesheets carry a content version. The blog's front page leads with the newest post
+  and its cover and lists every other post once, newest first; each post has a built cover and a
+  byline with its author and date. Every site address in the README, the
   project URLs, and the citation is built.
 
 To check external links: `uv run --group docs sphinx-build -b linkcheck docs docs/_build/linkcheck`.
@@ -215,7 +229,7 @@ To check external links: `uv run --group docs sphinx-build -b linkcheck docs doc
 | Navbar: wordmark and sections | `docs/_templates/site-logo.html`, `docs/_templates/site-nav.html` |
 | Wordmark (Inter outlines, light and dark ink) and its generator | `site/brand/`, `site/wordmark.py` |
 | Palette as CSS custom properties | `docs/palette_css.py` |
-| Blog posts and the post list | `docs/blog/` |
+| Blog posts and the front page that lists them | `docs/blog/`, `docs/_static/blog.css` |
 | Release cards and the page that lists them | `docs/docs/benchmarks/`, `docs/docs/benchmarks.md`, `docs/_static/benchmarks.css` |
 | Docs landing page and section index | `docs/docs/index.md` |
 | API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/code/index.md` |
