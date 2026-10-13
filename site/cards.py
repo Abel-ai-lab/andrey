@@ -350,13 +350,13 @@ STORED_COVERS = {
     "pair": BRAND / "cover-pair.jpg",
     "iceberg": BRAND / "cover-iceberg.jpg",
     "contour": BRAND / "cover-contour.jpg",
-    "turbine": BRAND / "cover-turbine.jpg",
+    "lanes": BRAND / "cover-lanes.jpg",
 }
 COVERS = {
     "pair": "portraits of Andrey Kolmogorov and Andrey Markov",
     "iceberg": "an iceberg whose two peaks join into one mass under the waterline",
     "contour": "a contour map with two summits, one dotted path ending on each",
-    "turbine": "the fan of a jet engine seen head-on",
+    "lanes": "lanes rising into the sky, one amber streak far ahead",
     "graph": "the letters of Andrey as a graph",
 }
 # The blog's front page shows each earlier post's cover as a square tile of TILE px, cropped from
@@ -368,7 +368,7 @@ COVER_FOCUS = {"pair": "right"}
 
 
 def cover_jpeg(kind: str, quality: int = COVER_QUALITY) -> bytes:
-    """A post's cover as a JPEG: ``kind`` is ``pair``, ``iceberg``, ``contour``, ``turbine``, or
+    """A post's cover as a JPEG: ``kind`` is ``pair``, ``iceberg``, ``contour``, ``lanes``, or
     ``graph``, the default. Every cover but the graph is stored, so ``quality`` applies to the graph
     cover only."""
     if kind not in COVERS:
@@ -403,6 +403,9 @@ def cover_alt(kind: str) -> str:
             "A contour map drawn in navy lines: from one start, a white dotted path ends on the "
             "smaller summit and an amber one on the larger summit, marked with a star"
         )
-    if kind == "turbine":
-        return "The fan of a jet engine seen head-on, drawn in navy lines, with an amber center"
+    if kind == "lanes":
+        return (
+            "Lanes drawn in navy lines rise like a bridge into a starry sky; the others move in "
+            "short steps while one amber streak runs far ahead"
+        )
     return "The letters a, n, d, r, e, y as a small directed graph, with a dashed arc from a to y"

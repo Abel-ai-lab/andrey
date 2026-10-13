@@ -8,7 +8,7 @@ date: 2026-10-08
 author: Shu Wan
 tags: [Engineering, Speed]
 version: 0.1.0
-cover: turbine
+cover: lanes
 ---
 
 # Why Andrey is fast
