@@ -178,6 +178,8 @@ class RunRecord:
     # The largest lag a temporal solution searched, from its params; `None` for a static solution.
     # Its estimate covers lags 1 to `tau_max`, the lags its lag-resolved scores are taken over.
     tau_max: int | None = None
+    # A panel dataset's number of time points; `n` is then its units per time point. 0 otherwise.
+    times: int = 0
     wall_s: float | None = None
     cpu_s: float | None = None  # fit-scoped self+children CPU
     child_cpu_s: float | None = None  # CPU attributed to the (parallel) worker pool alone

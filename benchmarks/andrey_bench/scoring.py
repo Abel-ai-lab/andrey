@@ -1,8 +1,9 @@
 """Scoring utilities for benchmark estimates.
 
 ``score_result`` scores through ``andrey.metrics``, against the truth's PAG for a PAG estimate, lag
-by lag for a temporal estimate (:func:`temporal_score_columns`), and link by link for a window graph
-(:func:`window_scores`).
+by lag for a temporal estimate (:func:`temporal_score_columns`), link by link for a window graph
+(:func:`window_scores`), and coefficient by coefficient for a coefficient stack
+(:func:`coefficient_scores`).
 
 ``confounded_pair_scores`` scores the pairs an estimate attributes to a hidden common cause.
 
@@ -24,6 +25,7 @@ from andrey import GraphStructure, TemporalStructure
 from andrey.core import LATENT
 from andrey.data.latent import marginal
 from andrey_bench import window as W
+from andrey_bench.coefficients import CoefficientStack
 from andrey_bench.contracts import links_from_temporal
 
 # Andrey endpoint-mark convention (mirrors contracts.py): mark AT node i on edge i-j is marks[i, j].
@@ -34,8 +36,13 @@ def structure_hash(structure: GraphStructure | TemporalStructure | W.WindowGraph
     """A hash of the normalized graph, comparable across packages.
 
     A temporal structure hashes its links as sorted ``(lag, cause, effect)`` triples, and a window
-    graph its nonzero marks as sorted ``(lag, i, j, mark)`` tuples, conflicts included.
+    graph its nonzero marks as sorted ``(lag, i, j, mark)`` tuples, conflicts included, and a
+    coefficient stack the positions of its links (nonzero, finite coefficients), not their values.
     """
+    if isinstance(structure, CoefficientStack):
+        links = sorted(tuple(int(v) for v in idx) for idx in np.argwhere(structure.support()))
+        shape = structure.stack.shape
+        return hashlib.sha1(f"coefficients:{structure.kind}:{shape}:{links}".encode()).hexdigest()
     if isinstance(structure, W.WindowGraph):
         marks = sorted(
             (int(k), int(i), int(j), int(structure.marks[k, i, j]))
@@ -73,6 +80,8 @@ def score_result(
     ``TypeError`` unless both are temporal, and a window graph by :func:`window_scores`, which
     raises ``TypeError`` unless both are window graphs.
     """
+    if isinstance(truth, CoefficientStack) or isinstance(estimate, CoefficientStack):
+        return coefficient_scores(estimate, truth)
     if isinstance(truth, W.WindowGraph) or isinstance(estimate, W.WindowGraph):
         return window_scores(estimate, truth)
     if isinstance(truth, TemporalStructure) or isinstance(estimate, TemporalStructure):
@@ -197,6 +206,57 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
         "lagged_circle": float((found == W.CIRCLE).sum()),
         "lagged_arrow": float((found == W.ARROW).sum()),
     }
+
+
+def coefficient_scores(estimate: object, truth: object) -> dict[str, Any]:
+    """Score a coefficient stack against the true one.
+
+    The blocks scored are the instantaneous and lag-1 autoregressive blocks: ``B0`` and ``B1`` of a
+    ``varma`` stack, and ``B(t,t)`` and ``B(t,t-1)`` at every time point but the first of a
+    ``panel`` stack. A link is a nonzero coefficient; its block gives its lag, its row the effect,
+    and its column the cause. Columns:
+
+    - ``precision``, ``recall``, ``f1``: the directed cross-links (cause and effect differ) of
+      those blocks, a link counted when its lag, cause, and effect all match;
+      ``instantaneous_*`` and ``lagged_*`` split them by block.
+    - ``instantaneous_rmse`` and ``lagged_rmse``: the root mean square error of every entry of
+      those blocks, as the LiNGAM papers report their estimates; ``ma_rmse`` that of the
+      moving-average block ``M1`` of a ``varma`` stack.
+
+    Raises ``TypeError`` unless both are coefficient stacks, and ``ValueError`` unless they have
+    the same kind and shape.
+    """
+    if not isinstance(estimate, CoefficientStack) or not isinstance(truth, CoefficientStack):
+        raise TypeError("coefficient_scores needs a coefficient estimate and a coefficient truth")
+    if estimate.kind != truth.kind or estimate.stack.shape != truth.stack.shape:
+        raise ValueError("coefficient_scores needs stacks of the same kind and shape")
+    if truth.kind == "varma":
+        est = estimate.stack[None, :2]
+        true_ = truth.stack[None, :2]
+    else:
+        est = estimate.stack[1:]
+        true_ = truth.stack[1:]
+    cross = ~np.eye(truth.n_nodes, dtype=bool)
+    est_links = np.isfinite(est) & (est != 0) & cross
+    true_links = (true_ != 0) & cross
+
+    def prf(prefix: str, e: np.ndarray, t: np.ndarray) -> dict[str, float]:
+        tp, fp, fn = int((e & t).sum()), int((e & ~t).sum()), int((~e & t).sum())
+        precision = tp / (tp + fp) if tp + fp else 1.0
+        recall = tp / (tp + fn) if tp + fn else 1.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        return {f"{prefix}precision": precision, f"{prefix}recall": recall, f"{prefix}f1": f1}
+
+    columns: dict[str, Any] = {"family": "temporal_coefficients"}
+    columns.update(prf("", est_links, true_links))
+    columns.update(prf("instantaneous_", est_links[:, 0], true_links[:, 0]))
+    columns.update(prf("lagged_", est_links[:, 1], true_links[:, 1]))
+    for block, name in ((0, "instantaneous_rmse"), (1, "lagged_rmse")):
+        columns[name] = float(np.sqrt(np.mean((est[:, block] - true_[:, block]) ** 2)))
+    if truth.kind == "varma":
+        error = estimate.stack[2] - truth.stack[2]
+        columns["ma_rmse"] = float(np.sqrt(np.mean(error**2)))
+    return columns
 
 
 def _has_hidden(truth: GraphStructure) -> bool:
@@ -426,7 +486,7 @@ def sortability(data: np.ndarray, truth: GraphStructure | TemporalStructure) -> 
     is unavailable, or for a temporal truth: sortability is defined for i.i.d. rows, not a series.
 
     """
-    if isinstance(truth, (TemporalStructure, W.WindowGraph)):
+    if isinstance(truth, (TemporalStructure, W.WindowGraph, CoefficientStack)):
         return {}
     try:
         import andrey.data as _data  # noqa: WPS433 (deliberately lazy — optional dependency probe)

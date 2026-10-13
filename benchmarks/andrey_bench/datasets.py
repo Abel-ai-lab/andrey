@@ -15,6 +15,12 @@ The regimes of the PCMCI, PCMCI+, and LPCMCI papers are drawn by
 same-step links stores its truth as lag marks with the kind ``"temporal"``; a model with them
 stores the ``(L + 1, d, d)`` window marks of lags ``0..L`` (:mod:`andrey_bench.window`) with the
 kind ``"temporal_window"``. Unobserved variables are the key's ``latents``, last in the truth.
+
+The regimes of the VAR-LiNGAM and longitudinal LiNGAM papers are drawn by
+:mod:`andrey_bench.lingam_models` (functional ``varma2010`` or ``panel2013``) and store their truth
+as a coefficient stack (:mod:`andrey_bench.coefficients`), with the kind ``"temporal_coefficients"``
+or ``"panel_coefficients"``. A panel key's ``times`` is its number of time points, and its ``n``
+the number of units observed at each; a panel dataset's data has shape ``(times, n, d)``.
 """
 
 from __future__ import annotations
@@ -34,7 +40,7 @@ import numpy as np
 import andrey.data as data
 from andrey import TemporalStructure
 from andrey.core import LATENT, OBSERVED
-from andrey_bench import temporal_models
+from andrey_bench import lingam_models, temporal_models
 from andrey_bench.contracts import lag_marks
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
@@ -95,6 +101,11 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "pcmci_paper": ("random", "pcmci2019", "gaussian", "raw"),
     "pcmciplus_paper": ("random", "pcmciplus2020", "gaussian", "raw"),
     "lpcmci_paper": ("random", "lpcmci2020", "gaussian", "raw"),
+    # The simulations of the VAR-LiNGAM and longitudinal LiNGAM papers, with non-Gaussian noise;
+    # andrey_bench.lingam_models gives each setup and its source: Hyvarinen et al. (2010), Sect.
+    # 5.4, with one moving-average matrix; Kadowaki et al. (2013), JSAI Sect. 6.1.
+    "varma_lingam_paper": ("random", "varma2010", "nongaussian", "raw"),
+    "longitudinal_lingam_paper": ("random", "panel2013", "nongaussian", "raw"),
 }
 
 #: Temporal regimes and the density their keys set. At density 0 the instantaneous graph has no
@@ -107,10 +118,16 @@ TEMPORAL_REGIMES: dict[str, float] = {
         regime: temporal_models.MODELS[REGIMES[regime][1]].cross_degree
         for regime in ("pcmci_paper", "pcmciplus_paper", "lpcmci_paper")
     },
+    # The LiNGAM paper models record no density: each fixes its own link counts.
+    "varma_lingam_paper": 0.0,
+    "longitudinal_lingam_paper": 0.0,
 }
 
 #: The registry's ``graph_kind`` for a truth stored as window marks.
 WINDOW_KIND = "temporal_window"
+
+#: The registry's ``graph_kind`` for a truth stored as a coefficient stack, by model.
+COEFFICIENT_KINDS = {"varma2010": "temporal_coefficients", "panel2013": "panel_coefficients"}
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
 #: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
@@ -198,6 +215,9 @@ class DatasetKey:
     ``latents`` nodes are generated and then dropped from the data. The data has ``d - latents``
     columns; the stored truth keeps all ``d`` nodes. At ``0``, ``latents`` affects neither the label
     nor the generator call. Datasets without hidden nodes therefore keep their identity.
+
+    ``times`` is a panel's number of time points, with ``n`` units at each. At ``0``, its default, it
+    affects neither the label nor the generator call either.
     """
 
     topology: str
@@ -209,6 +229,7 @@ class DatasetKey:
     seed: int
     standardize: str
     latents: int = 0
+    times: int = 0
 
     @property
     def label(self) -> str:
@@ -218,9 +239,10 @@ class DatasetKey:
         density would merge a dense key into the sparse key's file.
         """
         hidden = f"-L{self.latents}" if self.latents else ""
+        panel = f"-T{self.times}" if self.times else ""
         return (
             f"{self.topology}-{self.functional}-{self.noise}-deg{self.density:g}"
-            f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}"
+            f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}{panel}"
         )
 
     @property
@@ -259,6 +281,21 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
         if key.latents != temporal_models.hidden_count(key.functional, key.d):
             raise ValueError(f"{key.label}: latents must be the model's unobserved variables")
         return call
+    if key.functional in lingam_models.MODELS:
+        panel = key.functional == "panel2013"
+        if panel != bool(key.times) or key.latents:
+            raise ValueError(f"{key.label}: times is set for panel2013 alone, and latents is 0")
+        call = {
+            "generator": f"andrey_bench.lingam_models.{'sample_panel' if panel else 'sample_varma'}",
+            "model": key.functional,
+            "setup": lingam_models.model_params(key.functional),
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+        }
+        if panel:
+            call["times"] = key.times
+        return call
     try:
         graph = TOPOLOGY_TO_GRAPH[key.topology]
         functional = FUNCTIONAL_TO_ANDREY[key.functional]
@@ -295,6 +332,13 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
             "density": key.density,
             "params": {"cross_links_per_variable": key.density},
         }
+    if key.functional in lingam_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": lingam_models.model_params(key.functional),
+        }
     model = TOPOLOGY_TO_GRAPH[key.topology]
     return {
         "model": model,
@@ -311,7 +355,8 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
     as consumed by the scorer and Andrey adapter. With hidden nodes, the truth covers all ``d``
     nodes. :func:`latent_node_types` rebuilds their types from the key. A temporal truth is
     returned as :func:`lag_only_marks` with the kind ``"temporal"``. A paper model's series and
-    truth come from :mod:`andrey_bench.temporal_models`, as the module docstring says.
+    truth come from :mod:`andrey_bench.temporal_models` or :mod:`andrey_bench.lingam_models`, as
+    the module docstring says.
     """
     kwargs = generation_kwargs(key)
     if key.functional in temporal_models.MODELS:
@@ -320,6 +365,12 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
         if temporal_models.MODELS[key.functional].same_step:
             return series, window, WINDOW_KIND
         return series, lag_marks(window[1:] != 0), "temporal"
+    if key.functional == "varma2010":
+        series, stack = lingam_models.sample_varma(key.functional, key.d, key.n, key.seed)
+        return series, stack, COEFFICIENT_KINDS[key.functional]
+    if key.functional == "panel2013":
+        panel, stack = lingam_models.sample_panel(key.functional, key.d, key.times, key.n, key.seed)
+        return panel, stack, COEFFICIENT_KINDS[key.functional]
     ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
     data_arr = np.ascontiguousarray(ds.data, dtype=CANONICAL_DTYPE)
     graph = ds.graph
@@ -503,6 +554,7 @@ __all__ = [
     "TEMPORAL_REGIMES",
     "LAG_ONLY_DENSITY",
     "WINDOW_KIND",
+    "COEFFICIENT_KINDS",
     "DEFAULT_REGIME",
     "latents_for",
     "latent_node_types",

@@ -17,6 +17,7 @@ import pandas as pd
 
 from andrey import GraphStructure, TemporalStructure
 from andrey_bench import datasets, rundir, scoring
+from andrey_bench.coefficients import CoefficientStack
 from andrey_bench.contracts import (
     RunRecord,
     SolutionAdapter,
@@ -46,13 +47,18 @@ def _truth(
     nodes present in the data. A ``temporal`` truth is a stack of lag marks and becomes a
     ``TemporalStructure`` with lags ``1..L``; a ``temporal_window`` truth is a stack of window marks
     and becomes a :class:`~andrey_bench.window.WindowGraph` whose lag 0 is a DAG, its last
-    ``latents`` variables unobserved.
+    ``latents`` variables unobserved. A ``temporal_coefficients`` or ``panel_coefficients`` truth is
+    a :class:`~andrey_bench.coefficients.CoefficientStack`.
     """
     marks = np.asarray(marks)
     if kind == "temporal":
         return temporal_from_lag_marks(marks)
     if kind == datasets.WINDOW_KIND:
         return WindowGraph(marks, lag0="dag", latents=latents)
+    if kind == "temporal_coefficients":
+        return CoefficientStack(marks, kind="varma")
+    if kind == "panel_coefficients":
+        return CoefficientStack(marks, kind="panel")
     types = datasets.latent_node_types(len(marks), latents)
     return GraphStructure.from_numpy(marks, kind=kind, node_types=types)
 
@@ -115,6 +121,7 @@ def assemble_record(
         status=measures.get("status", Status.OK.value),
         latents=key.latents,
         tau_max=params.get("tau_max"),
+        times=key.times,
         wall_s=measures.get("wall_s"),
         cpu_s=measures.get("cpu_s"),
         child_cpu_s=measures.get("child_cpu_s"),
