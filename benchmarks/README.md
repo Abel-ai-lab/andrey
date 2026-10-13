@@ -378,7 +378,7 @@ trains two small neural networks per direction for 3000 epochs in batches of 128
 last partial batch, so the smoke pair of 100 rows trains nothing. It then compares the mean of the
 assumed cause with the mean of the estimated noise by a two-sample t-test, rounded to three
 decimals. Andrey fits smooth basis expansions by Newton's method and tests independence with HSIC.
-causal-learn's fit takes about two minutes at 1000 rows and grows with the rows.
+causal-learn's fit takes over a minute at 1000 rows and grows with the rows.
 
 ### Where the clock starts
 
