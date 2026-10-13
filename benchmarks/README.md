@@ -150,6 +150,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
 | PCMCI | Andrey (Student-t, Fisher-z), tigramite |
 | PCMCI+, LPCMCI | Andrey (Student-t), tigramite |
+| VARMA-LiNGAM, LongitudinalLiNGAM | Andrey, lingam |
 | Granger (lasso) | Andrey (serial, parallel), causal-learn |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
@@ -328,12 +329,14 @@ removals, then reversals; Andrey ranks all moves by score change, then by the ed
 
 ### PCMCI on lagged series
 
-`pcmci_cpu.py` compares Andrey's PCMCI with tigramite's, with the empty lag stack as the floor. A
-rung is one variable count `d` and one series length `T`; the driver runs every `d` in its ladder at
-every `T` in its lengths, and a dataset is one series of `T` time steps, stored with `n = T`.
+`pcmci_cpu.py` compares Andrey's PCMCI with tigramite's, with the empty lag stack as the floor.
+Time-series sizes are written N x T: N variables (nodes) and a series of T time steps (the window
+length), and where a cell holds several trajectories or samples, M of them per N x T cell. A rung
+is one N x T size; the driver runs every N in its ladder at every T in its lengths, and a
+dataset is one series, stored with `d = N` and `n = T`.
 
 Each method runs on the simulation of its own paper, drawn by `andrey_bench/temporal_models.py`,
-which keeps the expected number of cross-links per variable fixed as `d` grows. Every variable
+which keeps the expected number of cross-links per variable fixed as N grows. Every variable
 depends on its own previous step, and a model whose process is not stationary is drawn again:
 
 | regime | method | source | cross-links per variable | same-step share | lags |
@@ -345,7 +348,7 @@ depends on its own previous step, and a model whose process is not stationary is
 The coefficients, autocorrelations, and noise follow each paper as well; the module docstring lists
 them. A truth without same-step links is stored as the marks of lags `1..L`. `var_lagged`, the
 earlier regime, draws each lag-1 cross-link with probability 0.3, so its links per variable grow
-with `d`.
+with N.
 
 Every solution tests lags 1 to `tau_max`, at `pc_alpha=0.2` and `alpha_level=0.05`:
 
@@ -386,7 +389,7 @@ $ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py --out outputs/pcmci \
     --ladder 5 10 20 --lengths 500 1000 --tau-max 2 --cores 1
 ```
 
-The driver refuses a series shorter than `2 * tau_max * (d + 1) + 3` steps, the shortest Andrey's
+The driver refuses a series shorter than `2 * tau_max * (N + 1) + 3` steps, the shortest Andrey's
 PCMCI accepts.
 
 ### PCMCI+ and LPCMCI on series with same-step links
@@ -394,7 +397,7 @@ PCMCI accepts.
 `pcmci_cpu.py --method pcmciplus` and `--method lpcmci` compare Andrey's PCMCI+ and LPCMCI with
 tigramite's on `pcmciplus_paper` and `lpcmci_paper`, where some links act within a time step. The
 truth is a window over lags 0 to the largest true lag: the same-step DAG and the lagged links.
-`lpcmci_paper` generates `d` series and drops 30% of them, so its rows compare the two packages'
+`lpcmci_paper` generates N series and drops 30% of them, so its rows compare the two packages'
 graphs only; their errors against the truth would need the true PAG, which the harness does not
 compute.
 
@@ -439,7 +442,7 @@ ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python \
 ```
 
 The driver refuses a series shorter than the shortest Andrey's method accepts:
-`2 * tau_max * (d + 1) + d + 1` steps for PCMCI+, `d * (tau_max + 1) + 2 * tau_max + 1` for LPCMCI.
+`2 * tau_max * (N + 1) + N + 1` steps for PCMCI+, `N * (tau_max + 1) + 2 * tau_max + 1` for LPCMCI.
 
 ### Lasso Granger causality
 
@@ -447,13 +450,13 @@ The driver refuses a series shorter than the shortest Andrey's method accepts:
 vector-autoregressive series with known lagged edges, drawn by `andrey.data`: two lags, Gaussian
 noise, and no effects within a time step, so the true lagged edges are the nonzero entries of the
 lag matrices. Every variable keeps its own past, and each other variable enters a lag with
-probability `2 / (d - 1)`; the lag matrices are scaled so the series is stationary. Each variable
+probability `2 / (N - 1)`; the lag matrices are scaled so the series is stationary. Each variable
 is z-scored before the fits, so both packages get the same standardized series, and both fit with
 the same `maxlag` and `cv`. The data do not fit the dataset store, which holds one graph
 per dataset, so the driver draws each series itself and calls the runner directly, as
 `public_datasets.py` does.
 
-The defaults are `d` of 5, 10, 20, 40, and 80 variables, 1000 time steps, five seeds, `maxlag` 2,
+The defaults are N of 5, 10, 20, 40, and 80 variables, T of 1000 time steps, five seeds, `maxlag` 2,
 `cv` 5, one repeat without warm-up, and `--cap-wall-s` of 1800. A fit past the cap is a `timeout`
 record with no scores. A smoke run fits one series of 5 variables:
 
@@ -464,7 +467,7 @@ $ANDREY_BENCH_PYTHON benchmarks/granger_var.py --out outputs/granger-smoke --smo
 A lagged edge is a nonzero coefficient at lags 1 to `maxlag`. `precision`, `recall`, and `f1`
 score every lagged edge; `cross_precision`, `cross_recall`, and `cross_f1` leave out each
 variable's edges from its own past, which every true series holds. The summary prints their means
-per `d` and solution, the median wall time, and `agree`, the share of series on which every
+per N and solution, the median wall time, and `agree`, the share of series on which every
 solution returns the same lagged edges. Andrey runs twice: serially, and with its per-variable fits
 on `--cores` threads (`andrey.granger.numpy.parallel`); both return the same coefficients.
 
@@ -480,6 +483,49 @@ first and returns the coefficients in the data's units, so its edges do not depe
 causal-learn fits the series as given, so on raw series with unequal variances the two keep
 different small coefficients. The driver gives both the z-scored series, so `agree` compares the
 same fit.
+
+### VARMA-LiNGAM and longitudinal LiNGAM
+
+`lingam_ts.py --method varma` and `--method longitudinal` compare Andrey's VARMA-LiNGAM and
+longitudinal LiNGAM with lingam's (`VARMALiNGAM`, `LongitudinalLiNGAM`), each on the simulation of
+its paper, drawn by `andrey_bench/lingam_models.py`:
+
+| regime | method | source | size |
+|---|---|---|---|
+| `varma_lingam_paper` | VARMA-LiNGAM | Hyvarinen et al. (2010), Sect. 5.4, plus one moving-average matrix | N x T, one series |
+| `longitudinal_lingam_paper` | LongitudinalLiNGAM | Kadowaki et al. (2013), JSAI Sect. 6.1 | N x T, M units per time point |
+
+`varma_lingam_paper` draws a strictly lower-triangular same-step matrix with 0.8 N links and a
+lag-1 matrix with 2 N links, the paper's 40% of entries at N = 5 held per variable as N grows,
+weights 0.05 to 0.5 in magnitude with a random sign, and super-Gaussian noise. The paper's model
+has no moving-average part, so the series adds one moving-average matrix drawn like the lag-1 one.
+`longitudinal_lingam_paper` draws, at every time point, a dense same-step DAG with weights 0.5 to
+1.5 in magnitude and a dense lag-1 matrix with weights up to 0.5, a hidden common cause at the
+first time point, and non-Gaussian noise; Bach and Jordan's (2002) densities that the paper names
+are specified in full for 5 of the 18, which are the ones used. A panel's data has shape `(T, M,
+N)`, stored with `d = N`, `n = M`, and `times = T`.
+
+Both packages run the same settings: VARMA-LiNGAM with `order=(1, 1)`, no order search, and the lag
+blocks pruned by adaptive Lasso (lingam's defaults are an order search by BIC and pruning);
+LongitudinalLiNGAM with one lag and the pairwise likelihood-ratio measure. Every estimate is a
+coefficient stack in the `[effect, cause]` layout both packages report
+(`andrey_bench/coefficients.py`), scored by `scoring.coefficient_scores`:
+
+| columns | what they score |
+|---|---|
+| `precision`, `recall`, `f1` | the directed cross-links of the same-step and lag-1 blocks, a link counted when its lag, cause, and effect match; `instantaneous_*` and `lagged_*` split them |
+| `instantaneous_rmse`, `lagged_rmse`, `ma_rmse` | the root mean square error of the blocks' weights, the papers' accuracy measure |
+
+Two solutions return the same graph when the same weights are nonzero (`structure_hash`). lingam
+1.13.0, the release with both estimators, installs on Python 3.12, so its fits run in an environment
+of their own:
+
+```shell
+benchmarks/start_lingam_ts.sh
+export ANDREY_BENCH_LINGAM_TS_PYTHON=$PWD/benchmarks/.venv-lingam-ts/bin/python
+$ANDREY_BENCH_PYTHON benchmarks/lingam_ts.py --method longitudinal --out outputs/longitudinal \
+    --ladder 3 5 10 --lengths 20 50 --samples 200 1000 --seeds 10
+```
 
 ### Where the clock starts
 
@@ -780,6 +826,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
 - `pcmci_cpu.py` - compares PCMCI, PCMCI+, or LPCMCI with tigramite on series, over variables and
   series lengths.
+- `lingam_ts.py` - compares VARMA-LiNGAM and longitudinal LiNGAM with lingam on their papers'
+  simulations.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
 - `xges_cpu.py` - compares Andrey's XGES, with and without the extended search, with the xges
@@ -792,7 +840,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.
 - `start_r.sh` - builds the R package library and installs `rpy2`.
-- `start_xges.sh`, `start_tigramite.sh` - build the separate xges and tigramite environments.
+- `start_xges.sh`, `start_tigramite.sh`, `start_lingam_ts.sh` - build the separate xges, tigramite,
+  and lingam time-series environments.
 - `andrey_bench/contracts.py` - adapter protocol, record schema, dataset and run identity.
 - `andrey_bench/adapters/` - one adapter per package, method, backend, and mode.
 - `andrey_bench/rsession.py` - embedded R interpreter, data transfer, and result retrieval within
