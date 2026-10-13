@@ -287,12 +287,15 @@ def readme_banner(quality: int = BANNER_QUALITY) -> str:
 # JPEG takes the first quality in ``COVER_QUALITIES`` under MAX_BYTES.
 COVER_W, COVER_H = 1600, 640
 COVER_QUALITIES = (75, 70, 65, 60, 55)
-ART = {kind: BRAND / f"art-{kind}.jpg" for kind in ("pair", "lanes", "iceberg", "contour")}
+ART = {
+    kind: BRAND / f"art-{kind}.jpg" for kind in ("pair", "lanes", "iceberg", "contour", "hourglass")
+}
 COVERS = {
     "pair": "portraits of Andrey Markov and Andrey Kolmogorov, side by side",
     "lanes": "lanes rising into the sky, one amber streak far ahead",
     "iceberg": "an iceberg whose two peaks join into one faint mass under the waterline",
     "contour": "two summits drawn in contour lines, one dotted trail ending on each",
+    "hourglass": "an hourglass whose sand falls one way only",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge

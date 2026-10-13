@@ -1116,7 +1116,7 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     assert cards.TAGLINE == "A very fast causal discovery package"
 
 
-@pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "ground"])
+@pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "hourglass", "ground"])
 def test_a_post_banner_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
     import io
 
@@ -1131,7 +1131,7 @@ def test_a_post_banner_is_a_small_jpeg_drawn_the_same_every_build(cards, kind):
     assert cards.cover_alt(kind).strip()
 
 
-@pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "ground"])
+@pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "hourglass", "ground"])
 def test_a_post_tile_is_a_small_square_jpeg_drawn_the_same_every_build(cards, kind):
     import io
 
