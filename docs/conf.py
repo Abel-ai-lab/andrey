@@ -317,6 +317,8 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
     for name, tile in cards.grain.hero_tiles():
         _write_bytes(GENERATED / "static" / name, tile)
+    # A release cover or tile without its own art (_static/benchmarks.css).
+    _write_bytes(GENERATED / "static" / "release-ground.jpg", cards.release_ground_jpeg())
 
 
 # Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage's card carries the
