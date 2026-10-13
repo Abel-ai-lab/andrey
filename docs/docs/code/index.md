@@ -8,7 +8,7 @@ meta:
 # API reference
 
 The public API of Andrey - everything exported by `andrey`, `andrey.metrics`, and `andrey.viz`,
-and the dataset loaders of `andrey.data` - generated from the source docstrings.
+and the dataset loaders and simulators of `andrey.data` - generated from the source docstrings.
 `andrey.__version__` gives the installed version.
 
 ## Structure-learning methods
@@ -205,6 +205,23 @@ Sachs data end to end.
    load_dataset
    list_datasets
    RealDataset
+```
+
+### Simulators
+
+`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
+scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
+for the mixed-data tests and scores. Each returns the data with the true graph.
+
+```{eval-rst}
+.. currentmodule:: andrey.data
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   sample_discrete
+   sample_mixed
 ```
 
 ## Metrics

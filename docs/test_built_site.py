@@ -21,6 +21,8 @@ from html.parser import HTMLParser
 import pytest
 
 import andrey
+import andrey.data.discrete
+import andrey.data.mixed
 import andrey.data.real
 import andrey.metrics
 import andrey.viz
@@ -45,6 +47,8 @@ MATH_UNICODE = set(
 PUBLIC_MODULES = (
     (andrey, ""),
     (andrey.data.real, "data."),
+    (andrey.data.discrete, "data."),
+    (andrey.data.mixed, "data."),
     (andrey.metrics, "metrics."),
     (andrey.viz, "viz."),
     (andrey.viz.mpl, "viz.mpl."),

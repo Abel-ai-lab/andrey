@@ -22,6 +22,8 @@ from .dataset import CausalDataset, QAReport, SCMParams
 from .discrete import _parents_of
 from .scm import _GRAPH, _NOISE, _SEED_SCHEME, _WEIGHTS, _component_rng, named_graph
 
+__all__ = ["sample_mixed"]
+
 # Magnitudes of a continuous parent's weight and of a categorical parent's shifts.
 _WEIGHT_RANGE = (0.5, 2.0)
 
@@ -43,8 +45,10 @@ def sample_mixed(
     ----------
     graph : {"erdos_renyi", "scale_free", "small_world", "hub"}, default="erdos_renyi"
         The random graph the DAG is drawn from, as for :func:`~andrey.data.sample_scm`.
-    d, n : int
-        Node count and sample count.
+    d : int
+        Node count.
+    n : int
+        Sample count.
     seed : int
         Root seed.
     density : float, default=2.0

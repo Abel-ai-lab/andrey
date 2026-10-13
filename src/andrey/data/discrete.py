@@ -20,6 +20,8 @@ from .dataset import CausalDataset, QAReport, SCMParams
 from .graphs import DAGDraw
 from .scm import _GRAPH, _NOISE, _SEED_SCHEME, _WEIGHTS, _component_rng, named_graph
 
+__all__ = ["sample_discrete"]
+
 
 def sample_discrete(
     *,
@@ -37,8 +39,10 @@ def sample_discrete(
     ----------
     graph : {"erdos_renyi", "scale_free", "small_world", "hub"}, default="erdos_renyi"
         The random graph the DAG is drawn from, as for :func:`~andrey.data.sample_scm`.
-    d, n : int
-        Node count and sample count.
+    d : int
+        Node count.
+    n : int
+        Sample count.
     seed : int
         Root seed.
     density : float, default=2.0
