@@ -177,8 +177,9 @@ def test_coerce_scalars_and_choices():
     assert _coerce("0.05", pc["alpha"]) == 0.05
     assert _coerce("1e-3", pc["alpha"]) == 0.001  # scientific notation
     assert _coerce("fisherz", pc["indep_test"]) == "fisherz"
+    assert _coerce("kci", pc["indep_test"]) == "kci"
     with pytest.raises(CliError):  # bad choice
-        _coerce("kci", pc["indep_test"])
+        _coerce("no_such_test", pc["indep_test"])
     with pytest.raises(CliError):  # not a number
         _coerce("abc", pc["alpha"])
 
