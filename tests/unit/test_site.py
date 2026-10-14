@@ -674,11 +674,12 @@ def test_one_header_on_every_page():
     assert '"navbar_start": ["site-logo", "site-version"]' in conf
     assert '"navbar_center": ["site-nav"]' in conf
     nav = (ROOT / "docs" / "_templates" / "site-nav.html").read_text()
-    assert re.findall(r'\("([\w/]+)", "(\w+)"', nav) == [
+    assert re.findall(r'\("([\w/]+)", "([\w ]+)"', nav) == [
         ("docs/index", "Docs"),
         ("docs/examples/index", "Examples"),
         ("docs/demos/index", "Demos"),
         ("blog/index", "Blog"),
+        ("docs/benchmarks", "Release cards"),
         ("docs/faq", "FAQ"),
     ]
 
@@ -699,7 +700,7 @@ def test_the_navbar_names_only_the_page_being_read_as_current():
 
     def marks(pagename):
         page = nav.render(pagename=pagename, _=str, pathto=lambda doc: doc)
-        highlighted = re.findall(r'<li class="nav-item current active">\s*<a [^>]*>(\w+)<', page)
+        highlighted = re.findall(r'<li class="nav-item current active">\s*<a [^>]*>([^<]+)<', page)
         return highlighted, re.findall(r'aria-current="page">([^<]+)<', page)
 
     assert marks("index") == ([], [])
@@ -712,6 +713,8 @@ def test_the_navbar_names_only_the_page_being_read_as_current():
     assert marks("blog/index") == (["Blog"], ["Blog"])
     assert marks("blog/20261008-introducing-andrey") == (["Blog"], [])
     assert marks("docs/faq") == (["FAQ"], ["FAQ"])
+    assert marks("docs/benchmarks") == (["Release cards"], ["Release cards"])
+    assert marks("docs/benchmarks/0.4.0") == (["Release cards"], [])
 
 
 def test_homepage_styles_are_scoped_to_the_homepage():

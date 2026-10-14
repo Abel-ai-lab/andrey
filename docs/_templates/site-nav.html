@@ -2,10 +2,13 @@
     aria-current goes only on the link to the page being read. -#}
 {%- set sections = [
   ("docs/index", "Docs", pagename.startswith("docs/")
-    and not pagename.startswith(("docs/examples/", "docs/demos/")) and pagename != "docs/faq"),
+    and not pagename.startswith(("docs/examples/", "docs/demos/", "docs/benchmarks/"))
+    and pagename not in ("docs/faq", "docs/benchmarks")),
   ("docs/examples/index", "Examples", pagename.startswith("docs/examples/")),
   ("docs/demos/index", "Demos", pagename.startswith("docs/demos/")),
   ("blog/index", "Blog", pagename == "blog" or pagename.startswith("blog/")),
+  ("docs/benchmarks", "Release cards", pagename == "docs/benchmarks"
+    or pagename.startswith("docs/benchmarks/")),
   ("docs/faq", "FAQ", pagename == "docs/faq"),
 ] %}
 <nav aria-label="{{ _('Site') }}">
