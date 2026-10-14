@@ -20,7 +20,12 @@ from andrey import GraphStructure
 from andrey_bench import datasets
 from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.causal_learn_pc import CI_TESTS, CausalLearnPC
-from andrey_bench.adapters.tigramite_pc import PYTHON_ENV_VAR, TigramitePC, graph_to_adjacency
+from andrey_bench.adapters.tigramite_pc import (
+    PYTHON_ENV_VAR,
+    TigramitePC,
+    graph_to_adjacency,
+    tigramite_pc_adapter,
+)
 
 NONLINEAR = ("kci", "rcot", "cmiknn", "gpdc")
 
@@ -125,3 +130,4 @@ def test_tigramite_pc_runs_in_its_environment(test: str, tmp_path: Path) -> None
     adjacent = {(i, j) for i in range(3) for j in range(i + 1, 3) if native[i, j] or native[j, i]}
     assert adjacent == {(0, 1)}
     assert TigramitePC(test).to_structure(native).kind == "cpdag"
+    assert tigramite_pc_adapter(test).package_version not in ("", "unknown")

@@ -19,8 +19,9 @@ uv venv "$VENV" --python 3.13 --clear
 uv pip install --python "$VENV/bin/python" "tigramite==5.2.10.1" scikit-learn dcor numba pytest
 
 "$VENV/bin/python" - <<'PY'
+from importlib import metadata
+
 import numpy as np
-import tigramite
 from tigramite import data_processing
 from tigramite.independence_tests.cmiknn import CMIknn
 from tigramite.independence_tests.gpdc import GPDC
@@ -34,7 +35,7 @@ for test in (cmiknn, GPDC(significance="analytic")):
     pcmci = PCMCI(dataframe=data_processing.DataFrame(data), cond_ind_test=test, verbosity=0)
     graph = pcmci.run_pcalg_non_timeseries_data(pc_alpha=0.05, contemp_collider_rule="none")["graph"]
     assert graph.shape == (3, 3, 1), graph.shape
-print(f"tigramite-env OK tigramite {tigramite.__version__} numpy {np.__version__}")
+print(f"tigramite-env OK tigramite {metadata.version('tigramite')} numpy {np.__version__}")
 PY
 
 echo ">> done"

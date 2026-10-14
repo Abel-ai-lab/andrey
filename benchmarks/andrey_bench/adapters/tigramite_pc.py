@@ -49,10 +49,11 @@ CI_TESTS: dict[str, dict[str, Any]] = {
 
 @functools.lru_cache(maxsize=None)
 def _tigramite_version(python: str) -> str:
-    """``tigramite.__version__`` as reported by the interpreter that will run the fits."""
+    """tigramite's distribution version in the interpreter that will run the fits (the module
+    carries no ``__version__``)."""
     try:
         out = subprocess.run(
-            [python, "-c", "import tigramite; print(tigramite.__version__)"],
+            [python, "-c", "from importlib import metadata; print(metadata.version('tigramite'))"],
             capture_output=True,
             text=True,
             timeout=60,
