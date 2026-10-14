@@ -26,7 +26,10 @@ def _standardize(data: np.ndarray) -> np.ndarray:
     The rounded mean of identical values can differ from them, which leaves a standard deviation
     near zero rather than zero, so constancy is read from the range.
     """
-    std = data.std(axis=0, ddof=1)
+    with np.errstate(over="ignore"):  # an overflow raises below
+        std = data.std(axis=0, ddof=1)
+    if not np.isfinite(std).all():
+        raise ValueError("data values too large to standardize; rescale the columns")
     std[np.ptp(data, axis=0) == 0] = np.inf
     return (data - data.mean(axis=0)) / std
 
@@ -56,6 +59,8 @@ def _kci_moments(a: np.ndarray, b: np.ndarray) -> tuple[float, float, float]:
 
 def _gamma_pvalue(statistic: float, mean: float, var: float) -> float:
     """Upper tail at ``statistic`` of the gamma law with the given mean and variance."""
+    if not np.isfinite([statistic, mean, var]).all():
+        raise FloatingPointError("KCI statistic or null moments are not finite")
     if not (mean > 0.0 and var > 0.0):
         return 1.0  # a constant variable: no variation to depend on
     shape = mean * mean / var
@@ -81,7 +86,8 @@ class KCI:
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D, contains NaN or infinity, or ``ridge`` is not positive.
+        If ``data`` is not 2-D, contains NaN or infinity, or has values too large to
+        standardize, or ``ridge`` is not positive and finite.
 
     Notes
     -----
@@ -118,8 +124,8 @@ class KCI:
     """
 
     def __init__(self, data: np.ndarray, *, ridge: float = 1e-3) -> None:
-        if not ridge > 0.0:
-            raise ValueError(f"ridge must be positive, got {ridge}")
+        if not 0.0 < ridge < np.inf:
+            raise ValueError(f"ridge must be positive and finite, got {ridge}")
         arr = _checked_data(data, "KCI")
         self._data = _standardize(arr)
         self._n = arr.shape[0]
@@ -153,6 +159,8 @@ def _hall_buckley_eagleson_pvalue(statistic: float, weights: np.ndarray) -> floa
     k1 = float(np.sum(weights))
     k2 = 2.0 * float(np.sum(weights**2))
     k3 = 8.0 * float(np.sum(weights**3))
+    if not np.isfinite([statistic, k1, k2, k3]).all():
+        raise FloatingPointError("RCoT statistic or null weights are not finite")
     if not (k2 > 0.0 and k3 > 0.0):
         return 1.0  # a constant variable: no variation to depend on
     dof = 8.0 * k2**3 / k3**2
@@ -200,7 +208,8 @@ class RCoT:
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D or contains NaN or infinity, or a feature count is below 1.
+        If ``data`` is not 2-D, contains NaN or infinity, or has values too large to
+        standardize, or a feature count is below 1.
 
     Notes
     -----

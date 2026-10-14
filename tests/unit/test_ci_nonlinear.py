@@ -25,6 +25,7 @@ from andrey.core.ci_kernel import (
     KCI,
     RCoT,
     _fourier_features,
+    _gamma_pvalue,
     _hall_buckley_eagleson_pvalue,
     _kci_moments,
 )
@@ -232,10 +233,34 @@ def test_rejects_bad_data(name, data, match):
         _build(name, data)
 
 
+@pytest.mark.parametrize("name", ["kci", "rcot", "gpdc"])
+def test_rejects_data_too_large_to_standardize(name):
+    """Values near 1e200 overflow the variance; the test raises rather than read every column as
+    constant."""
+    data = _common_cause(seed=0, n=100, n_cond=1) * 1e200
+    with pytest.raises(ValueError, match="too large"):
+        _build(name, data)
+
+
+@pytest.mark.parametrize(
+    "pvalue",
+    [
+        lambda: _gamma_pvalue(1.0, np.nan, 1.0),
+        lambda: _hall_buckley_eagleson_pvalue(1.0, np.full(3, np.nan)),
+    ],
+    ids=["kci", "rcot"],
+)
+def test_null_law_of_nan_raises(pvalue):
+    """A NaN reaching the null law is an error, not a constant variable."""
+    with pytest.raises(FloatingPointError):
+        pvalue()
+
+
 @pytest.mark.parametrize(
     ("cls", "kwargs", "match"),
     [
         (KCI, {"ridge": 0.0}, "ridge"),
+        (KCI, {"ridge": np.inf}, "ridge"),
         (RCoT, {"n_features": 0}, "feature counts"),
         (CMIknn, {"k_cmi": 1.0}, "k_cmi"),
         (CMIknn, {"k_perm": 0}, "k_perm"),

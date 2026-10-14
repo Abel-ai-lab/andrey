@@ -60,7 +60,8 @@ class GPDC:
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D or contains NaN or infinity, or ``n_null`` is below 1.
+        If ``data`` is not 2-D, contains NaN or infinity, or has values too large to
+        standardize, or ``n_null`` is below 1.
 
     Notes
     -----
@@ -103,7 +104,10 @@ class GPDC:
         if n_null < 1:
             raise ValueError(f"n_null must be at least 1, got {n_null}")
         arr = _checked_data(data, "GPDC")
-        std = arr.std(axis=0)
+        with np.errstate(over="ignore"):  # an overflow raises below
+            std = arr.std(axis=0)
+        if not np.isfinite(std).all():
+            raise ValueError("data values too large to standardize; rescale the columns")
         std[np.ptp(arr, axis=0) == 0] = np.inf  # identical values; their std is rounding, not 0
         self._data = (arr - arr.mean(axis=0)) / std
         self._n = arr.shape[0]
