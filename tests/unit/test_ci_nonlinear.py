@@ -225,3 +225,17 @@ def test_ships_as_experimental(name):
     experimental = [w for w in caught if w.category is andrey.ExperimentalWarning]
     assert len(experimental) == 1
     assert f"indep_test={name!r} is experimental" in str(experimental[0].message)
+
+
+@pytest.mark.parametrize(
+    ("method", "kind"),
+    [("fci", "pag"), ("gfci", "pag"), ("cdnod", "cpdag")],
+)
+def test_every_constraint_method_takes_the_nonlinear_tests(method, kind):
+    """FCI, GFCI, and CD-NOD select the nonlinear tests by name, as PC does."""
+    data = _common_cause(seed=0, n=60, n_cond=1)
+    args = (data, np.repeat([0.0, 1.0], 30)) if method == "cdnod" else (data,)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+        for name in TESTS:
+            assert getattr(andrey, method)(*args, indep_test=name).structure.kind == kind
