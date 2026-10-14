@@ -836,6 +836,16 @@
 }
 
 /* The one number: set large at the foot of the tile, as "up to 900x faster". */
+.andrey-home .tile .tile-score {
+  max-width: 46ch;
+}
+
+.andrey-home .tile .tile-score b {
+  color: var(--andrey-ground-amber);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .andrey-home .tile .tile-number {
   display: flex;
   flex-wrap: wrap;

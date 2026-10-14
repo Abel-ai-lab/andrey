@@ -743,9 +743,10 @@ def quality_intro(summaries: list[dict]) -> str:
     kinds = dict.fromkeys(m["error_kind"] for m in claimed_comparisons(summaries))
     errors = ", or, ".join(ERRORS[kind][1] for kind in kinds)
     return (
-        f"An error is {errors}. Andrey's graphs are as accurate as other popular packages' on the "
-        "same data: the charts give both packages' errors at each size, and every release is "
-        "tested against the true graphs that generated the data."
+        f"An error is {errors}. Andrey's graphs are as accurate as the reference packages' (the "
+        "other packages it is compared with) on the same data: the charts give both packages' "
+        "errors at each size, and every release is tested against the true graphs that generated "
+        "the data."
     )
 
 
@@ -814,6 +815,21 @@ def accuracy_rows(summaries: list[dict]) -> list[dict]:
     return rows
 
 
+def accuracy_counts(summaries: list[dict]) -> tuple[int, int]:
+    """How many comparisons have the same or fewer errors for Andrey, and how many there are."""
+    rows = accuracy_rows(summaries)
+    return sum(r["good"] for r in rows), sum(r["sizes"] for r in rows)
+
+
+def accuracy_line(summaries: list[dict]) -> str:
+    """The accuracy tile's line: how many comparisons have the same or fewer errors, in amber."""
+    good, total = accuracy_counts(summaries)
+    return (
+        '<p class="tile-text tile-score">Same or fewer errors in '
+        f"<b>{good} of {total}</b> comparisons</p>"
+    )
+
+
 # The accuracy figure's frame: the label column, the plot's width, a row's height, and its scale's
 # top (Andrey's errors as a share of the other package's).
 ACC_LABEL, ACC_PLOT, ACC_ROW, ACC_TOP = 280, 340, 30, 120
@@ -824,7 +840,7 @@ def accuracy_figure(summaries: list[dict]) -> str:
     at 100%, Andrey's as a cobalt dot at its share of them, both summed over the sizes the two
     share. Above it, in amber, how many of those comparisons have the same or fewer errors."""
     rows = accuracy_rows(summaries)
-    good, total = sum(r["good"] for r in rows), sum(r["sizes"] for r in rows)
+    good, total = accuracy_counts(summaries)
 
     def x(share: float) -> float:
         return ACC_LABEL + ACC_PLOT * min(share, ACC_TOP) / ACC_TOP
@@ -1832,6 +1848,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "figure_carousel": figure_carousel(summaries, interface_figures),
         "family_dialogs": family_dialogs(summaries),
         "accuracy_dialog": accuracy_dialog(summaries),
+        "accuracy_line": accuracy_line(summaries),
         "why_fast": _why_fast["dialog"](),
         "dialog_head": dialog_head,
         "dialog_tail": DIALOG_TAIL,

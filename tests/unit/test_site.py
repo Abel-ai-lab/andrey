@@ -1003,6 +1003,19 @@ def test_the_accuracy_figure_puts_one_number_in_amber():
     assert figure.count('class="acc-ref"') == figure.count('class="acc-ours"') == len(rows)
 
 
+def test_the_accuracy_tile_shows_the_derived_counts(placeholder_page):
+    good, total = build.accuracy_counts([SUMMARY])
+    assert 0 < good <= total
+    assert re.findall(r"<b>([^<]+)</b> comparisons", build.accuracy_line([SUMMARY])) == [
+        f"{good} of {total}"
+    ]
+    face = placeholder_page.split('data-tile="accuracy"')[1].split("</a>")[0]
+    assert "tile-score" in face
+    # The tile names the packages only generically; the dialog says what a comparison is.
+    assert "causal-learn" not in face
+    assert "one method against one package at one size" in build.accuracy_figure([SUMMARY])
+
+
 def test_the_why_fast_tiles_open_the_scenes_dialog(placeholder_page):
     assert placeholder_page.count('data-wf-open="why-fast"') == 2
     assert '<dialog class="wf wf-dialog" id="why-fast"' in placeholder_page
