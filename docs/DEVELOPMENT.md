@@ -63,8 +63,13 @@ stipple drifts, and the tiles fly in on scroll (a view timeline, or `tiles.js` w
 turns through the figures (`figure_carousel()`): each family's first speed chart, the accuracy
 figure (`accuracy_figure()`, Andrey's errors against the other package's, a row per method), and
 the graph figures. The sections after the grid carry their own art (`art-start.jpg`,
-`art-docs.jpg`). The navbar on every page is a frosted glass pill (`docs/_static/andrey.css`); the
-homepage's hero runs up under it.
+`art-docs.jpg`). No section ends on a hard edge: the hero's foot and the art bands fade into the
+paper, and as the reader scrolls past, the last cover and each band dim toward it (a view timeline,
+or `story.js` and `tiles.js` with an `IntersectionObserver`; a static fade under reduced motion).
+The navbar on every page is a frosted glass pill (`docs/_static/andrey.css`); the homepage's hero
+runs up under it. In Chromium the pill is Liquid Glass: `glass.js` draws a lens map for the pill's
+size into the SVG filter in `_templates/site-logo.html` and sets `data-glass`; Safari and Firefox
+keep the frosted pill, and reduced transparency gets the solid paper.
 
 Each tile is a link. `tiles.js` opens its details as a dialog; without script the details are the
 dialogs' content, shown in the page after the grid (`homepage.html`'s noscript style), and the tile

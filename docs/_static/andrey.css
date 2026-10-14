@@ -92,7 +92,16 @@ html[data-theme="dark"] {
 
 /* The navbar is a floating glass pill: the header itself is clear, and its inner row is a
    translucent, frosted bar inset from the edges, so the page (and the homepage's hero art) shows
-   through it blurred. Without backdrop-filter the bar is the solid paper. */
+   through it blurred. Its rim is a hairline lit from the top left and shaded at the bottom right,
+   with a soft glow inside. The tint thickens over the first screen of scrolling, so the pill reads
+   over the homepage's covers and over a page of text. Without backdrop-filter, or under reduced
+   transparency, the bar is the solid paper. */
+@property --glass-tint {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 80%;
+}
+
 .bd-header {
   --nav-gap: 0.5rem;
   padding: var(--nav-gap) 1rem;
@@ -104,24 +113,95 @@ html[data-theme="dark"] {
 }
 
 .bd-header .bd-header__inner {
+  --rim-light: color-mix(in srgb, var(--andrey-ground-ink) 70%, transparent);
+  --rim-shade: color-mix(in srgb, var(--andrey-ground-navy) 16%, transparent);
   height: calc(var(--pst-header-height) - var(--nav-gap) * 2);
-  max-width: 72rem;
+  max-width: 70rem;
   margin-inline: auto;
-  padding-inline: 0.75rem 0.6rem;
-  border: 1px solid color-mix(in srgb, var(--andrey-ink) 12%, transparent);
+  padding-inline: 0.6rem 0.45rem;
+  border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--andrey-paper) 74%, transparent);
+  background: color-mix(in srgb, var(--andrey-paper) var(--glass-tint), transparent);
   box-shadow:
-    0 10px 30px -14px color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--andrey-paper) 55%, transparent);
+    inset 1px 1px 0 var(--rim-light),
+    inset -1px -1px 0 var(--rim-shade),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-ink) 7%, transparent),
+    inset 0 8px 18px -12px var(--rim-light),
+    0 10px 30px -16px color-mix(in srgb, var(--andrey-ground-navy) 42%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.6);
   backdrop-filter: blur(18px) saturate(1.6);
   pointer-events: auto;
 }
 
+html[data-theme="dark"] .bd-header .bd-header__inner {
+  --rim-light: color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent);
+  --rim-shade: color-mix(in srgb, var(--andrey-paper) 70%, transparent);
+}
+
+.bd-header .navbar-nav .nav-link {
+  padding-inline: 0.55rem;
+  font-size: 0.92rem;
+  letter-spacing: -0.005em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .bd-header .bd-header__inner {
+      animation: glass-settle linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 60svh;
+    }
+  }
+}
+
+@keyframes glass-settle {
+  from {
+    --glass-tint: 66%;
+  }
+
+  to {
+    --glass-tint: 86%;
+  }
+}
+
+/* Liquid Glass, in Chromium (glass.js sets data-glass): the backdrop bends at the pill's rounded
+   edges through the SVG lens in _templates/site-logo.html, as light through the rim of a thick
+   pane, and a specular highlight lies along its top. The tint is thinner, so the bending shows. */
+html[data-glass="liquid"] .bd-header .bd-header__inner {
+  background: color-mix(in srgb, var(--andrey-paper) calc(var(--glass-tint) - 14%), transparent);
+  backdrop-filter: url(#andrey-lens) blur(5px) saturate(1.8) brightness(1.04);
+  box-shadow:
+    inset 1px 1px 0 var(--rim-light),
+    inset -1px -1px 0 var(--rim-shade),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-ink) 6%, transparent),
+    inset 0 10px 14px -10px var(--rim-light),
+    inset 0 -6px 12px -8px color-mix(in srgb, var(--andrey-ground-cobalt-light) 30%, transparent),
+    0 10px 30px -16px color-mix(in srgb, var(--andrey-ground-navy) 42%, transparent);
+}
+
+html[data-glass="liquid"][data-theme="dark"] .bd-header .bd-header__inner {
+  backdrop-filter: url(#andrey-lens) blur(5px) saturate(1.5) brightness(0.92);
+}
+
+.andrey-lens {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .bd-header .bd-header__inner {
     background: var(--andrey-paper);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bd-header .bd-header__inner,
+  html[data-glass] .bd-header .bd-header__inner {
+    background: var(--andrey-paper);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
@@ -131,7 +211,7 @@ html:not(:has(.andrey-home)) .bd-header::before {
   --fade: linear-gradient(180deg, var(--andrey-ink) 45%, transparent);
   content: "";
   position: absolute;
-  inset: 0 0 -1.5rem;
+  inset: 0 0 -2.25rem;
   z-index: -1;
   background: linear-gradient(
     180deg,

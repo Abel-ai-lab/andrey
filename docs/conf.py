@@ -183,6 +183,8 @@ html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
 html_extra_path = ["_generated/extra"]
 html_css_files = ["andrey-tokens.css", "andrey.css", "graph-guides.css"]
+# The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill).
+html_js_files = [("glass.js", {"defer": "defer"})]
 REPO_URL = "https://github.com/Abel-ai-lab/andrey"
 SITE_URL = "https://andrey.abel.ai/"
 html_theme_options = {
