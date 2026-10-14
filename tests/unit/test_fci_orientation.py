@@ -1,4 +1,4 @@
-"""Uncovered possibly-directed path requirements for FCI's tail orientation rules."""
+"""FCI's tail orientation rules R7-R10 and their uncovered possibly-directed paths."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import importlib
 import numpy as np
 import pytest
 
-from andrey.constraint.fci import _exists_uncovered_pd_path, _rule_r9, _rule_r10
+from andrey.constraint.fci import _exists_uncovered_pd_path, _rule_r7, _rule_r9, _rule_r10
 from andrey.core.structure import ARROW, CIRCLE, TAIL
 
 
@@ -16,6 +16,28 @@ def _circle_graph(n: int, edges: list[tuple[int, int]]) -> np.ndarray:
     for u, v in edges:
         marks[u, v] = marks[v, u] = CIRCLE
     return marks
+
+
+def test_r7_needs_a_third_node():
+    """A lone ``a --o b`` has no ``c`` to pair with, so its circle stays."""
+    marks = _circle_graph(2, [(0, 1)])
+    marks[0, 1] = TAIL
+    expected = marks.copy()
+
+    assert _rule_r7(marks, False) is False
+    np.testing.assert_array_equal(marks, expected)
+
+
+def test_r7_orients_only_the_edge_to_c():
+    """``a --o b o-o c`` with ``a``, ``c`` non-adjacent: only the endpoint at ``b`` toward ``c``."""
+    a, b, c = range(3)
+    marks = _circle_graph(3, [(a, b), (b, c)])
+    marks[a, b] = TAIL
+    expected = marks.copy()
+    expected[b, c] = TAIL
+
+    assert _rule_r7(marks, False)
+    np.testing.assert_array_equal(marks, expected)
 
 
 def test_r9_prunes_unreachable_diamond_chain():

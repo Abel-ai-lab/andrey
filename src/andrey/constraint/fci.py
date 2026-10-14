@@ -838,9 +838,10 @@ def _rule_r7(
         tail_side = [a for a in into_circles if marks[a, b] == TAIL]  # a --o b
         for c in into_circles:
             for a in tail_side:
-                if not _adjacent(marks, a, c) and _triple(a, b, c) not in ambiguous:
-                    marks[b, c] = TAIL
-                    change = True
+                if a == c or _adjacent(marks, a, c) or _triple(a, b, c) in ambiguous:
+                    continue
+                marks[b, c] = TAIL
+                change = True
     return change
 
 
