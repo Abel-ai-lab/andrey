@@ -63,8 +63,8 @@ def boss(
         If ``score_func`` is not ``"local_score_BIC_from_cov"``.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
-        column up to scale and shift, or, with more rows than columns, is a linear function of
-        other columns.
+        column up to scale and shift given more than two rows, or, with more rows than columns, is a
+        linear function of other columns.
 
     See Also
     --------
@@ -188,8 +188,8 @@ def grasp(
         If ``score_func`` is not ``"local_score_BIC_from_cov"``, or ``depth`` is not ``3``.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
-        column up to scale and shift, or, with more rows than columns, is a linear function of
-        other columns.
+        column up to scale and shift given more than two rows, or, with more rows than columns, is a
+        linear function of other columns.
 
     See Also
     --------

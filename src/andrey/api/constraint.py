@@ -302,8 +302,8 @@ def gfci(
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
         ``collider_rule`` is not a supported choice, or if a column is constant, repeats another
-        column up to scale and shift, or, with more rows than columns, is a linear function of
-        other columns.
+        column up to scale and shift given more than two rows, or, with more rows than columns, is a
+        linear function of other columns.
 
     Warns
     -----

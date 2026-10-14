@@ -65,8 +65,8 @@ def ges(
         If ``score_func`` is not ``"local_score_BIC"``.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
-        column up to scale and shift, or, with more rows than columns, is a linear function of
-        other columns.
+        column up to scale and shift given more than two rows, or, with more rows than columns, is a
+        linear function of other columns.
 
     See Also
     --------
@@ -163,8 +163,8 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     ------
     ValueError
         If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
-        column up to scale and shift, or, with more rows than columns, is a linear function of
-        other columns.
+        column up to scale and shift given more than two rows, or, with more rows than columns, is a
+        linear function of other columns.
 
     Warns
     -----
@@ -248,10 +248,10 @@ def xges(
     TypeError
         If ``extended_search`` is not a bool.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``,
-        if ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
-        column up to scale and shift, or, with more rows than columns, is a linear function of
-        other columns.
+        If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, if
+        ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
+        column up to scale and shift given more than two rows, or, with more rows than columns, is a
+        linear function of other columns.
 
     See Also
     --------
@@ -359,8 +359,8 @@ def hc(
         If a given ``max_iter`` is not an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
-        or if a column is constant, repeats another column up to scale and shift, or, with more
-        rows than columns, is a linear function of other columns.
+        or if a column is constant, repeats another column up to scale and shift given more than two
+        rows, or, with more rows than columns, is a linear function of other columns.
 
     Warns
     -----
@@ -462,8 +462,8 @@ def tabu(
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
         less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or if a column is constant,
-        repeats another column up to scale and shift, or, with more rows than columns, is a linear
-        function of other columns.
+        repeats another column up to scale and shift given more than two rows, or, with more rows
+        than columns, is a linear function of other columns.
 
     Warns
     -----
@@ -561,8 +561,8 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     ------
     ValueError
         If ``search_method`` is not ``"astar"`` or ``"dp"``, or if a column is constant, repeats
-        another column up to scale and shift, or, with more rows than columns, is a linear function
-        of other columns.
+        another column up to scale and shift given more than two rows, or, with more rows than
+        columns, is a linear function of other columns.
 
     Warns
     -----
