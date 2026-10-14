@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 from scipy.stats import chi2, kstest, multivariate_normal
 
+from andrey.core import mixed
 from andrey.core.ci import CGTest, ChiSquare, DGTest, make_indep_test
 from andrey.core.mixed import ConditionalGaussian, column_mask
 from andrey.core.score import BICScore, CGScore, DGScore
@@ -133,6 +134,50 @@ def test_cg_rejects_collinear_continuous_columns():
     x[:, 3] = 2.0 * x[:, 1] + 1.0
     with pytest.raises(ValueError, match="collinear"):
         ConditionalGaussian(x, mask).loglik([1, 3])
+
+
+def test_cg_rejects_a_collinear_set_fit_with_others():
+    x, mask = _mixed()
+    x[:, 3] = 2.0 * x[:, 1] + 1.0
+    with pytest.raises(ValueError, match="collinear"):
+        ConditionalGaussian(x, mask).loglik_many([[0, 1], [0, 1, 3], [1]])
+
+
+def _near_collinear(seed: int = 0, n: int = 400) -> tuple[np.ndarray, np.ndarray]:
+    """Columns a (3 categories), x, and y = x plus noise small enough that the covariance of x and
+    y has a condition number near 1e10 and a least eigenvalue near 1e-10."""
+    rng = np.random.default_rng(seed)
+    a = rng.integers(0, 3, n)
+    x = a + rng.standard_normal(n)
+    y = x + 1.4e-5 * rng.standard_normal(n)
+    return np.column_stack([a, x, y]), np.array([True, False, False])
+
+
+def test_cg_fits_an_ill_conditioned_set_by_its_eigenvalues(monkeypatch):
+    """A set whose covariances are ill conditioned but not singular gets the value the eigenvalue
+    path gives it, alone or fit with well-conditioned sets."""
+    x, mask = _near_collinear()
+    sets = [[0, 1, 2], [1, 2], [0, 1], [2]]
+    values = ConditionalGaussian(x, mask).loglik_many(sets)
+    assert ConditionalGaussian(x, mask).loglik([0, 1, 2]) == values[0]
+    monkeypatch.setattr(mixed, "_CONDITION", 0.0)  # every set takes the eigenvalue path
+    exact = ConditionalGaussian(x, mask).loglik_many(sets)
+    assert values[:2] == exact[:2]
+    assert np.isfinite(values).all()
+
+
+@pytest.mark.parametrize("rare", [False, True], ids=["common categories", "a two-row category"])
+def test_cg_values_do_not_depend_on_the_cache_bounds(monkeypatch, rare):
+    """Small caches drop entries between requests; every value equals the unbounded cache's."""
+    x, mask = _mixed()
+    x = _with_rare_category(x) if rare else x
+    batches = [[[0, 1], [1, 3], [0, 1, 2, 3]], [[0, 1, 3], [2, 3], [0, 1]], [[1, 2, 3], [0, 1, 3]]]
+    unbounded = ConditionalGaussian(x, mask, cache_size=None)
+    expected = [unbounded.loglik_many(sets) for sets in batches]
+    monkeypatch.setattr(mixed, "_CELL_BYTES", 1)
+    small = ConditionalGaussian(x, mask, cache_size=1)
+    assert [small.loglik_many(sets) for sets in batches] == expected
+    assert [small.loglik_many(sets) for sets in reversed(batches)] == expected[::-1]
 
 
 def test_cg_counts_parameters_for_every_joint_category():
