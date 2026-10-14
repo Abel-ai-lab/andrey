@@ -8,7 +8,8 @@ meta:
 # API reference
 
 The public API of Andrey - everything exported by `andrey`, `andrey.metrics`, and `andrey.viz`,
-and the dataset loaders of `andrey.data` - generated from the source docstrings.
+the dataset loaders of `andrey.data`, and the conditional-independence tests of `andrey.core` -
+generated from the source docstrings.
 `andrey.__version__` gives the installed version.
 
 ## Structure-learning methods
@@ -107,7 +108,8 @@ PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_tes
 The experimental tests detect nonlinear dependence that partial correlation misses, at a far
 higher cost per test, and have no published benchmark yet. Each warns with
 {py:class}`~andrey.ExperimentalWarning` the first time a process builds it. By name, a test runs
-with its default settings; to change one, register a variant and select it by its new name:
+with its default settings; to change one, register a variant with
+{py:func}`~andrey.core.ci.register_indep_test` and select it by its new name:
 
 ```python
 from functools import partial
@@ -127,10 +129,15 @@ andrey.pc(data, indep_test="cmiknn_200")
    :toctree: generated
    :nosignatures:
 
+   ci.FisherZ
    ci_kernel.KCI
    ci_kernel.RCoT
    ci_cmiknn.CMIknn
    ci_gpdc.GPDC
+   ci.CITest
+   ci.register_indep_test
+   ci.available_indep_tests
+   ci.make_indep_test
 
 .. currentmodule:: andrey
 ```

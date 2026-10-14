@@ -9,7 +9,7 @@ precomputes the sample correlation matrix once, then answers each query from the
 partial correlation of columns ``x`` and ``y`` given ``condition_set``. Empty and single-element
 conditioning sets -- the bulk of a constraint-based search -- use the closed-form (first-order)
 partial correlation and skip the matrix inversion entirely; larger sets invert the correlation
-submatrix. numpy float64 is the oracle. A query is canonicalized (``x``, ``y`` ordered, the
+submatrix. NumPy float64 is the oracle. A query is canonicalized (``x``, ``y`` ordered, the
 conditioning set sorted unique) so its p-value does not depend on argument order, and nothing is
 memoized: a test object holds the correlation matrix and the sample size, whatever it is asked.
 
@@ -31,6 +31,8 @@ from scipy.special import ndtr
 
 from . import stats
 from .warning_policy import ExperimentalWarning, warn_once
+
+__all__ = ["CITest", "FisherZ", "register_indep_test", "available_indep_tests", "make_indep_test"]
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
@@ -66,7 +68,7 @@ class FisherZ:
     conditioning set of a pair once, so retained results would grow with the number of subsets
     visited. Later queries are recomputed.
 
-    The scalar path and :meth:`batched_call` use numpy's log with identical partial-correlation
+    The scalar path and :meth:`batched_call` use NumPy's log with identical partial-correlation
     and clip arithmetic. Their p-values match exactly, so repeated queries take the same
     ``p > alpha`` decision across call paths, including at the threshold.
     """
