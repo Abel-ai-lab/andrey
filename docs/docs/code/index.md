@@ -21,7 +21,9 @@ method is either supported or experimental; `andrey list` prints the status.
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column
 names. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
-column. A single column gives a one-node graph.
+column. A single column gives a one-node graph. Methods that score with BIC also reject a column
+that repeats another up to scale and shift or, given more rows than columns, is a linear function
+of other columns.
 
 ### Supported methods
 

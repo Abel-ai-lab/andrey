@@ -16,10 +16,10 @@ change names its pull request.
   ([#TBD])
 - These searches and `exact_search` raise a `ValueError` naming the columns when a column repeats
   another up to scale and shift given more than two rows or, with more rows than columns, is a
-  linear function of other columns, instead of returning a graph from scores that are not finite.
-  ([#TBD])
-- With fewer rows than columns, these searches no longer pick a parent set of `n_samples - 1` or
-  more variables, which fits its child exactly. ([#TBD])
+  linear function of other columns, instead of returning a graph from scores of a zero residual
+  variance, which were infinite or finite but meaningless. ([#TBD])
+- With no more rows than columns, these searches no longer pick a parent set of `n_samples - 1`
+  or more variables, which fits its child exactly. ([#TBD])
 
 ## [0.3.0] - 2026-10-13
 
