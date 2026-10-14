@@ -341,11 +341,11 @@ def test_rejects_bad_settings(cls, kwargs, match):
 
 
 @pytest.mark.parametrize(
-    ("n", "condition_set", "warns"), [(199, (2,), True), (199, (), False), (200, (2,), False)]
+    ("n", "condition_set", "warns"), [(499, (2,), True), (499, (), False), (500, (2,), False)]
 )
-def test_rcot_warns_on_a_conditional_query_below_200_rows(n, condition_set, warns):
-    """Below 200 rows RCoT's level exceeds ``alpha`` once it conditions, so it warns, and still
-    answers; an unconditional query, or 200 rows, does not warn."""
+def test_rcot_warns_on_a_conditional_query_below_500_rows(n, condition_set, warns):
+    """Below 500 rows RCoT warns on a query with a conditioning set, and still answers; an
+    unconditional query, or 500 rows, does not warn."""
     andrey.core.warning_policy.reset()
     test = RCoT(np.random.default_rng(0).standard_normal((n, 3)))
     with warnings.catch_warnings(record=True) as caught:

@@ -16,8 +16,8 @@ change names its pull request.
 - The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
   and have reference pages; register a variant with `register_indep_test` to select it by name.
   ([#TBD])
-- `SampleSizeWarning`: RCoT warns when it conditions on fewer than 200 rows, where it rejects
-  true independences more often than `alpha`. ([#TBD])
+- `SampleSizeWarning`: RCoT warns when it conditions on fewer than 500 rows, the smallest sample
+  size its reference evaluates. ([#TBD])
 
 ## [0.3.0] - 2026-10-13
 

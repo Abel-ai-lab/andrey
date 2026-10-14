@@ -20,8 +20,9 @@ from .warning_policy import SampleSizeWarning, warn_once
 
 __all__ = ["KCI", "RCoT"]
 
-# Below this many rows RCoT's false-rejection rate on a conditional query was measured above alpha.
-_RCOT_MIN_ROWS = 200
+# The smallest sample size Strobl et al. (2019) evaluate; with up to two conditioning variables,
+# fewer rows were measured to reject true independences more often than alpha.
+_RCOT_MIN_ROWS = 500
 
 
 def _standardize(data: np.ndarray) -> np.ndarray:
@@ -221,7 +222,8 @@ class RCoT:
     Warns
     -----
     SampleSizeWarning
-        On the first query with a conditioning set, when ``data`` has fewer than 200 rows.
+        On the first query with a conditioning set, when ``data`` has fewer than 500 rows, the
+        smallest sample size [1]_ evaluates.
 
     Notes
     -----
@@ -244,9 +246,12 @@ class RCoT:
     arguments, and the same seed reproduces it.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
-    variables. On fewer than 200 rows, it rejects a true conditional independence more often than
-    ``alpha`` even when every column is independent of the others, and warns: with two conditioning
-    variables, more than twice as often at 100 rows. The p-value is random through the features: a
+    variables. It warns on a conditional query below 500 rows, the smallest sample size [1]_
+    evaluates. Measured on columns independent of each other, its rate of rejecting a true
+    conditional independence with one or two conditioning variables reached ``alpha`` at 500 rows
+    and was about twice ``alpha`` at 100 rows with two. With three to six conditioning variables
+    the rate averaged about 1.3 times ``alpha`` from 500 to 2,000 rows, with no row count from
+    which it held at ``alpha``. The p-value is random through the features: a
     different seed moves it, most near the threshold. The regression on the conditioning-set
     features removes a strong nonlinear effect of that set only approximately, and what remains
     reads as dependence: with two or more conditioning variables that drive both ``x`` and ``y``,
@@ -294,8 +299,8 @@ class RCoT:
         x_int, y_int, cond = _canonical(x, y, condition_set)
         if cond and self._n < _RCOT_MIN_ROWS:
             warn_once(
-                f"RCoT on fewer than {_RCOT_MIN_ROWS} rows rejects a true conditional independence "
-                "more often than alpha.",
+                f"RCoT on fewer than {_RCOT_MIN_ROWS} rows may reject a true conditional "
+                "independence more often than alpha.",
                 SampleSizeWarning,
             )
         rng = np.random.default_rng([self._seed, x_int, y_int, len(cond), *cond])
