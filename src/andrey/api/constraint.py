@@ -1,6 +1,6 @@
 """Constraint-based facade adapters.
 
-The underlying searches use :mod:`andrey.core` for Fisher-Z tests and orientation. ``pc`` and
+The underlying searches use :mod:`andrey.core` for the CI tests and orientation. ``pc`` and
 ``cdnod`` produce CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with BIC scoring.
 """
 
@@ -34,8 +34,13 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` is Gaussian partial correlation, for linear
+        effects. The others also detect nonlinear dependence, at a far higher cost per test, and
+        are experimental: each warns on its first use in a process. ``"kci"`` is the kernel test,
+        ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional
+        mutual information test, and ``"gpdc"`` Gaussian-process regression with a distance
+        correlation test.
 
     Returns
     -------
@@ -47,7 +52,7 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, or if
         ``alpha`` is not in ``(0, 1)``.
@@ -65,10 +70,11 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
 
     Notes
     -----
-    **When to use it.** PC suits continuous data with no unmeasured common causes. Its Fisher-Z test
-    assumes that each variable depends linearly on its causes with roughly Gaussian noise. It is
-    fastest on sparse graphs, where every variable has few neighbors [5]_. An undirected edge
-    (``--``) is one the data cannot orient.
+    **When to use it.** PC suits continuous data with no unmeasured common causes. Its default
+    Fisher-Z test assumes that each variable depends linearly on its causes with roughly Gaussian
+    noise; the experimental nonlinear tests drop that assumption at a far higher cost per test.
+    It is fastest on sparse graphs, where every variable has few neighbors [5]_. An undirected
+    edge (``--``) is one the data cannot orient.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -148,8 +154,13 @@ def fci(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` is Gaussian partial correlation, for linear
+        effects. The others also detect nonlinear dependence, at a far higher cost per test, and
+        are experimental: each warns on its first use in a process. ``"kci"`` is the kernel test,
+        ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional
+        mutual information test, and ``"gpdc"`` Gaussian-process regression with a distance
+        correlation test.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -168,7 +179,7 @@ def fci(
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
         is not in ``(0, 1)``, or if ``collider_rule`` is not a supported choice.
@@ -274,9 +285,11 @@ def gfci(
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test for the FCI phase. Only Fisher-Z (Gaussian partial
-        correlation) is supported.
+    indep_test : {"fisherz", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
+        Conditional-independence test for the FCI phase. ``"fisherz"`` is Gaussian partial
+        correlation, for linear effects. The others also detect nonlinear dependence, at a far
+        higher cost per test, and are experimental: each warns on its first use in a process. See
+        :func:`~andrey.pc` for each one.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
@@ -298,7 +311,7 @@ def gfci(
     ------
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC"``, or ``indep_test`` names no available
-        test; ``"fisherz"`` is the only one built in.
+        test.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, or if
         ``collider_rule`` is not a supported choice.
@@ -388,8 +401,13 @@ def cdnod(
         the result equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` is Gaussian partial correlation, for linear
+        effects. The others also detect nonlinear dependence, at a far higher cost per test, and
+        are experimental: each warns on its first use in a process. ``"kci"`` is the kernel test,
+        ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional
+        mutual information test, and ``"gpdc"`` Gaussian-process regression with a distance
+        correlation test.
 
     Returns
     -------
@@ -401,7 +419,7 @@ def cdnod(
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
         If ``c_indx`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
         ``data`` has too few rows for a test, or if ``alpha`` is not in ``(0, 1)``.

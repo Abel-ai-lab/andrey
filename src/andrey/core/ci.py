@@ -12,18 +12,25 @@ partial correlation and skip the matrix inversion entirely; larger sets invert t
 submatrix. numpy float64 is the oracle. A query is canonicalized (``x``, ``y`` ordered, the
 conditioning set sorted unique) so its p-value does not depend on argument order, and nothing is
 memoized: a test object holds the correlation matrix and the sample size, whatever it is asked.
+
+The registry at the end maps each ``indep_test`` name to a factory. The experimental nonlinear
+tests live in their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
+:mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`) and are imported when first
+built.
 """
 
 from __future__ import annotations
 
 import math
 from collections.abc import Callable, Iterable
+from functools import partial
 from typing import Protocol, cast, runtime_checkable
 
 import numpy as np
 from scipy.special import ndtr
 
 from . import stats
+from .warning_policy import ExperimentalWarning, warn_once
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
@@ -65,13 +72,7 @@ class FisherZ:
     """
 
     def __init__(self, data: np.ndarray) -> None:
-        arr = np.asarray(data, dtype=np.float64)
-        if arr.ndim != 2:
-            raise ValueError(
-                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
-            )
-        if not np.isfinite(arr).all():
-            raise ValueError("data contains NaN or Inf; cannot run Fisher-Z test")
+        arr = _checked_data(data, "Fisher-Z")
         self._n: int = arr.shape[0]
         self._corr: np.ndarray = np.asarray(stats.corrcoef(arr, rowvar=False), dtype=np.float64)
 
@@ -237,12 +238,33 @@ class FisherZ:
         return self._corr, self._n
 
 
+NONLINEAR_INDEP_TESTS: tuple[str, ...] = ("kci", "rcot", "cmiknn", "gpdc")
+
+
+def _nonlinear(name: str, data: np.ndarray) -> CITest:
+    """Build the experimental nonlinear test ``name``, warning once per process."""
+    from .ci_cmiknn import CMIknn
+    from .ci_gpdc import GPDC
+    from .ci_kernel import KCI, RCoT
+
+    test = {"kci": KCI, "rcot": RCoT, "cmiknn": CMIknn, "gpdc": GPDC}[name]
+    warn_once(
+        f"indep_test={name!r} is experimental: it has no published benchmark, and its settings "
+        "may change without deprecation.",
+        ExperimentalWarning,
+    )
+    return test(data)
+
+
 # The indep_test registry: a name maps to a factory building a :class:`CITest` over the data.
-# Fisher-Z is the only shipped test; the constraint facades resolve their ``indep_test`` argument
-# through :func:`make_indep_test`, and :func:`register_indep_test` lets a downstream test or plugin
-# add another under the same Protocol -- the generality this registry exposes.
-SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz",)
-_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {"fisherz": FisherZ}
+# The constraint facades resolve their ``indep_test`` argument through :func:`make_indep_test`, and
+# :func:`register_indep_test` lets a downstream test or plugin add another under the same Protocol.
+# Fisher-Z is supported; the nonlinear tests are experimental and warn when built.
+SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz", *NONLINEAR_INDEP_TESTS)
+_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {
+    "fisherz": FisherZ,
+    **{name: partial(_nonlinear, name) for name in NONLINEAR_INDEP_TESTS},
+}
 
 
 def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> None:
@@ -271,6 +293,16 @@ def make_indep_test(name: str, data: np.ndarray) -> CITest:
             f"unknown indep_test {name!r}; registered: {available_indep_tests()}"
         ) from None
     return factory(data)
+
+
+def _checked_data(data: np.ndarray, test_name: str) -> np.ndarray:
+    """``data`` as a float64 ``(n_samples, n_features)`` matrix; raises on NaN or infinity."""
+    arr = np.asarray(data, dtype=np.float64)
+    if arr.ndim != 2:
+        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}")
+    if not np.isfinite(arr).all():
+        raise ValueError(f"data contains NaN or Inf; cannot run {test_name} test")
+    return arr
 
 
 def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, list[int]]:

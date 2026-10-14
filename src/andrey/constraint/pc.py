@@ -38,8 +38,8 @@ def pc(
 
     ``data`` is an ``(n_samples, n_features)`` array; ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
-    ``indep_test`` selects the conditional-independence test from the registry (``"fisherz"`` is the
-    only shipped one). Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
+    ``indep_test`` selects the conditional-independence test from the registry. Returns the CPDAG
+    as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple

@@ -92,6 +92,49 @@ A method becomes supported once it has:
 
 `tests/unit/test_spec_registry.py` checks each criterion for every supported method.
 
+### Conditional-independence tests
+
+PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_test`:
+
+| `indep_test` | Test | Status |
+|---|---|---|
+| `"fisherz"` | Partial correlation with Fisher's z-transform: linear effects, Gaussian noise | Supported |
+| `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Experimental |
+| `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Experimental |
+| `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Experimental |
+| `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Experimental |
+
+The experimental tests detect nonlinear dependence that partial correlation misses, at a far
+higher cost per test, and have no published benchmark yet. Each warns with
+{py:class}`~andrey.ExperimentalWarning` the first time a process builds it. By name, a test runs
+with its default settings; to change one, register a variant and select it by its new name:
+
+```python
+from functools import partial
+
+import andrey
+from andrey.core.ci import register_indep_test
+from andrey.core.ci_cmiknn import CMIknn
+
+register_indep_test("cmiknn_200", partial(CMIknn, n_permutations=200))
+andrey.pc(data, indep_test="cmiknn_200")
+```
+
+```{eval-rst}
+.. currentmodule:: andrey.core
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   ci_kernel.KCI
+   ci_kernel.RCoT
+   ci_cmiknn.CMIknn
+   ci_gpdc.GPDC
+
+.. currentmodule:: andrey
+```
+
 ## Graph structures
 
 ```{eval-rst}

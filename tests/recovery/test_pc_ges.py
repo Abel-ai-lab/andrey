@@ -39,9 +39,9 @@ def test_ges_output_contract():
     assert out.structure.kind == "cpdag" and "score" in out.metadata
 
 
-def test_pc_rejects_non_fisherz():
+def test_pc_rejects_unknown_indep_test():
     with pytest.raises(NotImplementedError):
-        andrey.pc(datagen.generate("gauss_5v"), indep_test="kci")
+        andrey.pc(datagen.generate("gauss_5v"), indep_test="no_such_test")
 
 
 def test_ges_rejects_unknown_score():

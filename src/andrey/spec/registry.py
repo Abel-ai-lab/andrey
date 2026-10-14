@@ -28,7 +28,10 @@ _INDEP_TEST = ParamSpec(
     name="indep_test",
     type="str",
     default="fisherz",
-    doc="Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.",
+    doc="Conditional-independence test. fisherz = Gaussian partial correlation, for linear "
+    "effects. The experimental nonlinear tests, each far slower per test: kci = kernel test; "
+    "rcot = its random-feature approximation; cmiknn = nearest-neighbor conditional mutual "
+    "information; gpdc = Gaussian-process regression and distance correlation.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _COLLIDER_RULE = ParamSpec(
