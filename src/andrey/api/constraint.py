@@ -375,16 +375,17 @@ def fci(
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
-    It considers every circle path, so a covered route through a node never hides an uncovered
-    route through the same node. Rule R8 checks each pair of endpoints in both orders, so whether
-    it fires does not depend on the node labels.
+    It considers every circle path, up to a fixed search bound, so a covered route through a node
+    never hides an uncovered route through the same node. Rule R8 checks each pair of endpoints in
+    both orders, so whether it fires does not depend on the node labels.
 
     **Possible-d-separation set.** FCI builds each possible-d-separation set with a search that
     keeps only nodes reached through possible parents. This set can be smaller than the published
     definition [2]_, so FCI can keep an edge that the published set would remove, even with exact
-    tests. FCI keeps this search because the published set made fits much slower at 50 variables
-    and less accurate on simulated data. FCI tests every subset of the set, except the empty set
-    and the subsets of either endpoint's neighbors, which the first step already tested.
+    tests. FCI keeps this search because the published set grows quickly with the graph, the
+    search's set is the one FCI has been measured with, and on simulated data the published set did
+    not give more accurate PAGs. FCI tests every subset of the set, except the empty set and the
+    subsets of either endpoint's neighbors, which the first step already tested.
 
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union
@@ -397,8 +398,10 @@ def fci(
     circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at
     800 (2,579 against 1,772). The median fit took 0.061 s at 20 variables and 72 s at 800, on 16
     cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
-    passed the empty graph's (696 against 676). With the mixed-data tests, it is experimental and
-    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    passed the empty graph's (696 against 676). Rule R5 stops searching a pair after a fixed number
+    of partial paths and leaves its circles, so on graphs with many circle-circle edges it can miss
+    an undirected cycle. With the mixed-data tests, it is experimental and not benchmarked yet; its
+    tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -535,15 +538,16 @@ def gfci(
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
-    It considers every circle path, and rule R8 checks each pair of endpoints in both orders. GFCI
-    shares FCI's possible-d-separation set and separating sets; the Notes of :func:`~andrey.fci`
-    describe both choices and the reasons for keeping them.
+    It considers every circle path, up to a fixed search bound, and rule R8 checks each pair of
+    endpoints in both orders. GFCI shares FCI's possible-d-separation set and separating sets; the
+    Notes of :func:`~andrey.fci` describe both choices and the reasons for keeping them.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
     and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
-    linear relations with Gaussian noise. With the mixed-data score and test, its tests run it on
-    5 variables with 3,000 rows.
+    linear relations with Gaussian noise. Rule R5 has the search bound described under
+    :func:`~andrey.fci`. With the mixed-data score and test, its tests run it on 5 variables with
+    3,000 rows.
 
     References
     ----------
