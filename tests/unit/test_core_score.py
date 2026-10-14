@@ -271,6 +271,28 @@ def test_check_columns_rejects_a_one_hot_block():
         BICScore(x)
 
 
+def _near_sum(relative_residual):
+    """Data whose column 5 is ``x2 + x3`` plus noise, with the given residual variance fraction."""
+    x = _columns(500, 10)
+    others = np.column_stack([np.ones(500), np.delete(x, 5, axis=1)])
+    target = x[:, 2] + x[:, 3]
+    noise = x[:, 5] - others @ np.linalg.lstsq(others, x[:, 5], rcond=None)[0]
+    scale = np.sqrt(relative_residual / (1.0 - relative_residual) * target.var() / noise.var())
+    x[:, 5] = target + scale * noise
+    return x
+
+
+@pytest.mark.parametrize("relative_residual", [3e-12, 1e-11])
+def test_check_columns_accepts_a_residual_above_the_threshold(relative_residual):
+    BICScore(_near_sum(relative_residual))
+
+
+@pytest.mark.parametrize("relative_residual", [3e-13, 0.0])
+def test_check_columns_rejects_a_residual_at_most_the_threshold(relative_residual):
+    with pytest.raises(ValueError, match=r"columns \[2, 3, 5\] are linearly dependent"):
+        BICScore(_near_sum(relative_residual))
+
+
 @pytest.mark.parametrize(("n", "d"), [(101, 100), (20, 30), (2, 3)])
 def test_check_columns_accepts_independent_columns(n, d):
     BICScore(_columns(n, d))

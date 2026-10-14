@@ -128,10 +128,15 @@ def check_columns(cov: np.ndarray, n: int) -> None:
 
     A column is rejected when it is constant; with more than two rows ``n``, when its residual
     variance given one other column is at most ``ZERO_RESIDUAL`` times its variance (an affine copy
-    of that column); and with more rows than columns, when the correlation matrix's smallest
-    eigenvalue is at most ``ZERO_RESIDUAL`` times its largest (some columns are linear functions of
-    others). Every column is a linear function of any ``n - 1`` others, so the last two checks
-    apply only where the row count does not force such a fit.
+    of that column); and with more rows than columns, when its residual variance given all other
+    columns is at most ``ZERO_RESIDUAL`` times its variance (a linear function of other columns).
+    Every column is a linear function of any ``n - 1`` others, so the last two checks apply only
+    where the row count does not force such a fit.
+
+    The residual variance of column ``j`` given all others, relative to its variance, is
+    ``1 / inv(corr)[j, j]`` for the correlation matrix ``corr``. It is at least the smallest
+    eigenvalue of ``corr``, so data whose smallest eigenvalue exceeds ``ZERO_RESIDUAL`` pass
+    without the per-column computation.
 
     Parameters
     ----------
@@ -164,10 +169,15 @@ def check_columns(cov: np.ndarray, n: int) -> None:
         )
     if n <= d:
         return
-    values = np.linalg.eigvalsh(corr)
-    if values[0] <= ZERO_RESIDUAL * values[-1]:
-        weights = np.abs(np.linalg.eigh(corr)[1][:, 0])
-        columns = np.flatnonzero(weights > 1e-6 * weights.max()).tolist()
+    if np.linalg.eigvalsh(corr)[0] > ZERO_RESIDUAL:
+        return
+    values, vectors = np.linalg.eigh(corr)
+    # diag(inv(corr)) from the eigendecomposition. Eigenvalues below the rounding of the largest
+    # are zero up to rounding; the floor keeps them finite and off the columns they do not touch.
+    floor = np.finfo(np.float64).eps * values[-1]
+    residual = 1.0 / ((vectors**2) @ (1.0 / np.maximum(values, floor)))
+    columns = np.flatnonzero(~(residual > ZERO_RESIDUAL)).tolist()
+    if columns:
         raise ValueError(
             f"data columns {columns} are linearly dependent: one is a linear function of the "
             "others; drop one of them before the fit"
