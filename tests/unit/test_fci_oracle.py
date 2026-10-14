@@ -82,6 +82,27 @@ def test_r5_finds_an_uncovered_route_behind_a_covered_one(monkeypatch):
     np.testing.assert_array_equal(_oracle_fci(monkeypatch, 6, edges, (7, 8, 9, 10)), truth)
 
 
+def test_possible_dsep_tests_every_subset(monkeypatch):
+    """Only ``{2, 3, 6}``, the first three-node subset of the possible-d-sep set, separates 4 and 5.
+
+    Skipping that subset keeps the false edge ``4 - 5`` and leaves circles where 0 meets 4 and 5.
+    """
+    edges = [(2, 3), (2, 6), (3, 5), (6, 4), (7, 0), (7, 5), (9, 0), (9, 4), (10, 5), (10, 6)]
+    edges += [(11, 3), (11, 4)]
+    truth = np.array(
+        [
+            [_, _, _, _, A, A, _],
+            [_, _, _, _, _, _, _],
+            [_, _, _, C, _, _, C],
+            [_, _, A, _, A, T, _],
+            [A, _, _, A, _, _, A],
+            [A, _, _, A, _, _, A],
+            [_, _, A, _, T, A, _],
+        ]
+    )
+    np.testing.assert_array_equal(_oracle_fci(monkeypatch, 7, edges), truth)
+
+
 R8_GRAPHS = {
     "r8-44641": [(0, 4), (0, 2), (4, 1), (4, 2), (1, 6), (1, 5), (1, 2), (6, 5), (3, 5), (3, 2)]
     + [(5, 2), (7, 4), (7, 3)],

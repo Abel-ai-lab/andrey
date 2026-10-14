@@ -363,7 +363,10 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     """Possible-d-separating nodes for the pair ``(x, y)`` (descending), from a reachability BFS.
 
     Grows a frontier of node pairs from ``x``, extending through definite colliders and adjacent
-    triples, and collects every intermediate node reachable by a possible-parent path.
+    triples, and collects every intermediate node reachable by a possible-parent path. The frontier
+    holds ``(a, c)`` pairs rather than the last edge of each path, so the set can be smaller than
+    Possible-D-Sep as Spirtes, Glymour, and Scheines (2000) define it; :func:`andrey.fci` gives the
+    reasons for keeping it.
     """
     n = marks.shape[0]
     dsep: set[int] = set()
@@ -410,32 +413,26 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     dsep.discard(x)
     dsep.discard(y)
     # Sort by descending labels "X{i+1}". Lexicographic order differs from numeric order
-    # at two digits; this order determines which conditioning subsets are skipped.
+    # at two digits; this order decides which separating subset is found and recorded first.
     return sorted(dsep, key=lambda v: f"X{v + 1}", reverse=True)
 
 
 def _iter_dsep_choices(
     dsep: list[int], adj_a: set[int], adj_b: set[int]
 ) -> Iterator[tuple[int, ...]]:
-    """Conditioning subsets of ``dsep`` (size >= 2) outside either endpoint's adjacency.
+    """Every non-empty subset of ``dsep`` that lies inside neither endpoint's adjacency.
 
-    Candidate subsets are enumerated by increasing size. For each size, the first combination
-    is skipped and the last is emitted twice; a size with a single combination emits it once.
-    Subsets are generated one at a time and filtered against the endpoint adjacencies.
+    Subsets come by increasing size, each size in ``combinations`` order, one at a time. The
+    adjacency search already tested the empty set and every subset of either endpoint's
+    neighbors: those neighborhoods only shrink, so each such subset was a candidate at its size
+    and left the pair dependent. Testing it again cannot remove the edge.
     """
 
     def outside(values: tuple[int, ...]) -> bool:
         return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
 
-    for size in range(2, len(dsep) + 1):
-        combos = combinations(dsep, size)
-        last = next(combos)  # skip the first combination of each size
-        for values in combos:
-            if outside(values):
-                yield values
-            last = values
-        if outside(last):  # and emits the last one twice
-            yield last
+    for size in range(1, len(dsep) + 1):
+        yield from filter(outside, combinations(dsep, size))
 
 
 def _try_remove_by_dsep(
@@ -452,8 +449,6 @@ def _try_remove_by_dsep(
 ) -> bool:
     """Remove edge ``x-y`` if some possible-d-sep subset makes ``x`` and ``y`` independent."""
     dsep = _possible_dsep(marks, a, b)
-    if len(dsep) < 2:
-        return False
     for cond in _iter_dsep_choices(dsep, adj_a, adj_b):
         if test(x, y, cond) > alpha:
             marks[x, y] = NULL
