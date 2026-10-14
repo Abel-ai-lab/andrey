@@ -16,7 +16,7 @@ import pytest
 
 from andrey_bench import scoring
 from andrey_bench.window import ARROW, CIRCLE, NULL, TAIL, WindowGraph
-from andrey_bench.window_pag import _Separation, true_window_pag
+from andrey_bench.window_pag import DesignOracle, _Separation, true_window_pag
 
 BENCH = Path(__file__).resolve().parents[1]
 
@@ -139,6 +139,24 @@ def test_the_separation_search_agrees_with_networkx():
             x, y = (int(v) for v in rng.choice(n, 2, replace=False))
             given = {int(v) for v in rng.choice(n, 3, replace=False)} - {x, y}
             assert search.separated(x, y, given) == nx.is_d_separator(dag, {x}, {y}, given)
+
+
+@pytest.mark.parametrize(
+    ("links", "n", "lags"),
+    [
+        (FIG1, 4, 1),
+        ([(1, 0, 0), (1, 0, 2), (0, 2, 1)], 3, 1),
+        ([(1, 0, 0), (1, 1, 1), (1, 2, 2), (0, 3, 0), (2, 3, 1), (1, 3, 3), (1, 1, 2)], 4, 2),
+    ],
+)
+def test_lpcmci_with_an_exact_test_returns_the_true_pag(links, n, lags):
+    """Gerhardus and Runge (2020), Theorem 2: with exact tests LPCMCI returns the true PAG."""
+    from andrey.temporal.lpcmci import run
+
+    truth = _truth(links, n=n, latents=1, lags=lags)
+    pag = true_window_pag(truth, tau_max=2)
+    found = run(DesignOracle(truth, tau_max=2, past=12), n - 1, 2, 0.05, 1)
+    assert np.array_equal(found.start_marks, pag.marks)
 
 
 # --- scores against the true PAG ------------------------------------------------------------------
