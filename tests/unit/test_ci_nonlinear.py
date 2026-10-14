@@ -199,13 +199,20 @@ def test_is_symmetric_and_deterministic(name):
 
 
 @pytest.mark.parametrize("name", ["rcot", "cmiknn", "gpdc"])
-def test_seed_reproduces_the_pvalue(name):
-    """A random test's p-value follows its seed; ``None`` reads ``ANDREY_SEED``, default 0."""
+def test_seed_reproduces_the_pvalue(name, monkeypatch):
+    """A random test's p-value follows its seed, not the queries before it; ``None`` reads
+    ``ANDREY_SEED``, default 0."""
     cls, settings = TESTS[name]
     data = _common_cause(seed=4, n=120, n_cond=1)
     pvalues = {seed: cls(data, seed=seed, **settings)(0, 1, (2,)) for seed in range(4)}
-    assert cls(data, **settings)(0, 1, (2,)) == pvalues[0]
     assert len(set(pvalues.values())) > 1
+    monkeypatch.delenv("ANDREY_SEED", raising=False)
+    test = cls(data, **settings)
+    assert test(0, 1, (2,)) == pvalues[0]
+    test(0, 2)
+    assert test(0, 1, (2,)) == pvalues[0]
+    monkeypatch.setenv("ANDREY_SEED", "2")
+    assert cls(data, **settings)(0, 1, (2,)) == pvalues[2]
 
 
 @pytest.mark.parametrize("constant", [[0], [0, 1]])
