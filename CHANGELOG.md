@@ -11,11 +11,14 @@ change names its pull request.
 
 ### Fixed
 
-- `ges` returns the same graph however small the data's scale, where squared covariances used to
-  underflow and change the result. ([#TBD])
-- `ges`, `gies`, `gfci`, `xges`, `hc`, and `tabu` raise a `ValueError` when a column is an exact
-  linear function of other columns, instead of returning a graph from scores that are not finite.
+- `ges`, `gies`, `gfci`, `xges`, `hc`, `tabu`, `boss`, and `grasp` return the same graph however
+  small the data's scale, where squared covariances used to underflow and change the result.
   ([#TBD])
+- These searches and `exact_search` raise a `ValueError` naming the columns when a column repeats
+  another up to scale and shift or, with more rows than columns, is a linear function of other
+  columns, instead of returning a graph from scores that are not finite. ([#TBD])
+- With fewer rows than columns, these searches no longer pick a parent set of `n_samples - 1` or
+  more variables, which fits its child exactly. ([#TBD])
 
 ## [0.3.0] - 2026-10-13
 

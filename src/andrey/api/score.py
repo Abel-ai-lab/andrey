@@ -64,8 +64,9 @@ def ges(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC"``.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if a column is an exact linear function
-        of other columns, so its BIC score is not finite.
+        If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
+        column up to scale and shift, or, with more rows than columns, is a linear function of
+        other columns.
 
     See Also
     --------
@@ -97,6 +98,9 @@ def ges(
     200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
     and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
     the default parent cap, its median errors passed the empty graph's (612 against 338).
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -158,8 +162,9 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if a column is an exact linear function
-        of other columns, so its BIC score is not finite.
+        If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
+        column up to scale and shift, or, with more rows than columns, is a linear function of
+        other columns.
 
     Warns
     -----
@@ -172,6 +177,9 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 600 rows. It
     takes observational data only, so it returns the graph and score that :func:`~andrey.ges`
     returns on the same data, and the limitations of GES apply.
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -240,9 +248,10 @@ def xges(
     TypeError
         If ``extended_search`` is not a bool.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
-        no constant column, if ``lambda_value`` is negative or non-finite, or if a column is an
-        exact linear function of other columns, so its BIC score is not finite.
+        If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``,
+        if ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
+        column up to scale and shift, or, with more rows than columns, is a linear function of
+        other columns.
 
     See Also
     --------
@@ -270,6 +279,9 @@ def xges(
     edge it tries to delete and retries the edges after keeping a result, so its run time grows
     with the number of edges and of results kept. Its BIC score assumes linear relations with
     Gaussian noise.
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -347,8 +359,8 @@ def hc(
         If a given ``max_iter`` is not an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
-        or if a column is an exact linear function of other columns, so its BIC score is not
-        finite.
+        or if a column is constant, repeats another column up to scale and shift, or, with more
+        rows than columns, is a linear function of other columns.
 
     Warns
     -----
@@ -367,6 +379,9 @@ def hc(
     at 3,200, on 4 cores. It has no move limit by default; run time grows with the moves the search
     takes. A graph that no single move improves need not be the best-scoring one. Its BIC score
     assumes linear relations with Gaussian noise.
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -446,8 +461,9 @@ def tabu(
         If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
-        less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or if a column is an exact
-        linear function of other columns, so its BIC score is not finite.
+        less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or if a column is constant,
+        repeats another column up to scale and shift, or, with more rows than columns, is a linear
+        function of other columns.
 
     Warns
     -----
@@ -475,6 +491,9 @@ def tabu(
     moves between new best scores, with no move limit by default; run time grows with the moves
     taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be
     missed. Its BIC score assumes linear relations with Gaussian noise.
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -541,7 +560,9 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     Raises
     ------
     ValueError
-        If ``search_method`` is not ``"astar"`` or ``"dp"``.
+        If ``search_method`` is not ``"astar"`` or ``"dp"``, or if a column is constant, repeats
+        another column up to scale and shift, or, with more rows than columns, is a linear function
+        of other columns.
 
     Warns
     -----
@@ -555,6 +576,9 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     It scores every possible parent set of every variable, so its run time at least doubles with
     each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
     its memory doubles as well.
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------

@@ -62,7 +62,9 @@ def boss(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
+        column up to scale and shift, or, with more rows than columns, is a linear function of
+        other columns.
 
     See Also
     --------
@@ -104,6 +106,9 @@ def boss(
     variables. The median fit took 0.031 s at 20 variables and 292 s at 800, on 16 cores. On the
     223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``, its median errors
     passed the empty graph's (506 against 338).
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -182,7 +187,9 @@ def grasp(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC_from_cov"``, or ``depth`` is not ``3``.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
+        column up to scale and shift, or, with more rows than columns, is a linear function of
+        other columns.
 
     See Also
     --------
@@ -228,6 +235,9 @@ def grasp(
     variables. The median fit took 0.037 s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16
     cores; larger graphs were not measured. On the 223-variable ANDES network with 1,000 simulated
     rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338).
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
