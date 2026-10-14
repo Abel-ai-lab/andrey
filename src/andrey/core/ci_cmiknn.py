@@ -86,9 +86,10 @@ class CMIknn:
     ----------
     data : ndarray of shape (n_samples, n_variables)
         Observed data, one row per sample. Each column is replaced by its ranks.
-    k_cmi : float, default=0.2
+    k_cmi : float, default=0.1
         Nearest neighbors of the estimator, as a fraction of the rows. More neighbors lower the
-        estimate's variance and raise its bias.
+        estimate's variance and raise its bias toward zero, which costs power as the conditioning
+        set grows.
     k_perm : int, default=5
         Nearest neighbors in the conditioning set among which ``x`` is shuffled.
     n_permutations : int, default=500
@@ -139,7 +140,7 @@ class CMIknn:
         self,
         data: np.ndarray,
         *,
-        k_cmi: float = 0.2,
+        k_cmi: float = 0.1,
         k_perm: int = 5,
         n_permutations: int = 500,
         seed: int | None = None,

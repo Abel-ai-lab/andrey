@@ -32,6 +32,22 @@ def _centered_gaussian_kernel(columns: np.ndarray, width: float) -> np.ndarray:
     return kernel - col_mean[None, :] - col_mean[:, None] + col_mean.mean()
 
 
+def _kci_moments(a: np.ndarray, b: np.ndarray) -> tuple[float, float, float]:
+    """KCI's statistic ``tr(A B) / n`` and the mean and variance of its null law.
+
+    Under the null the statistic is ``(1 / n) sum_k lam_k z_k^2``, ``lam`` the eigenvalues of
+    ``w w'`` with ``w_t = vec(psi_t phi_t')``, ``A = Psi Psi'`` and ``B = Phi Phi'``. ``w' w`` has
+    entries ``A_st B_st``, so the mean ``tr(w w') / n`` and the variance ``2 tr((w w')^2) / n^2``
+    come from the elementwise product of ``A`` and ``B``.
+    """
+    n = a.shape[0]
+    ab = a * b
+    statistic = float(ab.sum()) / n
+    mean = float(np.trace(ab)) / n
+    var = 2.0 * float(np.sum(ab * ab)) / n**2
+    return statistic, mean, var
+
+
 def _gamma_pvalue(statistic: float, mean: float, var: float) -> float:
     """Upper tail at ``statistic`` of the gamma law with the given mean and variance."""
     if not (mean > 0.0 and var > 0.0):
@@ -121,13 +137,7 @@ class KCI:
         eigval, eigvec = np.linalg.eigh(ks)
         shrink = self._ridge / (np.clip(eigval, 0.0, None) + self._ridge)
         resid = (eigvec * shrink) @ eigvec.T  # R = ridge (Ks + ridge I)^-1
-        a = resid @ kxs @ resid
-        b = resid @ ky @ resid
-        ab = a * b
-        statistic = float(ab.sum()) / n
-        mean = float(np.trace(ab)) / n
-        var = 2.0 * float(np.sum(ab * ab)) / n**2
-        return _gamma_pvalue(statistic, mean, var)
+        return _gamma_pvalue(*_kci_moments(resid @ kxs @ resid, resid @ ky @ resid))
 
 
 def _hall_buckley_eagleson_pvalue(statistic: float, weights: np.ndarray) -> float:

@@ -157,6 +157,24 @@ def _confounded_anm(
     return np.column_stack([h, x0, x1, x2, x3])[:, list(observed)]
 
 
+def _nonmonotone(seed: int, n_samples: int, noise_scale: float) -> np.ndarray:
+    """Nonlinear SEM ``x0 -> x2 <- x1``, ``x2 -> x3`` whose links partial correlation cannot see.
+
+    ``x0`` and ``x1`` are standard normal; ``x2 = |x0| + |x1| + n`` and
+    ``x3 = (x2 - 1)**2 + n``, each ``n`` an independent normal draw of scale ``noise_scale``. An
+    even function of a symmetric cause is uncorrelated with it, so ``x0`` and ``x1`` are
+    uncorrelated with ``x2``. Only absolute values, sums, and products: each is exactly rounded
+    on every machine, so the input hash holds across runners.
+    """
+    rng = np.random.default_rng(seed)
+    x0 = rng.standard_normal(n_samples)
+    x1 = rng.standard_normal(n_samples)
+    x2 = np.abs(x0) + np.abs(x1) + noise_scale * rng.standard_normal(n_samples)
+    shifted = x2 - 1.0
+    x3 = shifted * shifted + noise_scale * rng.standard_normal(n_samples)
+    return np.column_stack([x0, x1, x2, x3])
+
+
 # Full order h, x0, x1, x2, x3 (``weights[j][i]`` is the coefficient of ``i`` in ``j``). A strong
 # hidden effect (1.5 against unit-range noise) leaves a trace in the pair's residuals that the
 # independence tests detect at 2000 rows.
@@ -212,6 +230,20 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0],
         ],
+    },
+    # Nonlinear SEM with non-monotone links (see ``_nonmonotone``) - the nonlinear CI tests.
+    # ``edges`` is the true DAG, whose CPDAG is fully oriented: the collider 0 -> 2 <- 1 and, by
+    # Meek's first rule, 2 -> 3. ``queries`` are the ``(x, y, condition_set)`` whose p-values are
+    # recorded: an independence, a dependence partial correlation misses, the same given the
+    # other parent, an independence given the middle node, and a dependence given two variables.
+    # At this seed every test's p-values sit far from 0.05, so no answer hangs on one query.
+    "nonmonotone_4v": {
+        "model": "nonmonotone",
+        "seed": 20261014,
+        "n_samples": 400,
+        "noise_scale": 0.3,
+        "edges": [(0, 2), (1, 2), (2, 3)],
+        "queries": [(0, 1, ()), (0, 2, ()), (0, 2, (1,)), (0, 3, (2,)), (2, 3, (0, 1))],
     },
     # Stable VAR(1), non-Gaussian noise - VARLiNGAM and (linear) Granger.
     "var_4v_stable": {
@@ -413,6 +445,8 @@ def generate(case_id: str, *, replicate: int = 0) -> np.ndarray:
             noise=spec["noise"],
             observed=spec["observed"],
         )
+    if model == "nonmonotone":
+        return _nonmonotone(seed=seed, n_samples=spec["n_samples"], noise_scale=spec["noise_scale"])
     if model == "confounded_anm":
         return _confounded_anm(
             seed=seed,

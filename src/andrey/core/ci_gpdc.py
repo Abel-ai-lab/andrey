@@ -26,6 +26,17 @@ def _centered_distances(ranks: np.ndarray) -> np.ndarray:
     return dist - col_mean[None, :] - col_mean[:, None] + col_mean.mean()
 
 
+def _squared_distance_correlation(a: np.ndarray, b: np.ndarray) -> float:
+    """Squared distance correlation from the doubly centered distance matrices ``a`` and ``b``.
+
+    Zero when either variable is constant.
+    """
+    var_a, var_b = float(np.mean(a * a)), float(np.mean(b * b))
+    if not (var_a > 0.0 and var_b > 0.0):
+        return 0.0
+    return float(np.mean(a * b)) / np.sqrt(var_a * var_b)
+
+
 class GPDC:
     """Gaussian-process regression, then a distance-correlation test of the residuals (GPDC).
 
@@ -94,12 +105,12 @@ class GPDC:
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the GPDC p-value for ``x`` independent of ``y`` given ``condition_set``."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
-        a = _centered_distances(self._ranks(self._residual(x_int, cond)))
-        b = _centered_distances(self._ranks(self._residual(y_int, cond)))
-        var_a, var_b = float(np.mean(a * a)), float(np.mean(b * b))
-        if not (var_a > 0.0 and var_b > 0.0):
+        rx, ry = self._residual(x_int, cond), self._residual(y_int, cond)
+        if not (np.ptp(rx) > 0.0 and np.ptp(ry) > 0.0):
             return 1.0  # a constant variable: no variation to depend on
-        statistic = float(np.mean(a * b)) / np.sqrt(var_a * var_b)
+        statistic = _squared_distance_correlation(
+            _centered_distances(self._ranks(rx)), _centered_distances(self._ranks(ry))
+        )
         return float(np.mean(self._null_distribution() >= statistic))
 
     def _residual(self, column: int, cond: list[int]) -> np.ndarray:
@@ -117,9 +128,7 @@ class GPDC:
 
     @staticmethod
     def _ranks(values: np.ndarray) -> np.ndarray:
-        """Ranks 0 to n - 1; a constant input keeps all ranks equal."""
-        if np.ptp(values) == 0.0:
-            return np.zeros(values.shape[0], dtype=np.intp)
+        """Ranks 0 to n - 1, ties broken by row order."""
         return np.argsort(np.argsort(values, kind="stable"), kind="stable")
 
     def _null_distribution(self) -> np.ndarray:
@@ -127,10 +136,9 @@ class GPDC:
         if self._null is None:
             rng = np.random.default_rng([self._seed, self._n])
             a = _centered_distances(np.arange(self._n))
-            var = float(np.mean(a * a))
             draws = np.empty(self._n_null)
             for i in range(self._n_null):
                 perm = rng.permutation(self._n)
-                draws[i] = float(np.mean(a * a[np.ix_(perm, perm)])) / var
+                draws[i] = _squared_distance_correlation(a, a[np.ix_(perm, perm)])
             self._null = draws
         return self._null

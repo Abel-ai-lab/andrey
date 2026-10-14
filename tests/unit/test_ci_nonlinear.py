@@ -1,11 +1,11 @@
-"""The nonlinear conditional-independence tests: known cases, null calibration, and the contract.
+"""The nonlinear conditional-independence tests: fixed cases, reference values, and the contract.
 
-Each test is checked on fixed seeded cases with one certain answer (a dependence Fisher-Z misses,
-an independence given the common cause), on its rejection rate under the null over fixed seeds
-(it must sit near ``alpha``), on its power when a shared noise term makes the pair dependent, and
-on the ``CITest`` contract: argument order, determinism, and input validation. The permutation
-tests run with fewer permutations than their defaults to keep the suite fast; a permutation
-p-value is calibrated whatever their number.
+Each test is checked on fixed seeded inputs with one certain answer (a dependence Fisher-Z misses,
+an independence given the common cause, a dependence through shared noise), on closed forms its
+parts must reproduce, and on the ``CITest`` contract: argument order, determinism, and input
+validation. The permutation tests run with fewer draws than their defaults to keep the suite fast;
+a permutation p-value is calibrated at any number of draws. Their rejection rates over many draws
+are a measurement, made by ``qa/ci_calibration.py``.
 """
 
 from __future__ import annotations
@@ -14,12 +14,13 @@ import warnings
 
 import numpy as np
 import pytest
+from scipy.stats import chi2
 
 import andrey
 from andrey.core import ci
-from andrey.core.ci_cmiknn import CMIknn
-from andrey.core.ci_gpdc import GPDC
-from andrey.core.ci_kernel import KCI, RCoT
+from andrey.core.ci_cmiknn import CMIknn, _cmi, _distances, _rank_columns
+from andrey.core.ci_gpdc import GPDC, _centered_distances, _squared_distance_correlation
+from andrey.core.ci_kernel import KCI, RCoT, _hall_buckley_eagleson_pvalue, _kci_moments
 from andrey.core.independence import hsic_test
 
 ALPHA = 0.05
@@ -30,15 +31,6 @@ TESTS = {
     "rcot": (RCoT, {}),
     "cmiknn": (CMIknn, {"n_permutations": 100}),
     "gpdc": (GPDC, {"n_null": 300}),
-}
-
-# name -> (rows, conditioning-set sizes) for the calibration and power checks. KCI's fixed kernel
-# widths hold their level with one conditioning variable only (see its Limitations).
-CALIBRATION = {
-    "kci": (200, [1]),
-    "rcot": (500, [1, 2]),
-    "cmiknn": (100, [1, 2]),
-    "gpdc": (100, [1, 2]),
 }
 
 
@@ -60,18 +52,7 @@ def _common_cause(seed: int, n: int, n_cond: int, shared: float = 0.0) -> np.nda
     return np.column_stack([x, y, z])
 
 
-def _rejections(name: str, seeds, n: int, n_cond: int, shared: float = 0.0) -> int:
-    cond = tuple(range(2, 2 + n_cond))
-    return sum(
-        _build(name, _common_cause(seed, n, n_cond, shared))(0, 1, cond) <= ALPHA for seed in seeds
-    )
-
-
-def _calibration_cases():
-    return [(name, k) for name, (_, sizes) in CALIBRATION.items() for k in sizes]
-
-
-# ---- known cases -------------------------------------------------------------------------------
+# ---- fixed cases -------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("name", TESTS)
@@ -86,9 +67,25 @@ def test_detects_a_dependence_partial_correlation_misses(name):
 
 @pytest.mark.parametrize("name", TESTS)
 def test_separates_given_the_common_cause(name):
-    test = _build(name, _common_cause(seed=0, n=200, n_cond=1))
-    assert test(0, 1) <= 0.01  # marginally dependent through z
+    """``x = tanh(2 z) + noise`` and ``y = z + z^2 / 2 + noise``: dependent through ``z`` alone."""
+    rng = np.random.default_rng(0)
+    z = rng.standard_normal(200)
+    x = np.tanh(2.0 * z) + 0.4 * rng.standard_normal(200)
+    y = z + 0.5 * z * z + 0.4 * rng.standard_normal(200)
+    test = _build(name, np.column_stack([x, y, z]))
+    assert test(0, 1) <= 0.01
     assert test(0, 1, (2,)) > ALPHA
+
+
+@pytest.mark.parametrize("n_cond", [1, 2])
+@pytest.mark.parametrize("name", TESTS)
+def test_rejects_a_conditional_dependence(name, n_cond):
+    """Noise shared by ``x`` and ``y`` keeps them dependent given the conditioning variables."""
+    data = _common_cause(seed=0, n=200, n_cond=n_cond, shared=0.7)
+    assert _build(name, data)(0, 1, tuple(range(2, 2 + n_cond))) <= 0.01
+
+
+# ---- reference values --------------------------------------------------------------------------
 
 
 def test_kci_empty_set_is_the_gamma_hsic_test():
@@ -97,22 +94,60 @@ def test_kci_empty_set_is_the_gamma_hsic_test():
     np.testing.assert_allclose(KCI(data)(0, 1), hsic_test(data[:, 0], data[:, 1]), rtol=1e-9)
 
 
-# ---- calibration and power ---------------------------------------------------------------------
+def test_kci_null_moments_match_the_explicit_construction():
+    """The mean ``tr(w w') / n`` and variance ``2 tr((w w')^2) / n^2`` of KCI's null law, built
+    from ``w_t = vec(psi_t phi_t')`` with ``A = Psi Psi'`` and ``B = Phi Phi'``."""
+    rng = np.random.default_rng(0)
+    n = 25
+    a, b = (m @ m.T / n for m in rng.standard_normal((2, n, n)))
+    roots = []
+    for kernel in (a, b):
+        eigval, eigvec = np.linalg.eigh(kernel)
+        roots.append(eigvec * np.sqrt(np.clip(eigval, 0.0, None)))
+    psi, phi = roots
+    w = np.stack([np.outer(psi[t], phi[t]).ravel() for t in range(n)], axis=1)
+    ww = w @ w.T
+    expected = (np.trace(a @ b) / n, np.trace(ww) / n, 2.0 * np.trace(ww @ ww) / n**2)
+    np.testing.assert_allclose(_kci_moments(a, b), expected, rtol=1e-10)
 
 
-@pytest.mark.parametrize(("name", "n_cond"), _calibration_cases())
-def test_null_rejection_rate_is_near_alpha(name, n_cond):
-    """Over 200 seeded draws with ``x`` independent of ``y`` given ``z``, about 5% reject."""
-    n, _ = CALIBRATION[name]
-    rejected = _rejections(name, range(200), n=n, n_cond=n_cond)
-    assert 3 <= rejected <= 20, rejected
+@pytest.mark.parametrize("statistic", [0.5, 1.8, 4.0])
+def test_rcot_pvalue_is_exact_for_equal_weights(statistic):
+    """``0.3 * chi2(6)`` is a sum of six equally weighted squares; its law is matched exactly."""
+    expected = chi2.sf(statistic / 0.3, df=6)
+    assert _hall_buckley_eagleson_pvalue(statistic, np.full(6, 0.3)) == pytest.approx(expected)
 
 
-@pytest.mark.parametrize(("name", "n_cond"), _calibration_cases())
-def test_rejects_a_conditional_dependence(name, n_cond):
-    n, _ = CALIBRATION[name]
-    rejected = _rejections(name, range(20), n=n, n_cond=n_cond, shared=0.7)
-    assert rejected >= 16, rejected
+@pytest.mark.parametrize(("rho", "n_cond"), [(0.0, 0), (0.6, 0), (0.6, 1)])
+def test_cmiknn_estimates_gaussian_mutual_information(rho, n_cond):
+    """For jointly Gaussian variables with (partial) correlation ``rho`` the conditional mutual
+    information is ``-log(1 - rho^2) / 2``; the ranks do not change it."""
+    rng = np.random.default_rng(1)
+    n = 1000
+    z = rng.standard_normal(n)
+    x = rng.standard_normal(n)
+    y = rho * x + np.sqrt(1.0 - rho**2) * rng.standard_normal(n)
+    if n_cond:  # z drives both, and rho is their correlation given z
+        x, y = x + z, y + 0.8 * z
+    ranks = _rank_columns(np.column_stack([x, y, z]), rng)
+    dx, dy, dz = (_distances(ranks[:, c], np.int16) for c in range(3))
+    estimate = _cmi(dx, dy, dz if n_cond else np.zeros_like(dx), k=50)
+    assert estimate == pytest.approx(-0.5 * np.log(1.0 - rho**2), abs=0.03)
+
+
+def test_gpdc_statistic_is_the_squared_distance_correlation():
+    """The V-statistic ``dCov^2 = S1 + S2 - 2 S3`` of Szekely, Rizzo, and Bakirov (2007), over the
+    product of the two distance variances."""
+    rng = np.random.default_rng(0)
+    u, v = rng.permutation(40), rng.permutation(40)
+
+    def dcov2(p, q):
+        dp, dq = np.abs(p[:, None] - p[None, :]), np.abs(q[:, None] - q[None, :])
+        return (dp * dq).mean() + dp.mean() * dq.mean() - 2.0 * (dp.mean(1) * dq.mean(1)).mean()
+
+    expected = dcov2(u, v) / np.sqrt(dcov2(u, u) * dcov2(v, v))
+    statistic = _squared_distance_correlation(_centered_distances(u), _centered_distances(v))
+    assert statistic == pytest.approx(expected, rel=1e-12)
 
 
 # ---- the contract ------------------------------------------------------------------------------
@@ -180,11 +215,13 @@ def test_rejects_bad_settings(cls, kwargs, match):
 
 @pytest.mark.parametrize("name", TESTS)
 def test_ships_as_experimental(name):
-    """Each nonlinear test is selectable by name and warns that it is experimental."""
+    """Each nonlinear test is selectable by name in PC and warns that it is experimental."""
     assert name in ci.SHIPPED_INDEP_TESTS
     andrey.core.warning_policy.reset()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        ci.make_indep_test(name, _common_cause(seed=0, n=50, n_cond=1))
-    assert [w.category for w in caught] == [andrey.ExperimentalWarning]
-    assert f"indep_test={name!r} is experimental" in str(caught[0].message)
+        out = andrey.pc(_common_cause(seed=0, n=60, n_cond=1), indep_test=name)
+    assert out.structure.kind == "cpdag"
+    experimental = [w for w in caught if w.category is andrey.ExperimentalWarning]
+    assert len(experimental) == 1
+    assert f"indep_test={name!r} is experimental" in str(experimental[0].message)
