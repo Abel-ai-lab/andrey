@@ -30,6 +30,8 @@ change names its pull request.
 - `hc` returns the same graphs in less time. ([#56])
 - `hc` sets no move limit by default (`max_iter=None`), so large graphs are searched to a local
   optimum. ([#56])
+- `hc` with a mixed-data score never adds a continuous -> categorical edge, which the conditional
+  linear Gaussian model cannot express, and scores its candidate parent sets in batches. ([#TBD])
 
 ## [0.2.1] - 2026-10-12
 
