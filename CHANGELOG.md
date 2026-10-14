@@ -12,12 +12,15 @@ change names its pull request.
 ### Added
 
 - Discrete data: PC, FCI, GFCI, and CD-NOD take the chi-square and G-square tests
-  (`indep_test="chisq"` or `"gsq"`), and GES, hill climbing, Tabu search, BOSS, GRaSP, and exact
-  search take the BDeu and multinomial BIC scores (`score_func="local_score_BDeu"` or
-  `"local_score_BIC_discrete"`). Columns may hold pandas categoricals, booleans, strings, or whole
-  numbers. `andrey.data.discrete.DiscreteBN` samples random discrete networks, and
-  `load_dataset(..., discrete=True)` samples a published network from its own probability tables.
-  ([#94])
+  (`indep_test="chisq"` or `"gsq"`); GES, hill climbing, Tabu search, BOSS, GRaSP, and exact search
+  take the BDeu and multinomial BIC scores (`score_func="local_score_BDeu"` or
+  `"local_score_BIC_discrete"`). `andrey.data.discrete` samples discrete networks, and
+  `load_dataset(..., discrete=True)` samples a published network from its own tables. ([#94])
+
+### Changed
+
+- A method run with a continuous test or score refuses a DataFrame's categorical and string
+  columns, and names the discrete options, instead of reading category labels as numbers. ([#94])
 
 ## [0.3.0] - 2026-10-13
 

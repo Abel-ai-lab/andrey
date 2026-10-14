@@ -203,3 +203,19 @@ def test_fit_matrix_refuses_a_discrete_test_with_a_continuous_score():
 def test_gfci_names_the_mismatch():
     with pytest.raises(ValueError, match="disagree"):
         andrey.gfci(_fixed_data(), indep_test="chisq")
+
+
+def test_a_dataframe_keeps_its_labels_under_a_discrete_score():
+    rng = np.random.default_rng(0)
+    a = rng.integers(0, 2, 1000)
+    c = rng.integers(0, 2, 1000)
+    b = np.where(rng.random(1000) < 0.9, a | c, 1 - (a | c))
+    frame = pd.DataFrame(
+        {
+            "a": pd.Categorical(np.where(a == 1, "on", "off")),
+            "b": b.astype(bool),
+            "c": np.where(c == 1, "on", "off"),
+        }
+    )
+    edges = andrey.ges(frame, score_func="local_score_BDeu").structure.oriented_edges()
+    assert edges == [("a", "b", "directed"), ("c", "b", "directed")]
