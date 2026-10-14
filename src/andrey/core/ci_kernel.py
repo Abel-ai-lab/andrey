@@ -216,14 +216,16 @@ class RCoT:
     **How it works.** A variable ``v`` with median pairwise distance ``s`` (over its first 500
     rows) gets features ``sqrt(2) cos(v W + b)`` with ``W`` normal of standard deviation
     ``1 / s`` and ``b`` uniform on ``[0, 2 pi]``, the random features of the Gaussian kernel
-    ``exp(-|v - v'|^2 / (2 s^2))`` with the median distance as its bandwidth; every feature is
-    standardized [1]_. With ``A`` and ``B`` the features of ``x`` and ``y``, and
-    ``C`` those of the conditioning set, ``A`` and ``B`` are replaced by their residuals on ``C``
+    ``exp(-|v - v'|^2 / (2 s^2))``. The median distance is that kernel's bandwidth, the median
+    heuristic [4]_ that [1]_ uses; [1]_ prints the kernel as ``exp(-|v - v'|^2 / s)``. Every
+    feature is standardized [1]_. With ``A`` and ``B`` the features of ``x`` and ``y``, and ``C``
+    those of the conditioning set, ``A`` and ``B`` are replaced by their residuals on ``C``
     (ridge ``1e-10``). The statistic is ``n`` times the squared Frobenius norm of the residuals'
-    cross-covariance matrix. Under the null it is a weighted sum of chi-squared variables whose
-    weights are the eigenvalues of the covariance of the products of residuals; the p-value
-    matches the first three cumulants of that sum with a shifted and scaled chi-squared law
-    (Hall-Buckley-Eagleson) [2]_ [3]_. An empty conditioning set uses ``A`` and ``B``, centered.
+    cross-covariance matrix, as [1]_ defines it. Under the null it is a weighted sum of
+    chi-squared variables whose weights are the eigenvalues of the covariance of the products of
+    residuals; the p-value matches the first three cumulants of that sum with a shifted and scaled
+    chi-squared law (Hall-Buckley-Eagleson) [2]_ [3]_. An empty conditioning set uses ``A`` and
+    ``B``, centered.
 
     The features of a query are drawn from a generator seeded by ``seed``, the two variables, and
     the conditioning set, so a p-value does not depend on the order of queries or of the
@@ -248,6 +250,9 @@ class RCoT:
        random variables. Annals of Probability 11(4), 1028-1036.
     .. [3] Buckley, M. J., and Eagleson, G. K. (1988). An approximation to the distribution of
        quadratic forms in normal random variables. Australian Journal of Statistics 30A, 150-159.
+    .. [4] Gretton, A., Fukumizu, K., Teo, C. H., Song, L., Scholkopf, B., and Smola, A. J.
+       (2007). A kernel statistical test of independence. Advances in Neural Information
+       Processing Systems 20, 585-592.
     """
 
     def __init__(
