@@ -14,12 +14,20 @@ import warnings
 
 import numpy as np
 import pytest
+from scipy.integrate import quad
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import chi2
 
 import andrey
 from andrey.core import ci
-from andrey.core.ci_cmiknn import CMIknn, _cmi, _distances, _rank_columns
+from andrey.core.ci_cmiknn import (
+    CMIknn,
+    _cmi,
+    _distances,
+    _local_permutation,
+    _nearest_in_z,
+    _rank_columns,
+)
 from andrey.core.ci_gpdc import GPDC, _centered_distances, _squared_distance_correlation
 from andrey.core.ci_kernel import (
     KCI,
@@ -143,6 +151,18 @@ def test_rcot_pvalue_is_exact_for_equal_weights(statistic):
     assert _hall_buckley_eagleson_pvalue(statistic, np.full(6, 0.3)) == pytest.approx(expected)
 
 
+def test_rcot_pvalue_matches_the_exact_tail_for_unequal_weights():
+    """``2 chi2(1) + 0.1 chi2(20)`` four standard deviations above its mean: matching three
+    cumulants gives the exact tail within 5%; matching two (a gamma law) gives half of it."""
+    weights = np.array([2.0] + [0.1] * 20)
+    statistic = weights.sum() + 4.0 * np.sqrt(2.0 * np.sum(weights**2))
+    inner, _ = quad(
+        lambda v: chi2.pdf(v, 20) * chi2.sf((statistic - 0.1 * v) / 2.0, 1), 0.0, 10.0 * statistic
+    )
+    exact = inner + chi2.sf(10.0 * statistic, 20)
+    assert _hall_buckley_eagleson_pvalue(statistic, weights) == pytest.approx(exact, rel=0.05)
+
+
 @pytest.mark.parametrize("n_columns", [1, 3])
 def test_rcot_features_approximate_the_median_bandwidth_kernel(n_columns):
     """Many features of a few rows average to ``exp(-d^2 / (2 s^2))``, ``s`` the median distance
@@ -170,6 +190,20 @@ def test_cmiknn_estimates_gaussian_mutual_information(rho, n_cond):
     dx, dy, dz = (_distances(ranks[:, c], np.int16) for c in range(3))
     estimate = _cmi(dx, dy, dz if n_cond else np.zeros_like(dx), k=50)
     assert estimate == pytest.approx(-0.5 * np.log(1.0 - rho**2), abs=0.03)
+
+
+def test_cmiknn_local_shuffle_stays_near_in_z():
+    """Each row takes ``x`` from one of its ``k_perm`` nearest rows in ``z`` (in ranks, those
+    within 2 for ``k_perm = 5``), rows repeat rarely, and the dependence of ``x`` on ``z`` stays."""
+    rng = np.random.default_rng(0)
+    z = rng.standard_normal(300)
+    x = z + 0.3 * rng.standard_normal(300)
+    ranks = _rank_columns(np.column_stack([x, z]), rng)
+    nearest = _nearest_in_z(_distances(ranks[:, 1], np.int16), 5, rng)
+    perm = _local_permutation(nearest, rng)
+    assert np.abs(ranks[perm, 1] - ranks[:, 1]).max() <= 2
+    assert len(set(perm)) >= 0.9 * 300
+    assert np.corrcoef(x[perm], z)[0, 1] == pytest.approx(np.corrcoef(x, z)[0, 1], abs=0.02)
 
 
 def test_gpdc_statistic_is_the_squared_distance_correlation():
