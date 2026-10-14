@@ -9,6 +9,16 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- Discrete data: PC, FCI, GFCI, and CD-NOD take the chi-square and G-square tests
+  (`indep_test="chisq"` or `"gsq"`), and GES, hill climbing, Tabu search, BOSS, GRaSP, and exact
+  search take the BDeu and multinomial BIC scores (`score_func="local_score_BDeu"` or
+  `"local_score_BIC_discrete"`). Columns may hold pandas categoricals, booleans, strings, or whole
+  numbers. `andrey.data.discrete.DiscreteBN` samples random discrete networks, and
+  `load_dataset(..., discrete=True)` samples a published network from its own probability tables.
+  ([#94])
+
 ## [0.3.0] - 2026-10-13
 
 ### Highlights
@@ -113,3 +123,4 @@ First alpha release.
 [#57]: https://github.com/Abel-ai-lab/andrey/pull/57
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59
 [#64]: https://github.com/Abel-ai-lab/andrey/pull/64
+[#94]: https://github.com/Abel-ai-lab/andrey/pull/94
