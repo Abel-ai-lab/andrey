@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from scipy.integrate import quad
 from scipy.spatial.distance import pdist, squareform
-from scipy.stats import chi2
+from scipy.stats import chi2, gamma
 
 import andrey
 from andrey.core import ci
@@ -37,7 +37,6 @@ from andrey.core.ci_kernel import (
     _hall_buckley_eagleson_pvalue,
     _kci_moments,
 )
-from andrey.core.independence import hsic_test
 
 ALPHA = 0.05
 
@@ -121,10 +120,25 @@ def test_independent_discrete_columns_stay_independent(name):
 # ---- reference values --------------------------------------------------------------------------
 
 
-def test_kci_empty_set_is_the_gamma_hsic_test():
-    """With no conditioning set KCI is the gamma-approximated HSIC test at the empirical width."""
+def test_kci_empty_set_is_the_unconditional_gamma_law():
+    """Zhang et al. (2011), Sect. 3.4: ``T = tr(Kx Ky) / n`` against the gamma law with mean
+    ``tr(Kx) tr(Ky) / n^2`` and variance ``2 tr(Kx^2) tr(Ky^2) / n^4``, ``K`` the centered
+    Gaussian kernel of width 0.5 (300 rows) on standardized columns."""
     data = np.random.default_rng(1).standard_normal((300, 2))
-    np.testing.assert_allclose(KCI(data)(0, 1), hsic_test(data[:, 0], data[:, 1]), rtol=1e-9)
+    data[:, 1] += 0.2 * data[:, 0] ** 2
+    n = 300
+    center = np.eye(n) - 1.0 / n
+
+    def kernel(column):
+        z = (column - column.mean()) / column.std(ddof=1)
+        return center @ np.exp(-((z[:, None] - z[None, :]) ** 2) / (2.0 * 0.5**2)) @ center
+
+    kx, ky = kernel(data[:, 0]), kernel(data[:, 1])
+    statistic = np.trace(kx @ ky) / n
+    mean = np.trace(kx) * np.trace(ky) / n**2
+    var = 2.0 * np.trace(kx @ kx) * np.trace(ky @ ky) / n**4
+    expected = gamma.sf(statistic, mean**2 / var, scale=var / mean)
+    np.testing.assert_allclose(KCI(data)(0, 1), expected, rtol=1e-9)
 
 
 def test_kci_null_moments_match_the_explicit_construction():
