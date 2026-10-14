@@ -207,15 +207,16 @@ def test_cmiknn_estimates_gaussian_mutual_information(rho, n_cond):
 
 
 def test_cmiknn_local_shuffle_stays_near_in_z():
-    """Each row takes ``x`` from one of its ``k_perm`` nearest rows in ``z``, rows repeat rarely,
-    and the dependence of ``x`` on ``z`` stays."""
+    """Each row takes ``x`` from a row no farther in ``z`` than its ``k_perm``-th nearest, rows
+    repeat rarely, and the dependence of ``x`` on ``z`` stays."""
     rng = np.random.default_rng(0)
     z = rng.standard_normal(300)
     x = z + 0.3 * rng.standard_normal(300)
     ranks = _rank_columns(np.column_stack([x, z]), rng)
-    nearest = _nearest_in_z(_distances(ranks[:, 1], np.int16), 5, rng)
-    perm = _local_permutation(nearest, rng)
-    assert all(perm[i] in nearest[i] for i in range(300))
+    dz = _distances(ranks[:, 1], np.int16)
+    perm = _local_permutation(_nearest_in_z(dz, 5, rng), rng)
+    kth_nearest = np.sort(dz, axis=1)[:, 4]  # position 0 holds the row itself
+    assert np.all(dz[np.arange(300), perm] <= kth_nearest)
     assert len(set(perm)) >= 0.9 * 300
     assert np.corrcoef(x[perm], z)[0, 1] == pytest.approx(np.corrcoef(x, z)[0, 1], abs=0.02)
 
