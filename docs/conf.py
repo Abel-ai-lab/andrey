@@ -22,6 +22,7 @@ import textwrap
 
 import ablog.blog
 from ablog.blog import Blog
+from ablog.post import register_posts
 from docutils import nodes
 from docutils.parsers.rst import Directive
 from sphinx import addnodes
@@ -379,7 +380,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     description = _description(app, context, doctree)
     url = SITE_URL + ("" if pagename == "index" else f"{pagename}.html")
     image = HOME_PREVIEW
-    if pagename in Blog(app):  # each post's card is drawn from its title, once per build
+    if pagename in _blog(app):  # each post's card is drawn from its title, once per build
         image = f"assets/preview/{pagename.removeprefix('blog/')}.jpg"
         target = pathlib.Path(app.outdir) / image
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -387,7 +388,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     image = SITE_URL + image
     tags = {
         "description": description,
-        "og:type": "article" if pagename in Blog(app) else "website",
+        "og:type": "article" if pagename in _blog(app) else "website",
         "og:site_name": app.config.project,
         "og:title": title,
         "og:description": description,
@@ -426,6 +427,16 @@ def _newest_post(posts: list[tuple[str, str, str]]) -> tuple[str, str]:
     return newest[0], newest[2]
 
 
+def _blog(app) -> Blog:  # noqa: ANN001
+    """ABlog's posts, registered from the environment if ABlog has not yet done so. ABlog registers
+    them only when it resolves a doctree or collects its pages, so an incremental build that
+    rewrites no page reaches the index pages with none."""
+    blog = Blog(app)
+    if not blog:
+        register_posts(app)
+    return blog
+
+
 def _newest_first(posts: list[tuple[str, str, str]]) -> list[str]:
     """The docnames of ``posts``, each as for ``_newest_post``: the newest post, then the others
     newest first by ``_post_key``. Others that tie in both date and version keep their order in
@@ -440,7 +451,7 @@ def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
     with a version, as its docname and version."""
     posts = [
         (post.docname, f"{post.date:%Y-%m-%d}", str(version))
-        for post in Blog(app).posts
+        for post in _blog(app).posts
         if post.date and (version := app.env.metadata[post.docname].get("version"))
     ]
     return _newest_post(posts)
@@ -491,7 +502,7 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     under its title, where a reader looks for them and where they stay on a narrow screen. A post is
     not updated after it is published, so the version dates what it says. ABlog has read the posts'
     front matter by now."""
-    blog = Blog(app)
+    blog = _blog(app)
     if app.builder.format != "html" or docname not in blog:
         return
     post = blog[docname]
@@ -602,7 +613,7 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
     if app.builder.format != "html" or not places:
         return
     meta = app.env.metadata
-    posts = {post.docname: post for post in Blog(app).posts if post.date}
+    posts = {post.docname: post for post in _blog(app).posts if post.date}
     order = _newest_first(
         [
             (name, f"{post.date:%Y-%m-%d}", str(meta[name].get("version") or ""))
