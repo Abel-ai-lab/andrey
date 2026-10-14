@@ -261,6 +261,11 @@ def backward_chunk_best(
 # under the lowest delta that bound allows, or minus infinity when another batch can take the
 # other side of a guard. The scan visits candidates in that order and recomputes each visited
 # base group with forward_chunk_best's batch, until no lower bound can beat the best exact key.
+#
+# A batch's deltas depend only on the target, the base, and the batch's sources, and its bounds
+# hold against any other batch over the same base. So a target enumerated again keeps a base's
+# last batch while that batch covers the base's sources, and a delta whose bound is 0 is exact in
+# every batch.
 
 # The scan the forward phase uses in-process: ``True`` runs forward_chunk_best over every target at
 # every pass; ``False`` keeps each target's candidates until a move touches it. Tests flip it to
@@ -269,6 +274,13 @@ _FULL_RESCAN = False
 
 # A candidate kept for selection: ``(lowest exact delta, x, t_index, T, base)``.
 _Screened = tuple[float, int, int, tuple[int, ...], tuple[int, ...]]
+
+# A base's group at one target: ``(clique, sources, batch, deltas, bounds, dependent)``. ``clique``
+# and ``sources`` are bitmasks of NA u T and of the group's sources; ``deltas`` and ``bounds`` map
+# each source of ``batch``, a set of sources scored in one call that covers the group's, to its
+# screening delta and bound; ``dependent`` is a bitmask of the batch's sources with a bound
+# other than 0.
+_Group = tuple[int, int, frozenset[int], dict[int, float], dict[int, float], int]
 
 
 def _touched(before: np.ndarray | None, after: np.ndarray) -> np.ndarray:
@@ -305,10 +317,9 @@ class _ForwardScan:
         self.build_reach = _reach_factory(n)
         self.everyone = (1 << n) - 1
         self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
-        # Per target: each base's clique mask and screening deltas by source; the candidates that
-        # can improve, sorted by lowest exact delta; and each base's last exact deltas with the
-        # passing sources they were scored for.
-        self.groups: dict[int, dict[tuple[int, ...], tuple[int, dict[int, float]]]] = {}
+        # Per target: each base's group; the candidates that can improve, sorted by lowest exact
+        # delta; and each base's last exact deltas with the passing sources they were scored for.
+        self.groups: dict[int, dict[tuple[int, ...], _Group]] = {}
         self.screened: dict[int, list[_Screened]] = {}
         self.exact: dict[int, dict[tuple[int, ...], tuple[list[int], dict[int, float]]]] = {}
 
@@ -323,7 +334,7 @@ class _ForwardScan:
         self._refresh(adj)
         heap = [(moves[0][0], y, 0) for y, moves in self.screened.items() if moves]
         heapq.heapify(heap)
-        scored: dict[tuple[int, tuple[int, ...]], dict[int, float]] = {}  # this pass's groups
+        scored: dict[tuple[int, tuple[int, ...]], tuple[dict[int, float], int]] = {}
         succ: list[int] | None = None
         best: ForwardResult = None
         limit = -_EPS_IMPROVE  # no candidate whose exact delta exceeds this can be selected
@@ -333,14 +344,15 @@ class _ForwardScan:
             if i + 1 < len(moves):
                 heapq.heappush(heap, (moves[i + 1][0], y, i + 1))
             _low, x, t_index, T, base = moves[i]
-            deltas = scored.get((y, base))
-            if deltas is None:
+            exact = scored.get((y, base))  # this pass's exact deltas and passing sources
+            if exact is None:
                 if succ is None:
-                    succ = _bitset.tail_successor_masks_wide(adj)
-                deltas = scored[(y, base)] = self._exact(y, base, succ)
-            delta = deltas.get(x)
-            if delta is None or not delta < -_EPS_IMPROVE:
+                    succ = _bitset.row_masks(adj == ops.TAIL)
+                exact = scored[(y, base)] = self._exact(y, base, succ)
+            deltas, passing = exact
+            if not (passing >> x) & 1 or not deltas[x] < -_EPS_IMPROVE:
                 continue  # a y ~> x path misses the clique, or the Insert does not improve
+            delta = deltas[x]
             key = (stable_key(delta, self.n), x, y, t_index)
             if best is None or key < best[0]:
                 best = (key, x, y, T)
@@ -369,9 +381,12 @@ class _ForwardScan:
         are enumerated once per such group. A candidate is kept when the lowest exact delta its
         screening delta and bound allow can improve.
         """
-        groups: dict[tuple[int, ...], tuple[int, dict[int, float]]] = {}
+        previous = self.groups.get(y, {})
+        groups: dict[tuple[int, ...], _Group] = {}
         screened: list[_Screened] = []
-        self.groups[y], self.screened[y], self.exact[y] = groups, screened, {}
+        self.groups[y], self.screened[y] = groups, screened
+        exact = self.exact.get(y, {})
+        self.exact[y] = {}
         parents = np.flatnonzero(adj[y] == ops.ARROW).tolist()
         if self.max_parents is not None and len(parents) > self.max_parents:
             return  # y already carries the maximum admissible parent count.
@@ -388,37 +403,54 @@ class _ForwardScan:
                 cands.extend((x, t_index, T) for x in sources)
         for base, cands in members.items():
             cands.sort()  # ascending sources, as _insert_candidates yields them
-            moves = [("add", x) for x, _, _ in cands]
-            bounds: list[float] = []
-            deltas = self.delta_engine.delta_many_with_base(y, base, moves, bounds=bounds)
-            clique_mask = _bitset.bitmask(set(base) - pa_set)
-            groups[base] = (clique_mask, {x: d for (x, _, _), d in zip(cands, deltas, strict=True)})
-            for (x, t_index, T), d, bound in zip(cands, deltas, bounds, strict=True):
-                low = -math.inf if bound == math.inf else d - bound
+            sources = [x for x, _, _ in cands]
+            kept = previous.get(base)
+            if kept is not None and kept[2].issuperset(sources):
+                batch, deltas, bounds, dependent = kept[2:]
+            else:
+                bound_list: list[float] = []
+                delta_list = self.delta_engine.delta_many_with_base(
+                    y, base, [("add", x) for x in sources], bounds=bound_list
+                )
+                batch = frozenset(sources)
+                deltas = dict(zip(sources, delta_list, strict=True))
+                bounds = dict(zip(sources, bound_list, strict=True))
+                dependent = _bitset.bitmask(x for x, b in bounds.items() if b != 0.0)
+            clique = _bitset.bitmask(set(base) - pa_set)
+            groups[base] = (clique, _bitset.bitmask(sources), batch, deltas, bounds, dependent)
+            if base in exact:
+                self.exact[y][base] = exact[base]
+            for x, t_index, T in cands:
+                bound = bounds[x]
+                low = -math.inf if bound == math.inf else deltas[x] - bound
                 if low < -_EPS_IMPROVE:
                     screened.append((low, x, t_index, T, base))
         screened.sort(key=lambda move: move[:3])
 
-    def _exact(self, y: int, base: tuple[int, ...], succ: list[int]) -> dict[int, float]:
-        """Exact deltas of ``base``'s group at ``y``, by source, for the sources that pass.
+    def _exact(
+        self, y: int, base: tuple[int, ...], succ: list[int]
+    ) -> tuple[dict[int, float], int]:
+        """Exact deltas of ``base``'s group at ``y`` by source, and a mask of its passing sources.
 
         A source passes when no semi-directed ``y ~> x`` path avoids the group's clique. The
-        passing sources are scored in one batch, as :func:`forward_chunk_best` scores them. A batch
-        of the same sources gives the same deltas, so the last batch is reused while they pass.
+        passing sources are scored in one batch, as :func:`forward_chunk_best` scores them. The
+        group's batch serves when it holds exactly the passing sources, or when every passing
+        source's bound is 0; otherwise the last exact batch serves while the same sources pass.
         """
-        clique_mask, screening = self.groups[y][base]
-        reach = _bitset.semidirected_reach_set(succ, y, clique_mask)
-        valid = [x for x in screening if not (reach >> x) & 1]
-        if len(valid) == len(screening):
-            return screening
+        clique, sources, batch, deltas, _bounds, dependent = self.groups[y][base]
+        passing = sources & ~_bitset.semidirected_reach_set(succ, y, clique)
+        if passing.bit_count() == len(batch) or not passing & dependent:
+            return deltas, passing
+        valid = _bitset.nodes(passing)
         last = self.exact[y].get(base)
         if last is not None and last[0] == valid:
-            return last[1]
+            return last[1], passing
         moves = [("add", x) for x in valid]
-        deltas = self.delta_engine.delta_many_with_base(y, base, moves)
-        exact = dict(zip(valid, deltas, strict=True))
+        exact = dict(
+            zip(valid, self.delta_engine.delta_many_with_base(y, base, moves), strict=True)
+        )
         self.exact[y][base] = (valid, exact)
-        return exact
+        return exact, passing
 
 
 def _forward_inprocess(
