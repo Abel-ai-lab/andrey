@@ -63,13 +63,12 @@ def test_dialog_has_one_tab_and_one_panel_per_scene():
     tabs = [a for t, a in tags if a.get("role") == "tab"]
     panels = [a for t, a in tags if a.get("role") == "tabpanel"]
     assert [t["aria-controls"] for t in tabs] == [p["id"] for p in panels]
-    assert [t["aria-selected"] for t in tabs] == ["true", "false", "false", "false"]
-    assert ["hidden" in p for p in panels] == [False, True, True, True]
-    # The opener is a link, so the scenes stay reachable without script.
-    tag, opener = next((t, a) for t, a in tags if "data-wf-open" in a)
-    dialog = next(a for t, a in tags if t == "dialog")
-    assert tag == "a" and opener["href"]
-    assert opener["data-wf-open"] == dialog["id"]
+    assert [p["id"] for p in panels] == [f"wf-panel-{s['key']}" for s in SCENES]
+    # One scene at a time: the first shows, the others wait for their tab.
+    assert [t["aria-selected"] for t in tabs] == ["true"] + ["false"] * (len(SCENES) - 1)
+    assert ["hidden" in p for p in panels] == [False] + [True] * (len(SCENES) - 1)
+    # The page that holds the dialog brings its own opener (tests/unit/test_site.py).
+    assert not any("data-wf-open" in a for _, a in tags)
 
 
 def test_the_dialog_names_every_idea():

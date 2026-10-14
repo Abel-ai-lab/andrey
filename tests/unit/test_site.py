@@ -1019,8 +1019,15 @@ def test_the_accuracy_tile_shows_the_derived_counts(placeholder_page):
 def test_the_why_fast_tiles_open_the_scenes_dialog(placeholder_page):
     assert placeholder_page.count('data-wf-open="why-fast"') == 2
     assert '<dialog class="wf wf-dialog" id="why-fast"' in placeholder_page
-    assert 'data-wf-scene="hardware"' in placeholder_page
-    assert 'id="wf-panel-hardware"' in placeholder_page
+    # Each opener is a link to the post, so the scenes stay reachable without script, and the
+    # scene it names has a panel in the dialog.
+    for opener in re.findall(r"<[^>]*data-wf-open=[^>]*>", placeholder_page):
+        assert opener.startswith("<a ")
+        href = re.search(r'href="([^"]+)"', opener)[1]
+        assert (ROOT / "docs" / href).with_suffix(".md").is_file()
+        scene = re.search(r'data-wf-scene="([^"]+)"', opener)
+        if scene:
+            assert f'id="wf-panel-{scene[1]}"' in placeholder_page
 
 
 def test_the_scroll_story_is_off_without_script_and_under_reduced_motion():
