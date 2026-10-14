@@ -382,6 +382,108 @@ def dag2cpdag(dag: np.ndarray) -> np.ndarray:
     return out
 
 
+def _row_masks(mask: np.ndarray) -> list[int]:
+    """Each row of a square boolean matrix as an int with bit ``j`` set iff ``mask[i, j]``."""
+    n = mask.shape[0]
+    packed = np.packbits(mask, axis=1, bitorder="little")
+    width = packed.shape[1]
+    raw = packed.tobytes()
+    return [int.from_bytes(raw[i * width : (i + 1) * width], "little") for i in range(n)]
+
+
+def _bits(mask: int) -> list[int]:
+    """The set bits of ``mask``, ascending."""
+    out = []
+    while mask:
+        low = mask & -mask
+        out.append(low.bit_length() - 1)
+        mask ^= low
+    return out
+
+
+def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
+    """``dag2cpdag(pdag2dag(pdag))`` for a valid ``int8`` mark matrix, over per-node bitmasks.
+
+    Builds the same consistent extension as :func:`pdag2dag` and labels its edges by Chickering's
+    rule as :func:`dag2cpdag` does, in the topological order the extension's removal order gives.
+    Every consistent extension of a PDAG has its skeleton and v-structures, so the CPDAG does not
+    depend on the extension or the order. A PDAG with no consistent extension goes to
+    :func:`pdag2dag`, which raises. The input is not validated.
+    """
+    n = pdag.shape[0]
+    tail = pdag == TAIL
+    directed = tail & (pdag == ARROW).T  # (i, j): i -> j
+    children = _row_masks(directed)
+    parents = _row_masks(directed.T)
+    undirected = _row_masks(tail & tail.T)
+    adjacent = _row_masks(pdag != NULL)
+    active = (1 << n) - 1
+
+    def removable(x: int) -> bool:
+        if children[x] & active:
+            return False
+        around = adjacent[x] & active
+        for nb in _bits(undirected[x] & active):
+            if around & ~(1 << nb) & ~adjacent[nb]:
+                return False
+        return True
+
+    ready = [x for x in range(n) if removable(x)]
+    queued = 0
+    for x in ready:
+        queued |= 1 << x
+    removed: list[int] = []
+    while ready:
+        x = heapq.heappop(ready)
+        active &= ~(1 << x)
+        removed.append(x)
+        parents[x] |= undirected[x] & active  # each remaining undirected edge points into x
+        for v in _bits(adjacent[x] & active & ~queued):
+            if removable(v):
+                heapq.heappush(ready, v)
+                queued |= 1 << v
+    if active:
+        pdag2dag(pdag)  # raises: no consistent extension
+
+    # A removed node has no edge out to a node removed after it, so the reversed removal order is a
+    # topological order. Chickering labels the edges into y from the parent x latest in that order:
+    # every edge into y is compelled when some compelled w -> x has w outside Pa(y); otherwise each
+    # such w -> y is compelled, and the rest follow x -> y, compelled iff some other parent of y is
+    # not a parent of x.
+    pos = [0] * n
+    for rank, v in enumerate(reversed(removed)):
+        pos[v] = rank
+    compelled = [0] * n
+    heads: list[int] = []
+    tails: list[int] = []
+    rev_heads: list[int] = []
+    rev_tails: list[int] = []
+    for y in reversed(removed):
+        pa = parents[y]
+        if not pa:
+            continue
+        members = _bits(pa)
+        x = max(members, key=pos.__getitem__)
+        into_x = compelled[x]
+        if into_x & ~pa or pa & ~parents[x] & ~(1 << x):
+            compelled[y] = pa
+        else:
+            compelled[y] = into_x
+        for p in members:
+            if compelled[y] >> p & 1:
+                heads.append(y)
+                tails.append(p)
+            else:
+                rev_heads.append(y)
+                rev_tails.append(p)
+    out = np.zeros((n, n), dtype=np.int8)
+    out[heads, tails] = ARROW
+    out[tails, heads] = TAIL
+    out[rev_heads, rev_tails] = TAIL
+    out[rev_tails, rev_heads] = TAIL
+    return out
+
+
 # ---- collider orientation -----------------------------------------------------------------------
 
 

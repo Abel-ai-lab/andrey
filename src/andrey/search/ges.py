@@ -10,14 +10,14 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.core import GraphStructure, _bitset, backend
-from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
+from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
 from andrey.core.score import BICScore, Score
 from andrey.search import operators as ops
 
 
 def _reform_cpdag(adj: np.ndarray) -> np.ndarray:
     """Canonicalize a search PDAG to its CPDAG via a consistent DAG extension."""
-    return dag2cpdag(pdag2dag(adj))
+    return _cpdag_of_pdag(adj)
 
 
 # Above this variable count the uint64 successor packing overflows, so the semi-directed-path check
