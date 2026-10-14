@@ -302,6 +302,14 @@ def test_rejects_data_too_large_to_standardize(name):
         _build(name, data)
 
 
+@pytest.mark.parametrize("name", ["kci", "rcot", "gpdc"])
+def test_rejects_data_too_small_to_standardize(name):
+    """Values near 1e-170 underflow the variance to zero while the range stays positive."""
+    data = _common_cause(seed=0, n=100, n_cond=1) * 1e-170
+    with pytest.raises(ValueError, match="too small"):
+        _build(name, data)
+
+
 @pytest.mark.parametrize(
     "pvalue",
     [

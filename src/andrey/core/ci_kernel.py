@@ -24,13 +24,16 @@ def _standardize(data: np.ndarray) -> np.ndarray:
     """Z-score each column (``ddof=1``); a column of identical values becomes zero.
 
     The rounded mean of identical values can differ from them, which leaves a standard deviation
-    near zero rather than zero, so constancy is read from the range.
+    near zero rather than zero, so constancy is read from the range. A varying column whose
+    variance overflows or underflows to zero raises.
     """
-    with np.errstate(over="ignore"):  # an overflow raises below
+    with np.errstate(over="ignore", under="ignore"):  # either one raises below
         std = data.std(axis=0, ddof=1)
     if not np.isfinite(std).all():
         raise ValueError("data values too large to standardize; rescale the columns")
     std[np.ptp(data, axis=0) == 0] = np.inf
+    if (std == 0).any():
+        raise ValueError("data values too small to standardize; rescale the columns")
     return (data - data.mean(axis=0)) / std
 
 
@@ -87,7 +90,7 @@ class KCI:
     ------
     ValueError
         If ``data`` is not 2-D, has fewer than 2 rows, contains NaN or infinity, or has values
-        too large to standardize, or ``ridge`` is not positive and finite.
+        too large or too small to standardize, or ``ridge`` is not positive and finite.
 
     Notes
     -----
@@ -209,7 +212,7 @@ class RCoT:
     ------
     ValueError
         If ``data`` is not 2-D, has fewer than 2 rows, contains NaN or infinity, or has values
-        too large to standardize, or a feature count is below 1.
+        too large or too small to standardize, or a feature count is below 1.
 
     Notes
     -----
