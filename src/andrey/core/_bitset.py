@@ -62,6 +62,25 @@ def bitmask(nodes: Iterable[int]) -> int:
     return m
 
 
+def nodes(mask: int) -> list[int]:
+    """The nodes whose bits are set in ``mask``, ascending: the inverse of :func:`bitmask`."""
+    out = []
+    while mask:
+        low = mask & -mask
+        out.append(low.bit_length() - 1)
+        mask ^= low
+    return out
+
+
+def row_masks(matrix: np.ndarray) -> list[int]:
+    """Each row of a square boolean matrix as a Python int, bit ``j`` set iff ``matrix[i, j]``."""
+    n = matrix.shape[0]
+    packed = np.packbits(matrix, axis=1, bitorder="little")
+    width = packed.shape[1]
+    raw = packed.tobytes()
+    return [int.from_bytes(raw[i * width : (i + 1) * width], "little") for i in range(n)]
+
+
 def semidirected_reaches_wide(succ: list[int], start: int, target: int, barrier: int) -> bool:
     """Arbitrary-width int-bitmask BFS: the ``d > 64`` analog of the numpy bitmask BFS.
 

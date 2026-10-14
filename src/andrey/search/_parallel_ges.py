@@ -303,6 +303,7 @@ class _ForwardScan:
         self.n = n
         self.max_parents = max_parents
         self.build_reach = _reach_factory(n)
+        self.everyone = (1 << n) - 1
         self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
         # Per target: each base's clique mask and screening deltas by source; the candidates that
         # can improve, sorted by lowest exact delta; and each base's last exact deltas with the
@@ -311,17 +312,15 @@ class _ForwardScan:
         self.screened: dict[int, list[_Screened]] = {}
         self.exact: dict[int, dict[tuple[int, ...], tuple[list[int], dict[int, float]]]] = {}
 
-    def best(self, adj: np.ndarray, state: NeighborState) -> ForwardResult:
-        """The best-improving Insert into the targets, by ``(stable_key, x, y, t_idx)``.
-
-        ``state`` is :func:`neighborhood_state` of ``adj``.
-        """
+    def best(self, adj: np.ndarray) -> ForwardResult:
+        """The best-improving Insert into the targets, by ``(stable_key, x, y, t_idx)``."""
         if _FULL_RESCAN:
+            state = neighborhood_state(adj, self.n)
             reachable = self.build_reach(adj)
             return forward_chunk_best(
                 self.targets, adj, self.delta_engine, self.n, self.max_parents, state, reachable
             )
-        self._refresh(adj, state)
+        self._refresh(adj)
         heap = [(moves[0][0], y, 0) for y, moves in self.screened.items() if moves]
         heapq.heapify(heap)
         scored: dict[tuple[int, tuple[int, ...]], dict[int, float]] = {}  # this pass's groups
@@ -350,31 +349,45 @@ class _ForwardScan:
                 limit = min(-_EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-_KEY_DP))
         return best
 
-    def _refresh(self, adj: np.ndarray, state: NeighborState) -> None:
+    def _refresh(self, adj: np.ndarray) -> None:
         """Enumerate again the targets whose candidates differ from the kept graph's."""
         touched = _touched(self.adj, adj)
-        for y in self.targets:
-            if touched[y]:
-                self._enumerate(y, adj, state)
+        redo = [y for y in self.targets if touched[y]]
+        if redo:
+            adjacent = _bitset.row_masks(adj != ops.NULL)
+            lines = _bitset.row_masks((adj == ops.TAIL) & (adj.T == ops.TAIL))
+            for y in redo:
+                self._enumerate(y, adj, adjacent, lines)
         self.adj = adj.copy()
 
-    def _enumerate(self, y: int, adj: np.ndarray, state: NeighborState) -> None:
+    def _enumerate(self, y: int, adj: np.ndarray, adjacent: list[int], lines: list[int]) -> None:
         """Group ``y``'s clique-valid candidates by base and score each group in one batch.
 
-        A candidate is kept when the lowest exact delta its screening delta and bound allow can
-        improve.
+        ``adjacent`` and ``lines`` hold each node's adjacent nodes and undirected neighbors as
+        bitmasks. The candidates are :func:`_insert_candidates`'s. Sources adjacent to the same
+        undirected neighbors of ``y`` share ``NA``, ``t0``, and every subset ``T``, so the subsets
+        are enumerated once per such group. A candidate is kept when the lowest exact delta its
+        screening delta and bound allow can improve.
         """
         groups: dict[tuple[int, ...], tuple[int, dict[int, float]]] = {}
         screened: list[_Screened] = []
         self.groups[y], self.screened[y], self.exact[y] = groups, screened, {}
-        paj = state[1][y]
-        if self.max_parents is not None and len(paj) > self.max_parents:
+        parents = np.flatnonzero(adj[y] == ops.ARROW).tolist()
+        if self.max_parents is not None and len(parents) > self.max_parents:
             return  # y already carries the maximum admissible parent count.
-        pa_set = set(int(p) for p in paj)
+        pa_set = set(parents)
+        nbrs = lines[y]
+        by_na: dict[int, list[int]] = {}
+        for x in _bitset.nodes(self.everyone & ~adjacent[y] & ~(1 << y)):
+            by_na.setdefault(adjacent[x] & nbrs, []).append(x)
         members: dict[tuple[int, ...], list[tuple[int, int, tuple[int, ...]]]] = {}
-        for x, t_index, T, clique in _insert_candidates(y, adj, state):
-            members.setdefault(tuple(sorted(pa_set | clique)), []).append((x, t_index, T))
+        for na_mask, sources in by_na.items():
+            na = _bitset.nodes(na_mask)
+            for t_index, T in ops.clique_extensions(adj, na, _bitset.nodes(nbrs & ~na_mask)):
+                cands = members.setdefault(tuple(sorted(pa_set.union(na, T))), [])
+                cands.extend((x, t_index, T) for x in sources)
         for base, cands in members.items():
+            cands.sort()  # ascending sources, as _insert_candidates yields them
             moves = [("add", x) for x, _, _ in cands]
             bounds: list[float] = []
             deltas = self.delta_engine.delta_many_with_base(y, base, moves, bounds=bounds)
@@ -420,8 +433,7 @@ def _forward_inprocess(
         _ForwardScan(chunk, delta_engine, n, max_parents) for chunk in even_chunks(n, n_chunks)
     ]
     while True:
-        state = neighborhood_state(adj, n)
-        best = reduce_best([scan.best(adj, state) for scan in scans])
+        best = reduce_best([scan.best(adj) for scan in scans])
         if best is None:
             return adj
         _key, x, y, T = best
@@ -504,7 +516,7 @@ def _forward_task(
     n = _WORKER_N
     if _WORKER_SCAN is None or _WORKER_SCAN.targets != list(targets):
         _WORKER_SCAN = _ForwardScan(targets, _WORKER_DELTA, n, max_parents)
-    return _WORKER_SCAN.best(adj, neighborhood_state(adj, n))
+    return _WORKER_SCAN.best(adj)
 
 
 def _backward_task(targets: Sequence[int], adj: np.ndarray, run_token: object) -> BackwardResult:
@@ -664,11 +676,10 @@ def run_ges(
     before: np.ndarray | None = None  # the graph of the previous forward pass
     try:
         while True:  # forward phase
-            state = neighborhood_state(adj, n)
             work = [0]
             if workers > 1:
                 touched = _touched(before, adj)
-                per_target = forward_work_per_target(n, state, max_parents)
+                per_target = forward_work_per_target(n, neighborhood_state(adj, n), max_parents)
                 work = [w for w, redo in zip(per_target, touched, strict=True) if redo]
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
@@ -682,7 +693,7 @@ def run_ges(
                 wset = lazy.get()
                 best = reduce_best(wset.dispatch(_forward_task, adj, max_parents, lazy.token))
             else:
-                best = scan.best(adj, state)
+                best = scan.best(adj)
             if best is None:
                 break
             before = adj.copy()

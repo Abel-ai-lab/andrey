@@ -30,6 +30,7 @@ from collections.abc import Iterable, Mapping
 
 import numpy as np
 
+from ._bitset import nodes, row_masks
 from .structure import ARROW, NULL, TAIL, GraphStructure, Kind
 
 __all__ = [
@@ -382,25 +383,6 @@ def dag2cpdag(dag: np.ndarray) -> np.ndarray:
     return out
 
 
-def _row_masks(mask: np.ndarray) -> list[int]:
-    """Each row of a square boolean matrix as an int with bit ``j`` set iff ``mask[i, j]``."""
-    n = mask.shape[0]
-    packed = np.packbits(mask, axis=1, bitorder="little")
-    width = packed.shape[1]
-    raw = packed.tobytes()
-    return [int.from_bytes(raw[i * width : (i + 1) * width], "little") for i in range(n)]
-
-
-def _bits(mask: int) -> list[int]:
-    """The set bits of ``mask``, ascending."""
-    out = []
-    while mask:
-        low = mask & -mask
-        out.append(low.bit_length() - 1)
-        mask ^= low
-    return out
-
-
 def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
     """``dag2cpdag(pdag2dag(pdag))`` for a valid ``int8`` mark matrix, over per-node bitmasks.
 
@@ -413,17 +395,17 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
     n = pdag.shape[0]
     tail = pdag == TAIL
     directed = tail & (pdag == ARROW).T  # (i, j): i -> j
-    children = _row_masks(directed)
-    parents = _row_masks(directed.T)
-    undirected = _row_masks(tail & tail.T)
-    adjacent = _row_masks(pdag != NULL)
+    children = row_masks(directed)
+    parents = row_masks(directed.T)
+    undirected = row_masks(tail & tail.T)
+    adjacent = row_masks(pdag != NULL)
     active = (1 << n) - 1
 
     def removable(x: int) -> bool:
         if children[x] & active:
             return False
         around = adjacent[x] & active
-        for nb in _bits(undirected[x] & active):
+        for nb in nodes(undirected[x] & active):
             if around & ~(1 << nb) & ~adjacent[nb]:
                 return False
         return True
@@ -438,7 +420,7 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
         active &= ~(1 << x)
         removed.append(x)
         parents[x] |= undirected[x] & active  # each remaining undirected edge points into x
-        for v in _bits(adjacent[x] & active & ~queued):
+        for v in nodes(adjacent[x] & active & ~queued):
             if removable(v):
                 heapq.heappush(ready, v)
                 queued |= 1 << v
@@ -462,7 +444,7 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
         pa = parents[y]
         if not pa:
             continue
-        members = _bits(pa)
+        members = nodes(pa)
         x = max(members, key=pos.__getitem__)
         into_x = compelled[x]
         if into_x & ~pa or pa & ~parents[x] & ~(1 << x):
