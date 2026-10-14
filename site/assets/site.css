@@ -115,12 +115,11 @@
 }
 
 /* ---------- hero ---------- */
-/* The hero fills the first screen edge to edge, on the link-preview cards' stipple ground
-   (site/grain.py), in both themes: gradients draw the navy-to-cobalt tone, and two repeating speck
-   tiles, faded in by masks, draw the cobalt specks from the top left and the amber ones at the
-   bottom right. The art is a small causal graph over more specks (site/build.py: hero_graph). A
-   darker ellipse behind the text keeps the light type readable. The --andrey-ground-* tones are the
-   same in both themes. */
+/* The hero is a blog cover at full bleed, in both themes: the cover's art (site/brand/art-*.jpg,
+   its subject on the right) over the stipple ground, and a navy fade over the left where the light
+   type sits, as on the covers (site/cards.py: cover_svg). The scroll story crossfades three
+   covers, one per word. Amber is the art's one key element and the word. The --andrey-ground-*
+   tones are the same in both themes. */
 .andrey-home .hero {
   --andrey-ink: var(--andrey-ground-ink);
   --andrey-muted: var(--andrey-ground-muted);
@@ -141,48 +140,28 @@
   padding: clamp(3rem, 8vw, 6rem) var(--gutter);
   overflow: hidden;
   background:
-    radial-gradient(
-      circle at 18% 8%,
-      color-mix(in srgb, var(--andrey-ground-cobalt) 80%, var(--andrey-ground-navy)) 0,
-      transparent 62%
-    ),
-    radial-gradient(circle at 70% 50%, color-mix(in srgb, var(--andrey-ground-cobalt) 30%, transparent), transparent 58%),
-    radial-gradient(circle at 100% 105%, color-mix(in srgb, var(--andrey-ground-amber) 35%, transparent), transparent 42%),
+    radial-gradient(circle at 75% 40%, color-mix(in srgb, var(--andrey-ground-cobalt) 70%, transparent), transparent 70%),
     var(--andrey-ground-navy);
 }
 
+/* The stipple, under the art until it loads and where it is cropped away. A mask reads only
+   alpha, so the navy here only sets how much of each tile shows. */
 .andrey-home .story-pin::before,
-.andrey-home .story-pin::after {
+.andrey-home .tile::before {
+  --fade: radial-gradient(
+    circle at 75% 40%,
+    var(--andrey-ground-navy) 0,
+    color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent) 45%,
+    transparent 85%
+  );
   content: "";
   position: absolute;
   inset: 0;
   z-index: -2;
-  pointer-events: none;
-}
-
-/* A mask reads only alpha, so the navy here only sets how much of each tile shows. */
-.andrey-home .story-pin::before {
-  --fade: radial-gradient(
-    circle at 18% 8%,
-    var(--andrey-ground-navy) 0,
-    color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent) 40%,
-    transparent 78%
-  );
   background: url("grain-noise.png") 0 0 / 128px, url("grain-cobalt.png") 0 0 / 128px;
   -webkit-mask-image: var(--fade);
   mask-image: var(--fade);
-}
-
-.andrey-home .story-pin::after {
-  --fade: radial-gradient(
-    circle at 100% 108%,
-    var(--andrey-ground-navy) 0,
-    color-mix(in srgb, var(--andrey-ground-navy) 50%, transparent) 22%,
-    transparent 46%
-  );
-  background: url("grain-amber.png") 64px 64px / 128px;
-  -webkit-mask-image: var(--fade);
-  mask-image: var(--fade);
+  pointer-events: none;
 }
 
 .andrey-home .hero-art {
@@ -192,153 +171,54 @@
   pointer-events: none;
 }
 
-.andrey-home .hero-graph {
-  display: block;
+.andrey-home .hero-cover {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  object-position: 88% 50%;
 }
 
-.andrey-home .hero-specks circle {
-  fill: var(--andrey-ground-cobalt-light);
-  opacity: 0.5;
-}
-
-.andrey-home .hero-specks circle.amber {
-  fill: var(--andrey-ground-amber);
-  opacity: 0.65;
-}
-
-.andrey-home .hero-edge line {
-  stroke: var(--andrey-ground-ink);
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  opacity: 0.85;
-}
-
-.andrey-home .hero-edge polygon {
-  fill: var(--andrey-ground-ink);
-  opacity: 0.85;
-}
-
-/* The settled graph is the page's rest state; the story's other states hide or show these. */
-.andrey-home .hero-edge--open,
-.andrey-home .hero-edge--wrong {
+/* Without the story the first cover shows alone. */
+.andrey-home .hero-cover:not([data-i="1"]) {
   opacity: 0;
 }
 
-.andrey-home .hero-edge--open line {
-  stroke: var(--andrey-ground-amber);
-  stroke-width: 3;
+/* The covers' navy fade, from the left edge to past the middle. */
+.andrey-home .hero-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--andrey-ground-navy) 78%, transparent),
+    color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent) 32%,
+    transparent 62%
+  );
 }
 
-.andrey-home .hero-edge--wrong line {
-  stroke: var(--andrey-edge-bidirected);
-  stroke-width: 2.4;
-  stroke-dasharray: 0.03 0.03;
-}
-
-.andrey-home .hero-node {
-  fill: var(--andrey-ground-navy);
-  stroke: var(--andrey-ground-ink);
-  stroke-width: 2.6;
-}
-
-.andrey-home .hero-signal {
-  fill: var(--andrey-ground-amber);
-  filter: drop-shadow(0 0 7px var(--andrey-ground-amber));
-  offset-rotate: 0deg;
-  offset-distance: 100%;
-  opacity: 0;
-}
-
-/* Edges draw from their cause, then the nodes settle, then a point travels a path from cause to
-   effect and the page rests. Under reduced motion the finished graph stands still. */
-@media (prefers-reduced-motion: no-preference) {
-  .andrey-home .hero-edge line {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: hero-draw 800ms var(--ease) calc(500ms + var(--i) * 160ms) forwards;
+/* On a narrow screen the type sits on the stipple ground and the art's subject below it, at twice
+   two and a half times the screen's width, fading in from the ground at its top. */
+@media (max-width: 47.99rem) {
+  .andrey-home .hero-cover {
+    inset: auto -25% 0 auto;
+    width: 260%;
+    max-width: none;
+    height: auto;
+    -webkit-mask-image: linear-gradient(180deg, transparent, var(--andrey-ground-navy) 30%);
+    mask-image: linear-gradient(180deg, transparent, var(--andrey-ground-navy) 30%);
   }
 
-  .andrey-home .hero-edge--wrong line {
-    animation: none;
-    stroke-dasharray: 0.03 0.03;
-    stroke-dashoffset: 0;
-  }
-
-  .andrey-home .hero-edge polygon {
-    animation: hero-fade 300ms ease-out calc(1100ms + var(--i) * 160ms) both;
-  }
-
-  .andrey-home .hero-node {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: hero-pop 600ms var(--ease) calc(300ms + var(--i) * 120ms) both;
-  }
-
-  .andrey-home .hero-specks {
-    animation: hero-fade 1600ms ease-out both;
-  }
-
-  .andrey-home .hero-signal--first {
-    animation: hero-signal 3200ms cubic-bezier(0.5, 0, 0.3, 1) 3200ms 2;
+  .andrey-home .hero-art::after {
+    content: none;
   }
 }
 
-@keyframes hero-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes hero-fade {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes hero-pop {
-  from {
-    opacity: 0;
-    scale: 0.4;
-  }
-}
-
-@keyframes hero-signal {
-  from {
-    offset-distance: 0%;
-    opacity: 1;
-  }
-
-  85% {
-    opacity: 1;
-  }
-
-  to {
-    offset-distance: 100%;
-    opacity: 0;
-  }
-}
-
-/* The darker ellipse behind the text column. */
 .andrey-home .hero-intro {
   position: relative;
   width: min(100%, calc(var(--page) - 2 * var(--gutter)));
   margin-inline: auto;
-}
-
-.andrey-home .hero-intro::before {
-  content: "";
-  position: absolute;
-  inset: -30% 30% -30% -20%;
-  z-index: -1;
-  background: radial-gradient(
-    ellipse closest-side,
-    color-mix(in srgb, var(--andrey-ground-navy) 72%, transparent),
-    color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent) 60%,
-    transparent
-  );
-  pointer-events: none;
 }
 
 .andrey-home .hero .lede {
@@ -373,9 +253,7 @@
   }
 
   .andrey-home .story-pin::before,
-  .andrey-home .story-pin::after,
-  .andrey-home .hero-art,
-  .andrey-home .hero-intro::before {
+  .andrey-home .hero-art {
     display: none;
   }
 }
@@ -388,20 +266,27 @@
   letter-spacing: -0.055em;
 }
 
-/* The three keywords, one tone each, from the ground's tokens: accelerated is amber and slanted,
-   accurate cobalt, agentic green. They color the hero's line, the static line, and the headings. */
-.andrey-home .word--1 {
-  color: var(--andrey-ground-amber);
+/* The word, as on the covers and the link-preview card (site/cards.py: SLANT, TRACE): amber and
+   slanted, with the trace of its letters on its right, copies behind it, each further right and
+   fainter. Without the story the three words are one amber phrase. */
+.andrey-home .hero .word {
   display: inline-block;
+  color: var(--andrey-ground-amber);
   transform: skewX(-11deg);
 }
 
-.andrey-home .word--2 {
-  color: var(--andrey-ground-cobalt-light);
+.andrey-home .hero .story-word {
+  text-shadow:
+    0.033em 0 0.02em color-mix(in srgb, var(--andrey-ground-amber) 32%, transparent),
+    0.067em 0 0.025em color-mix(in srgb, var(--andrey-ground-amber) 24%, transparent),
+    0.1em 0 0.03em color-mix(in srgb, var(--andrey-ground-amber) 17%, transparent),
+    0.133em 0 0.035em color-mix(in srgb, var(--andrey-ground-amber) 11%, transparent),
+    0.167em 0 0.04em color-mix(in srgb, var(--andrey-ground-amber) 7%, transparent),
+    0.2em 0 0.045em color-mix(in srgb, var(--andrey-ground-amber) 4%, transparent);
 }
 
-.andrey-home .word--3 {
-  color: var(--andrey-ground-green);
+.andrey-home .story-static .word {
+  display: inline;
 }
 
 .andrey-home .nowrap {
@@ -509,15 +394,10 @@
     .andrey-home .hero.is-story [data-i="1"] { animation-name: story-first; }
     .andrey-home .hero.is-story [data-i="2"] { animation-name: story-second; }
     .andrey-home .hero.is-story [data-i="3"] { animation-name: story-third; }
-    .andrey-home .hero.is-story .hero-edge--wrong { animation-name: story-wrong; }
-    .andrey-home .hero.is-story .hero-edge--open { animation-name: story-open; }
-    .andrey-home .hero.is-story .hero-edge--settled { animation-name: story-settled; }
-    .andrey-home .hero.is-story .hero-edge--found {
-      transform-origin: var(--ox) var(--oy);
-      animation-name: story-found;
-    }
-    .andrey-home .hero.is-story .hero-signal--first { animation-name: story-signal-first; }
-    .andrey-home .hero.is-story .hero-signal--second { animation-name: story-signal-second; }
+    /* Each cover fades in over the one before, so the ground never shows between them. */
+    .andrey-home .hero.is-story .hero-cover[data-i="1"] { animation-name: none; }
+    .andrey-home .hero.is-story .hero-cover[data-i="2"] { animation-name: cover-second; }
+    .andrey-home .hero.is-story .hero-cover[data-i="3"] { animation-name: cover-third; }
   }
 
   /* No scroll-driven animation: story.js sets data-step, and each change eases. */
@@ -532,11 +412,6 @@
       translate: 0 0.35em;
     }
 
-    .andrey-home .hero.is-story .hero-edge--found {
-      transform: scale(0);
-      transform-origin: var(--ox) var(--oy);
-    }
-
     .andrey-home .hero.is-story[data-step="1"] [data-i="1"],
     .andrey-home .hero.is-story[data-step="2"] [data-i="2"],
     .andrey-home .hero.is-story[data-step="3"] [data-i="3"] {
@@ -544,19 +419,10 @@
       translate: none;
     }
 
-    .andrey-home .hero.is-story[data-step="1"] .hero-edge--open,
-    .andrey-home .hero.is-story[data-step="1"] .hero-edge--wrong {
+    .andrey-home .hero.is-story .hero-cover[data-i="1"],
+    .andrey-home .hero.is-story[data-step="2"] .hero-cover[data-i="2"],
+    .andrey-home .hero.is-story[data-step="3"] .hero-cover[data-i="2"] {
       opacity: 1;
-    }
-
-    .andrey-home .hero.is-story:not([data-step="1"]) .hero-edge--open {
-      opacity: 0;
-    }
-
-    .andrey-home .hero.is-story:not([data-step="1"]) .hero-edge--settled,
-    .andrey-home .hero.is-story:not([data-step="1"]) .hero-edge--found {
-      opacity: 1;
-      transform: none;
     }
   }
 }
@@ -577,39 +443,14 @@
   74%, 100% { opacity: 1; translate: none; }
 }
 
-@keyframes story-wrong {
-  0%, 12% { opacity: 0; }
-  20%, 34% { opacity: 0.9; }
-  46%, 100% { opacity: 0; }
+@keyframes cover-second {
+  0%, 30% { opacity: 0; }
+  40%, 100% { opacity: 1; }
 }
 
-@keyframes story-open {
-  0%, 36% { opacity: 1; }
-  46%, 100% { opacity: 0; }
-}
-
-@keyframes story-settled {
-  0%, 36% { opacity: 0; }
-  46%, 100% { opacity: 1; }
-}
-
-@keyframes story-found {
-  0%, 38% { opacity: 0; transform: scale(0); }
-  52%, 100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes story-signal-first {
-  0% { offset-distance: 0%; opacity: 0; }
-  4% { opacity: 1; }
-  26% { offset-distance: 100%; opacity: 1; }
-  30%, 100% { offset-distance: 100%; opacity: 0; }
-}
-
-@keyframes story-signal-second {
-  0%, 66% { offset-distance: 0%; opacity: 0; }
-  70% { opacity: 1; }
-  94% { offset-distance: 100%; opacity: 1; }
-  98%, 100% { offset-distance: 100%; opacity: 0; }
+@keyframes cover-third {
+  0%, 64% { opacity: 0; }
+  74%, 100% { opacity: 1; }
 }
 
 .andrey-home .lede {
@@ -719,12 +560,6 @@
   letter-spacing: -0.045em;
 }
 
-/* The hero's tones are for the dark ground; on the page the words are ink. */
-.andrey-home .group-title .word {
-  color: var(--andrey-ink);
-  transform: none;
-}
-
 .andrey-home .bento-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -736,16 +571,20 @@
   list-style: none;
 }
 
+/* A tile is a small cover, in both themes: the stipple ground, its art cropped on the right
+   (site/brand/bento/*.jpg), a navy fade on the left under the light type. The small tiles' art is
+   cobalt only, so the one amber is the number; a tile without a number keeps its art's amber. */
 .andrey-home .tile {
+  --andrey-ink: var(--andrey-ground-ink);
+  --andrey-muted: var(--andrey-ground-muted);
   position: relative;
+  isolation: isolate;
   grid-column: span 4;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--andrey-line);
-  border-radius: 28px;
-  background: var(--andrey-surface);
+  border-radius: 18px;
+  background: var(--andrey-ground-navy);
   overflow: hidden;
-  transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
 }
 
 .andrey-home .tile::marker {
@@ -760,9 +599,19 @@
   grid-column: span 6;
 }
 
-.andrey-home .tile:hover {
-  border-color: color-mix(in srgb, var(--andrey-accent) 55%, var(--andrey-line));
-  background: color-mix(in srgb, var(--andrey-accent) 5%, var(--andrey-surface));
+.andrey-home .tile-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 100% 50%;
+  transition: scale 0.6s var(--ease);
+}
+
+.andrey-home .tile:hover .tile-art {
+  scale: 1.04;
 }
 
 .andrey-home .tile-face {
@@ -774,17 +623,46 @@
   text-decoration: none;
 }
 
+.andrey-home .tile-face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--andrey-ground-navy) 82%, transparent),
+    color-mix(in srgb, var(--andrey-ground-navy) 58%, transparent) 38%,
+    transparent 72%
+  );
+  pointer-events: none;
+}
+
+/* A narrow tile's art is detail behind its number: dimmer, and never clear of the fade. */
+.andrey-home .tile:not(.tile--6) .tile-art {
+  opacity: 0.7;
+}
+
+.andrey-home .tile:not(.tile--6) .tile-face::after {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--andrey-ground-navy) 85%, transparent),
+    color-mix(in srgb, var(--andrey-ground-navy) 62%, transparent) 50%,
+    color-mix(in srgb, var(--andrey-ground-navy) 25%, transparent)
+  );
+}
+
 .andrey-home .tile-face:hover {
   text-decoration: none;
 }
 
 .andrey-home .tile-face:focus-visible {
-  outline-offset: -4px;
-  border-radius: 28px;
+  outline-color: var(--andrey-ground-ink);
+  outline-offset: -5px;
+  border-radius: 18px;
 }
 
 .andrey-home .tile .tile-title {
-  max-width: 18ch;
+  max-width: 16ch;
   margin: 0;
   font-size: clamp(1.45rem, 2.2vw, 1.9rem);
   font-weight: 600;
@@ -793,7 +671,7 @@
 }
 
 .andrey-home .tile .tile-text {
-  max-width: 32ch;
+  max-width: 28ch;
   margin: 0.7rem 0 0;
   color: var(--andrey-muted);
   font-size: 1.02rem;
@@ -813,7 +691,7 @@
 }
 
 .andrey-home .tile .tile-number b {
-  color: var(--andrey-accent);
+  color: var(--andrey-ground-amber);
   font-size: clamp(2.6rem, 4.4vw, 3.8rem);
   font-weight: 600;
   line-height: 1;
@@ -833,9 +711,13 @@
   transform: rotate(90deg) scale(1.08);
 }
 
-/* The latest release: its cover fills the tile. */
+/* The latest release: its cover fills the tile, with its own title and fade. */
 .andrey-home .tile--release .tile-face {
   padding: 0;
+}
+
+.andrey-home .tile--release .tile-face::after {
+  content: none;
 }
 
 .andrey-home .tile--release img {
@@ -1712,27 +1594,12 @@
     grid-column: span 6;
     grid-row: span 1;
   }
-
-  .andrey-home .hero-intro::before {
-    inset: -20% -10%;
-  }
 }
 
 @media (max-width: 44rem) {
-  /* The graph sits under the text, larger than the screen, so its nodes stay readable. */
   .andrey-home .story-pin {
     align-items: flex-start;
     padding-top: 2rem;
-  }
-
-  .andrey-home .hero-graph {
-    position: absolute;
-    right: -14vw;
-    top: 56%;
-    width: 140vw;
-    height: auto;
-    aspect-ratio: 1000 / 640;
-    opacity: 0.8;
   }
 
   .andrey-home .bento-grid {
@@ -1745,6 +1612,16 @@
   .andrey-home .tile--release {
     grid-column: auto;
     min-height: 11rem;
+  }
+
+  /* A wide tile is as narrow as the others here, so its type gets the narrow tiles' fade. */
+  .andrey-home .tile--6 .tile-face::after {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--andrey-ground-navy) 85%, transparent),
+      color-mix(in srgb, var(--andrey-ground-navy) 62%, transparent) 50%,
+      color-mix(in srgb, var(--andrey-ground-navy) 25%, transparent)
+    );
   }
 }
 

@@ -288,7 +288,8 @@ def readme_banner(quality: int = BANNER_QUALITY) -> str:
 COVER_W, COVER_H = 1600, 640
 COVER_QUALITIES = (75, 70, 65, 60, 55)
 ART = {
-    kind: BRAND / f"art-{kind}.jpg" for kind in ("pair", "lanes", "iceberg", "contour", "hourglass")
+    kind: BRAND / f"art-{kind}.jpg"
+    for kind in ("pair", "lanes", "iceberg", "contour", "hourglass", "agentic")
 }
 COVERS = {
     "pair": "portraits of Andrey Markov and Andrey Kolmogorov, side by side",
@@ -296,6 +297,7 @@ COVERS = {
     "iceberg": "an iceberg whose two peaks join into one faint mass under the waterline",
     "contour": "two summits drawn in contour lines, one dotted trail ending on each",
     "hourglass": "an hourglass whose sand falls one way only",
+    "agentic": "an orrery whose rings carry a graph, one amber arm steering it",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge

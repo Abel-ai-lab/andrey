@@ -15,6 +15,17 @@
     dotted trail ends on the lower summit and an amber one climbs to a glowing star on the higher.
   - `art-hourglass.jpg`: 0.4.0, an hourglass in navy lines, cropped by the frame's top and bottom,
     its amber sand falling in a fine stream from the upper bulb to the lower: one way only.
+  - `art-agentic.jpg`: the homepage's "agentic", an orrery in pale engraved rings tilted across
+    the frame, a small directed graph on its rings, and one amber arm from its hidden center
+    steering one node.
+- `bento/<art>.jpg`: the homepage's bento tiles, each a crop of an art at twice its tile's size
+  (1168 x 416 for a wide tile, 768 x 416 for a narrow one), in the same tones. The crops of the
+  covers above keep their names; the others are drawn for their tile: `hardware` (a honeycomb of
+  cells, one lit), `constraint` (a web of threads, most cut), `permutation` (a row of slabs, one
+  lifted out), `lingam` (dunes leaning one way), `accuracy` (a sighting reticle over a graph),
+  `graphs` (many streams braided into one), `compare` (a level balance), and `methods` (a prism
+  fanning one beam into many rays). A narrow tile's art, and any tile that shows a number, is
+  cobalt only, so the number is its one amber.
 - The release cards' covers (`docs/_static/release-cards/<release>.jpg`) are tall versions of the
   same art, in the same tones, with calm areas where the card's text sits.
 - `abel-logo-white.svg`: the Abel AI Lab logotype, from Abel's brand kit. Its last path is the

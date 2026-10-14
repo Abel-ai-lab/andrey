@@ -27,17 +27,17 @@
   <section class="hero" id="story" aria-labelledby="headline">
     <div class="story-track">
       <div class="story-pin">
-        <div class="hero-art">{{ home.hero_graph }}</div>
+        <div class="hero-art" aria-hidden="true">{{ home.hero_art }}</div>
         <div class="hero-intro">
           {#- Screen readers get the sentence once; the two visible forms are for the eye. -#}
           <h1 id="headline">
             <span class="visually-hidden">Causal discovery: accelerated, accurate, agentic.</span>
-            <span class="story-static" aria-hidden="true">Causal discovery: <span class="nowrap"><span class="word word--1">accelerated</span>,</span> <span class="nowrap"><span class="word word--2">accurate</span>,</span> <span class="nowrap"><span class="word word--3">agentic</span>.</span></span>
+            <span class="story-static" aria-hidden="true">Causal discovery: <span class="word">accelerated, accurate, agentic.</span></span>
             <span class="story-live" aria-hidden="true">Causal discovery,
               <span class="story-words">
-                <span class="story-step story-word word word--1" data-i="1">accelerated</span>
-                <span class="story-step story-word word word--2" data-i="2">accurate</span>
-                <span class="story-step story-word word word--3" data-i="3">agentic</span>
+                <span class="story-step story-word word" data-i="1">accelerated</span>
+                <span class="story-step story-word word" data-i="2">accurate</span>
+                <span class="story-step story-word word" data-i="3">agentic</span>
               </span>
             </span>
           </h1>
@@ -60,13 +60,15 @@
 
   <section class="bento wrap" aria-label="What Andrey offers">
     <div class="bento-group" id="accelerated">
-      <h2 class="group-title"><span class="word word--1">Accelerated</span></h2>
+      <h2 class="group-title">Accelerated</h2>
       <ul class="bento-grid">
         <li class="tile tile--6"><a class="tile-face" href="blog/20261008-why-andrey-is-fast.html" data-wf-open="why-fast">
+          {{ home.tile_art("lanes", "6") }}
           <h3 class="tile-title">Why Andrey is fast</h3>
           <p class="tile-text">Four ideas, each shown as a short animation.</p>
           {{ home.plus }}</a></li>
         <li class="tile tile--6"><a class="tile-face" href="blog/20261008-why-andrey-is-fast.html" data-wf-open="why-fast" data-wf-scene="hardware">
+          {{ home.tile_art("hardware", "6") }}
           <h3 class="tile-title">CPU-parallel and GPU</h3>
           <p class="tile-text">Use every core, or a graphics card, where a method gains from it.</p>
           {{ home.plus }}</a></li>
@@ -75,21 +77,25 @@
     </div>
 
     <div class="bento-group" id="accurate">
-      <h2 class="group-title"><span class="word word--2">Accurate</span></h2>
+      <h2 class="group-title">Accurate</h2>
       <ul class="bento-grid">
         <li class="tile tile--6"><a class="tile-face" href="#accuracy" data-tile="accuracy">
+          {{ home.tile_art("accuracy", "6") }}
           <h3 class="tile-title">Just as accurate as other popular packages</h3>
           <p class="tile-text">Every release is tested against the true graphs that generated the data.</p>
           {{ home.plus }}</a></li>
         <li class="tile tile--6"><a class="tile-face" href="#graphs" data-tile="graphs">
+          {{ home.tile_art("graphs", "6") }}
           <h3 class="tile-title">One graph for every method</h3>
           <p class="tile-text">Draw it, convert it, or compare it with the same code.</p>
           {{ home.plus }}</a></li>
         <li class="tile tile--6"><a class="tile-face" href="#compare" data-tile="compare">
+          {{ home.tile_art("compare", "6") }}
           <h3 class="tile-title">How Andrey compares</h3>
           <p class="tile-text">What each package offers, by method family.</p>
           {{ home.plus }}</a></li>
         <li class="tile tile--6"><a class="tile-face" href="#methods" data-tile="methods">
+          {{ home.tile_art("methods", "6") }}
           <h3 class="tile-title">Methods for every kind of data</h3>
           <p class="tile-number"><b>{{ home.method_count }}</b></p>
           {{ home.plus }}</a></li>
@@ -97,9 +103,10 @@
     </div>
 
     <div class="bento-group" id="agentic">
-      <h2 class="group-title"><span class="word word--3">Agentic</span></h2>
+      <h2 class="group-title">Agentic</h2>
       <ul class="bento-grid">
         <li class="tile tile--6"><a class="tile-face" href="#agents" data-tile="agents">
+          {{ home.tile_art("agentic", "6") }}
           <h3 class="tile-title">Built for agents</h3>
           <p class="tile-text">A command line that never prompts, and a skill an agent loads.</p>
           {{ home.plus }}</a></li>

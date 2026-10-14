@@ -1307,92 +1307,38 @@ def chip(icon: str, url: str, text: str, *, primary: bool = False) -> str:
     return f'<a class="{kind}" href="{escape(url)}">{glyph(icon)}{escape(text)}</a>'
 
 
-# The hero's graph on a 1000 x 640 canvas: (x, y) per node, in layers from causes to effects.
-HERO_NODES = (
-    (470, 120), (450, 330), (490, 540),
-    (640, 225), (650, 440),
-    (820, 130), (850, 330), (810, 540),
-)  # fmt: skip
-HERO_EDGES = ((0, 3), (1, 3), (1, 4), (2, 4), (3, 5), (3, 6), (4, 6), (4, 7))
-HERO_FOUND = (3, 4)  # an edge the "accurate" step adds
-HERO_WRONG = ((2, 3), (0, 6))  # edges the "accurate" step removes
-HERO_UNSURE = (0, 1)  # drawn undirected, then oriented by the "accurate" step
-HERO_SIGNAL = (0, 3, 6)  # the path the amber point travels, cause to effect
-HERO_RADIUS = 15
-HERO_SPECKS = 170
+# The hero's art, one cover per word of its scroll story (site/brand/art-<name>.jpg), and each
+# bento tile's (site/brand/bento/<name>.jpg): a crop of a cover's art at twice the tile's size. A
+# family without art shows the stipple ground.
+HERO_ART = ("lanes", "contour", "agentic")
+FAMILY_ART = {
+    "constraint": "constraint",
+    "score": "contour",
+    "permutation": "permutation",
+    "lingam": "lingam",
+    "latent": "iceberg",
+    "pairwise": "hourglass",
+}
+TILE_SIZES = {"4": (768, 416), "6": (1168, 416)}
+PRIORITY = ' fetchpriority="high"'
 
 
-def hero_graph() -> str:
-    """The hero's art: specks of data over a small causal graph, as inline SVG in the hero's
-    ground tones.
-
-    Directed edges end in arrowheads, as in :mod:`andrey.viz`. The graph has three states, one
-    per keyword of the hero's scroll story (``site/assets/story.js``): quickly drawn, with two
-    wrong edges (``hero-edge--wrong``, in the bidirected edge's rose) and one edge undirected
-    (amber, ``hero-edge--open``); settled, with the wrong edges gone, the missing one found
-    (``hero-edge--found``), and the undirected one oriented (``hero-edge--settled``); and driven by
-    an agent. Without the story the page shows the settled graph. Each edge, then each node, has
-    a ``--i`` and, for an edge, its cause's position as ``--ox`` and ``--oy``, for the stylesheet's
-    motion; ``hero-signal`` points travel the ``HERO_SIGNAL`` path. Seeded, so a build draws the
-    same art.
-    """
-    rng = np.random.default_rng(7)
-    xs = rng.beta(2.2, 1.4, HERO_SPECKS) * 1000
-    ys = rng.uniform(0, 640, HERO_SPECKS)
-    radii = rng.uniform(1.1, 2.8, HERO_SPECKS)
-    amber = rng.random(HERO_SPECKS) < 0.18
-    specks = "".join(
-        f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r:.1f}"{" class=amber" if a else ""}/>'
-        for x, y, r, a in zip(xs, ys, radii, amber, strict=True)
+def hero_art() -> str:
+    """The hero's covers, stacked: the first shows alone without the story, and the story
+    (``story.js``) crossfades them with the word, as ``story-step`` ``data-i`` 1 to 3."""
+    return "".join(
+        f'<img class="hero-cover story-step" data-i="{i}" src="_static/art-{name}.jpg" alt="" '
+        f'width="1600" height="640"{PRIORITY if i == 1 else ""}>'
+        for i, name in enumerate(HERO_ART, 1)
     )
 
-    def geometry(i: int, j: int) -> tuple[float, float, float, float, float, float]:
-        """The line between two nodes, clear of both, and the unit vector along it."""
-        (x1, y1), (x2, y2) = HERO_NODES[i], HERO_NODES[j]
-        length = math.hypot(x2 - x1, y2 - y1)
-        ux, uy = (x2 - x1) / length, (y2 - y1) / length
-        gap = HERO_RADIUS + 5
-        return x1 + ux * gap, y1 + uy * gap, x2 - ux * gap, y2 - uy * gap, ux, uy
 
-    def edge(i: int, j: int, k: int, kind: str = "", *, arrow: bool = True) -> str:
-        x1, y1, x2, y2, ux, uy = geometry(i, j)
-        bx, by = (x2 - ux * 13, y2 - uy * 13) if arrow else (x2, y2)  # the arrowhead's base
-        head = (
-            f'<polygon points="{x2:.1f},{y2:.1f} {bx - uy * 6:.1f},{by + ux * 6:.1f} '
-            f'{bx + uy * 6:.1f},{by - ux * 6:.1f}"/>'
-            if arrow
-            else ""
-        )
-        ox, oy = HERO_NODES[i]
-        return (
-            f'<g class="hero-edge{kind}" style="--i: {k}; --ox: {ox}px; --oy: {oy}px">'
-            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{bx:.1f}" y2="{by:.1f}" pathLength="1"/>'
-            f"{head}</g>"
-        )
-
-    k = len(HERO_EDGES)
-    edges = [edge(i, j, n) for n, (i, j) in enumerate(HERO_EDGES)]
-    edges.append(edge(*HERO_UNSURE, k, " hero-edge--open story-step", arrow=False))
-    edges.append(edge(*HERO_UNSURE, k, " hero-edge--settled story-step"))
-    edges.append(edge(*HERO_FOUND, k + 1, " hero-edge--found story-step"))
-    edges += [edge(i, j, k + 2, " hero-edge--wrong story-step", arrow=False) for i, j in HERO_WRONG]
-    nodes = "".join(
-        f'<circle class="hero-node" style="--i: {n}" cx="{x}" cy="{y}" r="{HERO_RADIUS}"/>'
-        for n, (x, y) in enumerate(HERO_NODES)
-    )
-    path = " ".join(
-        f"{'M' if n == 0 else 'L'}{HERO_NODES[v][0]} {HERO_NODES[v][1]}"
-        for n, v in enumerate(HERO_SIGNAL)
-    )
-    signals = "".join(
-        f'<circle class="hero-signal hero-signal--{name} story-step" r="6" '
-        f"style=\"offset-path: path('{path}')\"/>"
-        for name in ("first", "second")
-    )
+def tile_art(name: str, size: str) -> str:
+    """A tile's art, behind its text; decorative, so it has no text alternative."""
+    width, height = TILE_SIZES[size]
     return (
-        '<svg class="hero-graph" viewBox="0 0 1000 640" preserveAspectRatio="xMaxYMid meet" '
-        'aria-hidden="true" focusable="false">'
-        f'<g class="hero-specks">{specks}</g>{"".join(edges)}{nodes}{signals}</svg>'
+        f'<img class="tile-art" src="_static/bento/{name}.jpg" alt="" width="{width}" '
+        f'height="{height}" loading="lazy">'
     )
 
 
@@ -1479,10 +1425,11 @@ def family_tile(info: dict) -> str:
         if info["number"]
         else ""
     )
+    art = FAMILY_ART.get(info["family"])
     return tile(
         f"speed-{info['family']}",
         "4",
-        f'<h3 class="tile-title">{escape(info["title"])}</h3>'
+        (tile_art(art, "4") if art else "") + f'<h3 class="tile-title">{escape(info["title"])}</h3>'
         f'<p class="tile-text">{escape(method_names(info["methods"]))}</p>{number}',
         kind="family",
     )
@@ -1768,7 +1715,8 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "banner": banner if placeholder else "",
         "lede": escape(lede()),
         "hero_chips": hero_chips(),
-        "hero_graph": hero_graph(),
+        "hero_art": hero_art(),
+        "tile_art": tile_art,
         "plus": plus(),
         "family_tiles": "".join(family_tile(info) for info in family_tiles(summaries)),
         "family_dialogs": family_dialogs(summaries),

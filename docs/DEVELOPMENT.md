@@ -29,7 +29,7 @@ Every link is relative, so one build serves any hostname.
 
 The homepage is a template, [`site/homepage.html`](../site/homepage.html), on pydata's layout with
 only its navbar. `conf.py` fills it with `homepage_context` from [`site/build.py`](../site/build.py):
-the hero's graph, the family tiles and their charts, the accuracy cards, the comparison table, and
+the hero's art, the family tiles and their charts, the accuracy cards, the comparison table, and
 the table's footnote.
 `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the page's do
 not meet; `site/assets/figures.css` and `figures.js` hold the timing comparison and the speed
@@ -45,11 +45,18 @@ those two pages. A tile's link names the scene to start at in `data-wf-scene`.
 
 The hero is a scroll story over three words: accelerated, accurate, agentic. `story.js` turns it on
 (`is-story`) unless the reader asks for reduced motion; then the hero's pin sticks for two screens
-of scrolling, "Causal discovery," stays, and the word, the line under it, and the graph change with
-the scroll position. The stylesheet drives the changes with scroll-driven animations; where the
+of scrolling, "Causal discovery," stays, and the word, the line under it, and the cover art change
+with the scroll position. The stylesheet drives the changes with scroll-driven animations; where the
 browser has none, `story.js` sets `data-step` from an `IntersectionObserver`. Only opacity and
 transforms move. Without the script or under reduced motion the hero is one static line and the
-settled graph. The tiles below it fall into three groups under the same words.
+first cover. The tiles below it fall into three groups under the same words.
+
+The hero and the tiles look like the blog's covers, in both themes: the stipple ground, art in the
+brand's tones with its subject on the right (`HERO_ART`, `FAMILY_ART`, and `tile_art()` in
+`site/build.py`; the files in `site/brand/`), a navy fade under the light type, and amber on one
+element only: the word in the hero, the number in a tile, or else the art's own key element. New
+art comes from the cover process and is stored after `brand_tones`; a site test checks its tones
+and size.
 
 Each tile is a link. `tiles.js` opens its details as a dialog; without script the details are the
 dialogs' content, shown in the page after the grid (`homepage.html`'s noscript style), and the tile

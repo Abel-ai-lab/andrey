@@ -94,10 +94,10 @@ def grain_tile(size: int = 256, seed: int = SEED + 1) -> bytes:
 
 
 def hero_tiles() -> tuple[tuple[str, bytes], ...]:
-    """The homepage hero's tiles, by file name: cobalt specks, amber specks, and grain."""
+    """The stipple's tiles for the homepage's hero and bento tiles, by file name: cobalt specks
+    and grain."""
     return (
         ("grain-cobalt.png", speck_tile(COBALT_LIGHT, 0.55)),
-        ("grain-amber.png", speck_tile(AMBER, 0.6, seed=SEED + 2)),
         ("grain-noise.png", grain_tile()),
     )
 

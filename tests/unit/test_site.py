@@ -966,8 +966,7 @@ def test_a_new_family_gets_a_tile_with_no_code_change(monkeypatch):
 def test_the_bento_has_three_groups_under_the_three_words(placeholder_page):
     groups = re.findall(r'<div class="bento-group" id="(\w+)">', placeholder_page)
     assert groups == ["accelerated", "accurate", "agentic"]
-    for key in groups:
-        assert placeholder_page.count('<h2 class="group-title"><span class="word word--') == 3
+    assert placeholder_page.count('<h2 class="group-title">') == 3
     # Speed tiles are under the first word; the accuracy tile under the second; agents, the third.
     start = {k: placeholder_page.index(f'id="{k}"') for k in groups}
     assert (
@@ -997,10 +996,34 @@ def test_the_scroll_story_is_off_without_script_and_under_reduced_motion():
     assert "sticky" not in pin[: pin.index("}")]
     pinned = css[css.index(".andrey-home .hero.is-story .story-pin {") :]
     assert "position: sticky" in pinned[: pinned.index("}")]
-    # The scroll moves only opacity, translation, and scale, and the signal along its path.
+    # The scroll moves only opacity and translation.
     steps = css[css.index("@keyframes story-first") :]
     props = set(re.findall(r"(?:^|[{;] )([a-z-]+):", steps, re.M))
-    assert props <= {"opacity", "transform", "translate", "offset-distance"}
+    assert props <= {"opacity", "transform", "translate"}
+
+
+def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeholder_page, cards):
+    import numpy as np
+    from PIL import Image
+
+    brand = ROOT / "site" / "brand"
+    # The hero crossfades one cover per word; each is a stored series art.
+    covers = re.findall(
+        r'<img class="hero-cover[^>]*src="_static/(art-[\w-]+\.jpg)"', placeholder_page
+    )
+    assert len(covers) == 3 and all((brand / c) in cards.ART.values() for c in covers)
+    tiles = re.findall(
+        r'<img class="tile-art" src="_static/(bento/[\w-]+\.jpg)" alt="" '
+        r'width="(\d+)" height="(\d+)"',
+        placeholder_page,
+    )
+    assert len(tiles) >= 10
+    for path, width, height in tiles:
+        with Image.open(brand / path) as image:
+            assert image.size == (int(width), int(height)), path
+            art = image.convert("RGB")
+        toned = cards.brand_tones(art, match_ground=False)
+        assert np.abs(np.asarray(art, float) - np.asarray(toned, float)).mean() < 8, path
 
 
 def test_the_homepage_keeps_every_note_at_its_foot(placeholder_page):
