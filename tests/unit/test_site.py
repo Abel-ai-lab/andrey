@@ -1021,13 +1021,13 @@ def test_the_why_fast_tiles_open_the_scenes_dialog(placeholder_page):
     assert '<dialog class="wf wf-dialog" id="why-fast"' in placeholder_page
     # Each opener is a link to the post, so the scenes stay reachable without script, and the
     # scene it names has a panel in the dialog.
-    for opener in re.findall(r"<[^>]*data-wf-open=[^>]*>", placeholder_page):
+    openers = re.findall(r"<[^>]*data-wf-open=[^>]*>", placeholder_page)
+    for opener in openers:
         assert opener.startswith("<a ")
         href = re.search(r'href="([^"]+)"', opener)[1]
         assert (ROOT / "docs" / href).with_suffix(".md").is_file()
-        scene = re.search(r'data-wf-scene="([^"]+)"', opener)
-        if scene:
-            assert f'id="wf-panel-{scene[1]}"' in placeholder_page
+    scenes = re.findall(r'data-wf-scene="([^"]+)"', "".join(openers))
+    assert scenes and all(f'id="wf-panel-{scene}"' in placeholder_page for scene in scenes)
 
 
 def test_the_scroll_story_is_off_without_script_and_under_reduced_motion():

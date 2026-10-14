@@ -67,7 +67,7 @@ def test_dialog_has_one_tab_and_one_panel_per_scene():
     # One scene at a time: the first shows, the others wait for their tab.
     assert [t["aria-selected"] for t in tabs] == ["true"] + ["false"] * (len(SCENES) - 1)
     assert ["hidden" in p for p in panels] == [False] + [True] * (len(SCENES) - 1)
-    # The page that holds the dialog brings its own opener (tests/unit/test_site.py).
+    # The dialog ships no opener; the page that holds it does.
     assert not any("data-wf-open" in a for _, a in tags)
 
 
