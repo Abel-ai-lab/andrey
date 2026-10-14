@@ -375,6 +375,21 @@ def fci(
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
+    It considers every circle path, so a covered route through a node never hides an uncovered
+    route through the same node. Rule R8 checks each pair of endpoints in both orders, so whether
+    it fires does not depend on the node labels.
+
+    **Possible-d-separation set.** FCI builds each possible-d-separation set with a search that
+    keeps only nodes reached through possible parents. This set can be smaller than the published
+    definition [2]_, so FCI can keep an edge that the published set would remove, even with exact
+    tests. We keep this search on purpose: the published set made fits much slower at 50 variables
+    and less accurate on simulated data. FCI tests every subset of the set, except the empty set
+    and the subsets of either endpoint's neighbors, which the first step already tested.
+
+    **Separating sets.** When several conditioning sets of the same size make a pair independent
+    in the first step, FCI records their union as the pair's separating set. We keep the union on
+    purpose: it does not depend on the order of the tests, and on simulated data it gave more
+    accurate PAGs than the first set found.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) with one variable in ten hidden, from 20 to 800 variables counting the hidden ones,
@@ -520,6 +535,9 @@ def gfci(
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
+    It considers every circle path, and rule R8 checks each pair of endpoints in both orders. GFCI
+    shares FCI's possible-d-separation set and separating sets; the Notes of :func:`~andrey.fci`
+    describe both choices and why we keep them.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
     and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,

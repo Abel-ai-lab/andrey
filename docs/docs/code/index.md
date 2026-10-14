@@ -73,9 +73,10 @@ variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 ti
    granger
 ```
 
-FCI and GFCI use uncovered possibly-directed paths for their R9 and R10 tail orientations:
-nodes two steps apart on each path must be non-adjacent. The same rules determine the oracle PAG
-returned by `andrey.data.latent.marginal(..., "pag")`.
+FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
+apart on each path must be non-adjacent. R5 considers every circle path, and R8 checks each pair of
+endpoints in both orders, so neither depends on the node labels. The same rules determine the oracle
+PAG returned by `andrey.data.latent.marginal(..., "pag")`.
 
 ### Experimental methods
 
