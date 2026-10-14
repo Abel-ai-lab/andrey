@@ -40,8 +40,8 @@ from . import stats
 # eigenvalue is at most this.
 _SINGULAR = 1e-12
 _LOG_2PI = math.log(2.0 * math.pi)
-# The most categorical-variable sets whose cells are kept.
-_CELL_CACHE = 4096
+# The memory, in bytes, the kept cell numberings of categorical-variable sets may take.
+_CELL_BYTES = 64 * 2**20
 
 
 def column_mask(categorical: npt.ArrayLike | None, d: int) -> np.ndarray:
@@ -201,7 +201,7 @@ class ConditionalGaussian:
         self._codes = np.asfortranarray(self._codes)
         self._columns = np.asfortranarray(self._z)
         self._loglik = lru_cache(maxsize=cache_size)(self._loglik_impl)
-        self._cells = lru_cache(maxsize=_CELL_CACHE)(self._cells_impl)
+        self._cells = lru_cache(maxsize=max(1, _CELL_BYTES // (8 * max(n, 1))))(self._cells_impl)
 
     def loglik(self, variables: Sequence[int]) -> float:
         """Return the log-likelihood of the set ``variables``; ``0`` for the empty set."""
