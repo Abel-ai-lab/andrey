@@ -54,7 +54,8 @@ class GPDC:
     n_null : int, default=1000
         Draws of the null distribution of the distance correlation.
     seed : int or None, default=None
-        Seed for the null draws. ``None`` uses ``ANDREY_SEED``, or ``0`` when it is unset.
+        Seed for the null draws and the tie-breaking. ``None`` uses ``ANDREY_SEED``, or ``0`` when
+        it is unset.
 
     Raises
     ------
@@ -67,12 +68,14 @@ class GPDC:
     Gaussian-process regression on ``z`` with a radial-basis-function kernel plus white noise,
     whose length scale and noise level maximize the marginal likelihood [2]_; the residuals are the
     observations minus the fitted means. An empty conditioning set uses ``x`` and ``y`` themselves.
-    The residuals are replaced by their ranks, which gives them uniform marginals, and the
-    statistic is their squared distance correlation, from the doubly centered matrices of their
-    pairwise distances [3]_. After ranking, the null is the same statistic between the ranks and
-    a random permutation of them, drawn ``n_null`` times [1]_. With ``b`` of the ``n_null`` draws
-    at least as large as the statistic, the p-value is ``(b + 1) / (n_null + 1)``: the observed
-    statistic counts as one more draw, so the p-value is never zero [4]_.
+    The residuals are replaced by their ranks, which gives them uniform marginals; tied values
+    are ordered by a random key per row and variable, drawn once from ``seed``, so that every
+    ranking stays equally likely under the null. The statistic is their squared distance
+    correlation, from the doubly centered matrices of their pairwise distances [3]_. After
+    ranking, the null is the same statistic between the ranks and a random permutation of them,
+    drawn ``n_null`` times [1]_. With ``b`` of the ``n_null`` draws at least as large as the
+    statistic, the p-value is ``(b + 1) / (n_null + 1)``: the observed statistic counts as one
+    more draw, so the p-value is never zero [4]_.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. The test assumes ``x`` and ``y`` depend on the conditioning set additively, a
@@ -106,6 +109,7 @@ class GPDC:
         self._n = arr.shape[0]
         self._n_null = int(n_null)
         self._seed = resolve_seed(seed)
+        self._tie_keys = np.random.default_rng(self._seed).random(arr.shape)
         self._null: np.ndarray | None = None
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
@@ -115,7 +119,7 @@ class GPDC:
         if not (np.ptp(rx) > 0.0 and np.ptp(ry) > 0.0):
             return 1.0  # a constant variable: no variation to depend on
         statistic = _squared_distance_correlation(
-            _centered_distances(self._ranks(rx)), _centered_distances(self._ranks(ry))
+            _centered_distances(self._ranks(rx, x_int)), _centered_distances(self._ranks(ry, y_int))
         )
         exceed = np.count_nonzero(self._null_distribution() >= statistic)
         return (exceed + 1) / (self._n_null + 1)
@@ -133,10 +137,9 @@ class GPDC:
             regressor.fit(features, target)
         return target - regressor.predict(features)
 
-    @staticmethod
-    def _ranks(values: np.ndarray) -> np.ndarray:
-        """Ranks 0 to n - 1, ties broken by row order."""
-        return np.argsort(np.argsort(values, kind="stable"), kind="stable")
+    def _ranks(self, values: np.ndarray, column: int) -> np.ndarray:
+        """Ranks 0 to n - 1, ties broken by the random key of ``column``."""
+        return np.argsort(np.lexsort((self._tie_keys[:, column], values)))
 
     def _null_distribution(self) -> np.ndarray:
         """``n_null`` distance correlations of the ranks with a random permutation of them."""

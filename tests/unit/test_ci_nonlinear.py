@@ -102,6 +102,13 @@ def test_permutation_pvalue_counts_the_observed_statistic(cls, draws):
     assert cls(data, **{draws: 49})(0, 1) == pytest.approx(1.0 / 50)
 
 
+@pytest.mark.parametrize("name", TESTS)
+def test_independent_discrete_columns_stay_independent(name):
+    """Two independent binary columns: ties must not turn the row order into a dependence."""
+    data = np.random.default_rng(0).integers(0, 2, size=(200, 2)).astype(float)
+    assert _build(name, data)(0, 1) > ALPHA
+
+
 # ---- reference values --------------------------------------------------------------------------
 
 
