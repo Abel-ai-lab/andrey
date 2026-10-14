@@ -32,6 +32,11 @@ from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.andrey_tabu import andrey_tabu_adapters
 from andrey_bench.adapters.andrey_xges import AndreyXGES
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
+from andrey_bench.adapters.bnlearn_discrete import (
+    BnlearnDiscreteHC,
+    BnlearnDiscretePC,
+    BnlearnDiscreteTabu,
+)
 from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
 from andrey_bench.adapters.bnlearn_tabu import BnlearnTabu
@@ -49,6 +54,7 @@ from andrey_bench.adapters.pcalg_fci import PcalgFCI
 from andrey_bench.adapters.pcalg_ges import PcalgGES
 from andrey_bench.adapters.pcalg_pc import PcalgPC
 from andrey_bench.adapters.pcalg_rfci import PcalgRFCI
+from andrey_bench.adapters.pgmpy_hc import PgmpyHC
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.oracle import OracleGES
 
@@ -82,6 +88,10 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     BnlearnHC(),
     BnlearnTabu(),
     BnlearnPCStable(),
+    BnlearnDiscretePC(),
+    BnlearnDiscreteHC(),
+    BnlearnDiscreteTabu(),
+    PgmpyHC(),
     OracleGES(),
     BaselineEmpty(),
 ]
@@ -143,6 +153,7 @@ DEFERRED_MODULES = {
     "andrey.xges.numpy.no_extended_search": "andrey.search.xges",
     "causal-learn.boss": "causallearn.search.PermutationBased.BOSS",
     "causal-learn.grasp": "causallearn.search.PermutationBased.GRaSP",
+    "pgmpy.hc": "pgmpy.estimators",
 }
 
 

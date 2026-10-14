@@ -26,6 +26,7 @@ Reproduce ([0.3.0](../docs/docs/benchmarks/0.3.0.md#reproduce),
 Packages:
 
 - [causal-learn](https://github.com/py-why/causal-learn)
+- [pgmpy](https://github.com/pgmpy/pgmpy)
 - [gCastle](https://github.com/huawei-noah/trustworthyAI/tree/master/gcastle)
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
@@ -140,6 +141,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
+| PC, GES, HC, Tabu, BOSS on categorical data | Andrey, causal-learn, pgmpy (`hc`), bnlearn (`pc.stable`, `hc`, `tabu`) |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -147,6 +149,26 @@ identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selec
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
 
 The harness does not submit jobs. One file is one job.
+
+### Categorical data
+
+`discrete_cpu.py` compares Andrey's discrete tests and scores with causal-learn, pgmpy, and bnlearn
+on ASIA, ALARM, and HEPAR2 sampled from their own probability tables, at 1,000 and 5,000 rows, and
+on random discrete networks (`DiscreteBN`, Erdos-Renyi, mean degree 2, 2 to 4 states) of 10, 20,
+and 50 variables at 2,000 rows. Each comparison runs one objective in every package: PC's chi-square
+and G-square tests with degrees of freedom adjusted for empty rows and columns (bnlearn's `x2-adf`
+and `mi-adf`); BDeu with equivalent sample size 1 and a structure prior of one expected parent per
+variable (bnlearn's `bde` with `prior = "vsp"`) for GES, hill climbing, Tabu search, and BOSS; and
+the multinomial BIC for hill climbing against pgmpy and bnlearn. pgmpy's hill climbing runs with
+its tabu list off. Every estimate is scored against the network's DAG through its equivalence class.
+
+The driver downloads each network once before any fit. A campaign split into several jobs that
+share `ANDREY_DATA_DIR` loads each network once first, so no two jobs download the same file at
+once. bnlearn needs the R lane; without it, leave bnlearn out:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-smoke --smoke --no-r
+```
 
 ### Hidden confounders
 

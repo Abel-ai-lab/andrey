@@ -18,9 +18,10 @@ uv pip install torch --torch-backend=auto
 uv pip install -e "$REPO" numba safetensors
 # pytest is not optional here: the validation suite runs in this venv, against these package
 # versions, and it is what says the harness measures correctly before a benchmark is believed.
-# pygam 0.12 or later: lingam's CAMUV fails with older pygam on current SciPy.
-uv pip install causal-learn "gcastle==1.0.4" "lingam==1.12.2" "pygam>=0.12" psutil pandas pyarrow pytest
-python -c "import andrey, causallearn, castle, lingam, pyarrow, torch; import importlib.metadata as m; print('bench-env OK causal-learn', m.version('causal-learn'), 'cuda', torch.cuda.is_available())"
+# pygam 0.12 or later: lingam's CAMUV fails with older pygam on current SciPy. pgmpy: the discrete
+# hill-climbing comparison.
+uv pip install causal-learn "gcastle==1.0.4" "lingam==1.12.2" "pygam>=0.12" "pgmpy==1.1.2" psutil pandas pyarrow pytest
+python -c "import andrey, causallearn, castle, lingam, pgmpy, pyarrow, torch; import importlib.metadata as m; print('bench-env OK causal-learn', m.version('causal-learn'), 'cuda', torch.cuda.is_available())"
 deactivate
 
 echo ">> done"

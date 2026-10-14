@@ -68,7 +68,7 @@ class CausalLearnGES:
             X,
             score_func=score_func,
             maxP=max_parents,
-            parameters={"lambda_value": lambda_value},
+            parameters=_score_parameters(score_func, lambda_value),
         )
 
         return generalgraph_to_adjacency(record["G"].graph)
@@ -78,3 +78,13 @@ class CausalLearnGES:
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+def _score_parameters(score_func: str, lambda_value: float) -> dict[str, float] | None:
+    """causal-learn's score parameters: ``None`` for BDeu, which then uses its defaults.
+
+    causal-learn's BDeu reads ``sample_prior``, ``structure_prior``, and ``r_i_map`` from a given
+    dict, so a dict carrying only ``lambda_value`` fails; its defaults are an equivalent sample size
+    of 1 and a structure prior of 1, the settings Andrey's BDeu uses.
+    """
+    return None if score_func == "local_score_BDeu" else {"lambda_value": lambda_value}
