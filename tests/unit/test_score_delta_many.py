@@ -172,3 +172,18 @@ def test_row_deltas_are_two_full_scores_on_ill_conditioned_base() -> None:
     remove = score_delta.remove_deltas(score, 1, base)
     assert [add[u] for u in (2, 3)] == [_full_delta(score, 1, base, u, "add") for u in (2, 3)]
     assert [remove[u] for u in base] == [_full_delta(score, 1, base, u, "remove") for u in base]
+
+
+@pytest.mark.parametrize("scale", [1e-80, 1e-90])
+def test_add_deltas_do_not_depend_on_the_data_scale(scale: float) -> None:
+    """Rescaling the data leaves every BIC delta unchanged, even where squared covariances
+    underflow."""
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((300, 5))
+    x[:, 1] += x[:, 0]
+    x[:, 2] += x[:, 1] - x[:, 3]
+    unit, scaled = BICScore(x), BICScore(x * scale)
+    for base in [(), (3,)]:
+        want = score_delta.add_deltas(unit, 2, base)
+        got = score_delta.add_deltas(scaled, 2, base)
+        np.testing.assert_allclose(got, want, rtol=1e-9)

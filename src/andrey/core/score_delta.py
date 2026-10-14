@@ -787,7 +787,7 @@ def add_deltas(
     R_v = float(e[i])  # e_ii is R(i | base)
     penalty = score_obj.log_n * score_obj.lambda_value
     with np.errstate(divide="ignore", invalid="ignore"):
-        R_v_new = R_v - e * e / R_u
+        R_v_new = R_v - e * (e / R_u)  # e * e underflows on tiny-variance data
         out = score_obj.n * (_log(R_v_new) - _log(R_v)) + penalty
     # A finite delta implies positive R(i | base) and R(i | base + u), so only R_u is checked.
     exact = np.flatnonzero(~((R_u > 0.0) & np.isfinite(out))).tolist()
