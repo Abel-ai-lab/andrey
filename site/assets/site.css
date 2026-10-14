@@ -290,8 +290,17 @@
     inset: var(--crop-top, 40%) 0 auto;
     height: 60%;
     object-position: var(--crop-x) 50%;
-    -webkit-mask-image: linear-gradient(180deg, transparent, var(--andrey-ground-navy) var(--crop-fade, 4.5rem));
-    mask-image: linear-gradient(180deg, transparent, var(--andrey-ground-navy) var(--crop-fade, 4.5rem));
+    --crop-mask: linear-gradient(
+      180deg,
+      transparent,
+      color-mix(in srgb, var(--andrey-ground-navy) 14%, transparent) calc(var(--crop-fade) * 0.3),
+      color-mix(in srgb, var(--andrey-ground-navy) 50%, transparent) calc(var(--crop-fade) * 0.6),
+      color-mix(in srgb, var(--andrey-ground-navy) 90%, transparent) calc(var(--crop-fade) * 0.9),
+      var(--andrey-ground-navy) var(--crop-fade)
+    );
+    --crop-fade: 4.5rem;
+    -webkit-mask-image: var(--crop-mask);
+    mask-image: var(--crop-mask);
   }
 
   .andrey-home .hero-cover[data-i="1"] {
@@ -301,7 +310,7 @@
   .andrey-home .hero-cover[data-i="2"] {
     --crop-x: 100%;
     --crop-top: 56%;
-    --crop-fade: 1.5rem;
+    --crop-fade: 2.75rem;
   }
 
   .andrey-home .hero-cover[data-i="3"] {
@@ -542,6 +551,24 @@
       opacity: 1;
     }
   }
+}
+
+/* On a phone the contour's crop starts lower than the lanes', so the lanes leave as it arrives. */
+@media (prefers-reduced-motion: no-preference) and (max-width: 47.99rem) {
+  @supports (animation-timeline: scroll()) {
+    .andrey-home .hero.is-story .hero-cover[data-i="1"] { animation-name: cover-first; }
+  }
+
+  @supports not (animation-timeline: scroll()) {
+    .andrey-home .hero.is-story:not([data-step="1"]) .hero-cover[data-i="1"] {
+      opacity: 0;
+    }
+  }
+}
+
+@keyframes cover-first {
+  0%, 30% { opacity: 1; }
+  40%, 100% { opacity: 0; }
 }
 
 @keyframes cover-dim {
