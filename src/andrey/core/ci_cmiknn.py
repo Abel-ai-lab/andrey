@@ -115,11 +115,12 @@ class CMIknn:
     subspace (row ``i`` counted), the estimate is
     ``I = psi(k) + mean_i [psi(k_z) - psi(k_xz) - psi(k_yz)]``, ``psi`` the digamma function [1]_.
     Each null copy maps every row to one of its ``k_perm`` nearest rows in ``z``, avoiding a row
-    already taken where it can; the p-value is the share of copies whose estimate is at least
-    ``I``. An empty conditioning set shuffles ``x`` over all rows, and the estimate becomes the
-    mutual information estimate of ``x`` and ``y`` [2]_. The default ``k_cmi``, a tenth of the
-    rows, is the low end of the range [1]_ recommends; a larger share smooths the estimate, which
-    costs power as the conditioning set grows.
+    already taken where it can. With ``b`` of the ``B`` copies estimating at least ``I``, the
+    p-value is ``(b + 1) / (B + 1)``: the observed data count as one more draw, so the p-value is
+    never zero [3]_. An empty conditioning set shuffles ``x`` over all rows, and the estimate
+    becomes the mutual information estimate of ``x`` and ``y`` [2]_. The default ``k_cmi``, a tenth
+    of the rows, is the low end of the range [1]_ recommends; a larger share smooths the estimate,
+    which costs power as the conditioning set grows.
 
     The jitter is drawn once, from ``seed``, when the test is built; the shuffles of a query come
     from a generator seeded by ``seed``, the two variables, and the conditioning set, so a p-value
@@ -128,9 +129,9 @@ class CMIknn:
     **Limitations.** Not benchmarked yet. Each query computes ``n_permutations + 1`` estimates,
     each over ``n x n`` distance matrices, so its time grows with the square of the number of rows
     times the permutations, and its memory with the square of the rows: hundreds of rows take
-    seconds per query, and tens of thousands do not fit. The p-value moves with ``seed`` and
-    cannot fall between multiples of ``1 / n_permutations``. Its tests run it on up to 500 rows and
-    two conditioning variables.
+    seconds per query, and tens of thousands do not fit. The p-value moves with ``seed``, is a
+    multiple of ``1 / (n_permutations + 1)``, and is at least that. Its tests run it on up to 500
+    rows and two conditioning variables.
 
     References
     ----------
@@ -138,6 +139,9 @@ class CMIknn:
        estimator of conditional mutual information. AISTATS, PMLR 84, 938-947.
     .. [2] Kraskov, A., Stogbauer, H., and Grassberger, P. (2004). Estimating mutual information.
        Physical Review E 69, 066138.
+    .. [3] Phipson, B., and Smyth, G. K. (2010). Permutation p-values should never be zero:
+       calculating exact p-values when permutations are randomly drawn. Statistical Applications
+       in Genetics and Molecular Biology 9(1), Article 39.
     """
 
     def __init__(
@@ -184,4 +188,4 @@ class CMIknn:
             else:
                 perm = _local_permutation(nearest, rng)
             exceed += _cmi(dx[np.ix_(perm, perm)], dy, dz, self._k) >= observed
-        return exceed / self._n_permutations
+        return (exceed + 1) / (self._n_permutations + 1)

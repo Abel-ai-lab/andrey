@@ -4,8 +4,8 @@ Each test is checked on fixed seeded inputs with one certain answer (a dependenc
 an independence given the common cause, a dependence through shared noise), on closed forms its
 parts must reproduce, and on the ``CITest`` contract: argument order, determinism, and input
 validation. The permutation tests run with fewer draws than their defaults to keep the suite fast;
-a permutation p-value is calibrated at any number of draws. Their rejection rates over many draws
-are a measurement, made by ``qa/ci_calibration.py``.
+a permutation p-value ``(b + 1) / (B + 1)`` keeps its level at any number of draws ``B``. Their
+rejection rates over many draws are a measurement, made by ``qa/ci_calibration.py``.
 """
 
 from __future__ import annotations
@@ -91,6 +91,15 @@ def test_rejects_a_conditional_dependence(name, n_cond):
     """Noise shared by ``x`` and ``y`` keeps them dependent given the conditioning variables."""
     data = _common_cause(seed=0, n=200, n_cond=n_cond, shared=0.7)
     assert _build(name, data)(0, 1, tuple(range(2, 2 + n_cond))) <= 0.01
+
+
+@pytest.mark.parametrize(("cls", "draws"), [(CMIknn, "n_permutations"), (GPDC, "n_null")])
+def test_permutation_pvalue_counts_the_observed_statistic(cls, draws):
+    """A dependence no null draw reaches gets ``1 / (B + 1)``, never zero."""
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(200)
+    data = np.column_stack([x, x + 0.1 * rng.standard_normal(200)])
+    assert cls(data, **{draws: 49})(0, 1) == pytest.approx(1.0 / 50)
 
 
 # ---- reference values --------------------------------------------------------------------------

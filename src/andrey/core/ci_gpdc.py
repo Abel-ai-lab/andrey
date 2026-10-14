@@ -70,16 +70,17 @@ class GPDC:
     The residuals are replaced by their ranks, which gives them uniform marginals, and the
     statistic is their squared distance correlation, from the doubly centered matrices of their
     pairwise distances [3]_. After ranking, the null is the same statistic between the ranks and
-    a random permutation of them, drawn ``n_null`` times; the p-value is the share of draws at
-    least as large as the statistic [1]_.
+    a random permutation of them, drawn ``n_null`` times [1]_. With ``b`` of the ``n_null`` draws
+    at least as large as the statistic, the p-value is ``(b + 1) / (n_null + 1)``: the observed
+    statistic counts as one more draw, so the p-value is never zero [4]_.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. The test assumes ``x`` and ``y`` depend on the conditioning set additively, a
     function of it plus noise; a dependence through the noise's scale, such as ``x = z e``, stays
     in the residuals and reads as conditional dependence. The null ignores the degrees of freedom
     the regressions use, as [1]_ does. Each regression costs the cube of the number of rows per
-    optimizer step, so thousands of rows take seconds per query. The p-value cannot fall between
-    multiples of ``1 / n_null``.
+    optimizer step, so thousands of rows take seconds per query. The p-value is a multiple of
+    ``1 / (n_null + 1)``, and is at least that.
 
     References
     ----------
@@ -90,6 +91,9 @@ class GPDC:
        Learning. MIT Press.
     .. [3] Szekely, G. J., Rizzo, M. L., and Bakirov, N. K. (2007). Measuring and testing
        dependence by correlation of distances. Annals of Statistics 35(6), 2769-2794.
+    .. [4] Phipson, B., and Smyth, G. K. (2010). Permutation p-values should never be zero:
+       calculating exact p-values when permutations are randomly drawn. Statistical Applications
+       in Genetics and Molecular Biology 9(1), Article 39.
     """
 
     def __init__(self, data: np.ndarray, *, n_null: int = 1000, seed: int | None = None) -> None:
@@ -113,7 +117,8 @@ class GPDC:
         statistic = _squared_distance_correlation(
             _centered_distances(self._ranks(rx)), _centered_distances(self._ranks(ry))
         )
-        return float(np.mean(self._null_distribution() >= statistic))
+        exceed = np.count_nonzero(self._null_distribution() >= statistic)
+        return (exceed + 1) / (self._n_null + 1)
 
     def _residual(self, column: int, cond: list[int]) -> np.ndarray:
         target = self._data[:, column]
