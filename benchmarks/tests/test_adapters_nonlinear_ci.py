@@ -30,7 +30,7 @@ from andrey_bench.adapters.tigramite_pc import (
 NONLINEAR = ("kci", "rcot", "cmiknn", "gpdc")
 
 
-def _nonlinear_data(seed: int = 0, n: int = 80) -> np.ndarray:
+def _nonlinear_data(seed: int = 0, n: int = 200) -> np.ndarray:
     """``x0 -> x1`` through ``|x0|``, and an independent ``x2``."""
     rng = np.random.default_rng(seed)
     x0 = rng.standard_normal(n)
