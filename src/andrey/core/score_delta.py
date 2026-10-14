@@ -945,15 +945,23 @@ class FullScoreDelta:
         self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
     ) -> list[float]:
         """Return RAW deltas ``[score(i, base +/- u_k) - score(i, base)]`` for single moves."""
-        base = tuple(sorted(int(p) for p in base_parents))
-        return [_delta_two_scores(self.score_obj, int(i), base, u, op) for op, u in deltas]
+        base = sorted(int(p) for p in base_parents)
+        scores = self.score_obj.score_many(int(i), [base, *_moved(base, deltas)])
+        return [float(s - scores[0]) for s in scores[1:]]
 
     def score_many_with_base(
         self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
     ) -> list[float]:
         """Return absolute scores ``[score(i, base +/- u_k)]`` for single moves."""
         base = [int(p) for p in base_parents]
-        return [
-            self.score_obj.score(int(i), [*base, u] if op == "add" else [p for p in base if p != u])
-            for op, u in deltas
-        ]
+        return self.score_obj.score_many(int(i), _moved(base, deltas))
+
+
+def _moved(base: list[int], deltas: Sequence[tuple[str, int]]) -> list[list[int]]:
+    """The parent sets ``base`` plus or minus ``u`` for each ``(op, u)`` in ``deltas``."""
+    sets = []
+    for op, u in deltas:
+        if op not in ("add", "remove"):
+            raise ValueError(f"unknown delta op: {op!r} (expected 'add' or 'remove')")
+        sets.append([*base, int(u)] if op == "add" else [p for p in base if p != u])
+    return sets

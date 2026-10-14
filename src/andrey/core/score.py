@@ -37,7 +37,7 @@ import numpy.typing as npt
 from scipy.special import gammaln
 
 from . import categorical, stats
-from .mixed import ConditionalGaussian, DegenerateGaussian
+from .mixed import _LRU, ConditionalGaussian, DegenerateGaussian
 
 #: The scores that read category codes, and those that read mixed data with a categorical mask.
 DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu",)
@@ -503,14 +503,7 @@ class CGScore:
         self.n: int = self._cg.n
         self.lambda_value = penalty_weight(lambda_value)
         self.log_n = float(np.log(self.n))
-        self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
-
-    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
-        cg = self._cg
-        family = (*parents, node)
-        loglik = cg.loglik(family) - cg.loglik(parents)
-        dof = cg.dof(family) - cg.dof(parents)
-        return -2.0 * loglik + self.lambda_value * self.log_n * dof
+        self._memo = _LRU(cache_size)
 
     def score(self, node: int, parents: Sequence[int]) -> float:
         """Return the memoized negative local CG score for ``node`` given ``parents``.
@@ -518,12 +511,29 @@ class CGScore:
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
         """
-        key = tuple(sorted(int(p) for p in parents))
-        return self._score_key(int(node), key)
+        return self.score_many(node, [parents])[0]
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
-        """Return the negative local CG scores for many parent sets, in request order."""
-        return [self.score(node, parents) for parents in parent_sets]
+        """Return the negative local CG scores for many parent sets, in request order.
+
+        The log-likelihoods the scores need are fit in one batch; each score equals the one
+        :meth:`score` returns alone.
+        """
+        node = int(node)
+        keys = [tuple(sorted(int(p) for p in parents)) for parents in parent_sets]
+        found = {key: self._memo.get((node, key)) for key in keys}
+        todo = [key for key, value in found.items() if value is None]
+        if todo:
+            cg = self._cg
+            families = [(*key, node) for key in todo]
+            loglik = cg.loglik_many(families + todo)
+            for i, (family, key) in enumerate(zip(families, todo, strict=True)):
+                dof = cg.dof(family) - cg.dof(key)
+                value = -2.0 * (loglik[i] - loglik[len(todo) + i])
+                value += self.lambda_value * self.log_n * dof
+                found[key] = value
+                self._memo.put((node, key), value)
+        return [found[key] for key in keys]
 
 
 #: Every local score class; the searches that difference full scores take any of them.

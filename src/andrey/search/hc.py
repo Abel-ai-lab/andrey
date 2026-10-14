@@ -207,7 +207,8 @@ class MoveScanner:
         """Every add delta and every remove delta at target ``v`` with parents ``pa``.
 
         BIC takes the vectorized Schur updates. A score without one, such as BDeu, differences two
-        full local scores per candidate. Entries that are not a legal add or remove are ``inf``.
+        full local scores per candidate, all scored in one :meth:`score_many` call. Entries that are
+        not a legal add or remove, or are a forbidden add, are ``inf``.
         """
         delta = self._delta
         if isinstance(delta, DeltaBICScore):
@@ -216,14 +217,13 @@ class MoveScanner:
                 add_deltas(delta.score_obj, v, pa, cond_threshold=cond),
                 remove_deltas(delta.score_obj, v, pa, cond_threshold=cond),
             )
-        base = tuple(pa)
+        adds = [u for u in range(self._d) if u != v and u not in pa and not self._forbidden[v, u]]
+        sets = [pa, *(sorted([*pa, u]) for u in adds), *([p for p in pa if p != u] for u in pa)]
+        scores = np.array(self._score.score_many(v, sets))
         add = np.full(self._d, np.inf)
         rem = np.full(self._d, np.inf)
-        for u in range(self._d):
-            if u in base:
-                rem[u] = delta.delta(v, base, u, "remove")
-            elif u != v:
-                add[u] = delta.delta(v, base, u, "add")
+        add[adds] = scores[1 : 1 + len(adds)] - scores[0]
+        rem[pa] = scores[1 + len(adds) :] - scores[0]
         return add, rem
 
     def _unreach(self, tails: list[int]) -> list[int]:

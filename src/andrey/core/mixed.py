@@ -27,8 +27,10 @@ References
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
-from functools import lru_cache
+from collections import OrderedDict
+from collections.abc import Callable, Hashable, Sequence
+from functools import cache
+from typing import Any, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -146,7 +148,9 @@ class ConditionalGaussian:
     categorical variables' numbers of categories: a mean, a covariance, and a weight for every joint
     category, whether it occurs or not, less one weight, since the weights sum to one.
 
-    Log-likelihoods are memoized by the sorted set of variables.
+    Log-likelihoods are memoized by the sorted set of variables. Within the memory bound, each
+    categorical set keeps its cells and their sums of the continuous columns and of their products,
+    which every set with those categorical variables reads; sets that share them are fit together.
 
     Parameters
     ----------
@@ -194,18 +198,38 @@ class ConditionalGaussian:
         constant = np.flatnonzero(~self._mask & (scale == 0))
         if constant.size:
             raise ValueError(f"continuous column {int(constant[0])} is constant")
-        scale[self._mask] = 1.0
-        self._z = np.where(self._mask, 0.0, (arr - arr.mean(axis=0)) / scale)
-        self._log_scale = np.log(scale)
-        # Column-major copies: a set's columns are read one at a time.
         self._codes = np.asfortranarray(self._codes)
-        self._columns = np.asfortranarray(self._z)
-        self._loglik = lru_cache(maxsize=cache_size)(self._loglik_impl)
-        self._cells = lru_cache(maxsize=max(1, _CELL_BYTES // (8 * max(n, 1))))(self._cells_impl)
+        # ``_slot[v]`` is continuous variable v's row of ``_columns``.
+        continuous = np.flatnonzero(~self._mask)
+        z = (arr[:, continuous] - arr[:, continuous].mean(axis=0)) / scale[continuous]
+        self._slot = np.full(d, -1, dtype=np.intp)
+        self._slot[continuous] = np.arange(continuous.size)
+        self._log_scale = np.log(scale[continuous])
+        self._gram = z.T @ z / n  # the covariance of all rows
+        # The standardized continuous columns as rows and, last, a row of ones, whose products with
+        # a column are its sums.
+        self._columns = np.vstack((z.T, np.ones((1, n))))
+        self._one = continuous.size
+        self._memo = _LRU(cache_size)
+        self._stats = _LRU(_CELL_BYTES, weigh=_nbytes)
 
     def loglik(self, variables: Sequence[int]) -> float:
         """Return the log-likelihood of the set ``variables``; ``0`` for the empty set."""
-        return self._loglik(tuple(sorted({int(v) for v in variables})))
+        return self.loglik_many([variables])[0]
+
+    def loglik_many(self, sets: Sequence[Sequence[int]]) -> list[float]:
+        """Return the log-likelihood of each set in ``sets``, in order.
+
+        The sets are fit together, and each gets the value it gets alone.
+        """
+        keys = [tuple(sorted({int(v) for v in variables})) for variables in sets]
+        found = {key: self._memo.get(key) for key in keys}
+        todo = [key for key, value in found.items() if value is None]
+        if todo:
+            for key, value in zip(todo, self._fit(todo), strict=True):
+                found[key] = value
+                self._memo.put(key, value)
+        return [found[key] for key in keys]
 
     def dof(self, variables: Sequence[int]) -> int:
         """Return the parameter count of the model of the set ``variables``; ``0`` for none."""
@@ -214,38 +238,216 @@ class ConditionalGaussian:
         d = sum(1 for v in held if not self._mask[v])
         return joint * (d * (d + 3) // 2 + 1) - 1
 
-    def _cells_impl(self, discrete: tuple[int, ...]) -> tuple[np.ndarray, np.ndarray, float]:
-        """Each row's cell over ``discrete``, the cell sizes, and their multinomial loglik."""
-        cell, m = categories.configurations(self._codes, self._cardinalities, discrete)
-        counts = np.bincount(cell, minlength=m).astype(np.float64)
-        return cell, counts, float(np.sum(counts * np.log(counts / self.n)))
+    def _cells(self, discrete: tuple[int, ...]) -> _Cells:
+        """The cells of the categorical set ``discrete``, kept while the memory bound allows."""
+        cells = self._stats.get(discrete)
+        if cells is None:
+            cell, m = categories.configurations(self._codes, self._cardinalities, discrete)
+            counts = np.bincount(cell, minlength=m).astype(np.float64)
+            loglik = float(np.sum(counts * np.log(counts / self.n)))
+            cells = _Cells(cell, counts, loglik)
+            self._stats.put(discrete, cells)
+        return cells
 
-    def _loglik_impl(self, variables: tuple[int, ...]) -> float:
-        discrete = tuple(v for v in variables if self._mask[v])
-        continuous = [v for v in variables if not self._mask[v]]
-        cell, counts, loglik = self._cells(discrete)
-        m = counts.size
-        n = self.n
-        d = len(continuous)
-        if d == 0:
-            return loglik
-        resid = []
-        for v in continuous:
-            column = self._columns[:, v]
-            resid.append(column - (np.bincount(cell, column, minlength=m) / counts)[cell])
-        scatter = np.empty((m, d, d))
-        for a in range(d):
-            for b in range(a, d):
-                scatter[:, a, b] = scatter[:, b, a] = np.bincount(
-                    cell, resid[a] * resid[b], minlength=m
+    def _moments(self, pairs: list[tuple[tuple[int, ...], int, int]]) -> list[np.ndarray]:
+        """Per-cell sums of products for each ``(categorical set, row a, row b)`` in ``pairs``.
+
+        The row of ones makes ``(a, ones)`` the sums of ``a`` and ``(ones, ones)`` the cell sizes.
+        Each result is kept under its triple; the missing ones are summed in one pass.
+        """
+        get = self._stats.get
+        found = [get(pair) for pair in pairs]
+        by_set: dict[tuple[int, ...], list[int]] = {}
+        for i, value in enumerate(found):
+            if value is None:
+                by_set.setdefault(pairs[i][0], []).append(i)
+        if not by_set:
+            return found
+        bins, weights, order, sizes = [], [], [], []
+        base = 0
+        for discrete, items in by_set.items():
+            cells = self._cells(discrete)
+            m = cells.counts.size
+            left = [pairs[i][1] for i in items]
+            right = [pairs[i][2] for i in items]
+            bins.append((cells.cell + (base + m * np.arange(len(items)))[:, None]).ravel())
+            weights.append((self._columns[left] * self._columns[right]).ravel())
+            order += items
+            sizes += [m] * len(items)
+            base += m * len(items)
+        sums = np.bincount(np.concatenate(bins), np.concatenate(weights), minlength=base)
+        for i, value in zip(order, np.split(sums, np.cumsum(sizes)[:-1]), strict=True):
+            found[i] = value.copy()
+            self._stats.put(pairs[i], found[i])
+        return found
+
+    def _fit(self, keys: list[tuple[int, ...]]) -> list[float]:
+        """Log-likelihoods of the sets ``keys``.
+
+        The cells of all the sets with ``d`` continuous variables are stacked, one row per cell of
+        each set, and fit in one pass; each set's terms are then summed over its own rows.
+        """
+        mask, slot, one = self._mask, self._slot, self._one
+        out = np.empty(len(keys))
+        cells_of: list[_Cells] = []
+        pairs_of: list[list[int]] = []
+        by_size: dict[int, list[int]] = {}
+        at: dict[tuple[tuple[int, ...], int, int], int] = {}
+        for g, key in enumerate(keys):
+            discrete = tuple(v for v in key if mask[v])
+            cells = self._cells(discrete)
+            cells_of.append(cells)
+            row = [int(slot[v]) for v in key if not mask[v]]
+            pairs_of.append([])
+            if not row:
+                out[g] = cells.loglik
+                continue
+            row.append(one)
+            by_size.setdefault(len(row) - 1, []).append(g)
+            pairs_of[g] = [
+                at.setdefault((discrete, a, b), len(at)) for i, a in enumerate(row) for b in row[i:]
+            ]
+        if not at:
+            return out.tolist()
+        found = self._moments(list(at))
+        offsets = np.cumsum([0] + [value.size for value in found])
+        flat = np.concatenate(found)
+        for d, members in by_size.items():
+            sizes = np.array([cells_of[g].counts.size for g in members])
+            starts = np.cumsum(sizes) - sizes
+            owner = np.repeat(np.arange(len(members)), sizes)  # each row's set
+            local = np.arange(owner.size) - starts[owner]  # each row's cell within its set
+            where = offsets[np.array([pairs_of[g] for g in members])]
+            # [r, t]: row r's sums of products of its set's t-th column pair, ones column last.
+            moments = flat[where[owner] + local[:, None]]
+            slots = np.array([[slot[v] for v in keys[g] if not mask[v]] for g in members])
+            sets = [keys[g] for g in members]
+            if d == 1:  # the pairs: the column with itself, with the ones column, ones with ones
+                counts = moments[:, 2]
+                sums = moments[:, 1]
+                scatter = moments[:, 0] - sums * sums / counts
+                whole = self._gram[slots[:, 0], slots[:, 0]][owner]
+                fitted = (scatter + whole) / (counts + 1.0)
+                _check_singular(fitted <= _SINGULAR, owner, sets, mask)
+                log_det, quad = np.log(fitted), scatter / fitted
+            else:
+                full = moments[:, _triangle(d)]
+                counts = full[:, d, d]
+                sums = full[:, :d, d]
+                scatter = (
+                    full[:, :d, :d] - sums[:, :, None] * sums[:, None, :] / counts[:, None, None]
                 )
-        # Each cell's covariance, shrunk toward that of all rows (the columns are centered).
-        z = self._z[:, continuous]
-        fitted = (scatter + z.T @ z / n) / (counts + 1.0)[:, None, None]
-        eig = np.linalg.eigvalsh(fitted)
-        if (eig[:, 0] <= _SINGULAR).any():
-            raise ValueError(f"continuous columns {continuous} are collinear; cannot fit them")
-        log_det = np.sum(np.log(eig), axis=1)
-        quad = np.trace(np.linalg.solve(fitted, scatter), axis1=1, axis2=2)
-        loglik -= 0.5 * float(np.sum(counts * (log_det + d * _LOG_2PI) + quad))
-        return loglik - n * float(np.sum(self._log_scale[continuous]))
+                # Each cell's covariance, shrunk toward that of all rows.
+                whole = self._gram[slots[:, :, None], slots[:, None, :]][owner]
+                fitted = (scatter + whole) / (counts + 1.0)[:, None, None]
+                log_det, quad = _gaussian_terms(fitted, scatter, starts, owner, sets, mask)
+            terms = counts * (log_det + d * _LOG_2PI) + quad
+            loglik = np.array([cells_of[g].loglik for g in members])
+            values = loglik - 0.5 * np.add.reduceat(terms, starts)
+            out[members] = values - self.n * np.sum(self._log_scale[slots], axis=1)
+        return out.tolist()
+
+
+class _Cells(NamedTuple):
+    """One categorical set's cells."""
+
+    cell: np.ndarray  # each row's cell
+    counts: np.ndarray  # rows per cell
+    loglik: float  # the multinomial log-likelihood of the counts
+
+
+@cache
+def _triangle(d: int) -> np.ndarray:
+    """``[a, b]``: the position of the pair ``(min, max)`` in the upper triangle of ``d + 1``."""
+    e = d + 1
+    position = {}
+    for a in range(e):
+        for b in range(a, e):
+            position[a, b] = len(position)
+    return np.array([[position[min(a, b), max(a, b)] for b in range(e)] for a in range(e)])
+
+
+def _gaussian_terms(
+    fitted: np.ndarray,
+    scatter: np.ndarray,
+    starts: np.ndarray,
+    owner: np.ndarray,
+    sets: list[tuple[int, ...]],
+    mask: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """``log det C`` and ``tr(C^-1 S)`` for each fitted covariance ``C`` and scatter ``S``.
+
+    Row ``r`` of the ``(rows, d, d)`` stacks is a cell of set ``owner[r]``, whose rows begin at
+    ``starts``. A set's Cholesky factors give its log-determinants and its inverses the traces.
+    When a factor fails, or an inverse's norm cannot certify the least eigenvalue above
+    ``_SINGULAR``, the set's eigenvalues decide instead, and a set with a cell at or below it
+    raises ``ValueError``. Each set takes the same path in any batch.
+    """
+    try:
+        factor, inverse = np.linalg.cholesky(fitted), np.linalg.inv(fitted)
+        failed = np.zeros(len(sets), dtype=bool)
+    except np.linalg.LinAlgError:
+        factor, inverse = np.ones_like(fitted), np.zeros_like(fitted)
+        failed = np.zeros(len(sets), dtype=bool)
+        for g, (lo, hi) in enumerate(zip(starts, [*starts[1:], len(fitted)], strict=True)):
+            try:
+                factor[lo:hi] = np.linalg.cholesky(fitted[lo:hi])
+                inverse[lo:hi] = np.linalg.inv(fitted[lo:hi])
+            except np.linalg.LinAlgError:
+                failed[g] = True
+    certified = np.sum(inverse**2, axis=(-2, -1)) < _SINGULAR**-2
+    exact = (failed | ~np.logical_and.reduceat(certified, starts))[owner]
+    log_det = 2.0 * np.sum(np.log(np.diagonal(factor, axis1=-2, axis2=-1)), axis=-1)
+    quad = np.sum(inverse * scatter, axis=(-2, -1))
+    if exact.any():
+        eig = np.linalg.eigvalsh(fitted[exact])
+        _check_singular(eig[:, 0] <= _SINGULAR, owner[exact], sets, mask)
+        log_det[exact] = np.sum(np.log(eig), axis=-1)
+        quad[exact] = np.trace(np.linalg.solve(fitted[exact], scatter[exact]), axis1=-2, axis2=-1)
+    return log_det, quad
+
+
+def _check_singular(
+    singular: np.ndarray, owner: np.ndarray, sets: list[tuple[int, ...]], mask: np.ndarray
+) -> None:
+    """Raise ``ValueError`` for the first set owning a ``singular`` row."""
+    if singular.any():
+        continuous = [v for v in sets[int(owner[np.argmax(singular)])] if not mask[v]]
+        raise ValueError(f"continuous columns {continuous} are collinear; cannot fit them")
+
+
+def _nbytes(value: object) -> int:
+    if isinstance(value, np.ndarray):
+        return value.nbytes
+    return sum(a.nbytes for a in value if isinstance(a, np.ndarray))
+
+
+class _LRU:
+    """A map that drops its least recently used entries once their total weight passes ``limit``.
+
+    ``None`` sets no limit; ``weigh`` gives an entry's weight, one by default.
+    """
+
+    def __init__(self, limit: int | None, weigh: Callable[[Any], int] | None = None) -> None:
+        self._data: OrderedDict[Hashable, Any] = OrderedDict()
+        self._limit = math.inf if limit is None else limit
+        self._weigh = weigh
+        self._weight = 0
+
+    def get(self, key: Hashable) -> Any:
+        """The value under ``key``, now the most recently used, or ``None``."""
+        value = self._data.get(key)
+        if value is not None:
+            self._data.move_to_end(key)
+        return value
+
+    def put(self, key: Hashable, value: Any) -> None:
+        """Keep ``value`` under ``key``, dropping the oldest entries past the limit."""
+        if key in self._data:
+            old = self._data.pop(key)
+            self._weight -= 1 if self._weigh is None else self._weigh(old)
+        self._data[key] = value
+        self._weight += 1 if self._weigh is None else self._weigh(value)
+        while self._weight > self._limit and len(self._data) > 1:
+            _, old = self._data.popitem(last=False)
+            self._weight -= 1 if self._weigh is None else self._weigh(old)

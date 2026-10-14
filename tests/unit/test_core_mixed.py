@@ -108,6 +108,19 @@ def test_cg_loglik_is_a_gaussian_per_joint_category(variables, rare):
     )
 
 
+@pytest.mark.parametrize("rare", [False, True], ids=["common categories", "a two-row category"])
+def test_cg_sets_fit_together_equal_sets_fit_alone(rare):
+    """A batch mixes sets of every size and categorical part; each value equals the lone fit."""
+    x, mask = _mixed()
+    x = _with_rare_category(x) if rare else x
+    sets = [[0], [1], [0, 2], [1, 3], [0, 1], [0, 1, 2, 3], [], [0, 1, 3], [2, 3], [1, 2, 3]]
+    together = ConditionalGaussian(x, mask).loglik_many(sets)
+    assert together == [ConditionalGaussian(x, mask).loglik(s) for s in sets]
+    scorer, alone = CGScore(x, mask), CGScore(x, mask)
+    parent_sets = [[], [0], [2], [0, 2], [1], [0, 1, 2]]
+    assert scorer.score_many(3, parent_sets) == [alone.score(3, pa) for pa in parent_sets]
+
+
 def test_cg_covers_a_cell_too_small_for_its_own_covariance():
     """The two-row category's covariance of two variables is singular on its own; shrunk toward
     all rows it is not, so the likelihood is finite."""
