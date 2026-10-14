@@ -150,7 +150,8 @@ class ConditionalGaussian:
 
     Log-likelihoods are memoized by the sorted set of variables. Within the memory bound, each
     categorical set keeps its cells and their sums of the continuous columns and of their products,
-    which every set with those categorical variables reads; sets that share them are fit together.
+    which every set with those categorical variables reads. :meth:`loglik_many` fits all of a
+    request's sets together.
 
     Parameters
     ----------
