@@ -15,6 +15,8 @@ from scipy.special import digamma
 from .ci import _canonical, _checked_data
 from .seeding import resolve_seed
 
+__all__ = ["CMIknn"]
+
 
 def _rank_columns(data: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """Rank each column (0 to n - 1) after a jitter far below its spread breaks ties at random."""

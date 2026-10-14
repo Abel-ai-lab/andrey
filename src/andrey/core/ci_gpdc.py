@@ -18,6 +18,8 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 from .ci import _canonical, _checked_data
 from .seeding import resolve_seed
 
+__all__ = ["GPDC"]
+
 
 def _centered_distances(ranks: np.ndarray) -> np.ndarray:
     """The doubly centered matrix of pairwise distances between the entries of ``ranks``."""
