@@ -156,6 +156,21 @@ def _hall_buckley_eagleson_pvalue(statistic: float, weights: np.ndarray) -> floa
     return float(gammaincc(dof / 2.0, max(chi2, 0.0) / 2.0))
 
 
+def _fourier_features(values: np.ndarray, count: int, rng: np.random.Generator) -> np.ndarray:
+    """``count`` random Fourier features of the rows of ``values`` for the Gaussian kernel
+    ``exp(-|a - b|^2 / (2 s^2))``, ``s`` the median pairwise distance over the first 500 rows.
+
+    The average product of two rows' features converges to their kernel value.
+    """
+    dists = pdist(values[:500], "euclidean")
+    scale = float(np.median(dists)) if dists.size else 0.0
+    weights = rng.standard_normal((values.shape[1], count))
+    offsets = rng.uniform(0.0, 2.0 * np.pi, count)
+    if scale > 0.0:
+        weights /= scale
+    return np.sqrt(2.0) * np.cos(values @ weights + offsets)
+
+
 class RCoT:
     """Randomized conditional correlation test (RCoT), a fast approximation of KCI.
 
@@ -172,7 +187,9 @@ class RCoT:
         Random Fourier features drawn for ``x`` and for ``y``.
     n_features_cond : int, default=100
         Random Fourier features drawn for the conditioning set. More features remove more of the
-        conditioning set's effect, at a cost that grows with their square.
+        conditioning set's effect, at a cost that grows with their square. The default is four
+        times the 25 of [1]_: with 25, two conditioning variables that drive both ``x`` and ``y``
+        leave enough of their effect to reject most true independences at 500 rows.
     seed : int or None, default=None
         Seed for the random features. ``None`` uses ``ANDREY_SEED``, or ``0`` when it is unset.
 
@@ -184,9 +201,10 @@ class RCoT:
     Notes
     -----
     **How it works.** A variable ``v`` with median pairwise distance ``s`` (over its first 500
-    rows) gets features ``sqrt(2) cos(v W + b)`` with ``W`` normal of variance ``2 / s`` and
-    ``b`` uniform on ``[0, 2 pi]``, the random features of the kernel ``exp(-|v - v'|^2 / s)``;
-    every feature is standardized [1]_. With ``A`` and ``B`` the features of ``x`` and ``y``, and
+    rows) gets features ``sqrt(2) cos(v W + b)`` with ``W`` normal of standard deviation
+    ``1 / s`` and ``b`` uniform on ``[0, 2 pi]``, the random features of the Gaussian kernel
+    ``exp(-|v - v'|^2 / (2 s^2))`` with the median distance as its bandwidth; every feature is
+    standardized [1]_. With ``A`` and ``B`` the features of ``x`` and ``y``, and
     ``C`` those of the conditioning set, ``A`` and ``B`` are replaced by their residuals on ``C``
     (ridge ``1e-10``). The statistic is ``n`` times the squared Frobenius norm of the residuals'
     cross-covariance matrix. Under the null it is a weighted sum of chi-squared variables whose
@@ -258,12 +276,5 @@ class RCoT:
         return _hall_buckley_eagleson_pvalue(statistic, weights)
 
     def _features(self, columns: list[int], count: int, rng: np.random.Generator) -> np.ndarray:
-        """Standardized random Fourier features of ``columns`` for the median-distance kernel."""
-        values = self._data[:, columns]
-        dists = pdist(values[:500], "euclidean")
-        scale = float(np.median(dists)) if dists.size else 0.0
-        weights = rng.standard_normal((len(columns), count))
-        offsets = rng.uniform(0.0, 2.0 * np.pi, count)
-        if scale > 0.0:
-            weights *= np.sqrt(2.0 / scale)
-        return _standardize(np.sqrt(2.0) * np.cos(values @ weights + offsets))
+        """Standardized random Fourier features of ``columns``."""
+        return _standardize(_fourier_features(self._data[:, columns], count, rng))

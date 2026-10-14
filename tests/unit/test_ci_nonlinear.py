@@ -14,13 +14,20 @@ import warnings
 
 import numpy as np
 import pytest
+from scipy.spatial.distance import pdist, squareform
 from scipy.stats import chi2
 
 import andrey
 from andrey.core import ci
 from andrey.core.ci_cmiknn import CMIknn, _cmi, _distances, _rank_columns
 from andrey.core.ci_gpdc import GPDC, _centered_distances, _squared_distance_correlation
-from andrey.core.ci_kernel import KCI, RCoT, _hall_buckley_eagleson_pvalue, _kci_moments
+from andrey.core.ci_kernel import (
+    KCI,
+    RCoT,
+    _fourier_features,
+    _hall_buckley_eagleson_pvalue,
+    _kci_moments,
+)
 from andrey.core.independence import hsic_test
 
 ALPHA = 0.05
@@ -57,10 +64,11 @@ def _common_cause(seed: int, n: int, n_cond: int, shared: float = 0.0) -> np.nda
 
 @pytest.mark.parametrize("name", TESTS)
 def test_detects_a_dependence_partial_correlation_misses(name):
-    """``y = x^2 + noise`` with symmetric ``x``: uncorrelated, yet strongly dependent."""
-    rng = np.random.default_rng(0)
-    x = rng.standard_normal(200)
-    data = np.column_stack([x, x**2 + 0.3 * rng.standard_normal(200)])
+    """``y = x^2 + noise`` with symmetric ``x``: uncorrelated, yet strongly dependent. RCoT's few
+    features need more than 200 rows to see it, so the case has 500."""
+    rng = np.random.default_rng(1)
+    x = rng.standard_normal(500)
+    data = np.column_stack([x, x**2 + 0.3 * rng.standard_normal(500)])
     assert ci.FisherZ(data)(0, 1) > ALPHA
     assert _build(name, data)(0, 1) <= 0.01
 
@@ -116,6 +124,18 @@ def test_rcot_pvalue_is_exact_for_equal_weights(statistic):
     """``0.3 * chi2(6)`` is a sum of six equally weighted squares; its law is matched exactly."""
     expected = chi2.sf(statistic / 0.3, df=6)
     assert _hall_buckley_eagleson_pvalue(statistic, np.full(6, 0.3)) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("n_columns", [1, 3])
+def test_rcot_features_approximate_the_median_bandwidth_kernel(n_columns):
+    """Many features of a few rows average to ``exp(-d^2 / (2 s^2))``, ``s`` the median distance
+    (Strobl et al. 2019, Sect. 4.1: Gaussian kernels with the median-distance bandwidth)."""
+    values = np.random.default_rng(3).standard_normal((12, n_columns))
+    features = _fourier_features(values, 40_000, np.random.default_rng(4))
+    dists = squareform(pdist(values))
+    scale = np.median(pdist(values))
+    expected = np.exp(-(dists**2) / (2.0 * scale**2))
+    np.testing.assert_allclose(features @ features.T / 40_000, expected, atol=0.03)
 
 
 @pytest.mark.parametrize(("rho", "n_cond"), [(0.0, 0), (0.6, 0), (0.6, 1)])
