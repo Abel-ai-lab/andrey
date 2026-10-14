@@ -112,6 +112,4 @@ def ground_tokens() -> dict[str, str]:
         "--andrey-ground-amber": AMBER,
         "--andrey-ground-ink": "#ffffff",
         "--andrey-ground-muted": andrey.viz.LIGHT.ramp[0],
-        # The dark palette's green, which reads on the navy ground in either theme.
-        "--andrey-ground-green": andrey.viz.DARK.categorical[2],
     }

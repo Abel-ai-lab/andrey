@@ -28,6 +28,7 @@
     <div class="story-track">
       <div class="story-pin">
         <div class="hero-art" aria-hidden="true">{{ home.hero_art }}</div>
+        <div class="hero-fade" aria-hidden="true"></div>
         <div class="hero-intro">
           {#- Screen readers get the sentence once; the two visible forms are for the eye. -#}
           <h1 id="headline">
@@ -169,7 +170,7 @@
 
   <section class="section wrap" id="start" aria-labelledby="start-title">
     <div class="section-cover">
-      <img src="_static/art-start.jpg" alt="" width="1600" height="640" loading="lazy">
+      <div class="cover-art" aria-hidden="true"><img src="_static/art-start.jpg" alt="" width="1600" height="640" loading="lazy"></div>
       <h2 id="start-title" class="reveal">From data to graph</h2>
     </div>
     <div class="step" id="example">

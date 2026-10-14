@@ -44,6 +44,15 @@
     for (const tile of bento.querySelectorAll(".bento-grid > .tile")) arrive.observe(tile);
   }
 
+  // The art bands' dim where the browser has no view timeline: dimmed until most of the band is
+  // on the screen.
+  if (!still && !CSS.supports("animation-timeline: view()") && "IntersectionObserver" in window) {
+    const lit = new IntersectionObserver((entries) => {
+      for (const entry of entries) entry.target.classList.toggle("is-dimmed", entry.intersectionRatio < 0.6);
+    }, { threshold: [0, 0.6] });
+    for (const art of document.querySelectorAll(".cover-art")) lit.observe(art);
+  }
+
   // The figures' carousel: controls, and a slow turn that holds under the pointer or focus, out
   // of view, and under reduced motion. Without the script the row scrolls sideways.
   for (const root of document.querySelectorAll(".carousel")) {

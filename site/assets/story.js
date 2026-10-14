@@ -31,4 +31,16 @@
     observer.observe(mark);
   }
   track.style.position = "relative";
+
+  // The dim as the cover leaves: on once the bento's top passes the screen's lower fifth.
+  const next = hero.nextElementSibling;
+  if (next) {
+    new IntersectionObserver(
+      ([entry]) => {
+        const passed = entry.isIntersecting || entry.boundingClientRect.top < 0;
+        hero.toggleAttribute("data-leaving", passed);
+      },
+      { rootMargin: "0px 0px -20% 0px" },
+    ).observe(next);
+  }
 })();
