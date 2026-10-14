@@ -40,6 +40,8 @@ from . import stats
 # eigenvalue is at most this.
 _SINGULAR = 1e-12
 _LOG_2PI = math.log(2.0 * math.pi)
+# The most categorical-variable sets whose cells are kept.
+_CELL_CACHE = 4096
 
 
 def column_mask(categorical: npt.ArrayLike | None, d: int) -> np.ndarray:
@@ -195,7 +197,11 @@ class ConditionalGaussian:
         scale[self._mask] = 1.0
         self._z = np.where(self._mask, 0.0, (arr - arr.mean(axis=0)) / scale)
         self._log_scale = np.log(scale)
+        # Column-major copies: a set's columns are read one at a time.
+        self._codes = np.asfortranarray(self._codes)
+        self._columns = np.asfortranarray(self._z)
         self._loglik = lru_cache(maxsize=cache_size)(self._loglik_impl)
+        self._cells = lru_cache(maxsize=_CELL_CACHE)(self._cells_impl)
 
     def loglik(self, variables: Sequence[int]) -> float:
         """Return the log-likelihood of the set ``variables``; ``0`` for the empty set."""
@@ -208,27 +214,33 @@ class ConditionalGaussian:
         d = sum(1 for v in held if not self._mask[v])
         return joint * (d * (d + 3) // 2 + 1) - 1
 
-    def _loglik_impl(self, variables: tuple[int, ...]) -> float:
-        discrete = [v for v in variables if self._mask[v]]
-        continuous = [v for v in variables if not self._mask[v]]
+    def _cells_impl(self, discrete: tuple[int, ...]) -> tuple[np.ndarray, np.ndarray, float]:
+        """Each row's cell over ``discrete``, the cell sizes, and their multinomial loglik."""
         cell, m = categories.configurations(self._codes, self._cardinalities, discrete)
         counts = np.bincount(cell, minlength=m).astype(np.float64)
+        return cell, counts, float(np.sum(counts * np.log(counts / self.n)))
+
+    def _loglik_impl(self, variables: tuple[int, ...]) -> float:
+        discrete = tuple(v for v in variables if self._mask[v])
+        continuous = [v for v in variables if not self._mask[v]]
+        cell, counts, loglik = self._cells(discrete)
+        m = counts.size
         n = self.n
-        loglik = float(np.sum(counts * np.log(counts / n)))
         d = len(continuous)
         if d == 0:
             return loglik
-        z = self._z[:, continuous]
-        sums = np.stack([np.bincount(cell, z[:, a], minlength=m) for a in range(d)], axis=1)
-        means = sums / counts[:, None]
-        resid = z - means[cell]
+        resid = []
+        for v in continuous:
+            column = self._columns[:, v]
+            resid.append(column - (np.bincount(cell, column, minlength=m) / counts)[cell])
         scatter = np.empty((m, d, d))
         for a in range(d):
             for b in range(a, d):
                 scatter[:, a, b] = scatter[:, b, a] = np.bincount(
-                    cell, resid[:, a] * resid[:, b], minlength=m
+                    cell, resid[a] * resid[b], minlength=m
                 )
         # Each cell's covariance, shrunk toward that of all rows (the columns are centered).
+        z = self._z[:, continuous]
         fitted = (scatter + z.T @ z / n) / (counts + 1.0)[:, None, None]
         eig = np.linalg.eigvalsh(fitted)
         if (eig[:, 0] <= _SINGULAR).any():
