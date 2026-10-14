@@ -138,10 +138,196 @@ html[data-theme="dark"] .bd-header .bd-header__inner {
   --rim-shade: color-mix(in srgb, var(--andrey-paper) 70%, transparent);
 }
 
-.bd-header .navbar-nav .nav-link {
-  padding-inline: 0.55rem;
-  font-size: 0.92rem;
-  letter-spacing: -0.005em;
+/* The pill's contents: every item is one control height on the pill's center line, with one gap
+   between them. The links are small, medium-weight Inter, as on the covers; the current section
+   keeps its size and takes a cobalt dot below its label. Search, the theme switcher, the GitHub
+   link, and the menu are quiet ghost buttons: no fill until hovered. */
+.bd-header .bd-header__inner {
+  --nav-control: 2rem;
+  --nav-step: 0.5rem;
+  padding-block: 0;
+}
+
+.bd-header .navbar-header-items {
+  flex-wrap: nowrap;
+  padding-left: calc(var(--nav-step) * 2);
+}
+
+.bd-header .navbar-header-items__start {
+  gap: var(--nav-step);
+}
+
+.bd-header .navbar-header-items__center,
+.bd-header .navbar-header-items__end {
+  column-gap: calc(var(--nav-step) / 2);
+}
+
+.bd-header ul.navbar-nav {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: calc(var(--nav-step) / 2);
+}
+
+.bd-header ul.navbar-nav > li.nav-item {
+  margin-inline: 0;
+}
+
+.bd-header ul.navbar-nav > li.nav-item > .nav-link {
+  display: flex;
+  align-items: center;
+  height: var(--nav-control);
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  color: var(--andrey-muted);
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.bd-header ul.navbar-nav > li.nav-item > .nav-link:hover,
+.bd-header ul.navbar-nav > li.nav-item.current > .nav-link {
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.bd-header ul.navbar-nav > li.nav-item > .nav-link::before,
+.bd-header ul.navbar-nav > li.nav-item > .nav-link:hover::before {
+  inset: auto 50% 0.2rem auto;
+  width: 0.25rem;
+  height: 0.25rem;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  background-color: transparent;
+  transform: translateX(50%);
+}
+
+.bd-header ul.navbar-nav > li.nav-item.current > .nav-link::before {
+  border: 0;
+  background-color: var(--andrey-accent);
+}
+
+.bd-header .navbar-item {
+  height: var(--nav-control);
+}
+
+.bd-header .search-button-field,
+.bd-header .theme-switch-button,
+.bd-header .navbar-icon-links .nav-link {
+  display: inline-flex;
+}
+
+.bd-header .search-button-field,
+.bd-header .theme-switch-button,
+.bd-header .navbar-icon-links .nav-link,
+.bd-header button.sidebar-toggle {
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  height: var(--nav-control);
+  min-width: var(--nav-control);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--andrey-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  transition: background-color var(--andrey-dur) var(--andrey-ease),
+              color var(--andrey-dur) var(--andrey-ease);
+}
+
+.bd-header .search-button-field:hover,
+.bd-header .theme-switch-button:hover,
+.bd-header .navbar-icon-links .nav-link:hover,
+.bd-header button.sidebar-toggle:hover {
+  background: color-mix(in srgb, var(--andrey-ink) 7%, transparent);
+  box-shadow: none;
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+/* The icons share one glyph size; the switcher's caret goes, since the button itself opens it. */
+.bd-header .theme-switch-button svg,
+.bd-header .navbar-icon-links svg,
+.bd-header .search-button-field svg,
+.bd-header button.sidebar-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+  vertical-align: 0;
+}
+
+.bd-header .theme-switch-button::after {
+  display: none;
+}
+
+.bd-header ul.navbar-icon-links {
+  column-gap: calc(var(--nav-step) / 2);
+}
+
+/* Search is a ghost button with its label and shortcut, the shortcut as a faint key cap. */
+.bd-header .search-button-field {
+  padding-inline: 0.65rem 0.4rem;
+}
+
+.bd-header .search-button-field .search-button__default-text {
+  margin: 0 0.35rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.bd-header .search-button-field .search-button__kbd-shortcut {
+  gap: 0.15rem;
+  color: var(--andrey-muted);
+  font-size: 0;
+}
+
+.bd-header .search-button-field .kbd-shortcut__modifier {
+  margin: 0;
+  padding: 0.12rem 0.32rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ink) 12%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--andrey-muted);
+  font: 500 0.68rem/1 var(--andrey-font-sans);
+}
+
+/* The menu's own search button shows only in the phone's menu. */
+.bd-header .drawer-search {
+  display: none;
+}
+
+.bd-sidebar-primary .drawer-search {
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--andrey-line);
+  background: transparent;
+}
+
+.bd-sidebar-primary .drawer-search > span {
+  display: flex;
+  margin: 0;
+}
+
+/* Just above the drawer's width, search keeps only its icon, so the links never crowd. */
+@media (min-width: 960px) and (max-width: 1023.98px) {
+  .bd-header .search-button-field .search-button__default-text,
+  .bd-header .search-button-field .search-button__kbd-shortcut {
+    display: none;
+  }
+
+  .bd-header .search-button-field {
+    padding: 0;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -230,12 +416,40 @@ html:not(:has(.andrey-home)) .bd-header::before {
   .bd-header {
     padding-inline: 0.5rem;
   }
+
+  /* On a phone, the pill holds the wordmark at its left and the menu at its right. */
+  .bd-header .bd-header__inner {
+    padding-inline: 0.75rem 0.5rem;
+  }
+
+  .bd-header .navbar-item:has(> .site-version),
+  .bd-header .navbar-persistent--mobile,
+  .bd-header button.secondary-toggle {
+    display: none;
+  }
+
+  .bd-header button.primary-toggle {
+    display: inline-flex;
+    order: 1;
+    margin: 0;
+    font-size: 0.95rem;
+  }
 }
 
-/* the wordmark at the height of the navbar's text, as on the homepage */
+/* The wordmark's box holds the descender of its "y", so the box sits a little low to center the
+   capitals on the pill's line. */
+.bd-header .navbar-brand {
+  display: flex;
+  align-items: center;
+  height: var(--nav-control);
+  margin: 0;
+  padding: 0 0.25rem;
+}
+
 .navbar-brand img.logo__image {
-  height: 1.6rem;
+  height: 1.375rem;
   width: auto;
+  transform: translateY(0.1rem);
 }
 
 nav.bd-links li > a:hover {
@@ -347,15 +561,15 @@ code.literal {
    tag outlined like the site's cards and code windows. */
 .site-version {
   align-self: center;
-  margin-left: 0.6rem;
-  padding: 0.1rem 0.45rem;
-  border: 1px solid var(--andrey-line);
+  padding: 0.25rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ink) 12%, transparent);
   border-radius: 6px;
   color: var(--andrey-muted);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  line-height: 1.4;
+  letter-spacing: 0.01em;
+  line-height: 1;
   text-decoration: none;
   white-space: nowrap;
 }
