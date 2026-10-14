@@ -12,8 +12,8 @@ change names its pull request.
 ### Changed
 
 - `ges`, `gfci`, and `gies` return the same graphs in less time. ([#TBD])
-- `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes, and `andrey calibrate` reports the
-  largest pass of each measured size. ([#TBD])
+- `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes; its default stays 10000. Measure
+  values calibrated before this change again with `andrey calibrate`. ([#TBD])
 
 ## [0.3.0] - 2026-10-13
 
