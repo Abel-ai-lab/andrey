@@ -20,8 +20,8 @@ from .warning_policy import SampleSizeWarning, warn_once
 
 __all__ = ["KCI", "RCoT"]
 
-# The smallest sample size Strobl et al. (2019) evaluate; with up to two conditioning variables,
-# fewer rows were measured to reject true independences more often than alpha.
+# The smallest sample size Strobl et al. (2019) evaluate; with two conditioning variables, fewer
+# rows were measured to reject true independences more often than alpha.
 _RCOT_MIN_ROWS = 500
 
 
@@ -246,20 +246,18 @@ class RCoT:
     arguments, and the same seed reproduces it.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
-    variables. It warns on a conditional query below 500 rows, the smallest sample size [1]_
-    evaluates. Measured on columns independent of each other, its rate of rejecting a true
-    conditional independence with one or two conditioning variables reached ``alpha`` at 500 rows
-    and was about twice ``alpha`` at 100 rows with two. With three to six conditioning variables
-    the rate averaged about 1.3 times ``alpha`` from 500 to 2,000 rows, with no row count from
-    which it held at ``alpha``. The p-value is random through the features: a
-    different seed moves it, most near the threshold. The regression on the conditioning-set
-    features removes a strong nonlinear effect of that set only approximately, and what remains
-    reads as dependence: with two or more conditioning variables that drive both ``x`` and ``y``,
-    the test rejects a true independence more often than ``alpha``, increasingly so as the rows grow
-    (on simulated draws with three such variables and 2,000 rows, nearly always). RCoT tests
-    conditional uncorrelatedness of ``n_features`` features per variable, which can miss a
-    dependence the full kernel test finds, such as one between an odd and an even function of the
-    same cause on a few hundred rows.
+    variables. Measured on columns independent of each other, its rate of rejecting a true
+    conditional independence with two conditioning variables was about twice ``alpha`` at 100 rows
+    and near ``alpha`` from 500 rows. With three, four, or six conditioning variables the rate
+    averaged about 1.3 times ``alpha`` from 500 to 2,000 rows, with no row count from which it held
+    at ``alpha``. The p-value is random through the features: a different seed moves it, most near
+    the threshold. The regression on the conditioning-set features removes a strong nonlinear effect
+    of that set only approximately, and what remains reads as dependence: with two or more
+    conditioning variables that drive both ``x`` and ``y``, the test rejects a true independence
+    more often than ``alpha``, increasingly so as the rows grow (on simulated draws with three such
+    variables and 2,000 rows, nearly always). RCoT tests conditional uncorrelatedness of
+    ``n_features`` features per variable, which can miss a dependence the full kernel test finds,
+    such as one between an odd and an even function of the same cause on a few hundred rows.
 
     References
     ----------
