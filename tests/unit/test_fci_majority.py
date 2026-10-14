@@ -222,12 +222,14 @@ def test_r5_rejects_ambiguous_circle_paths(triples, reverse_labels):
     np.testing.assert_array_equal(marks, (before != 0) * TAIL)
 
 
-@pytest.mark.parametrize("ties", [[], [(1, 3, 4)], [(0, 1, 5)]])
-def test_circle_path_keeps_global_visited_search(ties):
-    marks = circle_graph(6, [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (4, 5)])
-    paths = list(fci_module._uncovered_circle_paths(marks, 0, 5, (-1, -1), frozenset(ties)))
-    # A tied first route is rejected; unrelated ties do not expand the search to other prefixes.
-    assert paths == ([] if ties == [(1, 3, 4)] else [[0, 1, 3, 4, 5]])
+@pytest.mark.parametrize(
+    "ties,inner",
+    [([(1, 3, 4)], [2, 3, 4]), ([(2, 3, 4)], [1, 3, 4]), ([(1, 3, 4), (2, 3, 4)], None)],
+)
+def test_tied_circle_route_does_not_block_another(ties, inner):
+    marks = circle_graph(6, [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (4, 5), (0, 5)])
+    # Both routes from 0 to 5 pass through 3; a tie on one route leaves the other usable.
+    assert fci_module._uncovered_circle_cycle(marks, 0, 5, frozenset(ties)) == inner
 
 
 @pytest.mark.parametrize("middle_in_set", [False, True])

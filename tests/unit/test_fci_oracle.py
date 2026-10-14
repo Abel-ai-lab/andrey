@@ -61,6 +61,27 @@ def test_r8_orients_a_circle_arrow_edge(monkeypatch):
     np.testing.assert_array_equal(_oracle_fci(monkeypatch, 7, edges), truth)
 
 
+def test_r5_finds_an_uncovered_route_behind_a_covered_one(monkeypatch):
+    """Selection makes every edge undirected; R5 must find each uncovered circle cycle.
+
+    A breadth-first search that marks a node visited on its first, covered route never tries the
+    uncovered route through the same node, and leaves the circles in place.
+    """
+    edges = [(0, 2), (0, 3), (0, 10), (1, 5), (1, 7), (2, 9), (3, 7), (3, 8), (4, 2), (4, 8)]
+    edges += [(5, 9), (5, 10), (6, 0), (6, 1)]
+    truth = np.array(
+        [
+            [_, T, T, T, T, T],
+            [T, _, _, T, _, T],
+            [T, _, _, _, T, T],
+            [T, T, _, _, T, _],
+            [T, _, T, T, _, _],
+            [T, T, T, _, _, _],
+        ]
+    )
+    np.testing.assert_array_equal(_oracle_fci(monkeypatch, 6, edges, (7, 8, 9, 10)), truth)
+
+
 R8_GRAPHS = {
     "r8-44641": [(0, 4), (0, 2), (4, 1), (4, 2), (1, 6), (1, 5), (1, 2), (6, 5), (3, 5), (3, 2)]
     + [(5, 2), (7, 4), (7, 3)],

@@ -728,42 +728,56 @@ def _is_uncovered(marks: np.ndarray, path: list[int]) -> bool:
     return all(not _adjacent(marks, path[i], path[i + 2]) for i in range(len(path) - 2))
 
 
-def _uncovered_circle_paths(
-    marks: np.ndarray,
-    src: int,
-    dst: int,
-    exclude: tuple[int, int],
-    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
-) -> Iterator[list[int]]:
-    """Yield uncovered circle paths from a breadth-first search with one shared visited set.
-
-    Excluded endpoints cannot occur on the path. Each node is enqueued at most once, so alternate
-    prefixes are not enumerated. Ambiguity filters completed paths without changing the search.
-    """
-    n = marks.shape[0]
-    queue: deque[tuple[int, list[int]]] = deque()
-    visited: set[int] = set()
-    for u in range(n):
-        if u in exclude or not _traverse_circle(marks, src, u):
-            continue
-        if u not in visited:
-            visited.add(u)
-            queue.append((u, [src, u]))
+def _circle_reaches(marks: np.ndarray, target: int, avoid: int) -> set[int]:
+    """Nodes joined to ``target`` by a circle walk (every edge ``o-o``) that avoids ``avoid``."""
+    reachable = {target}
+    queue = deque([target])
     while queue:
-        node, path = queue.popleft()
-        if (
-            node == dst
-            and _is_uncovered(marks, path)
-            and not any(_triple(*path[i : i + 3]) in ambiguous for i in range(len(path) - 2))
-        ):
-            yield path
-        for u in range(n):
-            if u in exclude or not _traverse_circle(marks, node, u):
+        node = queue.popleft()
+        for other in range(marks.shape[0]):
+            if other != avoid and other not in reachable and _traverse_circle(marks, node, other):
+                reachable.add(other)
+                queue.append(other)
+    return reachable
+
+
+def _uncovered_circle_cycle(
+    marks: np.ndarray,
+    a: int,
+    b: int,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+) -> list[int] | None:
+    """Inner nodes ``c, ..., d`` of an uncovered circle cycle ``a, c, ..., d, b, a``, or ``None``.
+
+    The circle path ``a, c, ..., d, b`` is simple and uncovered, and ``a``-``d`` and ``b``-``c``
+    are non-adjacent, so the cycle closed by ``a o-o b`` is uncovered too. No triple on the cycle
+    is ambiguous. Search state belongs to each path: reaching a node through one predecessor must
+    not block a different route. Reverse reachability prunes nodes with no circle walk to ``b``
+    avoiding ``a``.
+    """
+    reachable = _circle_reaches(marks, b, a)
+    stack = [
+        [a, c]
+        for c in range(marks.shape[0])
+        if c != b
+        and c in reachable
+        and _traverse_circle(marks, a, c)
+        and not _adjacent(marks, b, c)
+        and _triple(b, a, c) not in ambiguous
+    ]
+    while stack:
+        path = stack.pop()
+        last = path[-1]
+        for node in range(marks.shape[0]):
+            if node not in reachable or node in path or not _traverse_circle(marks, last, node):
                 continue
-            if u in visited:
+            if _adjacent(marks, path[-2], node) or _triple(path[-2], last, node) in ambiguous:
                 continue
-            visited.add(u)
-            queue.append((u, path + [u]))
+            if node != b:
+                stack.append([*path, node])
+            elif not _adjacent(marks, a, last) and _triple(last, b, a) not in ambiguous:
+                return path[1:]
+    return None
 
 
 def _rule_r5(
@@ -773,33 +787,18 @@ def _rule_r5(
 
     The cycle is ``a o-o b`` closed by a circle path ``a, c, ..., d, b`` with ``a``-``d`` and
     ``b``-``c`` non-adjacent; the whole path, not only ``c, ..., d``, must be uncovered
-    (Zhang 2008).
+    (Zhang 2008). Every simple path is a candidate, so a covered route through a node never hides
+    an uncovered route through the same node.
     """
     n = marks.shape[0]
-    for b in range(n):
-        for a in _into(marks, b, CIRCLE):
-            if marks[a, b] != CIRCLE:  # need a o-o b
+    for a in range(n):
+        for b in range(a + 1, n):
+            if not _traverse_circle(marks, a, b):
                 continue
-            a_circle = [c for c in range(n) if c not in (a, b) and _traverse_circle(marks, c, a)]
-            b_circle = [d for d in range(n) if d not in (a, b) and _traverse_circle(marks, d, b)]
-            for c in a_circle:
-                if _adjacent(marks, b, c):
-                    continue
-                for d in b_circle:
-                    if _adjacent(marks, a, d):
-                        continue
-                    for path in _uncovered_circle_paths(marks, c, d, (a, b), ambiguous):
-                        if not _is_uncovered(marks, [a, *path, b]):
-                            continue
-                        # Include both triples crossing the closing edge a-b.
-                        full_path = [a, *path, b, a, path[0]]
-                        if any(
-                            _triple(*full_path[i : i + 3]) in ambiguous
-                            for i in range(len(full_path) - 2)
-                        ):
-                            continue
-                        change = True
-                        _orient_tails(marks, a, b, path)
+            path = _uncovered_circle_cycle(marks, a, b, ambiguous)
+            if path is not None:
+                _orient_tails(marks, a, b, path)
+                change = True
     return change
 
 
