@@ -29,6 +29,8 @@ References
 Gerhardus, A., and Runge, J. (2020). High-recall causal discovery for autocorrelated time series
 with latent confounders. NeurIPS 33, 12615-12625. https://arxiv.org/abs/2007.01884
 
+Koller, D., and Friedman, N. (2009). Probabilistic Graphical Models. MIT Press, Algorithm 3.1.
+
 Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the presence of
 latent confounders and selection bias. Artificial Intelligence 172(16-17), 1873-1896.
 """
@@ -64,18 +66,62 @@ def unrolled_dag(truth: WindowGraph, steps: int) -> nx.DiGraph:
     return dag
 
 
+class _Separation:
+    """d-separation in a DAG by the reachable-nodes search of Koller and Friedman (2009), Alg. 3.1.
+
+    Answers many queries on one graph: parents, children, and each conditioned node's ancestors
+    are kept between queries.
+    """
+
+    def __init__(self, dag: nx.DiGraph) -> None:
+        self.dag = dag
+        self.parents = {v: list(dag.predecessors(v)) for v in dag}
+        self.children = {v: list(dag.successors(v)) for v in dag}
+        self._ancestors: dict = {}
+
+    def ancestors(self, v) -> set:
+        """The ancestors of ``v``, ``v`` excluded."""
+        if v not in self._ancestors:
+            self._ancestors[v] = nx.ancestors(self.dag, v)
+        return self._ancestors[v]
+
+    def separated(self, x, y, given: set) -> bool:
+        """Whether ``given`` d-separates ``x`` and ``y``."""
+        opens = set(given)  # colliders in ``given`` or with a descendant in it pass the search
+        for z in given:
+            opens |= self.ancestors(z)
+        seen: set = set()
+        stack = [(x, True)]  # (node, reached from a child)
+        while stack:
+            v, up = stack.pop()
+            if (v, up) in seen:
+                continue
+            seen.add((v, up))
+            if v == y:
+                return False
+            if up and v not in given:
+                stack.extend((p, True) for p in self.parents[v])
+                stack.extend((c, False) for c in self.children[v])
+            elif not up:
+                if v not in given:
+                    stack.extend((c, False) for c in self.children[v])
+                if v in opens:  # an open collider
+                    stack.extend((p, True) for p in self.parents[v])
+        return True
+
+
 def _window_mag(truth: WindowGraph, tau_max: int, past: int):
     """The window nodes, the window MAG's marks with repeating adjacencies, and ``G``."""
     n_obs = truth.n_nodes - truth.latents
-    dag = unrolled_dag(truth, tau_max + 1 + past)
+    dag = _Separation(unrolled_dag(truth, tau_max + 1 + past))
     nodes = [(i, s) for s in range(tau_max + 1) for i in range(n_obs)]
     index = {v: a for a, v in enumerate(nodes)}
     window = set(nodes)
-    anc = {v: nx.ancestors(dag, v) & window for v in nodes}
+    anc = {v: dag.ancestors(v) & window for v in nodes}
     adjacent = np.zeros((len(nodes), len(nodes)), dtype=bool)
     for a, b in combinations(nodes, 2):
         sep = (anc[a] | anc[b]) - {a, b}
-        if not nx.is_d_separator(dag, {a}, {b}, sep):
+        if not dag.separated(a, b, sep):
             adjacent[index[a], index[b]] = adjacent[index[b], index[a]] = True
     # Repeating adjacencies: a link holds only when all its copies in the window do.
     for (i, sa), (j, sb) in combinations(nodes, 2):
@@ -229,7 +275,7 @@ class DesignOracle:
 
     def __init__(self, truth: WindowGraph, tau_max: int, past: int) -> None:
         self.n_obs = truth.n_nodes - truth.latents
-        self.dag = unrolled_dag(truth, 2 * tau_max + 1 + past)
+        self.dag = _Separation(unrolled_dag(truth, 2 * tau_max + 1 + past))
         self._cache: dict = {}
 
     def _node(self, column: int) -> tuple[int, int]:
@@ -245,9 +291,7 @@ class DesignOracle:
             key = (int(a), int(b), frozenset(int(c) for c in cond))
             if key not in self._cache:
                 given = {self._node(c) for c in key[2]}
-                self._cache[key] = nx.is_d_separator(
-                    self.dag, {self._node(key[0])}, {self._node(key[1])}, given
-                )
+                self._cache[key] = self.dag.separated(self._node(key[0]), self._node(key[1]), given)
             separated[row] = self._cache[key]
         return (~separated).astype(float), separated.astype(float)
 

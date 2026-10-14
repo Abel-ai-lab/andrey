@@ -16,7 +16,7 @@ import pytest
 
 from andrey_bench import scoring
 from andrey_bench.window import ARROW, CIRCLE, NULL, TAIL, WindowGraph
-from andrey_bench.window_pag import true_window_pag
+from andrey_bench.window_pag import _Separation, true_window_pag
 
 BENCH = Path(__file__).resolve().parents[1]
 
@@ -122,6 +122,23 @@ def test_no_hidden_series_matches_the_directed_truth_where_oriented():
     oriented = np.isin(pag.marks, (TAIL, ARROW))
     assert np.array_equal(pag.marks[oriented], truth.marks[oriented])
     assert not np.any((pag.marks != NULL) & (truth.marks == NULL))
+
+
+def test_the_separation_search_agrees_with_networkx():
+    import networkx as nx
+
+    rng = np.random.default_rng(0)
+    for _ in range(20):
+        n = 9
+        upper = np.triu(rng.random((n, n)) < 0.3, 1)
+        dag = nx.DiGraph()
+        dag.add_nodes_from(range(n))
+        dag.add_edges_from(zip(*np.nonzero(upper), strict=True))
+        search = _Separation(dag)
+        for _ in range(30):
+            x, y = (int(v) for v in rng.choice(n, 2, replace=False))
+            given = {int(v) for v in rng.choice(n, 3, replace=False)} - {x, y}
+            assert search.separated(x, y, given) == nx.is_d_separator(dag, {x}, {y}, given)
 
 
 # --- scores against the true PAG ------------------------------------------------------------------
