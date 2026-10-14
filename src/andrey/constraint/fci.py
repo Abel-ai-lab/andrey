@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Iterator, Mapping
 from contextlib import nullcontext
-from itertools import combinations, islice
+from itertools import combinations, islice, permutations
 
 import numpy as np
 
@@ -849,21 +849,16 @@ def _rule_r8(marks: np.ndarray, change: bool) -> bool:
     """R8: ``a -> b -> c`` (or ``a --o b -> c``) with ``a o-> c``  =>  ``a -> c``."""
     n = marks.shape[0]
     for b in range(n):
-        adj = _adjacent_nodes(marks, b)
-        for i in range(len(adj)):
-            for k in range(i + 1, len(adj)):
-                # Test only ascending endpoint pairs (x = adj[i], z = adj[k], i < k).
-                x, z = adj[i], adj[k]
-                b_to_z = marks[z, b] == ARROW and marks[b, z] == TAIL
-                x_to_b_directed = marks[b, x] == ARROW and marks[x, b] == TAIL
-                x_to_b_circle = marks[b, x] == CIRCLE and marks[x, b] == TAIL
-                x_o_arrow_z = (
-                    _adjacent(marks, x, z) and marks[z, x] == ARROW and marks[x, z] == CIRCLE
-                )
-                if (x_to_b_directed or x_to_b_circle) and b_to_z and x_o_arrow_z:
-                    marks[x, z] = TAIL
-                    marks[z, x] = ARROW
-                    change = True
+        # Both orders of each neighbor pair, so the rule does not depend on node labels.
+        for x, z in permutations(_adjacent_nodes(marks, b), 2):
+            b_to_z = marks[z, b] == ARROW and marks[b, z] == TAIL
+            x_to_b_directed = marks[b, x] == ARROW and marks[x, b] == TAIL
+            x_to_b_circle = marks[b, x] == CIRCLE and marks[x, b] == TAIL
+            x_o_arrow_z = _adjacent(marks, x, z) and marks[z, x] == ARROW and marks[x, z] == CIRCLE
+            if (x_to_b_directed or x_to_b_circle) and b_to_z and x_o_arrow_z:
+                marks[x, z] = TAIL
+                marks[z, x] = ARROW
+                change = True
     return change
 
 
