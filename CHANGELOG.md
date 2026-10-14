@@ -9,6 +9,14 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Fixed
+
+- `ges` returns the same graph however small the data's scale, where squared covariances used to
+  underflow and change the result. ([#TBD])
+- `ges`, `gies`, `gfci`, `xges`, `hc`, and `tabu` raise a `ValueError` when a column is an exact
+  linear function of other columns, instead of returning a graph from scores that are not finite.
+  ([#TBD])
+
 ## [0.3.0] - 2026-10-13
 
 ### Highlights

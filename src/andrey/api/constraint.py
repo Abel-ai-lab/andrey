@@ -300,8 +300,9 @@ def gfci(
         If ``score_func`` is not ``"local_score_BIC"``, or ``indep_test`` names no available
         test; ``"fisherz"`` is the only one built in.
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, or if
-        ``collider_rule`` is not a supported choice.
+        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
+        ``collider_rule`` is not a supported choice, or if a column is an exact linear function of
+        other columns, so its BIC score is not finite.
 
     Warns
     -----

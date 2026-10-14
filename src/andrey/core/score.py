@@ -60,6 +60,13 @@ def local_score_bic(
         Precomputed ``log(n)``; computed from ``n`` when omitted.
     cov_diag : ndarray, optional
         Precomputed diagonal of ``cov``; computed from ``cov`` when omitted.
+
+    Raises
+    ------
+    ValueError
+        If the residual variance is zero, negative, or ``NaN``, which happens when ``node`` is
+        (nearly) a linear function of ``parents`` or the parents are (nearly) collinear. Its log,
+        and so the score, would not be finite.
     """
     if log_n is None:
         log_n = float(np.log(n))
@@ -69,7 +76,7 @@ def local_score_bic(
     n_parents = len(parents)
 
     if n_parents == 0:
-        return float(n * np.log(cov_diag[node]))
+        return float(n * np.log(_checked_residual(float(cov_diag[node]), node, parents)))
 
     if n_parents == 1:
         parent = int(parents[0])
@@ -77,12 +84,13 @@ def local_score_bic(
         if parent_var != 0.0:
             cov_ip = float(cov[node, parent])
             residual = float(cov_diag[node]) - cov_ip * (cov_ip / parent_var)
+            residual = _checked_residual(residual, node, parents)
             return float(n * np.log(residual) + log_n * lambda_value)
         yX = cov[node : node + 1, parent : parent + 1]
         XX = cov[parent : parent + 1, parent : parent + 1]
         beta = _solve(XX, yX.T)
-        H = float(np.log(cov_diag[node] - (yX @ beta).item()))
-        return float(n * H + log_n * lambda_value)
+        residual = _checked_residual(cov_diag[node] - (yX @ beta).item(), node, parents)
+        return float(n * np.log(residual) + log_n * lambda_value)
 
     if n_parents == 2:
         parent0 = int(parents[0])
@@ -95,15 +103,26 @@ def local_score_bic(
             ]
         )
         beta = _solve(XX, yX.T)
-        H = float(np.log(cov_diag[node] - (yX @ beta).item()))
-        return float(n * H + log_n * 2 * lambda_value)
+        residual = _checked_residual(cov_diag[node] - (yX @ beta).item(), node, parents)
+        return float(n * np.log(residual) + log_n * 2 * lambda_value)
 
     pa = [int(p) for p in parents]
     yX = cov[node : node + 1, pa]
     XX = cov[pa][:, pa]
     beta = _solve(XX, yX.T)
-    H = np.log(cov_diag[node] - (yX @ beta).item())
-    return float(n * H + log_n * n_parents * lambda_value)
+    residual = _checked_residual(cov_diag[node] - (yX @ beta).item(), node, parents)
+    return float(n * np.log(residual) + log_n * n_parents * lambda_value)
+
+
+def _checked_residual(residual: float, node: int, parents: Sequence[int]) -> float:
+    """Return ``residual`` if it is positive; raise otherwise, since its log is not finite."""
+    if not residual > 0.0:
+        raise ValueError(
+            f"residual variance of node {node} given parents {[int(p) for p in parents]} is "
+            f"{residual:.3g}, not positive: the column is (nearly) a linear function of these "
+            "parents, or the parents are (nearly) collinear; drop or merge redundant columns"
+        )
+    return float(residual)
 
 
 def _solve(a: np.ndarray, b: np.ndarray) -> np.ndarray:

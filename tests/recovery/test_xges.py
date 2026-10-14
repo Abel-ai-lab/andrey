@@ -261,21 +261,13 @@ def test_a_fingerprint_collision_does_not_undo_a_move(extended_search):
     assert edges == {(2 * j, 2 * j + 1) for j in pairs}
 
 
-@pytest.mark.parametrize(("n", "d"), [(8, 12), (12, 20)], ids=["-inf", "nan"])
-def test_no_branch_is_tried_when_the_score_is_not_finite(n, d, monkeypatch):
-    """With fewer rows than columns, parent sets fit some columns exactly and the base search's
-    total is -inf or nan. No branch can score below that, so the extended search tries none and
-    returns the base search's graph."""
+@pytest.mark.parametrize(("n", "d"), [(8, 12), (12, 20)])
+def test_fewer_rows_than_columns_raise(n, d):
+    """With fewer rows than columns, some parent sets fit a column exactly, leaving a residual
+    variance that is not positive and a BIC score that is not finite."""
     x = np.random.default_rng(0).standard_normal((n, d))
-    branches = []
-    branch = _Search.branch
-    monkeypatch.setattr(_Search, "branch", lambda self: branches.append(1) or branch(self))
-    with np.errstate(divide="ignore", invalid="ignore"):
-        xges_graph, xges_score = xges_search(x)
-        base_graph, _ = xges_search(x, extended_search=False)
-    assert not np.isfinite(xges_score)
-    assert branches == []
-    assert np.array_equal(from_structure(xges_graph), from_structure(base_graph))
+    with pytest.raises(ValueError, match="residual variance of node"):
+        xges_search(x)
 
 
 def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
@@ -307,14 +299,18 @@ import json, sys
 import numpy as np
 from andrey.search.xges import xges
 for path, lambda_value, extended_search in json.loads(sys.argv[1]):
-    xges(np.load(path), lambda_value=lambda_value, extended_search=extended_search)
+    try:
+        xges(np.load(path), lambda_value=lambda_value, extended_search=extended_search)
+    except ValueError:  # a residual variance that rounds to zero or below
+        pass
     print(path, flush=True)
 """
 
 
 def test_the_search_ends_on_rank_deficient_data(tmp_path):
     """Collinear columns make parent sets singular, where the Schur update and two full scores
-    disagree and a cycle of moves can each look improving. Every search must still end; a child
+    disagree and a cycle of moves can each look improving. Every search must still end, with a
+    graph or with the ValueError for a residual variance that is not positive; a child
     process runs the fits so that one that does not is stopped."""
     runs = []
     for name, (x, lambda_value, extended_search) in _rank_deficient().items():

@@ -111,6 +111,14 @@ def test_no_columns_give_an_empty_graph(method):
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("method", ["ges", "hc", "tabu", "xges"])
+def test_bic_searches_reject_a_duplicated_column(method):
+    x = _data()
+    with pytest.raises(ValueError, match="residual variance of node"):
+        SINGLE[method](np.column_stack([x, x[:, 0]]))
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_varma_lingam_needs_two_variables():
     with pytest.raises(ValueError, match="data needs at least 2 columns"):
         andrey.varma_lingam(_data(d=1))

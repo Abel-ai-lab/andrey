@@ -64,7 +64,8 @@ def ges(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC"``.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or if a column is an exact linear function
+        of other columns, so its BIC score is not finite.
 
     See Also
     --------
@@ -157,7 +158,8 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or if a column is an exact linear function
+        of other columns, so its BIC score is not finite.
 
     Warns
     -----
@@ -239,7 +241,8 @@ def xges(
         If ``extended_search`` is not a bool.
     ValueError
         If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
-        no constant column, or if ``lambda_value`` is negative or non-finite.
+        no constant column, if ``lambda_value`` is negative or non-finite, or if a column is an
+        exact linear function of other columns, so its BIC score is not finite.
 
     See Also
     --------
@@ -343,8 +346,9 @@ def hc(
     TypeError
         If a given ``max_iter`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if a given ``max_iter`` is less than
-        ``1``.
+        If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
+        or if a column is an exact linear function of other columns, so its BIC score is not
+        finite.
 
     Warns
     -----
@@ -442,7 +446,8 @@ def tabu(
         If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
-        less than ``1``, or if ``max_tabu`` is outside ``1..tabu_length``.
+        less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or if a column is an exact
+        linear function of other columns, so its BIC score is not finite.
 
     Warns
     -----

@@ -198,3 +198,32 @@ def test_baseline_values(data, cov):
         assert local_score_bic(cov, n, node, list(pa), lambda_value=1.0) == pytest.approx(
             expected, abs=1e-12
         )
+
+
+# ---- degenerate residuals -----------------------------------------------------------------
+
+# Covariances where node 0 is an exact linear function of its parents, one per parent-set branch.
+_DETERMINISTIC = {
+    "no parents": (np.zeros((1, 1)), []),
+    "one parent": (np.array([[1.0, 1.0], [1.0, 1.0]]), [1]),
+    "two parents": (np.array([[2.0, 1.0, 1.0], [1.0, 1.0, 0.0], [1.0, 0.0, 1.0]]), [1, 2]),
+    "three parents": (
+        np.array(
+            [[3.0, 1.0, 1.0, 1.0], [1.0, 1.0, 0.0, 0.0], [1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 1.0]]
+        ),
+        [1, 2, 3],
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(_DETERMINISTIC))
+def test_zero_residual_raises(case):
+    cov, pa = _DETERMINISTIC[case]
+    with pytest.raises(ValueError, match="residual variance of node 0"):
+        local_score_bic(cov, 60, 0, pa)
+
+
+def test_negative_residual_raises():
+    cov = np.array([[0.5, 1.0], [1.0, 1.0]])  # R(0 | 1) = 0.5 - 1 = -0.5
+    with pytest.raises(ValueError, match="residual variance of node 0"):
+        local_score_bic(cov, 60, 0, [1])
