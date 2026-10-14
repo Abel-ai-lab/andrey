@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import threading
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
@@ -120,6 +122,24 @@ def test_a_changed_cache_that_cannot_be_replaced_is_named(offline_datasets, monk
         load_dataset("sachs")
     assert f"cached file at {target}" in str(caught.value)
     assert target.read_text() == "raf\tmek\n1\t2\n"
+
+
+def test_concurrent_first_loads_share_the_download(offline_datasets, monkeypatch, tmp_path):
+    workers = 8
+    together = threading.Barrier(workers)
+    served = real.fetch
+
+    def fetch(url):
+        raw = served(url)
+        together.wait(timeout=10)  # every worker holds the bytes before any writes them
+        return raw
+
+    monkeypatch.setattr(real, "fetch", fetch)
+    with ThreadPoolExecutor(workers) as pool:
+        loads = list(pool.map(lambda _: load_dataset("asia", as_frame=False), range(workers)))
+    assert all(np.array_equal(load.data, loads[0].data) for load in loads)
+    assert len(offline_datasets) == workers
+    assert [p.name for p in (tmp_path / "cache" / "asia").iterdir()] == ["asia.bif.gz"]
 
 
 @pytest.mark.parametrize("url", ["http://example.invalid/x", "file:///etc/passwd"])

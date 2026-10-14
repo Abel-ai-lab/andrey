@@ -21,6 +21,7 @@ import hashlib
 import numbers
 import os
 import re
+import tempfile
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -298,9 +299,16 @@ def _download(remote: Remote, target: Path, cached: bool) -> bytes:
             tried.append(f"  {url}: SHA-256 {digest}, not {remote.sha256}")
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        partial = target.with_name(target.name + ".part")
-        partial.write_bytes(raw)
-        partial.replace(target)
+        # A temporary file of its own, so concurrent first loads never rename each other's.
+        with tempfile.NamedTemporaryFile(
+            dir=target.parent, prefix=target.name + ".", suffix=".part", delete=False
+        ) as partial:
+            partial.write(raw)
+        try:
+            os.replace(partial.name, target)
+        except OSError:
+            os.unlink(partial.name)
+            raise
         return raw
     stale = (
         f"\nThe cached file at {target} does not match the SHA-256 and was left in place; "
