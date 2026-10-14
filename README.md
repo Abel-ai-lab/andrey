@@ -46,8 +46,8 @@ uv add andrey-core
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/benchmark-chart-dark.svg">
     <img alt="Andrey's speedup over the slowest package on the same data: PC 941x at 400 variables,
-      FCI 8.7x at 800 variables, XGES 140x at 200 variables, Tabu search 561x at 800
-      variables, DirectLiNGAM 3.3x at 200 variables, PNL 275x at 5,000 rows"
+      FCI 8.7x at 800 variables, GES 4.3x at 150 variables, XGES 140x at 200 variables, Tabu
+      search 561x at 800 variables, DirectLiNGAM 3.3x at 200 variables"
       src=".github/readme/benchmark-chart-light.svg" width="100%">
   </picture>
 </p>
