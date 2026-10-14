@@ -9,6 +9,14 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
+  detect nonlinear dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#TBD])
+- The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
+  and have reference pages; register a variant with `register_indep_test` to select it by name.
+  ([#TBD])
+
 ## [0.3.0] - 2026-10-13
 
 ### Highlights
