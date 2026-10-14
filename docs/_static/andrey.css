@@ -436,6 +436,24 @@ html:not(:has(.andrey-home)) .bd-header::before {
   }
 }
 
+/* The phone menu's outline of the page: its top-level headings only, set off from the
+   documentation tree below by a rule. A wider screen has the right sidebar instead. */
+.page-outline {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--andrey-line);
+}
+
+.page-outline ul ul {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .page-outline {
+    display: none;
+  }
+}
+
 /* The wordmark's box holds the descender of its "y", so the box sits a little low to center the
    capitals on the pill's line. */
 .bd-header .navbar-brand {

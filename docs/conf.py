@@ -209,8 +209,9 @@ html_context = {"default_mode": "auto", "report_bug_url": f"{REPO_URL}/issues/ne
 BLOG_SIDEBAR = ["ablog/archives.html"]
 html_sidebars = {
     "index": [],
-    # The whole documentation tree, since the navbar names only the site's sections.
-    "docs/**": ["docs-nav.html"],
+    # The page's outline (phones only) and the whole documentation tree, since the navbar names
+    # only the site's sections.
+    "docs/**": ["page-outline.html", "docs-nav.html"],
     "blog": BLOG_SIDEBAR,
     # A post takes the full width beside its contents, so its charts have room.
     "blog/**": [],
