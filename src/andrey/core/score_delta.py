@@ -269,7 +269,7 @@ def local_score_bic_delta(
                 lambda_value=lambda_value,
                 log_n=log_n,
             )
-        R_v_new = R_v_old - (e_vu * e_vu) / R_u_old
+        R_v_new = R_v_old - e_vu * (e_vu / R_u_old)
         if R_v_new <= 0.0:
             return _delta_via_full_score(
                 cov,
@@ -326,7 +326,7 @@ def local_score_bic_delta(
                 lambda_value=lambda_value,
                 log_n=log_n,
             )
-        R_v_new = R_v_old + (e_vu * e_vu) / R_u_new
+        R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
         if R_v_new <= 0.0:
             return _delta_via_full_score(
                 cov,
@@ -474,7 +474,7 @@ def score_many_with_base(
                     if R_u_old <= 0.0:
                         continue
                     e_vu = float(cov[i, u])
-                    R_v_new = R_v_old - (e_vu * e_vu) / R_u_old
+                    R_v_new = R_v_old - e_vu * (e_vu / R_u_old)
                     if R_v_new <= 0.0:
                         continue
                     add_scores[u] = float(
@@ -492,7 +492,7 @@ def score_many_with_base(
                     R_uU = cov_diag[us_arr] - np.einsum("ij,ij->j", cs_U, beta_U)
                     safe_mask = R_uU > 0.0
                     safe_R_u = np.where(safe_mask, R_uU, 1.0)
-                    R_v_new_arr = R_v_old - (e_vU * e_vU) / safe_R_u
+                    R_v_new_arr = R_v_old - e_vU * (e_vU / safe_R_u)
                     safe_mask = safe_mask & (R_v_new_arr > 0.0)
                     if np.any(safe_mask):
                         deltas_arr = (
@@ -533,7 +533,7 @@ def score_many_with_base(
                         M_col = M_old[:, u_idx]
                         num = float(cs_v @ M_col) - float(cs_v[u_idx]) * M_uu
                         e_vu = float(cov[i, u]) + num / M_uu
-                        R_v_new = R_v_old + (e_vu * e_vu) / R_u_new
+                        R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
                         if R_v_new <= 0.0 or not np.isfinite(R_v_new):
                             continue
                         remove_scores[u] = float(
@@ -675,7 +675,7 @@ def delta_many_with_base(
                     if R_u_old <= 0.0:
                         continue
                     e_vu = float(cov[i, u])
-                    R_v_new = R_v_old - (e_vu * e_vu) / R_u_old
+                    R_v_new = R_v_old - e_vu * (e_vu / R_u_old)
                     if R_v_new <= 0.0:
                         continue
                     add_deltas[u] = float(n * (_log(R_v_new) - _log(R_v_old)) + log_n * lam)
@@ -690,7 +690,7 @@ def delta_many_with_base(
                 R_uU = cov_diag[us_arr] - np.einsum("ij,ij->j", cs_U, beta_U)
                 safe_mask = R_uU > 0.0
                 safe_R_u = np.where(safe_mask, R_uU, 1.0)
-                R_v_new_arr = R_v_old - (e_vU * e_vU) / safe_R_u
+                R_v_new_arr = R_v_old - e_vU * (e_vU / safe_R_u)
                 safe_mask = safe_mask & (R_v_new_arr > 0.0)
                 if np.any(safe_mask):
                     deltas_arr = (
@@ -724,7 +724,7 @@ def delta_many_with_base(
                 M_col = M_old[:, u_idx]
                 num = float(cs_v @ M_col) - float(cs_v[u_idx]) * M_uu
                 e_vu = float(cov[i, u]) + num / M_uu
-                R_v_new = R_v_old + (e_vu * e_vu) / R_u_new
+                R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
                 if R_v_new <= 0.0 or not np.isfinite(R_v_new):
                     continue
                 remove_deltas[u] = float(n * (_log(R_v_new) - log_Rv_old) - log_n * lam)
