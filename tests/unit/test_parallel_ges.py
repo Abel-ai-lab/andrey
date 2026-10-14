@@ -307,10 +307,11 @@ def test_ges_result_independent_of_ambient_blas_threads():
 
 
 def test_parity_on_degenerate_covariance():
-    """Serial and pooled GES agree on near-collinear data.
+    """Serial and pooled GES agree on near-duplicate columns the column check accepts.
 
-    Non-improving deltas and those that fall back to full scores must not change the pooled move
-    selection.
+    GES never scores a parent set that holds both columns of a near-duplicate pair here, so every
+    delta stays on the fast path; the test covers the near-collinear scores, not the fallback to
+    full scores.
     """
     rng = np.random.default_rng(3)
     base = rng.standard_normal((400, 6))
