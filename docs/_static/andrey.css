@@ -90,9 +90,45 @@ html[data-theme="dark"] {
   }
 }
 
+/* The navbar is a floating glass pill: the header itself is clear, and its inner row is a
+   translucent, frosted bar inset from the edges, so the page (and the homepage's hero art) shows
+   through it blurred. Without backdrop-filter the bar is the solid paper. */
 .bd-header {
-  border-bottom: 1px solid var(--andrey-line);
+  --nav-gap: 0.5rem;
+  padding: var(--nav-gap) 1rem;
+  border: 0;
+  /* pydata paints the header with !important. */
+  background-color: transparent !important;
   box-shadow: none;
+  pointer-events: none;
+}
+
+.bd-header .bd-header__inner {
+  height: calc(var(--pst-header-height) - var(--nav-gap) * 2);
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: 0.75rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ink) 12%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-paper) 74%, transparent);
+  box-shadow:
+    0 10px 30px -14px color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--andrey-paper) 55%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+  pointer-events: auto;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bd-header .bd-header__inner {
+    background: var(--andrey-paper);
+  }
+}
+
+@media (max-width: 959.98px) {
+  .bd-header {
+    padding-inline: 0.5rem;
+  }
 }
 
 /* the wordmark at the height of the navbar's text, as on the homepage */

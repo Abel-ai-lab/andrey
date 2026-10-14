@@ -131,13 +131,18 @@
 
 /* The pin is the ground. Without the scroll story it is one screen; with it (story.js adds
    is-story), it sticks while the reader scrolls the track, a few screens tall. */
+/* The hero runs up under the glass navbar (docs/_static/andrey.css), so its art shows through. */
+.andrey-home .hero {
+  margin-top: calc(-1 * var(--pst-header-height));
+}
+
 .andrey-home .story-pin {
   position: relative;
   isolation: isolate;
   display: flex;
   align-items: center;
-  min-height: max(34rem, calc(100svh - 8.5rem));
-  padding: clamp(3rem, 8vw, 6rem) var(--gutter);
+  min-height: max(38rem, calc(100svh - 4.5rem));
+  padding: calc(clamp(3rem, 8vw, 6rem) + var(--pst-header-height)) var(--gutter) clamp(3rem, 8vw, 6rem);
   overflow: hidden;
   background:
     radial-gradient(circle at 75% 40%, color-mix(in srgb, var(--andrey-ground-cobalt) 70%, transparent), transparent 70%),
@@ -311,7 +316,7 @@
   grid-area: 1 / 1;
 }
 
-/* With it, the pin sticks below the navbar for two screens of scrolling, and "Causal discovery,"
+/* With it, the pin sticks under the navbar for two screens of scrolling, and "Causal discovery,"
    stays while the word under it, the line after it, and the graph change with the reader's place
    in the track. Native scrolling throughout: CSS drives the changes from the scroll position where
    the browser can, and story.js sets data-step where it cannot. Only opacity and transform move. */
@@ -321,8 +326,8 @@
 
 .andrey-home .hero.is-story .story-pin {
   position: sticky;
-  top: 5rem;
-  height: calc(100svh - 5rem);
+  top: 0;
+  height: 100svh;
   min-height: 0;
 }
 
@@ -1599,7 +1604,7 @@
 @media (max-width: 44rem) {
   .andrey-home .story-pin {
     align-items: flex-start;
-    padding-top: 2rem;
+    padding-top: calc(2rem + var(--pst-header-height));
   }
 
   .andrey-home .bento-grid {
@@ -1627,7 +1632,7 @@
 
 @media (max-width: 30rem) {
   .andrey-home .story-pin {
-    padding-top: 1.5rem;
+    padding-top: calc(1.5rem + var(--pst-header-height));
   }
 
   .andrey-home .lede {
