@@ -265,7 +265,8 @@ def backward_chunk_best(
 # A batch's deltas depend only on the target, the base, and the batch's sources, and its bounds
 # hold against any other batch over the same base. So a target enumerated again keeps a base's
 # last batch while that batch covers the base's sources, and a delta whose bound is 0 is exact in
-# every batch.
+# every batch. The nodes a target reaches around a clique depend only on those nodes' successors,
+# so a reach set is kept until a move changes the marks of one of its nodes.
 
 # The scan the forward phase uses in-process: ``True`` runs forward_chunk_best over every target at
 # every pass; ``False`` keeps each target's candidates until a move touches it. Tests flip it to
@@ -322,6 +323,10 @@ class _ForwardScan:
         self.groups: dict[int, dict[tuple[int, ...], _Group]] = {}
         self.screened: dict[int, list[_Screened]] = {}
         self.exact: dict[int, dict[tuple[int, ...], tuple[list[int], dict[int, float]]]] = {}
+        # Each (target, clique mask)'s semi-directed reach set on the kept graph, and the graph's
+        # semi-directed successor masks once a reach set is computed on it.
+        self.reach: dict[tuple[int, int], int] = {}
+        self.succ: list[int] | None = None
 
     def best(self, adj: np.ndarray) -> ForwardResult:
         """The best-improving Insert into the targets, by ``(stable_key, x, y, t_idx)``."""
@@ -335,7 +340,6 @@ class _ForwardScan:
         heap = [(moves[0][0], y, 0) for y, moves in self.screened.items() if moves]
         heapq.heapify(heap)
         scored: dict[tuple[int, tuple[int, ...]], tuple[dict[int, float], int]] = {}
-        succ: list[int] | None = None
         best: ForwardResult = None
         limit = -_EPS_IMPROVE  # no candidate whose exact delta exceeds this can be selected
         while heap and heap[0][0] <= limit:
@@ -346,9 +350,7 @@ class _ForwardScan:
             _low, x, t_index, T, base = moves[i]
             exact = scored.get((y, base))  # this pass's exact deltas and passing sources
             if exact is None:
-                if succ is None:
-                    succ = _bitset.row_masks(adj == ops.TAIL)
-                exact = scored[(y, base)] = self._exact(y, base, succ)
+                exact = scored[(y, base)] = self._exact(y, base)
             deltas, passing = exact
             if not (passing >> x) & 1 or not deltas[x] < -_EPS_IMPROVE:
                 continue  # a y ~> x path misses the clique, or the Insert does not improve
@@ -363,6 +365,9 @@ class _ForwardScan:
 
     def _refresh(self, adj: np.ndarray) -> None:
         """Enumerate again the targets whose candidates differ from the kept graph's."""
+        if self.adj is not None:
+            moved = _bitset.bitmask(np.flatnonzero((self.adj != adj).any(axis=1)).tolist())
+            self.reach = {key: reach for key, reach in self.reach.items() if not reach & moved}
         touched = _touched(self.adj, adj)
         redo = [y for y in self.targets if touched[y]]
         if redo:
@@ -371,6 +376,7 @@ class _ForwardScan:
             for y in redo:
                 self._enumerate(y, adj, adjacent, lines)
         self.adj = adj.copy()
+        self.succ = None
 
     def _enumerate(self, y: int, adj: np.ndarray, adjacent: list[int], lines: list[int]) -> None:
         """Group ``y``'s clique-valid candidates by base and score each group in one batch.
@@ -427,9 +433,7 @@ class _ForwardScan:
                     screened.append((low, x, t_index, T, base))
         screened.sort(key=lambda move: move[:3])
 
-    def _exact(
-        self, y: int, base: tuple[int, ...], succ: list[int]
-    ) -> tuple[dict[int, float], int]:
+    def _exact(self, y: int, base: tuple[int, ...]) -> tuple[dict[int, float], int]:
         """Exact deltas of ``base``'s group at ``y`` by source, and a mask of its passing sources.
 
         A source passes when no semi-directed ``y ~> x`` path avoids the group's clique. The
@@ -438,7 +442,12 @@ class _ForwardScan:
         source's bound is 0; otherwise the last exact batch serves while the same sources pass.
         """
         clique, sources, batch, deltas, _bounds, dependent = self.groups[y][base]
-        passing = sources & ~_bitset.semidirected_reach_set(succ, y, clique)
+        reach = self.reach.get((y, clique))
+        if reach is None:
+            if self.succ is None:
+                self.succ = _bitset.row_masks(self.adj == ops.TAIL)
+            reach = self.reach[(y, clique)] = _bitset.semidirected_reach_set(self.succ, y, clique)
+        passing = sources & ~reach
         if passing.bit_count() == len(batch) or not passing & dependent:
             return deltas, passing
         valid = _bitset.nodes(passing)
