@@ -2182,7 +2182,6 @@
   justify-content: space-between;
   gap: 1rem 2rem;
   padding-block: 2.5rem 3rem;
-  border-top: 1px solid var(--andrey-line);
   color: var(--andrey-muted);
   font-size: 0.9rem;
 }
