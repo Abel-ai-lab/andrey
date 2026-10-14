@@ -45,7 +45,12 @@ PUBLISHED = ROOT / "benchmarks" / "published"
 # Every release's published comparison with other packages, oldest first, by folder under
 # PUBLISHED. The speed and accuracy sections cover them all. The first is SUMMARY, the one a
 # placeholder preview replaces.
-RELEASES = ("alpha-2026-09", "hidden-confounders-2026-10", "score-search-2026-10")
+RELEASES = (
+    "alpha-2026-09",
+    "hidden-confounders-2026-10",
+    "score-search-2026-10",
+    "pairwise-2026-10",
+)
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
 palette_block = runpy.run_path(str(DOCS / "palette_css.py"))["palette_block"]
@@ -81,11 +86,14 @@ REGIMES = {
     "latent_gauss_er": "linear-Gaussian data from Erdos-Renyi graphs with hidden confounders",
     "lingam_sf": "linear non-Gaussian data from scale-free graphs",
     "latent_lingam_er": "linear non-Gaussian data from Erdos-Renyi graphs with hidden confounders",
+    "anm_pair": "cause-effect pairs with additive noise",
+    "pnl_pair": "cause-effect pairs with post-nonlinear noise",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
 # How each kind of summary counts a graph's errors: the row keys for Andrey's count, the other
-# package's, and the empty graph's, then what one error is, as the accuracy section says it.
+# package's, and the empty graph's (None where a summary records none), then what one error is, as
+# the accuracy section says it.
 ERRORS = {
     "shd": (
         ("andrey_shd", "comparator_shd", "empty_shd"),
@@ -95,6 +103,10 @@ ERRORS = {
         ("andrey_directed_errors", "comparator_directed_errors", "empty_directed_errors"),
         "on data with hidden common causes, a directed edge that only one of the learned and "
         "true graphs has",
+    ),
+    "direction": (
+        ("andrey_reversed", "comparator_reversed", None),
+        "on a cause-effect pair, the reversed direction",
     ),
 }
 # The density the homepage shows. A summary that measures more than one mean degree at a size
@@ -174,10 +186,13 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
         if method["regime"] not in REGIMES:
             raise ValueError(f"{name}: describe regime {method['regime']!r} in REGIMES")
         registry_name(method)
-        keys = ROW_KEYS | set(ERRORS[error_kind(method)][0])
+        kind = error_kind(method)
+        keys = ROW_KEYS | {key for key in ERRORS[kind][0] if key}
         for row in method["rows"]:
             if keys - row.keys():
                 raise ValueError(f"{name} d={row.get('d')} lacks {sorted(keys - row.keys())}")
+            if kind == "direction" and (row.get("andrey_no_edge") or row.get("comparator_no_edge")):
+                raise ValueError(f"{name} n={row['n']}: a pair without an edge is not counted")
             timed = row["andrey_s"] is not None and row["comparator_s"] is not None
             if row["ratio"] is not None and not timed:
                 raise ValueError(
@@ -224,9 +239,12 @@ def error_kind(method: dict) -> str:
     - ``directed``: on data with hidden common causes, the directed edges in one graph but not the
       other, against the true graph's projection onto the observed variables; a reversed edge
       counts twice (the hidden-confounders-2026-10 summary).
+    - ``direction``: on cause-effect pairs, the pairs whose direction is reversed (the
+      pairwise-2026-10 summary). Each package names a direction on every pair it fits, so a fitted
+      pair is either right or reversed; a summary with a pair left without an edge fails to load.
 
-    Fewer is better in both. A comparison whose rows give neither fails, rather than drop out of
-    the count.
+    Fewer is better in each. A comparison whose rows give none of them fails, rather than drop out
+    of the count.
     """
     kinds = [
         kind
@@ -251,10 +269,11 @@ def comparisons(summary: dict) -> list[dict]:
     """A summary's comparisons in one layout, whatever kind of summary it is.
 
     Each keeps the summary's method, package (``comparator``), regime, hardware, and build, and
-    adds the registry's name (``spec``), family, and status, and its ``error_kind``. Each row
-    gives:
+    adds the registry's name (``spec``), family, and status, its ``error_kind``, and the ``unit``
+    of its sizes: "variables", or "rows" for a pairwise method. Each row gives:
 
-    - ``d``: the variables the method gets, the observed ones on data with hidden variables;
+    - ``d``: the size, in ``unit``: the variables the method gets, the observed ones on data with
+      hidden variables, or a cause-effect pair's rows, since every pair has two variables;
     - ``andrey_s`` and ``comparator_s``: the median fit times, ``None`` past a time cap;
     - ``ratio`` and ``at_least``: the speedup, from :func:`claimed_ratio`;
     - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`.
@@ -268,6 +287,7 @@ def comparisons(summary: dict) -> list[dict]:
         spec = specs[registry_name(method)]
         kind = error_kind(method)
         ours, theirs, _ = ERRORS[kind][0]
+        pairs = spec.family == "pairwise"
         rows = []
         for row in method["rows"]:
             if row.get("mean_degree", MEAN_DEGREE) != MEAN_DEGREE:
@@ -275,7 +295,7 @@ def comparisons(summary: dict) -> list[dict]:
             ratio, at_least = claimed_ratio(row)
             rows.append(
                 {
-                    "d": row.get("observed", row["d"]),
+                    "d": row["n"] if pairs else row.get("observed", row["d"]),
                     "andrey_s": row["andrey_s"],
                     "comparator_s": row["comparator_s"],
                     "ratio": ratio,
@@ -291,6 +311,7 @@ def comparisons(summary: dict) -> list[dict]:
                 "family": spec.family,
                 "status": spec.status,
                 "error_kind": kind,
+                "unit": "rows" if pairs else "variables",
                 "rows": rows,
             }
         )
@@ -409,10 +430,10 @@ def ratio_label(row: dict) -> str:
 PANEL = (
     ("alpha-2026-09", "PC"),
     ("alpha-2026-09", "FCI"),
-    ("alpha-2026-09", "GES"),
     ("score-search-2026-10", "XGES"),
     ("score-search-2026-10", "Tabu search"),
     ("alpha-2026-09", "DirectLiNGAM"),
+    ("pairwise-2026-10", "PNL"),
 )
 
 
@@ -465,7 +486,7 @@ def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str
         for package, row in timed.items():
             speed = ours / row["ratio"]
             bars.append((package, speed, speedup_text(speed)))
-        slides.append((name, f"{d:,} variables", sorted(bars, key=lambda bar: -bar[1])))
+        slides.append((name, f"{d:,} {lead['unit']}", sorted(bars, key=lambda bar: -bar[1])))
     return slides
 
 
@@ -550,9 +571,9 @@ def speed_intro(summaries: list[dict]) -> str:
     return (
         f"{lead}{', and ' + rest if rest else ''}, measured alongside {listed(packages)} on the "
         "same datasets and the same machine at each size. "
-        "Each chart plots the median fit time against the number of variables: up and to the "
-        'left is better. The <a href="docs/benchmarks.html">release cards</a> have every '
-        "measurement."
+        "Each chart plots the median fit time against the number of variables, or of rows for a "
+        'pair of variables: up and to the left is better. The <a href="docs/benchmarks.html">'
+        "release cards</a> have every measurement."
     )
 
 
@@ -592,9 +613,11 @@ SIZE_TICKS = (5, 10, 20, 50, 100, 200, 400, 800, 1600, 3200)
 def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: list[int]) -> str:
     """Fit time (x) against problem size (y) for Andrey and each package, both on log scales.
 
-    Up and to the left is better: more variables in less time. A hollow point is a size with no
-    paired ratio; a package past its time cap has no point at that size.
+    Up and to the left is better: larger problems in less time. The size is in the comparisons'
+    ``unit``, variables or rows. A hollow point is a size with no paired ratio; a package past its
+    time cap has no point at that size.
     """
+    unit = methods[0]["unit"]
     w, h, left, right, top, bottom = 320, 232, 44, 306, 22, 196
     x = log_scale(xr[0], xr[1], left, right)
     y = log_scale(sizes[0], sizes[-1], bottom, top)
@@ -628,7 +651,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
         path = " ".join(f"{x(t):.1f},{y(d):.1f}" for d, t, _ in timed)
         marks.append(f'<polyline class="tc-line {cls}" points="{path}"/>')
         for d, t, claim in timed:
-            tip = f"{label}, {d:,} variables: {seconds_text(t)}" + (
+            tip = f"{label}, {d:,} {unit}: {seconds_text(t)}" + (
                 "" if claim else ", no paired ratio"
             )
             marks.append(
@@ -650,10 +673,10 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
         f'<span class="tchart-up">up to <b>{escape(ratio_label(best))}</b></span></figcaption>'
         f'<p class="tc-legend">{legend}</p>'
         f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{escape(name)}: fit time against '
-        f'the number of variables for Andrey and {escape(peers)}">'
+        f'the number of {unit} for Andrey and {escape(peers)}">'
         f'<g class="tc-axis">{"".join(grid)}</g>'
         f'<text class="tc-title" x="{left}" y="{h - 4}">seconds (log)</text>'
-        f'<text class="tc-title" x="4" y="{top - 8}">variables</text>'
+        f'<text class="tc-title" x="4" y="{top - 8}">{unit}</text>'
         f"{''.join(marks)}</svg></figure>"
     )
 
@@ -665,7 +688,8 @@ def seconds_axis(v: float) -> str:
 
 def speed_chart(summaries: list[dict]) -> str:
     """An array of charts, one per method (or per run where a method's comparisons differ), each
-    with its largest speedup, on shared axes so the charts compare at a glance."""
+    with its largest speedup, on shared axes so the charts compare at a glance: one time axis, and
+    one size axis per unit."""
     # A speedup belt: a comparison where Andrey is not faster stays in the release cards' tables.
     groups = [(n, ms) for n, ms in time_groups(summaries) if all(faster(m) for m in ms)]
     times = [
@@ -677,8 +701,16 @@ def speed_chart(summaries: list[dict]) -> str:
         if t is not None
     ]
     xr = (10 ** math.floor(math.log10(min(times))), 10 ** math.ceil(math.log10(max(times))))
-    sizes = sorted({r["d"] for _, methods in groups for m in methods for r in m["rows"]})
-    return belt([time_chart(name, methods, xr, sizes) for name, methods in groups])
+    sizes: dict[str, set[int]] = {}
+    for _, methods in groups:
+        for m in methods:
+            sizes.setdefault(m["unit"], set()).update(r["d"] for r in m["rows"])
+    return belt(
+        [
+            time_chart(name, methods, xr, sorted(sizes[methods[0]["unit"]]))
+            for name, methods in groups
+        ]
+    )
 
 
 def belt(figures: list[str]) -> str:
@@ -799,7 +831,7 @@ def accuracy_card(name: str, methods: list[dict]) -> str:
         else:
             mark = ""
         tip = (
-            f"{method['comparator']}, {d:,} variables: Andrey "
+            f"{method['comparator']}, {d:,} {method['unit']}: Andrey "
             f"{number_text(row['andrey_errors'])} errors, {method['comparator']} "
             f"{number_text(row['comparator_errors'])}"
         )
@@ -815,7 +847,7 @@ def accuracy_card(name: str, methods: list[dict]) -> str:
         f'<strong class="rt-name">{escape(name)}</strong>'
         f'<span class="rt-score"><b>{good} of {len(scored)}</b>'
         "<span>same or fewer errors</span></span></figcaption>"
-        '<div class="rt-grid"><span class="rt-h rt-d">Variables</span>'
+        f'<div class="rt-grid"><span class="rt-h rt-d">{methods[0]["unit"].capitalize()}</span>'
         '<span class="rt-h">Compared with</span><span class="rt-h">Fewer errors &rarr;</span>'
         f'<span class="rt-h"></span>{"".join(rows)}</div></figure>'
     )

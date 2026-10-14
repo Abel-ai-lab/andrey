@@ -428,7 +428,7 @@ def test_the_headline_is_the_slogan_and_the_claim_drops_what_it_says(placeholder
     found = re.search(r'<h1 id="headline">(.*?)</h1>\s*<p class="claim">([^<]*)<', placeholder_page)
     assert re.sub(r"<[^>]+>", "", found[1]) == "Causal discovery, fast."
     assert found[2] == build.claim_sentence(placeholder_summaries())
-    assert found[2].startswith("Over 100x faster on PC, and faster on ")
+    assert found[2].startswith("Over 1,000x faster on PNL, and faster on ")
 
 
 def test_the_lede_names_every_registry_family_in_one_sentence(placeholder_page):
@@ -453,7 +453,7 @@ def test_the_description_states_the_speed_claim_and_the_method_count(monkeypatch
     specs = [s for s in list_specs() if s.name != dropped]
     monkeypatch.setattr(build, "list_specs", lambda: specs)
     description = build.page_description(summaries)
-    assert "over 100x faster on PC than other popular packages" in description
+    assert "over 1,000x faster on PNL than other popular packages" in description
     assert f"with PC, GES, FCI and {len(specs) - 3} more methods" in description
     # Search results cut a description at about 160 characters.
     assert len(description) <= 160
@@ -536,19 +536,21 @@ def test_the_speedup_panel_has_six_slides_each_a_published_ratio():
     for (release, name), (shown, size, bars) in zip(build.PANEL, slides, strict=True):
         assert shown == name
         # The slide is the method's largest size with a published ratio, at the panel's mean
-        # degree, and Andrey's bar prints that ratio, "≥" before a lower bound.
+        # degree, and Andrey's bar prints that ratio, "≥" before a lower bound. A pair's size is
+        # its rows.
+        methods = [m for m in by_release[release]["methods"] if m["method"] == name]
         rows = [
             r
-            for m in by_release[release]["methods"]
-            if m["method"] == name
+            for m in methods
             for r in m["rows"]
             if r["ratio"] is not None and r.get("mean_degree", build.MEAN_DEGREE) == 2.0
         ]
-        largest = max(r.get("observed", r["d"]) for r in rows)
-        assert size == f"{largest:,} variables"
-        ratio, at_least = max(
-            build.claimed_ratio(r) for r in rows if r.get("observed", r["d"]) == largest
-        )
+        pairs = methods[0].get("family") == "pairwise"
+        unit = "rows" if pairs else "variables"
+        size_of = (lambda r: r["n"]) if pairs else (lambda r: r.get("observed", r["d"]))
+        largest = max(size_of(r) for r in rows)
+        assert size == f"{largest:,} {unit}"
+        ratio, at_least = max(build.claimed_ratio(r) for r in rows if size_of(r) == largest)
         andrey = next(label for package, _, label in bars if package == "Andrey")
         assert andrey == ("\u2265" if at_least else "") + build.ratio_text(ratio)
         assert bars[-1][2] == "1x" and andrey == bars[0][2]

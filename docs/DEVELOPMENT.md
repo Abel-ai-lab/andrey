@@ -46,23 +46,24 @@ The homepage takes every number from the release summaries that `RELEASES` in `s
 each `benchmarks/published/<label>/summary.json`, or from the method registry,
 `andrey.spec.list_specs()`. Only methods the registry supports count. `comparisons()` reads every
 kind of summary into one layout: rows at mean degree 2 where a summary measures more than one, the
-observed variables on data with hidden variables, a ratio the summary flags as a lower bound printed
-as one, and each comparison's errors in the measure its summary records (`ERRORS`: the structural
-Hamming distance, or directed-edge errors on data with hidden common causes). The claim under the
-heading is the one `claim_sentence()` words from every supported comparison: the largest ratio
-rounded down to a power of ten on its method, then whether the other supported methods are faster
-("the other", "most other", or nothing). The build also fails unless the first summary's headline is
-the claim its own numbers support; the docs index, the notebook, and the live demo repeat it. The
-speedup panel shows one slide per method in `PANEL`, a (release, method) pair each, with every
-package measured in the same runs at its largest size with a paired ratio; the README chart draws
-the same slides as cards and refuses more than six. The hero names every registry family, and the
-method list shows every registered method. The page's description, which search results and link
-previews show, names PC, GES, and FCI, counts the other registered methods, and states the claim's
-first part ("over 100x faster on PC"). Every other page's description is the `description` in its
-front matter; without one, the page's first paragraph, cut at a word to 160 characters (an API
-page's is its docstring's summary line). A page with neither, such as search or the blog archive,
-takes the homepage's. To preview with placeholder numbers, which replace the first release's
-summary:
+observed variables on data with hidden variables, a cause-effect pair's rows as its size, a ratio
+the summary flags as a lower bound printed as one, and each comparison's errors in the measure its
+summary records (`ERRORS`: the structural Hamming distance, directed-edge errors on data with hidden
+common causes, or reversed directions on cause-effect pairs). The speed charts share one size axis
+per unit, variables or rows. The claim under the heading is the one `claim_sentence()` words from
+every supported comparison: the largest ratio rounded down to a power of ten on its method, then
+whether the other supported methods are faster ("the other", "most other", or nothing). The build
+also fails unless the first summary's headline is the claim its own numbers support; the docs index,
+the notebook, and the live demo repeat it. The speedup panel shows one slide per method in `PANEL`,
+a (release, method) pair each, with every package measured in the same runs at its largest size with
+a paired ratio; the README chart draws the same slides as cards and refuses more than six. The hero
+names every registry family, and the method list shows every registered method. The page's
+description, which search results and link previews show, names PC, GES, and FCI, counts the other
+registered methods, and states the claim's first part ("over 1,000x faster on PNL"). Every other
+page's description is the `description` in its front matter; without one, the page's first
+paragraph, cut at a word to 160 characters (an API page's is its docstring's summary line). A page
+with neither, such as search or the blog archive, takes the homepage's. To preview with placeholder
+numbers, which replace the first release's summary:
 
 ```shell
 uv run --group docs sphinx-build -b html docs docs/_build/html \
