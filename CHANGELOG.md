@@ -9,6 +9,11 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Fixed
+
+- `load_dataset` no longer fails when several processes download the same dataset at once into an
+  empty cache. ([#93])
+
 ## [0.3.0] - 2026-10-13
 
 ### Highlights
@@ -113,3 +118,4 @@ First alpha release.
 [#57]: https://github.com/Abel-ai-lab/andrey/pull/57
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59
 [#64]: https://github.com/Abel-ai-lab/andrey/pull/64
+[#93]: https://github.com/Abel-ai-lab/andrey/pull/93
