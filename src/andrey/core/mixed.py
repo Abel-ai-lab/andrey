@@ -41,6 +41,9 @@ from . import stats
 # A fitted covariance, on the scale of the standardized columns, counts as singular when its least
 # eigenvalue is at most this.
 _SINGULAR = 1e-12
+# A batch of fitted covariances takes the Cholesky path only for sets whose every covariance has a
+# condition number certified below this; the others take the eigenvalues.
+_CONDITION = 1e8
 _LOG_2PI = math.log(2.0 * math.pi)
 # The memory, in bytes, the kept cell numberings of categorical-variable sets may take.
 _CELL_BYTES = 64 * 2**20
@@ -254,20 +257,20 @@ class ConditionalGaussian:
         """Per-cell sums of products for each ``(categorical set, row a, row b)`` in ``pairs``.
 
         The row of ones makes ``(a, ones)`` the sums of ``a`` and ``(ones, ones)`` the cell sizes.
-        Each result is kept under its triple.
+        Each result is kept under its triple, but the cell sizes, which the cells keep.
         """
         get, put, one = self._stats.get, self._stats.put, self._one
         found = []
         for pair in pairs:
+            discrete, a, b = pair
+            if a == one:
+                found.append(self._cells(discrete).counts)
+                continue
             value = get(pair)
             if value is None:
-                discrete, a, b = pair
                 cells = self._cells(discrete)
-                if a == one:
-                    value = cells.counts
-                else:
-                    weights = self._columns[a] if b == one else self._columns[a] * self._columns[b]
-                    value = np.bincount(cells.cell, weights, minlength=cells.counts.size)
+                weights = self._columns[a] if b == one else self._columns[a] * self._columns[b]
+                value = np.bincount(cells.cell, weights, minlength=cells.counts.size)
                 put(pair, value)
             found.append(value)
         return found
@@ -370,24 +373,18 @@ def _gaussian_terms(
 
     Row ``r`` of the ``(rows, d, d)`` stacks is a cell of set ``owner[r]``, whose rows begin at
     ``starts``. A set's Cholesky factors give its log-determinants and its inverses the traces.
-    When a factor fails, or an inverse's norm cannot certify the least eigenvalue above
-    ``_SINGULAR``, the set's eigenvalues decide instead, and a set with a cell at or below it
-    raises ``ValueError``. Each set takes the same path in any batch.
+    A set takes its eigenvalues instead when a cell's condition number is not certified below
+    ``_CONDITION`` by ``||C||_F ||C^-1||_F``, and every set does when a factor fails. A set with a
+    cell's least eigenvalue at or below ``_SINGULAR`` raises ``ValueError``.
     """
     try:
         factor, inverse = np.linalg.cholesky(fitted), np.linalg.inv(fitted)
-        failed = np.zeros(len(sets), dtype=bool)
+        norms = np.sum(inverse**2, axis=(-2, -1)) * np.sum(fitted**2, axis=(-2, -1))
+        certified = norms < _CONDITION**2
     except np.linalg.LinAlgError:
         factor, inverse = np.ones_like(fitted), np.zeros_like(fitted)
-        failed = np.zeros(len(sets), dtype=bool)
-        for g, (lo, hi) in enumerate(zip(starts, [*starts[1:], len(fitted)], strict=True)):
-            try:
-                factor[lo:hi] = np.linalg.cholesky(fitted[lo:hi])
-                inverse[lo:hi] = np.linalg.inv(fitted[lo:hi])
-            except np.linalg.LinAlgError:
-                failed[g] = True
-    certified = np.sum(inverse**2, axis=(-2, -1)) < _SINGULAR**-2
-    exact = (failed | ~np.logical_and.reduceat(certified, starts))[owner]
+        certified = np.zeros(len(fitted), dtype=bool)
+    exact = ~np.logical_and.reduceat(certified, starts)[owner]
     log_det = 2.0 * np.sum(np.log(np.diagonal(factor, axis1=-2, axis2=-1)), axis=-1)
     quad = np.sum(inverse * scatter, axis=(-2, -1))
     if exact.any():
