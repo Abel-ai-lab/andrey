@@ -20,6 +20,7 @@ recomputed from the final CPDAG by :func:`andrey.search.ges._recompute_objective
 from __future__ import annotations
 
 import heapq
+import math
 from collections.abc import Callable, Iterator, Sequence
 from typing import Protocol
 
@@ -69,9 +70,18 @@ class DeltaEngine(Protocol):
     score_obj: BICScore
 
     def delta_many_with_base(
-        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+        self,
+        i: int,
+        base_parents: Sequence[int],
+        deltas: Sequence[tuple[str, int]],
+        *,
+        bounds: list[float] | None = None,
     ) -> list[float]:
-        """Return ``[score(i, base +/- u_k) - score(i, base)]`` for the requested moves."""
+        """Return ``[score(i, base +/- u_k) - score(i, base)]`` for the requested moves.
+
+        ``bounds``, when given, receives per move the most its delta can differ when another batch
+        over the same base scores it (:func:`andrey.core.score_delta.delta_many_with_base`).
+        """
         ...
 
 
@@ -91,9 +101,16 @@ class _FullScoreDelta:
         self.score_obj = score
 
     def delta_many_with_base(
-        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+        self,
+        i: int,
+        base_parents: Sequence[int],
+        deltas: Sequence[tuple[str, int]],
+        *,
+        bounds: list[float] | None = None,
     ) -> list[float]:
         base = tuple(sorted(int(p) for p in base_parents))
+        if bounds is not None:
+            bounds[:] = [0.0] * len(deltas)  # two full scores do not depend on the batch
         return [_delta_two_scores(self.score_obj, int(i), base, u, op) for op, u in deltas]
 
 
@@ -238,22 +255,19 @@ def backward_chunk_best(
 #
 # The selected move is the one forward_chunk_best selects, whose deltas come from one batch per
 # base of the candidates that pass the reachability check. A kept candidate carries a screening
-# delta from one batch of every candidate sharing its base, which can differ in the last bits. The
-# scan visits candidates in screening order and recomputes each visited base group with
-# forward_chunk_best's batch, until no screening delta can come within the bound below of beating
-# the best exact key. The bound assumes two batches over one base give deltas that differ by less
-# than ``_SCREEN_TOL * n_samples``; the conditioning gate keeps about six digits of each residual,
-# and measured differences stay below 1e-15 * n_samples.
+# delta from one batch of every candidate sharing its base. The two batches round differently, by
+# a few units in the last place on well-conditioned data and by any amount when the rank-one
+# update cancels, so the delta engine bounds the difference per candidate. A candidate is kept
+# under the lowest delta that bound allows, or minus infinity when another batch can take the
+# other side of a guard. The scan visits candidates in that order and recomputes each visited
+# base group with forward_chunk_best's batch, until no lower bound can beat the best exact key.
 
 # The scan the forward phase uses in-process: ``True`` runs forward_chunk_best over every target at
 # every pass; ``False`` keeps each target's candidates until a move touches it. Tests flip it to
 # compare the two. Pooled workers always keep their candidates.
 _FULL_RESCAN = False
 
-# Bound on the difference between a screening delta and the exact delta, per sample.
-_SCREEN_TOL = 1e-6
-
-# A candidate kept for selection: ``(screening delta, x, t_index, T, base)``.
+# A candidate kept for selection: ``(lowest exact delta, x, t_index, T, base)``.
 _Screened = tuple[float, int, int, tuple[int, ...], tuple[int, ...]]
 
 
@@ -288,11 +302,10 @@ class _ForwardScan:
         self.delta_engine = delta_engine
         self.n = n
         self.max_parents = max_parents
-        self.tol = _SCREEN_TOL * delta_engine.score_obj.n
         self.build_reach = _reach_factory(n)
         self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
         # Per target: each base's clique mask and screening deltas by source; the candidates that
-        # can improve, sorted by screening delta; and each base's last exact deltas with the
+        # can improve, sorted by lowest exact delta; and each base's last exact deltas with the
         # passing sources they were scored for.
         self.groups: dict[int, dict[tuple[int, ...], tuple[int, dict[int, float]]]] = {}
         self.screened: dict[int, list[_Screened]] = {}
@@ -314,13 +327,13 @@ class _ForwardScan:
         scored: dict[tuple[int, tuple[int, ...]], dict[int, float]] = {}  # this pass's groups
         succ: list[int] | None = None
         best: ForwardResult = None
-        limit = -_EPS_IMPROVE  # no candidate whose exact delta reaches this can be selected
-        while heap and heap[0][0] - self.tol < limit:
-            _delta, y, i = heapq.heappop(heap)
+        limit = -_EPS_IMPROVE  # no candidate whose exact delta exceeds this can be selected
+        while heap and heap[0][0] <= limit:
+            _low, y, i = heapq.heappop(heap)
             moves = self.screened[y]
             if i + 1 < len(moves):
                 heapq.heappush(heap, (moves[i + 1][0], y, i + 1))
-            _delta, x, t_index, T, base = moves[i]
+            _low, x, t_index, T, base = moves[i]
             deltas = scored.get((y, base))
             if deltas is None:
                 if succ is None:
@@ -332,7 +345,8 @@ class _ForwardScan:
             key = (stable_key(delta, self.n), x, y, t_index)
             if best is None or key < best[0]:
                 best = (key, x, y, T)
-                # Only a delta within one quantization step of this key can still win.
+                # Only a delta within one quantization step of this key can still win; at a key
+                # of minus infinity, only a delta of minus infinity can tie.
                 limit = min(-_EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-_KEY_DP))
         return best
 
@@ -345,7 +359,11 @@ class _ForwardScan:
         self.adj = adj.copy()
 
     def _enumerate(self, y: int, adj: np.ndarray, state: NeighborState) -> None:
-        """Group ``y``'s clique-valid candidates by base and score each group in one batch."""
+        """Group ``y``'s clique-valid candidates by base and score each group in one batch.
+
+        A candidate is kept when the lowest exact delta its screening delta and bound allow can
+        improve.
+        """
         groups: dict[tuple[int, ...], tuple[int, dict[int, float]]] = {}
         screened: list[_Screened] = []
         self.groups[y], self.screened[y], self.exact[y] = groups, screened, {}
@@ -358,12 +376,14 @@ class _ForwardScan:
             members.setdefault(tuple(sorted(pa_set | clique)), []).append((x, t_index, T))
         for base, cands in members.items():
             moves = [("add", x) for x, _, _ in cands]
-            deltas = self.delta_engine.delta_many_with_base(y, base, moves)
+            bounds: list[float] = []
+            deltas = self.delta_engine.delta_many_with_base(y, base, moves, bounds=bounds)
             clique_mask = _bitset.bitmask(set(base) - pa_set)
             groups[base] = (clique_mask, {x: d for (x, _, _), d in zip(cands, deltas, strict=True)})
-            for (x, t_index, T), d in zip(cands, deltas, strict=True):
-                if d - self.tol < -_EPS_IMPROVE:
-                    screened.append((d, x, t_index, T, base))
+            for (x, t_index, T), d, bound in zip(cands, deltas, bounds, strict=True):
+                low = -math.inf if bound == math.inf else d - bound
+                if low < -_EPS_IMPROVE:
+                    screened.append((low, x, t_index, T, base))
         screened.sort(key=lambda move: move[:3])
 
     def _exact(self, y: int, base: tuple[int, ...], succ: list[int]) -> dict[int, float]:
