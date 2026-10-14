@@ -1,4 +1,4 @@
-"""Conditional-independence test substrate: the partial-correlation Fisher-Z test.
+"""Conditional-independence test substrate: the partial-correlation Fisher-Z test and the registry.
 
 The constraint-based discovery family (PC / FCI / CDNOD) consumes a conditional-independence test
 through the :class:`CITest` contract: an object constructed once over the data and called as
@@ -24,6 +24,7 @@ import numpy as np
 from scipy.special import ndtr
 
 from . import stats
+from .discrete import ChiSquare, GSquare
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
@@ -238,11 +239,17 @@ class FisherZ:
 
 
 # The indep_test registry: a name maps to a factory building a :class:`CITest` over the data.
-# Fisher-Z is the only shipped test; the constraint facades resolve their ``indep_test`` argument
+# Fisher-Z serves continuous data; chi-square and G-square serve discrete data
+# (:mod:`andrey.core.discrete`). The constraint facades resolve their ``indep_test`` argument
 # through :func:`make_indep_test`, and :func:`register_indep_test` lets a downstream test or plugin
-# add another under the same Protocol -- the generality this registry exposes.
-SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz",)
-_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {"fisherz": FisherZ}
+# add another under the same Protocol.
+SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz", "chisq", "gsq")
+DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
+_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {
+    "fisherz": FisherZ,
+    "chisq": ChiSquare,
+    "gsq": GSquare,
+}
 
 
 def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> None:

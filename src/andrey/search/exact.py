@@ -21,7 +21,7 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import to_structure
-from andrey.core.score import Score
+from andrey.core.score import DISCRETE_SCORES, Score, make_discrete_score
 
 # One node of a variable's parent graph: its parent set, that set's local score, and the set as a
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.
@@ -207,10 +207,13 @@ def _dp_shortest_path(
     return tuple(structures)
 
 
-def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStructure:
-    """Return the globally BIC-optimal DAG for ``data`` as a ``dag`` structure.
+def exact_search(
+    data: np.ndarray, *, search_method: str = "astar", score_func: str = "local_score_BIC"
+) -> GraphStructure:
+    """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
-    Scores candidates with the linear-Gaussian BIC (``lambda=1``) on mean-centered data.
+    Scores candidates with ``score_func``: by default the linear-Gaussian BIC (``lambda=1``) on
+    mean-centered data.
     Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
     ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score but may return
     different score-tied representatives of the same Markov equivalence class. Exponential in the
@@ -222,6 +225,9 @@ def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStru
         Data matrix; rows are observations, columns are variables.
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
+    score_func : str
+        ``"local_score_BIC"`` (linear-Gaussian BIC on centered data), or a discrete score,
+        ``"local_score_BDeu"`` or ``"local_score_BIC_discrete"``.
 
     Returns
     -------
@@ -235,7 +241,16 @@ def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStru
     if n_vars <= 1:  # no candidate parents -- the optimum is the edgeless graph
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
 
-    score = _GramBICScore(X)
+    score: Score
+    if score_func == "local_score_BIC":
+        score = _GramBICScore(X)
+    elif score_func in DISCRETE_SCORES:
+        score = make_discrete_score(score_func, X)
+    else:
+        raise NotImplementedError(
+            f"unsupported score_func {score_func!r}; use 'local_score_BIC' or one of "
+            f"{DISCRETE_SCORES}"
+        )
     parent_graphs = [_generate_parent_graph(score, i, n_vars) for i in range(n_vars)]
 
     if search_method == "astar":

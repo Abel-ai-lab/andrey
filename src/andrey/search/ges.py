@@ -11,7 +11,7 @@ import numpy as np
 
 from andrey.core import GraphStructure, _bitset, backend
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
-from andrey.core.score import BICScore, Score
+from andrey.core.score import DISCRETE_SCORES, BICScore, Score, make_discrete_score
 from andrey.search import operators as ops
 
 
@@ -116,7 +116,9 @@ def ges(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score; ``"local_score_BIC"`` (linear-Gaussian BIC) is supported.
+        Local score: ``"local_score_BIC"`` (linear-Gaussian BIC), or a discrete score,
+        ``"local_score_BDeu"`` or ``"local_score_BIC_discrete"``, which scores every move by two
+        full local scores in one process.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
     maxP : float or None
@@ -132,12 +134,19 @@ def ges(
     tuple[GraphStructure, float]
         The CPDAG (``kind="cpdag"``) and its total BIC score.
     """
-    if score_func != "local_score_BIC":
-        raise NotImplementedError(f"unsupported score_func {score_func!r}; use 'local_score_BIC'")
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
     max_parents = n / 2 if maxP is None else maxP
-    score = BICScore(X, lambda_value=lambda_value)
+    score: Score
+    if score_func == "local_score_BIC":
+        score = BICScore(X, lambda_value=lambda_value)
+    elif score_func in DISCRETE_SCORES:
+        score = make_discrete_score(score_func, X, lambda_value=lambda_value)
+    else:
+        raise NotImplementedError(
+            f"unsupported score_func {score_func!r}; use 'local_score_BIC' or one of "
+            f"{DISCRETE_SCORES}"
+        )
 
     adj = np.zeros((n, n), dtype=np.int8)
     # Local import breaks the ges <-> _parallel_ges cycle.

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.api._adapt import column_labels, data_matrix, open_unit_interval, structure_output
+from andrey.api._adapt import column_labels, fit_matrix, open_unit_interval, structure_output
 from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
@@ -30,12 +30,14 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete test, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "chisq", "gsq"}, default="fisherz"
+        Conditional-independence test: ``"fisherz"`` (Gaussian partial correlation) for continuous
+        data, ``"chisq"`` (Pearson chi-square) or ``"gsq"`` (G-square) for categorical data.
 
     Returns
     -------
@@ -47,10 +49,10 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
-        If ``data`` has too few samples for a test or a singular correlation matrix, or if
-        ``alpha`` is not in ``(0, 1)``.
+        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
+        is not in ``(0, 1)``, or if a discrete test meets a column of non-integer numbers.
 
     Warns
     -----
@@ -119,7 +121,7 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     """
     from andrey.constraint.pc import pc as _pc
 
-    X = data_matrix(data)
+    X = fit_matrix(data, indep_test=indep_test)
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     return structure_output(
@@ -144,12 +146,14 @@ def fci(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete test, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "chisq", "gsq"}, default="fisherz"
+        Conditional-independence test: ``"fisherz"`` (Gaussian partial correlation) for continuous
+        data, ``"chisq"`` (Pearson chi-square) or ``"gsq"`` (G-square) for categorical data.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -168,10 +172,11 @@ def fci(
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
-        is not in ``(0, 1)``, or if ``collider_rule`` is not a supported choice.
+        is not in ``(0, 1)``, if ``collider_rule`` is not a supported choice, or if a discrete
+        test meets a column of non-integer numbers.
 
     See Also
     --------
@@ -239,7 +244,7 @@ def fci(
     """
     from andrey.constraint.fci import fci as _fci
 
-    X = data_matrix(data)
+    X = fit_matrix(data, indep_test=indep_test)
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     return structure_output(
@@ -267,16 +272,21 @@ def gfci(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    score_func : {"local_score_BIC"}, default="local_score_BIC"
-        Local score driving the GES skeleton phase.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete test, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
+    score_func : {"local_score_BIC", "local_score_BDeu", "local_score_BIC_discrete"}, \
+default="local_score_BIC"
+        Local score driving the GES skeleton phase: the linear-Gaussian BIC for continuous data,
+        or BDeu or the multinomial BIC for categorical data. A discrete score needs a discrete
+        ``indep_test``.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test for the FCI phase. Only Fisher-Z (Gaussian partial
-        correlation) is supported.
+    indep_test : {"fisherz", "chisq", "gsq"}, default="fisherz"
+        Conditional-independence test for the FCI phase: ``"fisherz"`` (Gaussian partial
+        correlation) for continuous data, ``"chisq"`` (Pearson chi-square) or ``"gsq"``
+        (G-square) for categorical data. A discrete test needs a discrete ``score_func``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
@@ -297,11 +307,12 @@ def gfci(
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC"``, or ``indep_test`` names no available
-        test; ``"fisherz"`` is the only one built in.
+        If ``score_func`` names no available score, or ``indep_test`` no available test.
     ValueError
-        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, or if
-        ``collider_rule`` is not a supported choice.
+        If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite (or not
+        1.0 with BDeu), if ``collider_rule`` is not a supported choice, if one of ``score_func``
+        and ``indep_test`` is discrete and the other is not, or if a discrete setting meets a
+        column of non-integer numbers.
 
     Warns
     -----
@@ -348,7 +359,7 @@ def gfci(
     warn_experimental("gfci")
     from andrey.search.gfci import gfci as _gfci
 
-    X = data_matrix(data)
+    X = fit_matrix(data, indep_test=indep_test, score_func=score_func)
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     pag = _gfci(
@@ -379,8 +390,9 @@ def cdnod(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete test, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
     c_indx : array-like of shape (n_samples,) or (n_samples, 1)
         Domain or context index of each row of ``data``, such as ``0`` and ``1`` for two domains, or
         the time step for data that drift over time. Coerced to ``float64``. See Notes for more
@@ -388,8 +400,9 @@ def cdnod(
         the result equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz"}, default="fisherz"
-        Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.
+    indep_test : {"fisherz", "chisq", "gsq"}, default="fisherz"
+        Conditional-independence test: ``"fisherz"`` (Gaussian partial correlation) for continuous
+        data, ``"chisq"`` (Pearson chi-square) or ``"gsq"`` (G-square) for categorical data.
 
     Returns
     -------
@@ -401,10 +414,11 @@ def cdnod(
     Raises
     ------
     NotImplementedError
-        If ``indep_test`` names no available test; ``"fisherz"`` is the only one built in.
+        If ``indep_test`` names no available test.
     ValueError
         If ``c_indx`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
-        ``data`` has too few rows for a test, or if ``alpha`` is not in ``(0, 1)``.
+        ``data`` has too few rows for a test, if ``alpha`` is not in ``(0, 1)``, or if a discrete
+        test meets a column of non-integer numbers.
 
     Warns
     -----
@@ -448,7 +462,7 @@ def cdnod(
     warn_experimental("cdnod")
     from andrey.constraint.cdnod import cdnod as _cdnod
 
-    X = data_matrix(data)
+    X = fit_matrix(data, indep_test=indep_test)
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
     c = np.asarray(c_indx, dtype=np.float64)

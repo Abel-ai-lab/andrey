@@ -24,7 +24,8 @@ from weakref import WeakKeyDictionary
 
 import numpy as np
 
-from .score import BICScore, local_score_bic
+from .discrete import DiscreteScore
+from .score import BICScore, Score, local_score_bic
 
 # Conditioning threshold for the Schur fast path. The Schur identity loses ~log10(cond) digits;
 # at cond=1e10 the residual keeps ~6 digits in float64, well above HC's 1e-9 strict-improvement
@@ -557,7 +558,7 @@ def score_many_with_base(
 
 
 def _delta_two_scores(
-    score_obj: BICScore, i: int, S_base_sorted: tuple[int, ...], u: int, op: str
+    score_obj: Score, i: int, S_base_sorted: tuple[int, ...], u: int, op: str
 ) -> float:
     """Raw delta ``score(i, base +/- u) - score(i, base)`` from two memoized full scores.
 
@@ -917,3 +918,109 @@ class DeltaBICScore:
         return delta_many_with_base(
             self.score_obj, i, base_parents, deltas, cond_threshold=self.cond_threshold
         )
+
+    def add_deltas(self, i: int, base_parents: Iterable[int]) -> np.ndarray:
+        """Return :func:`add_deltas` for ``i`` and ``base_parents`` under this conditioning gate."""
+        return add_deltas(self.score_obj, i, base_parents, cond_threshold=self.cond_threshold)
+
+    def remove_deltas(self, i: int, base_parents: Iterable[int]) -> np.ndarray:
+        """Return :func:`remove_deltas` for ``i`` and ``base_parents`` under this gate."""
+        return remove_deltas(self.score_obj, i, base_parents, cond_threshold=self.cond_threshold)
+
+
+class ScoreDifference:
+    """The move-scoring surface of :class:`DeltaBICScore` for a discrete score.
+
+    Every delta is the difference of two memoized full local scores of a
+    :class:`~andrey.core.discrete.DiscreteScore`, which has no closed-form update. The searches
+    take either engine.
+
+    Parameters
+    ----------
+    score : DiscreteScore
+        The local score; its :meth:`score` is memoized and lower is better.
+    n_features : int
+        The number of variables, the length of the arrays :meth:`add_deltas` and
+        :meth:`remove_deltas` return.
+    """
+
+    def __init__(self, score: DiscreteScore, n_features: int) -> None:
+        self.score_obj = score
+        self.n_features = int(n_features)
+
+    def delta(self, v: int, S_old_sorted: tuple[int, ...], u: int, op: str) -> float:
+        """Return ``score(v, S_new) - score(v, S_old)`` for a single ``add``/``remove`` of ``u``."""
+        return _delta_two_scores(self.score_obj, int(v), tuple(S_old_sorted), u, op)
+
+    def score_many_with_base(
+        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+    ) -> list[float]:
+        """Return absolute scores ``[score(i, base +/- delta_k)]`` for a batch of single moves."""
+        base = sorted(int(p) for p in base_parents)
+        out = []
+        for op, u in deltas:
+            if op == "add":
+                out.append(self.score_obj.score(i, [*base, int(u)]))
+            elif op == "remove":
+                out.append(self.score_obj.score(i, [p for p in base if p != int(u)]))
+            else:
+                raise ValueError(f"unknown delta op: {op!r} (expected 'add' or 'remove')")
+        return out
+
+    def delta_many_with_base(
+        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+    ) -> list[float]:
+        """Return RAW deltas ``[score(i, base +/- delta_k) - score(i, base)]`` for single moves."""
+        base = tuple(sorted(int(p) for p in base_parents))
+        return [_delta_two_scores(self.score_obj, int(i), base, u, op) for op, u in deltas]
+
+    def add_deltas(self, i: int, base_parents: Iterable[int]) -> np.ndarray:
+        """Return ``score(i, base + u) - score(i, base)`` for every ``u``.
+
+        Entries for ``i`` itself and for the members of ``base`` are ``inf``.
+        """
+        base = tuple(sorted(int(p) for p in base_parents))
+        out = np.full(self.n_features, np.inf)
+        for u in range(len(out)):
+            if u != i and u not in base:
+                out[u] = _delta_two_scores(self.score_obj, int(i), base, u, "add")
+        return out
+
+    def remove_deltas(self, i: int, base_parents: Iterable[int]) -> np.ndarray:
+        """Return ``score(i, base - u) - score(i, base)`` for every ``u`` in ``base``.
+
+        Entries outside ``base`` are ``inf``.
+        """
+        base = tuple(sorted(int(p) for p in base_parents))
+        out = np.full(self.n_features, np.inf)
+        for u in base:
+            out[u] = _delta_two_scores(self.score_obj, int(i), base, u, "remove")
+        return out
+
+
+def make_score_engine(
+    score_func: str, data: np.ndarray, *, lambda_value: float, bic_name: str
+) -> tuple[BICScore | DiscreteScore, DeltaBICScore | ScoreDifference]:
+    """Return a search's local score and its move-scoring engine for ``score_func``.
+
+    ``bic_name`` is the search's name for the linear-Gaussian BIC, served by :class:`BICScore` and
+    the Schur :class:`DeltaBICScore`; a name in
+    :data:`~andrey.core.score.DISCRETE_SCORES` is served by its discrete score and
+    :class:`ScoreDifference`.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``score_func`` is neither ``bic_name`` nor a discrete score.
+    """
+    from .score import DISCRETE_SCORES, make_discrete_score
+
+    if score_func == bic_name:
+        score = BICScore(data, lambda_value=lambda_value)
+        return score, DeltaBICScore(score)
+    if score_func in DISCRETE_SCORES:
+        discrete = make_discrete_score(score_func, data, lambda_value=lambda_value)
+        return discrete, ScoreDifference(discrete, np.shape(data)[1])
+    raise NotImplementedError(
+        f"unsupported score_func {score_func!r}; use {bic_name!r} or one of {DISCRETE_SCORES}"
+    )

@@ -7,7 +7,8 @@ when given, else ``ANDREY_DATA_DIR``, else ``$XDG_CACHE_HOME/andrey`` (``~/.cach
 
 ``sachs`` is measured data. ``asia``, ``alarm``, ``hepar2``, and ``andes`` are published
 Bayesian-network structures from the bnlearn repository; their data are simulated on the graph by
-a seeded linear-Gaussian model, since the networks' own tables are discrete.
+a seeded linear-Gaussian model, or, with ``discrete=True``, sampled from the networks' own discrete
+probability tables.
 
 >>> from andrey.data import list_datasets
 >>> list_datasets()
@@ -32,6 +33,7 @@ import numpy as np
 from andrey.core import GraphStructure, env
 
 from . import functional, noise
+from .discrete import read_bif_network
 from .graphs import FixedDAG
 from .scm import SCM
 
@@ -176,9 +178,8 @@ _PGMPY = (
     "920f4e03fce2a319af0fbc8dc6fad1ac99ff4318/discrete/{name}.bif.gz"
 )
 _SIMULATED = """\
-The graph is the published network's structure; the data are simulated on it, not measured. The
-network's own probability tables are not used: the rows come from a linear-Gaussian structural
-causal model on the graph ({simulation}).
+The graph is the published network's structure; the data are simulated on it, not measured.
+{simulation}
 
 Source: the bnlearn Bayesian network repository (M. Scutari, www.bnlearn.com/bnrepository,
 CC BY-SA 3.0), also in pgmpy/example_models (MIT).
@@ -319,6 +320,7 @@ def load_dataset(
     *,
     n: int | None = None,
     seed: int | None = None,
+    discrete: bool = False,
     as_frame: bool = True,
     data_home: str | os.PathLike[str] | None = None,
 ) -> RealDataset:
@@ -339,13 +341,19 @@ def load_dataset(
         - ``"asia"`` (8 variables, 8 arcs), ``"alarm"`` (37, 46), ``"hepar2"`` (70, 123), and
           ``"andes"`` (223, 338): published Bayesian networks [2]_. The graph is the network's
           structure; the data are simulated on it by a linear-Gaussian structural causal model,
-          standardized, since the networks' own tables are discrete.
+          standardized, or with ``discrete=True`` sampled from the network's own probability
+          tables.
     n : int or None, default=None
         Rows to simulate on a published network; ``None`` gives 1000. Measured data such as
         ``"sachs"`` take no ``n``.
     seed : int or None, default=None
         Seed of the simulation's weights and noise; ``None`` gives 0. The same seed and ``n``
         give the same rows. Measured data take no ``seed``.
+    discrete : bool, default=False
+        Sample a published network from its own discrete probability tables instead of a
+        linear-Gaussian model. Each column is categorical: a DataFrame column holds the network's
+        state names as a pandas categorical, in the file's state order, and an array holds the
+        state codes ``0 .. r - 1``. Measured data take no ``discrete``.
     as_frame : bool, default=True
         Return the observations as a pandas DataFrame named by variable, so a method run on them
         names its nodes. ``False`` returns a float64 NumPy array in the same column order.
@@ -362,9 +370,9 @@ def load_dataset(
     Raises
     ------
     ValueError
-        If ``name`` is not a dataset, ``n`` or ``seed`` is given for measured data, ``n`` is not
-        an integer of at least 2, or ``seed`` is not a non-negative integer. These are checked
-        before any download.
+        If ``name`` is not a dataset, ``n``, ``seed``, or ``discrete`` is given for measured data,
+        ``n`` is not an integer of at least 2, or ``seed`` is not a non-negative integer. These are
+        checked before any download.
     OSError
         If no source gives the file with its recorded SHA-256, for example without network
         access. The message lists each URL tried and the path to put the file at by hand, and
@@ -394,8 +402,10 @@ def load_dataset(
     if name not in DATASETS:
         raise ValueError(f"unknown dataset {name!r}; choose one of {list_datasets()}")
     remote = DATASETS[name]
-    if remote.measured and (n is not None or seed is not None):
-        raise ValueError(f"{name!r} is measured data: n and seed apply to simulated datasets")
+    if remote.measured and (n is not None or seed is not None or discrete):
+        raise ValueError(
+            f"{name!r} is measured data: n, seed, and discrete apply to simulated datasets"
+        )
     if n is not None and not (_is_int(n) and n >= 2):
         raise ValueError(f"n must be an integer of at least 2, got {n!r}")
     if seed is not None and not (_is_int(seed) and seed >= 0):
@@ -408,7 +418,18 @@ def load_dataset(
     contents = remote.read(raw)
     description = remote.description
     values = contents.values
-    if values is None:
+    states = None
+    if values is None and discrete:
+        n, seed = SIMULATED_ROWS if n is None else n, 0 if seed is None else seed
+        network = read_bif_network(gzip.decompress(raw).decode("utf-8"))
+        values = network.sample(n, np.random.default_rng(seed)).astype(np.float64)
+        states = network.states
+        description = description.replace(
+            "{simulation}",
+            "The rows are sampled from the network's own discrete probability tables "
+            f"(n={n}, seed={seed}).",
+        )
+    elif values is None:
         n, seed = SIMULATED_ROWS if n is None else n, 0 if seed is None else seed
         scm = SCM(
             graph=FixedDAG(nodes=contents.nodes, arcs=contents.arcs),
@@ -416,12 +437,19 @@ def load_dataset(
             noise=noise.gaussian(),
         )
         values = scm.sample(n=n, seed=seed, scale="standardize").data
-        description = description.replace("{simulation}", f"n={n}, seed={seed}")
+        description = description.replace(
+            "{simulation}",
+            "The network's own probability tables are not used: the rows come from a "
+            f"linear-Gaussian structural causal model on the graph (n={n}, seed={seed}).",
+        )
     data: Any = values
     if as_frame:
         import pandas as pd
 
         data = pd.DataFrame(values, columns=list(contents.nodes))
+        if states is not None:
+            for j, column in enumerate(contents.nodes):
+                data[column] = pd.Categorical.from_codes(values[:, j].astype(np.int64), states[j])
     return RealDataset(data, _graph(contents), contents.nodes, description)
 
 

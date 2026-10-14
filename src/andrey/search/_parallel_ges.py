@@ -21,7 +21,7 @@ from typing import Protocol
 import numpy as np
 
 from andrey.core import env
-from andrey.core.score import BICScore
+from andrey.core.score import BICScore, Score
 from andrey.core.score_delta import DeltaBICScore, _delta_two_scores
 from andrey.search import _parallel as par
 from andrey.search import calibrate
@@ -80,7 +80,7 @@ class _FullScoreDelta:
     ``_full_scores=True`` arm the quality gate pairs the Schur path against.
     """
 
-    def __init__(self, score: BICScore) -> None:
+    def __init__(self, score: Score) -> None:
         self.score_obj = score
 
     def delta_many_with_base(
@@ -393,7 +393,7 @@ class _LazyWorkerSet:
     task carries so a worker can reject a mismatched run).
     """
 
-    def __init__(self, score: BICScore, n_vars: int, workers: int) -> None:
+    def __init__(self, score: Score, n_vars: int, workers: int) -> None:
         self._score = score
         self._n_vars = n_vars
         self._workers = workers
@@ -401,6 +401,7 @@ class _LazyWorkerSet:
         self.token: object = None
 
     def get(self) -> par.StableWorkerSet:
+        assert isinstance(self._score, BICScore), "only the BIC fans out to workers"
         if self._wset is None:
             self.token = hash(self._score.cov.tobytes())
             self._wset = _create_pool(
@@ -421,7 +422,7 @@ class _LazyWorkerSet:
 
 def run_ges(
     adj: np.ndarray,
-    score: BICScore,
+    score: Score,
     n: int,
     max_parents: float | None,
     *,
@@ -438,14 +439,21 @@ def run_ges(
     partition-invariant. Returns only the CPDAG; ``ges()`` recomputes the objective from it.
     ``full_scores`` swaps the in-process PURE Schur engine for the two-full-score reference (the
     quality gate's ``_full_scores`` arm); pooled workers only ever run Schur, so the reference arm
-    is held in-process and never fans out.
+    is held in-process and never fans out. A ``score`` other than :class:`BICScore`, such as a
+    discrete score, always takes the reference arm.
     """
     workers = max(1, min(workers, n))
+    # A score other than the linear-Gaussian BIC has no Schur update: two full scores per move.
+    full_scores = full_scores or not isinstance(score, BICScore)
     w_min = _min_work()
     # Warn once a pass comes near the default cutoff (the pool never runs the full-score arm).
     warn = workers > 1 and not full_scores and calibrate.cutoff_is_default("ges")
     build_state = _reach_factory(n)
-    engine: DeltaEngine = _FullScoreDelta(score) if full_scores else DeltaBICScore(score)
+    engine: DeltaEngine = (
+        DeltaBICScore(score)
+        if isinstance(score, BICScore) and not full_scores
+        else _FullScoreDelta(score)
+    )
     lazy = _LazyWorkerSet(score, n, workers)
     try:
         while True:  # forward phase

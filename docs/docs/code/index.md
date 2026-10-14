@@ -23,6 +23,16 @@ least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, di
 names. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
 column. A single column gives a one-node graph.
 
+Categorical data takes a discrete test or score. PC, FCI, GFCI, and CD-NOD accept
+`indep_test="chisq"` (Pearson chi-square) and `"gsq"` (G-square); GES, GFCI, hill climbing, Tabu
+search, BOSS, GRaSP, and exact search accept `score_func="local_score_BDeu"` (BDeu, equivalent
+sample size 1, with the structure prior Tetrad and causal-learn use, which expects one parent per
+variable) and `"local_score_BIC_discrete"` (multinomial BIC). With either, each column is read
+as categories, one per distinct value: pandas categoricals, booleans, strings, and whole numbers
+are accepted, and a column of other numbers raises a `ValueError`, since data mixing continuous
+and categorical columns is not supported. The discrete tests and scores have no published
+benchmark yet.
+
 ### Supported methods
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
@@ -183,8 +193,9 @@ name.
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
 
-A published network's data come from a linear-Gaussian model on its graph, standardized, since its
-own tables are discrete; `n` (default 1000) and `seed` (default 0) set the rows. The first load
+A published network's data come from a linear-Gaussian model on its graph, standardized, or with
+`discrete=True` from the network's own discrete probability tables, as pandas categoricals named by
+the network's states; `n` (default 1000) and `seed` (default 0) set the rows. The first load
 downloads the file, checks its SHA-256, and caches it; later loads need no network. The
 cache directory is the `data_home` argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey`
 (`~/.cache/andrey` when `XDG_CACHE_HOME` is unset). Without network access, the error names the
@@ -201,6 +212,21 @@ Sachs data end to end.
    load_dataset
    list_datasets
    RealDataset
+```
+
+`andrey.data.discrete.DiscreteBN` draws a random discrete Bayesian network on a graph, with a
+Dirichlet probability table per variable, and samples categorical data with its true graph.
+
+```{eval-rst}
+.. currentmodule:: andrey.data.discrete
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   DiscreteBN
+   DiscreteNetwork
+   read_bif_network
 ```
 
 ## Metrics

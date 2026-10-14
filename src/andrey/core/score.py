@@ -17,11 +17,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from functools import lru_cache
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import numpy as np
 
 from . import stats
+
+if TYPE_CHECKING:
+    from .discrete import DiscreteScore
 
 
 def local_score_bic(
@@ -229,3 +232,40 @@ class BICScore:
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
         """Return the negative local BIC scores for many parent sets, in request order."""
         return [self.score(node, parents) for parents in parent_sets]
+
+
+# The discrete local scores (:mod:`andrey.core.discrete`), selected by ``score_func`` in every
+# score-based search alongside its linear-Gaussian BIC name.
+DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu", "local_score_BIC_discrete")
+
+
+def make_discrete_score(
+    score_func: str, data: np.ndarray, *, lambda_value: float = 1.0
+) -> DiscreteScore:
+    """Construct the discrete local score ``score_func`` over ``data``.
+
+    ``"local_score_BDeu"`` builds a :class:`~andrey.core.discrete.BDeuScore` with equivalent sample
+    size 1 and a structure prior expecting one parent per variable; BDeu has no penalty weight, so
+    ``lambda_value`` must stay 1.0;
+    ``"local_score_BIC_discrete"`` builds a :class:`~andrey.core.discrete.DiscreteBICScore` with
+    ``lambda_value``.
+
+    Raises
+    ------
+    ValueError
+        If ``score_func`` is not a discrete score, or ``lambda_value`` is not 1.0 for BDeu.
+    """
+    from .discrete import BDeuScore, DiscreteBICScore
+
+    if score_func == "local_score_BDeu":
+        if float(lambda_value) != 1.0:
+            raise ValueError(
+                f"lambda_value weights the BIC penalty and does not apply to BDeu; leave it at "
+                f"1.0, got {lambda_value}"
+            )
+        return BDeuScore(data)
+    if score_func == "local_score_BIC_discrete":
+        return DiscreteBICScore(data, lambda_value=lambda_value)
+    raise ValueError(
+        f"unknown discrete score_func {score_func!r}; expected one of {DISCRETE_SCORES}"
+    )

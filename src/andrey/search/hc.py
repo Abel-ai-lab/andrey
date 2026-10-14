@@ -15,8 +15,7 @@ import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore, add_deltas, remove_deltas
+from andrey.core.score_delta import DeltaBICScore, ScoreDifference, make_score_engine
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
@@ -56,7 +55,8 @@ class MoveScanner:
 
     ``add[v, u]`` and ``rem[v, u]`` depend only on target ``v`` and its parent set. Changed parent
     sets trigger one vectorized Schur update per affected row
-    (:func:`~andrey.core.score_delta.add_deltas`, :func:`~andrey.core.score_delta.remove_deltas`).
+    (``delta.add_deltas`` and ``delta.remove_deltas``: a Schur update for the BIC, two full local
+    scores per move for a discrete score).
     Every scanner computes the same deltas for the same target and parents.
 
     ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
@@ -73,9 +73,9 @@ class MoveScanner:
     cycles.
     """
 
-    def __init__(self, delta: DeltaBICScore, d: int) -> None:
+    def __init__(self, delta: DeltaBICScore | ScoreDifference, d: int) -> None:
+        self._delta = delta
         self._score = delta.score_obj
-        self._cond = delta.cond_threshold
         self._d = d
         self._inv_n = 1.0 / self._score.n
         self._add = np.full((d, d), np.inf)
@@ -149,8 +149,8 @@ class MoveScanner:
             lost += [(u, v) for v in _bits(old[u] & ~adj_int[u])]
         for v in range(d) if first else {v for _, v in gained + lost}:
             pa = parents_of[v]
-            self._add[v] = add_deltas(self._score, v, pa, cond_threshold=self._cond)
-            self._rem[v] = remove_deltas(self._score, v, pa, cond_threshold=self._cond)
+            self._add[v] = self._delta.add_deltas(v, pa)
+            self._rem[v] = self._delta.remove_deltas(v, pa)
             ids = self._ids
             self._set_of[v] = ids.setdefault(tuple(pa), len(ids))
             self._set_with[v] = ids.setdefault(tuple(sorted([*pa, v])), len(ids))
@@ -329,15 +329,11 @@ def hc(
     tuple[GraphStructure, float]
         The CPDAG (``kind="cpdag"``) and the total BIC score of the discovered DAG.
     """
-    if score_func != "local_score_BIC_from_cov":
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use 'local_score_BIC_from_cov'"
-        )
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
-
-    score = BICScore(X, lambda_value=lambda_value)
-    delta = DeltaBICScore(score)
+    score, delta = make_score_engine(
+        score_func, X, lambda_value=lambda_value, bic_name="local_score_BIC_from_cov"
+    )
 
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}

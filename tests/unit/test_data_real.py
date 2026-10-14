@@ -177,8 +177,23 @@ def test_n_and_seed_fix_the_simulated_rows(offline_datasets):
     assert "n=200, seed=4" in load_dataset("asia", n=200, seed=4).description
 
 
+def test_discrete_samples_the_networks_own_tables(offline_datasets):
+    asia = load_dataset("asia", n=4000, seed=2, discrete=True)
+    assert asia.data.shape == (4000, 8)
+    assert all(str(t) == "category" for t in asia.data.dtypes)
+    assert list(asia.data["smoke"].cat.categories) == ["yes", "no"]
+    # lung given smoke is 0.1 / 0.01 in the network's table; either is lung OR tub, exactly.
+    smokers = asia.data["smoke"] == "yes"
+    assert 0.08 < (asia.data["lung"][smokers] == "yes").mean() < 0.12
+    either = (asia.data["lung"] == "yes") | (asia.data["tub"] == "yes")
+    assert ((asia.data["either"] == "yes") == either).all()
+    assert "own discrete probability tables (n=4000, seed=2)" in asia.description
+    codes = load_dataset("asia", n=4000, seed=2, discrete=True, as_frame=False).data
+    np.testing.assert_array_equal(codes, asia.data.apply(lambda c: c.cat.codes).to_numpy())
+
+
 def test_measured_data_take_no_n_or_seed_and_nothing_is_fetched(offline_datasets):
-    for options in ({"n": 100}, {"seed": 1}):
+    for options in ({"n": 100}, {"seed": 1}, {"discrete": True}):
         with pytest.raises(ValueError, match="measured"):
             load_dataset("sachs", **options)
     assert offline_datasets == []

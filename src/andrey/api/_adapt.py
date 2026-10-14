@@ -24,6 +24,14 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
     it has fewer than ``min_rows`` rows, it holds ``NaN`` or ``inf``, or a column is constant: no
     method can estimate a variance or a dependence from such data.
     """
+    categorical = _categorical_columns(data)
+    if categorical:
+        raise ValueError(
+            f"{name} column {categorical[0]!r} is categorical, and this setting needs numeric "
+            "columns; for data whose columns are all categorical, choose a discrete test "
+            "(indep_test='chisq' or 'gsq') or score (score_func='local_score_BDeu' or "
+            "'local_score_BIC_discrete')"
+        )
     try:
         X = np.asarray(data, dtype=np.float64)
     except (TypeError, ValueError) as error:
@@ -50,6 +58,106 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
         column = repr(str(list(names)[j])) if names is not None else str(j)
         raise ValueError(f"{name} column {column} is constant; drop it before the fit")
     return X
+
+
+def fit_matrix(
+    data: npt.ArrayLike, *, indep_test: str | None = None, score_func: str | None = None
+) -> np.ndarray:
+    """Return ``data`` checked for the method's test and score: category codes or a float matrix.
+
+    A discrete ``indep_test`` or ``score_func`` reads ``data`` with :func:`discrete_matrix`;
+    otherwise :func:`data_matrix`. Raises ``ValueError`` when one of the two is discrete and the
+    other is not, since one data set cannot be both.
+    """
+    from andrey.core.ci import DISCRETE_INDEP_TESTS
+    from andrey.core.score import DISCRETE_SCORES
+
+    kinds = {}
+    if indep_test is not None:
+        kinds["indep_test"] = indep_test in DISCRETE_INDEP_TESTS
+    if score_func is not None:
+        kinds["score_func"] = score_func in DISCRETE_SCORES
+    if len(set(kinds.values())) > 1:
+        raise ValueError(
+            f"indep_test={indep_test!r} and score_func={score_func!r} disagree on the data type; "
+            "pair a discrete test (chisq, gsq) with a discrete score (local_score_BDeu, "
+            "local_score_BIC_discrete), or a continuous test with a continuous score"
+        )
+    return discrete_matrix(data) if any(kinds.values()) else data_matrix(data)
+
+
+def discrete_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -> np.ndarray:
+    """Return ``data`` as a float64 matrix of category codes ``0 .. r - 1``, checked before a fit.
+
+    Each column is one categorical variable. A DataFrame's categorical, boolean, string, and
+    integer columns are accepted, as are float columns that hold whole numbers; their distinct
+    values are coded in sorted order (a pandas categorical keeps its categories' order). Raises
+    ``ValueError``, naming ``name`` and the column, for a column with non-integer numbers, which
+    reads as continuous (data mixing continuous and categorical columns is not supported), and
+    for the conditions :func:`data_matrix` rejects: a shape that is not 2-D, too few rows, missing
+    values, or a constant column.
+    """
+    names = getattr(data, "columns", None)
+    if names is not None:
+        columns = [data[c] for c in names]  # ty: ignore[not-subscriptable]  # a DataFrame
+    else:
+        arr = np.asarray(data)
+        if arr.ndim != 2:
+            hint = "; for one variable, reshape it with .reshape(-1, 1)" if arr.ndim == 1 else ""
+            raise ValueError(
+                f"{name} must be a 2-D (n_samples, n_features) matrix, got shape {arr.shape}{hint}"
+            )
+        columns = [arr[:, j] for j in range(arr.shape[1])]
+    coded = []
+    for j, column in enumerate(columns):
+        label = repr(str(list(names)[j])) if names is not None else str(j)
+        codes = _category_codes(column, f"{name} column {label}")
+        if codes.size and codes.max() == 0:
+            raise ValueError(f"{name} column {label} is constant; drop it before the fit")
+        coded.append(codes)
+    X = np.column_stack(coded) if coded else np.empty((len(np.asarray(data)), 0))
+    return data_matrix(X, name=name, min_rows=min_rows)
+
+
+def _categorical_columns(data: object) -> list[str]:
+    """Return the names of a DataFrame's categorical and string columns; none for an array."""
+    dtypes = getattr(data, "dtypes", None)
+    if dtypes is None or not hasattr(dtypes, "items"):
+        return []
+    return [
+        str(c)
+        for c, dtype in dtypes.items()
+        if str(dtype) in ("category", "string") or getattr(dtype, "kind", "f") in "OSU"
+    ]
+
+
+def _category_codes(column: object, where: str) -> np.ndarray:
+    """Return one column as float64 codes ``0 .. r - 1``.
+
+    Raises ``ValueError``, naming ``where``, for missing values or non-integer numbers.
+    """
+    cat = getattr(column, "cat", None)
+    if str(getattr(column, "dtype", "")) == "category" and cat is not None:
+        codes = np.asarray(cat.codes, dtype=np.int64)
+        if (codes < 0).any():
+            raise ValueError(f"{where} has missing values; drop or impute them before the fit")
+        return np.unique(codes, return_inverse=True)[1].astype(np.float64)
+    values = np.asarray(column)
+    if values.dtype.kind in "biu":
+        return np.unique(values, return_inverse=True)[1].astype(np.float64)
+    if values.dtype.kind == "f":
+        if not np.isfinite(values).all():
+            raise ValueError(f"{where} holds NaN or inf; drop or impute them before the fit")
+        if not np.array_equal(values, np.round(values)):
+            raise ValueError(
+                f"{where} holds non-integer numbers, so it reads as continuous; a discrete test or "
+                "score needs every column categorical (data mixing continuous and categorical "
+                "columns is not supported)"
+            )
+        return np.unique(values, return_inverse=True)[1].astype(np.float64)
+    if any(v is None or (isinstance(v, float) and v != v) for v in values.tolist()):
+        raise ValueError(f"{where} has missing values; drop or impute them before the fit")
+    return np.unique(values.astype(str), return_inverse=True)[1].astype(np.float64)
 
 
 def int_in_range(value: object, name: str, low: int, high: int | None = None) -> int:

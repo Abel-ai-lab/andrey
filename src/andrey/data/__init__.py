@@ -13,11 +13,25 @@ true graph:
 >>> ds = scm.sample(n=500, seed=0)
 >>> ds.data.shape, ds.graph.kind
 ((500, 10), 'dag')
+
+:class:`~andrey.data.discrete.DiscreteBN` does the same for categorical data, with a random
+probability table per variable.
 """
 
 from __future__ import annotations
 
-from . import benchmarks, functional, graphs, latent, noise, qa, sortability, storage, temporal
+from . import (
+    benchmarks,
+    discrete,
+    functional,
+    graphs,
+    latent,
+    noise,
+    qa,
+    sortability,
+    storage,
+    temporal,
+)
 from .dataset import CausalDataset, QAReport, SCMParams
 from .generate import Ensemble, generate
 from .qa import FaithfulnessScreen
@@ -45,4 +59,5 @@ __all__ = [
     "storage",
     "benchmarks",
     "temporal",
+    "discrete",
 ]

@@ -15,8 +15,8 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore
+from andrey.core.score import Score
+from andrey.core.score_delta import DeltaBICScore, ScoreDifference, make_score_engine
 
 # The depth-first search of covered tucks descends at most this many score-preserving moves before
 # backtracking.
@@ -158,7 +158,9 @@ class _GST:
 
     __slots__ = ("vertex", "score", "delta", "n_features", "empty_score", "root")
 
-    def __init__(self, vertex: int, score: BICScore, delta: DeltaBICScore, n_features: int) -> None:
+    def __init__(
+        self, vertex: int, score: Score, delta: DeltaBICScore | ScoreDifference, n_features: int
+    ) -> None:
         self.vertex = vertex
         self.score = score
         self.delta = delta
@@ -371,7 +373,11 @@ def _dfs(
 
 
 def grasp(
-    data: np.ndarray, *, lambda_value: float = 1.0, random_state: int = 0
+    data: np.ndarray,
+    *,
+    score_func: str = "local_score_BIC_from_cov",
+    lambda_value: float = 1.0,
+    random_state: int = 0,
 ) -> tuple[GraphStructure, float]:
     """Learn a CPDAG from ``data`` by GRaSP over the linear-Gaussian BIC score.
 
@@ -384,6 +390,9 @@ def grasp(
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
+    score_func : str
+        Local score: ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC), or a discrete score,
+        ``"local_score_BDeu"`` or ``"local_score_BIC_discrete"``.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
     random_state : int
@@ -401,8 +410,9 @@ def grasp(
         empty = np.zeros((n_features, n_features), dtype=np.int8)
         return to_structure(empty, kind="cpdag"), 0.0
 
-    score = BICScore(X, lambda_value=lambda_value)
-    delta = DeltaBICScore(score)
+    score, delta = make_score_engine(
+        score_func, X, lambda_value=lambda_value, bic_name="local_score_BIC_from_cov"
+    )
     rng = random.Random(random_state)
     gsts = [_GST(v, score, delta, n_features) for v in range(n_features)]
 

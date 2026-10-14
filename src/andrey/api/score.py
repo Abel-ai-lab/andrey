@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from andrey.api._adapt import (
     column_labels,
     data_matrix,
+    fit_matrix,
     flag,
     int_in_range,
     json_safe,
@@ -42,29 +43,37 @@ def ges(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    score_func : {"local_score_BIC"}, default="local_score_BIC"
-        Local score objective. Only the Gaussian BIC score is supported.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete score, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
+    score_func : {"local_score_BIC", "local_score_BDeu", "local_score_BIC_discrete"}, \
+default="local_score_BIC"
+        Local score objective: the linear-Gaussian BIC for continuous data, or for categorical
+        data BDeu (equivalent sample size 1, and a structure prior expecting one parent per
+        variable) or the multinomial BIC. A
+        discrete score scores every move by two full local scores in one process.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative, and 1.0
+        with BDeu, which has no penalty weight.
 
     Returns
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GES"`` and ``metadata["score"]`` the BIC score of the result, the sum over variables
-        of ``n * log(residual variance) + lambda_value * log(n) * n_parents``; lower is better.
+        ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For the BIC
+        it is the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
+        n_parents``; a discrete score is ``-2`` times its log score.
         Directed marks (``->``) are oriented edges, undirected (``--``) the ones the equivalence
         class leaves open.
 
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC"``.
+        If ``score_func`` names no available score.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or not 1.0 with BDeu, or if a discrete
+        score meets a column of non-integer numbers.
 
     See Also
     --------
@@ -120,7 +129,7 @@ def ges(
     """
     from andrey.search.ges import ges as _ges
 
-    X = data_matrix(data)
+    X = fit_matrix(data, score_func=score_func)
     labels = column_labels(data)
     cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value)
     return structure_output(
@@ -316,13 +325,17 @@ def hc(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Covariance-based Gaussian BIC objective.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete score, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
+    score_func : {"local_score_BIC_from_cov", "local_score_BDeu", "local_score_BIC_discrete"}, \
+default="local_score_BIC_from_cov"
+        Local score: the covariance-based linear-Gaussian BIC for continuous data, or BDeu or the
+        multinomial BIC for categorical data (see :func:`andrey.ges`).
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative, and 1.0
+        with BDeu, which has no penalty weight.
     max_iter : int or None, default=None
         Maximum moves, at least ``1``; ``None`` sets no limit. The search still terminates, since
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
@@ -339,12 +352,13 @@ def hc(
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+        If ``score_func`` names no available score.
     TypeError
         If a given ``max_iter`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if a given ``max_iter`` is less than
-        ``1``.
+        If ``lambda_value`` is negative or non-finite (or not 1.0 with BDeu), if a given
+        ``max_iter`` is less than ``1``, or if a discrete score meets a column of non-integer
+        numbers.
 
     Warns
     -----
@@ -383,7 +397,7 @@ def hc(
     """
     from andrey.search.hc import hc as _hc
 
-    X = data_matrix(data)
+    X = fit_matrix(data, score_func=score_func)
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     cpdag, score = _hc(X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter)
@@ -409,13 +423,17 @@ def tabu(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Covariance-based Gaussian BIC objective.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete score, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
+    score_func : {"local_score_BIC_from_cov", "local_score_BDeu", "local_score_BIC_discrete"}, \
+default="local_score_BIC_from_cov"
+        Local score: the covariance-based linear-Gaussian BIC for continuous data, or BDeu or the
+        multinomial BIC for categorical data (see :func:`andrey.ges`).
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative, and 1.0
+        with BDeu, which has no penalty weight.
     tabu_length : int, default=10
         Number of most recently visited DAGs a move may not return to. At least ``1``.
     max_tabu : int or None, default=None
@@ -437,12 +455,13 @@ def tabu(
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+        If ``score_func`` names no available score.
     TypeError
         If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
-        less than ``1``, or if ``max_tabu`` is outside ``1..tabu_length``.
+        If ``lambda_value`` is negative or non-finite (or not 1.0 with BDeu), if ``tabu_length`` or
+        a given ``max_iter`` is less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or
+        if a discrete score meets a column of non-integer numbers.
 
     Warns
     -----
@@ -493,7 +512,7 @@ def tabu(
     """
     from andrey.search.tabu import tabu as _tabu
 
-    X = data_matrix(data)
+    X = fit_matrix(data, score_func=score_func)
     tabu_length = int_in_range(tabu_length, "tabu_length", 1)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
@@ -512,8 +531,10 @@ def tabu(
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
 
-def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> StructureOutput:
-    """Learn the globally optimal DAG for the BIC score by exact search.
+def exact_search(
+    data: npt.ArrayLike, *, search_method: str = "astar", score_func: str = "local_score_BIC"
+) -> StructureOutput:
+    """Learn the globally optimal DAG for a decomposable score by exact search.
 
     The optimum is identified up to its Markov equivalence class. A* (``search_method="astar"``)
     [1]_ and dynamic programming (``"dp"``) [2]_ may return different representatives. Runtime is
@@ -522,10 +543,15 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete score, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
     search_method : {"astar", "dp"}, default="astar"
         Exact search strategy: A* search or dynamic programming.
+    score_func : {"local_score_BIC", "local_score_BDeu", "local_score_BIC_discrete"}, \
+default="local_score_BIC"
+        Local score: the linear-Gaussian BIC for continuous data, or BDeu or the multinomial BIC
+        for categorical data (see :func:`andrey.ges`).
 
     Returns
     -------
@@ -535,8 +561,11 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
 
     Raises
     ------
+    NotImplementedError
+        If ``score_func`` names no available score.
     ValueError
-        If ``search_method`` is not ``"astar"`` or ``"dp"``.
+        If ``search_method`` is not ``"astar"`` or ``"dp"``, or if a discrete score meets a
+        column of non-integer numbers.
 
     Warns
     -----
@@ -572,9 +601,9 @@ def exact_search(data: npt.ArrayLike, *, search_method: str = "astar") -> Struct
     warn_experimental("exact_search")
     from andrey.search.exact import exact_search as _exact
 
-    X = data_matrix(data)
+    X = fit_matrix(data, score_func=score_func)
     labels = column_labels(data)
-    dag = _exact(X, search_method=search_method)
+    dag = _exact(X, search_method=search_method, score_func=score_func)
     return structure_output(dag, labels=labels, metadata={"algorithm": "ExactSearch"})
 
 

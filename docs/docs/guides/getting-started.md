@@ -266,6 +266,10 @@ kind of result; `cdnod` also takes a domain index, and `multi_group_direct_linga
 `longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
 {doc}`graph-types` explains which graph each one returns.
 
+For categorical data, choose a discrete test or score: `andrey.pc(df, indep_test="chisq")` or
+`andrey.ges(df, score_func="local_score_BDeu")`. Each column is then read as categories, one per
+distinct value, whether it holds pandas categories, booleans, strings, or whole numbers.
+
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the

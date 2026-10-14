@@ -9,6 +9,7 @@ and JSON schema render.
 from __future__ import annotations
 
 from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.core.score import DISCRETE_SCORES
 
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
@@ -28,7 +29,8 @@ _INDEP_TEST = ParamSpec(
     name="indep_test",
     type="str",
     default="fisherz",
-    doc="Conditional-independence test. Only Fisher-Z (Gaussian partial correlation) is supported.",
+    doc="Conditional-independence test: fisherz (Gaussian partial correlation) for continuous "
+    "data; chisq (Pearson chi-square) or gsq (G-square) for categorical data.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _COLLIDER_RULE = ParamSpec(
@@ -62,6 +64,11 @@ _RANDOM_STATE = ParamSpec(
     doc="Ignored: the pwling order search is deterministic. Accepted so that every LiNGAM method "
     "takes random_state.",
     nullable=True,
+)
+
+_SCORE_DOC = (
+    "Local score objective: the linear-Gaussian BIC for continuous data; local_score_BDeu or "
+    "local_score_BIC_discrete for categorical data."
 )
 
 _MATRIX_LAYOUT = "(n_samples, n_variables), row = sample"
@@ -134,8 +141,10 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score for the GES phase.",
-                choices=("local_score_BIC",),
+                doc="Local score for the GES phase: local_score_BIC (linear-Gaussian) for "
+                "continuous data; local_score_BDeu or local_score_BIC_discrete for categorical "
+                "data, paired with a discrete indep_test.",
+                choices=("local_score_BIC", *DISCRETE_SCORES),
             ),
             _LAMBDA_VALUE,
             _INDEP_TEST,
@@ -194,8 +203,8 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score objective.",
-                choices=("local_score_BIC",),
+                doc=_SCORE_DOC,
+                choices=("local_score_BIC", *DISCRETE_SCORES),
             ),
             _LAMBDA_VALUE,
         ),
@@ -279,8 +288,8 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC_from_cov",
-                doc="Local score objective (covariance-based BIC).",
-                choices=("local_score_BIC_from_cov",),
+                doc=_SCORE_DOC,
+                choices=("local_score_BIC_from_cov", *DISCRETE_SCORES),
             ),
             _LAMBDA_VALUE,
             ParamSpec(
@@ -315,8 +324,8 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC_from_cov",
-                doc="Local score objective (covariance-based BIC).",
-                choices=("local_score_BIC_from_cov",),
+                doc=_SCORE_DOC,
+                choices=("local_score_BIC_from_cov", *DISCRETE_SCORES),
             ),
             _LAMBDA_VALUE,
             ParamSpec(
@@ -350,7 +359,7 @@ _add(
     MethodSpec(
         name="exact_search",
         family="score",
-        summary="Globally optimal BIC search over DAGs (A* or dynamic programming). Exact but "
+        summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
         "the best-scoring equivalence class.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
@@ -365,6 +374,13 @@ _add(
                 default="astar",
                 doc="Exact search strategy: A* or dynamic programming.",
                 choices=("astar", "dp"),
+            ),
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC",
+                doc=_SCORE_DOC,
+                choices=("local_score_BIC", *DISCRETE_SCORES),
             ),
         ),
         references=("Yuan & Malone 2013", "Silander & Myllymaki 2006"),
@@ -409,8 +425,8 @@ _BOSS_SCORE = ParamSpec(
     name="score_func",
     type="str",
     default="local_score_BIC_from_cov",
-    doc="Local score objective (covariance-based BIC).",
-    choices=("local_score_BIC_from_cov",),
+    doc=_SCORE_DOC,
+    choices=("local_score_BIC_from_cov", *DISCRETE_SCORES),
 )
 _add(
     MethodSpec(

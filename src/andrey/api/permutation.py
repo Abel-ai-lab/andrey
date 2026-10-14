@@ -3,7 +3,8 @@
 ``boss`` and ``grasp`` are native -- they run a permutation/score search on the :mod:`andrey.core`
 compute substrate and return a CPDAG ``GraphStructure`` with its objective score. Both score
 candidate parent additions through the batched Schur delta-BIC surface over the linear-Gaussian
-BIC (:class:`andrey.core.score.BICScore`). Their search order is drawn from a private RNG seeded by
+BIC (:class:`andrey.core.score.BICScore`), or by full local scores for a discrete score
+(:mod:`andrey.core.discrete`). Their search order is drawn from a private RNG seeded by
 ``seed`` (or the global ``ANDREY_SEED``), so a run is reproducible.
 """
 
@@ -11,7 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from andrey.api._adapt import column_labels, data_matrix, json_safe, structure_output
+from andrey.api._adapt import column_labels, fit_matrix, json_safe, structure_output
 from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
@@ -36,13 +37,17 @@ def boss(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Local score objective (covariance-based BIC). Only this option is supported.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete score, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
+    score_func : {"local_score_BIC_from_cov", "local_score_BDeu", "local_score_BIC_discrete"}, \
+default="local_score_BIC_from_cov"
+        Local score: the covariance-based linear-Gaussian BIC for continuous data, or BDeu or the
+        multinomial BIC for categorical data (see :func:`andrey.ges`).
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative, and 1.0
+        with BDeu, which has no penalty weight.
     seed : int or None, default=None
         Seed for the random order in which the search visits variables. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
@@ -52,17 +57,17 @@ def boss(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"BOSS"`` and ``metadata["score"]`` the BIC score of the DAG read off the final order,
-        the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open.
+        ``"BOSS"`` and ``metadata["score"]`` the score of the DAG read off the final order,
+        computed as for :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented
+        edges, undirected (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+        If ``score_func`` names no available score.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite (or not 1.0 with BDeu), or if a discrete
+        score meets a column of non-integer numbers.
 
     See Also
     --------
@@ -127,11 +132,11 @@ def boss(
     """
     from andrey.search.boss import boss as _boss
 
-    if score_func != "local_score_BIC_from_cov":
-        raise NotImplementedError(f"BOSS supports 'local_score_BIC_from_cov', not {score_func!r}")
-    X = data_matrix(data)
+    X = fit_matrix(data, score_func=score_func)
     labels = column_labels(data)
-    cpdag, score = _boss(X, lambda_value=lambda_value, random_state=resolve_seed(seed))
+    cpdag, score = _boss(
+        X, score_func=score_func, lambda_value=lambda_value, random_state=resolve_seed(seed)
+    )
     metadata = {"algorithm": "BOSS", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -154,13 +159,17 @@ def grasp(
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
-        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
-        become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Local score objective (covariance-based BIC). Only this option is supported.
+        Observed data, one row per sample. Coerced to ``float64``; with a discrete score, each
+        column is read as categories, one per distinct value. A DataFrame's column names become
+        the structure's ``labels``.
+    score_func : {"local_score_BIC_from_cov", "local_score_BDeu", "local_score_BIC_discrete"}, \
+default="local_score_BIC_from_cov"
+        Local score: the covariance-based linear-Gaussian BIC for continuous data, or BDeu or the
+        multinomial BIC for categorical data (see :func:`andrey.ges`).
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative, and 1.0
+        with BDeu, which has no penalty weight.
     depth : int, default=3
         Maximum number of tucks in one chain of moves. Only ``3`` is supported.
     seed : int or None, default=None
@@ -172,17 +181,17 @@ def grasp(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GRaSP"`` and ``metadata["score"]`` the BIC score of the DAG read off the final order,
-        the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open.
+        ``"GRaSP"`` and ``metadata["score"]`` the score of the DAG read off the final order,
+        computed as for :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented
+        edges, undirected (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC_from_cov"``, or ``depth`` is not ``3``.
+        If ``score_func`` names no available score, or ``depth`` is not ``3``.
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite (or not 1.0 with BDeu), or if a discrete
+        score meets a column of non-integer numbers.
 
     See Also
     --------
@@ -251,12 +260,12 @@ def grasp(
     """
     from andrey.search.grasp import grasp as _grasp
 
-    if score_func != "local_score_BIC_from_cov":
-        raise NotImplementedError(f"GRaSP supports 'local_score_BIC_from_cov', not {score_func!r}")
     if depth != 3:
         raise NotImplementedError(f"GRaSP supports depth=3, not {depth!r}")
-    X = data_matrix(data)
+    X = fit_matrix(data, score_func=score_func)
     labels = column_labels(data)
-    cpdag, score = _grasp(X, lambda_value=lambda_value, random_state=resolve_seed(seed))
+    cpdag, score = _grasp(
+        X, score_func=score_func, lambda_value=lambda_value, random_state=resolve_seed(seed)
+    )
     metadata = {"algorithm": "GRaSP", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
