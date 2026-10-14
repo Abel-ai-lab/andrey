@@ -16,6 +16,7 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
+from statsmodels.tsa.statespace.varmax import VARMAX, VARMAXResultsWrapper
 
 from andrey.lingam.adjacency import predict_adaptive_lasso
 from andrey.lingam.direct import direct_lingam
@@ -74,21 +75,24 @@ def _fit_varma(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Maximum-likelihood VARMA(p, q) fit; return ``(phis, thetas, residuals)``.
 
-    Wraps the state-space VARMA estimator with a constant trend. ``phis`` has shape ``(p, n, n)``
-    (``phis[i]`` the lag-``i+1`` AR matrix), ``thetas`` shape ``(q, n, n)``, and ``residuals`` the
-    one-step innovations ``e(t)`` (shape ``(n_samples, n)``).
+    ``phis`` has shape ``(p, n, n)`` (``phis[i]`` the lag-``i+1`` AR matrix), ``thetas`` shape
+    ``(q, n, n)``, and ``residuals`` the one-step innovations ``e(t)`` (shape ``(n_samples, n)``).
     """
-    from statsmodels.tsa.statespace.varmax import VARMAX
-
     n = X.shape[1]
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        fitted = VARMAX(X, order=(p, q), trend="c").fit(maxiter=max_iter, disp=False)
+    fitted = _fit_varmax(X, p, q, max_iter)
 
     phis = _coef_stack(fitted.coefficient_matrices_var, p, n)
     thetas = _coef_stack(fitted.coefficient_matrices_vma, q, n)
     residuals = np.asarray(fitted.resid, dtype=np.float64)
     return phis, thetas, residuals
+
+
+def _fit_varmax(X: np.ndarray, p: int, q: int, max_iter: int) -> VARMAXResultsWrapper:
+    """The state-space VARMA(p, q) fit with a constant trend, skipping the parameter covariance."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = VARMAX(X, order=(p, q), trend="c")
+        return model.fit(maxiter=max_iter, disp=False, cov_type="none")
 
 
 def _coef_stack(matrices: np.ndarray | None, n_lags: int, n: int) -> np.ndarray:
@@ -176,16 +180,12 @@ def _select_order(
     """
     if criterion not in _CRITERIA:
         raise ValueError(f"criterion must be one of {_CRITERIA} or None, got {criterion!r}")
-    from statsmodels.tsa.statespace.varmax import VARMAX
-
     best = None
     for p in range(0, order[0] + 1):
         for q in range(0, order[1] + 1):
             if p == 0 and q == 0:
                 continue
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                fitted = VARMAX(X, order=(p, q), trend="c").fit(maxiter=max_iter, disp=False)
+            fitted = _fit_varmax(X, p, q, max_iter)
             value = float(getattr(fitted, criterion))
             if best is None or value < best[0]:
                 best = (value, p, q, fitted)
