@@ -73,7 +73,7 @@ class GPDC:
     a random permutation of them, drawn ``n_null`` times; the p-value is the share of draws at
     least as large as the statistic [1]_.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 400 rows and two conditioning
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. The test assumes ``x`` and ``y`` depend on the conditioning set additively, a
     function of it plus noise; a dependence through the noise's scale, such as ``x = z e``, stays
     in the residuals and reads as conditional dependence. The null ignores the degrees of freedom

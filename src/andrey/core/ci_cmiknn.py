@@ -129,7 +129,7 @@ class CMIknn:
     each over ``n x n`` distance matrices, so its time grows with the square of the number of rows
     times the permutations, and its memory with the square of the rows: hundreds of rows take
     seconds per query, and tens of thousands do not fit. The p-value moves with ``seed`` and
-    cannot fall between multiples of ``1 / n_permutations``. Its tests run it on up to 400 rows and
+    cannot fall between multiples of ``1 / n_permutations``. Its tests run it on up to 500 rows and
     two conditioning variables.
 
     References

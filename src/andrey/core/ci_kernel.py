@@ -99,7 +99,7 @@ class KCI:
     is ordered (lower index first) before it runs: the p-value does not depend on argument
     order.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 400 rows and two conditioning
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. Each query with a conditioning set costs an eigendecomposition and four products of
     ``n x n`` matrices, so time grows as the cube of the number of rows and memory as its square:
     thousands of rows are practical, tens of thousands are not. The kernel widths follow the row
@@ -216,7 +216,7 @@ class RCoT:
     the conditioning set, so a p-value does not depend on the order of queries or of the
     arguments, and the same seed reproduces it.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 400 rows and two conditioning
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. The p-value is random through the features: a different seed moves it, most near
     the threshold. The regression on the conditioning-set features removes a strong nonlinear
     effect of that set only approximately, and what remains reads as dependence: with two or more
