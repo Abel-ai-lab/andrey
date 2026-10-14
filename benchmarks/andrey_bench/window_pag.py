@@ -10,7 +10,7 @@ the generating time-series DAG ``G`` in three steps:
    their observed ancestors in the window do not d-separate them in ``G`` (the ancestral-set
    criterion of :func:`andrey.data.latent.marginal`). The mark at a node is a tail when it is an
    ancestor of the other end in ``G`` and an arrowhead otherwise. ``past`` grows until two
-   successive steps leave the PAG unchanged, so the cut-off past does not change the answer.
+   successive steps leave this MAG unchanged, so the cut-off past does not change the answer.
 2. **Repeating adjacencies.** A link ``X^i_{t-k-s} - X^j_{t-s}`` is kept only when every copy
    ``s = 0 .. tau_max - k`` inside the window is adjacent, so the window MAG holds every link at
    every shift or at none.
@@ -251,18 +251,39 @@ def true_window_pag(truth: WindowGraph, tau_max: int) -> WindowGraph:
     ``truth`` is a window truth whose lag 0 is a DAG and whose last ``latents`` series are
     unobserved. Returns a window graph over the observed series with ``lag0="pag"``: lag 0 as
     endpoint marks and, at lag ``k >= 1``, the mark at the earlier end of each link, whose later end
-    is an arrowhead. Raises ``RuntimeError`` when the unrolled past does not settle within
-    ``_MAX_ROUNDS`` rounds.
+    is an arrowhead. Raises ``RuntimeError`` when the window MAG does not settle within
+    ``_MAX_ROUNDS`` rounds of unrolled past, when a non-adjacent pair of it has no separating set,
+    or when an oriented mark contradicts it.
     """
     n_obs = truth.n_nodes - truth.latents
     step = tau_max + truth.tau_max
     found: list[np.ndarray] = []
     for round_ in range(1, _MAX_ROUNDS + 1):
         nodes, mag, anc = _window_mag(truth, tau_max, round_ * step)
-        found.append(_window_marks(nodes, _orient(nodes, mag, anc, tau_max), n_obs, tau_max))
-        if len(found) >= 3 and all(np.array_equal(found[-1], f) for f in found[-3:-1]):
-            return WindowGraph(found[-1], lag0="pag")
-    raise RuntimeError(f"the true PAG did not settle within {_MAX_ROUNDS} rounds of unrolled past")
+        found.append(mag)
+        if len(found) >= 3 and all(np.array_equal(mag, f) for f in found[-3:-1]):
+            _check_maximal(nodes, mag, anc)
+            return WindowGraph(
+                _window_marks(nodes, _orient(nodes, mag, anc, tau_max), n_obs, tau_max), lag0="pag"
+            )
+    raise RuntimeError(
+        f"the window MAG did not settle within {_MAX_ROUNDS} rounds of unrolled past"
+    )
+
+
+def _check_maximal(nodes, mag: np.ndarray, anc) -> None:
+    """Raise ``RuntimeError`` unless every non-adjacent pair is m-separated by its ancestors.
+
+    Dropping links for repeating adjacencies could leave a pair that no set separates; the FCI
+    rules then have no MAG to be sound for.
+    """
+    oracle = _MagOracle(mag)
+    for a, c in combinations(range(len(nodes)), 2):
+        if mag[a, c] == NULL:
+            ancestors = anc[nodes[a]] | anc[nodes[c]]
+            sep = [x for x, v in enumerate(nodes) if v in ancestors and x not in (a, c)]
+            if oracle(a, c, sep) < 0.5:
+                raise RuntimeError(f"no set separates the non-adjacent {nodes[a]} and {nodes[c]}")
 
 
 class DesignOracle:
