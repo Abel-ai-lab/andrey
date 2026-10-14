@@ -362,7 +362,8 @@ def test_no_pool_below_work_gate(monkeypatch):
 
 def test_parity_mixed_gate(monkeypatch):
     """A GES run that crosses the work threshold matches serial output."""
-    monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "1000")  # between pass-1 and dense-pass work
+    # Below the work of the first and the busiest forward passes, above that of most others.
+    monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "200")
     created: list[int] = []
     real = pg._create_pool
     monkeypatch.setattr(pg, "_create_pool", lambda *a, **k: (created.append(1), real(*a, **k))[1])

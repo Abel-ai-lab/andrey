@@ -257,6 +257,20 @@ _SCREEN_TOL = 1e-6
 _Screened = tuple[float, int, int, tuple[int, ...], tuple[int, ...]]
 
 
+def _touched(before: np.ndarray | None, after: np.ndarray) -> np.ndarray:
+    """A mask of the targets whose Insert candidates can differ between ``before`` and ``after``.
+
+    Those are the nodes with a changed mark and their undirected neighbors in ``after``; every node
+    when there is no ``before``.
+    """
+    if before is None:
+        return np.ones(after.shape[0], dtype=bool)
+    diff = before != after
+    changed = diff.any(axis=0) | diff.any(axis=1)
+    lines = (after == ops.TAIL) & (after.T == ops.TAIL)
+    return changed | lines[changed].any(axis=0)
+
+
 class _ForwardScan:
     """The forward pass over fixed targets, keeping each target's candidates between passes.
 
@@ -324,16 +338,10 @@ class _ForwardScan:
 
     def _refresh(self, adj: np.ndarray, state: NeighborState) -> None:
         """Enumerate again the targets whose candidates differ from the kept graph's."""
-        if self.adj is None:
-            stale = self.targets
-        else:
-            diff = self.adj != adj
-            changed = diff.any(axis=0) | diff.any(axis=1)
-            lines = (adj == ops.TAIL) & (adj.T == ops.TAIL)
-            touched = changed | lines[changed].any(axis=0)
-            stale = [y for y in self.targets if touched[y]]
-        for y in stale:
-            self._enumerate(y, adj, state)
+        touched = _touched(self.adj, adj)
+        for y in self.targets:
+            if touched[y]:
+                self._enumerate(y, adj, state)
         self.adj = adj.copy()
 
     def _enumerate(self, y: int, adj: np.ndarray, state: NeighborState) -> None:
@@ -495,8 +503,9 @@ def _backward_task(targets: Sequence[int], adj: np.ndarray, run_token: object) -
 #
 # A pass is worth fanning out only when its scan outweighs the worker round-trip (dispatch + pickle
 # + collect). Since the inner cost is exponential in undirected degree (``2^|t0|``), the gate tracks
-# *estimated candidate evaluations*, not a bare ``n`` -- so it is density-aware. It is checked per
-# pass (GES starts from the empty graph: pass 1 is cheap, later passes densen), and the worker set
+# *estimated candidate evaluations*, not a bare ``n`` -- so it is density-aware. A forward pass
+# counts only the targets it enumerates again, those the last move touched (every target on the
+# first pass); a backward pass counts every target. It is checked per pass, and the worker set
 # is created lazily on the first pass that crosses. The default is the fixed ``_DEFAULT_MIN_WORK``
 # below; ``ANDREY_GES_PARALLEL_MIN_WORK`` overrides it (0 sends every pass to the workers), and a
 # fit with workers warns once on the default when a pass nears it.
@@ -632,10 +641,15 @@ def run_ges(
     engine: DeltaEngine = _FullScoreDelta(score) if full_scores else DeltaBICScore(score)
     scan = _ForwardScan(range(n), engine, n, max_parents)
     lazy = _LazyWorkerSet(score, n, workers)
+    before: np.ndarray | None = None  # the graph of the previous forward pass
     try:
         while True:  # forward phase
             state = neighborhood_state(adj, n)
-            work = forward_work_per_target(n, state, max_parents) if workers > 1 else [0]
+            work = [0]
+            if workers > 1:
+                touched = _touched(before, adj)
+                per_target = forward_work_per_target(n, state, max_parents)
+                work = [w for w, redo in zip(per_target, touched, strict=True) if redo]
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
                 warn = False
@@ -651,6 +665,7 @@ def run_ges(
                 best = scan.best(adj, state)
             if best is None:
                 break
+            before = adj.copy()
             _key, x, y, T = best
             ops.apply_insert(adj, x, y, T)
             adj = _reform_cpdag(adj)
