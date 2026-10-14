@@ -858,7 +858,8 @@ def accuracy_figure(summaries: list[dict]) -> str:
     return (
         '<figure class="acc-figure">'
         f'<figcaption><b class="acc-score">{good} of {total}</b> comparisons with the same or '
-        'fewer errors.<span class="acc-note"> Each row sums both packages\' errors over the sizes '
+        "fewer errors. A comparison is one method against one package at one size."
+        '<span class="acc-note"> Each row sums both packages\' errors over the sizes '
         "they share: the ring is the other package's, the dot Andrey's, as a share of them."
         "</span></figcaption>"
         '<div class="acc-scroll" role="region" aria-label="Accuracy by method" tabindex="0">'
