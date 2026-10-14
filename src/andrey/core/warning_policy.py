@@ -48,6 +48,14 @@ class SearchLimitWarning(AndreyWarning):
     """
 
 
+class SampleSizeWarning(AndreyWarning):
+    """A test run on fewer rows than its level was measured to hold at, so it may reject a true
+    independence more often than ``alpha``.
+
+    RCoT warns on a conditional query below 200 rows.
+    """
+
+
 def warn_once(message: str, category: type[AndreyWarning]) -> None:
     """Warn with ``message`` the first time this process sees it, at the caller's line."""
     key = (category, message)

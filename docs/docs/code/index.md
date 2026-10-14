@@ -178,6 +178,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
+| {py:class}`~andrey.SampleSizeWarning` | A test runs on fewer rows than its level was measured to hold at: RCoT conditions on fewer than 200 rows. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -212,6 +213,7 @@ name.
    PerformanceWarning
    BackendFallbackWarning
    SearchLimitWarning
+   SampleSizeWarning
 ```
 
 ## Datasets

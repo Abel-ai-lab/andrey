@@ -16,6 +16,7 @@ import pytest
 import andrey
 from andrey.cli import main
 from andrey.core import backend, ci, warning_policy
+from andrey.core.ci_kernel import RCoT
 
 pc_module = importlib.import_module("andrey.constraint.pc")
 hc_module = importlib.import_module("andrey.search.hc")
@@ -67,12 +68,18 @@ def _search_limit(monkeypatch):
     return lambda: hc_module.hc(data, max_iter=1)  # the search itself: no experimental warning
 
 
+def _rcot_few_rows(monkeypatch):
+    test = RCoT(np.random.default_rng(0).standard_normal((50, 3)))
+    return lambda: test(0, 1, (2,))
+
+
 TRIGGERS = {
     "backend fallback": (_backend_fallback, andrey.BackendFallbackWarning),
     "PC expensive pass": (_pc_expensive_pass, andrey.PerformanceWarning),
     "default pool cutoff": (_default_pool_cutoff, andrey.PerformanceWarning),
     "experimental method": (_experimental, andrey.ExperimentalWarning),
     "search limit": (_search_limit, andrey.SearchLimitWarning),
+    "RCoT few rows": (_rcot_few_rows, andrey.SampleSizeWarning),
 }
 
 
@@ -120,6 +127,8 @@ def test_every_category_is_a_user_warning_under_the_base():
         andrey.ExperimentalWarning,
         andrey.PerformanceWarning,
         andrey.BackendFallbackWarning,
+        andrey.SearchLimitWarning,
+        andrey.SampleSizeWarning,
     ):
         assert issubclass(category, andrey.AndreyWarning)
     assert issubclass(andrey.AndreyWarning, UserWarning)

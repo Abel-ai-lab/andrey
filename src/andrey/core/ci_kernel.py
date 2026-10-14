@@ -16,8 +16,12 @@ from scipy.special import gammaincc
 from .ci import _canonical, _checked_data
 from .independence import hsic_test
 from .seeding import resolve_seed
+from .warning_policy import SampleSizeWarning, warn_once
 
 __all__ = ["KCI", "RCoT"]
+
+# Below this many rows RCoT's false-rejection rate on a conditional query was measured above alpha.
+_RCOT_MIN_ROWS = 200
 
 
 def _standardize(data: np.ndarray) -> np.ndarray:
@@ -214,6 +218,11 @@ class RCoT:
         If ``data`` is not 2-D, has fewer than 2 rows, contains NaN or infinity, or has values
         too large or too small to standardize, or a feature count is below 1.
 
+    Warns
+    -----
+    SampleSizeWarning
+        On the first query with a conditioning set, when ``data`` has fewer than 200 rows.
+
     Notes
     -----
     **How it works.** A variable ``v`` with median pairwise distance ``s`` (over its first 500
@@ -235,14 +244,17 @@ class RCoT:
     arguments, and the same seed reproduces it.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
-    variables. The p-value is random through the features: a different seed moves it, most near
-    the threshold. The regression on the conditioning-set features removes a strong nonlinear
-    effect of that set only approximately, and what remains reads as dependence: with two or more
-    conditioning variables that drive both ``x`` and ``y``, the test rejects a true independence
-    more often than ``alpha``, increasingly so as the rows grow (on simulated draws with three
-    such variables and 2,000 rows, nearly always). RCoT tests conditional uncorrelatedness of
-    ``n_features`` features per variable, which can miss a dependence the full kernel test finds,
-    such as one between an odd and an even function of the same cause on a few hundred rows.
+    variables. On fewer than 200 rows, it rejects a true conditional independence more often than
+    ``alpha`` even when every column is independent of the others, and warns: with two conditioning
+    variables, more than twice as often at 100 rows. The p-value is random through the features: a
+    different seed moves it, most near the threshold. The regression on the conditioning-set
+    features removes a strong nonlinear effect of that set only approximately, and what remains
+    reads as dependence: with two or more conditioning variables that drive both ``x`` and ``y``,
+    the test rejects a true independence more often than ``alpha``, increasingly so as the rows grow
+    (on simulated draws with three such variables and 2,000 rows, nearly always). RCoT tests
+    conditional uncorrelatedness of ``n_features`` features per variable, which can miss a
+    dependence the full kernel test finds, such as one between an odd and an even function of the
+    same cause on a few hundred rows.
 
     References
     ----------
@@ -280,6 +292,12 @@ class RCoT:
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the RCoT p-value for ``x`` independent of ``y`` given ``condition_set``."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
+        if cond and self._n < _RCOT_MIN_ROWS:
+            warn_once(
+                f"RCoT on fewer than {_RCOT_MIN_ROWS} rows rejects a true conditional independence "
+                "more often than alpha.",
+                SampleSizeWarning,
+            )
         rng = np.random.default_rng([self._seed, x_int, y_int, len(cond), *cond])
         n = self._n
         a = self._features([x_int], self._n_features, rng)

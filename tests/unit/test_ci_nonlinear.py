@@ -340,6 +340,21 @@ def test_rejects_bad_settings(cls, kwargs, match):
         cls(np.zeros((10, 3)), **kwargs)
 
 
+@pytest.mark.parametrize(
+    ("n", "condition_set", "warns"), [(199, (2,), True), (199, (), False), (200, (2,), False)]
+)
+def test_rcot_warns_on_a_conditional_query_below_200_rows(n, condition_set, warns):
+    """Below 200 rows RCoT's level exceeds ``alpha`` once it conditions, so it warns, and still
+    answers; an unconditional query, or 200 rows, does not warn."""
+    andrey.core.warning_policy.reset()
+    test = RCoT(np.random.default_rng(0).standard_normal((n, 3)))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        pvalue = test(0, 1, condition_set)
+    assert 0.0 <= pvalue <= 1.0
+    assert [w.category for w in caught] == ([andrey.SampleSizeWarning] if warns else [])
+
+
 # ---- the registry ------------------------------------------------------------------------------
 
 
