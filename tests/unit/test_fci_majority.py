@@ -223,13 +223,23 @@ def test_r5_rejects_ambiguous_circle_paths(triples, reverse_labels):
 
 
 @pytest.mark.parametrize(
-    "ties,inner",
-    [([(1, 3, 4)], [2, 3, 4]), ([(2, 3, 4)], [1, 3, 4]), ([(1, 3, 4), (2, 3, 4)], None)],
+    "ties,found",
+    [([(1, 3, 4)], True), ([(2, 3, 4)], True), ([(1, 3, 4), (2, 3, 4)], False)],
 )
-def test_tied_circle_route_does_not_block_another(ties, inner):
+def test_tied_circle_route_does_not_block_another(ties, found):
     marks = circle_graph(6, [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (4, 5), (0, 5)])
+    ambiguous = frozenset(ties)
     # Both routes from 0 to 5 pass through 3; a tie on one route leaves the other usable.
-    assert fci_module._uncovered_circle_cycle(marks, 0, 5, frozenset(ties)) == inner
+    inner = fci_module._uncovered_circle_cycle(marks, 0, 5, ambiguous)
+    if not found:
+        assert inner is None
+        return
+    cycle = [0, *inner, 5]
+    closed = [*cycle, *cycle[:2]]
+    assert len(set(cycle)) == len(cycle)
+    assert all(fci_module._traverse_circle(marks, u, v) for u, v in zip(closed, closed[1:]))
+    assert fci_module._is_uncovered(marks, closed)
+    assert not any(fci_module._triple(*closed[i : i + 3]) in ambiguous for i in range(len(cycle)))
 
 
 @pytest.mark.parametrize("middle_in_set", [False, True])
