@@ -741,18 +741,24 @@ def delta_many_with_base(
 
     if adds:
         add_deltas: dict[int, float] = {}
-        add_us = sorted({u for _, u in adds if u != i and u not in S_base_sorted})
+        in_base = set(S_base_sorted)
+        in_base.add(i)
+        add_us = sorted({u for _, u in adds if u not in in_base})
         if add_us and R_v_old is not None:
             if not S_base_sorted:
+                diag = cov_diag.tolist()
+                row = cov[i].tolist()
+                log_old = _log(R_v_old)
+                penalty = log_n * lam
                 for u in add_us:
-                    R_u_old = float(cov_diag[u])
+                    R_u_old = diag[u]
                     if R_u_old <= 0.0:
                         continue
-                    e_vu = float(cov[i, u])
+                    e_vu = row[u]
                     R_v_new = R_v_old - (e_vu * e_vu) / R_u_old
                     if R_v_new <= 0.0:
                         continue
-                    add_deltas[u] = float(n * (_log(R_v_new) - _log(R_v_old)) + log_n * lam)
+                    add_deltas[u] = float(n * (_log(R_v_new) - log_old) + penalty)
             else:
                 assert M_old is not None
                 S_list = list(S_base_sorted)
@@ -771,9 +777,13 @@ def delta_many_with_base(
                         n * (_log(np.where(safe_mask, R_v_new_arr, 1.0)) - _log(R_v_old))
                         + log_n * lam
                     )
-                    for pos, u in enumerate(add_us):
-                        if safe_mask[pos]:
-                            add_deltas[u] = float(deltas_arr[pos])
+                    add_deltas = {
+                        u: d
+                        for u, safe, d in zip(
+                            add_us, safe_mask.tolist(), deltas_arr.tolist(), strict=True
+                        )
+                        if safe
+                    }
                 if bounds is not None:
                     bound_of = _add_bounds(
                         n, log_n * lam, M_old, cov_diag[S_list], cs_v, cs_U, R_v_old, R_uU, e_vU
