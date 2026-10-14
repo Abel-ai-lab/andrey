@@ -289,7 +289,7 @@ COVER_W, COVER_H = 1600, 640
 COVER_QUALITIES = (75, 70, 65, 60, 55)
 ART = {
     kind: BRAND / f"art-{kind}.jpg"
-    for kind in ("pair", "lanes", "iceberg", "contour", "hourglass", "agentic")
+    for kind in ("pair", "lanes", "iceberg", "contour", "hourglass", "agentic", "start", "docs")
 }
 COVERS = {
     "pair": "portraits of Andrey Markov and Andrey Kolmogorov, side by side",
@@ -298,6 +298,8 @@ COVERS = {
     "contour": "two summits drawn in contour lines, one dotted trail ending on each",
     "hourglass": "an hourglass whose sand falls one way only",
     "agentic": "an orrery whose rings carry a graph, one amber arm steering it",
+    "start": "a cloud of data points gathering into a small graph, one arrow amber",
+    "docs": "the pages of a vast atlas fanning open, one edge amber like a bookmark",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge
@@ -325,6 +327,22 @@ def _ground_lightness() -> tuple[float, float, float]:
     return tuple(np.percentile(ground, [10, 50, 90]))
 
 
+def _cool(light: np.ndarray) -> np.ndarray:
+    """The blue of each lightness along black, navy, the palette's ramp, and white."""
+    ramp = andrey.viz.LIGHT.ramp  # palest first
+    colors = np.array(
+        [np.zeros(3), _rgb(grain.NAVY), *(_rgb(c) for c in ramp[::-1][1:]), np.full(3, 255.0)]
+    )
+    return np.stack([np.interp(light, colors @ LUMA, colors[:, c]) for c in range(3)], -1)
+
+
+def ground_tokens() -> dict[str, str]:
+    """``grain.ground_tokens`` and ``--andrey-ground-art``: the color ``brand_tones`` gives an
+    art's median pixel, its ground, so a page's ground meets the art with no seam."""
+    art = _cool(np.array(_ground_lightness()[1])).round().astype(int)
+    return {**grain.ground_tokens(), "--andrey-ground-art": "#{:02x}{:02x}{:02x}".format(*art)}
+
+
 def brand_tones(image: Image.Image, match_ground: bool = True) -> Image.Image:
     """``image`` in the brand's tones, its drawing unchanged.
 
@@ -342,11 +360,7 @@ def brand_tones(image: Image.Image, match_ground: bool = True) -> Image.Image:
     top = max(knots[3], knots[2] + 1)
     target = [0, *_ground_lightness(), max(top, 200), 255]
     light = np.interp(drawn, [0, *knots[:3], top, 255], target) if match_ground else drawn
-    ramp = andrey.viz.LIGHT.ramp  # palest first
-    colors = np.array(
-        [np.zeros(3), _rgb(grain.NAVY), *(_rgb(c) for c in ramp[::-1][1:]), np.full(3, 255.0)]
-    )
-    cool = np.stack([np.interp(light, colors @ LUMA, colors[:, c]) for c in range(3)], -1)
+    cool = _cool(light)
     amber = _rgb(grain.AMBER)
     amber_light = amber @ LUMA
     above = np.clip((drawn - amber_light) / (255 - amber_light), 0, 1)[..., None]

@@ -144,9 +144,12 @@
   min-height: max(38rem, calc(100svh - 4.5rem));
   padding: calc(clamp(3rem, 8vw, 6rem) + var(--pst-header-height)) var(--gutter) clamp(3rem, 8vw, 6rem);
   overflow: hidden;
-  background:
-    radial-gradient(circle at 75% 40%, color-mix(in srgb, var(--andrey-ground-cobalt) 70%, transparent), transparent 70%),
-    var(--andrey-ground-navy);
+  /* The art's own ground (--andrey-ground-art), darkening toward the type at the top. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--andrey-ground-navy) 75%, var(--andrey-ground-art)),
+    var(--andrey-ground-art) 80%
+  );
 }
 
 /* The stipple, under the art until it loads and where it is cropped away. A mask reads only
@@ -201,6 +204,45 @@
     color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent) 32%,
     transparent 62%
   );
+}
+
+/* The cover's slow life, as on a printed cover under moving light: the art pushes in and eases
+   back over half a minute, the stipple drifts by one tile, and the word arrives from the right,
+   where its trace points. Only transforms and opacity move, and none of it under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .andrey-home .hero-art {
+    transform-origin: 80% 50%;
+    animation: cover-push 32s ease-in-out infinite alternate;
+  }
+
+  .andrey-home .story-pin::before {
+    inset: -128px 0 0 -128px;
+    animation: grain-drift 48s linear infinite;
+  }
+
+  .andrey-home .hero .story-words,
+  .andrey-home .hero .story-static .word {
+    animation: word-arrive 1100ms var(--ease) 250ms both;
+  }
+}
+
+@keyframes cover-push {
+  to {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes grain-drift {
+  to {
+    transform: translate(128px, 128px);
+  }
+}
+
+@keyframes word-arrive {
+  from {
+    opacity: 0;
+    translate: 0.5em 0;
+  }
 }
 
 /* On a narrow screen the type sits on the stipple ground and the art's subject below it, at twice
@@ -579,16 +621,20 @@
 /* A tile is a small cover, in both themes: the stipple ground, its art cropped on the right
    (site/brand/bento/*.jpg), a navy fade on the left under the light type. The small tiles' art is
    cobalt only, so the one amber is the number; a tile without a number keeps its art's amber. */
-.andrey-home .tile {
+.andrey-home .tile-face,
+.andrey-home .carousel-head {
   --andrey-ink: var(--andrey-ground-ink);
   --andrey-muted: var(--andrey-ground-muted);
+}
+
+.andrey-home .tile {
   position: relative;
   isolation: isolate;
   grid-column: span 4;
   margin: 0;
   padding: 0;
   border-radius: 18px;
-  background: var(--andrey-ground-navy);
+  background: var(--andrey-ground-art);
   overflow: hidden;
 }
 
@@ -602,6 +648,10 @@
 
 .andrey-home .tile--release {
   grid-column: span 6;
+}
+
+.andrey-home .tile--12 {
+  grid-column: 1 / -1;
 }
 
 .andrey-home .tile-art {
@@ -734,6 +784,203 @@
   object-position: left center;
 }
 
+/* The figures' tile: its title and controls on the left, the figures on paper cards in a row
+   that snaps from one to the next. */
+.andrey-home .carousel {
+  display: grid;
+  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  padding: 1.6rem;
+}
+
+.andrey-home .carousel-head {
+  display: flex;
+  flex-direction: column;
+  color: var(--andrey-ink);
+}
+
+.andrey-home .carousel-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: auto;
+  padding-top: 1.5rem;
+}
+
+.andrey-home .carousel-controls[hidden] {
+  display: none;
+}
+
+.andrey-home .carousel-step {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 40%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--andrey-ground-navy) 40%, transparent);
+  color: var(--andrey-ground-ink);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.andrey-home .carousel-dots {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.andrey-home .carousel-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--andrey-ground-ink) 40%, transparent);
+  cursor: pointer;
+}
+
+.andrey-home .carousel-dot[aria-current="true"] {
+  background: var(--andrey-ground-ink);
+}
+
+.andrey-home .carousel-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: min(34rem, 88%);
+  grid-auto-rows: 25rem;
+  gap: 1rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+/* Every slide is the same height; a figure shrinks to fit it. */
+.andrey-home .carousel-slide {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  scroll-snap-align: start;
+  padding: 1.1rem 1.2rem;
+  border-radius: 14px;
+  background: var(--andrey-paper);
+  color: var(--andrey-ink);
+}
+
+.andrey-home .carousel-slide .tchart {
+  width: auto;
+  margin: 0;
+}
+
+.andrey-home .carousel-slide > *,
+.andrey-home .carousel-slide .acc-figure,
+.andrey-home .carousel-slide .acc-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.andrey-home .carousel-slide .acc-chart {
+  min-width: 0;
+}
+
+.andrey-home .carousel-slide svg {
+  flex: 1;
+  min-height: 0;
+  max-width: 100%;
+}
+
+.andrey-home .carousel-slide .acc-score {
+  display: inline;
+  font-size: 2rem;
+}
+
+.andrey-home .carousel-slide .acc-figure figcaption {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.andrey-home .carousel-slide .acc-note {
+  display: none;
+}
+
+.andrey-home .carousel-graphs {
+  flex-direction: row;
+  gap: 0.75rem;
+}
+
+.andrey-home .carousel-graphs figure {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem;
+}
+
+.andrey-home .carousel-graphs figcaption {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 44rem) {
+  .andrey-home .carousel {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 1.25rem;
+  }
+}
+
+/* The tiles fly in as they enter the screen, a row at a time with a short stagger across it
+   (--k), at the reader's own scroll speed. Where the browser has no view timeline, tiles.js adds
+   is-flying and marks each tile is-in as it arrives. Nothing moves under reduced motion. */
+.andrey-home .bento-grid > .tile:nth-child(3n + 2) {
+  --k: 1;
+}
+
+.andrey-home .bento-grid > .tile:nth-child(3n) {
+  --k: 2;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .andrey-home .bento-grid > .tile {
+      animation: tile-in linear both;
+      animation-timeline: view();
+      animation-range: entry calc(var(--k, 0) * 12%) entry calc(75% + var(--k, 0) * 12%);
+    }
+  }
+
+  @supports not (animation-timeline: view()) {
+    .andrey-home .bento.is-flying .bento-grid > .tile {
+      opacity: 0;
+      translate: 0 3rem;
+      scale: 0.96;
+      transition:
+        opacity 700ms var(--ease) calc(var(--k, 0) * 90ms),
+        translate 700ms var(--ease) calc(var(--k, 0) * 90ms),
+        scale 700ms var(--ease) calc(var(--k, 0) * 90ms);
+    }
+
+    .andrey-home .bento.is-flying .bento-grid > .tile.is-in {
+      opacity: 1;
+      translate: none;
+      scale: none;
+    }
+  }
+}
+
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    translate: 0 3rem;
+    scale: 0.96;
+  }
+}
+
 /* ---------- the dialogs: a tile's details, as the "Why Andrey is fast" dialog ---------- */
 .andrey-home .tile-details {
   display: contents;
@@ -773,6 +1020,79 @@
 
 .andrey-home .tile-dialog .tc-title {
   font-family: inherit;
+}
+
+/* The accuracy figure: a row per method, the other package's errors as a ring at 100% and
+   Andrey's as a cobalt dot at its share of them; the one number, above it, in amber. */
+.andrey-home .acc-figure {
+  margin: 0;
+}
+
+.andrey-home .acc-figure figcaption {
+  max-width: var(--measure);
+  margin-bottom: 1rem;
+  color: var(--andrey-muted);
+}
+
+.andrey-home .acc-score {
+  display: block;
+  color: var(--andrey-ground-amber);
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+/* On a phone the chart keeps a readable size and scrolls sideways. */
+.andrey-home .acc-scroll {
+  overflow-x: auto;
+}
+
+.andrey-home .acc-chart {
+  display: block;
+  min-width: 32rem;
+  width: 100%;
+  max-width: 44rem;
+  height: auto;
+  font-family: var(--font-sans);
+}
+
+.andrey-home .acc-name {
+  fill: var(--andrey-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.andrey-home .acc-with,
+.andrey-home .acc-tick,
+.andrey-home .acc-change {
+  fill: var(--andrey-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.andrey-home .acc-tick {
+  text-anchor: middle;
+}
+
+.andrey-home .acc-grid {
+  stroke: var(--andrey-line);
+}
+
+.andrey-home .acc-link {
+  stroke: var(--andrey-accent);
+  stroke-width: 2;
+  opacity: 0.45;
+}
+
+.andrey-home .acc-ref {
+  fill: var(--andrey-paper);
+  stroke: var(--andrey-muted);
+  stroke-width: 1.5;
+}
+
+.andrey-home .acc-ours {
+  fill: var(--andrey-accent);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -872,42 +1192,64 @@
 }
 
 /* ---------- compared with other packages ---------- */
+/* In the covers' type: the packages over a navy band, hairline rules, cobalt checks, and amber
+   only on Andrey's mark where no other package has it. The feature column stays in view while a
+   phone scrolls the table sideways. */
 .andrey-home .compare {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.95rem;
 }
 
 .andrey-home .compare th,
 .andrey-home .compare td {
-  padding: 0.6rem 0.9rem;
+  padding: 0.7rem 0.9rem;
   border-bottom: 1px solid var(--andrey-line);
+  background: var(--andrey-paper);
 }
 
-.andrey-home .compare thead th {
+.andrey-home .compare thead th,
+.andrey-home .compare thead td {
+  border-bottom: 0;
+  background: var(--andrey-ground-navy);
+  color: var(--andrey-ground-ink);
   font-weight: 600;
+  letter-spacing: -0.01em;
   text-align: center;
   white-space: nowrap;
 }
 
-.andrey-home .compare thead th:nth-child(2),
-.andrey-home .compare td:nth-child(2) {
-  background: var(--andrey-surface);
+.andrey-home .compare thead :first-child {
+  border-top-left-radius: 12px;
+}
+
+.andrey-home .compare thead :last-child {
+  border-top-right-radius: 12px;
 }
 
 .andrey-home .compare tbody th[scope="row"] {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 11rem;
   font-weight: 400;
   text-align: left;
 }
 
+.andrey-home .compare thead td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
 .andrey-home .compare .compare-group th {
-  padding-top: 1.4rem;
-  color: var(--andrey-muted);
-  font-size: 0.8rem;
+  padding-top: 1.6rem;
+  color: var(--andrey-ink);
+  font-size: 1.05rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: -0.02em;
   text-align: left;
-  text-transform: uppercase;
 }
 
 .andrey-home .compare .mark {
@@ -923,6 +1265,10 @@
   color: var(--andrey-accent);
 }
 
+.andrey-home .compare-alone td:nth-child(2) {
+  color: var(--andrey-ground-amber);
+}
+
 .andrey-home .mark--part,
 .andrey-home .mark--no {
   color: var(--andrey-muted);
@@ -931,6 +1277,22 @@
 .andrey-home .compare sup {
   margin-left: 0.15rem;
   font-size: 0.72rem;
+}
+
+@media (max-width: 44rem) {
+  .andrey-home .compare {
+    font-size: 0.85rem;
+  }
+
+  .andrey-home .compare th,
+  .andrey-home .compare td {
+    padding: 0.55rem 0.5rem;
+  }
+
+  .andrey-home .compare tbody th[scope="row"] {
+    min-width: 8.5rem;
+    max-width: 9.5rem;
+  }
 }
 
 /* ---------- footnotes: every note on the page, together at its foot ---------- */
@@ -1086,9 +1448,107 @@
   letter-spacing: -0.02em;
 }
 
-.andrey-home .band > .wrap > p {
+.andrey-home .band-row > div > p {
   max-width: var(--measure);
   color: var(--andrey-muted);
+}
+
+/* The sections below the bento, each paired with its art, as an Apple product page pairs a
+   section with its picture: "From data to graph" opens on a full-bleed cover band with its title
+   in large type, and the documentation band sets its art beside the text. */
+.andrey-home .section-cover {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  min-height: clamp(16rem, 34vw, 26rem);
+  margin: calc(-1 * clamp(3rem, 8vw, 5.5rem)) calc(50% - 50vw) clamp(2.5rem, 6vw, 4rem);
+  padding: clamp(1.5rem, 4vw, 3rem) max(var(--gutter), calc(50vw - var(--page) / 2 + var(--gutter)));
+  overflow: hidden;
+  background: var(--andrey-ground-art);
+}
+
+.andrey-home .section-cover img {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  object-fit: cover;
+  object-position: 80% 50%;
+}
+
+.andrey-home .section-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--andrey-ground-navy) 70%, transparent),
+    color-mix(in srgb, var(--andrey-ground-navy) 40%, transparent) 35%,
+    transparent 65%
+  );
+}
+
+.andrey-home .section .section-cover h2 {
+  margin: 0;
+  color: var(--andrey-ground-ink);
+  font-size: clamp(2.6rem, 6vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.andrey-home .band-row {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 4rem);
+}
+
+.andrey-home .band-art {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--andrey-ground-art);
+}
+
+.andrey-home .band-art img {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  object-fit: cover;
+  object-position: 72% 50%;
+}
+
+@media (max-width: 44rem) {
+  .andrey-home .band-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .andrey-home .band-art {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* A section's title rises in as it enters the screen. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .andrey-home .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 90%;
+    }
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    translate: 0 0.6em;
+  }
 }
 
 .andrey-home .docs-grid {

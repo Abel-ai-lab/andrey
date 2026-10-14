@@ -18,6 +18,9 @@
   - `art-agentic.jpg`: the homepage's "agentic", an orrery in pale engraved rings tilted across
     the frame, a small directed graph on its rings, and one amber arm from its hidden center
     steering one node.
+  - `art-start.jpg` and `art-docs.jpg`: the homepage's "From data to graph" (data points
+    gathering into a small graph, one arrow amber) and "Documentation" (an atlas's pages fanning
+    open, one edge amber).
 - `bento/<art>.jpg`: the homepage's bento tiles, each a crop of an art at twice its tile's size
   (1168 x 416 for a wide tile, 768 x 416 for a narrow one), in the same tones. The crops of the
   covers above keep their names; the others are drawn for their tile: `hardware` (a honeycomb of

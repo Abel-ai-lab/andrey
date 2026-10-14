@@ -73,6 +73,7 @@
           <p class="tile-text">Use every core, or a graphics card, where a method gains from it.</p>
           {{ home.plus }}</a></li>
         {{ home.family_tiles }}
+        {{ home.figure_carousel }}
       </ul>
     </div>
 
@@ -167,7 +168,10 @@
   </div>
 
   <section class="section wrap" id="start" aria-labelledby="start-title">
-    <h2 id="start-title">From data to graph</h2>
+    <div class="section-cover">
+      <img src="_static/art-start.jpg" alt="" width="1600" height="640" loading="lazy">
+      <h2 id="start-title" class="reveal">From data to graph</h2>
+    </div>
     <div class="step" id="example">
       <div>
         <h3>Recover a causal graph</h3>
@@ -193,11 +197,14 @@
   </section>
 
   <section class="band" id="docs" aria-labelledby="docs-title">
-    <div class="wrap">
-      <h2 id="docs-title">Documentation</h2>
-      <p>Guides, the graph model, and every method's parameters, with the benchmark tables and the
-        settings to rerun them.</p>
-      <ul class="docs-grid">{{ home.docs_grid }}</ul>
+    <div class="wrap band-row">
+      <div class="band-art"><img src="_static/art-docs.jpg" alt="" width="1600" height="640" loading="lazy"></div>
+      <div>
+        <h2 id="docs-title" class="reveal">Documentation</h2>
+        <p>Guides, the graph model, and every method's parameters, with the benchmark tables and the
+          settings to rerun them.</p>
+        <ul class="docs-grid">{{ home.docs_grid }}</ul>
+      </div>
     </div>
   </section>
 </main>

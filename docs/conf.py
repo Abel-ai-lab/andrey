@@ -271,7 +271,7 @@ def _write_tokens(app) -> None:  # noqa: ANN001 -- Sphinx passes its application
         f":root {{\n  --andrey-light-paper: {andrey.viz.LIGHT.paper};\n}}",
         # The stipple ground's tones (site/grain.py), the same in both themes.
         ":root {\n"
-        + "".join(f"  {name}: {value};\n" for name, value in cards.grain.ground_tokens().items())
+        + "".join(f"  {name}: {value};\n" for name, value in cards.ground_tokens().items())
         + "}",
     ]
     _write(_TOKENS_CSS, header + "\n" + "\n\n".join(blocks) + "\n")

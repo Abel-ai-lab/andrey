@@ -794,6 +794,80 @@ def accuracy_cards(summaries: list[dict]) -> list[str]:
     return [accuracy_card(name, methods) for name, methods in groups]
 
 
+def accuracy_rows(summaries: list[dict]) -> list[dict]:
+    """Per method and package compared: both packages' errors summed over the sizes where both
+    have a graph, and how many of those sizes Andrey has the same or fewer."""
+    rows = []
+    for name, methods in time_groups(summaries):
+        by: dict[str, dict] = {}
+        for c in error_comparisons(methods):
+            row = by.setdefault(
+                c["method"]["comparator"],
+                {"name": name, "comparator": c["method"]["comparator"], "ours": 0.0, "theirs": 0.0,
+                 "good": 0, "sizes": 0},
+            )  # fmt: skip
+            row["ours"] += c["row"]["andrey_errors"]
+            row["theirs"] += c["row"]["comparator_errors"]
+            row["good"] += c["kind"] != "more"
+            row["sizes"] += 1
+        rows += by.values()
+    return rows
+
+
+# The accuracy figure's frame: the label column, the plot's width, a row's height, and its scale's
+# top (Andrey's errors as a share of the other package's).
+ACC_LABEL, ACC_PLOT, ACC_ROW, ACC_TOP = 280, 340, 30, 120
+
+
+def accuracy_figure(summaries: list[dict]) -> str:
+    """Andrey against the other package, a row per method: the other package's errors as a ring
+    at 100%, Andrey's as a cobalt dot at its share of them, both summed over the sizes the two
+    share. Above it, in amber, how many of those comparisons have the same or fewer errors."""
+    rows = accuracy_rows(summaries)
+    good, total = sum(r["good"] for r in rows), sum(r["sizes"] for r in rows)
+
+    def x(share: float) -> float:
+        return ACC_LABEL + ACC_PLOT * min(share, ACC_TOP) / ACC_TOP
+
+    marks = []
+    for i, r in enumerate(rows):
+        y = 40 + i * ACC_ROW
+        share = 100 * r["ours"] / r["theirs"] if r["theirs"] else 100.0
+        change = share - 100
+        label = "same" if abs(change) < 0.5 else f"{change:+.0f}%".replace("-", "\u2212")
+        tip = (
+            f"{r['name']} with {r['comparator']}: Andrey {number_text(r['ours'])} errors, "
+            f"{r['comparator']} {number_text(r['theirs'])}"
+        )
+        marks.append(
+            f"<g><title>{escape(tip)}</title>"
+            f'<text class="acc-name" x="0" y="{y + 4}">{escape(r["name"])}'
+            f'<tspan class="acc-with" dx="8">{escape(r["comparator"])}</tspan></text>'
+            f'<line class="acc-link" x1="{x(share):.1f}" x2="{x(100):.1f}" y1="{y}" y2="{y}"/>'
+            f'<circle class="acc-ref" cx="{x(100):.1f}" cy="{y}" r="7"/>'
+            f'<circle class="acc-ours" cx="{x(share):.1f}" cy="{y}" r="5"/>'
+            f'<text class="acc-change" x="{ACC_LABEL + ACC_PLOT + 14}" y="{y + 4}">{label}</text>'
+            "</g>"
+        )
+    height = 40 + len(rows) * ACC_ROW
+    ticks = "".join(
+        f'<line class="acc-grid" x1="{x(t):.1f}" x2="{x(t):.1f}" y1="22" y2="{height - 14}"/>'
+        f'<text class="acc-tick" x="{x(t):.1f}" y="14">{t}%</text>'
+        for t in (0, 50, 100)
+    )
+    return (
+        '<figure class="acc-figure">'
+        f'<figcaption><b class="acc-score">{good} of {total}</b> comparisons with the same or '
+        'fewer errors.<span class="acc-note"> Each row sums both packages\' errors over the sizes '
+        "they share: the ring is the other package's, the dot Andrey's, as a share of them."
+        "</span></figcaption>"
+        '<div class="acc-scroll" role="region" aria-label="Accuracy by method" tabindex="0">'
+        f'<svg class="acc-chart" viewBox="0 0 {ACC_LABEL + ACC_PLOT + 70} {height}" role="img" '
+        f'aria-label="Andrey has the same or fewer errors in {good} of {total} comparisons">'
+        f"{ticks}{''.join(marks)}</svg></div></figure>"
+    )
+
+
 def accuracy_chart(summaries: list[dict]) -> str:
     """The accuracy cards on a belt."""
     return belt(accuracy_cards(summaries))
@@ -1435,6 +1509,38 @@ def family_tile(info: dict) -> str:
     )
 
 
+def figure_carousel(summaries: list[dict], graphs: str) -> str:
+    """A wide tile that turns through the figures: each family's first speed chart, the accuracy
+    figure, and the graph figures. Without script it is a row that scrolls sideways; the script
+    (``tiles.js``) adds the controls, turns it slowly, and holds while the pointer or focus is on
+    it, or the reader asks for reduced motion."""
+    first: dict[str, str] = {}
+    for family, figure in speed_figures(summaries):
+        first.setdefault(family, figure)
+    slides = [
+        *first.values(),
+        accuracy_figure(summaries),
+        f'<div class="carousel-graphs">{graphs}</div>',
+    ]
+    track = "".join(
+        f'<div class="carousel-slide" role="group" aria-roledescription="slide" '
+        f'aria-label="{i} of {len(slides)}">{slide}</div>'
+        for i, slide in enumerate(slides, 1)
+    )
+    return (
+        '<li class="tile tile--12 tile--carousel"><section class="carousel" '
+        'aria-roledescription="carousel" aria-labelledby="carousel-title">'
+        '<div class="carousel-head"><h3 class="tile-title" id="carousel-title">In figures</h3>'
+        '<p class="tile-text">Each family\'s speed, the accuracy on the same data, and one graph '
+        "for every method.</p>"
+        '<div class="carousel-controls" hidden><button class="carousel-step" type="button" '
+        'data-step="-1" aria-label="Previous figure">&lsaquo;</button><span class="carousel-dots">'
+        '</span><button class="carousel-step" type="button" data-step="1" aria-label="Next figure">'
+        "&rsaquo;</button></div></div>"
+        f'<div class="carousel-track" tabindex="0">{track}</div></section></li>'
+    )
+
+
 def dialog_head(key: str, title: str, intro: str = "") -> str:
     """The start of a tile's dialog, its heading and close button; ``DIALOG_TAIL`` ends it."""
     return (
@@ -1478,7 +1584,7 @@ def accuracy_dialog(summaries: list[dict]) -> str:
     """The accuracy dialog: what an error is, then a card per method."""
     return (
         dialog_head("accuracy", "Fast, and just as accurate", escape(quality_intro(summaries)))
-        + f'<div class="tile-charts">{"".join(accuracy_cards(summaries))}</div>'
+        + accuracy_figure(summaries)
         + DIALOG_TAIL
     )
 
@@ -1597,7 +1703,10 @@ def comparison_table() -> str:
                 f'<td class="mark mark--{mark}"{tip}>{glyph(icon)}'
                 f'<span class="visually-hidden">{said}</span></td>'
             )
-        rows.append(f'<tr><th scope="row">{escape(feature)}</th>{"".join(cells)}</tr>')
+        # Where only Andrey has it, its mark is the row's one amber.
+        alone = marks[0] == "yes" and "yes" not in marks[1:]
+        row_class = ' class="compare-alone"' if alone else ""
+        rows.append(f'<tr{row_class}><th scope="row">{escape(feature)}</th>{"".join(cells)}</tr>')
     return (
         '<p class="compare-hint">Scroll sideways for every package.</p>'
         '<div class="table-scroll" role="region" aria-label="Feature comparison" tabindex="0">'
@@ -1719,6 +1828,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "tile_art": tile_art,
         "plus": plus(),
         "family_tiles": "".join(family_tile(info) for info in family_tiles(summaries)),
+        "figure_carousel": figure_carousel(summaries, interface_figures),
         "family_dialogs": family_dialogs(summaries),
         "accuracy_dialog": accuracy_dialog(summaries),
         "why_fast": _why_fast["dialog"](),

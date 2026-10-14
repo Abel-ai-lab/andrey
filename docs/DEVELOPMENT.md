@@ -55,8 +55,16 @@ The hero and the tiles look like the blog's covers, in both themes: the stipple 
 brand's tones with its subject on the right (`HERO_ART`, `FAMILY_ART`, and `tile_art()` in
 `site/build.py`; the files in `site/brand/`), a navy fade under the light type, and amber on one
 element only: the word in the hero, the number in a tile, or else the art's own key element. New
-art comes from the cover process and is stored after `brand_tones`; a site test checks its tones
-and size.
+art comes from the cover process and is stored after `brand_tones`, as sRGB with no embedded
+profile; site tests check its tones and size, and that its median color is `--andrey-ground-art`
+(`cards.ground_tokens()`), the ground the CSS lays around it. The covers push in slowly, the
+stipple drifts, and the tiles fly in on scroll (a view timeline, or `tiles.js` with an
+`IntersectionObserver`); none of it moves under reduced motion. The last tile of the first group
+turns through the figures (`figure_carousel()`): each family's first speed chart, the accuracy
+figure (`accuracy_figure()`, Andrey's errors against the other package's, a row per method), and
+the graph figures. The sections after the grid carry their own art (`art-start.jpg`,
+`art-docs.jpg`). The navbar on every page is a frosted glass pill (`docs/_static/andrey.css`); the
+homepage's hero runs up under it.
 
 Each tile is a link. `tiles.js` opens its details as a dialog; without script the details are the
 dialogs' content, shown in the page after the grid (`homepage.html`'s noscript style), and the tile

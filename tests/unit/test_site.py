@@ -886,7 +886,9 @@ def _dialog(page, key):
 def _tiles(page):
     """Each tile as (link target, dialog id the script opens or None)."""
     tiles = []
-    for tile in re.findall(r'<li class="tile[^"]*">.*?</li>', page, re.S):
+    for tile in re.findall(
+        r'<li class="tile(?! tile--12 tile--carousel)[^"]*">.*?</li>', page, re.S
+    ):
         opener = re.search(r'data-tile="([^"]+)"', tile)
         tiles.append(
             (re.search(r'<a class="tile-face" href="([^"]+)"', tile)[1], opener and opener[1])
@@ -981,6 +983,26 @@ def test_the_bento_has_three_groups_under_the_three_words(placeholder_page):
     assert start["agentic"] < placeholder_page.index('data-tile="agents"')
 
 
+def test_the_figures_carousel_shows_each_family_and_the_accuracy(placeholder_page):
+    page = placeholder_page
+    carousel = page[page.index('<section class="carousel"') :]
+    carousel = carousel[: carousel.index("</section>")]
+    families = {f for f, _ in build.speed_figures(placeholder_summaries())}
+    assert carousel.count('aria-roledescription="slide"') == len(families) + 2
+    assert '<figure class="acc-figure">' in carousel
+    # Without script the figures are a row that scrolls; the controls wait for the script.
+    assert '<div class="carousel-controls" hidden>' in carousel
+
+
+def test_the_accuracy_figure_puts_one_number_in_amber():
+    rows = build.accuracy_rows([SUMMARY])
+    figure = build.accuracy_figure([SUMMARY])
+    good, total = sum(r["good"] for r in rows), sum(r["sizes"] for r in rows)
+    assert re.findall(r'<b class="acc-score">([^<]+)</b>', figure) == [f"{good} of {total}"]
+    # A ring and a dot per method and package compared.
+    assert figure.count('class="acc-ref"') == figure.count('class="acc-ours"') == len(rows)
+
+
 def test_the_why_fast_tiles_open_the_scenes_dialog(placeholder_page):
     assert placeholder_page.count('data-wf-open="why-fast"') == 2
     assert '<dialog class="wf wf-dialog" id="why-fast"' in placeholder_page
@@ -1003,6 +1025,28 @@ def test_the_scroll_story_is_off_without_script_and_under_reduced_motion():
     steps = css[css.index("@keyframes story-first") :]
     props = set(re.findall(r"(?:^|[{;] )([a-z-]+):", steps, re.M))
     assert props <= {"opacity", "transform", "translate"}
+
+
+def test_every_raster_is_srgb_with_no_profile_and_meets_the_css_ground(cards):
+    import numpy as np
+    from PIL import Image
+
+    # Browsers color-manage a JPEG with an embedded profile and leave one without it as sRGB, so
+    # every picture carries none and all render in the same space.
+    rasters = [
+        *(ROOT / "site" / "brand").rglob("*.jpg"),
+        *(ROOT / "docs" / "_static").rglob("*.jpg"),
+    ]
+    assert len(rasters) > 15
+    for path in rasters:
+        with Image.open(path) as image:
+            assert image.mode == "RGB" and not image.info.get("icc_profile"), path.name
+    # The page's ground behind and around the art is the art's own median color.
+    ground = cards._rgb(cards.ground_tokens()["--andrey-ground-art"])
+    for path in cards.ART.values():
+        with Image.open(path) as image:
+            median = np.median(np.asarray(image.convert("RGB"), float).reshape(-1, 3), axis=0)
+        assert np.abs(median - ground).max() < 16, path.name
 
 
 def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeholder_page, cards):
