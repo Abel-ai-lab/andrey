@@ -9,24 +9,29 @@ The move key is ``(stable_key(delta, n), x, y, index)``. ``stable_key`` quantize
 ``index`` is the subset-enumeration position of ``T``, preserving the serial tie order. The CPDAG
 is byte-identical across partitions and worker assignments.
 
+The forward phase keeps each target's Insert candidates between passes and enumerates them again
+only for the targets a move touches (:class:`_ForwardScan`); it selects the move a full scan
+(:func:`forward_chunk_best`) selects.
+
 ``ges()`` uses :func:`run_ges`; ``workers=1`` scans all targets in-process. The objective is
 recomputed from the final CPDAG by :func:`andrey.search.ges._recompute_objective`.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+import heapq
+from collections.abc import Callable, Iterator, Sequence
 from typing import Protocol
 
 import numpy as np
 
-from andrey.core import env
+from andrey.core import _bitset, env
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore, _delta_two_scores
 from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE, stable_key
+from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP, stable_key
 from andrey.search.ges import _reach_factory, _reform_cpdag
 
 # Shared helpers re-exported for GES callers and tests.
@@ -60,6 +65,8 @@ class DeltaEngine(Protocol):
     Satisfied by the PURE Schur :class:`~andrey.core.score_delta.DeltaBICScore` (production) and by
     :class:`_FullScoreDelta` (the two-full-score reference the quality gate pairs against).
     """
+
+    score_obj: BICScore
 
     def delta_many_with_base(
         self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
@@ -95,11 +102,42 @@ def neighborhood_state(adj: np.ndarray, n: int) -> NeighborState:
 
     Computed once per graph state (as the serial passes do) and shared read-only across all chunks;
     a chunk owning targets ``[y0, y1)`` iterates only its ``y`` slice but reads every node's arrays.
+    Node ``v``'s entries equal ``ops.adjacent``, ``ops.parents``, and ``ops.undirected_neighbors``
+    of ``v``; ``n`` is the node count of ``adj``.
     """
-    adj_sets = [set(ops.adjacent(adj, v).tolist()) for v in range(n)]
-    par_of = [ops.parents(adj, v) for v in range(n)]
-    nbr = [set(ops.undirected_neighbors(adj, v).tolist()) for v in range(n)]
+    adj_sets = [set(row.tolist()) for row in _rows(adj != ops.NULL)]
+    par_of = _rows(adj == ops.ARROW)
+    nbr = [set(row.tolist()) for row in _rows((adj == ops.TAIL) & (adj.T == ops.TAIL))]
     return adj_sets, par_of, nbr
+
+
+def _rows(mask: np.ndarray) -> list[np.ndarray]:
+    """The column indices of each row's ``True`` entries, ascending, one array per row."""
+    rows, cols = np.nonzero(mask)
+    return np.split(cols, np.searchsorted(rows, np.arange(1, mask.shape[0])))
+
+
+def _insert_candidates(
+    y: int, adj: np.ndarray, state: NeighborState
+) -> Iterator[tuple[int, int, tuple[int, ...], set[int]]]:
+    """Yield ``(x, t_index, T, clique)`` for every Insert into ``y`` whose ``NA u T`` is a clique.
+
+    ``clique = NA u T`` is the node set every semi-directed ``y ~> x`` path must meet for the
+    Insert to be valid; the caller checks that. Sources come in ascending ``x``, and each source's
+    subsets in :func:`~andrey.search.operators.clique_extensions` order.
+    """
+    adj_sets, _par_of, nbr = state
+    nbrs_y = nbr[y]
+    # Insert requires a non-adjacent pair.
+    sources = np.flatnonzero((adj[:, y] == ops.NULL) & (adj[y] == ops.NULL))
+    for x in sources.tolist():
+        if x == y:
+            continue
+        adj_x = adj_sets[x]
+        na = nbrs_y & adj_x
+        t0 = sorted(nbrs_y - adj_x)
+        for t_index, T in ops.clique_extensions(adj, na, t0):
+            yield x, t_index, T, na | set(T)
 
 
 def forward_chunk_best(
@@ -121,29 +159,21 @@ def forward_chunk_best(
     batching cannot change the result. Grouping is per target, and a target lives wholly in one
     chunk, so the batch shape (hence each delta) is identical however the targets are partitioned.
     """
-    adj_sets, par_of, nbr = state
+    par_of = state[1]
     best: ForwardResult = None
     best_key: tuple | None = None
     for y in targets:
         paj = par_of[y]
         if max_parents is not None and len(paj) > max_parents:
             continue  # y already carries the maximum admissible parent count.
-        nbrs_y = nbr[y]
         pa_set = set(int(p) for p in paj)
         # Group valid candidates by their base parent set; each base scores its adds in one batch.
         groups: dict[tuple[int, ...], list[tuple[int, int, tuple[int, ...]]]] = {}
-        for x in range(n):
-            if x == y or adj[x, y] != ops.NULL or adj[y, x] != ops.NULL:
-                continue  # Insert requires a non-adjacent pair.
-            adj_x = adj_sets[x]
-            na = nbrs_y & adj_x
-            t0 = sorted(nbrs_y - adj_x)
-            for t_index, T in ops.clique_extensions(adj, na, t0):
-                clique = na | set(T)
-                if reachable(y, x, clique):
-                    continue  # some semi-directed y ~> x path misses the clique: invalid Insert.
-                base = tuple(sorted(pa_set | na | set(T)))
-                groups.setdefault(base, []).append((x, t_index, T))
+        for x, t_index, T, clique in _insert_candidates(y, adj, state):
+            if reachable(y, x, clique):
+                continue  # some semi-directed y ~> x path misses the clique: invalid Insert.
+            base = tuple(sorted(pa_set | clique))
+            groups.setdefault(base, []).append((x, t_index, T))
         for base, cands in groups.items():
             moves = [("add", x) for x, _, _ in cands]
             for (x, t_index, T), delta in zip(
@@ -197,6 +227,159 @@ def backward_chunk_best(
     return best
 
 
+# ---- the incremental forward scan ---------------------------------------------------------------
+#
+# A target's Insert candidates (each source, subset ``T``, and the base it is scored off) depend on
+# the target's own marks, the adjacencies among its undirected neighbors, and which of those
+# neighbors each source is adjacent to. A move can change them only when it changes a mark of the
+# target or of one of the target's undirected neighbors in the new graph, so the candidates of every
+# other target are kept. The reachability condition reads the whole graph, so it is checked when a
+# candidate is considered for selection.
+#
+# The selected move is the one forward_chunk_best selects, whose deltas come from one batch per
+# base of the candidates that pass the reachability check. A kept candidate carries a screening
+# delta from one batch of every candidate sharing its base, which can differ in the last bits. The
+# scan visits candidates in screening order and recomputes each visited base group with
+# forward_chunk_best's batch, until no screening delta can come within the bound below of beating
+# the best exact key. The bound assumes two batches over one base give deltas that differ by less
+# than ``_SCREEN_TOL * n_samples``; the conditioning gate keeps about six digits of each residual,
+# and measured differences stay below 1e-15 * n_samples.
+
+# The scan the forward phase uses in-process: ``True`` runs forward_chunk_best over every target at
+# every pass; ``False`` keeps each target's candidates until a move touches it. Tests flip it to
+# compare the two. Pooled workers always keep their candidates.
+_FULL_RESCAN = False
+
+# Bound on the difference between a screening delta and the exact delta, per sample.
+_SCREEN_TOL = 1e-6
+
+# A candidate kept for selection: ``(screening delta, x, t_index, T, base)``.
+_Screened = tuple[float, int, int, tuple[int, ...], tuple[int, ...]]
+
+
+class _ForwardScan:
+    """The forward pass over fixed targets, keeping each target's candidates between passes.
+
+    :meth:`best` returns what :func:`forward_chunk_best` returns for the same targets and graph.
+    """
+
+    def __init__(
+        self,
+        targets: Sequence[int],
+        delta_engine: DeltaEngine,
+        n: int,
+        max_parents: float | None,
+    ) -> None:
+        self.targets = list(targets)
+        self.delta_engine = delta_engine
+        self.n = n
+        self.max_parents = max_parents
+        self.tol = _SCREEN_TOL * delta_engine.score_obj.n
+        self.build_reach = _reach_factory(n)
+        self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
+        # Per target: each base's clique mask and screening deltas by source; the candidates that
+        # can improve, sorted by screening delta; and each base's last exact deltas with the
+        # passing sources they were scored for.
+        self.groups: dict[int, dict[tuple[int, ...], tuple[int, dict[int, float]]]] = {}
+        self.screened: dict[int, list[_Screened]] = {}
+        self.exact: dict[int, dict[tuple[int, ...], tuple[list[int], dict[int, float]]]] = {}
+
+    def best(self, adj: np.ndarray, state: NeighborState) -> ForwardResult:
+        """The best-improving Insert into the targets, by ``(stable_key, x, y, t_idx)``.
+
+        ``state`` is :func:`neighborhood_state` of ``adj``.
+        """
+        if _FULL_RESCAN:
+            reachable = self.build_reach(adj)
+            return forward_chunk_best(
+                self.targets, adj, self.delta_engine, self.n, self.max_parents, state, reachable
+            )
+        self._refresh(adj, state)
+        heap = [(moves[0][0], y, 0) for y, moves in self.screened.items() if moves]
+        heapq.heapify(heap)
+        scored: dict[tuple[int, tuple[int, ...]], dict[int, float]] = {}  # this pass's groups
+        succ: list[int] | None = None
+        best: ForwardResult = None
+        limit = -_EPS_IMPROVE  # no candidate whose exact delta reaches this can be selected
+        while heap and heap[0][0] - self.tol < limit:
+            _delta, y, i = heapq.heappop(heap)
+            moves = self.screened[y]
+            if i + 1 < len(moves):
+                heapq.heappush(heap, (moves[i + 1][0], y, i + 1))
+            _delta, x, t_index, T, base = moves[i]
+            deltas = scored.get((y, base))
+            if deltas is None:
+                if succ is None:
+                    succ = _bitset.tail_successor_masks_wide(adj)
+                deltas = scored[(y, base)] = self._exact(y, base, succ)
+            delta = deltas.get(x)
+            if delta is None or not delta < -_EPS_IMPROVE:
+                continue  # a y ~> x path misses the clique, or the Insert does not improve
+            key = (stable_key(delta, self.n), x, y, t_index)
+            if best is None or key < best[0]:
+                best = (key, x, y, T)
+                # Only a delta within one quantization step of this key can still win.
+                limit = min(-_EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-_KEY_DP))
+        return best
+
+    def _refresh(self, adj: np.ndarray, state: NeighborState) -> None:
+        """Enumerate again the targets whose candidates differ from the kept graph's."""
+        if self.adj is None:
+            stale = self.targets
+        else:
+            diff = self.adj != adj
+            changed = diff.any(axis=0) | diff.any(axis=1)
+            lines = (adj == ops.TAIL) & (adj.T == ops.TAIL)
+            touched = changed | lines[changed].any(axis=0)
+            stale = [y for y in self.targets if touched[y]]
+        for y in stale:
+            self._enumerate(y, adj, state)
+        self.adj = adj.copy()
+
+    def _enumerate(self, y: int, adj: np.ndarray, state: NeighborState) -> None:
+        """Group ``y``'s clique-valid candidates by base and score each group in one batch."""
+        groups: dict[tuple[int, ...], tuple[int, dict[int, float]]] = {}
+        screened: list[_Screened] = []
+        self.groups[y], self.screened[y], self.exact[y] = groups, screened, {}
+        paj = state[1][y]
+        if self.max_parents is not None and len(paj) > self.max_parents:
+            return  # y already carries the maximum admissible parent count.
+        pa_set = set(int(p) for p in paj)
+        members: dict[tuple[int, ...], list[tuple[int, int, tuple[int, ...]]]] = {}
+        for x, t_index, T, clique in _insert_candidates(y, adj, state):
+            members.setdefault(tuple(sorted(pa_set | clique)), []).append((x, t_index, T))
+        for base, cands in members.items():
+            moves = [("add", x) for x, _, _ in cands]
+            deltas = self.delta_engine.delta_many_with_base(y, base, moves)
+            clique_mask = _bitset.bitmask(set(base) - pa_set)
+            groups[base] = (clique_mask, {x: d for (x, _, _), d in zip(cands, deltas, strict=True)})
+            for (x, t_index, T), d in zip(cands, deltas, strict=True):
+                if d - self.tol < -_EPS_IMPROVE:
+                    screened.append((d, x, t_index, T, base))
+        screened.sort(key=lambda move: move[:3])
+
+    def _exact(self, y: int, base: tuple[int, ...], succ: list[int]) -> dict[int, float]:
+        """Exact deltas of ``base``'s group at ``y``, by source, for the sources that pass.
+
+        A source passes when no semi-directed ``y ~> x`` path avoids the group's clique. The
+        passing sources are scored in one batch, as :func:`forward_chunk_best` scores them. A batch
+        of the same sources gives the same deltas, so the last batch is reused while they pass.
+        """
+        clique_mask, screening = self.groups[y][base]
+        reach = _bitset.semidirected_reach_set(succ, y, clique_mask)
+        valid = [x for x in screening if not (reach >> x) & 1]
+        if len(valid) == len(screening):
+            return screening
+        last = self.exact[y].get(base)
+        if last is not None and last[0] == valid:
+            return last[1]
+        moves = [("add", x) for x in valid]
+        deltas = self.delta_engine.delta_many_with_base(y, base, moves)
+        exact = dict(zip(valid, deltas, strict=True))
+        self.exact[y][base] = (valid, exact)
+        return exact
+
+
 def _forward_inprocess(
     adj: np.ndarray, delta_engine: DeltaEngine, n: int, max_parents: float | None, n_chunks: int
 ) -> np.ndarray:
@@ -205,15 +388,12 @@ def _forward_inprocess(
     Returns only the CPDAG; the objective is recomputed once from the final structure by ``ges()``,
     so no per-move total is threaded here.
     """
-    build_state = _reach_factory(n)
+    scans = [
+        _ForwardScan(chunk, delta_engine, n, max_parents) for chunk in even_chunks(n, n_chunks)
+    ]
     while True:
         state = neighborhood_state(adj, n)
-        reachable = build_state(adj)
-        results = [
-            forward_chunk_best(chunk, adj, delta_engine, n, max_parents, state, reachable)
-            for chunk in even_chunks(n, n_chunks)
-        ]
-        best = reduce_best(results)
+        best = reduce_best([scan.best(adj, state) for scan in scans])
         if best is None:
             return adj
         _key, x, y, T = best
@@ -247,7 +427,8 @@ def _backward_inprocess(
 # identical bytes into ``local_score_bic`` -- bit-identical to serial under one BLAS thread.
 # Reachability is backend-invariant, so workers pin the numpy/set-BFS path (no per-worker numba
 # warmup). The task functions take their targets positionally, so ``StableWorkerSet.dispatch``
-# drives them directly.
+# drives them directly. A worker always receives the same targets, so it keeps their forward
+# candidates in one :class:`_ForwardScan` across the passes it runs.
 
 # Per-worker state installed once by ``_init_worker`` and reused across every task and pass, so the
 # delta engine's pure inv-cov cache persists across passes -- the cross-pass reuse lever.
@@ -257,6 +438,7 @@ _WORKER_TOKEN: object = None
 _WORKER_BLAS: object = (
     None  # a held threadpoolctl controller capping this worker's BLAS to 1 thread
 )
+_WORKER_SCAN: _ForwardScan | None = None  # this worker's forward scan, built on its first task
 
 
 def _init_worker(
@@ -286,18 +468,21 @@ def _init_worker(
 def _forward_task(
     targets: Sequence[int], adj: np.ndarray, max_parents: float | None, run_token: object
 ) -> ForwardResult:
-    """Worker side of one forward chunk: rebuild the per-state structure, scan, return the best."""
+    """Worker side of one forward chunk: refresh the kept candidates, scan, return the best."""
+    global _WORKER_SCAN
     if run_token != _WORKER_TOKEN:
         raise RuntimeError("GES worker pool reused across runs (cov/token mismatch)")
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     n = _WORKER_N
-    state = neighborhood_state(adj, n)
-    reachable = _reach_factory(n)(adj)
-    return forward_chunk_best(targets, adj, _WORKER_DELTA, n, max_parents, state, reachable)
+    if _WORKER_SCAN is None or _WORKER_SCAN.targets != list(targets):
+        _WORKER_SCAN = _ForwardScan(targets, _WORKER_DELTA, n, max_parents)
+    return _WORKER_SCAN.best(adj, neighborhood_state(adj, n))
 
 
 def _backward_task(targets: Sequence[int], adj: np.ndarray, run_token: object) -> BackwardResult:
     """Worker side of one backward chunk."""
+    global _WORKER_SCAN
+    _WORKER_SCAN = None  # the forward phase has ended
     if run_token != _WORKER_TOKEN:
         raise RuntimeError("GES worker pool reused across runs (cov/token mismatch)")
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
@@ -444,13 +629,13 @@ def run_ges(
     w_min = _min_work()
     # Warn once a pass comes near the default cutoff (the pool never runs the full-score arm).
     warn = workers > 1 and not full_scores and calibrate.cutoff_is_default("ges")
-    build_state = _reach_factory(n)
     engine: DeltaEngine = _FullScoreDelta(score) if full_scores else DeltaBICScore(score)
+    scan = _ForwardScan(range(n), engine, n, max_parents)
     lazy = _LazyWorkerSet(score, n, workers)
     try:
         while True:  # forward phase
             state = neighborhood_state(adj, n)
-            work = forward_work_per_target(n, state, max_parents)
+            work = forward_work_per_target(n, state, max_parents) if workers > 1 else [0]
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
                 warn = False
@@ -463,9 +648,7 @@ def run_ges(
                 wset = lazy.get()
                 best = reduce_best(wset.dispatch(_forward_task, adj, max_parents, lazy.token))
             else:
-                # Only the in-process scan needs reachability; pooled workers rebuild it themselves.
-                reachable = build_state(adj)
-                best = forward_chunk_best(range(n), adj, engine, n, max_parents, state, reachable)
+                best = scan.best(adj, state)
             if best is None:
                 break
             _key, x, y, T = best
@@ -473,7 +656,7 @@ def run_ges(
             adj = _reform_cpdag(adj)
         while True:  # backward phase
             state = neighborhood_state(adj, n)
-            work = backward_work_per_target(n, state)
+            work = backward_work_per_target(n, state) if workers > 1 else [0]
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
                 warn = False

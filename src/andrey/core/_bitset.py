@@ -94,6 +94,30 @@ def semidirected_reaches_wide(succ: list[int], start: int, target: int, barrier:
     return False
 
 
+def semidirected_reach_set(succ: list[int], start: int, barrier: int) -> int:
+    """Every node reachable from ``start`` once the ``barrier`` nodes are removed, as a bitmask.
+
+    The same breadth-first OR-expansion as :func:`semidirected_reaches_wide`, over the per-node
+    Python-int masks of :func:`tail_successor_masks_wide`, so it holds for any node count.
+    ``start`` is never removed and always in the result. Bit ``t`` of the result, for ``t`` outside
+    ``barrier``, equals ``semidirected_reaches_wide(succ, start, t, barrier)``: one traversal
+    answers every target that shares a start and a barrier.
+    """
+    allowed = ~barrier
+    seen = 1 << start
+    frontier = seen
+    while frontier:
+        nxt = 0
+        bits = frontier
+        while bits:
+            lsb = bits & (-bits)
+            nxt |= succ[lsb.bit_length() - 1]
+            bits ^= lsb
+        frontier = nxt & allowed & ~seen
+        seen |= frontier
+    return seen
+
+
 def _semidirected_reaches_numpy(succ: np.ndarray, start: int, target: int, barrier: int) -> bool:
     """Pure-Python int-bitmask BFS: the always-present reference and the default-install path.
 

@@ -196,3 +196,21 @@ def test_setbfs_path_through_high_bit():
     # start == target is the empty path: reachable, so nothing blocks it (matches the bitmask BFS).
     assert ops.blocks_semi_directed_paths(succ_lists, 5, 5, set()) is False
     assert ops.blocks_semi_directed_paths(succ_lists, 5, 5, {5}) is False
+
+
+@pytest.mark.parametrize("seed", range(40))
+def test_reach_set_matches_oracle_across_d(seed):
+    """One reach-set traversal answers every target outside the barrier, past 64 nodes too."""
+    rng = np.random.default_rng(seed)
+    d = int(rng.integers(2, 200))
+    succ = _bitset.tail_successor_masks_wide(_random_tail_adj(rng, d))
+    for _ in range(4):
+        start = int(rng.integers(0, d))
+        barrier = _bitset.bitmask(v for v in range(d) if v != start and rng.random() < 0.2)
+        reach = _bitset.semidirected_reach_set(succ, start, barrier)
+        assert (reach >> start) & 1
+        for target in range(d):
+            if target == start or (barrier >> target) & 1:
+                continue
+            want = _reaches_setbased(succ, start, target, barrier)
+            assert bool((reach >> target) & 1) == want, (seed, d, start, target)

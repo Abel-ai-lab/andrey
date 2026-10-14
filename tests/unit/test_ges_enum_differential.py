@@ -1,8 +1,10 @@
-"""Test that GES enumeration and reachability paths return the same CPDAG and score.
+"""Test that GES enumeration, scan, and reachability paths return the same CPDAG and score.
 
-Compare pruned with unpruned subset-lattice enumeration; above 64 nodes the reference also uses set
-reachability (below the cap GES always takes the single-word bitmask). Separate checks cover forced
-and automatic reachability above 64 nodes and compare serial and two-chunk decomposition.
+The forward scan that keeps candidates between passes is compared with the full rescan, move by
+move, from 8 to 200 nodes on dense and sparse data, and with the slowest reference: the full rescan
+over unpruned subset lattices and set reachability. Separate checks cover the full rescan's forced
+and automatic reachability above 64 nodes, the bound the kept scan's screening deltas rely on, and
+serial against two-chunk decomposition.
 """
 
 from __future__ import annotations
@@ -40,25 +42,116 @@ def _gaussian_sem(seed: int, n: int, d: int, p: float) -> np.ndarray:
     return x
 
 
-def _run(x: np.ndarray, *, reach: str, prune: bool, maxP: float | None):
-    """Run GES with explicit reachability mode + pruning toggle (restored afterwards).
+def _run(
+    x: np.ndarray,
+    *,
+    reach: str = "auto",
+    prune: bool = True,
+    maxP: float | None,
+    lambda_value: float = 1.0,
+    full_rescan: bool = False,
+    moves: list[tuple] | None = None,
+):
+    """Run GES with explicit scan, reachability mode, and pruning toggles (restored afterwards).
 
-    ``reach`` takes effect only above 64 variables; below the cap GES always uses the bitmask.
+    ``reach`` takes effect only in the full rescan above 64 variables; below the cap it always uses
+    the bitmask. ``moves``, when given, collects each applied Insert and Delete in order.
     """
     old_reach = getattr(_GES_MOD, "_REACH_MODE", "auto")
     old_prune = getattr(ops, "_LATTICE_PRUNE", True)
+    insert, delete = ops.apply_insert, ops.apply_delete
     _GES_MOD._REACH_MODE = reach
     ops._LATTICE_PRUNE = prune
+    pg._FULL_RESCAN = full_rescan
+    if moves is not None:
+
+        def record_insert(adj, x, y, T):
+            moves.append(("insert", x, y, tuple(T)))
+            insert(adj, x, y, T)
+
+        def record_delete(adj, x, y, H):
+            moves.append(("delete", x, y, tuple(H)))
+            delete(adj, x, y, H)
+
+        ops.apply_insert, ops.apply_delete = record_insert, record_delete
     try:
         # Pin serial: the toggles are module globals that never reach pool workers, so under
         # ANDREY_NUM_WORKERS > 1 a pooled pass would silently run the live path inside the
         # reference run and the comparison would be fast-vs-fast.
         with backend.config(num_workers=1):
-            struct, score = ges(x, maxP=maxP)
+            struct, score = ges(x, lambda_value=lambda_value, maxP=maxP)
     finally:
         _GES_MOD._REACH_MODE = old_reach
         ops._LATTICE_PRUNE = old_prune
+        pg._FULL_RESCAN = False
+        ops.apply_insert, ops.apply_delete = insert, delete
     return struct.to_numpy(), score
+
+
+# Dense rows put several undirected neighbors on most targets, so subsets and reachability matter;
+# sparse rows reach 200 nodes. The full rescan costs about one scan of every target per accepted
+# move, so the largest rows take a heavier penalty, which keeps chance edges and moves few.
+_SCAN_GRID = [
+    # (seed, d, n, p, lambda_value)
+    (0, 8, 80, 0.60, 1.0),
+    (1, 8, 200, 0.80, 1.0),
+    (0, 15, 300, 0.40, 1.0),
+    (2, 30, 300, 0.25, 1.0),
+    (0, 60, 300, 0.08, 1.0),
+    (1, 100, 500, 0.02, 2.0),
+    (0, 200, 1000, 0.002, 2.0),
+]
+
+
+@pytest.mark.parametrize("seed,d,n,p,lambda_value", _SCAN_GRID)
+def test_kept_scan_matches_full_rescan(
+    seed: int, d: int, n: int, p: float, lambda_value: float
+) -> None:
+    """The kept forward scan applies the full rescan's moves and returns its CPDAG and score."""
+    x = _gaussian_sem(seed, n, d, p)
+    kept_moves: list[tuple] = []
+    full_moves: list[tuple] = []
+    kept_adj, kept_score = _run(x, maxP=None, lambda_value=lambda_value, moves=kept_moves)
+    full_adj, full_score = _run(
+        x, maxP=None, lambda_value=lambda_value, full_rescan=True, moves=full_moves
+    )
+    assert kept_moves == full_moves, f"move sequences differ at seed={seed}, d={d}"
+    assert np.array_equal(kept_adj, full_adj)
+    assert kept_score.hex() == full_score.hex()
+
+
+def test_screening_bound_covers_batch_differences() -> None:
+    """Scoring a source in a different batch over the same base stays far inside the bound.
+
+    The kept scan's screening deltas come from one batch of every candidate sharing a base; the
+    full rescan's come from a batch of the candidates that pass the reachability check. The scan
+    selects the full rescan's move whenever the two differ by less than ``_SCREEN_TOL`` per sample.
+    """
+    from andrey.core.score_delta import DeltaBICScore
+
+    rng = np.random.default_rng(0)
+    worst = 0.0
+    with threadpool_limits(limits=1):
+        for _ in range(20):
+            d = int(rng.integers(20, 80))
+            n = int(rng.choice([200, 2000]))
+            x = _gaussian_sem(int(rng.integers(1000)), n, d, 0.2)
+            engine = DeltaBICScore(BICScore(x))
+            for _ in range(20):
+                y = int(rng.integers(d))
+                rest = [v for v in range(d) if v != y]
+                base = sorted(rng.choice(rest, int(rng.integers(0, 10)), replace=False).tolist())
+                pool = [v for v in rest if v not in base]
+                sources = rng.choice(pool, min(len(pool), int(rng.integers(2, 30))), replace=False)
+                full = engine.delta_many_with_base(y, base, [("add", int(u)) for u in sources])
+                for _ in range(3):
+                    keep = rng.random(len(sources)) < 0.5
+                    part = engine.delta_many_with_base(
+                        y, base, [("add", int(u)) for u in sources[keep]]
+                    )
+                    for a, b in zip(np.asarray(full)[keep], part, strict=True):
+                        worst = max(worst, abs(a - b) / n)
+    assert worst < 1e-3 * pg._SCREEN_TOL
 
 
 # Every row reaches the pruned subset lattice (a t0 of at least ``ops._LATTICE_MIN_M`` nodes), so
@@ -80,7 +173,7 @@ def test_fast_enum_matches_reference(
     """Pruned and unpruned enumeration return the same CPDAG and score below and above 64 nodes."""
     x = _gaussian_sem(seed, n, d, p)
     live_adj, live_score = _run(x, reach="auto", prune=True, maxP=maxP)
-    ref_adj, ref_score = _run(x, reach="set", prune=False, maxP=maxP)
+    ref_adj, ref_score = _run(x, reach="set", prune=False, maxP=maxP, full_rescan=True)
     assert np.array_equal(live_adj, ref_adj), (
         f"CPDAG differs from the reference at seed={seed}, d={d}"
     )
@@ -96,14 +189,14 @@ def test_wide_and_set_reachability_agree_in_ges(
 ) -> None:
     """Wide bitmask and set reachability return the same CPDAG and score above 64 nodes."""
     x = _gaussian_sem(seed, n, d, p)
-    wide_adj, wide_score = _run(x, reach="wide", prune=True, maxP=maxP)
-    set_adj, set_score = _run(x, reach="set", prune=True, maxP=maxP)
+    wide_adj, wide_score = _run(x, reach="wide", prune=True, maxP=maxP, full_rescan=True)
+    set_adj, set_score = _run(x, reach="set", prune=True, maxP=maxP, full_rescan=True)
     assert np.array_equal(wide_adj, set_adj), f"wide vs set differ at seed={seed}, d={d}"
     assert wide_score == set_score
 
 
 def test_auto_reachability_uses_wide_and_matches_set(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Automatic reachability uses both traversals and preserves the CPDAG and BIC exactly."""
+    """The full rescan's automatic reachability uses both traversals and keeps CPDAG and BIC."""
     # 65 variables cross the single-word limit; few samples make the learned graph dense.
     x = np.random.default_rng(0).standard_normal((8, 65))
     wide_calls = 0
@@ -126,10 +219,10 @@ def test_auto_reachability_uses_wide_and_matches_set(monkeypatch: pytest.MonkeyP
     # Pin covariance to NumPy so backend environment settings do not change the scores.
     # The traversals above 64 variables do not consult the backend.
     with backend.config(backend="numpy"):
-        auto_adj, auto_score = _run(x, reach="auto", prune=True, maxP=5)
+        auto_adj, auto_score = _run(x, reach="auto", prune=True, maxP=5, full_rescan=True)
         assert wide_calls > 0, "auto never used wide reachability"
         assert set_states > 0, "auto never used set reachability"
-        set_adj, set_score = _run(x, reach="set", prune=True, maxP=5)
+        set_adj, set_score = _run(x, reach="set", prune=True, maxP=5, full_rescan=True)
     assert np.array_equal(auto_adj, set_adj)
     # Matching non-finite scores would pass the hex comparison without a valid BIC.
     assert np.isfinite(auto_score)

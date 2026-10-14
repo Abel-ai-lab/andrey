@@ -9,6 +9,10 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- `ges`, `gfci`, and `gies` return the same graphs in less time. ([#TBD])
+
 ## [0.3.0] - 2026-10-13
 
 ### Highlights
