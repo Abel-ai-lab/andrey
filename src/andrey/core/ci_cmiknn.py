@@ -101,8 +101,8 @@ class CMIknn:
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D or contains NaN or infinity, ``k_cmi`` is not in ``(0, 1)``, or
-        ``k_perm`` or ``n_permutations`` is below 1.
+        If ``data`` is not 2-D, has fewer than 2 rows, or contains NaN or infinity, ``k_cmi`` is
+        not in ``(0, 1)``, or ``k_perm`` or ``n_permutations`` is below 1.
 
     Notes
     -----
@@ -157,7 +157,7 @@ class CMIknn:
             raise ValueError(
                 f"k_perm and n_permutations must be at least 1, got {k_perm} and {n_permutations}"
             )
-        arr = _checked_data(data, "CMIknn")
+        arr = _checked_data(data, "CMIknn", min_rows=2)
         self._seed = resolve_seed(seed)
         self._ranks = _rank_columns(arr, np.random.default_rng(self._seed))
         n = arr.shape[0]

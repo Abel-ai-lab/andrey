@@ -86,8 +86,8 @@ class KCI:
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D, contains NaN or infinity, or has values too large to
-        standardize, or ``ridge`` is not positive and finite.
+        If ``data`` is not 2-D, has fewer than 2 rows, contains NaN or infinity, or has values
+        too large to standardize, or ``ridge`` is not positive and finite.
 
     Notes
     -----
@@ -126,7 +126,7 @@ class KCI:
     def __init__(self, data: np.ndarray, *, ridge: float = 1e-3) -> None:
         if not 0.0 < ridge < np.inf:
             raise ValueError(f"ridge must be positive and finite, got {ridge}")
-        arr = _checked_data(data, "KCI")
+        arr = _checked_data(data, "KCI", min_rows=2)
         self._data = _standardize(arr)
         self._n = arr.shape[0]
         self._ridge = float(ridge)
@@ -208,8 +208,8 @@ class RCoT:
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D, contains NaN or infinity, or has values too large to
-        standardize, or a feature count is below 1.
+        If ``data`` is not 2-D, has fewer than 2 rows, contains NaN or infinity, or has values
+        too large to standardize, or a feature count is below 1.
 
     Notes
     -----
@@ -262,7 +262,7 @@ class RCoT:
             raise ValueError(
                 f"feature counts must be at least 1, got {n_features} and {n_features_cond}"
             )
-        arr = _checked_data(data, "RCoT")
+        arr = _checked_data(data, "RCoT", min_rows=2)
         self._data = _standardize(arr)
         self._n = arr.shape[0]
         self._n_features = int(n_features)

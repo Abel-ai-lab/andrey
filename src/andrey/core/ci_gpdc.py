@@ -60,8 +60,8 @@ class GPDC:
     Raises
     ------
     ValueError
-        If ``data`` is not 2-D, contains NaN or infinity, or has values too large to
-        standardize, or ``n_null`` is below 1.
+        If ``data`` is not 2-D, has fewer than 2 rows, contains NaN or infinity, or has values
+        too large to standardize, or ``n_null`` is below 1.
 
     Notes
     -----
@@ -103,7 +103,7 @@ class GPDC:
     def __init__(self, data: np.ndarray, *, n_null: int = 1000, seed: int | None = None) -> None:
         if n_null < 1:
             raise ValueError(f"n_null must be at least 1, got {n_null}")
-        arr = _checked_data(data, "GPDC")
+        arr = _checked_data(data, "GPDC", min_rows=2)
         with np.errstate(over="ignore"):  # an overflow raises below
             std = arr.std(axis=0)
         if not np.isfinite(std).all():

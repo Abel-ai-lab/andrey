@@ -295,11 +295,14 @@ def make_indep_test(name: str, data: np.ndarray) -> CITest:
     return factory(data)
 
 
-def _checked_data(data: np.ndarray, test_name: str) -> np.ndarray:
-    """``data`` as a float64 ``(n_samples, n_features)`` matrix; raises on NaN or infinity."""
+def _checked_data(data: np.ndarray, test_name: str, min_rows: int = 0) -> np.ndarray:
+    """``data`` as a float64 ``(n_samples, n_features)`` matrix; raises on NaN or infinity, or on
+    fewer than ``min_rows`` rows."""
     arr = np.asarray(data, dtype=np.float64)
     if arr.ndim != 2:
         raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}")
+    if arr.shape[0] < min_rows:
+        raise ValueError(f"{test_name} needs at least {min_rows} rows, got {arr.shape[0]}")
     if not np.isfinite(arr).all():
         raise ValueError(f"data contains NaN or Inf; cannot run {test_name} test")
     return arr

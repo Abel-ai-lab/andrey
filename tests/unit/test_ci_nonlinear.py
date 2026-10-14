@@ -226,7 +226,12 @@ def test_constant_column_is_independent(name, constant):
 @pytest.mark.parametrize("name", TESTS)
 @pytest.mark.parametrize(
     ("data", "match"),
-    [(np.zeros(10), "2-D"), (np.full((10, 3), np.nan), "NaN or Inf")],
+    [
+        (np.zeros(10), "2-D"),
+        (np.full((10, 3), np.nan), "NaN or Inf"),
+        (np.zeros((0, 3)), "at least 2 rows"),
+        (np.ones((1, 3)), "at least 2 rows"),
+    ],
 )
 def test_rejects_bad_data(name, data, match):
     with pytest.raises(ValueError, match=match):
