@@ -262,12 +262,15 @@ def test_a_fingerprint_collision_does_not_undo_a_move(extended_search):
 
 
 @pytest.mark.parametrize(("n", "d"), [(8, 12), (12, 20)])
-def test_fewer_rows_than_columns_raise(n, d):
-    """With fewer rows than columns, some parent sets fit a column exactly, leaving a residual
-    variance that is not positive and a BIC score that is not finite."""
+@pytest.mark.parametrize("extended_search", [True, False])
+def test_fewer_rows_than_columns_keep_parent_sets_that_can_be_scored(n, d, extended_search):
+    """With fewer rows than columns, a parent set of ``n - 1`` or more fits its child exactly. The
+    search never picks one, so every node of the graph's DAG extension has a finite score."""
     x = np.random.default_rng(0).standard_normal((n, d))
-    with pytest.raises(ValueError, match="residual variance of node"):
-        xges_search(x)
+    graph, total = xges_search(x, extended_search=extended_search)
+    dag = pdag2dag(from_structure(graph))
+    assert max(int(np.count_nonzero(dag[:, v] == TAIL)) for v in range(d)) <= n - 2
+    assert np.isfinite(total)
 
 
 def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
@@ -294,23 +297,27 @@ def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
     return cases
 
 
+# The search without the column check that rejects such data before a fit.
 _FIT_EACH = """
 import json, sys
 import numpy as np
-from andrey.search.xges import xges
+from andrey.core.score import BICScore
+from andrey.search.xges import _Search
 for path, lambda_value, extended_search in json.loads(sys.argv[1]):
-    try:
-        xges(np.load(path), lambda_value=lambda_value, extended_search=extended_search)
-    except ValueError:  # a residual variance that rounds to zero or below
-        pass
+    x = np.load(path)
+    score = BICScore.from_cov(np.cov(x, rowvar=False), len(x), lambda_value=lambda_value)
+    search = _Search(score, x.shape[1])
+    search.inserts_on_empty_graph()
+    search.base_search()
+    if extended_search:
+        search.extend(len(x))
     print(path, flush=True)
 """
 
 
 def test_the_search_ends_on_rank_deficient_data(tmp_path):
     """Collinear columns make parent sets singular, where the Schur update and two full scores
-    disagree and a cycle of moves can each look improving. Every search must still end, with a
-    graph or with the ValueError for a residual variance that is not positive; a child
+    disagree and a cycle of moves can each look improving. Every search must still end; a child
     process runs the fits so that one that does not is stopped."""
     runs = []
     for name, (x, lambda_value, extended_search) in _rank_deficient().items():

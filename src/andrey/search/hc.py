@@ -62,9 +62,10 @@ class MoveScanner:
     ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
     ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
     ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
-    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score. Its delta is set
-    to zero to prevent Schur rounding noise exceeding ``_EPS_IMPROVE`` from creating a false
-    improvement.
+    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score. Its finite delta
+    is set to zero to prevent Schur rounding noise exceeding ``_EPS_IMPROVE`` from creating a false
+    improvement. A delta is ``inf`` when the move enters an unavailable family
+    (:func:`~andrey.core.score.local_score_bic`), so no move does.
 
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
@@ -112,10 +113,9 @@ class MoveScanner:
         self._sync(adj_int, parents_of)
         low = self._low.copy()
         tails, heads = self._tails, self._heads
-        with np.errstate(invalid="ignore"):  # a degenerate row's deltas may be infinite
-            rev = self._add[tails, heads] + self._rem[heads, tails]
-        rev[self._set_of[heads] == self._set_with[tails]] = 0.0
-        rev[np.isnan(rev) | self._cyclic] = np.inf
+        rev = self._add[tails, heads] + self._rem[heads, tails]
+        rev[(self._set_of[heads] == self._set_with[tails]) & np.isfinite(rev)] = 0.0
+        rev[self._cyclic] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:
             while True:

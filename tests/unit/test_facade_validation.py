@@ -110,12 +110,52 @@ def test_no_columns_give_an_empty_graph(method):
     assert SINGLE[method](_data(d=0)).structure.n_nodes == 0
 
 
+BIC = ["ges", "gies", "gfci", "xges", "hc", "tabu", "boss", "grasp", "exact_search"]
+
+
+def _sum_of_two_columns():
+    x = _data(200, 6)
+    x[:, 5] = x[:, 2] + x[:, 3]
+    return x
+
+
+# Data whose BIC score is meaningless, and what the error must say about it.
+BROKEN = {
+    "scaled copy": (
+        lambda: np.column_stack([_data(), 2.0 * _data()[:, 0] + 1.0]),
+        r"data column 3 is a linear function of column 0",
+    ),
+    "scaled copy, fewer rows than columns": (
+        lambda: np.column_stack([_data(5, 8), -_data(5, 8)[:, 2]]),
+        r"data column 8 is a linear function of column 2",
+    ),
+    "sum of two columns": (_sum_of_two_columns, r"data columns \[2, 3, 5\] are linearly dependent"),
+}
+
+
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-@pytest.mark.parametrize("method", ["ges", "hc", "tabu", "xges"])
-def test_bic_searches_reject_a_duplicated_column(method):
-    x = _data()
-    with pytest.raises(ValueError, match="residual variance of node"):
-        SINGLE[method](np.column_stack([x, x[:, 0]]))
+@pytest.mark.parametrize("case", list(BROKEN))
+@pytest.mark.parametrize("method", BIC)
+def test_bic_searches_reject_dependent_columns(method, case):
+    make, message = BROKEN[case]
+    with pytest.raises(ValueError, match=message):
+        SINGLE[method](make())
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("method", [m for m in BIC if m != "exact_search"])
+def test_bic_searches_fit_fewer_rows_than_columns(method):
+    out = SINGLE[method](np.random.default_rng(0).standard_normal((6, 12)))
+    assert out.structure.n_nodes == 12
+    assert np.isfinite(out.metadata.get("score", 0.0))
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_exact_search_gives_no_variable_more_parents_than_rows_minus_2():
+    dag = andrey.exact_search(np.random.default_rng(0).standard_normal((4, 6))).structure
+    heads = [v for _, v, _ in dag.oriented_edges(index=True)]
+    assert dag.n_nodes == 6
+    assert all(heads.count(v) <= 2 for v in range(6))
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

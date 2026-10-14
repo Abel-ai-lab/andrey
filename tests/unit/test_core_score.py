@@ -200,7 +200,7 @@ def test_baseline_values(data, cov):
         )
 
 
-# ---- degenerate residuals -----------------------------------------------------------------
+# ---- unavailable families and rejected columns -----------------------------------------------
 
 # Covariances where node 0 is an exact linear function of its parents, one per parent-set branch.
 _DETERMINISTIC = {
@@ -213,17 +213,70 @@ _DETERMINISTIC = {
         ),
         [1, 2, 3],
     ),
+    "negative residual": (np.array([[0.5, 1.0], [1.0, 1.0]]), [1]),
 }
 
 
 @pytest.mark.parametrize("case", list(_DETERMINISTIC))
-def test_zero_residual_raises(case):
+def test_a_residual_of_zero_or_below_scores_inf(case):
     cov, pa = _DETERMINISTIC[case]
-    with pytest.raises(ValueError, match="residual variance of node 0"):
-        local_score_bic(cov, 60, 0, pa)
+    assert local_score_bic(cov, 60, 0, pa) == np.inf
 
 
-def test_negative_residual_raises():
-    cov = np.array([[0.5, 1.0], [1.0, 1.0]])  # R(0 | 1) = 0.5 - 1 = -0.5
-    with pytest.raises(ValueError, match="residual variance of node 0"):
-        local_score_bic(cov, 60, 0, [1])
+def test_a_residual_at_rounding_level_scores_inf():
+    cov = np.array([[1.0, 1.0], [1.0, 1.0 + 1e-14]])  # R(0 | 1) is about 1e-14 of var(0)
+    assert local_score_bic(cov, 60, 0, [1]) == np.inf
+    assert np.isfinite(local_score_bic(cov, 60, 0, []))
+
+
+def test_parent_sets_past_n_minus_2_score_inf():
+    x = np.random.default_rng(0).standard_normal((6, 10))
+    score = BICScore(x)
+    assert np.isfinite(score.score(0, [1, 2, 3, 4]))
+    assert score.score(0, [1, 2, 3, 4, 5]) == np.inf
+    assert score.score(0, list(range(1, 10))) == np.inf
+
+
+def _columns(n, d, seed=0):
+    return np.random.default_rng(seed).standard_normal((n, d))
+
+
+def test_check_columns_rejects_a_constant_column():
+    x = _columns(50, 4)
+    x[:, 2] = 3.0
+    with pytest.raises(ValueError, match="column 2 is constant"):
+        BICScore(x)
+
+
+@pytest.mark.parametrize("n", [5, 60, 5000])
+def test_check_columns_rejects_a_scaled_and_shifted_copy(n):
+    x = _columns(n, 8)
+    x[:, 6] = 2.5 * x[:, 1] - 4.0
+    with pytest.raises(ValueError, match="column 6 is a linear function of column 1"):
+        BICScore(x)
+
+
+@pytest.mark.parametrize(("n", "d"), [(200, 10), (1000, 50), (5000, 200)])
+def test_check_columns_rejects_a_linear_function_of_other_columns(n, d):
+    x = _columns(n, d)
+    x[:, 5] = x[:, 2] + x[:, 3]
+    with pytest.raises(ValueError, match=r"columns \[2, 3, 5\] are linearly dependent"):
+        BICScore(x)
+
+
+def test_check_columns_rejects_a_one_hot_block():
+    rng = np.random.default_rng(6)
+    x = np.column_stack([rng.standard_normal((300, 4)), np.eye(3)[rng.integers(0, 3, 300)]])
+    with pytest.raises(ValueError, match=r"columns \[4, 5, 6\] are linearly dependent"):
+        BICScore(x)
+
+
+@pytest.mark.parametrize(("n", "d"), [(101, 100), (20, 30), (2, 3)])
+def test_check_columns_accepts_independent_columns(n, d):
+    BICScore(_columns(n, d))
+
+
+def test_check_columns_accepts_strongly_correlated_columns():
+    x = _columns(1000, 3)
+    x[:, 2] = x[:, 0] + x[:, 1] + 1e-5 * x[:, 2]
+    BICScore(x)
