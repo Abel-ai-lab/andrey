@@ -125,6 +125,27 @@ html[data-theme="dark"] {
   }
 }
 
+/* On a docs page, the text scrolling up beside the pill dims out under a soft, frosted fade of the
+   paper, so no line shows sharp in the gaps. The homepage's hero runs up under the pill instead. */
+html:not(:has(.andrey-home)) .bd-header::before {
+  --fade: linear-gradient(180deg, var(--andrey-ink) 45%, transparent);
+  content: "";
+  position: absolute;
+  inset: 0 0 -1.5rem;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--andrey-paper) 92%, transparent),
+    color-mix(in srgb, var(--andrey-paper) 70%, transparent) 55%,
+    transparent
+  );
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
+  pointer-events: none;
+}
+
 @media (max-width: 959.98px) {
   .bd-header {
     padding-inline: 0.5rem;
