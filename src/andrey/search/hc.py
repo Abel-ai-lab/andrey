@@ -76,7 +76,8 @@ class MoveScanner:
     and the mixed-data scores, all score-equivalent. Its delta is set to zero to prevent rounding
     noise exceeding ``_EPS_IMPROVE`` from creating a false improvement.
 
-    ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; ``None`` forbids none.
+    ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
+    legal. ``None`` forbids none.
 
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
@@ -198,7 +199,8 @@ class MoveScanner:
         self._cyclic = np.concatenate((self._cyclic, np.zeros(len(gained), dtype=bool)))
         for v in rows:
             row = np.where(self._parent[v], self._rem[v], self._add[v])
-            row[self._parent[:, v] | reach[v] | self._forbidden[v] | np.isnan(row)] = np.inf
+            row[self._parent[:, v] | reach[v] | np.isnan(row)] = np.inf
+            row[self._forbidden[v] & ~self._parent[v]] = np.inf  # forbidden adds; removes stay
             self._single[v] = row
             self._low[v] = row.min()
         self._adj = list(adj_int)
