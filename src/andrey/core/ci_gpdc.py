@@ -104,7 +104,7 @@ class GPDC:
             raise ValueError(f"n_null must be at least 1, got {n_null}")
         arr = _checked_data(data, "GPDC")
         std = arr.std(axis=0)
-        std[std == 0] = 1.0
+        std[np.ptp(arr, axis=0) == 0] = np.inf  # identical values; their std is rounding, not 0
         self._data = (arr - arr.mean(axis=0)) / std
         self._n = arr.shape[0]
         self._n_null = int(n_null)

@@ -19,11 +19,9 @@ __all__ = ["CMIknn"]
 
 
 def _rank_columns(data: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-    """Rank each column (0 to n - 1) after a jitter far below its spread breaks ties at random."""
-    spread = data.std(axis=0)
-    spread[spread == 0] = 1.0
-    jittered = data + 1e-9 * spread * rng.standard_normal(data.shape)
-    return np.argsort(np.argsort(jittered, axis=0), axis=0)
+    """Rank each column (0 to n - 1), ties ordered by a random key."""
+    order = np.lexsort((rng.random(data.shape), data), axis=0)
+    return np.argsort(order, axis=0)
 
 
 def _distances(column: np.ndarray, dtype: type) -> np.ndarray:
@@ -97,7 +95,7 @@ class CMIknn:
     n_permutations : int, default=500
         Shuffled copies that form the null distribution.
     seed : int or None, default=None
-        Seed for the tie-breaking jitter and the shuffles. ``None`` uses ``ANDREY_SEED``, or ``0``
+        Seed for the tie-breaking and the shuffles. ``None`` uses ``ANDREY_SEED``, or ``0``
         when it is unset.
 
     Raises
@@ -108,8 +106,8 @@ class CMIknn:
 
     Notes
     -----
-    **How it works.** A tiny random jitter breaks ties, then each column is replaced by its ranks,
-    and distances are in the maximum norm. With ``k = round(k_cmi n)``, ``eps_i`` the distance
+    **How it works.** Each column is replaced by its ranks, ties ordered at random, and distances
+    are in the maximum norm. With ``k = round(k_cmi n)``, ``eps_i`` the distance
     from row ``i`` to its ``k``-th nearest row in the space of ``x``, ``y``, and the conditioning
     set ``z``, and ``k_xz``, ``k_yz``, ``k_z`` the rows strictly closer than ``eps_i`` in each
     subspace (row ``i`` counted), the estimate is
@@ -122,9 +120,9 @@ class CMIknn:
     of the rows, is the low end of the range [1]_ recommends; a larger share smooths the estimate,
     which costs power as the conditioning set grows.
 
-    The jitter is drawn once, from ``seed``, when the test is built; the shuffles of a query come
-    from a generator seeded by ``seed``, the two variables, and the conditioning set, so a p-value
-    does not depend on the order of queries or of the arguments.
+    The tie-breaking is drawn once, from ``seed``, when the test is built; the shuffles of a query
+    come from a generator seeded by ``seed``, the two variables, and the conditioning set, so a
+    p-value does not depend on the order of queries or of the arguments.
 
     **Limitations.** Not benchmarked yet. Each query computes ``n_permutations + 1`` estimates,
     each over ``n x n`` distance matrices, so its time grows with the square of the number of rows

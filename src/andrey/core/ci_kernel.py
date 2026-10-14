@@ -21,9 +21,13 @@ __all__ = ["KCI", "RCoT"]
 
 
 def _standardize(data: np.ndarray) -> np.ndarray:
-    """Z-score each column (``ddof=1``); a constant column becomes zero."""
+    """Z-score each column (``ddof=1``); a column of identical values becomes zero.
+
+    The rounded mean of identical values can differ from them, which leaves a standard deviation
+    near zero rather than zero, so constancy is read from the range.
+    """
     std = data.std(axis=0, ddof=1)
-    std[std == 0] = 1.0
+    std[np.ptp(data, axis=0) == 0] = np.inf
     return (data - data.mean(axis=0)) / std
 
 

@@ -207,12 +207,13 @@ def test_seed_reproduces_the_pvalue(name):
     assert len(set(pvalues.values())) > 1
 
 
+@pytest.mark.parametrize("constant", [[0], [0, 1]])
 @pytest.mark.parametrize("name", TESTS)
-def test_constant_column_is_independent(name):
-    """A constant column has no variation to depend on. CMIknn's jitter turns it into random
-    ranks, so its p-value is a draw from the null rather than exactly 1."""
+def test_constant_column_is_independent(name, constant):
+    """A constant column has no variation to depend on, nor do two. CMIknn's random tie-breaking
+    turns it into random ranks, so its p-value is a draw from the null rather than exactly 1."""
     data = _common_cause(seed=3, n=100, n_cond=1)
-    data[:, 0] = 1.0
+    data[:, constant] = 0.1
     test = _build(name, data)
     if name == "cmiknn":
         assert test(0, 1) > ALPHA
