@@ -576,6 +576,67 @@ def _delta_two_scores(
     return float(score_obj.score(i, S_new) - score_obj.score(int(i), list(S_base_sorted)))
 
 
+def _add_bounds(
+    n: int,
+    penalty: float,
+    M: np.ndarray,
+    cov_SS_diag: np.ndarray,
+    cs_v: np.ndarray,
+    cs_U: np.ndarray,
+    R_v_old: float,
+    R_uU: np.ndarray,
+    e_vU: np.ndarray,
+) -> np.ndarray:
+    """Per-add bounds on how far a batched Schur add delta moves when another batch scores the add.
+
+    Every batch over one base reads the same ``M = inv(cov[S, S])``, ``cov``, and ``R(v | S)``.
+    Only ``M @ cs_U``, ``cs_v @ beta_U``, and the ``R_u`` einsum round differently. Each entry of
+    them is a ``k = |S|``-term dot product within ``gamma_k |x|^T |M| |y|`` of the exact one in any
+    summation order. With ``d = sqrt(diag cov[S, S])``, ``|x|^T |M| |y|`` is at most
+    ``||D M D||_F ||x / d|| ||y / d||``, which does not depend on the scale of the columns. Two
+    batches therefore differ by at most ``rho`` in ``R_u`` and ``eta`` in ``e_vu``; the interval
+    they leave for ``R(v | S + u)`` bounds the change in its log, and rounding of the logs adds a
+    few units in the last place.
+
+    Where the intervals leave the sign of ``R_u`` or ``R(v | S + u)`` open, another batch can take
+    the other side of an ``R > 0`` guard, and the bound is ``inf``. Where both batches certainly
+    fall back to two full scores, it is 0.
+
+    References
+    ----------
+    N. J. Higham. *Accuracy and Stability of Numerical Algorithms*, 2nd ed., SIAM, 2002,
+    Section 3.1.
+    """
+    eps = np.finfo(np.float64).eps
+    g = 3 * (M.shape[0] + 2) * eps  # covers gamma_k (2 + gamma_k), with room to spare
+    d = np.sqrt(cov_SS_diag)
+    fro = float(np.linalg.norm(M * np.outer(d, d)))
+    scaled = cs_U / d[:, None]
+    w_u = np.sqrt(np.einsum("ij,ij->j", scaled, scaled))
+    w_v = float(np.linalg.norm(cs_v / d))
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        rho = 2 * (g * fro * w_u * w_u + eps * np.abs(R_uU))
+        eta = 2 * (g * fro * w_v * w_u + eps * np.abs(e_vU))
+        ru_lo, ru_hi = R_uU - rho, R_uU + rho
+        e_abs = np.abs(e_vU)
+        t_hi = (e_abs + eta) ** 2 / ru_lo * (1 + 4 * eps)
+        t_lo = np.maximum(e_abs - eta, 0.0) ** 2 / ru_hi * (1 - 4 * eps)
+        slack = eps * (R_v_old + np.abs(t_hi))
+        new_lo = R_v_old - t_hi - slack
+        new_hi = R_v_old - t_lo + slack
+        R_new = R_v_old - (e_vU * e_vU) / R_uU  # this batch's value wherever its update is safe
+        shift = np.maximum(np.log1p((new_hi - R_new) / R_new), -np.log1p((new_lo - R_new) / R_new))
+        ulp = 8 * eps * (n * (np.abs(np.log(R_new)) + abs(np.log(R_v_old))) + penalty)
+        schur = 2 * (n * shift + ulp)
+        safe = (R_uU > 0.0) & (R_new > 0.0)
+        certain_schur = (ru_lo > 0.0) & (new_lo > 0.0)
+        certain_fallback = (ru_hi <= 0.0) | ((ru_lo > 0.0) & (new_hi <= 0.0))
+        bound = np.where(
+            safe, np.where(certain_schur, schur, np.inf), np.where(certain_fallback, 0.0, np.inf)
+        )
+    return np.where(np.isnan(bound), np.inf, bound)
+
+
 def delta_many_with_base(
     score_obj: BICScore,
     i: int,
@@ -583,6 +644,7 @@ def delta_many_with_base(
     deltas: Sequence[tuple[str, int]],
     *,
     cond_threshold: float = _COND_THRESHOLD,
+    bounds: list[float] | None = None,
 ) -> list[float]:
     """Return RAW deltas ``[score(i, base +/- u_k) - score(i, base)]`` for single-variable moves.
 
@@ -601,6 +663,12 @@ def delta_many_with_base(
     whose rank-one update trips a ``R <= 0`` safety guard, falls back to :func:`_delta_two_scores`
     (two memoized full scores) -- still exact. Results are returned in ``deltas`` order.
 
+    The batched adds round differently for different sets of moves, so one move's delta depends on
+    the batch it is scored in. ``bounds`` receives, per move, a bound on that dependence: the most
+    the delta can differ when the move is scored in any other batch over the same base
+    (:func:`_add_bounds`). It is ``inf`` when another batch can take the other side of an
+    ``R > 0`` guard, and 0 for every delta that does not depend on the batch.
+
     Parameters
     ----------
     score_obj : BICScore
@@ -614,7 +682,11 @@ def delta_many_with_base(
         ``("add", u)`` / ``("remove", u)`` moves.
     cond_threshold : float
         Conditioning-gate threshold routing near-singular bases to the two-full-score fallback.
+    bounds : list of float, optional
+        Filled with one batch-dependence bound per move, in ``deltas`` order.
     """
+    if bounds is not None:
+        bounds[:] = [0.0] * len(deltas)
     if not deltas:
         return []
 
@@ -700,6 +772,14 @@ def delta_many_with_base(
                     for pos, u in enumerate(add_us):
                         if safe_mask[pos]:
                             add_deltas[u] = float(deltas_arr[pos])
+                if bounds is not None:
+                    add_bounds = _add_bounds(
+                        n, log_n * lam, M_old, cov_diag[S_list], cs_v, cs_U, R_v_old, R_uU, e_vU
+                    )
+                    pos_of = {u: pos for pos, u in enumerate(add_us)}
+                    for idx, u in adds:
+                        if u in pos_of:
+                            bounds[idx] = float(add_bounds[pos_of[u]])
         for idx, u in adds:
             d = add_deltas.get(u)
             if d is None:
@@ -912,8 +992,19 @@ class DeltaBICScore:
         i: int,
         base_parents: Sequence[int],
         deltas: Sequence[tuple[str, int]],
+        *,
+        bounds: list[float] | None = None,
     ) -> list[float]:
-        """Return RAW deltas ``[score(i, base +/- delta_k) - score(i, base)]`` for single moves."""
+        """Return RAW deltas ``[score(i, base +/- delta_k) - score(i, base)]`` for single moves.
+
+        ``bounds``, when given, receives each delta's batch-dependence bound
+        (:func:`delta_many_with_base`).
+        """
         return delta_many_with_base(
-            self.score_obj, i, base_parents, deltas, cond_threshold=self.cond_threshold
+            self.score_obj,
+            i,
+            base_parents,
+            deltas,
+            cond_threshold=self.cond_threshold,
+            bounds=bounds,
         )
