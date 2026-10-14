@@ -309,11 +309,13 @@ def test_ges_result_independent_of_ambient_blas_threads():
 def test_parity_on_degenerate_covariance():
     """Serial and pooled GES agree on near-collinear data.
 
-    Non-improving and NaN deltas must not change the pooled move selection.
+    Non-improving deltas and those that fall back to full scores must not change the pooled move
+    selection.
     """
     rng = np.random.default_rng(3)
     base = rng.standard_normal((400, 6))
-    x = np.hstack([base, base[:, :2] + 1e-9 * rng.standard_normal((400, 2))])  # near-duplicate cols
+    # Near-duplicate columns, kept just far enough apart for the column check to accept them.
+    x = np.hstack([base, base[:, :2] + 1e-5 * rng.standard_normal((400, 2))])
     serial_struct, serial_score = ges(x)
     par_struct, par_score = _parallel(x, 3)
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())
