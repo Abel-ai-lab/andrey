@@ -610,8 +610,9 @@ def _add_bounds(
     N. J. Higham. *Accuracy and Stability of Numerical Algorithms*, 2nd ed., SIAM, 2002,
     Section 3.1.
     """
-    # ||D M D||_F^2 = diag (M * M) diag and ||x / d||^2 = (x * x) / diag. Twice (two batches)
-    # 3 gamma_k ||D M D||_F covers gamma_k (2 + gamma_k) with room to spare.
+    # ||D M D||_F^2 = diag (M * M) diag and ||x / d||^2 = (x * x) / diag. Per batch,
+    # 3 (k + 2) eps ||D M D||_F covers gamma_k (2 + gamma_k) ||D M D||_F with room to spare; two
+    # batches double it.
     inv_diag = 1.0 / cov_SS_diag
     c = 6 * (M.shape[0] + 2) * _EPS * math.sqrt(float(cov_SS_diag @ (M * M) @ cov_SS_diag))
     w_u2 = inv_diag @ (cs_U * cs_U)
