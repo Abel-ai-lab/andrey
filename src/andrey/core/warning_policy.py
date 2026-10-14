@@ -49,8 +49,8 @@ class SearchLimitWarning(AndreyWarning):
 
 
 class SampleSizeWarning(AndreyWarning):
-    """A test run on fewer rows than its level was measured to hold at, so it may reject a true
-    independence more often than ``alpha``.
+    """A test run below the row count where its level was measured to stay near ``alpha``, so it
+    may reject a true independence more often than ``alpha``.
 
     RCoT warns on a conditional query below 200 rows.
     """
