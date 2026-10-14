@@ -11,12 +11,7 @@
   --measure: 66ch;
   --page: 82rem;
   --gutter: clamp(1.25rem, 4vw, 3rem);
-  /* Two faint washes around the hero card, so it sits in the page rather than on it. */
-  background:
-    radial-gradient(56rem 36rem at 50% 22rem, color-mix(in srgb, var(--andrey-accent) 12%, transparent), transparent 70%),
-    radial-gradient(40rem 30rem at 88% 38rem, color-mix(in srgb, var(--andrey-ground-amber) 9%, transparent), transparent 70%),
-    var(--andrey-paper);
-  background-repeat: no-repeat;
+  background: var(--andrey-paper);
   color: var(--andrey-ink);
   font: 400 1.0625rem/1.6 var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -120,69 +115,53 @@
 }
 
 /* ---------- hero ---------- */
-/* The hero is a card on the link-preview cards' stipple ground (site/grain.py), in both themes:
-   gradients draw the navy-to-cobalt tone, and two repeating speck tiles, faded in by masks, draw the
-   cobalt specks from the top left and the amber ones at the bottom right. A darker ellipse behind the
-   text column keeps the light type readable, and grows on narrow screens. The --andrey-ground-* tones
-   are the same in both themes. */
+/* The hero fills the first screen edge to edge, on the link-preview cards' stipple ground
+   (site/grain.py), in both themes: gradients draw the navy-to-cobalt tone, and two repeating speck
+   tiles, faded in by masks, draw the cobalt specks from the top left and the amber ones at the
+   bottom right. The art is a small causal graph over more specks (site/build.py: hero_graph). A
+   darker ellipse behind the text keeps the light type readable. The --andrey-ground-* tones are the
+   same in both themes. */
 .andrey-home .hero {
   --andrey-ink: var(--andrey-ground-ink);
   --andrey-muted: var(--andrey-ground-muted);
   --andrey-line: color-mix(in srgb, var(--andrey-ground-ink) 26%, transparent);
   --andrey-surface: color-mix(in srgb, var(--andrey-ground-ink) 8%, transparent);
   --andrey-surface-2: color-mix(in srgb, var(--andrey-ground-ink) 14%, transparent);
+  color: var(--andrey-ink);
+}
+
+/* The pin is the ground. Without the scroll story it is one screen; with it (story.js adds
+   is-story), it sticks while the reader scrolls the track, a few screens tall. */
+.andrey-home .story-pin {
   position: relative;
   isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  display: flex;
   align-items: center;
-  gap: clamp(2rem, 4vw, 3.5rem);
-  width: calc(100% - 2 * var(--gutter));
-  max-width: calc(var(--page) - 2 * var(--gutter));
-  margin-block: 1.25rem 2rem;
-  padding: clamp(1.5rem, 4vw, 3.5rem);
+  min-height: max(34rem, calc(100svh - 8.5rem));
+  padding: clamp(3rem, 8vw, 6rem) var(--gutter);
   overflow: hidden;
-  border-radius: 24px;
   background:
     radial-gradient(
       circle at 18% 8%,
       color-mix(in srgb, var(--andrey-ground-cobalt) 80%, var(--andrey-ground-navy)) 0,
       transparent 62%
     ),
-    radial-gradient(circle at 54% 48%, color-mix(in srgb, var(--andrey-ground-cobalt) 30%, transparent), transparent 58%),
+    radial-gradient(circle at 70% 50%, color-mix(in srgb, var(--andrey-ground-cobalt) 30%, transparent), transparent 58%),
     radial-gradient(circle at 100% 105%, color-mix(in srgb, var(--andrey-ground-amber) 35%, transparent), transparent 42%),
     var(--andrey-ground-navy);
-  color: var(--andrey-ink);
 }
 
-/* The card's edge: a cobalt glow spreads from it in dark mode, and a navy shadow of the same shape
-   in light mode, which lowers the contrast at the card's edge. */
-html[data-theme="dark"] .andrey-home .hero {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--andrey-ground-cobalt-light) 18%, transparent),
-    0 0 60px 6px color-mix(in srgb, var(--andrey-ground-cobalt) 40%, transparent),
-    0 0 160px 40px color-mix(in srgb, var(--andrey-ground-cobalt) 22%, transparent),
-    60px 80px 200px 20px color-mix(in srgb, var(--andrey-ground-amber) 12%, transparent);
-}
-
-html[data-theme="light"] .andrey-home .hero {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--andrey-ground-navy) 10%, transparent),
-    0 12px 60px 6px color-mix(in srgb, var(--andrey-ground-navy) 30%, transparent),
-    0 30px 160px 40px color-mix(in srgb, var(--andrey-ground-navy) 16%, transparent);
-}
-
-.andrey-home .hero::before,
-.andrey-home .hero::after {
+.andrey-home .story-pin::before,
+.andrey-home .story-pin::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   pointer-events: none;
 }
 
 /* A mask reads only alpha, so the navy here only sets how much of each tile shows. */
-.andrey-home .hero::before {
+.andrey-home .story-pin::before {
   --fade: radial-gradient(
     circle at 18% 8%,
     var(--andrey-ground-navy) 0,
@@ -194,7 +173,7 @@ html[data-theme="light"] .andrey-home .hero {
   mask-image: var(--fade);
 }
 
-.andrey-home .hero::after {
+.andrey-home .story-pin::after {
   --fade: radial-gradient(
     circle at 100% 108%,
     var(--andrey-ground-navy) 0,
@@ -206,15 +185,152 @@ html[data-theme="light"] .andrey-home .hero {
   mask-image: var(--fade);
 }
 
-/* The darker ellipse behind the text column: under the amber specks, over the cobalt ones. */
+.andrey-home .hero-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.andrey-home .hero-graph {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.andrey-home .hero-specks circle {
+  fill: var(--andrey-ground-cobalt-light);
+  opacity: 0.5;
+}
+
+.andrey-home .hero-specks circle.amber {
+  fill: var(--andrey-ground-amber);
+  opacity: 0.65;
+}
+
+.andrey-home .hero-edge line {
+  stroke: var(--andrey-ground-ink);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.andrey-home .hero-edge polygon {
+  fill: var(--andrey-ground-ink);
+  opacity: 0.85;
+}
+
+/* The settled graph is the page's rest state; the story's other states hide or show these. */
+.andrey-home .hero-edge--open,
+.andrey-home .hero-edge--wrong {
+  opacity: 0;
+}
+
+.andrey-home .hero-edge--open line {
+  stroke: var(--andrey-ground-amber);
+  stroke-width: 3;
+}
+
+.andrey-home .hero-edge--wrong line {
+  stroke: var(--andrey-edge-bidirected);
+  stroke-width: 2.4;
+  stroke-dasharray: 0.03 0.03;
+}
+
+.andrey-home .hero-node {
+  fill: var(--andrey-ground-navy);
+  stroke: var(--andrey-ground-ink);
+  stroke-width: 2.6;
+}
+
+.andrey-home .hero-signal {
+  fill: var(--andrey-ground-amber);
+  filter: drop-shadow(0 0 7px var(--andrey-ground-amber));
+  offset-rotate: 0deg;
+  offset-distance: 100%;
+  opacity: 0;
+}
+
+/* Edges draw from their cause, then the nodes settle, then a point travels a path from cause to
+   effect and the page rests. Under reduced motion the finished graph stands still. */
+@media (prefers-reduced-motion: no-preference) {
+  .andrey-home .hero-edge line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: hero-draw 800ms var(--ease) calc(500ms + var(--i) * 160ms) forwards;
+  }
+
+  .andrey-home .hero-edge--wrong line {
+    animation: none;
+    stroke-dasharray: 0.03 0.03;
+    stroke-dashoffset: 0;
+  }
+
+  .andrey-home .hero-edge polygon {
+    animation: hero-fade 300ms ease-out calc(1100ms + var(--i) * 160ms) both;
+  }
+
+  .andrey-home .hero-node {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: hero-pop 600ms var(--ease) calc(300ms + var(--i) * 120ms) both;
+  }
+
+  .andrey-home .hero-specks {
+    animation: hero-fade 1600ms ease-out both;
+  }
+
+  .andrey-home .hero-signal--first {
+    animation: hero-signal 3200ms cubic-bezier(0.5, 0, 0.3, 1) 3200ms 2;
+  }
+}
+
+@keyframes hero-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes hero-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes hero-pop {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+
+@keyframes hero-signal {
+  from {
+    offset-distance: 0%;
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  to {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* The darker ellipse behind the text column. */
 .andrey-home .hero-intro {
   position: relative;
+  width: min(100%, calc(var(--page) - 2 * var(--gutter)));
+  margin-inline: auto;
 }
 
 .andrey-home .hero-intro::before {
   content: "";
   position: absolute;
-  inset: -18% -14%;
+  inset: -30% 30% -30% -20%;
   z-index: -1;
   background: radial-gradient(
     ellipse closest-side,
@@ -241,156 +357,266 @@ html[data-theme="light"] .andrey-home .hero {
   color: var(--andrey-ground-ink);
 }
 
-/* The speedup panel as frosted glass over the ground; without backdrop-filter it is flat navy. */
-.andrey-home .hero .race {
-  border-color: color-mix(in srgb, var(--andrey-ground-ink) 28%, transparent);
-  background: color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
-  box-shadow: 0 12px 40px color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent), inset 0 1px 0 color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  backdrop-filter: blur(14px) saturate(1.2);
-}
-
-.andrey-home .hero .race-choice:checked + label {
-  border-color: color-mix(in srgb, var(--andrey-ground-ink) 60%, transparent);
-  background: color-mix(in srgb, var(--andrey-ground-ink) 20%, transparent);
-  color: var(--andrey-ground-ink);
-}
-
-/* One line of header, the buttons, then the bars: no times and no notes. The bars do not replay.
-   Where the header does not fit on one line, the link moves under the title. */
-.andrey-home .race--speedup .race-head {
-  flex-wrap: wrap;
-  row-gap: 0.5rem;
-}
-
-.andrey-home .race--speedup .race-title {
-  max-width: none;
-  white-space: nowrap;
-}
-
-.andrey-home .race--speedup .race-link {
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-.andrey-home .race--speedup .race-sizes {
-  justify-content: flex-start;
-}
-
 .andrey-home .hero a {
   color: var(--andrey-ground-ink);
 }
 
 /* The accent ring is too faint on the dark ground; the ground's light ink stands out. */
-.andrey-home .hero :focus-visible,
-.andrey-home .hero .race-choice:focus-visible + label {
+.andrey-home .hero :focus-visible {
   outline-color: var(--andrey-ground-ink);
 }
 
 /* Readers who ask for more contrast get the light type on plain navy, without the specks. */
 @media (prefers-contrast: more) {
-  .andrey-home .hero {
+  .andrey-home .story-pin {
     background: var(--andrey-ground-navy);
   }
 
-  .andrey-home .hero::before,
-  .andrey-home .hero::after,
+  .andrey-home .story-pin::before,
+  .andrey-home .story-pin::after,
+  .andrey-home .hero-art,
   .andrey-home .hero-intro::before {
     display: none;
   }
 }
 
 .andrey-home .hero h1 {
-  max-width: 20ch;
+  max-width: 11ch;
   margin: 0;
-  font-size: clamp(2.25rem, 3.7vw, 3.4rem);
-  line-height: 1.09;
-  letter-spacing: -0.045em;
+  font-size: clamp(3rem, 7.4vw, 7rem);
+  line-height: 1;
+  letter-spacing: -0.055em;
 }
 
-/* "fast": amber and slanted, with the trace of its letters on its right, as on the link-preview
-   card and the README banner (site/cards.py: SLANT, ROOM, BLUR, TRACE): copies of the word behind
-   it, each further right and fainter, fading out over the space after it. It slides in from the
-   right, blurred, in the time and easing of Andrey's speedup bar beside it, and rests sharp. */
-.andrey-home .hero .fast {
-  position: relative;
-  display: inline-block;
+/* The three keywords, one tone each, from the ground's tokens: accelerated is amber and slanted,
+   accurate cobalt, agentic green. They color the hero's line, the static line, and the headings. */
+.andrey-home .word--1 {
   color: var(--andrey-ground-amber);
+  display: inline-block;
   transform: skewX(-11deg);
 }
 
-.andrey-home .hero .fast::after {
-  content: "fast";
-  position: absolute;
-  inset: 0 -0.2em 0 0;
-  z-index: -1;
-  color: transparent;
-  text-shadow:
-    0.033em 0 0.05em color-mix(in srgb, var(--andrey-ground-amber) 50%, transparent),
-    0.067em 0 0.05em color-mix(in srgb, var(--andrey-ground-amber) 40%, transparent),
-    0.1em 0 0.05em color-mix(in srgb, var(--andrey-ground-amber) 30%, transparent),
-    0.133em 0 0.05em color-mix(in srgb, var(--andrey-ground-amber) 22%, transparent),
-    0.167em 0 0.05em color-mix(in srgb, var(--andrey-ground-amber) 14%, transparent),
-    0.2em 0 0.05em color-mix(in srgb, var(--andrey-ground-amber) 8%, transparent);
-  --fade: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--andrey-ground-amber) 50%, transparent),
-    var(--andrey-ground-amber) 65%,
-    transparent
-  );
-  -webkit-mask-image: var(--fade);
-  mask-image: var(--fade);
-  transform-origin: left center;
-  pointer-events: none;
+.andrey-home .word--2 {
+  color: var(--andrey-ground-cobalt-light);
+}
+
+.andrey-home .word--3 {
+  color: var(--andrey-ground-green);
+}
+
+.andrey-home .nowrap {
+  white-space: nowrap;
+}
+
+/* Without the scroll story the hero is one static line. */
+.andrey-home .story-live,
+.andrey-home .story-line {
+  display: none;
+}
+
+.andrey-home .story-static {
+  display: block;
+}
+
+.andrey-home .story-copy {
+  display: grid;
+}
+
+.andrey-home .story-copy > * {
+  grid-area: 1 / 1;
+}
+
+/* With it, the pin sticks below the navbar for two screens of scrolling, and "Causal discovery,"
+   stays while the word under it, the line after it, and the graph change with the reader's place
+   in the track. Native scrolling throughout: CSS drives the changes from the scroll position where
+   the browser can, and story.js sets data-step where it cannot. Only opacity and transform move. */
+.andrey-home .hero.is-story .story-track {
+  height: 300svh;
+}
+
+.andrey-home .hero.is-story .story-pin {
+  position: sticky;
+  top: 5rem;
+  height: calc(100svh - 5rem);
+  min-height: 0;
+}
+
+.andrey-home .hero.is-story .story-static,
+.andrey-home .hero.is-story .story-lede {
+  display: none;
+}
+
+.andrey-home .hero.is-story .story-live {
+  display: block;
+}
+
+.andrey-home .hero.is-story .story-line {
+  display: block;
+}
+
+.andrey-home .story-words {
+  display: grid;
+}
+
+.andrey-home .story-word {
+  grid-area: 1 / 1;
+  justify-self: start;
+}
+
+.andrey-home .story-prompt {
+  display: none;
+  align-self: start;
+  margin: 1.5rem 0 0;
+}
+
+.andrey-home .hero.is-story .story-prompt {
+  display: grid;
+}
+
+.andrey-home .story-prompt code {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 32%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent);
+  color: var(--andrey-ground-ink);
+  font-size: clamp(0.78rem, 1.4vw, 1rem);
+  overflow-wrap: anywhere;
+}
+
+.andrey-home .story-prompt code + code {
+  margin-top: 0.4rem;
+  color: var(--andrey-ground-muted);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .andrey-home .hero .fast {
-    animation: fast-arrive 900ms var(--ease) 200ms both;
+  @supports (animation-timeline: scroll()) {
+    .andrey-home .hero.is-story {
+      --story-from: 0px;
+      --story-to: calc(200svh + 3rem);
+    }
+
+    .andrey-home .hero.is-story .story-step {
+      animation-duration: 1ms;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: scroll(root block);
+      animation-range: var(--story-from) var(--story-to);
+    }
+
+    .andrey-home .hero.is-story [data-i="1"] { animation-name: story-first; }
+    .andrey-home .hero.is-story [data-i="2"] { animation-name: story-second; }
+    .andrey-home .hero.is-story [data-i="3"] { animation-name: story-third; }
+    .andrey-home .hero.is-story .hero-edge--wrong { animation-name: story-wrong; }
+    .andrey-home .hero.is-story .hero-edge--open { animation-name: story-open; }
+    .andrey-home .hero.is-story .hero-edge--settled { animation-name: story-settled; }
+    .andrey-home .hero.is-story .hero-edge--found {
+      transform-origin: var(--ox) var(--oy);
+      animation-name: story-found;
+    }
+    .andrey-home .hero.is-story .hero-signal--first { animation-name: story-signal-first; }
+    .andrey-home .hero.is-story .hero-signal--second { animation-name: story-signal-second; }
   }
 
-  .andrey-home .hero .fast::after {
-    animation: fast-trace 900ms var(--ease) 200ms both;
+  /* No scroll-driven animation: story.js sets data-step, and each change eases. */
+  @supports not (animation-timeline: scroll()) {
+    .andrey-home .hero.is-story .story-step {
+      opacity: 0;
+      transition: opacity 500ms var(--ease), transform 500ms var(--ease), translate 500ms var(--ease);
+    }
+
+    .andrey-home .hero.is-story .story-word,
+    .andrey-home .hero.is-story .story-line {
+      translate: 0 0.35em;
+    }
+
+    .andrey-home .hero.is-story .hero-edge--found {
+      transform: scale(0);
+      transform-origin: var(--ox) var(--oy);
+    }
+
+    .andrey-home .hero.is-story[data-step="1"] [data-i="1"],
+    .andrey-home .hero.is-story[data-step="2"] [data-i="2"],
+    .andrey-home .hero.is-story[data-step="3"] [data-i="3"] {
+      opacity: 1;
+      translate: none;
+    }
+
+    .andrey-home .hero.is-story[data-step="1"] .hero-edge--open,
+    .andrey-home .hero.is-story[data-step="1"] .hero-edge--wrong {
+      opacity: 1;
+    }
+
+    .andrey-home .hero.is-story:not([data-step="1"]) .hero-edge--open {
+      opacity: 0;
+    }
+
+    .andrey-home .hero.is-story:not([data-step="1"]) .hero-edge--settled,
+    .andrey-home .hero.is-story:not([data-step="1"]) .hero-edge--found {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
-@keyframes fast-arrive {
-  from {
-    opacity: 0;
-    translate: 0.6em 0;
-    filter: blur(0.06em);
-  }
-
-  30% {
-    opacity: 1;
-  }
-
-  to {
-    translate: 0 0;
-    filter: blur(0);
-  }
+@keyframes story-first {
+  0%, 26% { opacity: 1; translate: none; }
+  36%, 100% { opacity: 0; translate: 0 -0.35em; }
 }
 
-@keyframes fast-trace {
-  from {
-    transform: scaleX(2.4);
-  }
+@keyframes story-second {
+  0%, 30% { opacity: 0; translate: 0 0.35em; }
+  40%, 60% { opacity: 1; translate: none; }
+  70%, 100% { opacity: 0; translate: 0 -0.35em; }
 }
 
-.andrey-home .claim {
-  max-width: 36ch;
-  margin: 1.25rem 0 0;
-  font-size: clamp(1.05rem, 1.5vw, 1.2rem);
-  font-weight: 600;
-  line-height: 1.35;
-  text-wrap: pretty;
+@keyframes story-third {
+  0%, 64% { opacity: 0; translate: 0 0.35em; }
+  74%, 100% { opacity: 1; translate: none; }
+}
+
+@keyframes story-wrong {
+  0%, 12% { opacity: 0; }
+  20%, 34% { opacity: 0.9; }
+  46%, 100% { opacity: 0; }
+}
+
+@keyframes story-open {
+  0%, 36% { opacity: 1; }
+  46%, 100% { opacity: 0; }
+}
+
+@keyframes story-settled {
+  0%, 36% { opacity: 0; }
+  46%, 100% { opacity: 1; }
+}
+
+@keyframes story-found {
+  0%, 38% { opacity: 0; transform: scale(0); }
+  52%, 100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes story-signal-first {
+  0% { offset-distance: 0%; opacity: 0; }
+  4% { opacity: 1; }
+  26% { offset-distance: 100%; opacity: 1; }
+  30%, 100% { offset-distance: 100%; opacity: 0; }
+}
+
+@keyframes story-signal-second {
+  0%, 66% { offset-distance: 0%; opacity: 0; }
+  70% { opacity: 1; }
+  94% { offset-distance: 100%; opacity: 1; }
+  98%, 100% { offset-distance: 100%; opacity: 0; }
 }
 
 .andrey-home .lede {
-  max-width: 47ch;
-  margin: 0.9rem 0 0;
+  max-width: 34ch;
+  margin: 1.5rem 0 0;
   color: var(--andrey-muted);
-  font-size: 1.125rem;
+  font-size: clamp(1.15rem, 2vw, 1.5rem);
   line-height: 1.65;
   text-wrap: pretty;
 }
@@ -478,133 +704,202 @@ html[data-theme="light"] .andrey-home .hero {
   opacity: 1;
 }
 
-/* ---------- pillars: four claims; "+" turns a card over to its details ---------- */
-.andrey-home .pillars {
+/* ---------- the bento grid: tiles of mixed sizes, each opening its details ---------- */
+/* Twelve columns. A tile spans 4 or 6; the latest release's takes two rows. A tile is a link, and
+   with script (tiles.js) it opens its dialog instead of jumping to it. */
+.andrey-home .bento {
+  padding-block: clamp(1rem, 3vw, 2rem) clamp(3rem, 7vw, 5rem);
+}
+
+/* Three groups, under the hero's three words. */
+.andrey-home .group-title {
+  margin: clamp(3rem, 7vw, 5rem) 0 1.25rem;
+  font-size: clamp(2.25rem, 5vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+/* The hero's tones are for the dark ground; on the page the words are ink. */
+.andrey-home .group-title .word {
+  color: var(--andrey-ink);
+  transform: none;
+}
+
+.andrey-home .bento-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: minmax(13rem, auto);
+  grid-auto-flow: dense;
   gap: 1rem;
-  margin-block: 0 clamp(2.5rem, 6vw, 4rem);
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
-/* The details open inside a <details> element's content box, whose own radius is 0, so the card's
-   radius reaches them as a variable; `inherit` would give them square corners. */
-.andrey-home .pillar {
-  --pillar-radius: 16px;
+.andrey-home .tile {
   position: relative;
+  grid-column: span 4;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--andrey-line);
+  border-radius: 28px;
+  background: var(--andrey-surface);
+  overflow: hidden;
+  transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
+}
+
+.andrey-home .tile::marker {
+  content: none;
+}
+
+.andrey-home .tile--6 {
+  grid-column: span 6;
+}
+
+.andrey-home .tile--release {
+  grid-column: span 6;
+}
+
+.andrey-home .tile:hover {
+  border-color: color-mix(in srgb, var(--andrey-accent) 55%, var(--andrey-line));
+  background: color-mix(in srgb, var(--andrey-accent) 5%, var(--andrey-surface));
+}
+
+.andrey-home .tile-face {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.6rem 1.6rem 1.5rem;
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.andrey-home .tile-face:hover {
+  text-decoration: none;
+}
+
+.andrey-home .tile-face:focus-visible {
+  outline-offset: -4px;
+  border-radius: 28px;
+}
+
+.andrey-home .tile .tile-title {
+  max-width: 18ch;
+  margin: 0;
+  font-size: clamp(1.45rem, 2.2vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+
+.andrey-home .tile .tile-text {
+  max-width: 32ch;
+  margin: 0.7rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 1.02rem;
+  line-height: 1.45;
+}
+
+/* The one number: set large at the foot of the tile, as "up to 900x faster". */
+.andrey-home .tile .tile-number {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.55rem;
+  margin: auto 3.4rem 0 0;
+  padding-top: 1.2rem;
+  color: var(--andrey-muted);
+  font-size: 1.02rem;
+}
+
+.andrey-home .tile .tile-number b {
+  color: var(--andrey-accent);
+  font-size: clamp(2.6rem, 4.4vw, 3.8rem);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: -0.05em;
+}
+
+.andrey-home .tile .wf-plus {
+  position: absolute;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  transition: transform 0.3s var(--ease);
+}
+
+.andrey-home .tile:hover .wf-plus,
+.andrey-home .tile-face:focus-visible .wf-plus {
+  transform: rotate(90deg) scale(1.08);
+}
+
+/* The latest release: its cover fills the tile. */
+.andrey-home .tile--release .tile-face {
+  padding: 0;
+}
+
+.andrey-home .tile--release img {
+  display: block;
+  width: 100%;
   height: 100%;
   min-height: 15rem;
-  border: 1px solid var(--andrey-line);
-  border-radius: var(--pillar-radius);
-  background: var(--andrey-surface);
+  object-fit: cover;
+  object-position: left center;
 }
 
-.andrey-home .pillar-face {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  height: 100%;
-  padding: 1.4rem 1.4rem 3.5rem;
-  border-radius: calc(var(--pillar-radius) - 1px);
-  cursor: pointer;
-  list-style: none;
+/* ---------- the dialogs: a tile's details, as the "Why Andrey is fast" dialog ---------- */
+.andrey-home .tile-details {
+  display: contents;
 }
 
-.andrey-home .pillar-face::-webkit-details-marker {
-  display: none;
+.andrey-home dialog.tile-dialog {
+  width: min(1100px, calc(100vw - 32px));
 }
 
-.andrey-home .pillar-icon {
-  color: var(--andrey-accent);
+.andrey-home .tile-body {
+  margin-top: 1.6rem;
 }
 
-.andrey-home .pillar-icon .icon {
-  width: 1.75rem;
-  height: 1.75rem;
-  stroke-width: 1.6;
-}
-
-.andrey-home .pillar-claim {
-  color: var(--andrey-ink);
-  font-size: 1.3rem;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.015em;
-  text-wrap: balance;
-}
-
-.andrey-home .pillar-claim em {
-  color: var(--andrey-accent);
-  font-style: normal;
-}
-
-/* The round "+" in the corner; open, it turns into a close mark. */
-.andrey-home .pillar-toggle {
-  position: absolute;
-  right: 1rem;
-  bottom: 1rem;
-  z-index: 2;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  background: var(--andrey-surface-2);
-  transition: transform 0.2s var(--ease), background 0.2s var(--ease);
-}
-
-.andrey-home .pillar-toggle::before,
-.andrey-home .pillar-toggle::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0.8rem;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--andrey-ink);
-  transform: translate(-50%, -50%);
-}
-
-.andrey-home .pillar-toggle::after {
-  transform: translate(-50%, -50%) rotate(90deg);
-}
-
-.andrey-home .pillar-face:hover .pillar-toggle {
-  background: var(--andrey-line);
-}
-
-.andrey-home .pillar[open] .pillar-toggle {
-  transform: rotate(45deg);
-}
-
-/* The details cover the card at its own size; on a card too narrow for them, they scroll inside it
-   rather than spill past its edge. */
-.andrey-home .pillar-more {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 1.25rem 1.25rem 3.5rem;
-  overflow-y: auto;
-  border-radius: calc(var(--pillar-radius) - 1px);
-  background: var(--andrey-surface);
+.andrey-home .tile-body > p {
+  max-width: var(--measure);
   color: var(--andrey-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
 }
 
-.andrey-home .pillar-more p {
-  margin: 0;
+.andrey-home .tile-dialog h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
 }
 
-.andrey-home .pillar-more a {
-  font-weight: 500;
+.andrey-home .tile-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
 }
 
-.andrey-home .pillar-face:focus-visible {
-  outline: 2px solid var(--andrey-accent);
-  outline-offset: 3px;
+.andrey-home .tile-charts .tchart {
+  width: auto;
+}
+
+.andrey-home .tile-more {
+  margin-bottom: 0;
+}
+
+.andrey-home .tile-dialog .tc-title {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .andrey-home dialog.tile-dialog[open] {
+    animation: tile-open 450ms var(--ease);
+  }
+}
+
+@keyframes tile-open {
+  from {
+    opacity: 0;
+    translate: 0 24px;
+    scale: 0.97;
+  }
 }
 
 /* ---------- sections ---------- */
@@ -1403,41 +1698,59 @@ html[data-theme="light"] .andrey-home .hero {
 }
 
 @media (max-width: 64rem) {
-  /* The text column spans the card here, over the lighter top left, so its band grows. */
+  .andrey-home .bento-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .andrey-home .tile,
+  .andrey-home .tile--6,
+  .andrey-home .tile--release {
+    grid-column: span 3;
+  }
+
+  .andrey-home .tile--release {
+    grid-column: span 6;
+    grid-row: span 1;
+  }
+
   .andrey-home .hero-intro::before {
-    inset: -8% -12%;
-    background: radial-gradient(
-      ellipse closest-side,
-      color-mix(in srgb, var(--andrey-ground-navy) 80%, transparent),
-      color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent) 65%,
-      transparent
-    );
+    inset: -20% -10%;
+  }
+}
+
+@media (max-width: 44rem) {
+  /* The graph sits under the text, larger than the screen, so its nodes stay readable. */
+  .andrey-home .story-pin {
+    align-items: flex-start;
+    padding-top: 2rem;
   }
 
-  .andrey-home .hero {
+  .andrey-home .hero-graph {
+    position: absolute;
+    right: -14vw;
+    top: 56%;
+    width: 140vw;
+    height: auto;
+    aspect-ratio: 1000 / 640;
+    opacity: 0.8;
+  }
+
+  .andrey-home .bento-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 2.5rem;
+    grid-auto-rows: auto;
   }
 
-  .andrey-home .hero h1 {
-    max-width: 24ch;
-    font-size: clamp(2.25rem, 6vw, 3.5rem);
+  .andrey-home .tile,
+  .andrey-home .tile--6,
+  .andrey-home .tile--release {
+    grid-column: auto;
+    min-height: 11rem;
   }
-
-  .andrey-home .lede {
-    max-width: 58ch;
-  }
-
 }
 
 @media (max-width: 30rem) {
-  .andrey-home .hero {
-    gap: 1.75rem;
+  .andrey-home .story-pin {
     padding-top: 1.5rem;
-  }
-
-  .andrey-home .claim {
-    margin-top: 1rem;
   }
 
   .andrey-home .lede {

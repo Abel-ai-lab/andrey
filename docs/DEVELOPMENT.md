@@ -29,18 +29,34 @@ Every link is relative, so one build serves any hostname.
 
 The homepage is a template, [`site/homepage.html`](../site/homepage.html), on pydata's layout with
 only its navbar. `conf.py` fills it with `homepage_context` from [`site/build.py`](../site/build.py):
-the race, the charts, the claim cards, the comparison table, and the table's footnote.
+the hero's graph, the family tiles and their charts, the accuracy cards, the comparison table, and
+the table's footnote.
 `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the page's do
 not meet; `site/assets/figures.css` and `figures.js` hold the timing comparison and the speed
 charts, which the launch post and the benchmark explorer show too.
 
-The speed section's "Why Andrey is fast" pill opens a dialog of four animated scenes, one per idea
+The "Why Andrey is fast" and "CPU-parallel and GPU" tiles open a dialog of four animated scenes, one per idea
 behind the speed, built by [`site/why_fast.py`](../site/why_fast.py). The blog post
 `docs/blog/20261008-why-andrey-is-fast.md` shows the same scenes under its own headings. Each scene compares
 Andrey with a lane labeled Others and names no package. `site/assets/why-fast.js` plays them with
 Motion, vendored unmodified as `site/assets/motion.js` under its MIT license; the version is pinned
 in the file's banner and in `tests/unit/test_why_fast.py`. `conf.py` loads both scripts only on
-those two pages.
+those two pages. A tile's link names the scene to start at in `data-wf-scene`.
+
+The hero is a scroll story over three words: accelerated, accurate, agentic. `story.js` turns it on
+(`is-story`) unless the reader asks for reduced motion; then the hero's pin sticks for two screens
+of scrolling, "Causal discovery," stays, and the word, the line under it, and the graph change with
+the scroll position. The stylesheet drives the changes with scroll-driven animations; where the
+browser has none, `story.js` sets `data-step` from an `IntersectionObserver`. Only opacity and
+transforms move. Without the script or under reduced motion the hero is one static line and the
+settled graph. The tiles below it fall into three groups under the same words.
+
+Each tile is a link. `tiles.js` opens its details as a dialog; without script the details are the
+dialogs' content, shown in the page after the grid (`homepage.html`'s noscript style), and the tile
+jumps to them. A tile per registry family that has a supported method with a published comparison
+(`family_tiles()`) shows the family's largest published ratio rounded down to one digit ("up to
+900x faster"), and none where Andrey is not at least twice as fast; its dialog holds the family's
+time charts. A new family gets its tile with no change to the page.
 
 The homepage takes every number from the release summaries that `RELEASES` in `site/build.py` names,
 each `benchmarks/published/<label>/summary.json`, or from the method registry,
@@ -50,14 +66,14 @@ observed variables on data with hidden variables, a cause-effect pair's rows as 
 the summary flags as a lower bound printed as one, and each comparison's errors in the measure its
 summary records (`ERRORS`: the structural Hamming distance, directed-edge errors on data with hidden
 common causes, or reversed directions on cause-effect pairs). The speed charts share one size axis
-per unit, variables or rows. The claim under the heading is the one `claim_sentence()` words from
-every supported comparison: the largest ratio rounded down to a power of ten on its method, then
-whether the other supported methods are faster ("the other", "most other", or nothing). The build
+per unit, variables or rows. The README's claim is the one `claim_sentence()` words from every
+supported comparison: the largest ratio rounded down to a power of ten on its method, then whether
+the other supported methods are faster ("the other", "most other", or nothing). The build
 also fails unless the first summary's headline is the claim its own numbers support; the docs index,
-the notebook, and the live demo repeat it. The speedup panel shows one slide per method in `PANEL`,
+the notebook, and the live demo repeat it. The README chart shows one card per method in `PANEL`,
 a (release, method) pair each, with every package measured in the same runs at its largest size with
-a paired ratio; the README chart draws the same slides as cards and refuses more than six. The hero
-names every registry family, and the method list shows every registered method. The page's
+a paired ratio, and refuses more than six. The methods dialog's first sentence names every registry
+family, and its list shows every registered method. The page's
 description, which search results and link previews show, names PC, GES, and FCI, counts the other
 registered methods, and states the claim's first part ("over 1,000x faster on PNL"). Every other
 page's description is the `description` in its front matter; without one, the page's first

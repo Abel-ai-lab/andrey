@@ -6,11 +6,11 @@
 
 Every number on the homepage comes from a release's published benchmark summary (``RELEASES``) or
 from the method registry. The speed and accuracy sections cover every comparison with another
-package whose method the registry supports, and the claim under the heading is the one
-:func:`claim_sentence` words from them. The speedup panel shows one slide per method in ``PANEL``.
-The method list comes from the method registry. A summary outside ``benchmarks/published/`` loads
-only as a placeholder, which marks the page as not for release. Links are relative to the site
-root.
+package whose method the registry supports; each family's tile shows its largest ratio rounded
+down to one digit, and the README claim is the one :func:`claim_sentence` words from them. The
+README chart shows one card per method in ``PANEL``. The method list comes from the method
+registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks the
+page as not for release. Links are relative to the site root.
 """
 
 from __future__ import annotations
@@ -423,27 +423,26 @@ def ratio_label(row: dict) -> str:
     return ("≥" if row["at_least"] else "") + ratio_text(row["ratio"])
 
 
-# ---- the hero's speedup panel ----------------------------------------------------------------
-# The methods the panel plays through, in order, each from a release's summary: (folder in
-# RELEASES, method). The first is what reduced motion and a page without script show. The README
-# chart draws the same slides as cards.
+# ---- the README's speedup cards --------------------------------------------------------------
+# The methods the README chart shows, in order, each from a release's summary: (folder in
+# RELEASES, method).
 PANEL = (
     ("alpha-2026-09", "PC"),
     ("alpha-2026-09", "FCI"),
+    ("alpha-2026-09", "GES"),
     ("score-search-2026-10", "XGES"),
     ("score-search-2026-10", "Tabu search"),
     ("alpha-2026-09", "DirectLiNGAM"),
-    ("pairwise-2026-10", "PNL"),
 )
 
 
 def speedup_text(speed: float) -> str:
-    """A speedup as the panel and the README print it: the slowest package is 1x."""
+    """A speedup as the README chart prints it: the slowest package is 1x."""
     return "1x" if speed == 1 else ratio_text(speed)
 
 
 def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str, float, str]]]]:
-    """Each panel method's speedups at its largest size with a published ratio, fastest first.
+    """Each ``PANEL`` method's speedups at its largest size with a published ratio, fastest first.
 
     A slide is the method, its size as it prints, and its bars: each package, its speed relative
     to the slowest package (1x), and the label it prints. ``summaries`` are in ``RELEASES`` order,
@@ -463,12 +462,12 @@ def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str
     for release, name in PANEL:
         found = [m for m in comparisons(by_release[release]) if m["method"] == name]
         if not found:
-            raise ValueError(f"the speedup panel needs {name} in {release}")
+            raise ValueError(f"the README chart needs {name} in {release}")
         if found[0]["status"] != "supported":
-            raise ValueError(f"the speedup panel shows supported methods; {name} is not")
+            raise ValueError(f"the README chart shows supported methods; {name} is not")
         claimed = [(row["d"], m) for m in found for row in m["rows"] if row["ratio"]]
         if not claimed:
-            raise ValueError(f"the speedup panel needs a published {name} ratio")
+            raise ValueError(f"the README chart needs a published {name} ratio")
         d, lead = max(claimed, key=lambda item: item[0])
         runs = [m for m in found if all(m[k] == lead[k] for k in keys)]
         rows = {m["comparator"]: r for m in runs for r in m["rows"] if r["d"] == d}
@@ -494,86 +493,19 @@ def slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
-def speedup_panel(summaries: list[dict]) -> str:
-    """The hero's panel: one slide of speedup bars per method, chosen by a row of radio buttons.
-
-    Every bar shares its slide's scale, set by Andrey's. The header names the slide's size and
-    links to the release cards; nothing sits under the bars. ``figures.js`` plays through the
-    slides until a reader picks one.
-    """
-    slides = speedup_slides(summaries)
-    sizes = "".join(
-        f'<span class="race-size" id="race-size-{slug(name)}">{escape(size)}</span>'
-        for name, size, _ in slides
-    )
-    chips = "".join(
-        f'<input class="race-choice" type="radio" name="race-method" id="race-m-{slug(name)}"'
-        f'{" checked" if i == 0 else ""}><label for="race-m-{slug(name)}">{escape(name)}</label>'
-        for i, (name, _, _) in enumerate(slides)
-    )
-    panels = []
-    for name, size, bars in slides:
-        top = bars[0][1]
-        rows = "".join(
-            f'<div class="race-row{" race-row--andrey" if package == "Andrey" else ""}" '
-            f'style="--i: {i}">'
-            f'<span class="race-name">{escape(package)}</span><span class="race-track">'
-            f'<span class="race-bar" style="--f: {speed / top:.6f}"><span class="race-fill">'
-            f'</span></span><span class="race-time">{escape(label)}'
-            "</span></span></div>"
-            for i, (package, speed, label) in enumerate(bars)
-        )
-        caption = f"{escape(name)}, {escape(size)}: speed relative to the slowest package"
-        panels.append(
-            f'<div class="race-panel" id="race-panel-{slug(name)}" role="group" '
-            f'aria-label="{caption}">{rows}</div>'
-        )
-    return (
-        '<figure class="race race--speedup" aria-labelledby="race-title">'
-        '<figcaption class="race-head"><span class="race-title" id="race-title">Speedup'
-        f'<span class="race-sizes-now"> <span aria-hidden="true">&middot;</span> {sizes}</span>'
-        '</span><a class="race-link" href="docs/benchmarks.html">Release cards</a></figcaption>'
-        f'<fieldset class="race-sizes"><legend class="visually-hidden">Method</legend>{chips}'
-        f'</fieldset><div class="race-panels">{"".join(panels)}</div></figure>'
-    )
-
-
-def speedup_css(summaries: list[dict]) -> str:
-    """Show only the checked method's panel and size. A hidden panel takes no space, so the panel
-    is as tall as the shown method's bars.
-
-    Without ``:has()`` every panel shows, one under another, each captioned with its method and
-    size, and the header drops the size.
-    """
-    names = [slug(name) for name, _, _ in speedup_slides(summaries)]
-    shown = ", ".join(
-        f".race:has(#race-m-{n}:checked) :is(#race-panel-{n}, #race-size-{n})" for n in names
-    )
-    return (
-        "@supports selector(:has(a)) { .race-panel, .race-size { display: none; } "
-        f"{shown} {{ display: revert; }} }} "
-        "@supports not selector(:has(a)) { .race--speedup .race-sizes-now { display: none; } "
-        ".race--speedup .race-panel::before { content: attr(aria-label); display: block; "
-        "margin-top: 1rem; font-size: 0.85rem; font-weight: 600; } }"
-    )
-
-
 def claimed_comparisons(summaries: list[dict]) -> list[dict]:
     """The comparisons the charts cover: the supported ones with a published ratio at some size."""
     return [m for m in supported(summaries) if any(r["ratio"] is not None for r in m["rows"])]
 
 
 # ---- speed across methods --------------------------------------------------------------------
-def speed_intro(summaries: list[dict]) -> str:
-    """Say what the speed chart shows and which packages it covers."""
-    packages = sorted({m["comparator"] for m in claimed_comparisons(summaries)}, key=str.lower)
-    lead, rest = speed_claim(summaries)
+def family_intro(methods: list[dict]) -> str:
+    """Say what a family's charts show and which packages they cover."""
+    packages = sorted({m["comparator"] for m in methods}, key=str.lower)
     return (
-        f"{lead}{', and ' + rest if rest else ''}, measured alongside {listed(packages)} on the "
-        "same datasets and the same machine at each size. "
-        "Each chart plots the median fit time against the number of variables, or of rows for a "
-        'pair of variables: up and to the left is better. The <a href="docs/benchmarks.html">'
-        "release cards</a> have every measurement."
+        f"Andrey was measured alongside {listed(packages)} on the same datasets and the same "
+        "machine at each size. Each chart plots the median fit time against the number of "
+        "variables, or of rows for a pair of variables: up and to the left is better."
     )
 
 
@@ -686,11 +618,11 @@ def seconds_axis(v: float) -> str:
     return {1000: "1k", 10000: "10k"}.get(v, f"{v:g}")
 
 
-def speed_chart(summaries: list[dict]) -> str:
-    """An array of charts, one per method (or per run where a method's comparisons differ), each
-    with its largest speedup, on shared axes so the charts compare at a glance: one time axis, and
-    one size axis per unit."""
-    # A speedup belt: a comparison where Andrey is not faster stays in the release cards' tables.
+def speed_figures(summaries: list[dict]) -> list[tuple[str, str]]:
+    """A chart per method (or per run where a method's comparisons differ), each with its largest
+    speedup, as (registry family, chart). The charts share axes so they compare at a glance: one
+    time axis, and one size axis per unit."""
+    # A speedup chart: a comparison where Andrey is not faster stays in the release cards' tables.
     groups = [(n, ms) for n, ms in time_groups(summaries) if all(faster(m) for m in ms)]
     times = [
         t
@@ -705,12 +637,15 @@ def speed_chart(summaries: list[dict]) -> str:
     for _, methods in groups:
         for m in methods:
             sizes.setdefault(m["unit"], set()).update(r["d"] for r in m["rows"])
-    return belt(
-        [
-            time_chart(name, methods, xr, sorted(sizes[methods[0]["unit"]]))
-            for name, methods in groups
-        ]
-    )
+    return [
+        (methods[0]["family"], time_chart(name, methods, xr, sorted(sizes[methods[0]["unit"]])))
+        for name, methods in groups
+    ]
+
+
+def speed_chart(summaries: list[dict]) -> str:
+    """The speed charts on a belt, for the benchmark page and the live demo."""
+    return belt([figure for _, figure in speed_figures(summaries)])
 
 
 def belt(figures: list[str]) -> str:
@@ -853,10 +788,15 @@ def accuracy_card(name: str, methods: list[dict]) -> str:
     )
 
 
-def accuracy_chart(summaries: list[dict]) -> str:
-    """A card per speed chart, on the same kind of belt, for the comparisons with a graph each."""
+def accuracy_cards(summaries: list[dict]) -> list[str]:
+    """A card per speed chart, for the comparisons with a graph each."""
     groups = [(n, ms) for n, ms in time_groups(summaries) if error_comparisons(ms)]
-    return belt([accuracy_card(name, methods) for name, methods in groups])
+    return [accuracy_card(name, methods) for name, methods in groups]
+
+
+def accuracy_chart(summaries: list[dict]) -> str:
+    """The accuracy cards on a belt."""
+    return belt(accuracy_cards(summaries))
 
 
 def notes_list(notes: list[str]) -> str:
@@ -962,7 +902,8 @@ def methods(summaries: list[dict]) -> tuple[str, str]:
         items = []
         for spec in (s for s in specs if s.family == family):
             bench = (
-                f'<a class="method-bench" href="#speed" aria-describedby="bench-{spec.name}">'
+                '<a class="method-bench" href="docs/benchmarks.html" '
+                f'aria-describedby="bench-{spec.name}">'
                 f"{BENCHMARKED_SEAL}"
                 f'<span class="method-tip" role="tooltip" id="bench-{spec.name}">{BENCHMARKED}'
                 "</span></a>"
@@ -999,30 +940,27 @@ def lede() -> str:
 
 # ---- the README chart ------------------------------------------------------------------------
 README_CHART = "benchmark-chart-{theme}.svg"  # in .github/readme/; the README links both themes
-# The README chart is the speedup panel's slides as cards: two rows of three, never more.
+# The README chart is one card per ``PANEL`` method: two rows of three, never more.
 README_COLUMNS, README_ROWS = 3, 2
 CHART_FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 
 
 def readme_slides(summary: dict) -> list[tuple[str, str, list[tuple[str, float, str]]]]:
-    """The README chart's cards: the speedup panel's slides, from ``summary`` and the later
-    releases' summaries."""
+    """The README chart's cards, from ``summary`` and the later releases' summaries."""
     slides = speedup_slides(release_summaries(summary))
     if len(slides) > README_COLUMNS * README_ROWS:
         raise ValueError(
-            f"the README chart holds {README_ROWS} rows of {README_COLUMNS} cards, and the panel "
+            f"the README chart holds {README_ROWS} rows of {README_COLUMNS} cards, and PANEL "
             f"has {len(slides)} methods; replace a method in PANEL instead of adding one"
         )
     return slides
 
 
 def readme_chart(summary: dict, palette: andrey.viz.Palette) -> str:
-    """The homepage's speedup panel as a standalone SVG: one card per method, Andrey accented.
-
-    A README can show only an image, so the panel's slides become cards side by side, from the
-    same :func:`speedup_slides`. Each card is as tall as its own bars; a row of cards starts below
-    the tallest card of the row above. The chart sits on an opaque card, so it stays legible where
-    a renderer shows the light file on a dark page.
+    """The speedup of each ``PANEL`` method as a standalone SVG: one card per method, Andrey
+    accented, from :func:`speedup_slides`. A README can show only an image. Each card is as tall as
+    its own bars; a row of cards starts below the tallest card of the row above. The chart sits on
+    an opaque card, so it stays legible where a renderer shows the light file on a dark page.
     """
     slides = readme_slides(summary)
     width, pad, gap, columns = 960, 24, 16, README_COLUMNS
@@ -1369,6 +1307,95 @@ def chip(icon: str, url: str, text: str, *, primary: bool = False) -> str:
     return f'<a class="{kind}" href="{escape(url)}">{glyph(icon)}{escape(text)}</a>'
 
 
+# The hero's graph on a 1000 x 640 canvas: (x, y) per node, in layers from causes to effects.
+HERO_NODES = (
+    (470, 120), (450, 330), (490, 540),
+    (640, 225), (650, 440),
+    (820, 130), (850, 330), (810, 540),
+)  # fmt: skip
+HERO_EDGES = ((0, 3), (1, 3), (1, 4), (2, 4), (3, 5), (3, 6), (4, 6), (4, 7))
+HERO_FOUND = (3, 4)  # an edge the "accurate" step adds
+HERO_WRONG = ((2, 3), (0, 6))  # edges the "accurate" step removes
+HERO_UNSURE = (0, 1)  # drawn undirected, then oriented by the "accurate" step
+HERO_SIGNAL = (0, 3, 6)  # the path the amber point travels, cause to effect
+HERO_RADIUS = 15
+HERO_SPECKS = 170
+
+
+def hero_graph() -> str:
+    """The hero's art: specks of data over a small causal graph, as inline SVG in the hero's
+    ground tones.
+
+    Directed edges end in arrowheads, as in :mod:`andrey.viz`. The graph has three states, one
+    per keyword of the hero's scroll story (``site/assets/story.js``): quickly drawn, with two
+    wrong edges (``hero-edge--wrong``, in the bidirected edge's rose) and one edge undirected
+    (amber, ``hero-edge--open``); settled, with the wrong edges gone, the missing one found
+    (``hero-edge--found``), and the undirected one oriented (``hero-edge--settled``); and driven by
+    an agent. Without the story the page shows the settled graph. Each edge, then each node, has
+    a ``--i`` and, for an edge, its cause's position as ``--ox`` and ``--oy``, for the stylesheet's
+    motion; ``hero-signal`` points travel the ``HERO_SIGNAL`` path. Seeded, so a build draws the
+    same art.
+    """
+    rng = np.random.default_rng(7)
+    xs = rng.beta(2.2, 1.4, HERO_SPECKS) * 1000
+    ys = rng.uniform(0, 640, HERO_SPECKS)
+    radii = rng.uniform(1.1, 2.8, HERO_SPECKS)
+    amber = rng.random(HERO_SPECKS) < 0.18
+    specks = "".join(
+        f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r:.1f}"{" class=amber" if a else ""}/>'
+        for x, y, r, a in zip(xs, ys, radii, amber, strict=True)
+    )
+
+    def geometry(i: int, j: int) -> tuple[float, float, float, float, float, float]:
+        """The line between two nodes, clear of both, and the unit vector along it."""
+        (x1, y1), (x2, y2) = HERO_NODES[i], HERO_NODES[j]
+        length = math.hypot(x2 - x1, y2 - y1)
+        ux, uy = (x2 - x1) / length, (y2 - y1) / length
+        gap = HERO_RADIUS + 5
+        return x1 + ux * gap, y1 + uy * gap, x2 - ux * gap, y2 - uy * gap, ux, uy
+
+    def edge(i: int, j: int, k: int, kind: str = "", *, arrow: bool = True) -> str:
+        x1, y1, x2, y2, ux, uy = geometry(i, j)
+        bx, by = (x2 - ux * 13, y2 - uy * 13) if arrow else (x2, y2)  # the arrowhead's base
+        head = (
+            f'<polygon points="{x2:.1f},{y2:.1f} {bx - uy * 6:.1f},{by + ux * 6:.1f} '
+            f'{bx + uy * 6:.1f},{by - ux * 6:.1f}"/>'
+            if arrow
+            else ""
+        )
+        ox, oy = HERO_NODES[i]
+        return (
+            f'<g class="hero-edge{kind}" style="--i: {k}; --ox: {ox}px; --oy: {oy}px">'
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{bx:.1f}" y2="{by:.1f}" pathLength="1"/>'
+            f"{head}</g>"
+        )
+
+    k = len(HERO_EDGES)
+    edges = [edge(i, j, n) for n, (i, j) in enumerate(HERO_EDGES)]
+    edges.append(edge(*HERO_UNSURE, k, " hero-edge--open story-step", arrow=False))
+    edges.append(edge(*HERO_UNSURE, k, " hero-edge--settled story-step"))
+    edges.append(edge(*HERO_FOUND, k + 1, " hero-edge--found story-step"))
+    edges += [edge(i, j, k + 2, " hero-edge--wrong story-step", arrow=False) for i, j in HERO_WRONG]
+    nodes = "".join(
+        f'<circle class="hero-node" style="--i: {n}" cx="{x}" cy="{y}" r="{HERO_RADIUS}"/>'
+        for n, (x, y) in enumerate(HERO_NODES)
+    )
+    path = " ".join(
+        f"{'M' if n == 0 else 'L'}{HERO_NODES[v][0]} {HERO_NODES[v][1]}"
+        for n, v in enumerate(HERO_SIGNAL)
+    )
+    signals = "".join(
+        f'<circle class="hero-signal hero-signal--{name} story-step" r="6" '
+        f"style=\"offset-path: path('{path}')\"/>"
+        for name in ("first", "second")
+    )
+    return (
+        '<svg class="hero-graph" viewBox="0 0 1000 640" preserveAspectRatio="xMaxYMid meet" '
+        'aria-hidden="true" focusable="false">'
+        f'<g class="hero-specks">{specks}</g>{"".join(edges)}{nodes}{signals}</svg>'
+    )
+
+
 def hero_chips() -> str:
     """The buttons beside the install line: Get started, and the live demo once its Space is
     public."""
@@ -1385,57 +1412,127 @@ def docs_grid() -> str:
     )
 
 
-def pillars(summaries: list[dict]) -> str:
-    """Four claims under the hero, each a card: an icon, one sentence with its key phrase in the
-    accent color, and details behind a "+" that link to the section backing the claim.
+def round_down(value: float) -> int:
+    """A ratio rounded down to one significant digit: 941 -> 900, 1,470 -> 1,000, 6.9 -> 6."""
+    unit = 10 ** math.floor(math.log10(value))
+    return int(value // unit * unit)
 
-    The card is a native ``details``: it opens without script, and the details cover the card at
-    its own size, so opening one moves nothing else on the page.
+
+def family_tiles(summaries: list[dict]) -> list[dict]:
+    """A tile per registry family with a supported method that has a published comparison, in
+    ``SPEC_FAMILIES`` order, so a new family gets one with no change here.
+
+    A tile gives the family's ``title``, its ``methods``, the ``comparisons`` its charts draw, its
+    best ``(comparison, row)``, and its ``number``: the largest published ratio rounded down to
+    one digit (:func:`round_down`), or ``None`` where Andrey is not at least twice as fast, so
+    the number is always more than half the ratio and never above it.
     """
-    lead, rest = speed_claim(summaries)
-    packages = sorted({m["comparator"] for m in claimed_comparisons(summaries)}, key=str.lower)
-    items = (
-        (
-            "zap",
-            f"<em>{lead}</em>{', and ' + rest if rest else ''}, compared with other popular "
-            "packages.",
-            f"Measured on the same datasets and machines as {escape(listed(packages))}.",
-            "#speed",
-            "Speed across methods",
-        ),
-        (
-            "target",
-            "<em>Just as accurate</em> as other popular packages.",
-            "Andrey's graphs are as accurate as other popular packages' on the same data, and "
-            "every release is tested against the true graphs that generated the data.",
-            "#accuracy",
-            "Errors across methods",
-        ),
-        (
-            "graph",
-            "<em>One graph object</em> from every method.",
-            "A DAG, CPDAG, PAG, or graph over time lags, drawn, converted to NetworkX or NumPy, "
-            "or compared with the same code.",
-            "#graphs",
-            "Three methods, three answers",
-        ),
-        (
-            "bot",
-            "<em>Agent support</em>, with a command line and a skill.",
-            "The <code>andrey</code> command never prompts and answers in JSON, and <code>andrey "
-            "--skill</code> prints a guide an agent loads as a skill.",
-            "#agents",
-            "Command line and skill",
-        ),
+    claimed = claimed_comparisons(summaries)
+    tiles = []
+    for family, title in SPEC_FAMILIES.items():
+        found = [m for m in claimed if m["family"] == family]
+        if not found:
+            continue
+        cells = [(m, r) for m in found for r in m["rows"] if r["ratio"] is not None]
+        method, row = max(cells, key=lambda cell: cell[1]["ratio"])
+        tiles.append(
+            {
+                "family": family,
+                "title": title,
+                "methods": list(dict.fromkeys(m["method"] for m in found)),
+                "comparisons": found,
+                "best": (method, row),
+                "number": round_down(row["ratio"]) if row["ratio"] >= 2 else None,
+            }
+        )
+    return tiles
+
+
+def plus() -> str:
+    """The round plus every tile carries, the one the "Why Andrey is fast" pill has."""
+    return f'<span class="wf-plus" aria-hidden="true">{_why_fast["PLUS"]}</span>'
+
+
+def tile(key: str, size: str, body: str, *, kind: str = "", href: str | None = None) -> str:
+    """One bento tile: a link that opens the dialog ``key`` and, without script, jumps to the same
+    id, where the dialog's content is shown in the page. ``href`` is another page that holds the
+    details, which the tile's script opener replaces."""
+    classes = f"tile tile--{size}" + (f" tile--{kind}" if kind else "")
+    return (
+        f'<li class="{classes}"><a class="tile-face" href="{href or "#" + key}" '
+        f'data-tile="{key}">{body}{plus()}</a></li>'
     )
-    return "".join(
-        '<li><details class="pillar"><summary class="pillar-face">'
-        f'<span class="pillar-icon">{glyph(icon)}</span>'
-        f'<span class="pillar-claim">{claim}</span>'
-        '<span class="pillar-toggle" aria-hidden="true"></span></summary>'
-        f'<div class="pillar-more"><p>{detail}</p><a href="{href}">{link} &rarr;</a></div>'
-        "</details></li>"
-        for icon, claim, detail, href, link in items
+
+
+def method_names(names: list[str]) -> str:
+    """A family's methods for its tile: all of them up to three, else two and the count."""
+    if len(names) <= 3:
+        return listed(names)
+    return f"{names[0]}, {names[1]}, and {len(names) - 2} more"
+
+
+def family_tile(info: dict) -> str:
+    """A family's tile: its name, its methods, and its best speedup in words."""
+    number = (
+        f'<p class="tile-number"><span>up to</span><b>{info["number"]:,}x</b>'
+        "<span>faster</span></p>"
+        if info["number"]
+        else ""
+    )
+    return tile(
+        f"speed-{info['family']}",
+        "4",
+        f'<h3 class="tile-title">{escape(info["title"])}</h3>'
+        f'<p class="tile-text">{escape(method_names(info["methods"]))}</p>{number}',
+        kind="family",
+    )
+
+
+def dialog_head(key: str, title: str, intro: str = "") -> str:
+    """The start of a tile's dialog, its heading and close button; ``DIALOG_TAIL`` ends it."""
+    return (
+        f'<dialog class="wf tile-dialog" id="{key}" aria-labelledby="{key}-title">'
+        f'<div class="wf-top"><div><h2 id="{key}-title">{escape(title)}</h2>'
+        f"{f'<p>{intro}</p>' if intro else ''}</div>"
+        f'<button class="wf-close" type="button" aria-label="Close">{_why_fast["CLOSE"]}'
+        '</button></div><div class="tile-body">'
+    )
+
+
+DIALOG_TAIL = "</div></dialog>"
+
+
+def family_dialog(info: dict, charts: list[str]) -> str:
+    """A family's dialog: its charts, one per method, and the way to the release cards."""
+    body = (
+        f'<div class="tile-charts">{"".join(charts)}</div>'
+        if charts
+        else "<p>No chart for this family compares like with like yet.</p>"
+    )
+    return (
+        dialog_head(
+            f"speed-{info['family']}", f"{info['title']} speed", family_intro(info["comparisons"])
+        )
+        + body
+        + '<p class="tile-more"><a href="docs/benchmarks.html">Every measurement, in the release '
+        "cards</a></p>" + DIALOG_TAIL
+    )
+
+
+def family_dialogs(summaries: list[dict]) -> str:
+    """The dialogs of ``family_tiles``, each with the charts of its family."""
+    charts: dict[str, list[str]] = {}
+    for family, figure in speed_figures(summaries):
+        charts.setdefault(family, []).append(figure)
+    return "".join(family_dialog(i, charts.get(i["family"], [])) for i in family_tiles(summaries))
+
+
+def accuracy_dialog(summaries: list[dict]) -> str:
+    """The accuracy dialog: what an error is, then a card per method."""
+    return (
+        dialog_head("accuracy", "Fast, and just as accurate", escape(quality_intro(summaries)))
+        + f'<div class="tile-charts">{"".join(accuracy_cards(summaries))}</div>'
+        + DIALOG_TAIL
     )
 
 
@@ -1669,18 +1766,17 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "description": page_description(summaries),
         "robots": '<meta name="robots" content="noindex">' if placeholder else "",
         "banner": banner if placeholder else "",
-        "claim": escape(home_claim(summaries)),
         "lede": escape(lede()),
         "hero_chips": hero_chips(),
-        "race": speedup_panel(summaries),
-        "pillars": pillars(summaries),
-        "speed_title": "Speed comparison",
-        "speed_intro": speed_intro(summaries),
-        "speed_chart": speed_chart(summaries),
+        "hero_graph": hero_graph(),
+        "plus": plus(),
+        "family_tiles": "".join(family_tile(info) for info in family_tiles(summaries)),
+        "family_dialogs": family_dialogs(summaries),
+        "accuracy_dialog": accuracy_dialog(summaries),
         "why_fast": _why_fast["dialog"](),
-        "accuracy_title": "Fast, and just as accurate",
-        "quality_intro": escape(quality_intro(summaries)),
-        "quality_chart": accuracy_chart(summaries),
+        "dialog_head": dialog_head,
+        "dialog_tail": DIALOG_TAIL,
+        "method_count": f"{len(list_specs())} methods",
         "interface_code": code_html(interface_code, "python"),
         "interface_output": escape(interface_output),
         "interface_figures": interface_figures,
@@ -1695,5 +1791,5 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "docs_grid": docs_grid(),
         "footnotes": notes.render(),
         "abel_mark": abel_mark(),
-        "style": speedup_css(summaries) + "\n" + homepage_code_css(),
+        "style": homepage_code_css(),
     }

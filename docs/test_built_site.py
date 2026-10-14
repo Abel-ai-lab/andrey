@@ -161,6 +161,23 @@ def test_every_page_has_one_short_description_equal_to_its_preview(html):
     assert not problems, "\n".join(problems)
 
 
+def test_every_homepage_tile_leads_to_details_that_are_built(html):
+    home = (html / "index.html").read_text(encoding="utf-8")
+    tiles = re.findall(r'<li class="tile[^"]*"><a class="tile-face" href="([^"]+)"', home)
+    assert len(tiles) >= 10
+    problems = []
+    for href in tiles:
+        if href.startswith("#"):
+            if f'<dialog class="wf tile-dialog" id="{href[1:]}"' not in home:
+                problems.append(f"{href}: no dialog holds its details")
+        elif not _resolve(html, html / "index.html", href).is_file():
+            problems.append(f"{href}: not built")
+    for script in ("tiles.js", "story.js"):
+        if f"{script}" not in home or not (html / "_static" / script).is_file():
+            problems.append(f"{script}: not loaded or not built")
+    assert not problems, "\n".join(problems)
+
+
 def test_every_header_leads_home_and_to_each_section(html):
     problems = []
     for page, text in _pages(html):

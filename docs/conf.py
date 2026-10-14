@@ -454,7 +454,8 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
-        css, js = ["figures.css", "site.css"], ["figures.js"]
+        context["release_tile"] = _release_tile(app)
+        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js", "story.js"]
     elif pagename == "blog/index":
         # The posts in the Release cards page's blocks.
         css = ["benchmarks.css", "blog.css"]
@@ -548,6 +549,21 @@ def _tile_file(app, docname: str) -> str:  # noqa: ANN001
     image = f"assets/tiles/{docname.removeprefix('blog/')}.jpg"
     _write_bytes(pathlib.Path(app.outdir) / image, cards.tile_jpeg(_cover_kind(app, docname)))
     return image
+
+
+def _release_tile(app) -> str:  # noqa: ANN001
+    """The homepage's tile for the latest release: its cover, linking to its post."""
+    docname, version = _release_post(app)
+    image, kind = _cover_file(app, docname)
+    title = html.escape(app.env.titles[docname].astext())
+    href = app.builder.get_relative_uri("index", docname)
+    return (
+        f'<li class="tile tile--release"><a class="tile-face" href="{href}" '
+        f'aria-label="Andrey {html.escape(version)}: {title}">'
+        f'<img src="{image}" alt="{html.escape(cards.cover_alt(kind), quote=True)}" '
+        f'width="{cards.COVER_W}" height="{cards.COVER_H}">'
+        f"{app.andrey_home['plus']}</a></li>"
+    )
 
 
 def _post_cover(app, docname: str) -> str:  # noqa: ANN001
