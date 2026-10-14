@@ -299,7 +299,8 @@ def _download(remote: Remote, target: Path, cached: bool) -> bytes:
             tried.append(f"  {url}: SHA-256 {digest}, not {remote.sha256}")
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        # A temporary file of its own, so concurrent first loads never rename each other's.
+        # Each download writes its own temporary file, so processes that load the same dataset at
+        # once never rename each other's.
         with tempfile.NamedTemporaryFile(
             dir=target.parent, prefix=target.name + ".", suffix=".part", delete=False
         ) as partial:
