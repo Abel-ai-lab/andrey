@@ -17,6 +17,7 @@ removal against one base at once, and :class:`DeltaBICScore` keeps the caches a 
 
 from __future__ import annotations
 
+import math
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
 from typing import Any
@@ -44,6 +45,7 @@ _DERIVED_SCORE_CACHE_CAP = 1_000_000
 _INV_CACHE_BYTE_CAP = 2 * 1024**3  # 2 GiB
 
 _log = np.log
+_EPS = float(np.finfo(np.float64).eps)
 
 
 class _InvCache(OrderedDict):
@@ -594,9 +596,10 @@ def _add_bounds(
     them is a ``k = |S|``-term dot product within ``gamma_k |x|^T |M| |y|`` of the exact one in any
     summation order. With ``d = sqrt(diag cov[S, S])``, ``|x|^T |M| |y|`` is at most
     ``||D M D||_F ||x / d|| ||y / d||``, which does not depend on the scale of the columns. Two
-    batches therefore differ by at most ``rho`` in ``R_u`` and ``eta`` in ``e_vu``; the interval
-    they leave for ``R(v | S + u)`` bounds the change in its log, and rounding of the logs adds a
-    few units in the last place.
+    batches therefore differ by at most ``rho`` in ``R_u`` and ``eta`` in ``e_vu``. The largest
+    rise of ``t = e_vu^2 / R_u`` over those intervals bounds how far ``R(v | S + u) = R(v | S) - t``
+    moves either way, which bounds the change in its log; rounding of the logs adds a few units in
+    the last place.
 
     Where the intervals leave the sign of ``R_u`` or ``R(v | S + u)`` open, another batch can take
     the other side of an ``R > 0`` guard, and the bound is ``inf``. Where both batches certainly
@@ -607,34 +610,32 @@ def _add_bounds(
     N. J. Higham. *Accuracy and Stability of Numerical Algorithms*, 2nd ed., SIAM, 2002,
     Section 3.1.
     """
-    eps = np.finfo(np.float64).eps
-    g = 3 * (M.shape[0] + 2) * eps  # covers gamma_k (2 + gamma_k), with room to spare
-    d = np.sqrt(cov_SS_diag)
-    fro = float(np.linalg.norm(M * np.outer(d, d)))
-    scaled = cs_U / d[:, None]
-    w_u = np.sqrt(np.einsum("ij,ij->j", scaled, scaled))
-    w_v = float(np.linalg.norm(cs_v / d))
-    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-        rho = 2 * (g * fro * w_u * w_u + eps * np.abs(R_uU))
-        eta = 2 * (g * fro * w_v * w_u + eps * np.abs(e_vU))
-        ru_lo, ru_hi = R_uU - rho, R_uU + rho
+    # ||D M D||_F^2 = diag (M * M) diag and ||x / d||^2 = (x * x) / diag. Twice (two batches)
+    # 3 gamma_k ||D M D||_F covers gamma_k (2 + gamma_k) with room to spare.
+    inv_diag = 1.0 / cov_SS_diag
+    c = 6 * (M.shape[0] + 2) * _EPS * math.sqrt(float(cov_SS_diag @ (M * M) @ cov_SS_diag))
+    w_u2 = inv_diag @ (cs_U * cs_U)
+    w_v = math.sqrt(float(inv_diag @ (cs_v * cs_v)))
+    with np.errstate(all="ignore"):
         e_abs = np.abs(e_vU)
-        t_hi = (e_abs + eta) ** 2 / ru_lo * (1 + 4 * eps)
-        t_lo = np.maximum(e_abs - eta, 0.0) ** 2 / ru_hi * (1 - 4 * eps)
-        slack = eps * (R_v_old + np.abs(t_hi))
-        new_lo = R_v_old - t_hi - slack
-        new_hi = R_v_old - t_lo + slack
-        R_new = R_v_old - (e_vU * e_vU) / R_uU  # this batch's value wherever its update is safe
-        shift = np.maximum(np.log1p((new_hi - R_new) / R_new), -np.log1p((new_lo - R_new) / R_new))
-        ulp = 8 * eps * (n * (np.abs(np.log(R_new)) + abs(np.log(R_v_old))) + penalty)
-        schur = 2 * (n * shift + ulp)
-        safe = (R_uU > 0.0) & (R_new > 0.0)
-        certain_schur = (ru_lo > 0.0) & (new_lo > 0.0)
-        certain_fallback = (ru_hi <= 0.0) | ((ru_lo > 0.0) & (new_hi <= 0.0))
-        bound = np.where(
-            safe, np.where(certain_schur, schur, np.inf), np.where(certain_fallback, 0.0, np.inf)
-        )
-    return np.where(np.isnan(bound), np.inf, bound)
+        rho = c * w_u2 + 2 * _EPS * np.abs(R_uU)
+        eta = c * w_v * np.sqrt(w_u2) + 2 * _EPS * e_abs
+        ru_lo = R_uU - rho
+        t = e_vU * e_vU / R_uU
+        R_new = R_v_old - t  # this batch's value wherever its update is safe
+        t_hi = (e_abs + eta) ** 2 / ru_lo * (1 + 4 * _EPS)
+        # t can rise further than it can fall, so this covers R(v | S + u) moving either way.
+        move = t_hi - t + 2 * _EPS * (R_v_old + t_hi)
+        ulp = 8 * _EPS * (n * (np.abs(np.log(R_new)) + abs(math.log(R_v_old))) + penalty)
+        bound = 2 * (ulp - n * np.log1p(-move / R_new))
+        # Every batch takes the update: R_u and R(v | S + u) stay positive.
+        certain = (ru_lo > 0.0) & (R_new > move)
+        if certain.all():
+            return bound
+        bound[~certain] = np.inf
+        # No batch takes the update, so every batch scores the add by two full scores.
+        bound[(R_uU + rho <= 0.0) | ((ru_lo > 0.0) & (R_new + move <= 0.0))] = 0.0
+    return bound
 
 
 def delta_many_with_base(
@@ -773,13 +774,15 @@ def delta_many_with_base(
                         if safe_mask[pos]:
                             add_deltas[u] = float(deltas_arr[pos])
                 if bounds is not None:
-                    add_bounds = _add_bounds(
+                    bound_of = _add_bounds(
                         n, log_n * lam, M_old, cov_diag[S_list], cs_v, cs_U, R_v_old, R_uU, e_vU
                     )
-                    pos_of = {u: pos for pos, u in enumerate(add_us)}
-                    for idx, u in adds:
-                        if u in pos_of:
-                            bounds[idx] = float(add_bounds[pos_of[u]])
+                    if len(deltas) == len(add_us) and [u for _, u in adds] == add_us:
+                        bounds[:] = bound_of.tolist()  # one add per source, in source order
+                    else:
+                        add_bounds = dict(zip(add_us, bound_of.tolist(), strict=True))
+                        for idx, u in adds:
+                            bounds[idx] = add_bounds.get(u, 0.0)
         for idx, u in adds:
             d = add_deltas.get(u)
             if d is None:
