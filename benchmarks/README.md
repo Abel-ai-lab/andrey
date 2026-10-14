@@ -375,14 +375,13 @@ package's names for the settings map to Andrey's:
 Tetrad's PC runs order-independent (`--stableFAS`), keeps the first of two conflicting colliders
 (`--conflictRule 1`), and has no depth cap, as Andrey's PC does. FGES runs with no structure prior
 (`--structurePrior 0`), since Andrey's GES has none. Both hill climbings take the best add, remove,
-or reverse move from the empty graph until none improves the score, with no restarts; bnlearn's
-networks give no categorical node a continuous parent, while Andrey's search lets one have
-continuous parents. bnlearn's hill climbing returns a DAG, so its comparable error is `mec_shd`;
-every other row is a CPDAG, scored by `shd`. The two packages define some of these tests and scores
-differently from Andrey, so their graphs can differ on the same data: Tetrad's conditional Gaussian
-parameter count leaves out each category's means, its degenerate Gaussian test statistic is twice
-the likelihood ratio, and its degenerate Gaussian score sums one regression per category of a
-categorical child.
+or reverse move from the empty graph until none improves the score, with no restarts, and neither
+gives a categorical node a continuous parent. bnlearn's hill climbing returns a DAG, so its
+comparable error is `mec_shd`; every other row is a CPDAG, scored by `shd`. The two packages define
+some of these tests and scores differently from Andrey, so their graphs can differ on the same
+data: Tetrad's conditional Gaussian parameter count leaves out each category's means, its
+degenerate Gaussian test statistic is twice the likelihood ratio, and its degenerate Gaussian score
+sums one regression per category of a categorical child.
 
 Tetrad runs as a black box: each fit writes the data to a CSV file, starts `java -jar` on the
 causal-cmd jar once, and reads its graph back, so every Tetrad time includes a Java start and the

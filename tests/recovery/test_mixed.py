@@ -205,3 +205,17 @@ def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
     assert shd(np.zeros((_RANDOM["d"],) * 2), truth) == 10
     categorical = random_network.provenance["config"]["categorical"]
     assert shd(CPDAG_FITS[fit](random_network.data, categorical).structure, truth) <= _MARGIN
+
+
+@pytest.mark.parametrize("score_func", ["local_score_degen_gauss", "local_score_cond_gauss"])
+def test_hc_gives_no_categorical_node_a_continuous_parent(score_func):
+    """Hill climbing keeps to conditional linear Gaussian networks, as the data were drawn."""
+    ds = sample_mixed(d=6, n=1000, seed=2)
+    categorical = ds.provenance["config"]["categorical"]
+    out = andrey.hc(ds.data, score_func=score_func, categorical=categorical)
+    into = [
+        (a, b)
+        for a, b, kind in out.structure.oriented_edges()
+        if kind == "directed" and a not in categorical and b in categorical
+    ]
+    assert into == []

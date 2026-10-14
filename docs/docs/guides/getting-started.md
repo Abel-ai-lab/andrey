@@ -291,7 +291,8 @@ turns each categorical column into indicator columns and treats every column as 
 suits effects that are linear and add up across categories. The conditional Gaussian
 (`cond_gauss`) gives each combination of categories its own Gaussian, so a category can change a
 variable's spread as well as its mean; it needs several rows for each combination of categories it
-conditions on. Both are experimental.
+conditions on. Both are experimental. With either score, `hc` gives no categorical column a
+continuous parent.
 
 **Marking the categorical columns.** Name them with `categorical`, by column name or 0-based
 position: `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without

@@ -7,8 +7,8 @@ categorical columns, every column of at most ``max_categories`` distinct whole n
 holds at most five codes and a continuous one a distinct value per row. The other packages in the
 mixed lane read the columns by the same rule. GES runs uncapped, as the facade does, on the numpy
 backend in one process; its mixed-data moves are scored in that process. Hill climbing starts from
-the empty graph and has no move limit, as bnlearn's ``hc`` by default; unlike bnlearn's conditional
-linear Gaussian networks, it lets a categorical node have continuous parents.
+the empty graph and has no move limit, as bnlearn's ``hc`` by default, and like bnlearn's conditional
+linear Gaussian networks it gives no categorical node a continuous parent.
 """
 
 from __future__ import annotations

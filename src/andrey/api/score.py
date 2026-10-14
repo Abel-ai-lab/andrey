@@ -489,7 +489,8 @@ def hc(
     Notes
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
-    after ``max_iter`` moves when set.
+    after ``max_iter`` moves when set. Under a mixed-data score, no move gives a categorical column
+    a continuous parent, so the DAG found is a conditional linear Gaussian network.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 45 variables with 800 rows,
     and on 40,000 rows with 24 variables. It has no move limit by default; run time grows with the

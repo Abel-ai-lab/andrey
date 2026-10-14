@@ -15,8 +15,9 @@ from operator import ne
 import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore, make_score
+from andrey.core.score import MIXED_SCORES, BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
@@ -75,6 +76,8 @@ class MoveScanner:
     and the mixed-data scores, all score-equivalent. Its delta is set to zero to prevent rounding
     noise exceeding ``_EPS_IMPROVE`` from creating a false improvement.
 
+    ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; ``None`` forbids none.
+
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
     nodes. Added edges can only invalidate adds. A row stays valid until its lowest add closes a
@@ -82,7 +85,13 @@ class MoveScanner:
     cycles.
     """
 
-    def __init__(self, delta: DeltaBICScore | FullScoreDelta, d: int) -> None:
+    def __init__(
+        self,
+        delta: DeltaBICScore | FullScoreDelta,
+        d: int,
+        *,
+        forbidden: np.ndarray | None = None,
+    ) -> None:
         self._delta = delta
         self._score = delta.score_obj
         self._d = d
@@ -101,6 +110,8 @@ class MoveScanner:
         self._ids: dict[tuple[int, ...], int] = {}
         self._set_of = np.zeros(d, dtype=np.intp)
         self._set_with = np.zeros(d, dtype=np.intp)
+        # [v, u]: the edge u -> v is never added, nor made by a reverse.
+        self._forbidden = np.zeros((d, d), dtype=bool) if forbidden is None else forbidden
 
     def best(
         self,
@@ -124,7 +135,7 @@ class MoveScanner:
         with np.errstate(invalid="ignore"):  # a degenerate row's deltas may be infinite
             rev = self._add[tails, heads] + self._rem[heads, tails]
         rev[self._set_of[heads] == self._set_with[tails]] = 0.0
-        rev[np.isnan(rev) | self._cyclic] = np.inf
+        rev[np.isnan(rev) | self._cyclic | self._forbidden[tails, heads]] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:
             while True:
@@ -187,7 +198,7 @@ class MoveScanner:
         self._cyclic = np.concatenate((self._cyclic, np.zeros(len(gained), dtype=bool)))
         for v in rows:
             row = np.where(self._parent[v], self._rem[v], self._add[v])
-            row[self._parent[:, v] | reach[v] | np.isnan(row)] = np.inf
+            row[self._parent[:, v] | reach[v] | self._forbidden[v] | np.isnan(row)] = np.inf
             self._single[v] = row
             self._low[v] = row.min()
         self._adj = list(adj_int)
@@ -341,8 +352,9 @@ def hc(
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
     score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
-    CPDAG. Returns the CPDAG and the DAG's total objective (lower is better), the sum of the final
-    per-node local scores.
+    CPDAG. Under a mixed-data score the DAG stays a conditional linear Gaussian network: no move
+    gives a categorical node a continuous parent. Returns the CPDAG and the DAG's total objective
+    (lower is better), the sum of the final per-node local scores.
 
     Parameters
     ----------
@@ -373,13 +385,17 @@ def hc(
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
     score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    forbidden = None
+    if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
+        mask = column_mask(categorical, d)
+        forbidden = mask[:, None] & ~mask[None, :]
 
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
-        scanner = MoveScanner(delta, d)
+        scanner = MoveScanner(delta, d, forbidden=forbidden)
         moves = 0
         while max_iter is None or moves < max_iter:
             best = scanner.best(adj_int, parents_of)
