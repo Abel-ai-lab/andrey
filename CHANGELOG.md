@@ -12,9 +12,8 @@ change names its pull request.
 ### Changed
 
 - `ges`, `gfci`, and `gies` return the same graphs in less time. ([#TBD])
-- `ges`, `gfci`, and `gies` with more than one worker start worker processes only where a
-  measured fit was faster with them: `ANDREY_GES_PARALLEL_MIN_WORK` defaults to 880000, and
-  `andrey calibrate` reports the largest pass of each measured size. ([#TBD])
+- `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes, and `andrey calibrate` reports the
+  largest pass of each measured size. ([#TBD])
 
 ## [0.3.0] - 2026-10-13
 

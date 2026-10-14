@@ -38,7 +38,7 @@ on the CPU. An operation without the requested backend uses its own default, wit
 - `ANDREY_NUM_WORKERS`: the worker processes for GES, GIES, and GFCI. `1` (the default) and `0` run
   serially; `-1` uses every usable core.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
-  candidates than this. The default is `880000`; `0` always uses them.
+  candidates than this. The default is `10000`; `0` always uses them.
 
 The cutoff matters only with more than one worker. `andrey calibrate` measures it for your machine.
 

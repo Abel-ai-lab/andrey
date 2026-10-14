@@ -511,11 +511,9 @@ def _backward_task(targets: Sequence[int], adj: np.ndarray, run_token: object) -
 # ``ANDREY_GES_PARALLEL_MIN_WORK`` overrides it (0 sends every pass to the workers), and a fit with
 # workers warns once on the default when a pass nears it.
 
-# Estimated candidate evaluations below which a pass runs in-process. On sparse linear-Gaussian
-# data, a single fit with 4 workers in a fresh process was slower than the serial fit at d = 512
-# (largest pass work about 430,000) and faster at d = 1024 (about 1,800,000); the default is their
-# geometric mean. Denser graphs measured up to d = 200 were slower with the pool at every pass.
-_DEFAULT_MIN_WORK = 880_000
+# Estimated candidate evaluations below which a pass runs in-process. The default is a starting
+# point, not tuned for any machine; `andrey calibrate` measures the value for this one.
+_DEFAULT_MIN_WORK = 10_000
 
 # The largest estimated work of a pass in the last fit with more than one worker; `andrey calibrate`
 # reads it to state a measured crossover in the gate's units.
