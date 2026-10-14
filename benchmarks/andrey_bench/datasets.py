@@ -69,6 +69,8 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "latent_lingam_er": ("er", "linear", "uniform", "standardized"),
     # Nonlinear additive noise with hidden confounders, where CAM-UV is identifiable.
     "latent_anm_er": ("er", "anm", "gaussian", "standardized"),
+    # Nonlinear additive noise without hidden nodes: PC with the nonlinear CI tests.
+    "anm_er": ("er", "anm", "gaussian", "standardized"),
 }
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At

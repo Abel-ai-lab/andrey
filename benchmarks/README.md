@@ -31,6 +31,7 @@ Packages:
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
+- [tigramite](https://github.com/jakobrunge/tigramite) - uses a separate environment; see below
 
 ## Setup
 
@@ -71,6 +72,16 @@ environment:
 benchmarks/start_xges.sh
 export ANDREY_BENCH_XGES_PYTHON=$PWD/benchmarks/.venv-xges/bin/python
 ```
+
+tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests, also
+fits in an environment of its own, so it and its dependencies stay out of bench-env:
+
+```shell
+benchmarks/start_tigramite.sh
+export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
+```
+
+Its adapter calls the package's public API only.
 
 An adapter selects another environment by setting `python_env` to the name of the variable that
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and
@@ -134,6 +145,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | HC | Andrey, bnlearn (`hc`) |
 | Tabu | Andrey, bnlearn (`tabu`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
+| PC with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT), tigramite (CMIknn, GPDC) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
 | BOSS | Andrey, causal-learn |
 | GRaSP | Andrey, causal-learn |
@@ -145,6 +157,19 @@ Include `baseline.empty` to bound the solutions run on the same datasets. Keep o
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
 identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selects CUDA inside
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
+
+`nonlinear_ci_cpu.py` runs PC with each nonlinear CI test on additive nonlinear noise, with rows
+as an axis of their own. Every reference runs at Andrey's defaults under its own names:
+
+| Andrey | causal-learn | tigramite |
+|---|---|---|
+| `indep_test="kci"` | `indep_test="kci"` | - |
+| `indep_test="rcot"` | `indep_test="rcit"`, `rcit=False`, `approx="hbe"` | - |
+| RCoT `n_features=5`, `n_features_cond=100` | `num_f2=5`, `num_f=100` | - |
+| `indep_test="cmiknn"` | - | `CMIknn`, `significance="shuffle_test"`, `sig_blocklength=1` |
+| CMIknn `k_cmi=0.1`, `k_perm=5`, `n_permutations=500` | - | `knn=0.1`, `shuffle_neighbors=5`, `sig_samples=500` |
+| `indep_test="gpdc"` | - | `GPDC`, `significance="analytic"` |
+| `alpha=0.05` | `alpha=0.05` | `pc_alpha=0.05`, `contemp_collider_rule="none"` |
 
 The harness does not submit jobs. One file is one job.
 
