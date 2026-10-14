@@ -87,7 +87,7 @@ class KCI:
     ``A = R Kxs R``, ``B = R Ky R``, ``T = tr(A B) / n``. Under the null, ``T`` is a weighted sum
     of chi-squared variables whose mean ``sum_t A_tt B_tt / n`` and variance
     ``2 sum_st (A_st B_st)^2 / n^2`` come from the elementwise product of ``A`` and ``B``. The
-    gamma law with that mean and variance gives the p-value.
+    gamma law with that mean and variance gives the p-value [1]_.
 
     Every kernel is Gaussian, ``exp(-|a - b|^2 / (2 w^2))``, on standardized columns. Without a
     conditioning set, ``w`` is 0.8 below 200 rows, 0.5 below 1,200, and 0.3 beyond. With ``k``
@@ -97,14 +97,13 @@ class KCI:
     is ordered (lower index first) before it runs: the p-value does not depend on argument
     order.
 
-    **Limitations.** Not benchmarked yet. Each query with a conditioning set costs an
-    eigendecomposition and four products of ``n x n`` matrices, so time grows as the cube of the
-    number of rows and memory as its square: thousands of rows are practical, tens of thousands
-    are not. The kernel widths are fixed, not fitted to the data. With one conditioning variable
-    the test rejects a true independence at close to the rate ``alpha``; with two or more it
-    rejects more often, increasingly so as the rows grow, so PC and FCI can keep edges a larger
-    conditioning set would remove. The unit tests check its level with one conditioning variable
-    on 200 rows and run it on up to 300 rows and two conditioning variables.
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 400 rows and two conditioning
+    variables. Each query with a conditioning set costs an eigendecomposition and four products of
+    ``n x n`` matrices, so time grows as the cube of the number of rows and memory as its square:
+    thousands of rows are practical, tens of thousands are not. The kernel widths follow the row
+    count and the size of the conditioning set, not the data. On simulated draws with up to three
+    conditioning variables and 500 rows, it rejected a true independence at rates between
+    ``alpha`` and twice ``alpha``; a test that rejects too often makes PC and FCI keep edges.
 
     References
     ----------
@@ -185,7 +184,7 @@ class RCoT:
     **How it works.** A variable ``v`` with median pairwise distance ``s`` (over its first 500
     rows) gets features ``sqrt(2) cos(v W + b)`` with ``W`` normal of variance ``2 / s`` and
     ``b`` uniform on ``[0, 2 pi]``, the random features of the kernel ``exp(-|v - v'|^2 / s)``;
-    every feature is standardized. With ``A`` and ``B`` the features of ``x`` and ``y``, and
+    every feature is standardized [1]_. With ``A`` and ``B`` the features of ``x`` and ``y``, and
     ``C`` those of the conditioning set, ``A`` and ``B`` are replaced by their residuals on ``C``
     (ridge ``1e-10``). The statistic is ``n`` times the squared Frobenius norm of the residuals'
     cross-covariance matrix. Under the null it is a weighted sum of chi-squared variables whose
@@ -197,14 +196,15 @@ class RCoT:
     the conditioning set, so a p-value does not depend on the order of queries or of the
     arguments, and the same seed reproduces it.
 
-    **Limitations.** Not benchmarked yet. The p-value is random through the features: a different
-    seed moves it, most near the threshold. The regression on the conditioning-set features
-    removes a strong nonlinear effect of that set only approximately; what remains reads as
-    dependence, so with a conditioning set of three or more variables that drives both ``x`` and
-    ``y``, the test rejects a true independence far more often than ``alpha``, and more so as the
-    rows grow. RCoT tests conditional uncorrelatedness of the features, which misses a dependence
-    that no feature captures. The unit tests check its level with up to two conditioning
-    variables on 500 rows.
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 400 rows and two conditioning
+    variables. The p-value is random through the features: a different seed moves it, most near
+    the threshold. The regression on the conditioning-set features removes a strong nonlinear
+    effect of that set only approximately, and what remains reads as dependence: with two or more
+    conditioning variables that drive both ``x`` and ``y``, the test rejects a true independence
+    more often than ``alpha``, increasingly so as the rows grow (on simulated draws with three
+    such variables and 2,000 rows, nearly always). RCoT tests conditional uncorrelatedness of
+    ``n_features`` features per variable, which can miss a dependence the full kernel test finds,
+    such as one between an odd and an even function of the same cause on a few hundred rows.
 
     References
     ----------

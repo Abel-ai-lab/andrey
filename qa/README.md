@@ -9,6 +9,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
 | `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
+| `ci_calibration.py` | Measure how often each nonlinear CI test rejects, with and without a dependence. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
 
 ## FCI column order
@@ -22,6 +23,20 @@ is not a requirement for these methods.
 
 ```shell
 uv run python -m qa.column_order
+```
+
+## CI test calibration
+
+A conditional-independence test is calibrated when it rejects a true independence at the rate
+`alpha`. `ci_calibration.py` measures that rate, and the rate with a dependence (the power), for
+KCI, RCoT, CMIknn, and GPDC at their default settings. Each draw makes `x` and `y` different
+nonlinear functions of 0 to 3 conditioning variables plus noise; a noise term shared by `x` and
+`y` makes them dependent. It is a measurement with no passing threshold: a rate is a property of
+the test on this data, not a pass or fail of the build.
+
+```shell
+uv run python -m qa.ci_calibration                 # every test at its default row counts
+uv run python -m qa.ci_calibration kci --rows 200  # one test, one row count
 ```
 
 ## Quality gate

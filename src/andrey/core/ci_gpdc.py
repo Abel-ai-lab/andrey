@@ -69,15 +69,15 @@ class GPDC:
     statistic is their squared distance correlation, from the doubly centered matrices of their
     pairwise distances [3]_. After ranking, the null is the same statistic between the ranks and
     a random permutation of them, drawn ``n_null`` times; the p-value is the share of draws at
-    least as large as the statistic.
+    least as large as the statistic [1]_.
 
-    **Limitations.** Not benchmarked yet. The test assumes ``x`` and ``y`` depend on the
-    conditioning set additively, a function of it plus noise; a dependence through the noise's
-    scale, such as ``x = z e``, stays in the residuals and reads as conditional dependence. The null
-    ignores the regression's fitted parameters, as the paper does. Each regression costs the cube
-    of the number of rows per optimizer step, so thousands of rows take seconds per query. The
-    p-value cannot fall between multiples of ``1 / n_null``. The unit tests run it on up to 200
-    rows and two conditioning variables.
+    **Limitations.** Not benchmarked yet. Its tests run it on up to 400 rows and two conditioning
+    variables. The test assumes ``x`` and ``y`` depend on the conditioning set additively, a
+    function of it plus noise; a dependence through the noise's scale, such as ``x = z e``, stays
+    in the residuals and reads as conditional dependence. The null ignores the degrees of freedom
+    the regressions use, as [1]_ does. Each regression costs the cube of the number of rows per
+    optimizer step, so thousands of rows take seconds per query. The p-value cannot fall between
+    multiples of ``1 / n_null``.
 
     References
     ----------

@@ -111,11 +111,13 @@ class CMIknn:
     from row ``i`` to its ``k``-th nearest row in the space of ``x``, ``y``, and the conditioning
     set ``z``, and ``k_xz``, ``k_yz``, ``k_z`` the rows strictly closer than ``eps_i`` in each
     subspace (row ``i`` counted), the estimate is
-    ``I = psi(k) + mean_i [psi(k_z) - psi(k_xz) - psi(k_yz)]``, ``psi`` the digamma function.
+    ``I = psi(k) + mean_i [psi(k_z) - psi(k_xz) - psi(k_yz)]``, ``psi`` the digamma function [1]_.
     Each null copy maps every row to one of its ``k_perm`` nearest rows in ``z``, avoiding a row
     already taken where it can; the p-value is the share of copies whose estimate is at least
     ``I``. An empty conditioning set shuffles ``x`` over all rows, and the estimate becomes the
-    mutual information of ``x`` and ``y``.
+    mutual information estimate of ``x`` and ``y`` [2]_. The default ``k_cmi``, a tenth of the
+    rows, is the low end of the range [1]_ recommends; a larger share smooths the estimate, which
+    costs power as the conditioning set grows.
 
     The jitter is drawn once, from ``seed``, when the test is built; the shuffles of a query come
     from a generator seeded by ``seed``, the two variables, and the conditioning set, so a p-value
@@ -125,8 +127,8 @@ class CMIknn:
     each over ``n x n`` distance matrices, so its time grows with the square of the number of rows
     times the permutations, and its memory with the square of the rows: hundreds of rows take
     seconds per query, and tens of thousands do not fit. The p-value moves with ``seed`` and
-    cannot fall between multiples of ``1 / n_permutations``. The unit tests run it on up to 200
-    rows and two conditioning variables.
+    cannot fall between multiples of ``1 / n_permutations``. Its tests run it on up to 400 rows and
+    two conditioning variables.
 
     References
     ----------
