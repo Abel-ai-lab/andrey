@@ -93,7 +93,8 @@ def test_a_serial_fit_never_warns(method):
 def test_serial_and_pooled_fits_agree_around_a_forced_cutoff(method, offset, pooled, monkeypatch):
     """A first pass over d variables has work d * (d - 1); a cutoff one below it pools that pass.
 
-    GES's later passes do more work, so at the cutoff only the results are compared.
+    A later pass can count more work, for a target with many undirected neighbors, so at the cutoff
+    only the results are compared.
     """
     d = 8
     created = []
@@ -104,6 +105,25 @@ def test_serial_and_pooled_fits_agree_around_a_forced_cutoff(method, offset, poo
     if pooled is not None:
         assert bool(created) is pooled
     np.testing.assert_array_equal(parallel, _fit(method, workers=1, d=d))
+
+
+def test_a_fit_on_the_default_cutoff_runs_in_one_process(monkeypatch):
+    """No pass of a sparse fit over 64 variables reaches the default cutoff."""
+    monkeypatch.setattr(pg, "_create_pool", lambda *a: pytest.fail("a pass reached the pool"))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.PerformanceWarning)
+        parallel = _fit("ges", workers=2, d=64)
+    assert 0 < pg.largest_pass_work < pg._DEFAULT_MIN_WORK
+    np.testing.assert_array_equal(parallel, _fit("ges", workers=1, d=64))
+
+
+def test_the_calibrator_states_the_cutoff_in_the_largest_pass_work():
+    """A size's work is the largest pass of its pooled fit; the first pass is a lower bound."""
+    serial, pooled, work = cal.fit_timers("ges", workers=2, repeats=1)
+    pooled(12)
+    assert work(12) >= 12 * 11
+    c = cal.bracket(lambda d: 2.0, lambda d: 1.0, grid=(16, 32), refine=0, work=lambda d: 7 * d)
+    assert c.cutoff == 7 * cal._MIN_D and c.work(cal._MIN_D) == 7 * cal._MIN_D
 
 
 def _timers(serial_cost, pooled_cost, calls):
@@ -139,7 +159,7 @@ def test_bracket_extends_above_the_grid_and_stops_at_the_cap():
     serial, pooled = _timers(lambda d: 1.0, lambda d: 2.0, calls)  # the pool never pays
     c = cal.bracket(serial, pooled, grid=(16, 32, 64, 128))
     assert (c.below, c.above) == (cal._MAX_D, None)
-    assert c.cutoff == cal._MAX_D * (cal._MAX_D - 1)
+    assert c.cutoff == max(cal._MAX_D * (cal._MAX_D - 1), pg._DEFAULT_MIN_WORK)  # never below it
     assert max(calls) == cal._MAX_D
 
 

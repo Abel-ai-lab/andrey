@@ -346,9 +346,9 @@ Three thresholds were calibrated once on one machine. Later measurements found e
 25x for `cov`, and 40x for entropy. Each error kept the faster path disabled.
 
 **The worker-pool default suits a single fit, not a campaign.** A campaign runs many fits in one
-process, and after the first pool start (about 2 s) the pool pays off at smaller sizes. With 8
-workers, `andrey calibrate` measured about 1,100 for GES, against the default of 10,000. Repeated
-runs produce a range because other node activity affects pool round-trip time.
+process, and after the first pool start the pool can pay off at smaller sizes. `andrey calibrate`
+measures the cutoff in the gate's unit, the largest estimated work of a pass. Repeated runs produce
+a range because other node activity affects pool round-trip time.
 
 Measure on the campaign node with the pool size used for fits, and **apply the measured
 thresholds**. Recording an unused calibration is worse than no calibration: it records a threshold

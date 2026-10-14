@@ -504,16 +504,22 @@ def _backward_task(targets: Sequence[int], adj: np.ndarray, run_token: object) -
 # A pass is worth fanning out only when its scan outweighs the worker round-trip (dispatch + pickle
 # + collect). Since the inner cost is exponential in undirected degree (``2^|t0|``), the gate tracks
 # *estimated candidate evaluations*, not a bare ``n`` -- so it is density-aware. A forward pass
-# counts only the targets it enumerates again, those the last move touched (every target on the
-# first pass); a backward pass counts every target. It is checked per pass, and the worker set
-# is created lazily on the first pass that crosses. The default is the fixed ``_DEFAULT_MIN_WORK``
-# below; ``ANDREY_GES_PARALLEL_MIN_WORK`` overrides it (0 sends every pass to the workers), and a
-# fit with workers warns once on the default when a pass nears it.
+# counts the targets the in-process scan would enumerate again: those touched since the graph it
+# kept, which is every target on the first pass and after the workers ran the passes in between. A
+# backward pass counts every target. It is checked per pass, and the worker set is created lazily
+# on the first pass that crosses. The default is the fixed ``_DEFAULT_MIN_WORK`` below;
+# ``ANDREY_GES_PARALLEL_MIN_WORK`` overrides it (0 sends every pass to the workers), and a fit with
+# workers warns once on the default when a pass nears it.
 
-# Estimated candidate evaluations below which a pass runs in-process. The default allows for the
-# first pool start of a single fit in a fresh process; repeated fits in one process pay off from a
-# lower value, which `andrey calibrate` measures.
-_DEFAULT_MIN_WORK = 10_000
+# Estimated candidate evaluations below which a pass runs in-process. On sparse linear-Gaussian
+# data, a single fit with 4 workers in a fresh process was slower than the serial fit at d = 512
+# (largest pass work about 430,000) and faster at d = 1024 (about 1,800,000); the default is their
+# geometric mean. Denser graphs measured up to d = 200 were slower with the pool at every pass.
+_DEFAULT_MIN_WORK = 880_000
+
+# The largest estimated work of a pass in the last fit with more than one worker; `andrey calibrate`
+# reads it to state a measured crossover in the gate's units.
+largest_pass_work = 0
 
 _DEGREE_CAP = (
     20  # cap 2^deg so the estimate never overflows; above it a pass is parallel regardless
@@ -634,22 +640,26 @@ def run_ges(
     quality gate's ``_full_scores`` arm); pooled workers only ever run Schur, so the reference arm
     is held in-process and never fans out.
     """
+    global largest_pass_work
     workers = max(1, min(workers, n))
     w_min = _min_work()
+    largest = 0
     # Warn once a pass comes near the default cutoff (the pool never runs the full-score arm).
     warn = workers > 1 and not full_scores and calibrate.cutoff_is_default("ges")
     engine: DeltaEngine = _FullScoreDelta(score) if full_scores else DeltaBICScore(score)
     scan = _ForwardScan(range(n), engine, n, max_parents)
     lazy = _LazyWorkerSet(score, n, workers)
-    before: np.ndarray | None = None  # the graph of the previous forward pass
     try:
         while True:  # forward phase
             state = neighborhood_state(adj, n)
             work = [0]
             if workers > 1:
-                touched = _touched(before, adj)
+                # The in-process scan enumerates again every target touched since the graph it
+                # kept, which after pooled passes is an older one (none before its first pass).
+                touched = _touched(scan.adj, adj)
                 per_target = forward_work_per_target(n, state, max_parents)
                 work = [w for w, redo in zip(per_target, touched, strict=True) if redo]
+            largest = max(largest, sum(work))
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
                 warn = False
@@ -665,13 +675,13 @@ def run_ges(
                 best = scan.best(adj, state)
             if best is None:
                 break
-            before = adj.copy()
             _key, x, y, T = best
             ops.apply_insert(adj, x, y, T)
             adj = _reform_cpdag(adj)
         while True:  # backward phase
             state = neighborhood_state(adj, n)
             work = backward_work_per_target(n, state) if workers > 1 else [0]
+            largest = max(largest, sum(work))
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
                 calibrate.warn_default_cutoff("ges", w_min)
                 warn = False
@@ -687,4 +697,6 @@ def run_ges(
             adj = _reform_cpdag(adj)
     finally:
         lazy.close()
+    if workers > 1:
+        largest_pass_work = largest
     return adj
