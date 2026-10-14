@@ -470,7 +470,7 @@
       if (!inside) dialog.close();
     });
     dialog.addEventListener("close", () => { clearTimeout(timer); if (run) run.stop(); });
-    // The opener is a link to the guide's page; with this script it opens the dialog instead.
+    // The opener is a link to the guide's page; with this script it opens the dialog instead, at the scene its data-wf-scene names.
     for (const opener of document.querySelectorAll(`[data-wf-open="${dialog.id}"]`)) {
       opener.setAttribute("role", "button");
       opener.setAttribute("aria-haspopup", "dialog");
@@ -479,7 +479,9 @@
         dialog.showModal();
         paused = false;
         if (!still) animate(dialog, { opacity: [0, 1], y: [24, 0], scale: [0.97, 1] }, { type: "spring", bounce: 0.12, visualDuration: 0.45 });
-        show(0, { fade: false });
+        // A link can name the scene to start at, by its key.
+        const first = panels.findIndex((panel) => panel.id === `wf-panel-${opener.dataset.wfScene}`);
+        show(Math.max(first, 0), { fade: false });
       });
     }
   }

@@ -194,26 +194,7 @@ html[data-theme="dark"] .wf { --wf-shade: var(--andrey-paper); }
   white-space: nowrap;
 }
 
-/* ---------- the homepage's pill and dialog ---------- */
-a.wf-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 16px;
-  padding: 7px 7px 7px 24px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--andrey-surface-2);
-  color: var(--andrey-ink);
-  font: 500 1.06rem/1 "Inter", system-ui, sans-serif;
-  letter-spacing: -0.01em;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background-color 0.2s var(--wf-ease, ease);
-}
-a.wf-pill:hover {
-  color: var(--andrey-ink);
-  background: color-mix(in srgb, var(--andrey-ink) 8%, var(--andrey-surface-2));
-}
+/* ---------- the homepage's plus and dialog ---------- */
 .wf-plus {
   display: grid;
   place-items: center;
@@ -225,7 +206,8 @@ a.wf-pill:hover {
 }
 .wf-plus svg { width: 15px; height: 15px; }
 
-dialog.wf-dialog {
+dialog.wf-dialog,
+dialog.tile-dialog {
   width: min(940px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   padding: 34px 40px 26px;
@@ -236,7 +218,8 @@ dialog.wf-dialog {
   overflow: auto;
   overscroll-behavior: contain;
 }
-dialog.wf-dialog::backdrop {
+dialog.wf-dialog::backdrop,
+dialog.tile-dialog::backdrop {
   background: color-mix(in srgb, var(--wf-shade) 45%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
 }
@@ -341,8 +324,7 @@ dialog.wf-dialog::backdrop {
 }
 .wf-note a { color: var(--andrey-accent); }
 
-.wf button:focus-visible,
-.wf-pill:focus-visible {
+.wf button:focus-visible {
   outline: 2px solid var(--andrey-accent);
   outline-offset: 3px;
 }
@@ -365,7 +347,7 @@ dialog.wf-dialog::backdrop {
 }
 @media (max-width: 680px) {
   .wf-stage { padding: 4px 16px; border-radius: 18px; }
-  dialog.wf-dialog { padding: 24px 18px 20px; border-radius: 24px; }
+  dialog.wf-dialog, dialog.tile-dialog { padding: 24px 18px 20px; border-radius: 24px; }
   .wf-caption { min-height: 11em; }
 }
 @media (prefers-reduced-motion: reduce) {

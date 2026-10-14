@@ -166,10 +166,11 @@ def fragment(key: str) -> str:
 def dialog(
     benchmarks: str = "docs/benchmarks.html", post: str = "blog/20261008-why-andrey-is-fast.html"
 ) -> str:
-    """The pill that opens the scenes, as a dialog that plays one scene at a time.
+    """The dialog that plays one scene at a time, without an opener.
 
-    The pill is a link to the blog post; the script turns it into the dialog's opener, so the
-    scenes stay reachable without script.
+    Any link with ``data-wf-open="why-fast"`` opens it, at the scene named by its
+    ``data-wf-scene``, or the first. The link is the page's own pointer to the blog post; the
+    script turns it into the opener, so the scenes stay reachable without script.
     """
     dots = "".join(
         f'<button class="wf-dot" type="button" role="tab" id="wf-tab-{s["key"]}" '
@@ -184,8 +185,6 @@ def dialog(
         for i, s in enumerate(SCENES, 1)
     )
     return (
-        f'<a class="wf-pill" href="{post}" data-wf-open="why-fast">'
-        f'Why Andrey is fast<span class="wf-plus">{PLUS}</span></a>'
         '<dialog class="wf wf-dialog" id="why-fast" aria-labelledby="why-fast-title">'
         '<div class="wf-top"><div><h2 id="why-fast-title">Why Andrey is fast</h2>'
         "<p>Four ideas, easiest first.</p></div>"
