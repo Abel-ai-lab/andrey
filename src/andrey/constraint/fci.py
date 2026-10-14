@@ -25,6 +25,8 @@ from andrey.core.ci import CITest, make_indep_test, pins_blas
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
 _UNBOUNDED_PATH = 1000
+# Bound the R5 search for one circle pair by this many partial paths.
+_R5_PARTIAL_PATHS = 10_000
 
 
 def fci(
@@ -736,6 +738,44 @@ def _circle_reaches(marks: np.ndarray, target: int, avoid: int) -> set[int]:
     return reachable
 
 
+def _circle_walk_closes(
+    marks: np.ndarray,
+    a: int,
+    b: int,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+) -> bool:
+    """True when a circle walk ``a, c, ..., d, b`` meets every R5 condition except simplicity.
+
+    The search runs over ``(previous, current)`` edges, so it takes polynomial time. Every
+    uncovered circle path is such a walk, so ``False`` rules out an R5 cycle for ``a o-o b``.
+    """
+    n = marks.shape[0]
+    start = [
+        (a, c)
+        for c in range(n)
+        if c != b
+        and _traverse_circle(marks, a, c)
+        and not _adjacent(marks, b, c)
+        and _triple(b, a, c) not in ambiguous
+    ]
+    seen = set(start)
+    queue = deque(start)
+    while queue:
+        previous, current = queue.popleft()
+        for node in range(n):
+            if node in (previous, a) or not _traverse_circle(marks, current, node):
+                continue
+            if _adjacent(marks, previous, node) or _triple(previous, current, node) in ambiguous:
+                continue
+            if node == b:
+                if not _adjacent(marks, a, current) and _triple(current, b, a) not in ambiguous:
+                    return True
+            elif (current, node) not in seen:
+                seen.add((current, node))
+                queue.append((current, node))
+    return False
+
+
 def _uncovered_circle_cycle(
     marks: np.ndarray,
     a: int,
@@ -749,7 +789,18 @@ def _uncovered_circle_cycle(
     is ambiguous. Search state belongs to each path: reaching a node through one predecessor must
     not block a different route. Reverse reachability prunes nodes with no circle walk to ``b``
     avoiding ``a``.
+
+    Finding such a simple path is NP-complete in general [1]_. A polynomial walk check
+    (:func:`_circle_walk_closes`) rules out most pairs first; the path search then stops after
+    ``_R5_PARTIAL_PATHS`` partial paths and returns ``None``.
+
+    References
+    ----------
+    .. [1] Szeider, S. (2003). Finding paths in graphs avoiding forbidden transitions. Discrete
+       Applied Mathematics 126(2-3), 261-273.
     """
+    if not _circle_walk_closes(marks, a, b, ambiguous):
+        return None
     reachable = _circle_reaches(marks, b, a)
     stack = [
         [a, c]
@@ -760,7 +811,9 @@ def _uncovered_circle_cycle(
         and not _adjacent(marks, b, c)
         and _triple(b, a, c) not in ambiguous
     ]
-    while stack:
+    for _ in range(_R5_PARTIAL_PATHS):
+        if not stack:
+            return None
         path = stack.pop()
         last = path[-1]
         for node in range(marks.shape[0]):
@@ -783,7 +836,8 @@ def _rule_r5(
     The cycle is ``a o-o b`` closed by a circle path ``a, c, ..., d, b`` with ``a``-``d`` and
     ``b``-``c`` non-adjacent; the whole path, not only ``c, ..., d``, must be uncovered
     (Zhang 2008). Every simple path is a candidate, so a covered route through a node never hides
-    an uncovered route through the same node.
+    an uncovered route through the same node. A pair whose search reaches ``_R5_PARTIAL_PATHS``
+    keeps its circles.
     """
     n = marks.shape[0]
     for a in range(n):
