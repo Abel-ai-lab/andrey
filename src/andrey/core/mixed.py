@@ -253,32 +253,22 @@ class ConditionalGaussian:
         """Per-cell sums of products for each ``(categorical set, row a, row b)`` in ``pairs``.
 
         The row of ones makes ``(a, ones)`` the sums of ``a`` and ``(ones, ones)`` the cell sizes.
-        Each result is kept under its triple; the missing ones are summed in one pass.
+        Each result is kept under its triple.
         """
-        get = self._stats.get
-        found = [get(pair) for pair in pairs]
-        by_set: dict[tuple[int, ...], list[int]] = {}
-        for i, value in enumerate(found):
+        get, put, one = self._stats.get, self._stats.put, self._one
+        found = []
+        for pair in pairs:
+            value = get(pair)
             if value is None:
-                by_set.setdefault(pairs[i][0], []).append(i)
-        if not by_set:
-            return found
-        bins, weights, order, sizes = [], [], [], []
-        base = 0
-        for discrete, items in by_set.items():
-            cells = self._cells(discrete)
-            m = cells.counts.size
-            left = [pairs[i][1] for i in items]
-            right = [pairs[i][2] for i in items]
-            bins.append((cells.cell + (base + m * np.arange(len(items)))[:, None]).ravel())
-            weights.append((self._columns[left] * self._columns[right]).ravel())
-            order += items
-            sizes += [m] * len(items)
-            base += m * len(items)
-        sums = np.bincount(np.concatenate(bins), np.concatenate(weights), minlength=base)
-        for i, value in zip(order, np.split(sums, np.cumsum(sizes)[:-1]), strict=True):
-            found[i] = value.copy()
-            self._stats.put(pairs[i], found[i])
+                discrete, a, b = pair
+                cells = self._cells(discrete)
+                if a == one:
+                    value = cells.counts
+                else:
+                    weights = self._columns[a] if b == one else self._columns[a] * self._columns[b]
+                    value = np.bincount(cells.cell, weights, minlength=cells.counts.size)
+                put(pair, value)
+            found.append(value)
         return found
 
     def _fit(self, keys: list[tuple[int, ...]]) -> list[float]:
