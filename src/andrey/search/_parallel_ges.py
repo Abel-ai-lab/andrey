@@ -319,10 +319,11 @@ class _ForwardScan:
         self.everyone = (1 << n) - 1
         self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
         # Per target: each base's group; the candidates that can improve, sorted by lowest exact
-        # delta; and each base's last exact deltas with the passing sources they were scored for.
+        # delta; and each base's last exact deltas with a mask of the passing sources they were
+        # scored for.
         self.groups: dict[int, dict[tuple[int, ...], _Group]] = {}
         self.screened: dict[int, list[_Screened]] = {}
-        self.exact: dict[int, dict[tuple[int, ...], tuple[list[int], dict[int, float]]]] = {}
+        self.exact: dict[int, dict[tuple[int, ...], tuple[int, dict[int, float]]]] = {}
         # Each (target, clique mask)'s semi-directed reach set on the kept graph, and the graph's
         # semi-directed successor masks once a reach set is computed on it.
         self.reach: dict[tuple[int, int], int] = {}
@@ -450,15 +451,15 @@ class _ForwardScan:
         passing = sources & ~reach
         if passing.bit_count() == len(batch) or not passing & dependent:
             return deltas, passing
-        valid = _bitset.nodes(passing)
         last = self.exact[y].get(base)
-        if last is not None and last[0] == valid:
+        if last is not None and last[0] == passing:
             return last[1], passing
+        valid = _bitset.nodes(passing)
         moves = [("add", x) for x in valid]
         exact = dict(
             zip(valid, self.delta_engine.delta_many_with_base(y, base, moves), strict=True)
         )
-        self.exact[y][base] = (valid, exact)
+        self.exact[y][base] = (passing, exact)
         return exact, passing
 
 
