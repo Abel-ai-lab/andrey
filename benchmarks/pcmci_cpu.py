@@ -18,7 +18,8 @@ lags 1 to 5; default ``tau_max`` 5), and ``lpcmci`` on ``lpcmci_paper`` (30% wit
 the rest at lags 1 to 3, 30% of the series unobserved; default ``tau_max`` 3). Every solution tests
 lags ``0..tau_max`` with the Student-t test and returns window marks, scored link by link
 (:func:`andrey_bench.scoring.window_scores`); the empty window is the floor. LPCMCI's estimates are
-not scored against the truth, which has unobserved series. Both packages run the method's defaults:
+scored against the true PAG over the observed series (:mod:`andrey_bench.window_pag`). Both
+packages run the method's defaults:
 PCMCI+ ``pc_alpha=0.01`` with the majority collider rule, LPCMCI ``pc_alpha=0.05`` with one
 preliminary round. ``--ladder`` counts every generated series, unobserved ones included.
 

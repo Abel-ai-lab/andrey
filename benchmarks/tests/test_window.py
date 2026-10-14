@@ -213,8 +213,8 @@ def test_a_same_step_run_records_its_window_and_link_scores(tmp_path):
     assert isinstance(rundir.read_structure(tmp_path, record.run_id), WindowGraph)
 
 
-def test_a_run_with_unobserved_series_records_no_score_against_the_truth(tmp_path):
-    """The estimate covers the observed series; without the true PAG there is nothing to score."""
+def test_a_run_with_unobserved_series_is_scored_against_the_true_pag(tmp_path):
+    """The estimate covers the observed series and is scored against their true PAG."""
     key = _paper_key("lpcmci_paper", d=10)
     result = run_batch(
         tmp_path,
@@ -228,5 +228,7 @@ def test_a_run_with_unobserved_series_records_no_score_against_the_truth(tmp_pat
     )
     assert result.errors == []
     (record,) = result.records
-    assert record.status == "ok" and record.metrics == {"family": "temporal_window"}
+    assert record.status == "ok" and record.metrics["family"] == "temporal_window"
+    assert record.metrics["n_true_links"] > 0 and record.metrics["adjacency_recall"] == 0.0
+    assert record.metrics["endpoint_shd"] == 2 * record.metrics["n_true_links"]
     assert rundir.read_structure(tmp_path, record.run_id).n_nodes == 10 - key.latents
