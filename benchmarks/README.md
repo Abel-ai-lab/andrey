@@ -338,8 +338,8 @@ direction with the larger p-value. On equal p-values, Andrey takes the direction
 HSIC statistic relative to its mean under independence, and causal-learn draws no edge.
 
 The defaults are sizes of 200, 500, 1000, and 2000 rows, 20 seeds, one repeat without warm-up, and
-`--cap-wall-s` of 1800. A fit at 2000 rows takes about half a minute: the Gaussian-process
-regression grows with the cube of the rows. A smoke run fits one pair of 100 rows:
+`--cap-wall-s` of 1800. The Gaussian-process regression's time grows with the cube of the rows. A
+smoke run fits one pair of 100 rows:
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/anm_pairs.py --out outputs/anm-smoke --smoke
