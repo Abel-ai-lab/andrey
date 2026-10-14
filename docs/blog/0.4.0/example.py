@@ -3,14 +3,21 @@ import pandas as pd
 
 import andrey
 
-# x causes y, which a saturating sensor reads: y = tanh(x + e).
+# x causes y in both pairs; e is noise.
 rng = np.random.default_rng(0)
 x = rng.laplace(size=500)
-y = np.tanh(x + 0.5 * rng.laplace(size=500))
-df = pd.DataFrame({"x": x, "y": y})
+e = rng.laplace(size=500)
 
-print(andrey.anm(df), andrey.pnl(df), sep="\n\n")
+# The additive pair: y = x + 0.3 * x**3 + 0.5 * e.
+additive = pd.DataFrame({"x": x, "y": x + 0.3 * x**3 + 0.5 * e})
+# The saturating pair, which a sensor reads: y = tanh(x + 0.5 * e).
+saturating = pd.DataFrame({"x": x, "y": np.tanh(x + 0.5 * e)})
 
-# For comparison: ANM with a significance level.
+print("Additive pair\n")
+print(andrey.anm(additive), andrey.pnl(additive), sep="\n\n")
+print("\nSaturating pair\n")
+print(andrey.anm(saturating), andrey.pnl(saturating), sep="\n\n")
+
+# For comparison: ANM on the saturating pair with a significance level.
 print()
-print(andrey.anm(df, alpha=0.05))
+print(andrey.anm(saturating, alpha=0.05))
