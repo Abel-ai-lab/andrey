@@ -64,6 +64,17 @@ def test_a_fit_far_below_the_default_cutoff_does_not_warn(method):
     assert not _cutoff_warnings(caught)
 
 
+@pytest.mark.parametrize("d, warns", [(20, False), (40, True)])
+def test_the_default_cutoff_warns_once_the_largest_pass_reaches_a_tenth_of_it(d, warns):
+    """On the built-in default, the warning follows the work the gate counts, not the size."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        _fit("ges", workers=2, d=d)
+    reached = pg.largest_pass_work >= cal.WARN_FRACTION * pg._DEFAULT_MIN_WORK
+    assert reached is warns
+    assert len(_cutoff_warnings(caught)) == int(warns)
+
+
 @pytest.mark.parametrize("method", METHODS)
 @pytest.mark.parametrize("value", ["0", "30", "default"])
 def test_an_explicit_cutoff_never_warns(method, value, monkeypatch):
