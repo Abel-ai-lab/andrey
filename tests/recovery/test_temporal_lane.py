@@ -56,6 +56,17 @@ def test_varma_lingam_baseline():
     )
 
 
+def test_varma_lingam_pruned_baseline():
+    from andrey.temporal.varma import varma_lingam
+
+    order, psis, omegas = varma_lingam(datagen.generate("varma_3v"), order=(1, 1), prune=True)
+    harness.assert_baseline(
+        "VARMALiNGAMPruned",
+        {"causal_order": list(order), "psis": np.asarray(psis), "omegas": np.asarray(omegas)},
+        case="varma_3v",
+    )
+
+
 def test_varma_lingam_output_contract():
     from andrey.api.temporal import varma_lingam
 

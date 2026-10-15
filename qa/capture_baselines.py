@@ -57,11 +57,15 @@ def _run_varlingam(X: np.ndarray, algorithm: str) -> dict:
     return project_output(_adapt_var_lingam(model), algorithm)
 
 
-def _run_varmalingam(X: np.ndarray, algorithm: str) -> dict:
+def _run_varmalingam(X: np.ndarray, algorithm: str, *, prune: bool = False) -> dict:
     from andrey.temporal.varma import varma_lingam
 
-    order, psis, omegas = varma_lingam(X, order=(1, 1), prune=False)
+    order, psis, omegas = varma_lingam(X, order=(1, 1), prune=prune)
     return {"causal_order": list(order), "psis": np.asarray(psis), "omegas": np.asarray(omegas)}
+
+
+def _run_varmalingam_pruned(X: np.ndarray, algorithm: str) -> dict:
+    return _run_varmalingam(X, algorithm, prune=True)
 
 
 def _run_granger(X: np.ndarray, algorithm: str) -> dict:
@@ -93,6 +97,7 @@ ALGORITHMS = {
     "GRaSP": (_facade("grasp", lambda_value=2.0), "gauss_5v"),
     "VARLiNGAM": (_run_varlingam, "var_4v_stable"),
     "VARMALiNGAM": (_run_varmalingam, "varma_3v"),
+    "VARMALiNGAMPruned": (_run_varmalingam_pruned, "varma_3v"),
     "Granger": (_run_granger, "var_4v_stable"),
     "RCD": (_facade("rcd"), "confounded_fork_4v"),
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),
