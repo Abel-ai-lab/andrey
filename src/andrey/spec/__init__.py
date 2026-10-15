@@ -1,7 +1,7 @@
 """Typed method registry and generated agent interfaces.
 
 One :class:`MethodSpec` per public method (``andrey.api.__all__``) supplies the JSON tool schema,
-``llms.txt``, generated ``SKILL.md``, and ``andrey`` CLI. The shared ``ANDREY_*`` environment
+generated ``SKILL.md``, and ``andrey`` CLI. The shared ``ANDREY_*`` environment
 variables are included. The Pydantic specs require only base dependencies.
 """
 
@@ -12,7 +12,6 @@ from .generate import (
     EXIT_CODES,
     SCHEMA_VERSION,
     help_schema,
-    render_llms_txt,
     render_skill,
     to_json_schema,
 )
@@ -42,6 +41,5 @@ __all__ = [
     "EXIT_CODES",
     "to_json_schema",
     "help_schema",
-    "render_llms_txt",
     "render_skill",
 ]

@@ -28,10 +28,10 @@ def experimental(caught: list[warnings.WarningMessage]) -> list[warnings.Warning
 def test_warns_once_on_the_first_call(chain):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        andrey.hc(chain)
-        andrey.hc(chain)
+        andrey.gies(chain)
+        andrey.gies(chain)
     [warning] = experimental(caught)
-    assert str(warning.message).startswith("andrey.hc is experimental")
+    assert str(warning.message).startswith("andrey.gies is experimental")
     assert "may change without deprecation" in str(warning.message)
     assert warning.filename == __file__  # the caller's line, not the package's
 
@@ -39,18 +39,21 @@ def test_warns_once_on_the_first_call(chain):
 def test_each_method_warns_on_its_own_first_call(chain):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        andrey.hc(chain)
         andrey.gies(chain)
-        andrey.hc(chain)
-    assert [str(w.message).split()[0] for w in experimental(caught)] == ["andrey.hc", "andrey.gies"]
+        andrey.exact_search(chain)
+        andrey.gies(chain)
+    assert [str(w.message).split()[0] for w in experimental(caught)] == [
+        "andrey.gies",
+        "andrey.exact_search",
+    ]
 
 
 def test_an_error_filter_fails_every_call(chain):
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         for _ in range(2):  # a call the filter stopped does not use up the warning
-            with pytest.raises(andrey.ExperimentalWarning, match="andrey.hc"):
-                andrey.hc(chain)
+            with pytest.raises(andrey.ExperimentalWarning, match="andrey.gies"):
+                andrey.gies(chain)
 
 
 def test_is_a_user_warning():
@@ -59,7 +62,9 @@ def test_is_a_user_warning():
 
 @pytest.mark.parametrize("name", sorted(n for n, s in REGISTRY.items() if s.status == "supported"))
 def test_supported_methods_do_not_warn_experimental(name, chain):
-    """Only ``ExperimentalWarning`` fails here: a numerical warning from a fit is not a status."""
+    """Only ``ExperimentalWarning`` fails here: a numerical warning from a fit is not a status. A
+    pairwise direction test takes the pair ``x -> y``."""
+    data = chain[:200, :2] if REGISTRY[name].family == "pairwise" else chain
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
-        getattr(andrey, name)(chain)
+        getattr(andrey, name)(data)

@@ -12,7 +12,6 @@ from andrey.spec import (
     SCHEMA_VERSION,
     get_spec,
     help_schema,
-    render_llms_txt,
     render_skill,
     to_json_schema,
 )
@@ -62,15 +61,6 @@ def test_method_schema_matches_spec(name):
     # Data inputs surface a flag; the CLI example runs this method.
     assert [i["name"] for i in schema["data"]["inputs"]] == [i.name for i in spec.data.inputs]
     assert schema["cli"].startswith(f"andrey run {name}")
-
-
-def test_llms_txt_lists_every_method_and_env_var():
-    txt = render_llms_txt()
-    for name, spec in REGISTRY.items():
-        tag = " (experimental)" if spec.status == "experimental" else ""
-        assert f"- `{name}`{tag}: " in txt
-    for v in ENV_VARS:
-        assert v.name in txt
 
 
 def test_skill_lists_every_method_and_env_var():

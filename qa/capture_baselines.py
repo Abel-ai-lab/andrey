@@ -87,7 +87,9 @@ ALGORITHMS = {
     "CDNOD": (_run_cdnod, "gauss_5v"),
     "GES": (_facade("ges", lambda_value=2.0), "gauss_5v"),
     "GIES": (_facade("gies", lambda_value=2.0), "gauss_5v"),
+    "XGES": (_facade("xges"), "gauss_5v"),
     "HC": (_facade("hc"), "gauss_5v"),
+    "Tabu": (_facade("tabu"), "gauss_5v"),
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),
     "BOSS": (_facade("boss", lambda_value=2.0), "gauss_5v"),
     "GRaSP": (_facade("grasp", lambda_value=2.0), "gauss_5v"),
@@ -96,6 +98,8 @@ ALGORITHMS = {
     "Granger": (_run_granger, "var_4v_stable"),
     "RCD": (_facade("rcd"), "confounded_fork_4v"),
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),
+    "ANM": (_facade("anm"), "anm_pair_cubic"),
+    "PNL": (_facade("pnl"), "anm_pair_cubic"),
 }
 
 # Multi-group methods take a list of matrices (runner receives ``generate_groups(case)``).

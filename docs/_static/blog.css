@@ -28,14 +28,179 @@
   font-size: 0.85rem;
 }
 
-/* A post's authors and date, under its title. */
+/* A post's authors, date, version, and tags, under its cover. */
 .post-byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
   margin: -0.4rem 0 1.6rem;
   color: var(--andrey-muted);
   font-size: 0.95rem;
 }
 
-/* ABlog's post list: each post's title, its date under it, then its excerpt. */
+/* ---------- the blog's front page (docs/conf.py, _blog_index) ---------- */
+/* The Release cards page's blocks (benchmarks.css), with each post's art in place of the stipple
+   ground: the newest post's cover across its block, above its TL;DR, and a small copy in each
+   earlier post's row (site/cards.py). */
+.blog-tile {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--andrey-radius-md);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--andrey-ground-navy) 14%, transparent),
+    0 6px 14px -8px color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
+}
+
+.blog-tile img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 2;
+  object-fit: cover;
+}
+
+.release-latest.blog-latest {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.4rem;
+  padding: 1.25rem 1.25rem 1.6rem;
+}
+
+.blog-latest .release-tldr {
+  padding: 0 0.5rem;
+}
+
+.bd-article .blog-latest h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.blog-latest h2 a {
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.blog-latest h2 a:hover {
+  color: var(--andrey-accent);
+}
+
+.blog-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+  margin-top: -0.4rem;
+}
+
+.blog-latest .blog-date {
+  color: var(--andrey-muted);
+  font-size: 0.88rem;
+}
+
+/* The earlier posts: a heading and the order button on the divider, then the rows. */
+.blog-earlier-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 2.75rem 0 0;
+  padding: 0 0 0.6rem;
+  border-bottom: 1px solid var(--andrey-line);
+}
+
+.bd-article .blog-earlier-head h2 {
+  margin: 0;
+  color: var(--andrey-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.blog-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: var(--andrey-surface);
+  color: var(--andrey-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.blog-order::after {
+  content: "";
+  width: 0.7rem;
+  height: 0.7rem;
+  background: currentcolor;
+  -webkit-mask: var(--blog-order-arrow) center / contain no-repeat;
+  mask: var(--blog-order-arrow) center / contain no-repeat;
+  --blog-order-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 3v10M2 10l3 3 3-3M11 13V3M8 6l3-3 3 3'/%3E%3C/svg%3E");
+}
+
+.blog-order:hover {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-accent);
+}
+
+.blog-order:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+
+.release-row.blog-row {
+  grid-template-columns: 10rem minmax(0, 1fr) auto;
+}
+
+@media (max-width: 760px) {
+  .release-row.blog-row {
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+  }
+}
+
+/* A post's tags, each a link to the posts that share it. */
+.blog-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.release-body .blog-tags {
+  margin-top: 0.55rem;
+}
+
+.blog-tags li {
+  margin: 0;
+}
+
+.blog-tags a {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  color: var(--andrey-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.blog-tags a:hover {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-accent);
+}
+
+/* ABlog's post list, on the archive and author pages: each post's title, its date under it, then
+   its excerpt. */
 .postlist {
   padding-left: 0;
   list-style: none;

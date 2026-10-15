@@ -22,3 +22,14 @@ for learn in (andrey.pc, andrey.fci, andrey.direct_lingam):
     edges = len(graph.to_edges())
     print(f"{learn.__name__:<15}{graph.kind:<7}{edges} edges")
     graphs[learn.__name__] = graph
+
+# The same lawn, day by day: the rain wets it that day, the sprinkler the next day, and a lawn
+# that was dry turns the sprinkler on the next day. VARMA-LiNGAM returns a graph for each lag.
+# The columns' order is the collapsed graph's, left to right.
+rain = rng.laplace(size=n)
+sprinkler, wet = np.zeros(n), np.zeros(n)
+for t in range(1, n):
+    sprinkler[t] = -0.6 * wet[t - 1] + rng.laplace()
+    wet[t] = 0.8 * rain[t] + 0.7 * sprinkler[t - 1] + rng.laplace()
+days = pd.DataFrame({"sprinkler": sprinkler, "wet": wet, "rain": rain})
+over_time = andrey.varma_lingam(days, order=(1, 0), prune=True).structure

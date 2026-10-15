@@ -40,6 +40,16 @@ def nongaussian_path(tmp_path):
     return path
 
 
+@pytest.fixture
+def pair_path(tmp_path):
+    """An additive-noise pair x -> y, the two columns the pairwise direction tests take."""
+    rng = np.random.default_rng(0)
+    x = rng.uniform(-1, 1, 300)
+    path = tmp_path / "pair.csv"
+    np.savetxt(path, np.column_stack([x, x * x * x + 0.3 * rng.uniform(-1, 1, 300)]), delimiter=",")
+    return path
+
+
 def _run(argv, capsys):
     code = main(argv)
     out, err = capsys.readouterr()
@@ -65,11 +75,9 @@ def test_list_on_a_terminal_names_its_columns(capsys, monkeypatch):
     assert len(rows) == len(REGISTRY)
 
 
-def test_root_skill_and_llms(capsys):
+def test_root_skill(capsys):
     _, skill, _ = _run(["--skill"], capsys)
     assert "andrey run <method> --help --json" in skill and "andrey config" in skill
-    _, llms, _ = _run(["--llms"], capsys)
-    assert "ANDREY_BACKEND" in llms
 
 
 def test_bare_invocation_prints_help(capsys):
@@ -431,14 +439,18 @@ def test_seeded_run_reports_resolved_seed(capsys, csv_path):
         "rcd",
         "camuv",
         "bottom_up_parce_lingam",
+        "pnl",
+        "anm",
     ],
 )
-def test_output_envelope_matches_spec(name, capsys, csv_path, nongaussian_path):
+def test_output_envelope_matches_spec(name, capsys, csv_path, nongaussian_path, pair_path):
     """The result envelope reflects the method's OutputSpec claims (kind / ordering / weighted)."""
     from andrey.spec import get_spec
 
     non_gaussian = ("direct_lingam", "gin", "rcd", "camuv", "bottom_up_parce_lingam")
-    data = str(nongaussian_path if name in non_gaussian else csv_path)
+    pairwise = ("pnl", "anm")
+    path = nongaussian_path if name in non_gaussian else csv_path
+    data = str(pair_path if name in pairwise else path)
     code, out, _ = _run(["run", name, "--data", data], capsys)
     env = json.loads(out)
     spec = get_spec(name)
@@ -913,7 +925,6 @@ def test_invalid_configuration_names_every_bad_setting(capsys, monkeypatch):
     [
         ["--json"],
         ["--help", "--skill"],
-        ["--skill", "--llms"],
         ["run"],
         ["run", "--help", "--json"],
         ["agent-context", "hc"],

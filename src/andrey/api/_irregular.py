@@ -2,8 +2,9 @@
 
 Fitted models are read by attribute name.
 
-* **ANM, PNL** (``(pval_forward, pval_backward)``): a two-node ``dag`` with the edge
-  :func:`_direction` picks, or none; the p-values go in metadata as ``float``.
+* **ANM, PNL** (``(pval_forward, pval_backward, stat_forward, stat_backward)``): a two-node
+  ``dag`` with the edge :func:`_direction` picks, or none; the p-values and statistics go in
+  metadata as ``float``.
 * **CAM-UV** (``(P, U)``): ``P[i]`` holds the parents of ``i``; ``U`` holds pairs sharing an
   unobserved cause. A ``pag`` with the directed edges and a ``<->`` per pair; the pairs also go
   in metadata.
@@ -61,14 +62,25 @@ def _nan_pairs(B: np.ndarray) -> list[list[int]]:
     return [[int(i), int(j)] for i, j in zip(rows, cols, strict=True) if i < j]
 
 
-def _direction(pval_forward: float, pval_backward: float, alpha: float | None) -> int:
+def _direction(
+    pval_forward: float,
+    pval_backward: float,
+    alpha: float | None,
+    *,
+    stat_forward: float | None = None,
+    stat_backward: float | None = None,
+) -> int:
     """Return ``1`` for ``x -> y``, ``-1`` for ``y -> x``, or ``0`` for no edge.
 
-    With ``alpha=None``, choose the direction with the larger p-value; a tie gives no edge.
-    Otherwise, choose a direction only when its p-value exceeds ``alpha`` and the other does not.
+    With ``alpha=None``, choose the direction with the larger p-value. Equal p-values, given both
+    test statistics, choose the direction with the smaller statistic, the weaker dependence; equal
+    or missing statistics give no edge. Otherwise, choose a direction only when its p-value exceeds
+    ``alpha`` and the other does not.
     """
     if alpha is None:
         forward, backward = pval_forward > pval_backward, pval_backward > pval_forward
+        if pval_forward == pval_backward and stat_forward is not None and stat_backward is not None:
+            forward, backward = stat_forward < stat_backward, stat_backward < stat_forward
     else:
         forward, backward = pval_forward > alpha, pval_backward > alpha
     return 1 if forward and not backward else -1 if backward and not forward else 0
@@ -79,44 +91,89 @@ def _pairwise_output(
     pval_backward: Any,
     *,
     algorithm: str,
+    stat_forward: Any = None,
+    stat_backward: Any = None,
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
 ) -> StructureOutput:
-    """Return a two-node ``dag`` with the chosen edge and ``float`` p-value metadata."""
+    """Return a two-node ``dag`` with the chosen edge and ``float`` p-value metadata.
+
+    Test statistics, when given, decide a p-value tie and go in metadata beside the p-values.
+    """
     forward, backward = _coerce_float(pval_forward), _coerce_float(pval_backward)
+    stats: dict[str, float] = {}
+    if stat_forward is not None and stat_backward is not None:
+        stats = {
+            "stat_forward": _coerce_float(stat_forward),
+            "stat_backward": _coerce_float(stat_backward),
+        }
     M = np.zeros((2, 2), dtype=np.int8)
-    direction = _direction(forward, backward, alpha)
+    direction = _direction(forward, backward, alpha, **stats)
     if direction:
         source, target = (0, 1) if direction > 0 else (1, 0)
         M[source, target], M[target, source] = TAIL, ARROW
     return structure_output(
         GraphStructure.from_numpy(M, kind="dag"),
         labels=labels,
-        metadata={"algorithm": algorithm, "pval_forward": forward, "pval_backward": backward},
+        metadata={
+            "algorithm": algorithm,
+            "pval_forward": forward,
+            "pval_backward": backward,
+            **stats,
+        },
     )
 
 
 def _adapt_anm(
-    pval_forward: Any, pval_backward: Any, *, alpha: float | None = None
+    pval_forward: Any,
+    pval_backward: Any,
+    *,
+    stat_forward: Any = None,
+    stat_backward: Any = None,
+    alpha: float | None = None,
+    labels: tuple[str, ...] | None = None,
 ) -> StructureOutput:
-    """Convert ANM p-values to a two-node ``dag`` and metadata."""
-    return _pairwise_output(pval_forward, pval_backward, algorithm="ANM", alpha=alpha)
+    """Convert ANM p-values, and the statistics when given, to a two-node ``dag`` and metadata.
+
+    Each statistic is an HSIC statistic divided by its mean under independence. With
+    ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
+    gives no edge.
+    """
+    return _pairwise_output(
+        pval_forward,
+        pval_backward,
+        algorithm="ANM",
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        alpha=alpha,
+        labels=labels,
+    )
 
 
 def _adapt_pnl(
     pval_forward: Any,
     pval_backward: Any,
     *,
+    stat_forward: Any = None,
+    stat_backward: Any = None,
     alpha: float | None = None,
     labels: tuple[str, ...] | None = None,
 ) -> StructureOutput:
-    """Convert PNL p-values to a two-node ``dag`` and metadata.
+    """Convert PNL p-values, and the statistics when given, to a two-node ``dag`` and metadata.
 
-    PNL returns each p-value as a shape-``(1,)`` array; :func:`_coerce_float` converts it to
-    a Python ``float``.
+    Each statistic is an HSIC statistic divided by its mean under independence. With
+    ``alpha=None``, the statistics decide a p-value tie: the smaller one wins. Without them, a tie
+    gives no edge. A p-value or statistic may be a shape-``(1,)`` array; :func:`_coerce_float`
+    converts it to a Python ``float``.
     """
     return _pairwise_output(
-        pval_forward, pval_backward, algorithm="PNL", alpha=alpha, labels=labels
+        pval_forward,
+        pval_backward,
+        algorithm="PNL",
+        stat_forward=stat_forward,
+        stat_backward=stat_backward,
+        alpha=alpha,
+        labels=labels,
     )
 
 

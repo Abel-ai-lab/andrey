@@ -9,6 +9,66 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- Categorical and mixed data: `pc`, `fci`, `gfci`, and `cdnod` take the chi-square, G-square,
+  degenerate Gaussian, and conditional Gaussian tests (`indep_test="chisq"`, `"gsq"`,
+  `"degen_gauss"`, `"cond_gauss"`), and `ges`, `gfci`, `hc`, `tabu`, `boss`, `grasp`, and
+  `exact_search` take the matching scores. ([#TBD])
+- `andrey.data.sample_discrete` and `sample_mixed` sample a discrete or a conditional linear
+  Gaussian network with its true graph. ([#TBD])
+- The categorical scores include the multinomial BIC beside BDeu on the BIC's `-2` log scale, read
+  text, string, and `category` columns as categories, and `load_dataset(..., discrete=True)` samples
+  ASIA, ALARM, HEPAR2, and ANDES from their own conditional probability tables (with Rui Zhu,
+  [#94]). ([#TBD])
+
+### Changed
+
+- `hc` with a mixed-data score never adds a continuous -> categorical edge, which the conditional
+  linear Gaussian model cannot express, and scores its candidate parent sets in batches. ([#TBD])
+
+## [0.4.1] - 2026-10-15
+
+### Breaking
+
+- `andrey --llms` is removed: `andrey list` looks up the methods, `andrey config --help` the
+  settings, and `andrey --skill` holds both in the agent guide. ([#122])
+
+### Fixed
+
+- `direct_lingam`, `multi_group_direct_lingam`, `var_lingam`, `varma_lingam`, and
+  `longitudinal_lingam` now regress by exact least squares in the causal-order search, as the
+  method's paper defines it, so on nearly tied candidates the causal order and the DAG can change
+  and now match the paper's estimator. ([#127])
+
+## [0.4.0] - 2026-10-15
+
+### Highlights
+
+- `anm` and `pnl` are supported. On cause-effect pairs, ANM names the same direction as
+  causal-learn on every pair and runs about 2x faster; PNL runs up to 1,470x faster and names the
+  true direction on more pairs. The 0.4.0 release card gives the numbers and each method's limits.
+  ([#95])
+
+### Added
+
+- `anm`: a direction test for a pair of variables under the additive noise model, returning a
+  two-node DAG and both p-values, as `pnl` does. ([#95])
+
+### Changed
+
+- With `alpha=None`, `pnl` breaks a tie between equal p-values by the HSIC statistics, which
+  `metadata` now holds, instead of drawing no edge. ([#95])
+
+## [0.3.0] - 2026-10-13
+
+### Highlights
+
+- `hc`, `tabu`, and `xges` are supported. On linear-Gaussian data, XGES returns the same graphs as
+  xges and runs up to 140x faster; Tabu search and hill climbing return the same equivalence
+  classes as bnlearn on most datasets and run up to 561x and 906x faster. The 0.3.0 release card
+  gives the numbers and each method's limits. ([#64])
+
 ### Breaking
 
 - `hc` runs in one process: its worker processes were slower at every measured size.
@@ -16,28 +76,15 @@ change names its pull request.
 
 ### Added
 
-- `tabu`, an experimental method: hill climbing that keeps searching past a local optimum and
-  returns the best DAG it visits, as a CPDAG. ([#56])
-- `xges`, an experimental method: extremely greedy equivalence search, returning a CPDAG and its
-  BIC score. ([#57])
-- Categorical data: `pc`, `fci`, `gfci`, and `cdnod` take the chi-square and G-square tests
-  (`indep_test="chisq"` and `"gsq"`), and `ges`, `gfci`, and `hc` take the BDeu score
-  (`score_func="local_score_BDeu"`).
-- `andrey.data.sample_discrete` samples a discrete network with its true graph.
-- Categorical data, by @ruizhu-lgtm: the multinomial BIC
-  (`score_func="local_score_BIC_categorical"`) and BDeu, both on the BIC's `-2` log scale, in
-  `ges`, `gfci`, `hc`, `tabu`, and `exact_search`, with text, string, and `category` columns read
-  as categories. ([#TBD])
-- `load_dataset(..., discrete=True)` samples ASIA, ALARM, HEPAR2, and ANDES from their own
-  conditional probability tables, by @ruizhu-lgtm. ([#TBD])
+- `tabu`: hill climbing that keeps searching past a local optimum and returns the best DAG it
+  visits, as a CPDAG. ([#56])
+- `xges`: extremely greedy equivalence search, returning a CPDAG and its BIC score. ([#57])
 
 ### Changed
 
 - `hc` returns the same graphs in less time. ([#56])
 - `hc` sets no move limit by default (`max_iter=None`), so large graphs are searched to a local
   optimum. ([#56])
-- `hc` with a mixed-data score never adds a continuous -> categorical edge, which the conditional
-  linear Gaussian model cannot express, and scores its candidate parent sets in batches. ([#TBD])
 
 ## [0.2.1] - 2026-10-12
 
@@ -103,7 +150,10 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Abel-ai-lab/andrey/releases/tag/v0.1.0
@@ -115,3 +165,8 @@ First alpha release.
 [#56]: https://github.com/Abel-ai-lab/andrey/pull/56
 [#57]: https://github.com/Abel-ai-lab/andrey/pull/57
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59
+[#64]: https://github.com/Abel-ai-lab/andrey/pull/64
+[#122]: https://github.com/Abel-ai-lab/andrey/pull/122
+[#127]: https://github.com/Abel-ai-lab/andrey/pull/127
+[#95]: https://github.com/Abel-ai-lab/andrey/pull/95
+[#94]: https://github.com/Abel-ai-lab/andrey/pull/94

@@ -23,7 +23,15 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
+    "XGES": {
+        "structural": ["graph"],
+        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
+    },
     "HC": {
+        "structural": ["graph"],
+        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
+    },
+    "Tabu": {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
@@ -79,7 +87,27 @@ SPEC: dict[str, dict] = {
         "numeric": {"coeff": {"atol": 1e-6, "rtol": 1e-5}},
     },
     # --- Irregular / pairwise & latent-confounder methods.
-    # ANM/PNL payload is the two p-values (numeric); no structural graph.
+    # ANM/PNL: the decided two-node graph, and both p-values and HSIC statistics.
+    # The Gaussian-process hyperparameter search ends within rounding of its optimum, so ANM's
+    # p-values and statistics get a looser tolerance than PNL's.
+    "ANM": {
+        "structural": ["graph"],
+        "numeric": {
+            "pval_forward": {"atol": 1e-4, "rtol": 1e-4},
+            "pval_backward": {"atol": 1e-4, "rtol": 1e-4},
+            "stat_forward": {"atol": 1e-4, "rtol": 1e-4},
+            "stat_backward": {"atol": 1e-4, "rtol": 1e-4},
+        },
+    },
+    "PNL": {
+        "structural": ["graph"],
+        "numeric": {
+            "pval_forward": {"atol": 1e-6, "rtol": 1e-5},
+            "pval_backward": {"atol": 1e-6, "rtol": 1e-5},
+            "stat_forward": {"atol": 1e-6, "rtol": 1e-5},
+            "stat_backward": {"atol": 1e-6, "rtol": 1e-5},
+        },
+    },
     "RCD": {
         "structural": ["graph"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},

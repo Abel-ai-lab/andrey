@@ -33,10 +33,11 @@ its row and column. A single column gives a one-node graph.
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
-workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs) and
-[0.2.0](../benchmarks/0.2.0.md#known-limits) release cards show where a method scores worse
-than the empty graph, as ICA-LiNGAM does at the 0.1.0 card's sample size and BottomUpParceLiNGAM
-does from 8 observed variables.
+workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs),
+[0.2.0](../benchmarks/0.2.0.md#known-limits), and [0.3.0](../benchmarks/0.3.0.md#known-limits)
+release cards show where a method scores worse than the empty graph, as ICA-LiNGAM does at the
+0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, and hill climbing
+and Tabu search do from 50 variables with ten rows per variable.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -48,10 +49,15 @@ does from 8 observed variables.
    pc
    fci
    ges
+   xges
+   hc
+   tabu
    boss
    grasp
    direct_lingam
    ica_lingam
+   anm
+   pnl
    rcd
    bottom_up_parce_lingam
 ```
@@ -74,15 +80,11 @@ in a process.
    gfci
    cdnod
    gies
-   xges
-   hc
-   tabu
    exact_search
    calm
    multi_group_direct_lingam
    varma_lingam
    longitudinal_lingam
-   pnl
    gin
    camuv
 ```
@@ -329,7 +331,7 @@ and `rc_params` return plain data and need no import.
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
 | `andrey calibrate` | Measured GES worker-pool cutoff for this machine, as a setting to export |
-| `andrey --skill` / `andrey --llms` | Generated package guides |
+| `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs

@@ -21,16 +21,22 @@ def test_direct_lingam_rejects_non_2d():
         andrey.direct_lingam(np.random.default_rng(0).standard_normal(100))
 
 
+#: The pairwise direction tests, which take a two-column table.
+PAIRWISE = [andrey.pnl, andrey.anm]
+
+
+@pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 @pytest.mark.parametrize("shape", [(100,), (100, 1), (100, 3)])
-def test_pnl_rejects_anything_but_a_pair(shape):
+def test_pairwise_tests_reject_anything_but_a_pair(fit, shape):
     with pytest.raises(ValueError, match=r"\(n_samples, 2\)"):
-        andrey.pnl(np.random.default_rng(0).standard_normal(shape))
+        fit(np.random.default_rng(0).standard_normal(shape))
 
 
+@pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
 @pytest.mark.parametrize("alpha", [0.0, 1.0, -0.1])
-def test_pnl_rejects_an_alpha_outside_the_unit_interval(alpha):
+def test_pairwise_tests_reject_an_alpha_outside_the_unit_interval(fit, alpha):
     with pytest.raises(ValueError, match="alpha"):
-        andrey.pnl(np.random.default_rng(0).standard_normal((100, 2)), alpha=alpha)
+        fit(np.random.default_rng(0).standard_normal((100, 2)), alpha=alpha)
 
 
 def _data(n=60, d=3):
@@ -117,10 +123,12 @@ def test_varma_lingam_needs_two_variables():
         andrey.varma_lingam(_data(d=1))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-def test_pnl_rejects_unusable_data():
+@pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
+def test_pairwise_tests_reject_unusable_data(fit):
     with pytest.raises(ValueError, match=r"data .*row 2, column 0"):
-        andrey.pnl(_with(_data(d=2), (2, 0), np.nan))
+        fit(_with(_data(d=2), (2, 0), np.nan))
+    with pytest.raises(ValueError, match=r"data column 1 is constant"):
+        fit(_with(_data(d=2), (slice(None), 1), 3.0))
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
@@ -198,7 +206,6 @@ def test_gin_labels_name_each_column():
         andrey.gin(_data(d=4), labels=("a", "b"))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("fit", "max_iter", "error"),
     [
@@ -216,7 +223,6 @@ def test_max_iter_is_a_positive_int(fit, max_iter, error):
         fit(_data(), max_iter=max_iter)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_hc_stops_at_max_iter_and_warns():
     chain = np.cumsum(np.random.default_rng(0).standard_normal((500, 8)), axis=1)
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
@@ -225,7 +231,6 @@ def test_hc_stops_at_max_iter_and_warns():
     assert len(andrey.hc(chain).structure.oriented_edges()) == 7  # runs to a local optimum
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_hc_sets_no_move_limit_by_default():
     # This dense graph takes over 200 moves: a limit of 200 stops the search, the default does not.
     x = sample_scm(d=30, n=800, seed=0, density=16.0).data
@@ -237,7 +242,6 @@ def test_hc_sets_no_move_limit_by_default():
     assert len(out.structure.oriented_edges()) > 200
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("settings", "named", "error"),
     [
@@ -256,7 +260,6 @@ def test_tabu_rejects_a_bad_setting(settings, named, error):
         andrey.tabu(_data(), **settings)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_tabu_stops_at_max_iter_and_warns():
     chain = np.cumsum(np.random.default_rng(0).standard_normal((500, 8)), axis=1)
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=3"):
@@ -406,7 +409,6 @@ def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
         andrey.cdnod(_categories(), c_indx, indep_test="chisq")
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("setting", "value", "error"),
     [

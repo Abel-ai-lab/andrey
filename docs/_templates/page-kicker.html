@@ -1,0 +1,11 @@
+{#- A documentation page's section over its title, linking to the page that lists it (conf.py:
+    _docs_sidebar); other pages keep the theme's breadcrumbs. -#}
+{%- if pagename.startswith("docs/") %}
+{%- if page_kicker %}
+<p class="page-kicker">
+  {%- if page_kicker.doc %}<a href="{{ pathto(page_kicker.doc) }}">{{ page_kicker.title }}</a>
+  {%- else %}{{ page_kicker.title }}{% endif %}</p>
+{%- endif %}
+{%- else %}
+{%- include "breadcrumbs.html" %}
+{%- endif %}

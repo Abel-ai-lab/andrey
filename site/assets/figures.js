@@ -79,8 +79,7 @@
       draw();
     }, { passive: false });
   }
-  // Hidden panels keep their place, so a newly shown panel restarts its bars instead of showing
-  // them done.
+  // A panel shown again restarts its bars instead of showing them done.
   const restart = (race) => {
     if (motion.matches) return;
     for (const animation of race.getAnimations({ subtree: true })) {

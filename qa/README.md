@@ -7,6 +7,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | Tool | Purpose |
 |---|---|
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
+| `reference_parity.py` | Fail a published row where the reference package has fewer errors. |
 | `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
@@ -34,18 +35,20 @@ uv run python -m qa.quality_gate
 
 The `quality-gate` workflow runs the same command. Every job that publishes to PyPI must need a job
 that calls it; `tests/unit/test_release_gates.py` fails otherwise. Pull requests do not run the
-gate. It checks PC, FCI, GES, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, RCD, and
-BottomUpParceLiNGAM on the datasets whose assumptions each method needs:
+gate. It checks PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, RCD,
+BottomUpParceLiNGAM, ANM, and PNL on the datasets whose assumptions each method needs:
 
 | Dataset | Draws | Methods |
 |---|---|---|
-| `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, GES, BOSS, GRaSP |
+| `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, GES, XGES, HC, Tabu, BOSS, GRaSP |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
-| ASIA, linear-Gaussian | 10 seeds | PC, GES, BOSS, GRaSP, FCI |
+| `anm_pair` at `n = 1000` | 10 seeds | ANM |
+| `pnl_pair` at `n = 1000` | 10 seeds | PNL |
+| ASIA, linear-Gaussian | 10 seeds | PC, GES, XGES, HC, Tabu, BOSS, GRaSP, FCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
-| Sachs, measured | 1 | PC, FCI, GES, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM |
+| Sachs, measured | 1 | PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM |
 
 - **Regimes.** `andrey.data` generates the published benchmark regimes with the benchmarks'
   arguments, at `n = 50d`; a test keeps the two in step. At the benchmarks' `n = 10d`, ICA-LiNGAM
@@ -54,6 +57,10 @@ BottomUpParceLiNGAM on the datasets whose assumptions each method needs:
   the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
+- **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
+  edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
+  with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when
+  they name the true direction on most draws.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -63,12 +70,12 @@ BottomUpParceLiNGAM on the datasets whose assumptions each method needs:
   from `cmu-phil/example-causal-datasets` (CC0-1.0) at a pinned commit once, checks its SHA-256,
   and caches it, so the first run needs network access.
 
-SHD follows the published summaries: PC, GES, BOSS, and GRaSP against the truth's CPDAG, the
-LiNGAM methods against the DAG, and FCI by endpoint SHD against the PAG of the observed variables.
-RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent projection, the edges
-and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through hidden
-nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only. On
-each dataset, a method passes when its median SHD over the draws is:
+SHD follows the published summaries: PC, GES, XGES, HC, Tabu, BOSS, and GRaSP against the truth's
+CPDAG, the LiNGAM methods, ANM, and PNL against the DAG, and FCI by endpoint SHD against the PAG of
+the observed variables. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent
+projection, the edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j`
+through hidden nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden
+nodes only. On each dataset, a method passes when its median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.
@@ -84,6 +91,30 @@ graph, and the gate rejects both.
 ```shell
 uv run python -m qa.quality_gate PC FCI
 uv run python -m qa.quality_gate --capture  # re-measure; review the diff
+```
+
+## Reference parity
+
+Before any fit, the gate checks the published benchmark summaries
+(`benchmarks/published/*/summary.json`) with `reference_parity.py`, which reads only those files,
+so the reference packages need not be installed. Each row pairs Andrey with one reference package at one size, and it
+fails at any margin:
+
+- where the row counts the series on which each side has fewer errors, when the reference has fewer
+  errors on more series than Andrey;
+- otherwise, when Andrey's errors (the row's mean or median SHD, or directed errors) are higher.
+
+A row where either side has no result is skipped. A released summary never changes, so a method
+re-measured against the same reference in a later summary is judged by the later rows only.
+
+`benchmarks/published/parity-allowlist.json` exempts a failing row only when it names the cause:
+`correct-by-paper` (Andrey follows the method's paper and the reference does not) or
+`reference-defect`, with a reason and a citation. Each entry pins the row's two error values (its
+two series counts, where the row has them), so a re-run that changes the row voids it, and an
+entry that matches no failing row fails the check.
+
+```shell
+uv run python -m qa.reference_parity  # exit 1 if any row fails
 ```
 
 ## Other tools

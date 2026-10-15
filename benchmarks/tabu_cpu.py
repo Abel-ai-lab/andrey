@@ -12,7 +12,7 @@ with any DAG of a CPDAG standing for its class. Andrey's tabu and hc return CPDA
 return DAGs: compare a DAG row's `mec_shd` with a CPDAG row's `shd`.
 
 Before running, load the R modules and export `R_LIBS_USER` as `benchmarks/start_r.sh --env`
-prints.
+prints. A run whose `--solutions` leaves out bnlearn's does not need R.
 
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/tabu_cpu.py \\
         --out outputs/tabu-cpu --cap-mem-mb 32000
@@ -171,6 +171,11 @@ def main(argv: list[str] | None = None) -> int:
         help="core budget per fit (default: every core this job is allowed)",
     )
     p.add_argument(
+        "--solutions",
+        default=None,
+        help="run only these solution names, comma-separated (default: every solution)",
+    )
+    p.add_argument(
         "--machine-id",
         default=socket.gethostname(),
         help="machine id stamped on every record and in run_id (default: this host's name)",
@@ -196,6 +201,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.smoke:
         vars(args).update(SMOKE)
 
+    field = SOLUTIONS
+    if args.solutions is not None:
+        chosen = set(args.solutions.split(","))
+        known = {a.name for a in SOLUTIONS}
+        unknown = sorted(chosen - known)
+        # A typo would otherwise run fewer solutions, and the missing rows would read as failures.
+        if unknown:
+            p.error(f"unknown solutions {unknown}; the solutions are {sorted(known)}")
+        field = [a for a in SOLUTIONS if a.name in chosen]
+
     out = Path(args.out)
     keys = {key.digest: key for key in ladder_keys(args.ladder, args.seeds)}
 
@@ -211,13 +226,15 @@ def main(argv: list[str] | None = None) -> int:
         _summarize(table)
         return 0
 
-    # Starts R before the first fit, so a missing module or library fails once.
-    r_environment = rsession.check_environment("bnlearn")
+    # Starts R before the first fit, so a missing module or library fails once; a run without
+    # bnlearn's solutions does not need R.
+    needs_r = any(a.package == "bnlearn" for a in field)
+    r_environment = rsession.check_environment("bnlearn") if needs_r else {}
     # Written before the first fit, so an interrupted benchmark still says what it was asked for.
     run_meta = {
         "driver": Path(__file__).name,
-        "solution list": [a.name for a in SOLUTIONS],
-        "params": {a.name: dict(a.params()) for a in SOLUTIONS},
+        "solution list": [a.name for a in field],
+        "params": {a.name: dict(a.params()) for a in field},
         "r environment": r_environment,
         "slice": regime_slice(),
         "ladder": args.ladder,
@@ -249,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         # One rung at a time, so a rung's data is materialized only when the ladder reaches it.
         result = run_batch(
             datasets.store_dir(out),
-            SOLUTIONS,
+            field,
             ladder_keys([d], args.seeds),
             machine_id=args.machine_id,
             cap_wall_s=args.cap_wall_s,
@@ -267,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # What each solution cost at this rung, or what stopped it.
         ran = []
-        for adapter in SOLUTIONS:
+        for adapter in field:
             mine = [r for r in result.records if r.name == adapter.name]
             walls = [r.wall_s for r in mine if r.status == "ok" and r.wall_s is not None]
             statuses = sorted({r.status for r in mine})

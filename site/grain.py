@@ -94,10 +94,10 @@ def grain_tile(size: int = 256, seed: int = SEED + 1) -> bytes:
 
 
 def hero_tiles() -> tuple[tuple[str, bytes], ...]:
-    """The homepage hero's tiles, by file name: cobalt specks, amber specks, and grain."""
+    """The stipple's tiles for the homepage's hero and bento tiles, by file name: cobalt specks
+    and grain."""
     return (
         ("grain-cobalt.png", speck_tile(COBALT_LIGHT, 0.55)),
-        ("grain-amber.png", speck_tile(AMBER, 0.6, seed=SEED + 2)),
         ("grain-noise.png", grain_tile()),
     )
 
@@ -112,6 +112,4 @@ def ground_tokens() -> dict[str, str]:
         "--andrey-ground-amber": AMBER,
         "--andrey-ground-ink": "#ffffff",
         "--andrey-ground-muted": andrey.viz.LIGHT.ramp[0],
-        # The dark palette's green, which reads on the navy ground in either theme.
-        "--andrey-ground-green": andrey.viz.DARK.categorical[2],
     }
