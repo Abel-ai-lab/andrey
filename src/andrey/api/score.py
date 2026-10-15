@@ -19,6 +19,7 @@ from andrey.api._adapt import (
     categorical_metadata,
     checked_data,
     column_labels,
+    data_kind,
     data_matrix,
     flag,
     int_in_range,
@@ -562,11 +563,15 @@ def tabu(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov"}, default="local_score_BIC_from_cov"
-        Covariance-based Gaussian BIC objective.
+    score_func : str, default="local_score_BIC_from_cov"
+        Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
+        continuous data, or ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, the BDeu
+        score or the multinomial BIC for categorical data coded by whole numbers, as for
+        :func:`~andrey.ges`.
     lambda_value : float, default=1.0
-        Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
-        sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+        Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
+        Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be finite
+        and non-negative. BDeu ignores it.
     tabu_length : int, default=10
         Number of most recently visited DAGs a move may not return to. At least ``1``.
     max_tabu : int or None, default=None
@@ -581,19 +586,20 @@ def tabu(
     -------
     StructureOutput
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"Tabu"`` and ``metadata["score"]`` the best DAG's BIC score, computed as for
+        ``"Tabu"`` and ``metadata["score"]`` the best DAG's score, computed as for
         :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open.
 
     Raises
     ------
     NotImplementedError
-        If ``score_func`` is not ``"local_score_BIC_from_cov"``.
+        If ``score_func`` names no score tabu search takes.
     TypeError
         If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
-        less than ``1``, or if ``max_tabu`` is outside ``1..tabu_length``.
+        less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or, with a categorical
+        score, if ``data`` holds a number that is not whole.
 
     Warns
     -----
@@ -621,7 +627,8 @@ def tabu(
     It takes hill climbing's moves plus up to ``max_tabu`` non-improving moves between new best
     scores, with no move limit by default; run time grows with the moves taken. It avoids only the
     last ``tabu_length`` DAGs, so a better DAG beyond that reach may be missed. Its BIC score
-    assumes linear relations with Gaussian noise.
+    assumes linear relations with Gaussian noise. With a categorical score, its tests run it on
+    small fixed categorical networks.
 
     References
     ----------
@@ -644,9 +651,15 @@ def tabu(
     'cpdag'
     """
     warn_experimental("tabu")
+    from andrey.search.tabu import TABU_SCORES
     from andrey.search.tabu import tabu as _tabu
 
-    X = data_matrix(data)
+    if score_func not in TABU_SCORES:
+        raise NotImplementedError(f"tabu supports {TABU_SCORES}, not {score_func!r}")
+    if data_kind(score_func) == "categorical":
+        X, _ = checked_data(data, None, "score_func", score_func)
+    else:
+        X = data_matrix(data)
     tabu_length = int_in_range(tabu_length, "tabu_length", 1)
     max_tabu = int_in_range(
         tabu_length if max_tabu is None else max_tabu, "max_tabu", 1, tabu_length
@@ -673,7 +686,7 @@ def exact_search(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
-    """Learn the globally optimal DAG for the BIC score by exact search.
+    """Learn the globally optimal DAG for a decomposable score by exact search.
 
     The optimum is identified up to its Markov equivalence class. A* (``search_method="astar"``)
     [1]_ and dynamic programming (``"dp"``) [2]_ may return different representatives. Runtime is
@@ -687,10 +700,11 @@ def exact_search(
     search_method : {"astar", "dp"}, default="astar"
         Exact search strategy: A* search or dynamic programming.
     score_func : str, default="local_score_BIC"
-        Local score: ``"local_score_BIC"``, the linear-Gaussian BIC, or
-        ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or conditional
-        Gaussian BIC for mixed data, as for :func:`~andrey.ges`. Each uses the standard penalty,
-        ``lambda_value=1``.
+        Local score: ``"local_score_BIC"``, the linear-Gaussian BIC; ``"local_score_BDeu"`` or
+        ``"local_score_BIC_categorical"``, the BDeu score or the multinomial BIC for categorical
+        data coded by whole numbers; or ``"local_score_degen_gauss"`` or
+        ``"local_score_cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed data, as
+        for :func:`~andrey.ges`. Each BIC uses the standard penalty, ``lambda_value=1``.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -733,13 +747,19 @@ def exact_search(
 
     Notes
     -----
+    **Categorical data.** ``"local_score_BDeu"`` [5]_ and ``"local_score_BIC_categorical"`` [6]_
+    read each distinct value of a column as one category and score a variable by its counts in
+    each configuration of its parents, as :func:`~andrey.ges` describes. Both give equivalent graphs
+    the same score.
+
     **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
     data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
     categorical columns as :func:`~andrey.pc` does. Both give equivalent graphs the same score, so
     the optimum is again identified up to its equivalence class.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 5 variables with 1,000 rows,
-    and with a mixed-data score on 5 variables with 3,000 rows.
+    with a mixed-data score on 5 variables with 3,000 rows, and with a categorical score on small
+    fixed categorical networks.
     It scores every possible parent set of every variable, so its run time at least doubles with
     each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
     its memory doubles as well.
@@ -754,6 +774,10 @@ def exact_search(
        acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
     .. [4] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
+    .. [5] Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks:
+       the combination of knowledge and statistical data. Machine Learning 20(3), 197-243.
+    .. [6] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
+       461-464.
 
     Examples
     --------

@@ -1,15 +1,17 @@
-"""Exact BIC-optimal DAG search, the engine behind :func:`andrey.exact_search`.
+"""Exact score-optimal DAG search, the engine behind :func:`andrey.exact_search`.
 
 The algorithm, its settings, and its references are described on :func:`andrey.exact_search`.
 
 Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + len(parents) *
 log(n)``, where ``resid`` is the residual sum of squares of the centered node on its centered
 parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is singular). The
-mixed-data scores are :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`
-with ``lambda_value=1``. Both searches run over the order graph,
-whose nodes are variable subsets: the shortest path from the empty set to the full set gives each
-variable its best parent set among the variables before it. The result is the optimal DAG itself,
-not its CPDAG, and each search breaks score ties deterministically.
+categorical scores are :class:`~andrey.core.score.BDeuScore` and
+:class:`~andrey.core.score.CategoricalBICScore`, and the mixed-data scores
+:class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each BIC with
+``lambda_value=1``. Both searches run over the order graph, whose nodes are variable subsets: the
+shortest path from the empty set to the full set gives each variable its best parent set among the
+variables before it. The result is the optimal DAG itself, not its CPDAG, and each search breaks
+score ties deterministically.
 """
 
 from __future__ import annotations
@@ -28,6 +30,8 @@ from andrey.core.score import Score, make_score
 #: The local scores :func:`exact_search` accepts.
 EXACT_SCORES: tuple[str, ...] = (
     "local_score_BIC",
+    "local_score_BDeu",
+    "local_score_BIC_categorical",
     "local_score_degen_gauss",
     "local_score_cond_gauss",
 )
@@ -223,9 +227,10 @@ def exact_search(
     score_func: str = "local_score_BIC",
     categorical: np.ndarray | None = None,
 ) -> GraphStructure:
-    """Return the globally BIC-optimal DAG for ``data`` as a ``dag`` structure.
+    """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
-    Scores candidates with the linear-Gaussian BIC (``lambda=1``) on mean-centered data.
+    Scores candidates with ``score_func``; the default, the linear-Gaussian BIC (``lambda=1``), on
+    mean-centered data.
     Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
     ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score but may return
     different score-tied representatives of the same Markov equivalence class. Exponential in the
@@ -238,14 +243,15 @@ def exact_search(
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
     score_func : str
-        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC or a mixed-data BIC.
+        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC, a categorical score, or
+        a mixed-data BIC.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
 
     Returns
     -------
     GraphStructure
-        The BIC-optimal DAG, edge ``i -> j`` when ``i`` is an optimal parent of ``j``.
+        The score-optimal DAG, edge ``i -> j`` when ``i`` is an optimal parent of ``j``.
     """
     X = np.asarray(data, dtype=np.float64)
     if search_method not in ("astar", "dp"):

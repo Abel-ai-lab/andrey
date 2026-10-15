@@ -134,9 +134,10 @@ row names the nodes) or a `.npy` file.
 ### Does it handle discrete or mixed data?
 
 Discrete data, yes: code each category as a whole number. PC, FCI, GFCI, and CDNOD test independence
-on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, and hill climbing score it
-with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`. Mixed data, with continuous
-and categorical columns, is experimental: the same methods, plus BOSS, GRaSP, and exact search, take
+on categorical data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu
+search, and exact search score it with `score_func="local_score_BDeu"` or
+`"local_score_BIC_categorical"`. Mixed data, with continuous and categorical columns, is
+experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and exact search take
 `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
 `"local_score_cond_gauss"`. They infer which columns are categorical unless you name them with
 `categorical`, and warn about what they inferred. We have not benchmarked them yet.

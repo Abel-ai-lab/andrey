@@ -8,12 +8,16 @@ CPDAG with a margin.
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
 import pytest
 
 import andrey
-from andrey.core import ARROW
+from andrey.core import ARROW, TAIL
+from andrey.core.orient import pdag2dag as to_dag
+from andrey.core.score import make_score
 from andrey.data import sample_discrete
 from andrey.metrics import shd, to_cpdag
 from tests.recovery.helpers import datagen
@@ -30,6 +34,8 @@ CPDAG_FITS = {
     "hc-bdeu": lambda x: andrey.hc(x, score_func="local_score_BDeu"),
     "ges-bic": lambda x: andrey.ges(x, score_func="local_score_BIC_categorical"),
     "hc-bic": lambda x: andrey.hc(x, score_func="local_score_BIC_categorical"),
+    "tabu-bdeu": lambda x: andrey.tabu(x, score_func="local_score_BDeu"),
+    "tabu-bic": lambda x: andrey.tabu(x, score_func="local_score_BIC_categorical"),
     "cdnod-chisq": lambda x: andrey.cdnod(x, np.zeros(len(x)), indep_test="chisq"),
 }
 PAG_FITS = {
@@ -39,6 +45,13 @@ PAG_FITS = {
     "gfci-bic-gsq": lambda x: andrey.gfci(
         x, score_func="local_score_BIC_categorical", indep_test="gsq"
     ),
+}
+
+# Each exact search, which returns one DAG of the optimal class.
+DAG_FITS = {
+    f"exact-{method}-{name}": partial(andrey.exact_search, search_method=method, score_func=score)
+    for name, score in (("bdeu", "local_score_BDeu"), ("bic", "local_score_BIC_categorical"))
+    for method in ("astar", "dp")
 }
 
 
@@ -141,3 +154,36 @@ def test_a_fractional_value_is_refused_by_the_categorical_bic():
     x[0, 0] = 0.5
     with pytest.raises(ValueError, match="whole number"):
         andrey.ges(x, score_func="local_score_BIC_categorical")
+
+
+@pytest.mark.parametrize("fit", list(DAG_FITS))
+def test_exact_search_returns_the_categorical_network(fit):
+    """Every edge of the network's CPDAG is oriented, so its class has the network alone."""
+    out = DAG_FITS[fit](datagen.generate("discrete_5v"))
+    assert out.structure.kind == "dag"
+    assert _edges(out, {"directed"}) == TRUTH
+
+
+@pytest.mark.parametrize("score_func", ["local_score_BDeu", "local_score_BIC_categorical"])
+def test_the_searches_order_by_score_on_one_categorical_score(score_func):
+    """Exact search finds the lowest total score, and tabu search never ends above hill climbing.
+    On this draw, dense and with few rows, hill climbing stops short of the optimum."""
+    data = sample_discrete(d=6, n=200, seed=7, density=4.0).data
+    score = make_score(score_func, data)
+
+    def total(structure):
+        dag = to_dag(structure.to_numpy())
+        return sum(score.score(v, np.flatnonzero(dag[:, v] == TAIL).tolist()) for v in range(6))
+
+    hc = andrey.hc(data, score_func=score_func)
+    tabu = andrey.tabu(data, score_func=score_func)
+    exact = andrey.exact_search(data, score_func=score_func)
+    assert hc.metadata["score"] == pytest.approx(total(hc.structure), rel=1e-12)
+    assert tabu.metadata["score"] <= hc.metadata["score"]
+    assert total(exact.structure) <= tabu.metadata["score"] + 1e-9
+    assert total(exact.structure) < hc.metadata["score"] - 1.0
+
+
+def test_tabu_takes_no_mixed_data_score():
+    with pytest.raises(NotImplementedError, match="tabu supports"):
+        andrey.tabu(datagen.generate("discrete_5v"), score_func="local_score_cond_gauss")

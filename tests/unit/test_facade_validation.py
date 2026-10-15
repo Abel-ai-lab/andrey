@@ -248,7 +248,7 @@ def test_hc_sets_no_move_limit_by_default():
         ({"tabu_length": 3, "max_tabu": 4}, "max_tabu", ValueError),
         ({"max_tabu": True}, "max_tabu", TypeError),
         ({"lambda_value": -1.0}, "lambda_value", ValueError),
-        ({"score_func": "local_score_BDeu"}, "score_func", NotImplementedError),
+        ({"score_func": "local_score_cond_gauss"}, "local_score_cond_gauss", NotImplementedError),
     ],
 )
 def test_tabu_rejects_a_bad_setting(settings, named, error):
@@ -293,6 +293,27 @@ CATEGORICAL = {
         x, score_func="local_score_BDeu"
     ),
     ("hc", "score_func", "local_score_BDeu"): lambda x: andrey.hc(x, score_func="local_score_BDeu"),
+    ("gfci", "indep_test", "gsq"): lambda x: andrey.gfci(
+        x, indep_test="gsq", score_func="local_score_BIC_categorical"
+    ),
+    ("ges", "score_func", "local_score_BIC_categorical"): lambda x: andrey.ges(
+        x, score_func="local_score_BIC_categorical"
+    ),
+    ("hc", "score_func", "local_score_BIC_categorical"): lambda x: andrey.hc(
+        x, score_func="local_score_BIC_categorical"
+    ),
+    ("tabu", "score_func", "local_score_BDeu"): lambda x: andrey.tabu(
+        x, score_func="local_score_BDeu"
+    ),
+    ("tabu", "score_func", "local_score_BIC_categorical"): lambda x: andrey.tabu(
+        x, score_func="local_score_BIC_categorical"
+    ),
+    ("exact_search", "score_func", "local_score_BDeu"): lambda x: andrey.exact_search(
+        x, score_func="local_score_BDeu"
+    ),
+    ("exact_search", "score_func", "local_score_BIC_categorical"): lambda x: andrey.exact_search(
+        x, score_func="local_score_BIC_categorical"
+    ),
 }
 
 
@@ -332,7 +353,9 @@ def test_a_categorical_error_names_the_dataframe_column():
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-@pytest.mark.parametrize("fit", [andrey.ges, andrey.hc, partial(andrey.gfci, indep_test="chisq")])
+@pytest.mark.parametrize(
+    "fit", [andrey.ges, andrey.hc, andrey.tabu, partial(andrey.gfci, indep_test="chisq")]
+)
 def test_bdeu_still_checks_lambda_value(fit):
     """BDeu has no penalty weight, but a setting outside its range is an error under any score."""
     with pytest.raises(ValueError, match="lambda_value"):

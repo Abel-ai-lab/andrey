@@ -13,6 +13,7 @@ from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
 from andrey.search.ges import GES_SCORES
 from andrey.search.hc import HC_SCORES
+from andrey.search.tabu import TABU_SCORES
 
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
@@ -373,8 +374,9 @@ _add(
         family="score",
         summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the best "
         "non-improving move, never returning to a recently visited DAG, and keeps the best DAG "
-        "seen. With the same settings its BIC score is never worse than hc's. Returns the CPDAG "
-        "of that DAG and its score.",
+        "seen. With the same settings its score is never worse than hc's. BIC by default; "
+        "score_func=local_score_BDeu or local_score_BIC_categorical for categorical data. Returns "
+        "the CPDAG of that DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -387,8 +389,10 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC_from_cov",
-                doc="Local score objective (covariance-based BIC).",
-                choices=("local_score_BIC_from_cov",),
+                doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
+                "categorical data coded by whole numbers.",
+                choices=TABU_SCORES,
             ),
             _LAMBDA_VALUE,
             ParamSpec(
@@ -422,9 +426,10 @@ _add(
     MethodSpec(
         name="exact_search",
         family="score",
-        summary="Globally optimal BIC search over DAGs (A* or dynamic programming). Exact but "
+        summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
-        "the best-scoring equivalence class. score_func=local_score_degen_gauss or "
+        "the best-scoring equivalence class. BIC by default; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
         "local_score_cond_gauss for mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -447,9 +452,10 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score: local_score_BIC = linear-Gaussian BIC; local_score_degen_gauss "
-                "and local_score_cond_gauss = degenerate and conditional Gaussian BIC, for mixed "
-                "data.",
+                doc="Local score: local_score_BIC = linear-Gaussian BIC; local_score_BDeu = BDeu "
+                "and local_score_BIC_categorical = multinomial BIC, for categorical data coded by "
+                "whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
+                "and conditional Gaussian BIC, for mixed data.",
                 choices=EXACT_SCORES,
             ),
             _CATEGORICAL,

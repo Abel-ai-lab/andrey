@@ -276,8 +276,9 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
 
-`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, and `hc` take every score, and
-`boss`, `grasp`, and `exact_search` the continuous and mixed ones. `gfci` takes a score and a test
+`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, and `exact_search` take
+every score, `tabu` the continuous and categorical ones, and `boss` and `grasp` the continuous and
+mixed ones. `gfci` takes a score and a test
 that read the same kind of data, such as
 `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
 
