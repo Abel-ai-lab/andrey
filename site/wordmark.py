@@ -1,16 +1,16 @@
-"""Write the Andrey wordmark and icon: the word "Andrey" in Unbounded, as outlines, in the
-palette's ink, its A's right stroke in amber; the icon is that A alone.
+"""The Andrey wordmark and icon: "Andrey" in Unbounded outlines in the palette's ink,
+with the A's right stroke in amber. The icon is that A alone.
 
-Outlines render the same with or without the font installed. The light and dark wordmarks take
-their ink from ``andrey.viz.LIGHT.ink`` and ``andrey.viz.DARK.ink``; the amber is the art's
-(``andrey.viz.LIGHT.categorical[1]``). The A stays one letter, its apex joined and its crossbar
-whole: only its right stroke, cut along the counter's inner edge, changes color. Rerun after a
-palette change:
+Outlines render the same with or without the font installed. The light and dark wordmarks use
+``andrey.viz.LIGHT.ink`` and ``andrey.viz.DARK.ink``; the amber matches the art
+(``andrey.viz.LIGHT.categorical[1]``). The A stays one letter, with a joined apex and an intact
+crossbar. Only its right stroke, cut along the counter's inner edge, changes color. The files
+are regenerated after a palette change:
 
     uv run --with fonttools --with uharfbuzz --with skia-pathops python site/wordmark.py \\
         Unbounded[wght].ttf
 
-The font file comes from Google Fonts (``ofl/unbounded``, SIL Open Font License); it is not kept
+The font file comes from Google Fonts (``ofl/unbounded``, SIL Open Font License) and is not stored
 in the repository.
 """
 
@@ -37,7 +37,7 @@ AMBER = andrey.viz.LIGHT.categorical[1]
 
 
 def instance(font_path: Path) -> bytes:
-    """The font at ``WEIGHT``, as font-file bytes (a static font passes through)."""
+    """The font as bytes at ``WEIGHT``; static fonts pass through."""
     font = TTFont(font_path)
     if "fvar" in font:
         font = instantiateVariableFont(font, {"wght": WEIGHT})
@@ -47,15 +47,17 @@ def instance(font_path: Path) -> bytes:
 
 
 def glyph_path(glyphs, name: str, offset: tuple[float, float]) -> pathops.Path:
-    """A glyph's outline, its overlaps merged, moved by ``offset``, in font units (y up)."""
+    """A glyph's outline in font units (y up), with overlaps merged and ``offset`` applied."""
     path = pathops.Path()
     glyphs[name].draw(TransformPen(path.getPen(), (1, 0, 0, 1, *offset)))
     return pathops.simplify(path)
 
 
 def right_stroke(a: pathops.Path) -> pathops.Path:
-    """The A's right stroke: the part beyond the line along the counter's right edge (its inner
-    edge), extended through the letter, which leaves the crossbar and the left stroke whole."""
+    """The A's right stroke, beyond the counter's right edge extended through the letter.
+
+    This inner boundary leaves the crossbar and left stroke whole.
+    """
     counter = min(
         (pathops.Path(contour) for contour in a.contours), key=lambda contour: abs(contour.area)
     )
@@ -78,8 +80,7 @@ def right_stroke(a: pathops.Path) -> pathops.Path:
 
 
 def outline(font_path: Path) -> tuple[pathops.Path, pathops.Path, pathops.Path]:
-    """Shape the word with its kerning: the whole word, its A, and the A's right stroke, in font
-    units (y up)."""
+    """The kerned word, its A, and the A's right stroke, in font units (y up)."""
     data = instance(font_path)
     shaped = hb.Buffer()
     shaped.add_str(WORD)
@@ -97,7 +98,7 @@ def outline(font_path: Path) -> tuple[pathops.Path, pathops.Path, pathops.Path]:
 
 
 def svg_d(path: pathops.Path) -> str:
-    """``path`` as SVG path data, flipped so y points down."""
+    """``path`` as SVG path data with the y-axis flipped to point down."""
     pen = SVGPathPen(None, ntos=lambda v: f"{v:.1f}".rstrip("0").rstrip("."))
     path.draw(TransformPen(pen, (1, 0, 0, -1, 0, 0)))
     return pen.getCommands()
@@ -106,7 +107,7 @@ def svg_d(path: pathops.Path) -> str:
 def document(
     paths: list[tuple[str, str]], bounds: tuple[float, float, float, float], label: str
 ) -> str:
-    """The ``(fill, path data)`` pairs in a standalone SVG with a tight viewBox, y down."""
+    """The ``(fill, path data)`` pairs as a standalone SVG with a tight viewBox and y down."""
     x0, y0, x1, y1 = bounds
     w, h = x1 - x0, y1 - y0
     width = round(HEIGHT_PX * w / h, 1)
@@ -118,7 +119,7 @@ def document(
 
 
 def icon(a: pathops.Path, stroke: pathops.Path) -> str:
-    """The A alone on a square, its ink following the browser's light or dark bar."""
+    """The A alone on a square, with ink that follows the browser's light or dark bar."""
     x0, y0, x1, y1 = a.bounds
     side = max(x1 - x0, y1 - y0) * 1.12
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
@@ -133,7 +134,7 @@ def icon(a: pathops.Path, stroke: pathops.Path) -> str:
 
 
 def main() -> None:
-    """Write the light and dark wordmarks and the icon (``brand/favicon.svg``)."""
+    """The light and dark wordmark files and the icon (``brand/favicon.svg``)."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("font", type=Path, help="Unbounded's .ttf (variable or SemiBold)")
     word, a, stroke = outline(parser.parse_args().font)

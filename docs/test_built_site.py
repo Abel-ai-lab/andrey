@@ -493,8 +493,8 @@ def test_the_404_page_resolves_its_links_from_the_site_root(html):
 
 
 def test_every_documentation_page_ends_on_the_documentation_footer(html):
-    # The documentation's own footer in place of the theme's ("Created using Sphinx", "Built with
-    # the PyData Sphinx Theme"); the homepage keeps its own.
+    # Documentation pages use their own footer without the theme's credits ("Created using
+    # Sphinx", "Built with the PyData Sphinx Theme"); the homepage has a separate footer.
     for page, text in _pages(html):
         if page == html / "index.html":
             assert 'class="docs-footer"' not in text
@@ -509,3 +509,23 @@ def test_every_documentation_page_ends_on_the_documentation_footer(html):
         assert "Created using" not in footer and "PyData Sphinx Theme" not in footer, page
         for href in re.findall(r'href="([^"#:]+\.html)"', footer):
             assert (page.parent / href).resolve().is_file(), (page, href)
+
+
+def test_the_brand_kit_offers_every_file_it_shows_and_zips_them(html):
+    import zipfile
+
+    from PIL import Image
+
+    page = (html / "docs" / "brand.html").read_text()
+    files = sorted(set(re.findall(r'href="\.\./_static/brand/([^"]+)" download', page)))
+    assert files and "andrey-brand-kit.zip" in files
+    kit = html / "_static" / "brand"
+    for name in files:
+        assert (kit / name).is_file(), name
+    with zipfile.ZipFile(kit / "andrey-brand-kit.zip") as zipped:
+        names = {pathlib.PurePosixPath(n).name for n in zipped.namelist()}
+    assert set(files) - {"andrey-brand-kit.zip"} <= names and "README.txt" in names
+    with Image.open(kit / "andrey-avatar.png") as avatar:
+        assert avatar.size == (1024, 1024)
+    with Image.open(kit / "andrey-icon-on-light.png") as icon:
+        assert icon.size == (512, 512)

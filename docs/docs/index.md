@@ -71,6 +71,8 @@ What changed in each release.
 - [Configuration](configuration.md) lists the environment variables Andrey reads.
 - [Release cards](benchmarks.md) keep each release's record: timings, accuracy, and known limits.
 - [Testing](ci.md) says what each release is tested on, and how to run the GPU checks.
+- [Brand kit](brand.md) offers wordmark, icon, and avatar downloads, with colors and usage
+  guidelines.
 
 ```{toctree}
 :hidden:
@@ -85,4 +87,5 @@ benchmarks
 faq
 changelog
 roadmap
+brand
 ```

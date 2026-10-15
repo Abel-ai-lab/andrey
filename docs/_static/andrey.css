@@ -235,9 +235,8 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   }
 }
 
-/* A newer release than the reader has seen: the brand's node, an amber dot, at the top right of
-   Release cards, in the navbar and the drawer alike (nav-new.js shows it; DESIGN.md, "Node and
-   edge"). */
+/* An amber dot, the brand's node, marks a release the reader has not seen at the top right of
+   Release cards in both the navbar and the drawer (`nav-new.js`; `DESIGN.md`, "Node and edge"). */
 .nav-new:not([hidden]) {
   display: inline-block;
   flex: none;
@@ -638,9 +637,10 @@ html:not(:has(.andrey-home)) .bd-header::before {
 }
 
 /* ---------- the documentation's footer ---------- */
-/* After craft.do's (_templates/docs-footer.html): a rounded navy card set in from the page's edges,
-   the wordmark beside three columns of links under small capitals and a hairline, then the
-   copyright and Abel's mark along its foot. The theme's footer row gives way to it. */
+/* The documentation footer (`_templates/docs-footer.html`), modeled on craft.do's: a rounded navy
+   card inset from the page's edges, with the wordmark beside three link columns under small
+   capitals and a hairline, and the copyright and Abel's mark at the bottom. The theme's footer
+   row is disabled. */
 .bd-footer {
   padding: 0 0.75rem 0.75rem;
   border-top: 0;
@@ -769,6 +769,168 @@ html:not(:has(.andrey-home)) .bd-header::before {
 
   .docs-footer__columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- the brand kit ---------- */
+/* `docs/brand.md`: each download appears on its intended ground (white or cobalt in either
+   theme), with its name and files. Colors appear as chips; the node and edge appear as an amber
+   dot and line. */
+.brand-all {
+  margin: 0.5rem 0 2rem;
+}
+
+.brand-assets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-assets--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.brand-asset {
+  margin: 0;
+}
+
+.brand-asset__view {
+  display: grid;
+  place-items: center;
+  height: 9rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-asset__view--light {
+  background: var(--andrey-ground-ink);
+}
+
+.brand-asset__view--dark {
+  border-color: transparent;
+  background: var(--andrey-ground-cobalt);
+}
+
+.brand-asset__view--plain {
+  background: var(--andrey-surface-2);
+}
+
+.brand-asset__view img {
+  max-width: 70%;
+  height: auto;
+}
+
+.brand-asset__avatar {
+  border-radius: 50%;
+}
+
+.brand-social {
+  margin: 1rem 0 0.6rem;
+}
+
+.brand-social img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-asset__name {
+  margin: 0.6rem 0 0.15rem;
+  font-weight: 600;
+}
+
+.brand-asset__files {
+  display: flex;
+  gap: 0.9rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.brand-marks {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-marks li {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-marks p {
+  margin: 0;
+}
+
+.brand-mark {
+  justify-self: center;
+  background: var(--andrey-ground-amber);
+}
+
+.brand-mark--node {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+}
+
+.brand-mark--edge {
+  width: 2.4rem;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.brand-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-color {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.brand-color__chip {
+  height: 4.5rem;
+  margin-bottom: 0.4rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-color__name {
+  font-weight: 600;
+}
+
+.brand-color__value {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--andrey-ink);
+  font-size: 0.8125rem;
+}
+
+.brand-color__role {
+  color: var(--andrey-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 47.99rem) {
+  .brand-assets,
+  .brand-assets--three {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -182,7 +182,7 @@ html_theme = "pydata_sphinx_theme"
 html_title = "Andrey"
 # site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script.
 html_static_path = ["_static", "_generated/static", "../site/brand", "../site/assets"]
-# The wordmark's A, its right stroke amber (site/wordmark.py).
+# The wordmark's A with its right stroke in amber (`site/wordmark.py`).
 html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
 html_extra_path = ["_generated/extra", "_extra"]
@@ -238,7 +238,7 @@ html_theme_options = {
     "navigation_with_keys": True,
     "show_prev_next": False,
     "icon_links": [{"name": "GitHub", "url": REPO_URL, "icon": "fa-brands fa-github"}],
-    # The documentation's own footer (_templates/docs-footer.html) in place of the theme's three.
+    # The documentation footer (`_templates/docs-footer.html`); the theme's three areas are empty.
     "footer_start": ["docs-footer"],
     "footer_center": [],
     "footer_end": [],
@@ -257,7 +257,7 @@ html_context = {
     "report_bug_url": f"{REPO_URL}/issues/new",
     "repo_url": REPO_URL,
     "pypi_url": PYPI_URL,
-    # Abel's mark in the text's color, for the documentation's footer.
+    # Abel's mark uses the text color in the documentation footer.
     "abel_mark": site.abel_mark(),
 }
 # A post's author and date sit under its title (_post_byline); the blog index links the archive.
@@ -373,6 +373,30 @@ def _methods_text() -> dict[str, str]:
     }
 
 
+# Brand kit colors: each color's name, role, and palette value.
+BRAND_COLORS = (
+    ("Ink", "Text and the wordmark on light grounds", andrey.viz.LIGHT.ink),
+    ("Paper", "The light ground", andrey.viz.LIGHT.paper),
+    ("Cobalt", "Links, selection, and the art's ground", cards.grain.COBALT),
+    ("Navy", "The art's deep ground and the footer", cards.grain.NAVY),
+    ("Night", "The dark ground", andrey.viz.DARK.paper),
+    ("Pale ink", "Text and the wordmark on dark grounds", andrey.viz.DARK.ink),
+    ("Amber", "The sole accent: one node or one edge", cards.grain.AMBER),
+)
+
+
+def _brand_colors() -> str:
+    """Brand kit swatches (``docs/brand.md``), each with its palette value."""
+    items = "".join(
+        f'<li class="brand-color"><span class="brand-color__chip" style="background:{value}">'
+        f'</span><span class="brand-color__name">{name}</span>'
+        f'<code class="brand-color__value">{value.upper()}</code>'
+        f'<span class="brand-color__role">{role}</span></li>'
+        for name, role, value in BRAND_COLORS
+    )
+    return f'<ul class="brand-colors">{items}</ul>\n'
+
+
 def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its application objects
     """Fill the homepage's context from the summary, and the FAQ's method counts."""
     (GENERATED / "static").mkdir(parents=True, exist_ok=True)
@@ -388,6 +412,10 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
         _write_bytes(GENERATED / "static" / name, tile)
     # A release cover or tile without its own art (_static/benchmarks.css).
     _write_bytes(GENERATED / "static" / "release-ground.jpg", cards.release_ground_jpeg())
+    # Brand kit downloads (`_static/brand/`) and colors from the palette.
+    for name, data in cards.brand_kit().items():
+        _write_bytes(GENERATED / "static" / "brand" / name, data)
+    _write(GENERATED / "brand-colors.html", _brand_colors())
 
 
 # Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage's card carries the
