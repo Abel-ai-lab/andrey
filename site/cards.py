@@ -68,9 +68,15 @@ def _scaled_width(path: Path, height: float) -> float:
 
 
 def _placed(path: Path, x: float, y: float, height: float, opacity: float = 1.0) -> str:
-    """The SVG at ``path`` in white, ``height`` tall with its top left at (``x``, ``y``)."""
+    """The SVG at ``path`` in white, ``height`` tall with its top left at (``x``, ``y``); the
+    wordmark's amber stroke keeps its amber."""
     body = re.sub(r"^.*?<svg[^>]*>|</svg>\s*$", "", path.read_text(), flags=re.S)
-    body = re.sub(r'fill="#[0-9a-fA-F]{6}"', 'fill="#ffffff"', body)
+    keep = grain.AMBER.lower()
+    body = re.sub(
+        r'fill="(#[0-9a-fA-F]{6})"',
+        lambda m: m[0] if m[1].lower() == keep else 'fill="#ffffff"',
+        body,
+    )
     body = body.replace('fill="white"', 'fill="#ffffff"')
     bx, by, bw, bh = _view_box(path)
     return (
@@ -443,8 +449,8 @@ def _jpeg_href(image: Image.Image) -> str:
 
 def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = H) -> str:
     """The banner as SVG, ``width`` x ``height``: ``kind``'s art filling the height, its right edge
-    on the banner's, and over its left side the wordmark, ``title``, and ``line`` after a short
-    amber rule. Text sizes follow the height."""
+    on the banner's, and over its left side the wordmark, ``title``, and ``line`` after an amber
+    dot. Text sizes follow the height."""
     k = height / COVER_H
     size, line_width, most = BANNER_TITLE
     lines = _lines(title, size, line_width, most) or [title]
@@ -467,8 +473,8 @@ def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = 
         _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 96, 56)
         + title_text
         + (
-            f'<rect x="{BANNER_LEFT}" y="{rule_y}" width="42" height="5" fill="{grain.AMBER}"/>'
-            f'<text x="{BANNER_LEFT + 60}" y="{rule_y + 17}" font-family="Inter" '
+            f'<circle cx="{BANNER_LEFT + 9}" cy="{rule_y + 2.5}" r="9" fill="{grain.AMBER}"/>'
+            f'<text x="{BANNER_LEFT + 34}" y="{rule_y + 17}" font-family="Inter" '
             f'font-weight="600" font-size="{BANNER_LINE}" fill="#ffffff" opacity="0.9">'
             f"{html.escape(line)}</text>"
             if line

@@ -182,7 +182,7 @@ html_theme = "pydata_sphinx_theme"
 html_title = "Andrey"
 # site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script.
 html_static_path = ["_static", "_generated/static", "../site/brand", "../site/assets"]
-# The wordmark's "A" in the accent blue: a placeholder mark until the brand has one.
+# The wordmark's A, its right stroke amber (site/wordmark.py).
 html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
 html_extra_path = ["_generated/extra", "_extra"]

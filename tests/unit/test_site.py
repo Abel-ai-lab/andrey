@@ -372,10 +372,16 @@ def test_a_graph_in_parts_is_drawn_part_by_part():
     assert all(0 <= c <= 1 for position in positions.values() for c in position)
 
 
-def test_wordmark_takes_the_palette_ink():
+def test_wordmark_takes_the_palette_ink_and_its_a_one_amber_stroke():
+    # The word in the palette's ink, then its A's right stroke in the art's amber; the icon is
+    # that A, its ink following the browser's light or dark bar.
+    amber = andrey.viz.LIGHT.categorical[1]
     for name, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         svg = (ROOT / "site" / "brand" / f"wordmark-{name}.svg").read_text()
-        assert re.findall(r'fill="([^"]+)"', svg) == [palette.ink]
+        assert re.findall(r'fill="([^"]+)"', svg) == [palette.ink, amber]
+    icon = (ROOT / "site" / "brand" / "favicon.svg").read_text()
+    assert f".ink{{fill:{andrey.viz.LIGHT.ink}}}" in icon and f'fill="{amber}"' in icon
+    assert f"prefers-color-scheme: dark){{.ink{{fill:{andrey.viz.DARK.ink}}}" in icon
 
 
 def test_a_ratio_needs_both_times_and_not_better_graphs(tmp_path):
