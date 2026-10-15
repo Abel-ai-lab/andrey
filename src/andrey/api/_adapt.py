@@ -162,7 +162,9 @@ def checked_data(
     return X, None
 
 
-def categories_as_numbers(data: npt.ArrayLike, setting: str, *, name: str = "data") -> object:
+def categories_as_numbers(
+    data: npt.ArrayLike, setting: str, *, name: str = "data"
+) -> npt.ArrayLike:
     """Return ``data`` with each column that does not hold numbers numbered by its values.
 
     For a categorical setting, every column is categorical, so a text, ``string``, or pandas
