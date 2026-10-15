@@ -21,8 +21,8 @@ repository's conventions.
 Each public method (`andrey.pc`, `andrey.ges`, ...) is a facade in `src/andrey/api/` with one
 typed [`MethodSpec`](src/andrey/spec/registry.py) per name in `andrey.api.__all__`.
 `src/andrey/spec/generate.py` builds every agent interface from the registry: the JSON tool schema
-(`--help --json`), `llms.txt` (`andrey --llms`), the agent skill (`andrey --skill`), and the flags
-of `andrey run`, `list`, `config`, and `calibrate`. Every `ANDREY_*` variable is described once, in
+(`--help --json`), the agent skill (`andrey --skill`), and the flags of `andrey run`, `list`,
+`config`, and `calibrate`. Every `ANDREY_*` variable is described once, in
 [`src/andrey/spec/environment.py`](src/andrey/spec/environment.py), and reaches the same surfaces.
 Edit the spec, not the surfaces.
 
@@ -32,7 +32,7 @@ Edit the spec, not the surfaces.
 | `src/andrey/spec/registry.py` | One `MethodSpec` per public method; parameter defaults are the source of truth. |
 | `src/andrey/spec/environment.py` | Every `ANDREY_*` variable, and the precedence rules (`PRECEDENCE`). |
 | `src/andrey/core/env.py` | One parser per `ANDREY_*` variable, used by the package, `andrey config`, and `andrey run`. |
-| `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_llms_txt` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
+| `src/andrey/spec/generate.py` | `to_json_schema` / `help_schema` / `render_skill`; `SCHEMA_VERSION`, `EXIT_CODES`. |
 | `src/andrey/cli.py` | The `andrey` console script (Typer): `list`, `config`, `calibrate`, and `run`, which validates `<method>` and its `key=value` overrides (and `--config`) against the registry. |
 
 ### The agent skill
@@ -101,7 +101,7 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    identical to the signature), with `status="experimental"`, and call
    `warn_experimental("<name>")` first in the facade until the method is supported.
 3. Run `uv run pytest tests/unit/test_spec_registry.py`, which names whatever is missing. The CLI,
-   the schema, `llms.txt`, and the skill pick up the method on their own.
+   the schema, and the skill pick up the method on their own.
 4. Test it as [Test a method](#test-a-method) describes.
 
 ### Speed up a method
