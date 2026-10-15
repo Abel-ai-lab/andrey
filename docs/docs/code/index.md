@@ -305,7 +305,7 @@ and `rc_params` return plain data and need no import.
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
 | `andrey calibrate` | Measured GES worker-pool cutoff for this machine, as a setting to export |
-| `andrey --skill` / `andrey --llms` | Generated package guides |
+| `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs
