@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 import runpy
 import tarfile
@@ -159,3 +160,126 @@ def test_website_workflows_request_deployment_for_exact_application_commits(lane
         assert set(job["needs"]) == {"ci", "docs"}
         assert workflow["jobs"]["ci"]["uses"] == "./.github/workflows/ci.yml"
         assert workflow["jobs"]["docs"]["uses"] == "./.github/workflows/docs.yml"
+
+
+def _summary(*rows: dict, comparator: str | None = "ref") -> dict:
+    return {"methods": [{"method": "M", "comparator": comparator, "rows": list(rows)}]}
+
+
+def _entry(**changes) -> dict:
+    entry = {
+        "summary": "s",
+        "method": "M",
+        "comparator": "ref",
+        "row": {"d": 50},
+        "andrey_errors": 5.0,
+        "comparator_errors": 4.0,
+        "cause": "correct-by-paper",
+        "reason": "the paper's rule",
+        "citation": "Author (2000).",
+    }
+    return {**entry, **changes}
+
+
+def _failures(*rows: dict, allowlist: tuple[dict, ...] = ()) -> list[str]:
+    from qa import reference_parity
+
+    return reference_parity.check(reference_parity.paired_rows("s", _summary(*rows)), [*allowlist])[
+        0
+    ]
+
+
+@pytest.mark.parametrize(
+    ("row", "fails"),
+    [
+        ({"d": 50, "andrey_shd": 5.0, "comparator_shd": 4.99}, True),
+        ({"d": 50, "andrey_shd": 5.0, "comparator_shd": 5.0}, False),
+        ({"d": 50, "andrey_directed_errors": 3.0, "comparator_directed_errors": 2.0}, True),
+        # Per-series counts decide the row alone, whatever the central errors say.
+        (
+            {
+                "d": 50,
+                "andrey_fewer_errors": 1,
+                "comparator_fewer_errors": 2,
+                "andrey_shd": 1.0,
+                "comparator_shd": 9.0,
+            },
+            True,
+        ),
+        (
+            {
+                "d": 50,
+                "andrey_fewer_errors": 2,
+                "comparator_fewer_errors": 1,
+                "andrey_shd": 9.0,
+                "comparator_shd": 1.0,
+            },
+            False,
+        ),
+        ({"n": 200, "andrey_right_comparator_wrong": 0, "comparator_right_andrey_wrong": 1}, True),
+        # A side without a result is not a paired row.
+        ({"d": 50, "andrey_shd": 5.0, "comparator_shd": None}, False),
+    ],
+)
+def test_parity_fails_a_row_where_the_reference_has_fewer_errors(row, fails):
+    assert bool(_failures(row)) is fails
+
+
+def test_parity_reports_each_failing_row_with_its_numbers():
+    rows = (
+        {"d": 50, "andrey_shd": 5.0, "comparator_shd": 4.67},
+        {"d": 100, "andrey_shd": 7.0, "comparator_shd": 6.0},
+    )
+    failures = _failures(*rows)
+    assert len(failures) == 2
+    assert "d=50" in failures[0] and "5" in failures[0] and "4.67" in failures[0]
+
+
+def test_parity_rejects_a_paired_row_without_an_error_field():
+    from qa import reference_parity
+
+    with pytest.raises(ValueError):
+        reference_parity.paired_rows("s", _summary({"d": 50, "andrey_f1": 0.5}))
+    assert reference_parity.paired_rows("s", _summary({"d": 50}, comparator=None)) == []
+
+
+def test_parity_allowlist_exempts_only_a_cited_cause_with_the_row_numbers():
+    row = {"d": 50, "andrey_shd": 5.0, "comparator_shd": 4.0}
+    assert _failures(row, allowlist=(_entry(),)) == []
+    for bad in (
+        _entry(cause="tie-break"),
+        _entry(citation=""),
+        _entry(reason=" "),
+        _entry(andrey_errors=6.0),
+    ):
+        assert len(_failures(row, allowlist=(bad,))) == 1, bad
+    assert len(_failures(row, allowlist=(_entry(), _entry()))) == 1
+
+
+def test_parity_fails_an_allowlist_entry_without_a_failing_row():
+    row = {"d": 50, "andrey_shd": 4.0, "comparator_shd": 5.0}
+    assert len(_failures(row, allowlist=(_entry(),))) == 1
+    assert len(_failures(row, allowlist=(_entry(row={"d": 20}),))) == 1
+
+
+def test_parity_judges_a_method_by_its_newest_summary(tmp_path):
+    from qa import reference_parity
+
+    for name, generated, shd in (("old", "2026-09-01", 9.0), ("new", "2026-10-01", 4.0)):
+        (tmp_path / name).mkdir()
+        summary = {
+            "generated": generated,
+            **_summary({"d": 50, "andrey_shd": shd, "comparator_shd": 5.0}),
+        }
+        (tmp_path / name / "summary.json").write_text(json.dumps(summary))
+    rows = reference_parity.published_rows(tmp_path)
+    assert [r.summary for r in rows] == ["new"]
+    assert reference_parity.check(rows, [])[0] == []
+
+
+def test_published_rows_match_their_reference_or_name_the_cause():
+    from qa import reference_parity
+
+    allowlist = json.loads(reference_parity.ALLOWLIST.read_text())["entries"]
+    failures, _ = reference_parity.check(reference_parity.published_rows(), allowlist)
+    assert failures == [], "\n".join(failures)
