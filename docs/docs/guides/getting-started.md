@@ -273,7 +273,7 @@ Each test and score reads the columns as one kind of data:
 | Data | `indep_test` | `score_func` |
 |---|---|---|
 | Continuous | `fisherz` (the default) | `local_score_BIC` (the default) |
-| Categorical | `chisq`, `gsq` | `local_score_BDeu` |
+| Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
 
 `pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, and `hc` take every score, and

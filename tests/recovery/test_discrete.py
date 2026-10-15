@@ -1,4 +1,4 @@
-"""Recovery on categorical data: the chi-square and G-square tests and the BDeu score.
+"""Recovery on categorical data: the chi-square and G-square tests, BDeu, and the multinomial BIC.
 
 The fixed cases have one answer: ``discrete_5v`` is the network ``x0 -> x2 <- x1``, ``x2 -> x3 ->
 x4``, whose CPDAG has every edge oriented, and ``discrete_independent_4v`` has no edges. The
@@ -28,12 +28,17 @@ CPDAG_FITS = {
     "pc-gsq": lambda x: andrey.pc(x, indep_test="gsq"),
     "ges-bdeu": lambda x: andrey.ges(x, score_func="local_score_BDeu"),
     "hc-bdeu": lambda x: andrey.hc(x, score_func="local_score_BDeu"),
+    "ges-bic": lambda x: andrey.ges(x, score_func="local_score_BIC_categorical"),
+    "hc-bic": lambda x: andrey.hc(x, score_func="local_score_BIC_categorical"),
     "cdnod-chisq": lambda x: andrey.cdnod(x, np.zeros(len(x)), indep_test="chisq"),
 }
 PAG_FITS = {
     "fci-chisq": lambda x: andrey.fci(x, indep_test="chisq"),
     "fci-gsq": lambda x: andrey.fci(x, indep_test="gsq"),
     "gfci-bdeu-chisq": lambda x: andrey.gfci(x, score_func="local_score_BDeu", indep_test="chisq"),
+    "gfci-bic-gsq": lambda x: andrey.gfci(
+        x, score_func="local_score_BIC_categorical", indep_test="gsq"
+    ),
 }
 
 
@@ -124,8 +129,15 @@ def random_network():
     return sample_discrete(**_RANDOM)
 
 
-@pytest.mark.parametrize("fit", ["pc-chisq", "pc-gsq", "ges-bdeu"])
+@pytest.mark.parametrize("fit", ["pc-chisq", "pc-gsq", "ges-bdeu", "ges-bic"])
 def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
     truth = to_cpdag(random_network.graph)
     assert shd(np.zeros((_RANDOM["d"],) * 2), truth) == 10
     assert shd(CPDAG_FITS[fit](random_network.data), truth) <= _MARGIN
+
+
+def test_a_fractional_value_is_refused_by_the_categorical_bic():
+    x = datagen.generate("discrete_5v")
+    x[0, 0] = 0.5
+    with pytest.raises(ValueError, match="whole number"):
+        andrey.ges(x, score_func="local_score_BIC_categorical")

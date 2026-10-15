@@ -174,7 +174,8 @@ _add(
                 type="str",
                 default="local_score_BIC",
                 doc="Local score for the GES phase: local_score_BIC = linear-Gaussian BIC; "
-                "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
+                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
+                "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
                 "Gaussian BIC, for mixed data (experimental). The test must read the same kind of "
                 "data.",
@@ -230,9 +231,9 @@ _add(
         name="ges",
         family="score",
         summary="Greedy equivalence search: a score-based greedy search over CPDAGs. Fast and "
-        "accurate on linear-Gaussian data with the BIC; score_func=local_score_BDeu for "
-        "categorical data, local_score_degen_gauss or local_score_cond_gauss for mixed data. The "
-        "score is in metadata['score'].",
+        "accurate on linear-Gaussian data with the BIC; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data. The score is in metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -249,7 +250,8 @@ _add(
                 type="str",
                 default="local_score_BIC",
                 doc="Local score objective: local_score_BIC = linear-Gaussian BIC; "
-                "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
+                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
+                "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
                 "Gaussian BIC, for mixed data (experimental).",
                 choices=GES_SCORES,
@@ -324,10 +326,10 @@ _add(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
-        "score improves; a simple greedy baseline. BIC by default; score_func=local_score_BDeu for "
-        "categorical data, local_score_degen_gauss or local_score_cond_gauss for mixed data. Stops "
-        "at a local optimum, or after max_iter moves when set. Returns the CPDAG of the final DAG "
-        "and its score.",
+        "score improves; a simple greedy baseline. BIC by default; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
+        "when set. Returns the CPDAG of the final DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -344,7 +346,8 @@ _add(
                 type="str",
                 default="local_score_BIC_from_cov",
                 doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
-                "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
+                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
+                "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
                 "Gaussian BIC, for mixed data.",
                 choices=HC_SCORES,

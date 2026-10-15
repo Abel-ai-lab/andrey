@@ -7,9 +7,9 @@ form, branching on parent-set size for the scalar fast paths.
 :func:`local_score_bic` is the pure per-node primitive; :class:`BICScore` precomputes the covariance
 once and memoizes scores behind the :class:`Score` protocol that structure-search engines consume.
 :class:`BDeuScore` scores category codes with ``-2`` times the log BDeu marginal likelihood behind
-the same protocol. :class:`DGScore` and :class:`CGScore` score mixed data, continuous and
-categorical columns marked by a mask, with the BIC of the degenerate Gaussian and conditional
-Gaussian models of :mod:`andrey.core.mixed`.
+the same protocol, and :class:`CategoricalBICScore` with the multinomial BIC. :class:`DGScore` and
+:class:`CGScore` score mixed data, continuous and categorical columns marked by a mask, with the BIC
+of the degenerate Gaussian and conditional Gaussian models of :mod:`andrey.core.mixed`.
 
 References
 ----------
@@ -18,6 +18,10 @@ https://doi.org/10.1214/aos/1176344136
 
 Heckerman, Geiger & Chickering (1995). Learning Bayesian networks: the combination of knowledge
 and statistical data. Machine Learning 20(3):197-243. https://doi.org/10.1007/BF00994016
+
+Chickering & Heckerman (1997). Efficient approximations for the marginal likelihood of Bayesian
+networks with hidden variables. Machine Learning 29(2-3):181-212.
+https://doi.org/10.1023/A:1007469629108
 
 Andrews, Ramsey & Cooper (2018). Scoring Bayesian networks of mixed variables. International
 Journal of Data Science and Analytics 6(1):3-18. https://doi.org/10.1007/s41060-017-0085-7
@@ -40,7 +44,7 @@ from . import categorical, stats
 from .mixed import _LRU, ConditionalGaussian, DegenerateGaussian
 
 #: The scores that read category codes, and those that read mixed data with a categorical mask.
-DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu",)
+DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu", "local_score_BIC_categorical")
 MIXED_SCORES: tuple[str, ...] = ("local_score_cond_gauss", "local_score_degen_gauss")
 
 
@@ -367,6 +371,94 @@ class BDeuScore:
         return [self.score(node, parents) for parents in parent_sets]
 
 
+class CategoricalBICScore:
+    """Multinomial BIC score over category codes, on the scale of :class:`BICScore`.
+
+    Each node is a categorical variable whose distribution in each configuration of its parents is
+    fit by its counts [1]_ [2]_. With ``r`` the node's categories, ``q`` the product of its parents'
+    categories, ``N_ij`` the rows in parent configuration ``j``, and ``N_ijk`` those of them where
+    the node takes value ``k``, the local score is
+
+    ``-2 * sum_jk N_ijk * log(N_ijk / N_ij) + lambda_value * log(n) * q * (r - 1)``
+
+    ``-2`` times the maximized log-likelihood plus ``lambda_value * log(n)`` per free parameter of
+    the node's conditional probability table. Lower is better; with ``lambda_value=1`` it is ``-2``
+    times the BIC. A cell no row falls in adds nothing to the likelihood but still counts its
+    parameters. Equivalent graphs score the same.
+
+    ``__init__`` re-encodes each column to the codes ``0..r-1`` (see
+    :func:`~andrey.core.categorical.encode`), each distinct value one category. Scores are memoized
+    by ``(node, sorted parents)``.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, d)
+        Finite values; each distinct value of a column is one category.
+    lambda_value : float, default=1.0
+        Weight on the BIC complexity term.
+    cache_size : int or None, default=1_000_000
+        Memoization cache bound; ``None`` is unbounded.
+
+    Notes
+    -----
+    **Limitations.** It counts ``q * (r - 1)`` parameters whether or not every parent configuration
+    occurs, so with many parent categories and few rows the penalty outgrows the likelihood gain
+    and the score prefers fewer parents than the data support. Its tests check it against the
+    formula on fixed tables; the searches that take it are not benchmarked on it yet.
+
+    References
+    ----------
+    .. [1] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
+       461-464.
+    .. [2] Chickering, D. M., and Heckerman, D. (1997). Efficient approximations for the marginal
+       likelihood of Bayesian networks with hidden variables. Machine Learning 29(2-3), 181-212.
+    """
+
+    def __init__(
+        self,
+        data: np.ndarray,
+        *,
+        lambda_value: float = 1.0,
+        cache_size: int | None = 1_000_000,
+    ) -> None:
+        arr = np.asarray(data)
+        if arr.ndim != 2:
+            raise ValueError(
+                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
+            )
+        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
+            raise ValueError("data contains NaN or Inf; cannot compute categorical BIC scores")
+        self.n: int = arr.shape[0]
+        self.lambda_value = penalty_weight(lambda_value)
+        self.log_n = float(np.log(self.n))
+        self._codes, self._cardinalities = categorical.encode(arr)
+        self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
+
+    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
+        codes = self._codes
+        r = int(self._cardinalities[node])
+        q = float(np.prod([float(self._cardinalities[p]) for p in parents]))
+        config, m = categorical.configurations(codes, self._cardinalities, parents)
+        counts = np.bincount(config * r + codes[:, node], minlength=m * r).reshape(m, r)
+        n_ij = np.repeat(counts.sum(axis=1), r)[counts.ravel() > 0]
+        n_ijk = counts[counts > 0]
+        log_likelihood = float(np.sum(n_ijk * np.log(n_ijk / n_ij)))
+        return -2.0 * log_likelihood + self.lambda_value * self.log_n * q * (r - 1)
+
+    def score(self, node: int, parents: Sequence[int]) -> float:
+        """Return the memoized local categorical BIC score for ``node`` given ``parents``.
+
+        The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
+        the lookup.
+        """
+        key = tuple(sorted(int(p) for p in parents))
+        return self._score_key(int(node), key)
+
+    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
+        """Return the local categorical BIC scores for many parent sets, in request order."""
+        return [self.score(node, parents) for parents in parent_sets]
+
+
 class DGScore:
     """Degenerate Gaussian BIC score over mixed data.
 
@@ -538,7 +630,7 @@ class CGScore:
 
 
 #: Every local score class; the searches that difference full scores take any of them.
-LocalScore = BICScore | BDeuScore | DGScore | CGScore
+LocalScore = BICScore | BDeuScore | CategoricalBICScore | DGScore | CGScore
 
 
 def make_score(
@@ -551,7 +643,8 @@ def make_score(
     """Build the local score ``score_func`` names over ``data``.
 
     ``"local_score_BIC"`` and ``"local_score_BIC_from_cov"`` name :class:`BICScore`,
-    ``"local_score_BDeu"`` :class:`BDeuScore` with its default priors, and
+    ``"local_score_BDeu"`` :class:`BDeuScore` with its default priors,
+    ``"local_score_BIC_categorical"`` :class:`CategoricalBICScore`, and
     ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` :class:`DGScore` and
     :class:`CGScore` over the ``categorical`` mask. BDeu has no penalty weight but still checks
     ``lambda_value``'s range. A search checks ``score_func`` against the names it takes before
@@ -562,6 +655,8 @@ def make_score(
     if score_func == "local_score_BDeu":
         penalty_weight(lambda_value)
         return BDeuScore(np.asarray(data))
+    if score_func == "local_score_BIC_categorical":
+        return CategoricalBICScore(np.asarray(data), lambda_value=lambda_value)
     if score_func == "local_score_degen_gauss":
         return DGScore(data, categorical, lambda_value=lambda_value)
     if score_func == "local_score_cond_gauss":

@@ -1,7 +1,7 @@
 """Hill climbing over DAGs, the engine behind :func:`andrey.hc`.
 
 Under BIC, candidate moves use Schur-complement deltas from :mod:`andrey.core.score_delta`; under
-BDeu and the mixed-data scores, the difference of two full local scores. :class:`MoveScanner`
+the categorical and mixed-data scores, the difference of two full local scores. :class:`MoveScanner`
 caches them between passes, recomputing only changed targets. Output is the DAG's CPDAG and total
 score; lower is better.
 """
@@ -35,6 +35,7 @@ __all__ = ["hc"]
 HC_SCORES: tuple[str, ...] = (
     "local_score_BIC_from_cov",
     "local_score_BDeu",
+    "local_score_BIC_categorical",
     "local_score_degen_gauss",
     "local_score_cond_gauss",
 )
@@ -72,9 +73,9 @@ class MoveScanner:
     ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
     ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
     ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
-    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, BDeu,
-    and the mixed-data scores, all score-equivalent. Its delta is set to zero to prevent rounding
-    noise exceeding ``_EPS_IMPROVE`` from creating a false improvement.
+    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, the
+    categorical scores, and the mixed-data scores, all score-equivalent. Its delta is set to zero to
+    prevent rounding noise exceeding ``_EPS_IMPROVE`` from creating a false improvement.
 
     ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
     legal. ``None`` forbids none.
@@ -350,7 +351,7 @@ def hc(
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Hill-Climbing over a BIC, BDeu, or mixed-data score.
+    """Discover a CPDAG by Hill-Climbing over a BIC, categorical, or mixed-data score.
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
     score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
@@ -364,8 +365,10 @@ def hc(
         Data matrix; rows are observations, columns are variables.
     score_func : str
         Local score: ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC), ``"local_score_BDeu"``
-        (BDeu on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors), or
-        a mixed-data BIC, ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
+        (BDeu on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors),
+        ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
+        :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
+        ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
         ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.

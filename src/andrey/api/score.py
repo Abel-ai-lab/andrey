@@ -58,14 +58,16 @@ def ges(
         become the structure's ``labels``.
     score_func : str, default="local_score_BIC"
         Local score objective: ``"local_score_BIC"``, the linear-Gaussian BIC, for
-        continuous data. ``"local_score_BDeu"`` is the BDeu score [3]_ for categorical data, coded
-        by whole numbers. ``"local_score_degen_gauss"`` (degenerate Gaussian) [4]_ and
+        continuous data. ``"local_score_BDeu"`` is the BDeu score [3]_ and
+        ``"local_score_BIC_categorical"`` the multinomial BIC [7]_, for categorical data coded by
+        whole numbers. ``"local_score_degen_gauss"`` (degenerate Gaussian) [4]_ and
         ``"local_score_cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed data,
         continuous and categorical columns. See Notes.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
-        be finite and non-negative. BDeu ignores it.
+        be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
+        per free parameter of a variable's conditional probability table.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -84,10 +86,10 @@ def ges(
         ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it is
         the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
         n_parents``; for BDeu, ``-2`` times the log of the structure prior times the marginal
-        likelihood; for the mixed-data scores, see Notes. Directed marks (``->``) are oriented
-        edges, undirected (``--``) the ones the equivalence class leaves open. Under a mixed-data
-        setting, ``metadata["categorical"]`` lists the categorical columns it read, by name or
-        0-based position.
+        likelihood; for the multinomial BIC and the mixed-data scores, see Notes. Directed marks
+        (``->``) are oriented edges, undirected (``--``) the ones the equivalence class leaves open.
+        Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
+        read, by name or 0-based position.
 
     Raises
     ------
@@ -98,7 +100,7 @@ def ges(
         an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``max_categories`` is less than ``2``,
-        with ``"local_score_BDeu"``, if ``data`` holds a value that is not a whole number, or, with
+        with a categorical score, if ``data`` holds a number that is not whole, or, with
         a mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
         with another score.
@@ -120,7 +122,8 @@ def ges(
     **When to use it.** GES suits data with no unmeasured common causes. Its default BIC score
     assumes continuous data, where each variable depends linearly on its causes with Gaussian noise;
     in that setting it is a fast, accurate default. For categorical data, use
-    ``"local_score_BDeu"``, and for mixed data ``"local_score_degen_gauss"`` or
+    ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, and for mixed data
+    ``"local_score_degen_gauss"`` or
     ``"local_score_cond_gauss"``. It returns the equivalence class.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
@@ -141,7 +144,11 @@ def ges(
     Dirichlet prior with an equivalent sample size of 1 spread evenly over the cells [3]_. A
     structure prior with one expected parent per variable multiplies it, from three variables up.
     Equivalent graphs score the same, as GES requires. Moves are scored in this process, without
-    the worker processes the BIC search can use.
+    the worker processes the BIC search can use. ``"local_score_BIC_categorical"`` reads the
+    columns the same way and scores a variable by ``-2`` times the log-likelihood of its counts in
+    each parent configuration, plus ``lambda_value * log(n)`` for each of the ``q * (r - 1)`` free
+    parameters, with ``r`` its categories and ``q`` its parents' joint categories [7]_. Both
+    scores are on the scale of the BIC: ``-2`` times a log score.
 
     **Mixed data.** ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` score data with
     continuous and categorical columns; the categorical columns are read as :func:`~andrey.pc`
@@ -168,7 +175,8 @@ def ges(
     the default parent cap, its median errors passed the empty graph's (612 against 338). The
     mixed-data scores are experimental and not benchmarked yet: their tests check each against a
     direct likelihood computation, and run GES on simulated mixed networks of at most 10 variables
-    with 5,000 rows.
+    with 5,000 rows. The multinomial BIC is not benchmarked yet: its tests check it against the
+    formula and run GES on small fixed categorical networks.
 
     References
     ----------
@@ -186,6 +194,8 @@ def ges(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [6] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
        Statistical Association 84(405), 165-175.
+    .. [7] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
+       461-464.
 
     Examples
     --------
@@ -430,7 +440,8 @@ def hc(
         become the structure's ``labels``.
     score_func : str, default="local_score_BIC_from_cov"
         Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
-        continuous data; ``"local_score_BDeu"``, the BDeu score for categorical data, coded by whole
+        continuous data; ``"local_score_BDeu"``, the BDeu score, or
+        ``"local_score_BIC_categorical"``, the multinomial BIC, for categorical data coded by whole
         numbers; or ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"``, the degenerate
         and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
@@ -496,7 +507,8 @@ def hc(
     and on 40,000 rows with 24 variables. It has no move limit by default; run time grows with the
     moves the search takes. A graph that no single move improves need not be the best-scoring one.
     Its BIC score assumes linear relations with Gaussian noise. With a mixed-data score, its tests
-    run it on 5 variables with 3,000 rows.
+    run it on 5 variables with 3,000 rows. With a categorical score, its tests run it on small fixed
+    categorical networks.
 
     References
     ----------

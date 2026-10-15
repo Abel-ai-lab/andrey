@@ -409,9 +409,10 @@ def gfci(
         become the structure's ``labels``.
     score_func : str, default="local_score_BIC"
         Local score driving the GES skeleton phase, as for :func:`~andrey.ges`:
-        ``"local_score_BIC"``, the linear-Gaussian BIC; ``"local_score_BDeu"`` for categorical
-        data, coded by whole numbers; or ``"local_score_degen_gauss"`` or
-        ``"local_score_cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed data.
+        ``"local_score_BIC"``, the linear-Gaussian BIC; ``"local_score_BDeu"`` or
+        ``"local_score_BIC_categorical"`` for categorical data, coded by whole numbers; or
+        ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or conditional
+        Gaussian BIC for mixed data.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
@@ -516,10 +517,10 @@ def gfci(
     # Both phases read the same data, so the score and the test must agree on its type.
     if data_kind(score_func) != data_kind(indep_test):
         raise ValueError(
-            "gfci's score and test must read the data alike: score_func='local_score_BDeu' with "
-            "indep_test 'chisq' or 'gsq' for categories, 'local_score_degen_gauss' or "
-            "'local_score_cond_gauss' with 'degen_gauss' or 'cond_gauss' for mixed data, or a BIC "
-            "score with 'fisherz'; got "
+            "gfci's score and test must read the data alike: score_func='local_score_BDeu' or "
+            "'local_score_BIC_categorical' with indep_test 'chisq' or 'gsq' for categories, "
+            "'local_score_degen_gauss' or 'local_score_cond_gauss' with 'degen_gauss' or "
+            "'cond_gauss' for mixed data, or a BIC score with 'fisherz'; got "
             f"score_func={score_func!r}, indep_test={indep_test!r}"
         )
     X, mask = checked_data(

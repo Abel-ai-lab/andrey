@@ -1,9 +1,9 @@
 """Greedy Equivalence Search over a decomposable score, the engine behind :func:`andrey.ges`.
 
-The linear-Gaussian BIC scores each candidate by its Schur delta; the discrete BDeu and the
-mixed-data scores difference two full local scores. The objective returned alongside the CPDAG is
-recomputed from it. The algorithm,
-its settings, and its reference are described on :func:`andrey.ges`.
+The linear-Gaussian BIC scores each candidate by its Schur delta; the categorical BDeu and BIC and
+the mixed-data scores difference two full local scores. The objective returned alongside the CPDAG
+is recomputed from it. The algorithm, its settings, and its reference are described on
+:func:`andrey.ges`.
 """
 
 from __future__ import annotations
@@ -86,9 +86,9 @@ def _recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
 
     The objective is recomputed from the final structure rather than accumulated from the search's
     Schur deltas, so it is independent of the (non-bit-pure) delta arithmetic and identical for
-    serial and parallel runs on the same CPDAG. Any consistent extension gives the same total (BIC
-    BDeu, and the mixed-data scores are score-equivalent), so ``pdag2dag``'s choice of
-    representative is immaterial.
+    serial and parallel runs on the same CPDAG. Any consistent extension gives the same total (BIC,
+    the categorical scores, and the mixed-data scores are score-equivalent), so ``pdag2dag``'s
+    choice of representative is immaterial.
     """
     dag = pdag2dag(adj)
     return float(sum(score.score(v, ops.parents(dag, v).tolist()) for v in range(n)))
@@ -98,6 +98,7 @@ def _recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
 GES_SCORES: tuple[str, ...] = (
     "local_score_BIC",
     "local_score_BDeu",
+    "local_score_BIC_categorical",
     "local_score_degen_gauss",
     "local_score_cond_gauss",
 )
@@ -112,7 +113,7 @@ def ges(
     categorical: np.ndarray | None = None,
     _full_scores: bool = False,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Greedy Equivalence Search over a BIC, BDeu, or mixed-data score.
+    """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
 
     Runs the forward (Insert) then backward (Delete) greedy phases from the empty graph, re-forming
     the CPDAG after every accepted move, then returns the discovered CPDAG and its total objective
@@ -128,9 +129,11 @@ def ges(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC"`` (linear-Gaussian BIC), ``"local_score_BDeu"`` (BDeu
-        on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors), or a
-        mixed-data BIC, ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
+        Local score: ``"local_score_BIC"`` (linear-Gaussian BIC), ``"local_score_BDeu"`` (BDeu on
+        category codes, :class:`~andrey.core.score.BDeuScore` with its default priors),
+        ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
+        :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
+        ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
         ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.

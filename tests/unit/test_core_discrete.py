@@ -1,8 +1,9 @@
-"""The categorical primitives: the chi-square and G-square tests, the BDeu score, and the codes.
+"""The categorical primitives: the chi-square and G-square tests, the BDeu and multinomial BIC
+scores, and the codes.
 
 Each statistic is checked against an independent computation: SciPy's contingency-table test for
-one table, a per-configuration loop for a conditional test, and the BDeu formula written out with
-``math.lgamma``.
+one table, a per-configuration loop for a conditional test, the BDeu formula written out with
+``math.lgamma``, and the multinomial BIC written out per cell.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from scipy.stats import chi2, chi2_contingency
 
 from andrey.core import categorical
 from andrey.core.ci import ChiSquare
-from andrey.core.score import BDeuScore
+from andrey.core.score import BDeuScore, CategoricalBICScore, make_score
 
 
 def _codes(seed: int = 0, n: int = 400, cards=(2, 3, 4, 3)) -> np.ndarray:
@@ -191,3 +192,87 @@ def test_the_sampler_rejects_category_bounds_that_are_not_ordered_whole_numbers(
 
     with pytest.raises(ValueError, match="categories must be"):
         sample_discrete(d=3, n=20, seed=0, categories=categories)
+
+
+def _multinomial_loglik(counts: np.ndarray) -> float:
+    """Maximized multinomial log-likelihood of ``counts`` (one row per parent configuration)."""
+    total = 0.0
+    for row in counts:
+        for c in row:
+            if c:
+                total += c * math.log(c / row.sum())
+    return total
+
+
+def test_categorical_bic_matches_the_formula():
+    x = np.array([[0, 0, 0], [0, 0, 1], [0, 1, 0], [1, 1, 1], [1, 1, 0], [0, 1, 1]], float)
+    score = CategoricalBICScore(x)
+    log_n = math.log(6)
+    # Node 0 with no parent: counts (4, 2), one free parameter.
+    assert score.score(0, []) == pytest.approx(-2 * _multinomial_loglik(np.array([[4, 2]])) + log_n)
+    # Node 0 given nodes 1 and 2: four configurations, each with one free parameter.
+    counts = np.array([[1, 0], [1, 0], [1, 1], [1, 1]])
+    assert score.score(0, [2, 1]) == pytest.approx(-2 * _multinomial_loglik(counts) + 4 * log_n)
+
+
+def test_categorical_bic_counts_the_parameters_of_unseen_configurations():
+    """Two parents of 2 and 3 categories give q = 6 configurations; the 3-category node has 2
+    free parameters in each, whether or not a row falls in it."""
+    x = np.array([[0, 0, 0], [1, 1, 1], [2, 0, 2], [0, 1, 0], [1, 0, 2], [2, 1, 1]], float)
+    x = np.vstack([x, [[0, 0, 1], [0, 0, 2]]])  # parent configuration (0, 0) seen; (1, 2) never
+    score = CategoricalBICScore(x, lambda_value=0.0)
+    assert score.score(0, [1, 2]) - CategoricalBICScore(x).score(0, [1, 2]) == pytest.approx(
+        -2 * 3 * 2 * math.log(len(x))
+    )
+
+
+def test_categorical_bic_without_a_penalty_is_minus_twice_the_log_likelihood():
+    x = _codes()
+    score = CategoricalBICScore(x, lambda_value=0.0)
+    counts = np.zeros((2, 3))
+    np.add.at(counts, (x[:, 0].astype(int), x[:, 1].astype(int)), 1)
+    assert score.score(1, [0]) == pytest.approx(-2 * _multinomial_loglik(counts), rel=1e-12)
+
+
+def test_categorical_bic_penalty_scales_with_lambda_value():
+    x = _codes()
+    plain, double = CategoricalBICScore(x), CategoricalBICScore(x, lambda_value=2.0)
+    free = CategoricalBICScore(x, lambda_value=0.0)
+    for parents in ([], [0], [0, 2]):
+        penalty = plain.score(1, parents) - free.score(1, parents)
+        assert double.score(1, parents) - free.score(1, parents) == pytest.approx(2 * penalty)
+
+
+def test_categorical_bic_is_score_equivalent():
+    """``x -> y`` and ``y -> x`` describe one equivalence class, so they score the same."""
+    x = _codes(n=500)
+    s = CategoricalBICScore(x)
+    for a, b in combinations(range(x.shape[1]), 2):
+        assert s.score(a, [b]) + s.score(b, []) == pytest.approx(s.score(b, [a]) + s.score(a, []))
+
+
+def test_categorical_bic_does_not_depend_on_the_codes():
+    x = _codes()
+    a, b = CategoricalBICScore(x), CategoricalBICScore(x * -3.0 + 2.0)
+    assert b.score(1, [2, 0]) == pytest.approx(a.score(1, [0, 2]), rel=1e-12)
+
+
+def test_categorical_bic_and_bdeu_agree_on_which_parent_explains_a_copy():
+    """Column 1 copies column 0 in most rows: both scores improve most by that parent."""
+    x = _codes(n=2000)
+    for score in (BDeuScore(x), CategoricalBICScore(x)):
+        gains = {p: score.score(1, [p]) - score.score(1, []) for p in (0, 2, 3)}
+        assert min(gains, key=gains.get) == 0 and gains[0] < 0
+
+
+@pytest.mark.parametrize("value", [-1.0, float("nan"), float("inf")])
+def test_categorical_bic_lambda_value_must_be_finite_and_non_negative(value):
+    with pytest.raises(ValueError, match="lambda_value"):
+        CategoricalBICScore(_codes(), lambda_value=value)
+
+
+def test_make_score_builds_the_categorical_bic_with_its_weight():
+    x = _codes()
+    built = make_score("local_score_BIC_categorical", x, lambda_value=2.0)
+    assert isinstance(built, CategoricalBICScore)
+    assert built.score(1, [0]) == CategoricalBICScore(x, lambda_value=2.0).score(1, [0])
