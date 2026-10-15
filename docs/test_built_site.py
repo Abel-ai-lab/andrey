@@ -480,7 +480,7 @@ def test_the_404_page_resolves_its_links_from_the_site_root(html):
     assert head.index('<base href="/">') < first
     # Its in-page links stay on the page rather than resolving to the homepage.
     assert "a.href = location.pathname + a.getAttribute('href')" in head
-    assert "<h1>Page not found" in text
+    assert "<h1>Missing link" in text and (html / "_static" / "missing-link.jpg").is_file()
     body = text.split("</head>", 1)[1]
     targets = {
         h.split("#")[0]

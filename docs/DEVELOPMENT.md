@@ -337,11 +337,13 @@ shows:
   and its cover and lists every other post once, newest first; each post has a built cover and a
   byline with its author and date. Every site address in the README, the
   project URLs, and the citation is built.
-- Search and answer engines: every page's structured data matches its link preview, and each
-  post's date, authors, and release match its front matter; `llms.txt` links public pages by
-  section with their own titles and descriptions; `sitemap.xml` lists each indexable page once,
-  and `robots.txt` names it; only the search page and the 404 page are `noindex`. The 404 page
-  resolves its links from the site's root, so it works at any address the server shows it at.
+- Search and answer engines: every page's structured data matches its link preview, and each post's
+  date, authors, and release match its front matter; `llms.txt` links public pages by section with
+  their own titles and descriptions; `sitemap.xml` lists each indexable page once, and `robots.txt`
+  names it; only the search page and the 404 page are `noindex`. The 404 page, "Missing link"
+  (`404.md`), resolves its links from the site's root, so it works at any address the server shows
+  it at; its art, `_static/missing-link.jpg`, is stored after `brand_tones`, and its cards lead to
+  the main sections.
 
 To check external links: `uv run --group docs sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 

@@ -597,6 +597,18 @@ html:not(:has(.andrey-home)) .bd-header::before {
   }
 }
 
+/* ---------- the 404 page ---------- */
+/* 404.md's art spans the text column, its corners rounded like a post's cover; the cards under it
+   are the documentation's own. */
+.bd-content img.missing-link-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0.25rem 0 1.5rem;
+  border-radius: 14px;
+  background: var(--andrey-ground-navy);
+}
+
 /* ---------- documentation sidebars ---------- */
 /* The documentation tree (_templates/docs-nav.html) lies flat on the paper: a group's heading in
    the ink beside its icon, its pages as plain rows under it, the page being read in the accent,
