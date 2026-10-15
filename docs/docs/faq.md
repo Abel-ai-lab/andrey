@@ -161,8 +161,13 @@ The [command-line reference](code/index.md#command-line-interface) has every com
 
 The `andrey` command never prompts. `andrey run` and `andrey list` print JSON when a program
 reads their output, and every command takes `--json`. `andrey run <method> --help --json` gives a
-method's parameters as JSON Schema without running it, and `andrey --skill` prints a skill an agent
-can install, for example `andrey --skill > ~/.claude/skills/andrey/SKILL.md`.
+method's parameters as JSON Schema without running it, and `andrey --skill` prints a skill that
+teaches an agent all of this. To install it, paste this prompt into your coding agent:
+
+```text
+Install Andrey's agent skill: make sure the andrey-core package is installed, run
+`andrey --skill`, and save its output as andrey/SKILL.md in your skills folder.
+```
 
 ## The project
 

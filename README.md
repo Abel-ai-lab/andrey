@@ -139,7 +139,13 @@ variable. From a shell or an agent:
 
 ```shell
 andrey run pc --data your_data.csv   # JSON when piped, a summary in a terminal
-andrey --skill                       # a guide an agent loads as a skill
+```
+
+To give your coding agent Andrey's skill, paste this prompt into it:
+
+```text
+Install Andrey's agent skill: make sure the andrey-core package is installed, run
+`andrey --skill`, and save its output as andrey/SKILL.md in your skills folder.
 ```
 
 ## Learn more
