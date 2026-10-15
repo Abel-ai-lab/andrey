@@ -372,10 +372,16 @@ def test_a_graph_in_parts_is_drawn_part_by_part():
     assert all(0 <= c <= 1 for position in positions.values() for c in position)
 
 
-def test_wordmark_takes_the_palette_ink():
+def test_wordmark_takes_the_palette_ink_and_its_a_one_amber_stroke():
+    # The word uses the palette's ink, with the A's right stroke in the art's amber. The icon is
+    # that A alone, with ink that follows the browser's light or dark bar.
+    amber = andrey.viz.LIGHT.categorical[1]
     for name, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         svg = (ROOT / "site" / "brand" / f"wordmark-{name}.svg").read_text()
-        assert re.findall(r'fill="([^"]+)"', svg) == [palette.ink]
+        assert re.findall(r'fill="([^"]+)"', svg) == [palette.ink, amber]
+    icon = (ROOT / "site" / "brand" / "favicon.svg").read_text()
+    assert f".ink{{fill:{andrey.viz.LIGHT.ink}}}" in icon and f'fill="{amber}"' in icon
+    assert f"prefers-color-scheme: dark){{.ink{{fill:{andrey.viz.DARK.ink}}}" in icon
 
 
 def test_a_ratio_needs_both_times_and_not_better_graphs(tmp_path):
@@ -1122,6 +1128,14 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
         r'<a class="tile-face" href="#[\w-]+" data-tile="([\w-]+)"', placeholder_page
     )
     assert opened and len(opened) == len(set(opened))
+
+
+def test_the_hero_pill_copies_the_agent_prompt_the_readme_and_the_faq_give(placeholder_page):
+    assert f'data-prompt="{html.escape(build.AGENT_PROMPT)}"' in placeholder_page
+    for name in build.AGENTS.values():  # each agent's mark, named
+        assert f"<title>{html.escape(name)}</title>" in placeholder_page
+    for page in (ROOT / "README.md", ROOT / "docs" / "docs" / "faq.md"):
+        assert build.AGENT_PROMPT in " ".join(page.read_text().split()), page.name
 
 
 def test_the_hero_and_the_first_section_share_one_art(placeholder_page):

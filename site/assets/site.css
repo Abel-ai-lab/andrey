@@ -272,6 +272,52 @@
   background: color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
 }
 
+/* The pill above the headline, which copies the agent prompt: the install line's glass, rounded. */
+.andrey-home .agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 32%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.andrey-home .agent-pill:hover,
+.andrey-home .agent-pill.is-copied {
+  border-color: var(--andrey-ground-ink);
+}
+
+.andrey-home .agent-logos {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.andrey-home .agent-logo {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.85;
+}
+
+/* On a phone the pill stays on one line: its label and its confirmation drop their second half. */
+@media (max-width: 27rem) {
+  .andrey-home .agent-pill__more {
+    display: none;
+  }
+
+  .andrey-home .agent-pill__label {
+    white-space: nowrap;
+  }
+
+  .andrey-home .agent-logos {
+    gap: 0.3rem;
+  }
+}
+
 /* Cobalt in both themes: the dark theme's lighter accent is too pale under the light type. */
 .andrey-home .hero .chip--primary {
   border-color: color-mix(in srgb, var(--andrey-ground-ink) 35%, transparent);
@@ -1656,6 +1702,16 @@
   min-height: clamp(26rem, 46vw, 90svh);
   margin: calc(-1 * clamp(3rem, 8vw, 5.5rem)) calc(50% - 50vw) clamp(1rem, 3vw, 2rem);
   padding: clamp(1.5rem, 4vw, 3rem) max(var(--gutter), calc(50vw - var(--page) / 2 + var(--gutter)));
+}
+
+/* On a large screen the band is taller than its title needs, and the title sits in its middle: the
+   tiles rise into the band's foot, over its fading art, by half of what the band gained over its
+   height at 1312 px wide (37.75rem), so the title stays near its evidence and the art keeps its
+   full height. Narrower screens are unchanged. */
+.andrey-home .section-cover + .bento-grid {
+  position: relative;
+  z-index: 1;
+  margin-top: min(0px, calc((37.75rem - clamp(26rem, 46vw, 90svh)) / 2));
 }
 
 /* The band's art on its own ground, faded out at both ends over about a fifth of a screen, so the

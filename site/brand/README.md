@@ -37,5 +37,11 @@
   same art, in the same tones, with calm areas where the card's text sits.
 - `abel-logo-white.svg`: the Abel AI Lab logotype, from Abel's brand kit. Its last path is the
   mark, which the homepage's footer draws beside Abel's name.
-- `wordmark-light.svg`, `wordmark-dark.svg`, `favicon.svg`: Andrey's wordmark and icon.
+- `abel-symbol-night.svg`: Abel's logomark in Night Teal, for light backgrounds, unchanged from
+  the brand kit (`Abel-design-branding`, `assets/logos/symbol-night.svg`). The build draws it as
+  `_static/abel-symbol.png`, the organization's logo in the site's structured data.
+- `wordmark-light.svg`, `wordmark-dark.svg`, `favicon.svg`: the wordmark is "Andrey" in Unbounded
+  SemiBold outlines, in light or dark ink with the A's right stroke in the art's amber. The A stays
+  whole, with its apex joined and crossbar intact. The icon is that A alone; its ink follows the
+  browser's light or dark bar. `site/wordmark.py` writes all three.
 - `fonts/`: Inter, under the SIL Open Font License (`fonts/OFL.txt`).

@@ -1,7 +1,7 @@
 """Define the machine-readable list of ``ANDREY_*`` environment variables.
 
 Each variable has one :class:`EnvVarSpec`, grouped by backend selection, reproducibility,
-determinism, or data. CLI help, configuration reports, ``llms.txt``, and ``SKILL.md`` render these
+determinism, or data. CLI help, configuration reports, and ``SKILL.md`` render these
 definitions. Each variable's parser is in :mod:`andrey.core.env`. The human-readable list is
 ``docs/docs/configuration.md``.
 """

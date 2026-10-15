@@ -9,6 +9,11 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Removed
+
+- `andrey --llms`: `andrey list` looks up the methods, `andrey config --help` the settings, and
+  `andrey --skill` holds both in the agent guide. ([#122])
+
 ### Fixed
 
 - `direct_lingam`, `multi_group_direct_lingam`, `var_lingam`, `varma_lingam`, and
@@ -140,4 +145,5 @@ First alpha release.
 [#57]: https://github.com/Abel-ai-lab/andrey/pull/57
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59
 [#64]: https://github.com/Abel-ai-lab/andrey/pull/64
+[#122]: https://github.com/Abel-ai-lab/andrey/pull/122
 [#95]: https://github.com/Abel-ai-lab/andrey/pull/95
