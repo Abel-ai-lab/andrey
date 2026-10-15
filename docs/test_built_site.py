@@ -451,7 +451,7 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
     for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
         assert f"https://andrey.abel.ai/{required}" in urls, required
     # Left out: pages with no content of their own, and the redirects from moved addresses.
-    left_out = ("search.html", "genindex.html", "blog/drafts.html", "demo/index.html")
+    left_out = ("search.html", "404.html", "genindex.html", "blog/drafts.html", "demo/index.html")
     moved = (
         "blog/andrey-0-2-0.html",
         "blog/introducing-andrey.html",
@@ -461,10 +461,32 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         assert f"https://andrey.abel.ai/{address}" not in urls, address
 
 
-def test_only_the_search_page_is_noindex(html):
+def test_only_the_search_page_and_the_404_page_are_noindex(html):
     for page, text in _pages(html):
         robots = re.findall(r'<meta name="robots" content="([^"]*)"', text)
-        if page == html / "search.html":
-            assert robots == ["noindex, follow"]
+        if page in (html / "search.html", html / "404.html"):
+            assert robots == ["noindex, follow"], page
         else:
             assert not robots, page
+
+
+def test_the_404_page_resolves_its_links_from_the_site_root(html):
+    # The server shows 404.html at whatever address was missing, so its links and files resolve
+    # from the root, whatever the depth: a <base href="/"> ahead of the first relative address.
+    text = (html / "404.html").read_text()
+    head = text.split("</head>", 1)[0]
+    assert head.count('<base href="/">') == 1
+    first = min(head.index(m) for m in ('href="_static', 'src="_static') if m in head)
+    assert head.index('<base href="/">') < first
+    # Its in-page links stay on the page rather than resolving to the homepage.
+    assert "a.href = location.pathname + a.getAttribute('href')" in head
+    assert "<h1>Page not found" in text and (html / "_static" / "missing-link.jpg").is_file()
+    body = text.split("</head>", 1)[1]
+    targets = {
+        h.split("#")[0]
+        for h in re.findall(r'href="([^"#:][^":]*)"', body)
+        if not h.startswith(("/", "//")) and h.split("#")[0]
+    }
+    assert {"docs/index.html", "docs/benchmarks.html", "blog/index.html"} <= targets
+    for target in targets:
+        assert (html / target).exists(), target

@@ -204,6 +204,9 @@ ABEL_URL = "https://abel.ai/"
 ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
 ABEL_LOGO = "_static/abel-symbol.png"
 ABEL_LOGO_WIDTH = 600
+# Pages a search engine should not list: the search page, and the page the server shows for a
+# missing address (404.md).
+UNINDEXED = {"search", "404"}
 # The pages llms.txt lists, by section; each release card and published post follows its section's
 # pages, newest first.
 LLMS_SECTIONS = (
@@ -432,8 +435,8 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
     """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
     image), and its structured data (``discovery.head_tags``): the organization, the website, the
-    software at the release the page belongs to, the page or post, and its breadcrumbs. The search
-    page is ``noindex``. The description and ``og:description`` are one value."""
+    software at the release the page belongs to, the page or post, and its breadcrumbs. The pages
+    in ``UNINDEXED`` are ``noindex``. The description and ``og:description`` are one value."""
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
@@ -464,7 +467,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         for key, value in tags.items()
     )
     page = {"title": title, "description": description, "url": url, "image": image}
-    if pagename == "search":
+    if pagename in UNINDEXED:
         page["indexable"] = False
     if match := re.fullmatch(r"docs/benchmarks/(\d+\.\d+\.\d+)", pagename):
         page["software_version"] = match[1]
@@ -652,6 +655,17 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     context["metatags"] = context.get("metatags", "") + _preview_tags(
         app, pagename, context, doctree
     )
+    # The server answers a missing address with the 404 page at that address, at any depth, so the
+    # page resolves its links and files from the site's root; its in-page links (the skip link and
+    # the heading's) stay on the page.
+    if pagename == "404":
+        context["metatags"] = (
+            '<base href="/">\n'
+            + context["metatags"]
+            + "<script>addEventListener('DOMContentLoaded', () => { for (const a of "
+            "document.querySelectorAll('a[href^=\"#\"]')) "
+            "a.href = location.pathname + a.getAttribute('href') })</script>\n"
+        )
 
 
 def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
