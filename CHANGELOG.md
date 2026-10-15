@@ -16,17 +16,17 @@ change names its pull request.
 - `anm` and `pnl` are supported. On cause-effect pairs, ANM names the same direction as
   causal-learn on every pair and runs about 2x faster; PNL runs up to 1,470x faster and names the
   true direction on more pairs. The 0.4.0 release card gives the numbers and each method's limits.
-  ([#TBD])
+  ([#95])
 
 ### Added
 
 - `anm`: a direction test for a pair of variables under the additive noise model, returning a
-  two-node DAG and both p-values, as `pnl` does. ([#TBD])
+  two-node DAG and both p-values, as `pnl` does. ([#95])
 
 ### Changed
 
 - With `alpha=None`, `pnl` breaks a tie between equal p-values by the HSIC statistics, which
-  `metadata` now holds, instead of drawing no edge. ([#TBD])
+  `metadata` now holds, instead of drawing no edge. ([#95])
 
 ## [0.3.0] - 2026-10-13
 
@@ -133,3 +133,4 @@ First alpha release.
 [#57]: https://github.com/Abel-ai-lab/andrey/pull/57
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59
 [#64]: https://github.com/Abel-ai-lab/andrey/pull/64
+[#95]: https://github.com/Abel-ai-lab/andrey/pull/95
