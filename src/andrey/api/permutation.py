@@ -3,9 +3,9 @@
 ``boss`` and ``grasp`` are native -- they run a permutation/score search on the :mod:`andrey.core`
 compute substrate and return a CPDAG ``GraphStructure`` with its objective score. Both score
 candidate parent additions through the batched Schur delta-BIC surface over the linear-Gaussian
-BIC (:class:`andrey.core.score.BICScore`), or by full local scores for a discrete score
-(:mod:`andrey.core.discrete`). Their search order is drawn from a private RNG seeded by
-``seed`` (or the global ``ANDREY_SEED``), so a run is reproducible.
+BIC (:class:`andrey.core.score.BICScore`), or through a discrete score's batched local scores
+(:meth:`andrey.core.discrete.DiscreteScore.add_scores`). Their search order is drawn from a
+private RNG seeded by ``seed`` (or the global ``ANDREY_SEED``), so a run is reproducible.
 """
 
 from __future__ import annotations
@@ -108,8 +108,7 @@ default="local_score_BIC_from_cov"
     median errors (SHD) stayed below the empty graph's at every size, 24 against 800 at 800
     variables. The median fit took 0.031 s at 20 variables and 292 s at 800, on 16 cores. On the
     223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``, its median errors
-    passed the empty graph's (506 against 338). With a discrete score, it is not benchmarked yet;
-    its tests run it on at most 3 variables with 1,000 rows.
+    passed the empty graph's (506 against 338).
 
     References
     ----------
@@ -238,8 +237,6 @@ default="local_score_BIC_from_cov"
     variables. The median fit took 0.037 s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16
     cores; larger graphs were not measured. On the 223-variable ANDES network with 1,000 simulated
     rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338).
-    With a discrete score, it is not benchmarked yet; its tests run it on at most 3 variables with
-    270 rows.
 
     References
     ----------

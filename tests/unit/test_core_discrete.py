@@ -1,8 +1,8 @@
 """Discrete tests and scores: reference values, invariances, and the search-facing surfaces.
 
-The reference values were computed on the fixed data below by causal-learn 0.1.4 (``CIT`` with
+The reference values were computed on the fixed data below by causal-learn 0.1.4.8 (``CIT`` with
 ``"chisq"`` and ``"gsq"``; ``local_score_BDeu``, structure prior included, times ``-2``) and by
-pgmpy 1.0 (``BIC.local_score`` times ``-2``).
+pgmpy 1.1.2 (``BIC.local_score`` times ``-2``).
 """
 
 from __future__ import annotations

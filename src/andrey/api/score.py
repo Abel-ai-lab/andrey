@@ -50,8 +50,7 @@ def ges(
 default="local_score_BIC"
         Local score objective: the linear-Gaussian BIC for continuous data, or for categorical
         data BDeu (equivalent sample size 1, and a structure prior expecting one parent per
-        variable) or the multinomial BIC. A
-        discrete score scores every move by two full local scores in one process.
+        variable) or the multinomial BIC.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative, and 1.0
@@ -104,9 +103,7 @@ default="local_score_BIC"
     below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against
     200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
     and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
-    the default parent cap, its median errors passed the empty graph's (612 against 338). With a
-    discrete score, it is not benchmarked yet; its tests run it on at most 3 variables with 1,000
-    rows.
+    the default parent cap, its median errors passed the empty graph's (612 against 338).
 
     References
     ----------
@@ -378,8 +375,7 @@ default="local_score_BIC_from_cov"
     exceeded the empty graph's. The median fit took under a second at 800 variables and about 20 s
     at 3,200, on 4 cores. It has no move limit by default; run time grows with the moves the search
     takes. A graph that no single move improves need not be the best-scoring one. Its BIC score
-    assumes linear relations with Gaussian noise. With a discrete score, it is not benchmarked yet;
-    its tests run it on at most 3 variables with 1,000 rows.
+    assumes linear relations with Gaussian noise.
 
     References
     ----------
@@ -491,8 +487,7 @@ default="local_score_BIC_from_cov"
     at 3,200, on 4 cores. It takes hill climbing's moves plus up to ``max_tabu`` non-improving
     moves between new best scores, with no move limit by default; run time grows with the moves
     taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be
-    missed. Its BIC score assumes linear relations with Gaussian noise. With a discrete score, it is
-    not benchmarked yet; its tests run it on at most 3 variables with 270 rows.
+    missed. Its BIC score assumes linear relations with Gaussian noise.
 
     References
     ----------
@@ -582,8 +577,7 @@ default="local_score_BIC"
     **Limitations.** Not benchmarked yet. Its tests run it on at most 5 variables with 1,000 rows.
     It scores every possible parent set of every variable, so its run time at least doubles with
     each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
-    its memory doubles as well. With a discrete score, it is not benchmarked yet; its tests run it
-    on at most 3 variables with 1,000 rows.
+    its memory doubles as well.
 
     References
     ----------

@@ -26,12 +26,11 @@ column. A single column gives a one-node graph.
 Categorical data takes a discrete test or score. PC, FCI, GFCI, and CD-NOD accept
 `indep_test="chisq"` (Pearson chi-square) and `"gsq"` (G-square); GES, GFCI, hill climbing, Tabu
 search, BOSS, GRaSP, and exact search accept `score_func="local_score_BDeu"` (BDeu, equivalent
-sample size 1, with the structure prior Tetrad and causal-learn use, which expects one parent per
-variable) and `"local_score_BIC_discrete"` (multinomial BIC). With either, each column is read
-as categories, one per distinct value: pandas categoricals, booleans, strings, and whole numbers
-are accepted, and a column of other numbers raises a `ValueError`, since data mixing continuous
-and categorical columns is not supported. The discrete tests and scores have no published
-benchmark yet.
+sample size 1, with a structure prior that expects one parent per variable) and
+`"local_score_BIC_discrete"` (multinomial BIC). With either, each column is read as categories, one
+per distinct value: pandas categoricals, booleans, strings, and whole numbers are accepted, and a
+column of other numbers raises a `ValueError`, since data mixing continuous and categorical columns
+is not supported. The discrete tests and scores have no published benchmark yet.
 
 ### Supported methods
 

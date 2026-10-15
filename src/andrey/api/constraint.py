@@ -93,8 +93,6 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
     1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
     practical to roughly 1,000 variables on sparse data with ten rows per variable; runtime grows
     combinatorially with the largest neighborhood, so sparser graphs can stay feasible beyond that.
-    With a discrete test, it is not benchmarked yet; its tests run it on at most 3 variables with
-    1,000 rows.
 
     References
     ----------
@@ -220,8 +218,7 @@ def fci(
     circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at
     800 (2,579 against 1,772). The median fit took 0.061 s at 20 variables and 72 s at 800, on 16
     cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
-    passed the empty graph's (696 against 676). With a discrete test, it is not benchmarked yet; its
-    tests run it on at most 3 variables with 1,000 rows.
+    passed the empty graph's (696 against 676).
 
     References
     ----------
@@ -337,8 +334,7 @@ default="local_score_BIC"
     **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
     and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
-    linear relations with Gaussian noise. With a discrete test and score, it is not benchmarked yet;
-    its tests run it on at most 3 variables with 270 rows.
+    linear relations with Gaussian noise.
 
     References
     ----------
@@ -444,8 +440,7 @@ def cdnod(
     **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 500 rows,
     and on 1,200 rows with 7 variables. It runs the PC search with the index as one more variable,
     so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its Fisher-Z tests
-    assume linear relations with Gaussian noise. With a discrete test, it is not benchmarked yet;
-    its tests run it on 2 variables and a three-level context with 1,200 rows.
+    assume linear relations with Gaussian noise.
 
     References
     ----------
