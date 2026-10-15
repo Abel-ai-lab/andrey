@@ -31,7 +31,6 @@ from typing import get_args
 
 import networkx as nx
 import numpy as np
-from PIL import Image
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
@@ -1603,6 +1602,8 @@ def streak(art: str, points: int = 16) -> list[tuple[float, float]]:
     travels: the warm pixels cut into ``points`` equal bands along the streak's longer extent, and
     each band's median point, so the path follows a bend and runs through a dotted trail's dots.
     Fails when the art has no streak to follow."""
+    from PIL import Image  # the docs group's; the unit tests import this module without it
+
     with Image.open(SITE / "brand" / f"art-{art}.jpg") as image:
         rgb = np.asarray(image.convert("RGB"), dtype=float)
     warm = (rgb[..., 0] - rgb[..., 2] > 40) & (rgb[..., 0] > 120)
