@@ -1658,6 +1658,16 @@
   padding: clamp(1.5rem, 4vw, 3rem) max(var(--gutter), calc(50vw - var(--page) / 2 + var(--gutter)));
 }
 
+/* On a large screen the band is taller than its title needs, and the title sits in its middle: the
+   tiles rise into the band's foot, over its fading art, by half of what the band gained over its
+   height at 1312 px wide (37.75rem), so the title stays near its evidence and the art keeps its
+   full height. Narrower screens are unchanged. */
+.andrey-home .section-cover + .bento-grid {
+  position: relative;
+  z-index: 1;
+  margin-top: min(0px, calc((37.75rem - clamp(26rem, 46vw, 90svh)) / 2));
+}
+
 /* The band's art on its own ground, faded out at both ends over about a fifth of a screen, so the
    bento above sinks into it and the code below rises out of it. The title stays outside the mask,
    over the band's solid middle. */
