@@ -251,7 +251,7 @@ uv run python -m qa.quality_gate <NAME>
 On each dataset the method passes when its median SHD is below the empty graph's, and within its
 tolerance of the recorded baseline in either direction. The gate runs before every release and
 fails the publish. [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances.
-The gate and the unit tests also fail any published benchmark row where the reference package has
+The gate also fails any published benchmark row where the reference package has
 fewer errors than Andrey, unless `benchmarks/published/parity-allowlist.json` cites the cause
 ([reference parity](qa/README.md#reference-parity)).
 

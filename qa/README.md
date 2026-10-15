@@ -97,8 +97,7 @@ uv run python -m qa.quality_gate --capture  # re-measure; review the diff
 
 Before any fit, the gate checks the published benchmark summaries
 (`benchmarks/published/*/summary.json`) with `reference_parity.py`, which reads only those files,
-so the reference packages need not be installed. `tests/unit/test_release_gates.py` runs the same
-check on every pull request. Each row pairs Andrey with one reference package at one size, and it
+so the reference packages need not be installed. Each row pairs Andrey with one reference package at one size, and it
 fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer

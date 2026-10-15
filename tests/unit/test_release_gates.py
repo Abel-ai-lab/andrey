@@ -275,11 +275,3 @@ def test_parity_judges_a_method_by_its_newest_summary(tmp_path):
     rows = reference_parity.published_rows(tmp_path)
     assert [r.summary for r in rows] == ["new"]
     assert reference_parity.check(rows, [])[0] == []
-
-
-def test_published_rows_match_their_reference_or_name_the_cause():
-    from qa import reference_parity
-
-    allowlist = json.loads(reference_parity.ALLOWLIST.read_text())["entries"]
-    failures, _ = reference_parity.check(reference_parity.published_rows(), allowlist)
-    assert failures == [], "\n".join(failures)
