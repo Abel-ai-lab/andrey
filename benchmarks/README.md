@@ -327,6 +327,14 @@ the best non-improving moves are often several reversals of covered edges, which
 unchanged, and each package takes the first in its own scan order. bnlearn scans additions, then
 removals, then reversals; Andrey ranks all moves by score change, then by the edge's endpoints.
 
+The two packages also score a graph slightly differently. Both charge `log(n)` per parameter in
+deviance units, but bnlearn's `bic-g` divides each node's residual sum of squares by `n - p - 1`,
+with `p` its parent count. Andrey's BIC divides by a count that does not depend on the parents, so
+its score differences are those of the maximum-likelihood BIC. bnlearn's score therefore adds a
+small cost per parent: it can rank two nearly equal moves the other way, and it rejects a last move
+whose BIC gain is below that cost. The two hill climbs can then end a few edges apart, with
+Andrey's graph at the lower BIC. Read a difference in `shd` together with the `bic` column.
+
 ### ANM direction test
 
 `anm_pairs.py` compares Andrey's `anm` with causal-learn's `ANM` on cause-effect pairs from the
