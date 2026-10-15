@@ -62,7 +62,7 @@ def varma_lingam(
     else:
         p, q, phis, thetas, residuals = _select_order(X, order, criterion, max_iter)
 
-    causal_order, b0 = direct_lingam(residuals, least_squares=True)
+    causal_order, b0 = direct_lingam(residuals)
 
     if prune:
         psis, omegas = _prune(X, residuals, causal_order, p, q)

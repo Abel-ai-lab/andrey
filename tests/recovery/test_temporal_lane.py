@@ -87,8 +87,8 @@ def test_varma_lingam_rejects_max_iter_below_one():
 def test_varma_lingam_orders_innovations_by_least_squares():
     """The order comes from least-squares pairwise regressions of the fitted innovations.
 
-    On these 40 steps the ``n / (n - 1)`` slope factor of the default convention orders the
-    innovations [1, 2, 0]; least squares gives the true order, [0, 1, 2].
+    On these 40 steps a slope scaled by ``n / (n - 1)`` orders the innovations [1, 2, 0]; least
+    squares gives the true order, [0, 1, 2].
     """
     from statsmodels.tsa.statespace.varmax import VARMAX
 
@@ -109,7 +109,7 @@ def test_varma_lingam_orders_innovations_by_least_squares():
         warnings.simplefilter("ignore")
         fit = VARMAX(X, order=(1, 1), trend="c").fit(maxiter=2000, disp=False, cov_type="none")
     innovations = np.asarray(fit.resid)
-    assert order == pwling.find_causal_order(innovations, least_squares=True) == [0, 1, 2]
+    assert order == pwling.find_causal_order(innovations) == [0, 1, 2]
 
 
 def test_longitudinal_lingam_output_contract():

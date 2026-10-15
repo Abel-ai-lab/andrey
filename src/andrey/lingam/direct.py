@@ -14,16 +14,13 @@ import numpy as np
 from andrey.lingam import adjacency, pwling
 
 
-def direct_lingam(
-    X: np.ndarray, *, measure: str = "pwling", least_squares: bool = False
-) -> tuple[list[int], np.ndarray]:
+def direct_lingam(X: np.ndarray, *, measure: str = "pwling") -> tuple[list[int], np.ndarray]:
     """Fit DirectLiNGAM: return ``(causal_order, B)`` for ``x_i = sum_j B[i, j] x_j``.
 
-    ``measure="pwling"`` is the only supported measure; it is deterministic. ``least_squares``
-    picks the slope of the order search's regressions (:func:`pwling.compute_residual`).
+    ``measure="pwling"`` is the only supported measure; it is deterministic.
     """
     if measure != "pwling":
         raise NotImplementedError(f"DirectLiNGAM supports measure='pwling', not {measure!r}")
     X = np.asarray(X, dtype=np.float64)
-    order = pwling.find_causal_order(X, least_squares=least_squares)
+    order = pwling.find_causal_order(X)
     return order, adjacency.estimate(X, order)
