@@ -49,17 +49,17 @@ next section opens on its own art alone.
 
 - Accelerated: the ideas behind the speed, one at a time as the reader scrolls, then a tile per
   method family.
-- Accurate: where Andrey has fewer errors, as a chart, and beside it a note naming the methods as
-  accurate as the other package's.
+- Accurate: where Andrey has fewer errors, as a chart, and beside it a note: every release is
+  tested against true graphs, and its release card gives every method's errors.
 - Agentic: an agent's run of the command line, and the contract it reads first.
 - All-in-one: a note with the methods by family, how many of the comparison table's features each
   package has, and every kind of causal graph drawn, then "From data to graph", which opens on its
   own art (`example_cover()`, `EXAMPLE_ART`): the Sachs example's code, output, and graph.
 
 Every claim comes from the summaries and the registry (`act_claims()`): the largest family speedup,
-how many methods are more accurate and how many as accurate (`accuracy_verdicts()`, one count per
-method however many packages it is compared with), and the number of methods. A tile opens its
-dialog, and no two tiles open the same one (Agentic's one tile shows the whole command-line
+the largest cut in errors (`fewest_errors()`, the accuracy chart's first row; the homepage shows
+only the wins, and the release cards every method's errors), and the number of methods. A tile opens
+its dialog, and no two tiles open the same one (Agentic's one tile shows the whole command-line
 session, `agent_tile()`); a tile whose dialog would only repeat it has none, and carries no plus.
 
 The ideas are four animated scenes built by [`site/why_fast.py`](../site/why_fast.py) (`story()`),

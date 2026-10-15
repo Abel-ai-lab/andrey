@@ -800,22 +800,10 @@ def accuracy_rows(summaries: list[dict]) -> list[dict]:
     return rows
 
 
-def accuracy_verdicts(summaries: list[dict]) -> tuple[list[str], list[str], float]:
-    """The methods compared with another package, one per spec: those with fewer errors than some
-    package and more than none (a change of half a percent or more, ``accuracy_change``), then the
-    rest, which are as accurate, and how far apart the rest are at most, in percent."""
-    by_spec: dict[str, list[dict]] = {}
-    for row in accuracy_rows(summaries):
-        by_spec.setdefault(row["spec"], []).append(row)
-    more, same, spread = [], [], 0.0
-    for rows in by_spec.values():
-        changes = [accuracy_change(r) for r in rows]
-        if min(changes) <= -0.5 and max(changes) < 0.5:
-            more.append(rows[0]["name"])
-        else:
-            same.append(rows[0]["name"])
-            spread = max(spread, *(abs(c) for c in changes))
-    return more, same, spread
+def fewest_errors(summaries: list[dict]) -> float:
+    """Andrey's largest cut in errors against a package compared, in percent: the first row of
+    ``accuracy_wins``."""
+    return max(-accuracy_change(r) for r in accuracy_rows(summaries))
 
 
 def accuracy_change(row: dict) -> float:
@@ -1573,7 +1561,7 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
     hero, and the sentence under its title, its number in bold. The cover's art keeps its one
     amber."""
     fastest = max(info["number"] for info in family_tiles(summaries) if info["number"])
-    more, same, _ = accuracy_verdicts(summaries)
+    fewer = fewest_errors(summaries)
     count = len(list_specs())
     kinds = NUMBER_WORDS[len(graph_kinds())]
     return {
@@ -1582,8 +1570,8 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
             f"Up to <b>{fastest:,}x</b> faster than other popular packages.",
         ),
         "accurate": (
-            f"More accurate in {len(more)} methods",
-            f"More accurate in <b>{len(more)} methods</b>, and as accurate in {len(same)} more.",
+            f"Up to {fewer:.0f}% fewer errors",
+            f"Up to <b>{fewer:.0f}%</b> fewer errors than other popular packages.",
         ),
         "agentic": (
             "Runs with no one watching",
@@ -1710,20 +1698,18 @@ def glass_tile(span: str, title: str, text: str, glass: str, *, key: str = "") -
 
 
 def accuracy_tiles(summaries: list[dict]) -> str:
-    """Where Andrey has fewer errors, as a chart, and beside it in plain text the methods as
-    accurate as the others', which need no figure."""
-    more, same, spread = accuracy_verdicts(summaries)
-    close = "the same errors as" if spread < 0.5 else f"within {spread:.0f}% of"
+    """Where Andrey has fewer errors, as a chart, and beside it in plain text the release promise
+    and where every method's errors are: the release cards. The homepage shows only the wins."""
     return glass_tile(
         "7",
-        f"More accurate in {len(more)} methods",
-        "Fewer errors than the other package, summed over every size both ran.",
+        "Fewer errors than the other package",
+        "Summed over every size both ran.",
         accuracy_wins(summaries),
     ) + (
-        f'<li class="bento-note"><h3>As accurate in {len(same)} more</h3>'
-        f"<p>{escape(listed(same))}: errors {close} the other package's.</p>"
-        "<p>Every release is tested against the true graphs that generated the data. "
-        '<a href="docs/benchmarks.html">Release cards</a></p></li>'
+        '<li class="bento-note"><h3>Tested against the true graphs</h3>'
+        "<p>Every release is tested against the true graphs that generated the data. Its release "
+        "card gives every method's errors beside the other package's.</p>"
+        '<p><a href="docs/benchmarks.html">Release cards</a></p></li>'
     )
 
 

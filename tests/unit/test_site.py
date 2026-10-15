@@ -1086,24 +1086,23 @@ def test_the_accuracy_bars_draw_only_the_methods_with_fewer_errors():
     assert figure.count('<div class="err-bar">') == len(wins)
     assert re.findall(r"--f: ([\d.]+)", figure)[1::2] == ["1.000"] * len(wins)
     assert len(re.findall(r">\d+% fewer errors<", figure)) == len(wins)
-    _, same, spread = build.accuracy_verdicts([SUMMARY])
     tiles = build.accuracy_tiles([SUMMARY])
-    assert f"As accurate in {len(same)} more" in tiles and f"within {spread:.0f}% of" in tiles
+    # The homepage shows the wins only; every other method's errors are on the release cards.
+    assert not any(hedge in tiles.lower() for hedge in ("as accurate", "on par", "within"))
+    assert '<a href="docs/benchmarks.html">Release cards</a>' in tiles
 
 
-def test_the_accuracy_section_counts_each_compared_method_once(placeholder_page):
-    summaries = placeholder_summaries()
-    more, same, spread = build.accuracy_verdicts(summaries)
-    # Every method compared with another package is more accurate or as accurate, once, however
-    # many packages or variants it is compared with.
-    compared = {r["spec"] for r in build.accuracy_rows(summaries)}
-    assert more and len(more) + len(same) == len(compared)
-    assert not set(more) & set(same)
+def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
+    # The claim is the largest cut in errors, the chart's first row, not a count of methods.
+    fewer = f"{build.fewest_errors(placeholder_summaries()):.0f}%"
     section = placeholder_page[placeholder_page.index('id="accurate"') :]
     section = section[: section.index("</section>")]
-    assert f">More accurate in {len(more)} methods<" in section
-    assert f">As accurate in {len(same)} more<" in section
-    assert f"within {spread:.0f}% of" in section
+    assert f"Up to <b>{fewer}</b> fewer errors than other popular packages." in section
+    assert re.findall(r">(\d+%) fewer errors<", section)[0] == fewer
+    # The tile under it names what its chart shows rather than repeating the number.
+    assert '<h3 class="tile-title">Fewer errors than the other package</h3>' in section
+    assert "More accurate in" not in placeholder_page
+    assert not any(hedge in section.lower() for hedge in ("as accurate", "on par", "within"))
     # The win rows name the package each is against; PC is more accurate only against gCastle.
     assert re.findall(r'<div class="err-bar"><span>([^<]+)</span>', section)
 
@@ -1126,11 +1125,11 @@ def test_the_first_section_tells_why_it_is_fast_one_scene_at_a_time(placeholder_
 
 
 def test_a_list_is_a_note_in_plain_type_not_a_card(placeholder_page):
-    # The methods as accurate as the others' and the methods by family are lists, which a card
-    # would only frame: each is a note beside a tile, its heading and text on the page's paper.
+    # The release promise and the methods by family need no figure, which a card would only
+    # frame: each is a note beside a tile, its heading and text on the page's paper.
     notes = re.findall(r'<li class="bento-note">(.*?)</li>', placeholder_page, re.S)
     assert [re.search(r"<h3>([^<]+)</h3>", note)[1] for note in notes] == [
-        f"As accurate in {len(build.accuracy_verdicts(placeholder_summaries())[1])} more",
+        "Tested against the true graphs",
         f"{len(list_specs())} methods",
     ]
     assert not any("tile-glass" in note or "wf-plus" in note for note in notes)
