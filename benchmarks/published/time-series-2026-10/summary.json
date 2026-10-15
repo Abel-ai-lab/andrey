@@ -18,11 +18,11 @@
   },
   "VARMA-LiNGAM": {
    "name": "varma_lingam_paper",
-   "description": "one linear series per seed with non-Gaussian noise, as in Hyvarinen et al. (2010), Sect. 5.4: a lower-triangular same-step matrix with 0.8 N links and a lag-1 matrix with 2 N links, weights 0.05 to 0.5 in magnitude, plus one moving-average matrix drawn like the lag-1 one"
+   "description": "one linear series per seed with non-Gaussian noise, as in Hyvarinen et al. (2010), Sect. 5.4: a lower-triangular same-step matrix with 0.8 d links and a lag-1 matrix with 2 d links, weights 0.05 to 0.5 in magnitude, plus one moving-average matrix drawn like the lag-1 one"
   },
   "LongitudinalLiNGAM": {
    "name": "longitudinal_lingam_paper",
-   "description": "M units observed at T time points with non-Gaussian noise, as in Kadowaki et al. (2013): a dense same-step DAG and a dense lag-1 matrix drawn anew at every time point, and a hidden common cause at the first"
+   "description": "M units observed at n time points with non-Gaussian noise, as in Kadowaki et al. (2013): a dense same-step DAG and a dense lag-1 matrix drawn anew at every time point, and a hidden common cause at the first"
   },
   "Granger": {
    "name": "var2_lagged",

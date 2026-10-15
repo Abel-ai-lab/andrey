@@ -96,7 +96,7 @@ def test_a_lagged_key_is_a_sample_scm_call_of_its_own():
         "scale": "raw",
         "density": 0.0,
     }
-    assert key.label == "er-var-gaussian-deg0-d5-n300-s0-raw"
+    assert key.label == "er-var-gaussian-deg0-d5-n300-s0-raw"  # gitleaks:allow
     assert key.digest != _lagged_key(seed=1).digest != _lagged_key(n=301).digest
 
 
