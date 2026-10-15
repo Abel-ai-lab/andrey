@@ -302,10 +302,10 @@ head carries its Twitter card fields and one JSON-LD graph: the organization (wi
 `site/brand/abel-symbol-night.svg`, drawn as `_static/abel-symbol.png`), the website, the software
 (with Andrey's icon, the favicon) at the release the page belongs to (a post's `version`, a release
 card's number, else the current release), the page, a `BlogPosting` for a post with its date and
-authors, and the page's breadcrumbs. The search page is `noindex`. After the build,
-`_write_discovery` in `conf.py` writes two files at the site's root from the built pages:
-`llms.txt`, the pages in `LLMS_SECTIONS` under Docs, Release cards, and Blog, each with its own
-title and description, every release card and published post following its section's pages; and
+authors, and the page's breadcrumbs. The search page and the 404 page are `noindex` (`UNINDEXED`).
+After the build, `_write_discovery` in `conf.py` writes two files at the site's root from the built
+pages: `llms.txt`, the pages in `LLMS_SECTIONS` under Docs, Release cards, and Blog, each with its
+own title and description, every release card and published post following its section's pages; and
 `sitemap.xml`, the address of every indexable page. `robots.txt` is a plain file
 (`_extra/robots.txt`) that lets every crawler read every page and names the sitemap. A page listed
 in `LLMS_SECTIONS` that is renamed or removed fails the build until the list follows it.
@@ -340,7 +340,8 @@ shows:
 - Search and answer engines: every page's structured data matches its link preview, and each
   post's date, authors, and release match its front matter; `llms.txt` links public pages by
   section with their own titles and descriptions; `sitemap.xml` lists each indexable page once,
-  and `robots.txt` names it; only the search page is `noindex`.
+  and `robots.txt` names it; only the search page and the 404 page are `noindex`. The 404 page
+  resolves its links from the site's root, so it works at any address the server shows it at.
 
 To check external links: `uv run --group docs sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 
