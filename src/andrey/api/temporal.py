@@ -116,11 +116,10 @@ def varma_lingam(
     ``order=(1, 1)`` and ``prune=True``. Its median errors (missing and extra cross-links) stayed
     below the empty graph's from 300 time steps at every size; at 100 time steps they exceeded it
     from 10 variables on. The fit takes minutes at 20 variables and 1,000 time steps. It assumes
-    linear effects and non-Gaussian noise. The likelihood fit stops after ``max_iter`` iterations
-    and gives no warning when it has not converged. A fit stopped before convergence depends on
-    the versions of the numerical libraries, so the same series can give a different graph in
-    another environment; raise ``max_iter`` to let the fit converge. With ``criterion`` set, it
-    fits one model for every ``(p, q)`` in the grid.
+    linear effects and non-Gaussian noise. The likelihood fit can stop before it converges, and
+    gives no warning; a larger ``max_iter`` does not prevent this. The result then depends on the
+    versions of the numerical libraries, so the same series can give a different graph in another
+    environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid.
 
     References
     ----------
