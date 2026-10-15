@@ -10,8 +10,8 @@ from andrey.core import ARROW, GraphStructure, TemporalStructure
 from andrey.data import functional, graphs, noise, temporal
 from andrey.data.scm import SCM
 from andrey.metrics import temporal_scores
-
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 # A_k[effect, cause]: every series depends on its own past; five cross links at lags 1 and 2.
 LAG_1 = np.array(
@@ -103,3 +103,8 @@ def test_independent_autocorrelated_series_give_only_self_loops(indep_test):
     data = temporal.generate(np.eye(4), 0.9 * np.eye(4)[None], None, innovations, burn_in=200)
     out = andrey.pcmci(data, tau_max=2, alpha_level=0.01, indep_test=indep_test)
     assert _links(out) == {(i, i, 1) for i in range(4)}
+
+
+def test_matches_the_recorded_output():
+    out = andrey.pcmci(datagen.generate("var_3v_lag2"), tau_max=2)
+    assert_recorded_output(out, "PCMCI", case="var_3v_lag2")

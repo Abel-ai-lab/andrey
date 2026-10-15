@@ -81,6 +81,35 @@ SPEC: dict[str, dict] = {
             "omegas": {"atol": 1e-6, "rtol": 1e-5},
         },
     },
+    # PCMCI, PCMCI+, LPCMCI: the per-lag graphs (LPCMCI's links with both marks) and the
+    # conflicts, exactly; the test p-values and statistics within rounding.
+    "PCMCI": {
+        "structural": ["graph"],
+        "numeric": {
+            "p_values": {"atol": 1e-8, "rtol": 1e-6},
+            "statistics": {"atol": 1e-8, "rtol": 1e-6},
+        },
+    },
+    "PCMCIplus": {
+        "structural": ["graph", "conflicts"],
+        "numeric": {
+            "p_values": {"atol": 1e-8, "rtol": 1e-6},
+            "statistics": {"atol": 1e-8, "rtol": 1e-6},
+        },
+    },
+    "LPCMCI": {
+        "structural": ["links", "conflicts"],
+        "numeric": {
+            "p_values": {"atol": 1e-8, "rtol": 1e-6},
+            "statistics": {"atol": 1e-8, "rtol": 1e-6},
+        },
+    },
+    # Longitudinal LiNGAM: each time point's causal order and every coefficient block, NaN where a
+    # block reaches before the panel start.
+    "LongitudinalLiNGAM": {
+        "structural": ["causal_orders"],
+        "numeric": {"time_weights": {"atol": 1e-6, "rtol": 1e-5}},
+    },
     "VARMALiNGAMPruned": {
         "structural": ["causal_order"],
         "numeric": {

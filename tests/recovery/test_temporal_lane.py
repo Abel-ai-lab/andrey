@@ -85,6 +85,13 @@ def test_longitudinal_lingam_output_contract():
     assert out.metadata["algorithm"] == "longitudinallingam"
 
 
+def test_longitudinal_lingam_matches_the_recorded_output():
+    from andrey.api.temporal import longitudinal_lingam
+
+    out = longitudinal_lingam(datagen.generate_groups("panel_4v"))
+    assert_recorded_output(out, "LongitudinalLiNGAM", case="panel_4v")
+
+
 def test_var_lingam_recovery():
     from andrey.api._temporal import _adapt_var_lingam
 

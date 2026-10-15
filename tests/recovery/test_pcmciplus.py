@@ -10,8 +10,8 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, TemporalStructure
 from andrey.data import functional, graphs, noise, temporal
 from andrey.data.scm import SCM
 from andrey.metrics import temporal_scores
-
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 # B0[effect, cause]: X0 -> X1 -> X2 <- X3 within each step.
 B0 = np.zeros((5, 5))
@@ -123,3 +123,8 @@ def test_independent_autocorrelated_series_give_only_self_loops(indep_test):
     out = andrey.pcmciplus(data, tau_max=2, indep_test=indep_test)
     assert _lagged(out) == {(i, i, 1) for i in range(4)}
     assert _same_step(out) == set()
+
+
+def test_matches_the_recorded_output():
+    out = andrey.pcmciplus(datagen.generate("var_4v_stable"), tau_max=2)
+    assert_recorded_output(out, "PCMCIplus", case="var_4v_stable")

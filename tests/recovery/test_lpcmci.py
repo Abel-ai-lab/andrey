@@ -7,8 +7,8 @@ import pytest
 
 import andrey
 from andrey.data import temporal
-
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+from tests.recovery.helpers import datagen
+from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
 # Six variables; X5 is white noise and hidden. B0[effect, cause] within one step:
 # X5 -> X1, X5 -> X2, X2 -> X3. A1[effect, cause] at lag 1: memory in X0..X4, X0 -> X1, X3 -> X4.
@@ -90,3 +90,8 @@ def test_independent_autocorrelated_series_give_only_autodependencies():
     data = temporal.generate(np.eye(4), 0.9 * np.eye(4)[None], None, innovations, burn_in=200)
     out = andrey.lpcmci(data, tau_max=2, pc_alpha=0.01)
     assert _links(out) == {f"{i}-->{i}@1" for i in range(4)}
+
+
+def test_matches_the_recorded_output():
+    out = andrey.lpcmci(datagen.generate("var_6v_hidden"), tau_max=2)
+    assert_recorded_output(out, "LPCMCI", case="var_6v_hidden")

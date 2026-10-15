@@ -105,11 +105,16 @@ ALGORITHMS = {
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),
     "ANM": (_facade("anm"), "anm_pair_cubic"),
     "PNL": (_facade("pnl"), "anm_pair_cubic"),
+    "PCMCI": (_facade("pcmci", tau_max=2), "var_3v_lag2"),
+    "PCMCIplus": (_facade("pcmciplus", tau_max=2), "var_4v_stable"),
+    "LPCMCI": (_facade("lpcmci", tau_max=2), "var_6v_hidden"),
 }
 
-# Multi-group methods take a list of matrices (runner receives ``generate_groups(case)``).
+# Multi-group and panel methods take a list of matrices (runner receives
+# ``generate_groups(case)``).
 GROUP_ALGORITHMS = {
     "MultiGroupDirectLiNGAM": (_run_multi_group_direct_lingam, "mgdl_2groups"),
+    "LongitudinalLiNGAM": (_facade("longitudinal_lingam"), "panel_4v"),
 }
 
 
@@ -138,9 +143,11 @@ def capture(args: argparse.Namespace) -> None:
         if name in GROUP_ALGORITHMS:
             group_runner, case = GROUP_ALGORITHMS[name]
             groups = datagen.generate_groups(case)
+            spec = datagen.GROUP_CASES[case]
+            seeds = [g["seed"] for g in spec["groups"]] if "groups" in spec else [spec["seed"]]
             input_block = {
                 "case": case,
-                "seeds": [group["seed"] for group in datagen.GROUP_CASES[case]["groups"]],
+                "seeds": seeds,
                 "shapes": [list(X.shape) for X in groups],
                 "sha256": datagen.input_sha256(case),
             }
