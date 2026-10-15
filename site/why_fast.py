@@ -1,10 +1,11 @@
 """The "Why Andrey is fast" scenes: one animation per idea behind Andrey's speed.
 
 Each scene runs the same illustrative work in two lanes: Andrey's, and a quieter lane for other
-packages, which are never named. The scenes appear in the homepage's dialog and under the
-headings of the blog post "Why Andrey is fast". The markup is complete without script: each
-counter already shows its lane's final count. ``site/assets/why-fast.js`` plays the scenes with
-Motion; they are illustrations of the ideas, not measurements.
+packages, which are never named. The scenes appear in the homepage's story, one at a time as the
+reader scrolls, and under the headings of the blog post "Why Andrey is fast". The markup is
+complete without script: each counter already shows its lane's final count.
+``site/assets/why-fast.js`` plays the scenes with Motion; they are illustrations of the ideas, not
+measurements.
 """
 
 from __future__ import annotations
@@ -79,16 +80,6 @@ REPLAY = icon(
     f'<path d="M3.2 8a4.8 4.8 0 1 0 1.5-3.5" stroke-width="1.8" {STROKE}/>'
     f'<path d="M4.4 1.9v2.9h2.9" stroke-width="1.8" {STROKE}/>',
 )
-PAUSE = icon(
-    "pause",
-    '<rect x="4" y="3" width="2.6" height="10" rx="1" fill="currentColor"/>'
-    '<rect x="9.4" y="3" width="2.6" height="10" rx="1" fill="currentColor"/>',
-)
-PLAY = icon(
-    "play",
-    '<path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z" '
-    'fill="currentColor"/>',
-)
 PLUS = icon("plus", f'<path d="M8 2v12M2 8h12" stroke-width="2.2" {STROKE}/>')
 CLOSE = icon("close", f'<path d="M3 3l10 10M13 3 3 13" stroke-width="2" {STROKE}/>')
 
@@ -131,20 +122,15 @@ def stage(scene: dict) -> str:
     )
 
 
-def figure(scene: dict, *, caption: bool = False, play: str = "view") -> str:
-    """One scene: the stage, then with ``caption`` its title and narration.
+def figure(scene: dict, *, play: str = "view") -> str:
+    """One scene's stage.
 
-    ``play="view"`` plays once when the scene scrolls into view; the dialog plays its own.
+    ``play="view"`` plays once when the scene scrolls into view, then offers a replay;
+    ``play="scroll"`` is played by the scroll, forward or back, with no control of its own.
     """
     size = " ".join(
         f'data-{name}="{" ".join(map(str, value)) if isinstance(value, tuple) else value}"'
         for name, value in scene["size"].items()
-    )
-    words = (
-        f'<div class="wf-caption"><h3>{escape(scene["title"])}</h3>'
-        f"<p>{escape(scene['text'])}</p></div>"
-        if caption
-        else ""
     )
     replay = (
         '<div class="wf-after"><button class="wf-replay" type="button" aria-label="Replay" hidden>'
@@ -154,7 +140,7 @@ def figure(scene: dict, *, caption: bool = False, play: str = "view") -> str:
     )
     return (
         f'<figure class="wf wf-scene" data-scene="{scene["key"]}" data-play="{play}" {size} '
-        f'data-unit="{" ".join(scene["unit"])}">{stage(scene)}{words}{replay}</figure>'
+        f'data-unit="{" ".join(scene["unit"])}">{stage(scene)}{replay}</figure>'
     )
 
 
@@ -163,36 +149,15 @@ def fragment(key: str) -> str:
     return figure(BY_KEY[key])
 
 
-def dialog(
-    benchmarks: str = "docs/benchmarks.html", post: str = "blog/20261008-why-andrey-is-fast.html"
-) -> str:
-    """The dialog that plays one scene at a time, without an opener.
+def story() -> str:
+    """The homepage's story: each scene in order, its title and narration above its stage.
 
-    Any link with ``data-wf-open="why-fast"`` opens it, at the scene named by its
-    ``data-wf-scene``, or the first. The link is the page's own pointer to the blog post; the
-    script turns it into the opener, so the scenes stay reachable without script.
+    Without script the steps stand one after another at their final counts. ``why-fast.js`` pins
+    them under the section's title and shows one at a time, each played by the scroll.
     """
-    dots = "".join(
-        f'<button class="wf-dot" type="button" role="tab" id="wf-tab-{s["key"]}" '
-        f'aria-controls="wf-panel-{s["key"]}" aria-selected="{str(i == 1).lower()}" '
-        f'aria-label="{i}. {escape(s["title"])}" tabindex="{0 if i == 1 else -1}"><i></i></button>'
-        for i, s in enumerate(SCENES, 1)
+    steps = "".join(
+        f'<li class="wf-step"><div class="wf-words"><h3>{escape(s["title"])}</h3>'
+        f"<p>{escape(s['text'])}</p></div>{figure(s, play='scroll')}</li>"
+        for s in SCENES
     )
-    panels = "".join(
-        f'<div class="wf-panel" role="tabpanel" id="wf-panel-{s["key"]}" '
-        f'aria-labelledby="wf-tab-{s["key"]}"{"" if i == 1 else " hidden"}>'
-        f"{figure(s, caption=True, play='dialog')}</div>"
-        for i, s in enumerate(SCENES, 1)
-    )
-    return (
-        '<dialog class="wf wf-dialog" id="why-fast" aria-labelledby="why-fast-title">'
-        '<div class="wf-top"><div><h2 id="why-fast-title">Why Andrey is fast</h2>'
-        "<p>Four ideas, easiest first.</p></div>"
-        f'<button class="wf-close" type="button" aria-label="Close">{CLOSE}</button></div>'
-        f'<div class="wf-panels">{panels}</div><div class="wf-controls">'
-        f'<div class="wf-dots" role="tablist" aria-label="Ideas">{dots}</div>'
-        f'<button class="wf-play" type="button" aria-label="Pause">{PAUSE}{PLAY}{REPLAY}</button>'
-        f'</div><p class="wf-note">The animation is for illustration only. '
-        f'For details, see the <a href="{benchmarks}">benchmarks</a> '
-        f'and the <a href="{post}">blog post</a>.</p></dialog>'
-    )
+    return f'<div class="wf wf-story"><ol class="wf-steps">{steps}</ol></div>'

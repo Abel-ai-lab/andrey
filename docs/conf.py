@@ -184,9 +184,16 @@ html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
 html_extra_path = ["_generated/extra"]
 html_css_files = ["andrey-tokens.css", "andrey.css", "graph-guides.css"]
-# The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill).
-html_js_files = [("glass.js", {"defer": "defer"})]
+# The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill), the dot
+# on Release cards until the reader has seen the latest release, and the outline's mark on the
+# section being read.
+html_js_files = [
+    ("glass.js", {"defer": "defer"}),
+    ("nav-new.js", {"defer": "defer"}),
+    ("page-outline.js", {"defer": "defer"}),
+]
 REPO_URL = "https://github.com/Abel-ai-lab/andrey"
+PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
@@ -199,12 +206,21 @@ html_theme_options = {
     "icon_links": [{"name": "GitHub", "url": REPO_URL, "icon": "fa-brands fa-github"}],
     "footer_center": ["report-bug"],
     "use_edit_page_button": False,
-    # The alpha status, once, above every page's header (_templates/sections/announcement.html).
-    "announcement": "Andrey is in alpha: the API may change between releases.",
+    # A documentation page's section over its title (_templates/page-kicker.html); other pages
+    # keep the breadcrumbs.
+    "article_header_start": ["page-kicker"],
+    # The page's outline (_templates/page-toc.html), then, on a documentation page, a link that
+    # edits it and one that reports a problem with it (_templates/page-links.html).
+    "secondary_sidebar_items": ["page-toc", "page-links"],
 }
 # The theme follows the reader's system setting until they pick one; unset, its script logs
 # "invalid theme mode" on a first visit.
-html_context = {"default_mode": "auto", "report_bug_url": f"{REPO_URL}/issues/new"}
+html_context = {
+    "default_mode": "auto",
+    "report_bug_url": f"{REPO_URL}/issues/new",
+    "repo_url": REPO_URL,
+    "pypi_url": PYPI_URL,
+}
 # A post's author and date sit under its title (_post_byline); the blog index links the archive.
 BLOG_SIDEBAR = ["ablog/archives.html"]
 html_sidebars = {
@@ -216,6 +232,16 @@ html_sidebars = {
     # A post takes the full width beside its contents, so its charts have room.
     "blog/**": [],
 }
+# The documentation tree's groups (_docs_sidebar): each section of the docs index named here heads
+# a group of its pages under its icon (_templates/nav-icons.html), and the index's other entries
+# make the last group. A section folds its pages past the first NAV_SHOWN.
+NAV_SECTIONS = {
+    "docs/guides/index": "book",
+    "docs/examples/index": "notebook",
+    "docs/demos/index": "play",
+}
+NAV_REFERENCE = ("Reference", "code")
+NAV_SHOWN = 5
 html_additional_pages = {"index": "homepage.html", "demo/index": "demo-redirect.html"}
 
 # ---- blog (ABlog) ----------------------------------------------------------------------------
@@ -447,15 +473,23 @@ def _newest_first(posts: list[tuple[str, str, str]]) -> list[str]:
     return [newest, *(post[0] for post in others)]
 
 
-def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
-    """The post about the latest release, which the alpha banner links: the newest dated blog post
-    with a version, as its docname and version."""
-    posts = [
-        (post.docname, f"{post.date:%Y-%m-%d}", str(version))
+def _dated_posts(app) -> list[tuple[str, str, str]]:  # noqa: ANN001
+    """Every dated blog post as (docname, ISO date, version), the version "" where it has none."""
+    return [
+        (
+            post.docname,
+            f"{post.date:%Y-%m-%d}",
+            str(app.env.metadata[post.docname].get("version") or ""),
+        )
         for post in _blog(app).posts
-        if post.date and (version := app.env.metadata[post.docname].get("version"))
+        if post.date
     ]
-    return _newest_post(posts)
+
+
+def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
+    """The post about the latest release, whose version the navbar's dot on Release cards names:
+    the newest dated blog post with a version, as its docname and version."""
+    return _newest_post([post for post in _dated_posts(app) if post[2]])
 
 
 def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
@@ -463,13 +497,13 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
 
     Page styles load after the shared ones (priority 900), so they win a tie.
     """
-    # The alpha banner on every page (_templates/sections/announcement.html) links this post.
-    context["release_post"], context["release_version"] = _release_post(app)
+    # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release.
+    context["release_version"] = _release_post(app)[1]
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
-        context["release_tile"] = _release_tile(app)
-        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js", "story.js"]
+        context["newest_post"] = _newest_post_card(app)
+        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js"]
     elif pagename == "blog/index":
         # The posts in the Release cards page's blocks.
         css = ["benchmarks.css", "blog.css"]
@@ -496,6 +530,64 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     context["metatags"] = context.get("metatags", "") + _preview_tags(
         app, pagename, context, doctree
     )
+
+
+def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
+    """Give a documentation page its sidebars' context.
+
+    ``docs_nav`` is the documentation tree's groups (_templates/docs-nav.html): a group per entry
+    of ``NAV_SECTIONS`` holding its pages, then the docs index's other entries. A row carries its
+    ``pages``, itself and every page under it, so the fold that holds the current page opens.
+    ``page_kicker`` names the page's section over its title: the page that lists it, or the last
+    group for a page the docs index lists itself. ``edit_url`` opens the file that holds the page's
+    text on GitHub: a Markdown file or notebook it includes (the changelog, a staged notebook's
+    canonical copy), else its own source, and none for a page autosummary writes.
+    """
+    if not pagename.startswith("docs/"):
+        return
+    includes = app.env.toctree_includes
+
+    def title(doc: str) -> str:
+        return app.env.titles[doc].astext()
+
+    def pages(doc: str) -> set[str]:
+        return {doc}.union(*(pages(child) for child in includes.get(doc, ())))
+
+    def row(doc: str) -> dict:
+        kids = dict.fromkeys(includes.get(doc, ()))
+        return {
+            "doc": doc,
+            "title": title(doc),
+            "pages": pages(doc),
+            "kids": [row(k) for k in kids],
+        }
+
+    top = list(dict.fromkeys(includes[root_doc]))
+    groups = [
+        {**row(doc), "icon": NAV_SECTIONS[doc], "shown": NAV_SHOWN}
+        for doc in top
+        if doc in NAV_SECTIONS
+    ]
+    rest = [row(doc) for doc in top if doc not in NAV_SECTIONS]
+    name, icon = NAV_REFERENCE
+    groups.append({"doc": None, "title": name, "icon": icon, "kids": rest, "shown": len(rest)})
+    context["docs_nav"] = groups
+
+    parent = next((doc for doc, kids in includes.items() if pagename in kids), None)
+    if parent == root_doc:
+        kicker = None if pagename in NAV_SECTIONS else {"doc": None, "title": name}
+    else:
+        kicker = parent and {"doc": parent, "title": title(parent)}
+    context["page_kicker"] = kicker
+
+    included = sorted(
+        path
+        for path in (pathlib.Path(dep).resolve() for dep in app.env.dependencies.get(pagename, ()))
+        if path.suffix in {".md", ".ipynb"} and GENERATED not in path.parents
+    )
+    source = included[0] if included else pathlib.Path(app.env.doc2path(pagename))
+    generated = "generated" in source.parts
+    context["edit_url"] = None if generated else f"{REPO_URL}/edit/main/{source.relative_to(ROOT)}"
 
 
 def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
@@ -565,18 +657,21 @@ def _tile_file(app, docname: str) -> str:  # noqa: ANN001
     return image
 
 
-def _release_tile(app) -> str:  # noqa: ANN001
-    """The homepage's tile for the latest release: its cover, linking to its post."""
-    docname, version = _release_post(app)
-    image, kind = _cover_file(app, docname)
-    title = html.escape(app.env.titles[docname].astext())
-    href = app.builder.get_relative_uri("index", docname)
+def _newest_post_card(app) -> str:  # noqa: ANN001
+    """The homepage's documentation band leads with the newest post, as the blog's front page
+    does (``_newest_first``): its cover, its date, and its description, linking to it."""
+    docname = _newest_first(_dated_posts(app))[0]
+    post = next(post for post in _blog(app).posts if post.docname == docname)
+    image, _ = _cover_file(app, docname)
+    description = html.escape((app.env.metadata[docname].get("description") or "").strip())
+    # The cover carries the title for the eye; the link names it for a screen reader.
     return (
-        f'<li class="tile tile--release"><a class="tile-face" href="{href}" '
-        f'aria-label="Andrey {html.escape(version)}: {title}">'
-        f'<img src="{image}" alt="{html.escape(cards.cover_alt(kind), quote=True)}" '
-        f'width="{cards.COVER_W}" height="{cards.COVER_H}">'
-        f"{app.andrey_home['plus']}</a></li>"
+        f'<a class="band-post" href="{app.builder.get_relative_uri("index", docname)}">'
+        f'<img src="{image}" alt="" width="{cards.COVER_W}" height="{cards.COVER_H}" '
+        'loading="lazy"><span class="band-post-body"><span class="band-post-kicker">Latest post · '
+        f'<time datetime="{post.date:%Y-%m-%d}">{post.date.strftime(app.config.post_date_format)}'
+        f'</time></span><span class="visually-hidden">{html.escape(post.title)}: </span>'
+        f"<span>{description}</span></span></a>"
     )
 
 
@@ -615,12 +710,7 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
         return
     meta = app.env.metadata
     posts = {post.docname: post for post in _blog(app).posts if post.date}
-    order = _newest_first(
-        [
-            (name, f"{post.date:%Y-%m-%d}", str(meta[name].get("version") or ""))
-            for name, post in posts.items()
-        ]
-    )
+    order = _newest_first(_dated_posts(app))
     latest, rows = "", []
     for name in order:
         post = posts[name]
@@ -797,6 +887,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("env-before-read-docs", _gallery_last)
     app.connect("doctree-read", _notebook_thumbnail)
     app.connect("html-page-context", _page_assets)
+    app.connect("html-page-context", _docs_sidebar)
     app.connect("doctree-resolved", _post_byline)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)

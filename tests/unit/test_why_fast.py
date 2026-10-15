@@ -29,7 +29,7 @@ class Tags(HTMLParser):
 
 
 def everything():
-    return why_fast["dialog"]() + "".join(why_fast["fragment"](s["key"]) for s in SCENES)
+    return why_fast["story"]() + "".join(why_fast["fragment"](s["key"]) for s in SCENES)
 
 
 def test_no_scene_names_another_package():
@@ -58,22 +58,15 @@ def test_counts_without_script_are_the_scenes_final_counts():
         assert counts[0] < counts[1]
 
 
-def test_dialog_has_one_tab_and_one_panel_per_scene():
-    tags = Tags(why_fast["dialog"]()).tags
-    tabs = [a for t, a in tags if a.get("role") == "tab"]
-    panels = [a for t, a in tags if a.get("role") == "tabpanel"]
-    assert [t["aria-controls"] for t in tabs] == [p["id"] for p in panels]
-    assert [p["id"] for p in panels] == [f"wf-panel-{s['key']}" for s in SCENES]
-    # One scene at a time: the first shows, the others wait for their tab.
-    assert [t["aria-selected"] for t in tabs] == ["true"] + ["false"] * (len(SCENES) - 1)
-    assert ["hidden" in p for p in panels] == [False] + [True] * (len(SCENES) - 1)
-    # The dialog ships no opener; the page that holds it does.
-    assert not any("data-wf-open" in a for _, a in tags)
-
-
-def test_the_dialog_names_every_idea():
-    dialog = why_fast["dialog"]()
-    assert all(why_fast["escape"](s["title"]) in dialog for s in SCENES)
+def test_the_story_tells_every_idea_in_order_with_no_controls():
+    tags = Tags(why_fast["story"]()).tags
+    figures = [a for t, a in tags if t == "figure"]
+    assert [f["data-scene"] for f in figures] == [s["key"] for s in SCENES]
+    # The scroll plays each scene, so the story carries no button and no opener of its own.
+    assert {f["data-play"] for f in figures} == {"scroll"}
+    assert not any(t == "button" or "data-wf-open" in a for t, a in tags)
+    story = why_fast["story"]()
+    assert all(why_fast["escape"](s["title"]) in story for s in SCENES)
 
 
 def test_the_readme_gives_each_idea_in_one_line():

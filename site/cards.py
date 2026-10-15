@@ -289,7 +289,17 @@ COVER_W, COVER_H = 1600, 640
 COVER_QUALITIES = (75, 70, 65, 60, 55)
 ART = {
     kind: BRAND / f"art-{kind}.jpg"
-    for kind in ("pair", "lanes", "iceberg", "contour", "hourglass", "agentic", "start", "docs")
+    for kind in (
+        "pair",
+        "lanes",
+        "iceberg",
+        "contour",
+        "hourglass",
+        "agentic",
+        "start",
+        "docs",
+        "methods",
+    )
 }
 COVERS = {
     "pair": "portraits of Andrey Markov and Andrey Kolmogorov, side by side",
@@ -300,12 +310,16 @@ COVERS = {
     "agentic": "an orrery whose rings carry a graph, one amber arm steering it",
     "start": "a cloud of data points gathering into a small graph, one arrow amber",
     "docs": "the pages of a vast atlas fanning open, one edge amber like a bookmark",
+    "methods": "a prism fanning one beam into many rays, one amber",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge
 BANNER_FADE = 0.55  # the navy fade behind the text ends at this share of the width
 BANNER_FADE_PEAK = 0.6  # its opacity at the left edge
-BANNER_TITLE = (64, 560, 2)  # the title's size, its widest line, and its most lines
+# The title's size, its widest line, and its most lines: large enough to read where a post's card
+# shows the banner at a third of its width.
+BANNER_TITLE = (88, 720, 2)
+BANNER_LINE = 40  # the release or kind under the title
 # The blog's front page shows each earlier post's art as a square tile of TILE px: the art's
 # square centered at TILE_CENTER of its width, where every art's subject sits. 240 px stays sharp
 # at three times the rows' 76 px.
@@ -432,7 +446,8 @@ def cover_svg(kind: str, title: str, line: str) -> str:
     ``line`` after a short amber rule."""
     size, width, most = BANNER_TITLE
     lines = _lines(title, size, width, most) or [title]
-    top = 268 if len(lines) == most else 300
+    step = round(size * 1.14)
+    top = 284 if len(lines) == most else 334
     navy = grain.NAVY
     stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
     fade = "".join(
@@ -440,22 +455,22 @@ def cover_svg(kind: str, title: str, line: str) -> str:
         for offset, opacity in stops
     )
     title_text = "".join(
-        f'<text x="{BANNER_LEFT}" y="{top + i * 76}" font-family="Inter" font-weight="600" '
-        f'font-size="{size}" letter-spacing="-1.5" fill="#ffffff">{html.escape(text)}</text>'
+        f'<text x="{BANNER_LEFT}" y="{top + i * step}" font-family="Inter" font-weight="600" '
+        f'font-size="{size}" letter-spacing="-2" fill="#ffffff">{html.escape(text)}</text>'
         for i, text in enumerate(lines)
     )
-    rule_y = top + (len(lines) - 1) * 76 + 66
+    rule_y = top + (len(lines) - 1) * step + 78
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{COVER_W}" height="{COVER_H}">'
         f'<defs><linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">{fade}</linearGradient>'
         f'</defs><image href="{_jpeg_href(_art(kind))}" width="{COVER_W}" height="{COVER_H}"/>'
         f'<rect width="{COVER_W}" height="{COVER_H}" fill="url(#fade)"/>'
-        + _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 104, 44)
+        + _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 96, 56)
         + title_text
         + (
-            f'<rect x="{BANNER_LEFT}" y="{rule_y}" width="34" height="4" fill="{grain.AMBER}"/>'
-            f'<text x="{BANNER_LEFT + 50}" y="{rule_y + 16}" font-family="Inter" '
-            f'font-weight="600" font-size="30" fill="#ffffff" opacity="0.9">'
+            f'<rect x="{BANNER_LEFT}" y="{rule_y}" width="42" height="5" fill="{grain.AMBER}"/>'
+            f'<text x="{BANNER_LEFT + 60}" y="{rule_y + 17}" font-family="Inter" '
+            f'font-weight="600" font-size="{BANNER_LINE}" fill="#ffffff" opacity="0.9">'
             f"{html.escape(line)}</text>"
             if line
             else ""

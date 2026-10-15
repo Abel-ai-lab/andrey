@@ -11,6 +11,15 @@
   --measure: 66ch;
   --page: 82rem;
   --gutter: clamp(1.25rem, 4vw, 3rem);
+  /* The navy fade the blog's and the release cards' covers lay under their type (site/cards.py:
+     BANNER_FADE_PEAK at the edge, three quarters of it at 55% of BANNER_FADE, none from
+     BANNER_FADE on), so the hero, the section covers, and the tiles shade their art the same. */
+  --cover-fade: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--andrey-ground-navy) 60%, transparent),
+    color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent) 30.25%,
+    transparent 55%
+  );
   background: var(--andrey-paper);
   color: var(--andrey-ink);
   font: 400 1.0625rem/1.6 var(--font-sans);
@@ -117,9 +126,8 @@
 /* ---------- hero ---------- */
 /* The hero is a blog cover at full bleed, in both themes: the cover's art (site/brand/art-*.jpg,
    its subject on the right) over the stipple ground, and a navy fade over the left where the light
-   type sits, as on the covers (site/cards.py: cover_svg). The scroll story crossfades three
-   covers, one per word. Amber is the art's one key element and the word. The --andrey-ground-*
-   tones are the same in both themes. */
+   type sits, as on the covers (site/cards.py: cover_svg). Amber is the art's one key element and
+   the words. The --andrey-ground-* tones are the same in both themes. */
 .andrey-home .hero {
   --andrey-ink: var(--andrey-ground-ink);
   --andrey-muted: var(--andrey-ground-muted);
@@ -129,32 +137,43 @@
   color: var(--andrey-ink);
 }
 
-/* The pin is the ground. Without the scroll story it is one screen; with it (story.js adds
-   is-story), it sticks while the reader scrolls the track, a few screens tall. */
-/* The hero runs up under the glass navbar (docs/_static/andrey.css), so its art shows through. */
-.andrey-home .hero {
-  margin-top: calc(-1 * var(--pst-header-height));
-}
-
-.andrey-home .story-pin {
+/* The hero and the first section share one art (.run): it stays on the screen, a screen tall,
+   while the hero's type scrolls away and the section's title comes up over it with its ideas,
+   until the section's tiles rise over it on the page's paper. The run starts under the glass
+   navbar (docs/_static/andrey.css), so the art shows through, and clips the art at its foot, so
+   the next section opens on its own. */
+.andrey-home .run {
   position: relative;
   isolation: isolate;
+  overflow: clip;
+  margin-top: calc(-1 * var(--pst-header-height));
+  /* The art's own ground (--andrey-ground-art), as on a cover. */
+  background: var(--andrey-ground-art);
+}
+
+.andrey-home .run-art {
+  position: sticky;
+  top: 0;
+  z-index: -1;
+  /* The large viewport: where a phone's toolbar collapses, the art still fills the screen. */
+  height: 100lvh;
+  margin-bottom: -100lvh;
+  overflow: clip;
+  container-type: size;
+  pointer-events: none;
+}
+
+.andrey-home .hero-ground {
   display: flex;
   align-items: center;
-  min-height: max(38rem, calc(100svh - 4.5rem));
-  padding: calc(clamp(3rem, 8vw, 6rem) + var(--pst-header-height)) var(--gutter) clamp(3rem, 8vw, 6rem);
-  overflow: hidden;
-  /* The art's own ground (--andrey-ground-art), darkening toward the type at the top. */
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--andrey-ground-navy) 75%, var(--andrey-ground-art)),
-    var(--andrey-ground-art) 80%
-  );
+  min-height: max(40rem, 100svh);
+  /* A short foot: the first section's title follows the cards on the same art. */
+  padding: calc(clamp(3rem, 8vw, 6rem) + var(--pst-header-height)) var(--gutter) clamp(1.5rem, 3vw, 2.5rem);
 }
 
 /* The stipple, under the art until it loads and where it is cropped away. A mask reads only
    alpha, so the navy here only sets how much of each tile shows. */
-.andrey-home .story-pin::before,
+.andrey-home .run-art::before,
 .andrey-home .tile::before {
   --fade: radial-gradient(
     circle at 75% 40%,
@@ -172,100 +191,56 @@
   pointer-events: none;
 }
 
-.andrey-home .hero-art {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.andrey-home .hero-cover {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 88% 50%;
-}
-
-/* Without the story the first cover shows alone. */
-.andrey-home .hero-cover:not([data-i="1"]) {
-  opacity: 0;
+/* The art keeps nearly its own size instead of filling the screen's height: 86% of the
+   screen's width or 60% of its height, whichever is more, standing on the screen's foot, so the
+   lanes rise from below. It is held to the right: flush with the screen's edge where it is
+   narrower, cropped 80% from the left where it is wider, as a cover is. Its top and left edges
+   fade into the same ground. The sweep is drawn in its frame (.cover-frame), so it stays on the
+   streak. */
+.andrey-home .run-art .cover-frame {
+  --frame-w: max(86cqw, 150cqh);
+  --edge: linear-gradient(180deg, transparent, var(--andrey-ground-navy) 18%);
+  --side: linear-gradient(90deg, transparent, var(--andrey-ground-navy) 20%);
+  top: auto;
+  right: min(0px, calc((100cqw - var(--frame-w)) * 0.2));
+  bottom: 0;
+  left: auto;
+  transform-origin: 80% 100%;
+  -webkit-mask-image: var(--edge), var(--side);
+  mask-image: var(--edge), var(--side);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
 }
 
 /* The covers' navy fade, from the left edge to past the middle. */
-.andrey-home .hero-art::after {
+.andrey-home .run-art::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--andrey-ground-navy) 78%, transparent),
-    color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent) 32%,
-    transparent 62%
-  );
-}
-
-/* The cover's foot fades into the page's paper over a fifth of a screen, so the bento rises out of
-   the cover's ground with no edge. */
-.andrey-home .hero-fade {
-  position: absolute;
-  inset: auto 0 0;
-  height: clamp(9rem, 24svh, 14rem);
-  background: linear-gradient(
-    180deg,
-    transparent,
-    color-mix(in srgb, var(--andrey-paper) 4%, transparent) 15%,
-    color-mix(in srgb, var(--andrey-paper) 14%, transparent) 30%,
-    color-mix(in srgb, var(--andrey-paper) 30%, transparent) 45%,
-    color-mix(in srgb, var(--andrey-paper) 50%, transparent) 60%,
-    color-mix(in srgb, var(--andrey-paper) 72%, transparent) 75%,
-    color-mix(in srgb, var(--andrey-paper) 90%, transparent) 90%,
-    var(--andrey-paper)
-  );
-  pointer-events: none;
-}
-
-/* The dim: as the reader scrolls past the last cover, the whole cover dims toward the paper, as on
-   an Apple product page, and its foot meets the bento's ground. Only with the scroll story; under
-   reduced motion the fade above is the whole blend. */
-.andrey-home .story-pin::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--andrey-paper) 62%, transparent),
-    var(--andrey-paper) 85%
-  );
-  opacity: 0;
-  pointer-events: none;
+  background: var(--cover-fade);
 }
 
 /* The cover's slow life, as on a printed cover under moving light: the art pushes in and eases
    back over half a minute, the stipple drifts by one tile, and the word arrives from the right,
    where its trace points. Only transforms and opacity move, and none of it under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
-  .andrey-home .hero-art {
-    transform-origin: 80% 50%;
+  .andrey-home .run-art .cover-frame {
     animation: cover-push 32s ease-in-out infinite alternate;
   }
 
-  .andrey-home .story-pin::before {
+  .andrey-home .run-art::before {
     inset: -128px 0 0 -128px;
     animation: grain-drift 48s linear infinite;
   }
 
-  .andrey-home .hero .story-words,
-  .andrey-home .hero .story-static .word {
+  .andrey-home .hero h1 .word {
     animation: word-arrive 1100ms var(--ease) 250ms both;
   }
 }
 
 @keyframes cover-push {
   to {
-    transform: scale(1.06);
+    transform: scale(1.03);
   }
 }
 
@@ -279,46 +254,6 @@
   from {
     opacity: 0;
     translate: 0.5em 0;
-  }
-}
-
-/* On a narrow screen the type sits on the stipple ground and a crop of the art below it, fading
-   in from the ground at its top. Each cover's crop keeps its amber in view: the lanes' streak, the
-   contour's star at the top right of its art, the agentic node. */
-@media (max-width: 47.99rem) {
-  .andrey-home .hero-cover {
-    inset: var(--crop-top, 40%) 0 auto;
-    height: 60%;
-    object-position: var(--crop-x) 50%;
-    --crop-mask: linear-gradient(
-      180deg,
-      transparent,
-      color-mix(in srgb, var(--andrey-ground-navy) 14%, transparent) calc(var(--crop-fade) * 0.3),
-      color-mix(in srgb, var(--andrey-ground-navy) 50%, transparent) calc(var(--crop-fade) * 0.6),
-      color-mix(in srgb, var(--andrey-ground-navy) 90%, transparent) calc(var(--crop-fade) * 0.9),
-      var(--andrey-ground-navy) var(--crop-fade)
-    );
-    --crop-fade: 4.5rem;
-    -webkit-mask-image: var(--crop-mask);
-    mask-image: var(--crop-mask);
-  }
-
-  .andrey-home .hero-cover[data-i="1"] {
-    --crop-x: 64%;
-  }
-
-  .andrey-home .hero-cover[data-i="2"] {
-    --crop-x: 100%;
-    --crop-top: 56%;
-    --crop-fade: 2.75rem;
-  }
-
-  .andrey-home .hero-cover[data-i="3"] {
-    --crop-x: 86%;
-  }
-
-  .andrey-home .hero-art::after {
-    content: none;
   }
 }
 
@@ -355,252 +290,169 @@
 
 /* Readers who ask for more contrast get the light type on plain navy, without the specks. */
 @media (prefers-contrast: more) {
-  .andrey-home .story-pin {
+  .andrey-home .run {
     background: var(--andrey-ground-navy);
   }
 
-  .andrey-home .story-pin::before,
-  .andrey-home .hero-art {
+  .andrey-home .run-art {
     display: none;
   }
 }
 
 .andrey-home .hero h1 {
-  max-width: 11ch;
+  max-width: 13ch;
   margin: 0;
-  font-size: clamp(3rem, 7.4vw, 7rem);
+  font-size: clamp(2.8rem, 6.4vw, 5.8rem);
   line-height: 1;
   letter-spacing: -0.055em;
 }
 
-/* The word, as on the covers and the link-preview card (site/cards.py: SLANT, TRACE): amber and
-   slanted, with the trace of its letters on its right, copies behind it, each further right and
-   fainter. Without the story the three words are one amber phrase. */
+/* The words: amber and slanted, as on the covers and the link-preview card (site/cards.py: SLANT),
+   lit as soft neon to match the art's light: a core a little paler than the amber inside a wide,
+   low halo, so their edges glow rather than cut. */
 .andrey-home .hero .word {
   display: inline-block;
   color: var(--andrey-ground-amber);
   transform: skewX(-11deg);
 }
 
-.andrey-home .hero .story-word {
-  text-shadow:
-    0.033em 0 0.02em color-mix(in srgb, var(--andrey-ground-amber) 32%, transparent),
-    0.067em 0 0.025em color-mix(in srgb, var(--andrey-ground-amber) 24%, transparent),
-    0.1em 0 0.03em color-mix(in srgb, var(--andrey-ground-amber) 17%, transparent),
-    0.133em 0 0.035em color-mix(in srgb, var(--andrey-ground-amber) 11%, transparent),
-    0.167em 0 0.04em color-mix(in srgb, var(--andrey-ground-amber) 7%, transparent),
-    0.2em 0 0.045em color-mix(in srgb, var(--andrey-ground-amber) 4%, transparent);
-}
-
-.andrey-home .story-static .word {
+.andrey-home .hero h1 .word {
   display: inline;
+  color: color-mix(in oklab, var(--andrey-ground-amber), var(--andrey-ground-ink) 16%);
+  text-shadow:
+    0 0 0.02em color-mix(in srgb, var(--andrey-ground-amber) 90%, transparent),
+    0 0 0.08em color-mix(in srgb, var(--andrey-ground-amber) 60%, transparent),
+    0 0 0.22em color-mix(in srgb, var(--andrey-ground-amber) 38%, transparent),
+    0 0 0.5em color-mix(in srgb, var(--andrey-ground-amber) 22%, transparent);
 }
 
 .andrey-home .nowrap {
   white-space: nowrap;
 }
 
-/* Without the scroll story the hero is one static line. */
-.andrey-home .story-live,
-.andrey-home .story-line {
-  display: none;
-}
-
-.andrey-home .story-static {
-  display: block;
-}
-
-.andrey-home .story-copy {
+/* The hero's four cards, one per section below: its art, its title, and its claim, as glass panes
+   along the cover's foot. */
+.andrey-home .act-cards {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: clamp(2.5rem, 6vh, 4rem) 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.andrey-home .story-copy > * {
-  grid-area: 1 / 1;
-}
-
-/* With it, the pin sticks under the navbar for two screens of scrolling, and "Causal discovery,"
-   stays while the word under it, the line after it, and the graph change with the reader's place
-   in the track. Native scrolling throughout: CSS drives the changes from the scroll position where
-   the browser can, and story.js sets data-step where it cannot. Only opacity and transform move. */
-.andrey-home .hero.is-story .story-track {
-  height: 300svh;
-}
-
-.andrey-home .hero.is-story .story-pin {
-  position: sticky;
-  top: 0;
-  height: 100svh;
-  min-height: 0;
-}
-
-.andrey-home .hero.is-story .story-static,
-.andrey-home .hero.is-story .story-lede {
-  display: none;
-}
-
-.andrey-home .hero.is-story .story-live {
-  display: block;
-}
-
-.andrey-home .hero.is-story .story-line {
-  display: block;
-}
-
-.andrey-home .story-words {
-  display: grid;
-}
-
-.andrey-home .story-word {
-  grid-area: 1 / 1;
-  justify-self: start;
-}
-
-.andrey-home .story-prompt {
-  display: none;
-  align-self: start;
-  margin: 1.5rem 0 0;
-}
-
-.andrey-home .hero.is-story .story-prompt {
-  display: grid;
-}
-
-.andrey-home .story-prompt code {
-  display: block;
-  width: fit-content;
-  max-width: 100%;
-  padding: 0.35rem 0.8rem;
-  border: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 32%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--andrey-ground-navy) 55%, transparent);
+.andrey-home .act-card a {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 9.5rem;
+  padding: 1rem 1.1rem;
+  overflow: hidden;
+  border-radius: 16px;
   color: var(--andrey-ground-ink);
-  font-size: clamp(0.78rem, 1.4vw, 1rem);
-  overflow-wrap: anywhere;
+  text-decoration: none;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--andrey-ground-ink) 35%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-ground-ink) 20%, transparent),
+    0 18px 40px -24px color-mix(in srgb, var(--andrey-ground-navy) 80%, transparent);
+  transition: transform var(--andrey-dur) var(--andrey-ease),
+              box-shadow var(--andrey-dur) var(--andrey-ease);
 }
 
-.andrey-home .story-prompt code + code {
-  margin-top: 0.4rem;
+.andrey-home .act-card img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  object-fit: cover;
+  object-position: 80% 50%;
+  transition: transform 600ms var(--ease);
+}
+
+.andrey-home .act-card a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* The covers' fade, turned to rise from the card's foot, where its type sits. */
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--andrey-ground-navy) 60%, transparent),
+    color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent) 30%,
+    transparent 70%
+  );
+}
+
+.andrey-home .act-card b {
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.andrey-home .act-card span {
+  margin-top: 0.15rem;
   color: var(--andrey-ground-muted);
+  font-size: 0.88rem;
 }
 
+.andrey-home .act-card a:hover img,
+.andrey-home .act-card a:focus-visible img {
+  transform: scale(1.04);
+}
+
+@media (max-width: 47.99rem) {
+  .andrey-home .act-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .andrey-home .act-card a {
+    min-height: 7rem;
+  }
+}
+
+/* The hero's cards arrive one after another when the page opens, and never under reduced
+   motion. */
 @media (prefers-reduced-motion: no-preference) {
-  @supports (animation-timeline: scroll()) {
-    .andrey-home .hero.is-story {
-      --story-from: 0px;
-      --story-to: calc(200svh + 3rem);
-    }
+  .andrey-home .act-card {
+    animation: card-arrive 900ms var(--ease) both;
+    animation-delay: calc(450ms + var(--n, 0) * 90ms);
+  }
 
-    .andrey-home .hero.is-story .story-step {
-      animation-duration: 1ms;
-      animation-timing-function: linear;
-      animation-fill-mode: both;
+  .andrey-home .act-card:nth-child(2) { --n: 1; }
+  .andrey-home .act-card:nth-child(3) { --n: 2; }
+  .andrey-home .act-card:nth-child(4) { --n: 3; }
+}
+
+/* The hero's scroll: the art stays, and the type and cards rise and fade over it, so the first
+   section's title comes up after them. Only where the cards fit in the first screen (on a phone
+   they sit below it, so they stay as the reader scrolls to them), where the browser drives
+   animations from the scroll, and never under reduced motion. */
+@media (prefers-reduced-motion: no-preference) and (min-width: 48rem) {
+  @supports (animation-timeline: scroll()) {
+    .andrey-home .hero-intro {
+      animation: hero-lift linear both;
       animation-timeline: scroll(root block);
-      animation-range: var(--story-from) var(--story-to);
-    }
-
-    .andrey-home .hero.is-story [data-i="1"] { animation-name: story-first; }
-    .andrey-home .hero.is-story [data-i="2"] { animation-name: story-second; }
-    .andrey-home .hero.is-story [data-i="3"] { animation-name: story-third; }
-    /* Each cover fades in over the one before, so the ground never shows between them. */
-    .andrey-home .hero.is-story .hero-cover[data-i="1"] { animation-name: none; }
-    .andrey-home .hero.is-story .hero-cover[data-i="2"] { animation-name: cover-second; }
-    .andrey-home .hero.is-story .hero-cover[data-i="3"] { animation-name: cover-third; }
-
-    /* The dim runs from the last stretch of the pin until the cover is mostly gone. */
-    .andrey-home .hero.is-story .story-track {
-      view-timeline: --story-track block;
-    }
-
-    .andrey-home .hero.is-story .story-pin::after {
-      animation: cover-dim linear both;
-      animation-timeline: --story-track;
-      animation-range: contain 86% exit 70%;
-    }
-  }
-
-  /* No scroll-driven animation: story.js sets data-step, and each change eases. */
-  @supports not (animation-timeline: scroll()) {
-    .andrey-home .hero.is-story .story-step {
-      opacity: 0;
-      transition: opacity 500ms var(--ease), transform 500ms var(--ease), translate 500ms var(--ease);
-    }
-
-    .andrey-home .hero.is-story .story-word,
-    .andrey-home .hero.is-story .story-line {
-      translate: 0 0.35em;
-    }
-
-    .andrey-home .hero.is-story[data-step="1"] [data-i="1"],
-    .andrey-home .hero.is-story[data-step="2"] [data-i="2"],
-    .andrey-home .hero.is-story[data-step="3"] [data-i="3"] {
-      opacity: 1;
-      translate: none;
-    }
-
-    .andrey-home .hero.is-story .hero-cover[data-i="1"],
-    .andrey-home .hero.is-story[data-step="2"] .hero-cover[data-i="2"],
-    .andrey-home .hero.is-story[data-step="3"] .hero-cover[data-i="2"] {
-      opacity: 1;
-    }
-
-    .andrey-home .hero.is-story .story-pin::after {
-      transition: opacity 700ms var(--ease);
-    }
-
-    .andrey-home .hero.is-story[data-leaving] .story-pin::after {
-      opacity: 1;
+      animation-range: 0 90svh;
     }
   }
 }
 
-/* On a phone the contour's crop starts lower than the lanes', so the lanes leave as it arrives. */
-@media (prefers-reduced-motion: no-preference) and (max-width: 47.99rem) {
-  @supports (animation-timeline: scroll()) {
-    .andrey-home .hero.is-story .hero-cover[data-i="1"] { animation-name: cover-first; }
-  }
-
-  @supports not (animation-timeline: scroll()) {
-    .andrey-home .hero.is-story:not([data-step="1"]) .hero-cover[data-i="1"] {
-      opacity: 0;
-    }
+@keyframes card-arrive {
+  from {
+    opacity: 0;
+    translate: 0 1.5rem;
   }
 }
 
-@keyframes cover-first {
-  0%, 30% { opacity: 1; }
-  40%, 100% { opacity: 0; }
-}
-
-@keyframes cover-dim {
+@keyframes hero-lift {
   to {
-    opacity: 1;
+    opacity: 0.15;
+    translate: 0 -4%;
   }
-}
-
-@keyframes story-first {
-  0%, 26% { opacity: 1; translate: none; }
-  36%, 100% { opacity: 0; translate: 0 -0.35em; }
-}
-
-@keyframes story-second {
-  0%, 30% { opacity: 0; translate: 0 0.35em; }
-  40%, 60% { opacity: 1; translate: none; }
-  70%, 100% { opacity: 0; translate: 0 -0.35em; }
-}
-
-@keyframes story-third {
-  0%, 64% { opacity: 0; translate: 0 0.35em; }
-  74%, 100% { opacity: 1; translate: none; }
-}
-
-@keyframes cover-second {
-  0%, 30% { opacity: 0; }
-  40%, 100% { opacity: 1; }
-}
-
-@keyframes cover-third {
-  0%, 64% { opacity: 0; }
-  74%, 100% { opacity: 1; }
 }
 
 .andrey-home .lede {
@@ -694,21 +546,291 @@
   opacity: 1;
 }
 
-/* ---------- the bento grid: tiles of mixed sizes, each opening its details ---------- */
-/* Twelve columns. A tile spans 4 or 6; the latest release's takes two rows. A tile is a link, and
-   with script (tiles.js) it opens its dialog instead of jumping to it. */
-.andrey-home .bento {
-  padding-block: clamp(1rem, 3vw, 2rem) clamp(3rem, 7vw, 5rem);
+/* ---------- the four sections: a cover with its claim, then its evidence ---------- */
+/* Each section opens on its art at full bleed (the cover band of .section-cover), its title large
+   and its claim under it, its number in bold; the art keeps the cover's one amber. The evidence
+   follows as tiles. */
+.andrey-home .act {
+  padding-block: clamp(3rem, 8vw, 5.5rem) clamp(1rem, 3vw, 2rem);
 }
 
-/* Three groups, under the hero's three words. */
-.andrey-home .group-title {
-  margin: clamp(3rem, 7vw, 5rem) 0 1.25rem;
-  font-size: clamp(2.25rem, 5vw, 4rem);
+.andrey-home .act-cover {
+  margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.andrey-home .act-head {
+  max-width: 40rem;
+}
+
+.andrey-home .section .act-claim {
+  max-width: 30ch;
+  margin: 1rem 0 0;
+  color: var(--andrey-ground-ink);
+  font-size: clamp(1.2rem, 2.2vw, 1.6rem);
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+/* The first section opens on the hero's art, which stays on the screen into it (.run): its title
+   and claim come up over the art right after the hero's cards, with the four ideas behind the
+   speed (the story, below), then its tiles rise over the art on a sheet of the page's paper,
+   whose top fades in over about a fifth of a screen. */
+/* Above .section's own padding, which would leave bare ground at the run's foot. */
+.andrey-home .section.act--hero {
+  padding-block: 0;
+}
+
+.andrey-home .act-cover--hero {
+  padding-top: clamp(2rem, 6vw, 4rem);
+}
+
+/* The story: each idea's title and narration beside its scene, on the art. Without script, or
+   with reduced motion, the ideas stand one after another. Where the section's title and an idea
+   fit the screen together, why-fast.js pins the stage (.wf-pin) under the navbar (.is-pinned)
+   and gives each idea three quarters of a screen of scroll: the current idea shows, its scene
+   played by the scroll, and a bar per idea fills as its scene plays. */
+/* The stage is as tall as its content (--pin-h, which the script measures), so the tiles follow
+   the story without a screen of bare art between them. On a short screen the script lifts the
+   title above the screen's top (--lift), and the story alone stays. */
+.andrey-home .wf-run.is-pinned {
+  height: calc(var(--pin-h, 100svh) + var(--steps, 4) * 75svh);
+}
+
+.andrey-home .wf-run.is-pinned .wf-pin {
+  position: sticky;
+  top: calc(var(--pst-header-height) - var(--lift, 0px));
+  max-height: calc(100svh - var(--pst-header-height) + var(--lift, 0px));
+  padding-top: clamp(1.5rem, 6svh, 3.5rem);
+}
+
+.andrey-home .wf-run.is-pinned .act-cover--hero {
+  padding-top: 0;
+  margin-bottom: clamp(1.25rem, 4svh, 2.5rem);
+}
+
+.andrey-home .wf-story {
+  color: var(--andrey-ground-ink);
+  font-family: inherit;
+}
+
+.andrey-home .wf-steps {
+  display: grid;
+  gap: clamp(2.5rem, 6vw, 4rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each idea's words above its scene, which takes the story's full width: the title, and beside it
+   the narration, then the two lanes at a size that reads across the room. */
+.andrey-home .wf-step {
+  display: grid;
+  gap: clamp(1.25rem, 3svh, 2rem);
+}
+
+.andrey-home .wf-words {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 0.75rem clamp(2rem, 5vw, 4rem);
+  align-items: baseline;
+}
+
+.andrey-home .wf-step::marker {
+  content: none;
+}
+
+.andrey-home .section .wf-words h3 {
+  margin: 0;
+  color: var(--andrey-ground-ink);
+  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+
+.andrey-home .section .wf-words p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--andrey-ground-muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+/* Pinned, the ideas share one place, and the current one shows. */
+.andrey-home .is-pinned .wf-step {
+  grid-area: 1 / 1;
+  opacity: 0;
+  translate: 0 0.75rem;
+  pointer-events: none;
+  transition:
+    opacity 0.4s var(--ease),
+    translate 0.5s var(--ease);
+}
+
+.andrey-home .is-pinned .wf-step.is-on {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+}
+
+.andrey-home .wf-rail {
+  display: none;
+}
+
+.andrey-home .is-pinned .wf-rail {
+  display: grid;
+  grid-template-columns: repeat(var(--steps, 4), minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: clamp(1rem, 3svh, 2rem);
+}
+
+.andrey-home .wf-bar-step {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.5rem 0;
+  border: 0;
+  background: none;
+  color: var(--andrey-ground-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.andrey-home .wf-bar-step[aria-current] {
+  color: var(--andrey-ground-ink);
+}
+
+.andrey-home .wf-bar-step:focus-visible {
+  outline-color: var(--andrey-ground-ink);
+}
+
+.andrey-home .wf-bar-step i {
+  position: relative;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent);
+}
+
+.andrey-home .wf-bar-step i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--andrey-ground-ink);
+  transform-origin: left;
+  scale: var(--fill, 0) 1;
+}
+
+@media (max-width: 56rem) {
+  .andrey-home .wf-words {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 44rem) {
+  .andrey-home .wf-bar-step span {
+    display: none;
+  }
+
+  .andrey-home .section .wf-words p {
+    font-size: 0.98rem;
+  }
+}
+
+/* The sheet's fade starts below the story, so the story's last line stays on the art. */
+.andrey-home .run-sheet {
+  --sheet-fade: clamp(9rem, 24svh, 14rem);
+  position: relative;
+  margin-top: calc(var(--sheet-fade) * 0.7);
+  padding-block: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 2rem);
+}
+
+/* Eased stops: a straight ramp shows a line where it starts. */
+.andrey-home .run-sheet::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--sheet-fade)) calc(50% - 50vw) 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--andrey-paper) 4%, transparent) calc(var(--sheet-fade) * 0.15),
+    color-mix(in srgb, var(--andrey-paper) 14%, transparent) calc(var(--sheet-fade) * 0.3),
+    color-mix(in srgb, var(--andrey-paper) 30%, transparent) calc(var(--sheet-fade) * 0.45),
+    color-mix(in srgb, var(--andrey-paper) 50%, transparent) calc(var(--sheet-fade) * 0.6),
+    color-mix(in srgb, var(--andrey-paper) 72%, transparent) calc(var(--sheet-fade) * 0.75),
+    color-mix(in srgb, var(--andrey-paper) 90%, transparent) calc(var(--sheet-fade) * 0.9),
+    var(--andrey-paper) var(--sheet-fade)
+  );
+}
+
+/* On a narrow or upright screen the type crosses the art's streak, past the reach of the covers'
+   left fade, so a soft navy halo keeps it clear of the light. */
+@media (max-width: 47.99rem), (orientation: portrait) {
+  .andrey-home .act-cover--hero .act-head,
+  .andrey-home .wf-words,
+  .andrey-home .hero .lede {
+    text-shadow: 0 0 1.2em color-mix(in srgb, var(--andrey-ground-navy) 70%, transparent);
+  }
+}
+
+/* "From data to graph" opens on its own art inside the last section, after the section's tiles,
+   its title a step below a section's. */
+.andrey-home .section-cover.act-cover--sub {
+  margin-top: clamp(3rem, 7vw, 4.5rem);
+}
+
+.andrey-home .section .act-cover--sub h3 {
+  margin: 0;
+  color: var(--andrey-ground-ink);
+  font-size: clamp(2.2rem, 4.5vw, 3.6rem);
   line-height: 1;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.04em;
 }
 
+.andrey-home .act-claim b {
+  font-weight: 700;
+}
+
+/* A section cover's motion as it crosses the screen: its art settles from a slight push and drifts
+   against the scroll, the title rises in, then the claim. The art never rests above its own
+   size. Only where the browser drives animations from the scroll, and never under reduced
+   motion; elsewhere the cover is still. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .andrey-home .act-cover .cover-frame {
+      animation: cover-settle linear both;
+      animation-timeline: view();
+      animation-range: entry 0% exit 100%;
+    }
+
+    .andrey-home .act-claim.reveal {
+      animation-range: entry 20% entry 100%;
+    }
+  }
+}
+
+@keyframes cover-settle {
+  0% {
+    scale: 1.08;
+    translate: 0 -6%;
+  }
+
+  50% {
+    scale: 1;
+    translate: 0 0;
+  }
+
+  100% {
+    scale: 1;
+    translate: 0 6%;
+  }
+}
+
+/* ---------- the tiles: mixed sizes, each opening its details ---------- */
+/* Twelve columns. A tile spans 4, 5, 6, or 7, or the whole row. A tile is a link, and with script
+   (tiles.js) it opens its dialog instead of jumping to it. */
 .andrey-home .bento-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -723,8 +845,7 @@
 /* A tile is a small cover, in both themes: the stipple ground, its art cropped on the right
    (site/brand/bento/*.jpg), a navy fade on the left under the light type. The small tiles' art is
    cobalt only, so the one amber is the number; a tile without a number keeps its art's amber. */
-.andrey-home .tile-face,
-.andrey-home .carousel-head {
+.andrey-home .tile-face {
   --andrey-ink: var(--andrey-ground-ink);
   --andrey-muted: var(--andrey-ground-muted);
 }
@@ -748,11 +869,15 @@
   grid-column: span 6;
 }
 
-.andrey-home .tile--release {
-  grid-column: span 6;
+.andrey-home .tile--5 {
+  grid-column: span 5;
 }
 
-.andrey-home .tile--12 {
+.andrey-home .tile--7 {
+  grid-column: span 7;
+}
+
+.andrey-home .bento-grid > .tile--wide {
   grid-column: 1 / -1;
 }
 
@@ -785,21 +910,16 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--andrey-ground-navy) 82%, transparent),
-    color-mix(in srgb, var(--andrey-ground-navy) 58%, transparent) 38%,
-    transparent 72%
-  );
+  background: var(--cover-fade);
   pointer-events: none;
 }
 
 /* A narrow tile's art is detail behind its number: dimmer, and never clear of the fade. */
-.andrey-home .tile:not(.tile--6) .tile-art {
+.andrey-home .tile:not(.tile--6):not(.tile--glass) .tile-art {
   opacity: 0.7;
 }
 
-.andrey-home .tile:not(.tile--6) .tile-face::after {
+.andrey-home .tile:not(.tile--6):not(.tile--glass) .tile-face::after {
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--andrey-ground-navy) 85%, transparent),
@@ -878,172 +998,196 @@
   transform: rotate(90deg) scale(1.08);
 }
 
-/* The latest release: its cover fills the tile, with its own title and fade. */
-.andrey-home .tile--release .tile-face {
-  padding: 0;
+/* A tile with its evidence on a glass card under its title: a scene playing (why-fast.js), a chart,
+   a terminal, or a figure. The card takes back the page's own ink and muted, which the tile's
+   light type replaces, so its figure reads as it does elsewhere on the site. */
+.andrey-home .tile--glass {
+  --page-ink: var(--andrey-ink);
+  --page-muted: var(--andrey-muted);
+  --page-line: var(--andrey-line);
+  min-height: 24rem;
 }
 
-.andrey-home .tile--release .tile-face::after {
+.andrey-home .tile--glass .tile-title {
+  max-width: none;
+}
+
+.andrey-home .tile--glass .tile-text {
+  max-width: 40ch;
+}
+
+.andrey-home .tile--glass .wf-plus {
+  top: 1.1rem;
+  bottom: auto;
+}
+
+.andrey-home .tile-glass {
+  --andrey-ink: var(--page-ink);
+  --andrey-muted: var(--page-muted);
+  --andrey-line: var(--page-line);
+  margin-top: auto;
+  padding-top: 1.25rem;
+}
+
+.andrey-home .tile-glass > *,
+.andrey-home .wf-step .wf-stage {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--andrey-surface) 90%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--andrey-surface) 100%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--andrey-ground-ink) 30%, transparent),
+    0 18px 36px -22px color-mix(in srgb, var(--andrey-ground-navy) 70%, transparent);
+  color: var(--andrey-ink);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+
+.andrey-home .wf-step .wf-stage {
+  padding: 4px 22px;
+}
+
+/* A story's scene keeps one row per lane down to a phone's width, where the post's stacks, and
+   grows with the story's width up to half again its drawn size (why-fast.js reads the cap). */
+.andrey-home .wf-step .wf-scene {
+  --wf-scale-max: 1.6;
+}
+
+@container wf-stage (min-width: 26rem) {
+  .andrey-home .wf-step .wf-lane {
+    grid-template-columns: 7.5rem minmax(0, 1fr) 5rem;
+    grid-template-areas: none;
+    column-gap: 14px;
+  }
+
+  .andrey-home .wf-step .wf-who,
+  .andrey-home .wf-step .wf-count,
+  .andrey-home .wf-step .wf-track {
+    grid-area: auto;
+  }
+}
+
+@container wf-stage (min-width: 48rem) {
+  .andrey-home .wf-step .wf-lane {
+    grid-template-columns: 11.5rem minmax(0, 1fr) 6.5rem;
+    column-gap: 20px;
+  }
+
+  .andrey-home .wf-step .wf-count b {
+    font-size: 2.6rem;
+  }
+}
+
+/* A note in the bento grid where a figure would add nothing: plain type on the page's paper, no
+   card, beside the tile whose evidence it completes. */
+.andrey-home .bento-note {
+  grid-column: span 5;
+  align-self: center;
+  padding: 0.5rem clamp(0rem, 2vw, 1.5rem);
+}
+
+.andrey-home .bento-note::marker {
   content: none;
 }
 
-.andrey-home .tile--release img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 15rem;
-  object-fit: cover;
-  object-position: left center;
+.andrey-home .section .bento-note h3 {
+  margin: 0;
+  font-size: clamp(1.45rem, 2.2vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
 }
 
-/* The figures' tile: its title and controls on the left, the figures on paper cards in a row
-   that snaps from one to the next. */
-.andrey-home .carousel {
+.andrey-home .section .bento-note p {
+  margin: 0.8rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+/* A terminal: each command, then the first lines it prints. */
+.andrey-home .tile-glass > .tile-term {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.andrey-home .tile-term .cmd {
+  color: var(--andrey-accent);
+  font-weight: 500;
+}
+
+.andrey-home .tile-term .elide {
+  color: var(--andrey-muted);
+}
+
+/* One graph from each of three methods, small, with only its method's name. */
+/* Every kind of causal graph in one row, as wide as the tile allows, two or three to a row on a
+   narrow screen. */
+.andrey-home .glass-graphs {
   display: grid;
-  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
-  gap: 1.5rem;
-  padding: 1.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+  gap: 0.5rem 1rem;
+  padding: 0.9rem 1rem;
 }
 
-.andrey-home .carousel-head {
-  display: flex;
-  flex-direction: column;
-  color: var(--andrey-ink);
-}
-
-.andrey-home .carousel-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: auto;
-  padding-top: 1.5rem;
-}
-
-.andrey-home .carousel-controls[hidden] {
-  display: none;
-}
-
-.andrey-home .carousel-step {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 40%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--andrey-ground-navy) 40%, transparent);
-  color: var(--andrey-ground-ink);
-  font-size: 1.4rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.andrey-home .carousel-dots {
-  display: flex;
-  gap: 0.35rem;
-}
-
-.andrey-home .carousel-dot {
-  width: 8px;
-  height: 8px;
+.andrey-home .glass-graphs figure {
+  min-width: 0;
+  margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--andrey-ground-ink) 40%, transparent);
-  cursor: pointer;
+  background: none;
+  box-shadow: none;
 }
 
-.andrey-home .carousel-dot[aria-current="true"] {
-  background: var(--andrey-ground-ink);
+.andrey-home .glass-graphs svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
-.andrey-home .carousel-track {
+.andrey-home .glass-graphs figcaption {
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* How many of the table's features each package has: a bar of full marks, then partial ones. */
+.andrey-home .coverage-bars {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: min(34rem, 88%);
-  grid-auto-rows: 25rem;
-  gap: 1rem;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-}
-
-/* Every slide is the same height; a figure shrinks to fit it. */
-.andrey-home .carousel-slide {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  scroll-snap-align: start;
-  padding: 1.1rem 1.2rem;
-  border-radius: 14px;
-  background: var(--andrey-paper);
-  color: var(--andrey-ink);
-}
-
-.andrey-home .carousel-slide .tchart {
-  width: auto;
+  gap: 0.55rem;
   margin: 0;
+  padding: 1rem;
+  list-style: none;
 }
 
-.andrey-home .carousel-slide > *,
-.andrey-home .carousel-slide .acc-figure,
-.andrey-home .carousel-slide .acc-scroll {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
+.andrey-home .coverage-bars li {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 1.2rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
 }
 
-.andrey-home .carousel-slide .acc-chart {
-  min-width: 0;
+.andrey-home .coverage-bars i {
+  height: 0.55rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, var(--andrey-accent) 0 calc(var(--yes) / var(--all) * 100%),
+      color-mix(in srgb, var(--andrey-accent) 35%, transparent) 0
+      calc((var(--yes) + var(--part)) / var(--all) * 100%),
+      var(--andrey-surface-2) 0);
 }
 
-.andrey-home .carousel-slide svg {
-  flex: 1;
-  min-height: 0;
-  max-width: 100%;
-}
-
-.andrey-home .carousel-slide .acc-score {
-  display: inline;
-  font-size: 2rem;
-}
-
-.andrey-home .carousel-slide .acc-figure figcaption {
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.andrey-home .carousel-slide .acc-note {
-  display: none;
-}
-
-.andrey-home .carousel-graphs {
-  flex-direction: row;
-  gap: 0.75rem;
-}
-
-.andrey-home .carousel-graphs figure {
-  flex: 1;
-  min-width: 0;
-  padding: 0.6rem;
-}
-
-.andrey-home .carousel-graphs figcaption {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  font-size: 0.78rem;
-}
-
-@media (max-width: 44rem) {
-  .andrey-home .carousel {
-    grid-template-columns: minmax(0, 1fr);
-    padding: 1.25rem;
-  }
+.andrey-home .coverage-bars b {
+  text-align: right;
 }
 
 /* The tiles fly in as they enter the screen, a row at a time with a short stagger across it
@@ -1067,7 +1211,7 @@
   }
 
   @supports not (animation-timeline: view()) {
-    .andrey-home .bento.is-flying .bento-grid > .tile {
+    .andrey-home main.is-flying .bento-grid > .tile {
       opacity: 0;
       translate: 0 3rem;
       scale: 0.96;
@@ -1077,7 +1221,7 @@
         scale 700ms var(--ease) calc(var(--k, 0) * 90ms);
     }
 
-    .andrey-home .bento.is-flying .bento-grid > .tile.is-in {
+    .andrey-home main.is-flying .bento-grid > .tile.is-in {
       opacity: 1;
       translate: none;
       scale: none;
@@ -1134,8 +1278,9 @@
   font-family: inherit;
 }
 
-/* The accuracy figure: a row per method, the other package's errors as a ring at 100% and
-   Andrey's as a cobalt dot at its share of them; the one number, above it, in amber. */
+/* Where Andrey has fewer errors: a row per method and package, both packages' errors as a pair of
+   bars on the row's own scale, Andrey's in the accent and the other package's in gray, as in the
+   speed race (figures.css), and how many fewer in words. */
 .andrey-home .acc-figure {
   margin: 0;
 }
@@ -1146,65 +1291,61 @@
   color: var(--andrey-muted);
 }
 
-.andrey-home .acc-score {
-  display: block;
-  color: var(--andrey-ground-amber);
-  font-size: clamp(2.4rem, 5vw, 3.4rem);
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+.andrey-home .err-pairs {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* On a phone the chart keeps a readable size and scrolls sideways. */
-.andrey-home .acc-scroll {
-  overflow-x: auto;
+.andrey-home .tile-glass > .err-pairs {
+  padding: 0.9rem 1rem 1rem;
 }
 
-.andrey-home .acc-chart {
-  display: block;
-  min-width: 32rem;
-  width: 100%;
-  max-width: 44rem;
-  height: auto;
-  font-family: var(--font-sans);
+.andrey-home .err-pairs .err-head {
+  display: flex;
+  max-width: none;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 0.3rem;
+  font-size: 0.85rem;
 }
 
-.andrey-home .acc-name {
-  fill: var(--andrey-ink);
-  font-size: 14px;
+.andrey-home .err-head span {
   font-weight: 600;
 }
 
-.andrey-home .acc-with,
-.andrey-home .acc-tick,
-.andrey-home .acc-change {
-  fill: var(--andrey-muted);
-  font-size: 12px;
-  font-weight: 400;
+.andrey-home .err-bar {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 3.5rem;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--andrey-muted);
+  font-size: 0.78rem;
 }
 
-.andrey-home .acc-tick {
-  text-anchor: middle;
+.andrey-home .err-bar i {
+  width: max(4px, calc(100% * var(--f)));
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-muted) 55%, transparent);
 }
 
-.andrey-home .acc-grid {
-  stroke: var(--andrey-line);
+.andrey-home .err-bar--andrey i {
+  background: var(--andrey-accent);
 }
 
-.andrey-home .acc-link {
-  stroke: var(--andrey-accent);
-  stroke-width: 2;
-  opacity: 0.45;
+.andrey-home .err-bar b {
+  color: var(--andrey-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-.andrey-home .acc-ref {
-  fill: var(--andrey-paper);
-  stroke: var(--andrey-muted);
-  stroke-width: 1.5;
-}
-
-.andrey-home .acc-ours {
-  fill: var(--andrey-accent);
+.andrey-home .err-bar--andrey span {
+  color: var(--andrey-accent);
+  font-weight: 600;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1406,45 +1547,6 @@
   }
 }
 
-/* ---------- footnotes: every note on the page, together at its foot ---------- */
-.andrey-home .fn-ref {
-  margin-left: 0.1em;
-  font-size: 0.65em;
-  font-weight: 500;
-  line-height: 0;
-}
-
-.andrey-home .fn-ref a {
-  text-decoration: none;
-}
-
-.andrey-home .footnotes {
-  padding-block: clamp(2rem, 5vw, 3rem);
-  color: var(--andrey-muted);
-  font-size: 0.82rem;
-  line-height: 1.55;
-}
-
-.andrey-home .footnotes ol {
-  display: grid;
-  gap: 0.6rem;
-  margin-block: 0;
-  padding-left: calc(var(--gutter) + 1.25rem);
-}
-
-.andrey-home .footnotes li:target {
-  color: var(--andrey-ink);
-}
-
-.andrey-home .footnotes ul {
-  margin: 0.35rem 0 0;
-  padding-left: 1.1rem;
-}
-
-.andrey-home .fn-back {
-  text-decoration: none;
-}
-
 .andrey-home .compare-hint {
   display: none;
   margin: 1rem 0 0;
@@ -1538,45 +1640,20 @@
   color: var(--andrey-surface);
 }
 
-/* The documentation band: the one section on a raised ground, so it reads as the next step
-   rather than more body text. The ground rises out of the paper and sinks back into it. */
-.andrey-home .band {
-  padding-block: clamp(6rem, 18svh, 10rem);
-  background: linear-gradient(
-    180deg,
-    var(--andrey-paper),
-    var(--andrey-surface-2) clamp(6rem, 18svh, 10rem),
-    var(--andrey-surface-2) calc(100% - clamp(6rem, 18svh, 10rem)),
-    var(--andrey-paper)
-  );
-}
-
 .andrey-home .docs-grid li {
   padding-top: 1rem;
   border-top: 2px solid var(--andrey-line);
 }
 
-.andrey-home .band h2 {
-  margin: 0 0 1rem;
-  font-size: clamp(2rem, 2.7vw, 2.5rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-}
-
-.andrey-home .band-row > div > p {
-  max-width: var(--measure);
-  color: var(--andrey-muted);
-}
-
-/* The sections below the bento, each paired with its art, as an Apple product page pairs a
-   section with its picture: "From data to graph" opens on a full-bleed cover band with its title
-   in large type, and the documentation band sets its art beside the text. */
+/* A section's cover band: its art at full bleed and its title in large type, as an Apple product
+   page pairs a section with its picture. The band grows with the screen's width, to 90% of its
+   height, so a wide screen shows the art's full height rather than a strip of it. */
 .andrey-home .section-cover {
   position: relative;
   isolation: isolate;
   display: flex;
   align-items: center;
-  min-height: clamp(26rem, 50vw, 38rem);
+  min-height: clamp(26rem, 46vw, 90svh);
   margin: calc(-1 * clamp(3rem, 8vw, 5.5rem)) calc(50% - 50vw) clamp(1rem, 3vw, 2rem);
   padding: clamp(1.5rem, 4vw, 3rem) max(var(--gutter), calc(50vw - var(--page) / 2 + var(--gutter)));
 }
@@ -1611,31 +1688,103 @@
   inset: 0;
   z-index: -1;
   overflow: hidden;
+  container-type: size;
   background: var(--andrey-ground-art);
   -webkit-mask-image: var(--band-fade);
   mask-image: var(--band-fade);
 }
 
-.andrey-home .cover-art img {
+/* The art in a frame of its own proportions, 1600 by 640, sized and placed as object-fit: cover
+   with object-position 80% 50% would place it: wide enough to fill the band, its overflow cropped
+   80% from the left and evenly top and bottom. A sweep drawn in the art's frame stays on its
+   streak at every width, and moves with it. */
+.andrey-home .cover-frame {
+  --frame-w: max(100cqw, 100cqh * 2.5);
+  position: absolute;
+  top: calc((100cqh - var(--frame-w) / 2.5) / 2);
+  left: calc((100cqw - var(--frame-w)) * 0.8);
+  width: var(--frame-w);
+  aspect-ratio: 1600 / 640;
+}
+
+.andrey-home .cover-frame > img,
+.andrey-home .cover-frame > svg {
   position: absolute;
   inset: 0;
   width: 100%;
   max-width: none;
   height: 100%;
-  object-fit: cover;
-  object-position: 80% 50%;
+}
+
+/* The sweep: a short trace of soft neon light, like the headline's words, that runs up the
+   streak from its foot to its tip in about a second, then rests. Hidden until the page script
+   finds the cover on the screen (tiles.js), and never shown under reduced motion. Only the dash's
+   offset and the opacity move. */
+.andrey-home .cover-sweep {
+  opacity: 0;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.andrey-home .cover-sweep path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 11 300;
+  stroke-dashoffset: 11;
+  opacity: 0;
+}
+
+.andrey-home .sweep-glow {
+  stroke: color-mix(in oklab, var(--andrey-ground-amber), var(--andrey-ground-ink) 20%);
+  stroke-width: 44;
+}
+
+.andrey-home .sweep-core {
+  stroke: color-mix(in oklab, var(--andrey-ground-amber), var(--andrey-ground-ink) 72%);
+  stroke-width: 9;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .andrey-home .cover-sweep[data-on] {
+    opacity: 1;
+  }
+
+  .andrey-home .cover-sweep[data-on] path {
+    animation: streak-sweep 4.2s infinite;
+  }
+}
+
+@keyframes streak-sweep {
+  0% {
+    stroke-dashoffset: 11;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.5, 0, 0.3, 1);
+  }
+
+  4% {
+    opacity: 1;
+  }
+
+  22% {
+    opacity: 1;
+  }
+
+  27% {
+    stroke-dashoffset: -100;
+    opacity: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -100;
+    opacity: 0;
+  }
 }
 
 .andrey-home .cover-art::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--andrey-ground-navy) 70%, transparent),
-    color-mix(in srgb, var(--andrey-ground-navy) 40%, transparent) 35%,
-    transparent 65%
-  );
+  background: var(--cover-fade);
 }
 
 /* As the band crosses the screen its art brightens out of the paper and dims back into it. */
@@ -1663,7 +1812,7 @@
   35%, 65% { opacity: 1; }
 }
 
-.andrey-home .section .section-cover h2 {
+.andrey-home .section .act-cover h2 {
   margin: 0;
   color: var(--andrey-ground-ink);
   font-size: clamp(2.6rem, 6vw, 5rem);
@@ -1678,20 +1827,52 @@
   gap: clamp(2rem, 5vw, 4rem);
 }
 
-.andrey-home .band-art {
-  aspect-ratio: 4 / 5;
+/* The newest post, beside the documentation: its cover, then its date and description. */
+.andrey-home .band-post {
+  display: block;
   overflow: hidden;
+  border: 1px solid var(--andrey-line);
   border-radius: 18px;
-  background: var(--andrey-ground-art);
+  background: var(--andrey-surface);
+  color: var(--andrey-ink);
+  text-decoration: none;
+  transition: box-shadow var(--andrey-dur) var(--andrey-ease),
+              transform var(--andrey-dur) var(--andrey-ease);
 }
 
-.andrey-home .band-art img {
+.andrey-home .band-post:hover {
+  box-shadow: 0 18px 40px -24px color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+.andrey-home .band-post img {
   display: block;
   width: 100%;
   max-width: none;
-  height: 100%;
-  object-fit: cover;
-  object-position: 72% 50%;
+  height: auto;
+  background: var(--andrey-ground-art);
+}
+
+.andrey-home .band-post-body {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1.1rem 1.25rem 1.3rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.andrey-home .band-post-kicker {
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .andrey-home .band-post:hover {
+    transform: translateY(-2px);
+  }
 }
 
 @media (max-width: 44rem) {
@@ -1702,10 +1883,6 @@
   /* Tall enough for both fades and a solid middle under the title. */
   .andrey-home .section-cover {
     min-height: 34rem;
-  }
-
-  .andrey-home .band-art {
-    aspect-ratio: 16 / 9;
   }
 }
 
@@ -2211,6 +2388,17 @@
   gap: 0.5rem 1.5rem;
 }
 
+/* The copyright and the license, on a line of their own under Abel's name and the links. */
+.andrey-home .footer-legal {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.andrey-home .footer-legal a {
+  color: inherit;
+}
+
 /* ---------- narrow screens ---------- */
 @media (max-width: 44rem) {
   .andrey-home .step,
@@ -2225,19 +2413,24 @@
   }
 
   .andrey-home .tile,
-  .andrey-home .tile--6,
-  .andrey-home .tile--release {
+  .andrey-home .tile--6 {
     grid-column: span 3;
   }
 
-  .andrey-home .tile--release {
+  .andrey-home .tile--5,
+  .andrey-home .tile--7,
+  .andrey-home .bento-note {
     grid-column: span 6;
-    grid-row: span 1;
+  }
+
+  /* Two tiles to a row here, so an odd tile at the end takes the whole row. */
+  .andrey-home .bento-grid > .tile:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }
 
 @media (max-width: 44rem) {
-  .andrey-home .story-pin {
+  .andrey-home .hero-ground {
     align-items: flex-start;
     padding-top: calc(2rem + var(--pst-header-height));
   }
@@ -2248,14 +2441,19 @@
   }
 
   .andrey-home .tile,
+  .andrey-home .tile--5,
   .andrey-home .tile--6,
-  .andrey-home .tile--release {
+  .andrey-home .tile--7 {
     grid-column: auto;
     min-height: 11rem;
   }
 
+  .andrey-home .bento-note {
+    grid-column: auto;
+  }
+
   /* A wide tile is as narrow as the others here, so its type gets the narrow tiles' fade. */
-  .andrey-home .tile--6 .tile-face::after {
+  .andrey-home .tile--6:not(.tile--glass) .tile-face::after {
     background: linear-gradient(
       90deg,
       color-mix(in srgb, var(--andrey-ground-navy) 85%, transparent),
@@ -2266,7 +2464,7 @@
 }
 
 @media (max-width: 30rem) {
-  .andrey-home .story-pin {
+  .andrey-home .hero-ground {
     padding-top: calc(1.5rem + var(--pst-header-height));
   }
 

@@ -1,9 +1,10 @@
-{#- The page's headings in the phone's menu, above the documentation tree; a wider screen shows
-    them in the right sidebar. A tap on one closes the menu and scrolls to the heading. -#}
+{#- The page's headings in the phone's menu, above the documentation tree, as the right sidebar
+    draws them on a wider screen. A tap on one closes the menu and scrolls to the heading. -#}
+{%- from "nav-icons.html" import icon %}
 {%- set page_toc = generate_toc_html() %}
 {%- if page_toc | length >= 1 %}
-<nav class="page-outline bd-links" aria-label="{{ _('On this page') }}">
-  <p class="bd-links__title" role="heading" aria-level="1">{{ _("On this page") }}</p>
+<nav class="page-outline" aria-label="{{ _('On this page') }}">
+  <p class="onthispage">{{ icon("outline") }}{{ _("On this page") }}</p>
   {{ page_toc }}
 </nav>
 <script>

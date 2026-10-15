@@ -1,4 +1,4 @@
-/* "Why Andrey is fast": the scenes in the homepage's dialog, the launch post, and the guide.
+/* "Why Andrey is fast": the scenes in the homepage's story and the launch post.
    Every color is an --andrey-* token generated from src/andrey/viz/theme.py, or derived from
    one, so this file names no color value. Both lanes of a scene share one grid, so a station or a pile sits at the same place in
    each. Motion runs only with no reduced-motion preference (why-fast.js). */
@@ -194,7 +194,7 @@ html[data-theme="dark"] .wf { --wf-shade: var(--andrey-paper); }
   white-space: nowrap;
 }
 
-/* ---------- the homepage's plus and dialog ---------- */
+/* ---------- the homepage's plus and the tiles' dialogs ---------- */
 .wf-plus {
   display: grid;
   place-items: center;
@@ -206,7 +206,6 @@ html[data-theme="dark"] .wf { --wf-shade: var(--andrey-paper); }
 }
 .wf-plus svg { width: 15px; height: 15px; }
 
-dialog.wf-dialog,
 dialog.tile-dialog {
   width: min(940px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
@@ -218,7 +217,6 @@ dialog.tile-dialog {
   overflow: auto;
   overscroll-behavior: contain;
 }
-dialog.wf-dialog::backdrop,
 dialog.tile-dialog::backdrop {
   background: color-mix(in srgb, var(--wf-shade) 45%, transparent);
   backdrop-filter: blur(14px) saturate(1.15);
@@ -247,82 +245,8 @@ dialog.tile-dialog::backdrop {
   cursor: pointer;
 }
 .wf-close svg { width: 14px; height: 14px; }
-.wf-panels { margin-top: 26px; }
-.wf-caption { margin-top: 26px; min-height: 8.2em; }
-.wf .wf-caption h3 {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  color: var(--andrey-ink);
-}
-.wf .wf-caption p {
-  margin: 0.55rem 0 0;
-  max-width: 62ch;
-  font-size: 1rem;
-  line-height: 1.55;
-  color: var(--andrey-muted);
-}
-.wf-controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 8px; }
-.wf-dots {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 48px;
-  padding: 0 20px;
-  border-radius: 999px;
-  background: var(--andrey-surface-2);
-}
-.wf-dot {
-  position: relative;
-  width: 8px;
-  height: 8px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--andrey-ink) 32%, transparent);
-  cursor: pointer;
-  overflow: hidden;
-  transition: width 0.5s var(--wf-ease);
-}
-.wf-dot::before { content: ""; position: absolute; inset: -12px -6px; }
-.wf-dot[aria-selected="true"] {
-  width: 44px;
-  background: color-mix(in srgb, var(--andrey-ink) 20%, transparent);
-}
-.wf-dot i {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--andrey-ink);
-  transform: scaleX(0);
-  transform-origin: left;
-}
-.wf-play {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--andrey-surface-2);
-  color: var(--andrey-ink);
-  cursor: pointer;
-}
-.wf-play svg { grid-area: 1 / 1; width: 16px; height: 16px; opacity: 0; }
-.wf-play[data-state="playing"] .i-pause,
-.wf-play[data-state="paused"] .i-play,
-.wf-play[data-state="ended"] .i-replay { opacity: 1; }
-/* On the homepage the section's paragraph measure reaches the note too; centered, it stays readable. */
-.wf .wf-note {
-  margin: 18px auto 0;
-  text-align: center;
-  font-size: 0.8rem;
-  color: var(--andrey-muted);
-}
-.wf-note a { color: var(--andrey-accent); }
+/* A scene played by the scroll: its check eases in and out as the reader scrolls past its end. */
+.wf-scene[data-play="scroll"] .wf-done { transition: opacity 0.25s var(--wf-ease), scale 0.25s var(--wf-ease); }
 
 .wf button:focus-visible {
   outline: 2px solid var(--andrey-accent);
@@ -347,9 +271,5 @@ dialog.tile-dialog::backdrop {
 }
 @media (max-width: 680px) {
   .wf-stage { padding: 4px 16px; border-radius: 18px; }
-  dialog.wf-dialog, dialog.tile-dialog { padding: 24px 18px 20px; border-radius: 24px; }
-  .wf-caption { min-height: 11em; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .wf-dot { transition: none; }
+  dialog.tile-dialog { padding: 24px 18px 20px; border-radius: 24px; }
 }

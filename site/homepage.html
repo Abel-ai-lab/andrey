@@ -15,7 +15,6 @@
   <div id="pst-scroll-pixel-helper"></div>
   {%- block search_dialog %}{{ super() }}{% endblock search_dialog %}
   {%- if home.banner %}<div class="andrey-home">{{ home.banner }}</div>{% endif %}
-  {%- include "sections/announcement.html" %}
   {%- block docs_navbar %}{{ super() }}{% endblock docs_navbar %}
   {#- The navbar's links move into this drawer on a narrow screen. #}
   <dialog id="pst-primary-sidebar-modal"></dialog>
@@ -24,158 +23,58 @@
   </div>
 <div class="andrey-home">
 <main id="main-content">
-  <section class="hero" id="story" aria-labelledby="headline">
-    <div class="story-track">
-      <div class="story-pin">
-        <div class="hero-art" aria-hidden="true">{{ home.hero_art }}</div>
-        <div class="hero-fade" aria-hidden="true"></div>
+  {#- The hero and the first section share one art, the fast lanes: it stays on the screen while
+      the hero's type scrolls away and the section's title comes up over it with the four ideas
+      behind the speed, until the section's tiles rise over it on the page's paper. #}
+  <div class="run">
+    <div class="run-art" aria-hidden="true">{{ home.hero_art }}</div>
+    <section class="hero" aria-labelledby="headline">
+      <div class="hero-ground">
         <div class="hero-intro">
-          {#- Screen readers get the sentence once; the two visible forms are for the eye. -#}
-          <h1 id="headline">
-            <span class="visually-hidden">Causal discovery: accelerated, accurate, agentic.</span>
-            <span class="story-static" aria-hidden="true">Causal discovery: <span class="word">accelerated, accurate, agentic.</span></span>
-            <span class="story-live" aria-hidden="true">Causal discovery,
-              <span class="story-words">
-                <span class="story-step story-word word" data-i="1">accelerated</span>
-                <span class="story-step story-word word" data-i="2">accurate</span>
-                <span class="story-step story-word word" data-i="3">agentic</span>
-              </span>
-            </span>
-          </h1>
-          <div class="story-copy">
-            <p class="lede story-lede">Learn causal graphs from observational data, in Python.</p>
-            <p class="story-step lede story-line" data-i="1" aria-hidden="true">Batched, cached, and parallel, on every core or a GPU.</p>
-            <p class="story-step lede story-line" data-i="2" aria-hidden="true">As accurate as other popular packages, checked against true graphs.</p>
-            <p class="story-step story-line story-prompt" data-i="3" aria-hidden="true"><code>$ andrey run pc --data sachs.csv</code><code>{"structure": {"graph_type": "CPDAG", ...}}</code></p>
-          </div>
+          <h1 id="headline">Causal discovery: <span class="word">accelerated, accurate, agentic.</span></h1>
+          <p class="lede">Learn causal graphs from observational data, in Python.</p>
           <div class="hero-actions">
             <div class="install-line">
               <code>uv add andrey-core</code>
             </div>
             {{ home.hero_chips }}
           </div>
+          <ul class="act-cards" aria-label="On this page">{{ home.act_cards }}</ul>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="bento wrap" aria-label="What Andrey offers">
-    <div class="bento-group" id="accelerated">
-      <h2 class="group-title">Accelerated</h2>
-      <ul class="bento-grid">
-        <li class="tile tile--6"><a class="tile-face" href="blog/20261008-why-andrey-is-fast.html" data-wf-open="why-fast">
-          {{ home.tile_art("lanes", "6") }}
-          <h3 class="tile-title">Why Andrey is fast</h3>
-          <p class="tile-text">Four ideas, each shown as a short animation.</p>
-          {{ home.plus }}</a></li>
-        <li class="tile tile--6"><a class="tile-face" href="blog/20261008-why-andrey-is-fast.html" data-wf-open="why-fast" data-wf-scene="hardware">
-          {{ home.tile_art("hardware", "6") }}
-          <h3 class="tile-title">CPU-parallel and GPU</h3>
-          <p class="tile-text">Use every core, or a graphics card, where a method gains from it.</p>
-          {{ home.plus }}</a></li>
-        {{ home.family_tiles }}
-        {{ home.figure_carousel }}
-      </ul>
-    </div>
-
-    <div class="bento-group" id="accurate">
-      <h2 class="group-title">Accurate</h2>
-      <ul class="bento-grid">
-        <li class="tile tile--6"><a class="tile-face" href="#accuracy" data-tile="accuracy">
-          {{ home.tile_art("accuracy", "6") }}
-          <h3 class="tile-title">As accurate as the reference packages</h3>
-          {{ home.accuracy_line }}
-          {{ home.plus }}</a></li>
-        <li class="tile tile--6"><a class="tile-face" href="#graphs" data-tile="graphs">
-          {{ home.tile_art("graphs", "6") }}
-          <h3 class="tile-title">One graph for every method</h3>
-          <p class="tile-text">Draw it, convert it, or compare it with the same code.</p>
-          {{ home.plus }}</a></li>
-        <li class="tile tile--6"><a class="tile-face" href="#compare" data-tile="compare">
-          {{ home.tile_art("compare", "6") }}
-          <h3 class="tile-title">How Andrey compares</h3>
-          <p class="tile-text">What each package offers, by method family.</p>
-          {{ home.plus }}</a></li>
-        <li class="tile tile--6"><a class="tile-face" href="#methods" data-tile="methods">
-          {{ home.tile_art("methods", "6") }}
-          <h3 class="tile-title">Methods for every kind of data</h3>
-          <p class="tile-number"><b>{{ home.method_count }}</b></p>
-          {{ home.plus }}</a></li>
-      </ul>
-    </div>
-
-    <div class="bento-group" id="agentic">
-      <h2 class="group-title">Agentic</h2>
-      <ul class="bento-grid">
-        <li class="tile tile--6"><a class="tile-face" href="#agents" data-tile="agents">
-          {{ home.tile_art("agentic", "6") }}
-          <h3 class="tile-title">Built for agents</h3>
-          <p class="tile-text">A command line that never prompts, and a skill an agent loads.</p>
-          {{ home.plus }}</a></li>
-        {{ release_tile }}
-      </ul>
-    </div>
-  </section>
-
-  <div class="tile-details">
-    {{ home.family_dialogs }}
-    {{ home.accuracy_dialog }}
-    {{ home.why_fast }}
-    {{ home.dialog_head("graphs", "One graph for every method") }}
-    <p>A method returns a <code>StructureOutput</code> whose <code>structure</code> is a
-      <code>GraphStructure</code>: the graph type, a mark at each end of every edge, and the
-      variable names. Draw it, convert it to NetworkX or a NumPy matrix, or compare it with
-      another method's graph, with the same code for every method. Time-series methods return a
-      graph over time lags.</p>
-    <div class="step">
-      <div>
-        <h3>Three methods, three answers</h3>
-        <p>The sprinkler network: season drives rain and the sprinkler, both wet the grass, and wet
-          grass is slippery. The methods agree on everything downstream of season, and differ on
-          the two edges out of it.</p>
-        <p><a href="docs/guides/graph-types.html">What each graph type claims</a></p>
-      </div>
-      <div>
-        <div class="window">
-          <div class="window-bar"><span class="window-title">interface.py</span></div>
-<div class="code-copy"><pre class="hl"><code>{{ home.interface_code }}</code></pre></div>
-        </div>
-        <div class="window">
-          <div class="window-bar"><span class="window-title">interface.py</span></div>
-<div class="code-copy"><pre class="output"><code>{{ home.interface_output }}</code></pre></div>
+    {#- Each section opens on its art with its claim, then shows the evidence. #}
+    <section class="section wrap act act--hero" id="accelerated" aria-labelledby="accelerated-title">
+      {#- The title stays while the ideas play one at a time (why-fast.js). #}
+      <div class="wf-run">
+        <div class="wf-pin">
+          {{ home.act_covers["accelerated"] }}
+          {{ home.why_fast_story }}
         </div>
       </div>
-    </div>
-    <div class="interface-figures">{{ home.interface_figures }}</div>
-    {{ home.dialog_tail }}
-    {{ home.dialog_head("agents", "Agent support") }}
-    <p>The <code>andrey</code> command never prompts and answers in JSON, and it describes every
-      method's parameters, so an agent can use it with no person watching.
-      <code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
-    {{ home.agent_demo }}
-    <p><a href="docs/code/index.html#command-line-interface">Command-line reference</a></p>
-    {{ home.dialog_tail }}
-    {{ home.dialog_head("methods", "Methods for every kind of data") }}
-    <p>{{ home.lede }} {{ home.methods_title }}. Every method name links to its API reference. An
-      experimental method has no published benchmark, and its API may change without
-      deprecation.</p>
-    {{ home.methods }}
-    {{ home.dialog_tail }}
-    {{ home.dialog_head("compare", "How Andrey compares") }}
-    <p>What each package offers, by method family.{{ home.compare_note }} The speed and accuracy
-      tiles measure Andrey against these and other packages on the same data.</p>
-    {{ home.comparison }}
-    {{ home.dialog_tail }}
+      <div class="run-sheet">
+        <ul class="bento-grid">{{ home.family_tiles }}</ul>
+      </div>
+    </section>
   </div>
 
-  <section class="section wrap" id="start" aria-labelledby="start-title">
-    <div class="section-cover">
-      <div class="cover-art" aria-hidden="true"><img src="_static/art-start.jpg" alt="" width="1600" height="640" loading="lazy"></div>
-      <h2 id="start-title" class="reveal">From data to graph</h2>
-    </div>
+  <section class="section wrap act" id="accurate" aria-labelledby="accurate-title">
+    {{ home.act_covers["accurate"] }}
+    <ul class="bento-grid">{{ home.accuracy_tiles }}</ul>
+  </section>
+
+  <section class="section wrap act" id="agentic" aria-labelledby="agentic-title">
+    {{ home.act_covers["agentic"] }}
+    <ul class="bento-grid">{{ home.agent_tile }}</ul>
+  </section>
+
+  <section class="section wrap act" id="all-in-one" aria-labelledby="all-in-one-title">
+    {{ home.act_covers["all-in-one"] }}
+    <ul class="bento-grid">{{ home.coverage_tiles }}</ul>
+    {{ home.example_cover }}
     <div class="step" id="example">
       <div>
-        <h3>Recover a causal graph</h3>
         <p>Sachs and colleagues measured 11 proteins and phospholipids in 853 human immune cells.
           PC finds 8 of the 17 links in the known signaling network, and none outside it.</p>
         <figure class="example-figure">
@@ -197,33 +96,57 @@
     </div>
   </section>
 
-  <section class="band" id="docs" aria-labelledby="docs-title">
-    <div class="wrap band-row">
-      <div class="band-art"><img src="_static/art-docs.jpg" alt="" width="1600" height="640" loading="lazy"></div>
-      <div>
-        <h2 id="docs-title" class="reveal">Documentation</h2>
-        <p>Guides, the graph model, and every method's parameters, with the benchmark tables and the
-          settings to rerun them.</p>
-        <ul class="docs-grid">{{ home.docs_grid }}</ul>
-      </div>
+  <div class="tile-details">
+    {{ home.family_dialogs }}
+    {{ home.dialog_head("graphs", home.graph_title) }}
+    <p>A causal graph says which variables drive which, and how much the data can tell decides its
+      kind. Four methods on data about a lawn, its sprinkler, and the rain: three on a table of
+      measurements, and VARMA-LiNGAM on the same lawn day by day.</p>
+    <div class="interface-figures">{{ home.interface_figures }}</div>
+    <p class="tile-more"><a href="docs/guides/graph-types.html">What each kind of graph means</a></p>
+    {{ home.dialog_tail }}
+    {{ home.dialog_head("agents", "Agent support") }}
+    <p>The <code>andrey</code> command never prompts and answers in JSON, and it describes every
+      method's parameters, so an agent can use it with no person watching.
+      <code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
+    {{ home.agent_demo }}
+    <p><a href="docs/code/index.html#command-line-interface">Command-line reference</a></p>
+    {{ home.dialog_tail }}
+    {{ home.dialog_head("methods", "Methods for every kind of data") }}
+    <p>{{ home.lede }} {{ home.methods_title }}. Every method name links to its API reference. An
+      experimental method has no published benchmark, and its API may change without
+      deprecation.</p>
+    {{ home.methods }}
+    {{ home.dialog_tail }}
+    {{ home.dialog_head("compare", "How Andrey compares") }}
+    <p>What each package offers, by method family. {{ home.compare_source }} The speed and accuracy
+      tiles measure Andrey against these and other packages on the same data.</p>
+    {{ home.comparison }}
+    {{ home.dialog_tail }}
+  </div>
+
+  <section class="section wrap docs-section" id="docs" aria-labelledby="docs-title">
+    {{ home.docs_cover }}
+    <div class="band-row">
+      {{ newest_post }}
+      <ul class="docs-grid">{{ home.docs_grid }}</ul>
     </div>
   </section>
 </main>
 
-<aside class="footnotes" aria-label="Notes">
-  <ol class="wrap">{{ home.footnotes }}</ol>
-</aside>
 
 <footer class="site-footer wrap">
   <a class="footer-abel" href="https://abel.ai/">{{ home.abel_mark }}Abel AI Lab</a>
   <nav aria-label="Footer">
     <a href="docs/">Documentation</a>
-    <a href="docs/benchmarks.html">Benchmarks</a>
+    <a href="docs/benchmarks.html">Release cards</a>
     <a href="docs/code/index.html">API reference</a>
     <a href="docs/faq.html">FAQ</a>
     <a href="docs/changelog.html">Changelog</a>
     <a href="{{ report_bug_url }}">Report a bug</a>
   </nav>
+  <p class="footer-legal">© 2026 Abel AI Lab. Andrey is open source under the
+    <a href="{{ repo_url }}/blob/main/LICENSE">Apache License 2.0</a>.</p>
 </footer>
 </div>
   {%- block scripts_end %}{{ super() }}{% endblock scripts_end %}
