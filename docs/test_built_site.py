@@ -509,3 +509,23 @@ def test_every_documentation_page_ends_on_the_documentation_footer(html):
         assert "Created using" not in footer and "PyData Sphinx Theme" not in footer, page
         for href in re.findall(r'href="([^"#:]+\.html)"', footer):
             assert (page.parent / href).resolve().is_file(), (page, href)
+
+
+def test_the_brand_kit_offers_every_file_it_shows_and_zips_them(html):
+    import zipfile
+
+    from PIL import Image
+
+    page = (html / "docs" / "brand.html").read_text()
+    files = sorted(set(re.findall(r'href="\.\./_static/brand/([^"]+)" download', page)))
+    assert files and "andrey-brand-kit.zip" in files
+    kit = html / "_static" / "brand"
+    for name in files:
+        assert (kit / name).is_file(), name
+    with zipfile.ZipFile(kit / "andrey-brand-kit.zip") as zipped:
+        names = {pathlib.PurePosixPath(n).name for n in zipped.namelist()}
+    assert set(files) - {"andrey-brand-kit.zip"} <= names and "README.txt" in names
+    with Image.open(kit / "andrey-avatar.png") as avatar:
+        assert avatar.size == (1024, 1024)
+    with Image.open(kit / "andrey-icon-on-light.png") as icon:
+        assert icon.size == (512, 512)

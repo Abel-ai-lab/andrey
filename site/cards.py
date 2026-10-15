@@ -524,3 +524,72 @@ def cover_alt(kind: str) -> str:
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
     return f"Cover: {COVERS[kind]}, drawn in navy lines"
+
+
+# ---- the brand kit -----------------------------------------------------------------------------
+# The files the Brand kit page offers for download (docs/docs/brand.md): the wordmark and the icon
+# for a light and a dark ground, as SVG and PNG, a square avatar, and all of them in one zip, each
+# drawn from the brand's own files (site/wordmark.py), so the kit never drifts from the site.
+KIT_WORDMARK_H = 256  # the wordmark PNGs' height
+KIT_ICON = 512  # the icon PNGs' side
+KIT_AVATAR = 1024  # the avatar's side
+KIT_NOTE = """Andrey brand kit
+
+The wordmark and the icon, for a light and a dark ground, as SVG and PNG, and a square avatar.
+Use them as they are to refer or link to Andrey: no recoloring, stretching, effects, or retyped
+lettering, and the A stays whole. The Apache License 2.0 covers Andrey's code, not its name or
+marks. Guidelines: https://andrey.abel.ai/docs/brand.html
+"""
+
+
+def _icon_paths() -> tuple[str, str, str]:
+    """The icon's viewBox, the path of the A's ink, and the path of its amber stroke."""
+    icon = (BRAND / "favicon.svg").read_text()
+    view_box = re.search(r'viewBox="([^"]+)"', icon)[1]
+    ink, amber = re.findall(r'<path[^>]* d="([^"]+)"', icon)
+    return view_box, ink, amber
+
+
+def _kit_icon(ink: str, ground: str | None = None) -> str:
+    """The A in ``ink`` with its amber stroke; on a square ``ground`` when given, the A at 62%."""
+    view_box, ink_d, amber_d = _icon_paths()
+    x, y, side, _ = (float(v) for v in view_box.split())
+    a = f'<path fill="{ink}" d="{ink_d}"/><path fill="{grain.AMBER}" d="{amber_d}"/>'
+    if ground is None:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view_box}">{a}</svg>\n'
+    pad = side * (1 / 0.62 - 1) / 2
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x - pad:g} {y - pad:g} '
+        f'{side + 2 * pad:g} {side + 2 * pad:g}"><rect x="{x - pad:g}" y="{y - pad:g}" '
+        f'width="{side + 2 * pad:g}" height="{side + 2 * pad:g}" fill="{ground}"/>{a}</svg>\n'
+    )
+
+
+def _png(svg: str, **size: int) -> bytes:
+    import resvg_py  # the docs group's renderer
+
+    return bytes(resvg_py.svg_to_bytes(svg_string=svg, **size))
+
+
+def brand_kit() -> dict[str, bytes]:
+    """The kit's files by name, and ``andrey-brand-kit.zip`` holding them all."""
+    import zipfile
+
+    light, dark = andrey.viz.LIGHT.ink, andrey.viz.DARK.ink
+    files = {}
+    for ground, theme in (("light", "light"), ("dark", "dark")):
+        svg = (BRAND / f"wordmark-{theme}.svg").read_text()
+        files[f"andrey-wordmark-on-{ground}.svg"] = svg.encode()
+        files[f"andrey-wordmark-on-{ground}.png"] = _png(svg, height=KIT_WORDMARK_H)
+        icon = _kit_icon(light if ground == "light" else dark)
+        files[f"andrey-icon-on-{ground}.svg"] = icon.encode()
+        files[f"andrey-icon-on-{ground}.png"] = _png(icon, width=KIT_ICON)
+    files["andrey-avatar.png"] = _png(_kit_icon("#ffffff", grain.COBALT), width=KIT_AVATAR)
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as kit:
+        for name, data in [("README.txt", KIT_NOTE.encode()), *files.items()]:
+            info = zipfile.ZipInfo(f"andrey-brand-kit/{name}", date_time=(2026, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            kit.writestr(info, data)  # a fixed date, so a rebuild writes the same zip
+    files["andrey-brand-kit.zip"] = out.getvalue()
+    return files

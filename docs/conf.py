@@ -373,6 +373,30 @@ def _methods_text() -> dict[str, str]:
     }
 
 
+# The brand's colors on the Brand kit page: name, role, and the value each takes from the palette.
+BRAND_COLORS = (
+    ("Ink", "Text and the wordmark on light grounds", andrey.viz.LIGHT.ink),
+    ("Paper", "The light ground", andrey.viz.LIGHT.paper),
+    ("Cobalt", "Links, selection, and the art's ground", cards.grain.COBALT),
+    ("Navy", "The art's deep ground and the footer", cards.grain.NAVY),
+    ("Night", "The dark ground", andrey.viz.DARK.paper),
+    ("Pale ink", "Text and the wordmark on dark grounds", andrey.viz.DARK.ink),
+    ("Amber", "The one accent: one node or one edge", cards.grain.AMBER),
+)
+
+
+def _brand_colors() -> str:
+    """The Brand kit page's swatches (docs/brand.md), each its color's value from the palette."""
+    items = "".join(
+        f'<li class="brand-color"><span class="brand-color__chip" style="background:{value}">'
+        f'</span><span class="brand-color__name">{name}</span>'
+        f'<code class="brand-color__value">{value.upper()}</code>'
+        f'<span class="brand-color__role">{role}</span></li>'
+        for name, role, value in BRAND_COLORS
+    )
+    return f'<ul class="brand-colors">{items}</ul>\n'
+
+
 def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its application objects
     """Fill the homepage's context from the summary, and the FAQ's method counts."""
     (GENERATED / "static").mkdir(parents=True, exist_ok=True)
@@ -388,6 +412,10 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
         _write_bytes(GENERATED / "static" / name, tile)
     # A release cover or tile without its own art (_static/benchmarks.css).
     _write_bytes(GENERATED / "static" / "release-ground.jpg", cards.release_ground_jpeg())
+    # The Brand kit page's downloads (_static/brand/) and its colors, from the palette.
+    for name, data in cards.brand_kit().items():
+        _write_bytes(GENERATED / "static" / "brand" / name, data)
+    _write(GENERATED / "brand-colors.html", _brand_colors())
 
 
 # Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage's card carries the
