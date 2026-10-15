@@ -7,8 +7,8 @@ by Gaussian maximum likelihood (a Kalman filter), and DirectLiNGAM on the innova
 causal order and the instantaneous matrix ``B0``. The structural matrices are ``psi[0] = B0``,
 ``psi[tau] = (I - B0) Phi_tau``, and ``omega[j] = (I - B0) Theta_j``, or
 ``(I - B0) Theta_j (I - B0)^-1`` with ``structural_ma=True``; ``[i, j]`` weights the influence of
-``j`` on ``i``. With ``prune=True`` the lagged matrices are re-estimated by adaptive Lasso on the
-causal order.
+``j`` on ``i``. With ``prune=True`` all structural matrices are re-estimated on the causal order:
+adaptive Lasso selects each variable's regressors and ordinary least squares refits their weights.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import warnings
 import numpy as np
 from statsmodels.tsa.statespace.varmax import VARMAX, VARMAXResultsWrapper
 
-from andrey.lingam.adjacency import predict_adaptive_lasso
+from andrey.lingam.adjacency import estimate, predict_adaptive_lasso
 from andrey.lingam.direct import direct_lingam
 
 _CRITERIA = ("aic", "bic", "hqic")
@@ -46,8 +46,9 @@ def varma_lingam(
     the structural moving-average matrix for innovation lag ``j + 1``. In both, entry ``[i, j]`` is
     the effect of source ``j`` on target ``i``.
 
-    With ``prune=True`` the lagged matrices are sparse adaptive-Lasso estimates; otherwise they are
-    the dense algebraic transform of the reduced-form coefficients. ``structural_ma=True`` applies
+    With ``prune=True`` the matrices are sparse: adaptive Lasso selects the regressors and least
+    squares refits their weights; otherwise they are the dense algebraic transform of the
+    reduced-form coefficients. ``structural_ma=True`` applies
     the paper-exact moving-average transform ``(I - B0) Theta_j (I - B0)^-1``, which recovers the
     true structural MA influence on the independent innovations; the default
     ``structural_ma=False`` uses ``(I - B0) Theta_j``.
@@ -63,7 +64,7 @@ def varma_lingam(
     causal_order, b0 = direct_lingam(residuals)
 
     if prune:
-        psis, omegas = _prune(X, residuals, b0, causal_order, p, q)
+        psis, omegas = _prune(X, residuals, causal_order, p, q)
     else:
         psis, omegas = _structural_matrices(b0, phis, thetas, p, q, structural_ma)
 
@@ -126,22 +127,24 @@ def _structural_matrices(
 def _prune(
     X: np.ndarray,
     residuals: np.ndarray,
-    b0: np.ndarray,
     causal_order: list[int],
     p: int,
     q: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Sparse structural matrices by adaptive Lasso on the causal order.
+    """Sparse structural matrices on the causal order: adaptive-Lasso selection, then OLS refit.
 
     Each variable ``x_i(t)`` is regressed on the contemporaneous values of its causal predecessors,
     all ``p`` autoregressive lags of every variable, and all ``q`` lags of the independent
-    innovations ``n(t) = (I - B0) e(t)``. Returns ``(psis, omegas)`` with ``psis`` of shape
+    innovations ``n(t) = (I - B0) e(t)``, with ``B0`` the least-squares refit of the residuals on
+    the causal order. Only time steps ``t >= max(p, q)`` are regression rows, so every lag refers
+    to an earlier step of the series. Returns ``(psis, omegas)`` with ``psis`` of shape
     ``(1 + p, n, n)`` (index 0 the instantaneous block) and ``omegas`` of shape ``(q, n, n)``.
     """
     n = X.shape[1]
     s = max(p, q)
     Xc = X - X.mean(axis=0)
 
+    b0 = estimate(residuals, list(causal_order), refit=True)
     n_samples = X.shape[0]
     innov = np.zeros((n_samples, n), dtype=np.float64)
     innov[n_samples - residuals.shape[0] :] = residuals @ (np.eye(n) - b0).T
@@ -158,7 +161,7 @@ def _prune(
     for pos, target in enumerate(order):
         later = set(order[pos:])  # self and causally-later contemporaneous columns
         predictors = [j for j in range(width) if not (j < n and j in later)]
-        coefs[target, predictors] = predict_adaptive_lasso(design, predictors, target)
+        coefs[target, predictors] = predict_adaptive_lasso(design, predictors, target, refit=True)
 
     psis = np.stack([coefs[:, n * k : n * (k + 1)] for k in range(1 + p)])
     omegas = (
