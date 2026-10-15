@@ -23,7 +23,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: Over 1,000x faster on PNL, and faster on most other supported methods.
 - **Just as accurate**: as accurate as other popular packages on the same data.
-- **One API**: 24 methods, each one function call.
+- **One API**: 28 methods, each one function call.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
 <!-- PITCH:END -->
