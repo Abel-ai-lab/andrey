@@ -538,18 +538,22 @@ def test_a_page_without_a_description_takes_its_first_paragraph(
 def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
     slides = build.speedup_slides(summaries)
-    assert [name for _, name in build.PANEL] == [
+    assert {name for _, name in build.PANEL} == {
         "PC",
         "FCI",
         "GES",
         "XGES",
         "Tabu search",
         "DirectLiNGAM",
-    ]
+    }
     assert len(slides) == 6
+    # The strongest speedup leads.
+    speeds = [next(s for p, s, _ in bars if p == "Andrey") for _, _, bars in slides]
+    assert speeds == sorted(speeds, reverse=True)
     by_release = dict(zip(build.RELEASES, summaries, strict=True))
-    for (release, name), (shown, size, bars) in zip(build.PANEL, slides, strict=True):
-        assert shown == name
+    shown = {name: (size, bars) for name, size, bars in slides}
+    for release, name in build.PANEL:
+        size, bars = shown[name]
         # The slide is the method's largest size with a published ratio, at the panel's mean
         # degree, and Andrey's bar prints that ratio, "≥" before a lower bound. A pair's size is
         # its rows.
@@ -571,6 +575,80 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
         assert bars[-1][2] == "1x" and andrey == bars[0][2]
 
 
+def _remeasured() -> tuple[dict, dict]:
+    """``SUMMARY`` with DirectLiNGAM also measured against causal-learn, and a later summary that
+    measures DirectLiNGAM against lingam again."""
+    earlier = copy.deepcopy(SUMMARY)
+    earlier["methods"].append(
+        _method(
+            "DirectLiNGAM",
+            "functional",
+            "causal-learn",
+            [_row(100, 8.4, 57.8, 6.87, 7, 7, 99)],
+            regime="lingam_sf",
+        )
+    )
+    later = {
+        "generated": "2026-10-15",
+        "methods": [
+            _method(
+                "DirectLiNGAM",
+                "functional",
+                "lingam",
+                [_row(100, 10.4, 110.2, 10.6, 6.3, 6.3, 99)],
+                regime="lingam_sf",
+            )
+        ],
+    }
+    return earlier, later
+
+
+def test_a_remeasured_comparison_shows_only_the_newest_summarys_rows():
+    earlier, later = _remeasured()
+    for summaries in ([earlier, later], [later, earlier]):
+        kept = build.newest(copy.deepcopy(summaries))
+        assert len(kept) == len(summaries)
+        found = build.supported(kept)
+        pairs = [(m["spec"], m["comparator"]) for m in found]
+        assert len(pairs) == len(set(pairs))
+        lingam = next(
+            m for m in found if (m["spec"], m["comparator"]) == ("direct_lingam", "lingam")
+        )
+        assert lingam["rows"] == build.comparisons(later)[0]["rows"]
+        # The earlier summary keeps every comparison the later one does not measure.
+        assert ("direct_lingam", "causal-learn") in pairs
+        assert {"PC", "FCI", "ICA-LiNGAM"} <= {m["method"] for m in found}
+
+
+def test_two_summaries_of_one_day_cannot_both_measure_a_comparison():
+    earlier, later = _remeasured()
+    later["generated"] = earlier["generated"]
+    with pytest.raises(ValueError, match="two summaries"):
+        build.newest([earlier, later])
+
+
+@pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
+def test_each_published_comparison_comes_from_one_summary():
+    summaries = build.release_summaries(build.load_summary(build.SUMMARY))
+    shown = [
+        (s["generated"], m["method"], m["comparator"])
+        for s in summaries
+        for m in build.comparisons(s)
+    ]
+    dates = {}
+    for generated, *pair in shown:
+        dates.setdefault(tuple(pair), set()).add(generated)
+    assert all(len(found) == 1 for found in dates.values())
+    # No published summary measures a comparison later than the one shown.
+    every = [build.load_summary(build.SUMMARY)] + [
+        build.load_summary(build.PUBLISHED / f / "summary.json") for f in build.RELEASES[1:]
+    ]
+    for summary in every:
+        for m in summary["methods"]:
+            (kept,) = dates[(m["method"], m["comparator"])]
+            assert kept >= summary["generated"]
+
+
 def test_the_readme_chart_takes_rows_at_its_mean_degree():
     summaries = placeholder_summaries()
     release, name = build.PANEL[0]
@@ -579,9 +657,13 @@ def test_the_readme_chart_takes_rows_at_its_mean_degree():
     # The same sizes again at a denser mean degree, each with a larger ratio: the panel keeps the
     # rows at MEAN_DEGREE.
     denser = [dict(r, mean_degree=4.0, ratio=r["ratio"] * 2) for r in method["rows"]]
-    before = build.speedup_slides(summaries)[0]
+
+    def slide():
+        return next(s for s in build.speedup_slides(summaries) if s[0] == name)
+
+    before = slide()
     method["rows"] = [dict(r, mean_degree=build.MEAN_DEGREE) for r in method["rows"]] + denser
-    assert build.speedup_slides(summaries)[0] == before
+    assert slide() == before
     kept = {r["ratio"] for m in build.comparisons(summary) for r in m["rows"]}
     assert kept.isdisjoint(r["ratio"] for r in denser)
 

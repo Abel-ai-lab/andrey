@@ -14,6 +14,13 @@ change names its pull request.
 - `andrey --llms`: `andrey list` looks up the methods, `andrey config --help` the settings, and
   `andrey --skill` holds both in the agent guide. ([#122])
 
+### Fixed
+
+- `direct_lingam`, `multi_group_direct_lingam`, `var_lingam`, `varma_lingam`, and
+  `longitudinal_lingam` now regress by exact least squares in the causal-order search, as the
+  method's paper defines it, so on nearly tied candidates the causal order and the DAG can change
+  and now match the paper's estimator. ([#127])
+
 ## [0.4.0] - 2026-10-15
 
 ### Highlights
@@ -139,4 +146,5 @@ First alpha release.
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59
 [#64]: https://github.com/Abel-ai-lab/andrey/pull/64
 [#122]: https://github.com/Abel-ai-lab/andrey/pull/122
+[#127]: https://github.com/Abel-ai-lab/andrey/pull/127
 [#95]: https://github.com/Abel-ai-lab/andrey/pull/95

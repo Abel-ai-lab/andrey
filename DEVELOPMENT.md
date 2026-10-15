@@ -213,6 +213,9 @@ uv run python -m qa.quality_gate <NAME>
 On each dataset the method passes when its median SHD is below the empty graph's and within its
 tolerance of the recorded baseline in either direction. The gate runs before every release and
 fails the publish; [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances.
+It also fails any published benchmark row where the reference package has fewer errors than
+Andrey, unless `benchmarks/published/parity-allowlist.json` cites the cause
+([reference parity](qa/README.md#reference-parity)).
 
 ### 5. Benchmark campaign
 
@@ -220,8 +223,11 @@ Measure speed and accuracy against every package that implements the method: cop
 `benchmarks/benchmark.py`, set its `SOLUTIONS` and `SLICE`, add an adapter for a new package under
 `benchmarks/andrey_bench/adapters/`, and run the campaign on the benchmark machine
 ([`benchmarks/README.md`](benchmarks/README.md)). A reference package's answer is measured, not a
-target: where the graphs differ, the card reports the difference and its cause. The fit records
-stay outside the repository.
+target, but every difference needs a cause. Both packages are deterministic on the same data, so
+each differing series has a first step where they diverge: fix an Andrey defect, with a test that
+fails before the fix; make an arbitrary tie-break independent of column order; and where Andrey is
+correct by the method's paper or the reference has a defect, add a cited entry to the allowlist.
+The fit records stay outside the repository.
 
 ### 6. Mark it supported
 
@@ -236,7 +242,7 @@ them):
   stops being practical, if the report shows one;
 - the method under "Supported methods" in `docs/docs/code/index.md`;
 - its rows in `benchmarks/published/<label>/summary.json` for the release that publishes it,
-  generated from the campaign's records;
+  generated from the campaign's records and passing `uv run python -m qa.reference_parity`;
 - a section in that release's card, `docs/docs/benchmarks/<release>.md`, with its driver in the
   "Reproduce" table ("The release cards" in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) adds a
   card);

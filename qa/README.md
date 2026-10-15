@@ -7,6 +7,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | Tool | Purpose |
 |---|---|
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
+| `reference_parity.py` | Fail a published row where the reference package has fewer errors. |
 | `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
@@ -90,6 +91,30 @@ graph, and the gate rejects both.
 ```shell
 uv run python -m qa.quality_gate PC FCI
 uv run python -m qa.quality_gate --capture  # re-measure; review the diff
+```
+
+## Reference parity
+
+Before any fit, the gate checks the published benchmark summaries
+(`benchmarks/published/*/summary.json`) with `reference_parity.py`, which reads only those files,
+so the reference packages need not be installed. Each row pairs Andrey with one reference package at one size, and it
+fails at any margin:
+
+- where the row counts the series on which each side has fewer errors, when the reference has fewer
+  errors on more series than Andrey;
+- otherwise, when Andrey's errors (the row's mean or median SHD, or directed errors) are higher.
+
+A row where either side has no result is skipped. A released summary never changes, so a method
+re-measured against the same reference in a later summary is judged by the later rows only.
+
+`benchmarks/published/parity-allowlist.json` exempts a failing row only when it names the cause:
+`correct-by-paper` (Andrey follows the method's paper and the reference does not) or
+`reference-defect`, with a reason and a citation. Each entry pins the row's two error values (its
+two series counts, where the row has them), so a re-run that changes the row voids it, and an
+entry that matches no failing row fails the check.
+
+```shell
+uv run python -m qa.reference_parity  # exit 1 if any row fails
 ```
 
 ## Other tools

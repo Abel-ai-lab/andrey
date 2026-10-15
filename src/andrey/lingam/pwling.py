@@ -16,11 +16,12 @@ from andrey.core import stats
 
 
 def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Residual of ``a`` regressed on ``b``: ``a - (cov(a, b) / var(b)) * b``.
+    """Least-squares residual of ``a`` regressed on ``b``: ``a - (cov(a, b) / var(b)) * b``.
 
-    ``np.cov`` (``ddof=1``) over ``np.var`` (``ddof=0``).
+    Covariance and variance share ``ddof=0``, so the residual is uncorrelated with ``b`` in the
+    sample, as the order search assumes.
     """
-    return a - (np.cov(a, b)[0, 1] / np.var(b)) * b
+    return a - (np.cov(a, b, ddof=0)[0, 1] / np.var(b)) * b
 
 
 def compute_entropy(u: np.ndarray) -> float:
@@ -43,7 +44,7 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     sub = X[:, cols]
     x_std = (sub - sub.mean(axis=0)) / sub.std(axis=0)  # (n, m) standardized candidate columns
     ent = stats.entropy(x_std)  # (m,) batched candidate entropy
-    cov = np.cov(x_std, rowvar=False)  # (m, m), ddof=1
+    cov = np.cov(x_std, rowvar=False, ddof=0)  # (m, m), same ddof as var: least-squares slopes
     var = np.var(x_std, axis=0)  # (m,), ddof=0
     m = len(cols)
     scores = np.empty(m, dtype=np.float64)
