@@ -24,6 +24,12 @@ change names its pull request.
   (`indep_test="chisq"` and `"gsq"`), and `ges`, `gfci`, and `hc` take the BDeu score
   (`score_func="local_score_BDeu"`).
 - `andrey.data.sample_discrete` samples a discrete network with its true graph.
+- Categorical data, by @ruizhu-lgtm: the multinomial BIC
+  (`score_func="local_score_BIC_categorical"`) and BDeu, both on the BIC's `-2` log scale, in
+  `ges`, `gfci`, `hc`, `tabu`, and `exact_search`, with text, string, and `category` columns read
+  as categories. ([#TBD])
+- `load_dataset(..., discrete=True)` samples ASIA, ALARM, HEPAR2, and ANDES from their own
+  conditional probability tables, by @ruizhu-lgtm. ([#TBD])
 
 ### Changed
 
