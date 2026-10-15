@@ -251,6 +251,9 @@ uv run python -m qa.quality_gate <NAME>
 On each dataset the method passes when its median SHD is below the empty graph's, and within its
 tolerance of the recorded baseline in either direction. The gate runs before every release and
 fails the publish. [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances.
+The gate also fails any published benchmark row where the reference package has
+fewer errors than Andrey, unless `benchmarks/published/parity-allowlist.json` cites the cause
+([reference parity](qa/README.md#reference-parity)).
 
 ### 5. Benchmark campaign
 
@@ -259,8 +262,13 @@ Measure the method's speed and accuracy against every package that implements it
 under `benchmarks/andrey_bench/adapters/`, and run the campaign on the benchmark machine.
 [`benchmarks/README.md`](benchmarks/README.md) covers environments, runs, and reading a result.
 
-A reference package's answer is measured, not a target: where the graphs differ, report the
-difference and its cause. The fit records stay outside the repository.
+A reference package's answer is measured, not a target, but every difference needs a cause. For
+each size, count the series where the two outputs differ and which side has fewer errors against
+the true graph. Both packages are deterministic on the same data, so each differing series has a
+first step where they diverge: fix an Andrey defect, with a test that fails before the fix;
+document an arbitrary tie-break and make it independent of column order; and for Andrey correct by
+the method's paper, or a defect in the reference, add a cited entry to
+`benchmarks/published/parity-allowlist.json`. The fit records stay outside the repository.
 
 ### 6. Mark it supported
 
@@ -276,7 +284,8 @@ fails. The pull request makes:
   core count, and the size where it stops being practical, if the report shows one;
 - the method under "Supported methods" in `docs/docs/code/index.md`;
 - its rows in the summary of the release that publishes its benchmark,
-  `benchmarks/published/<label>/summary.json`, generated from the campaign's records;
+  `benchmarks/published/<label>/summary.json`, generated from the campaign's records, passing
+  `uv run python -m qa.reference_parity` ([reference parity](qa/README.md#reference-parity));
 - a section for it in that release's card, `docs/docs/benchmarks/<release>.md`, with its driver in
   the "Reproduce" table; the Release cards page, `docs/docs/benchmarks.md`, features the latest
   release and lists the earlier ones ("The release cards" in

@@ -1,0 +1,38 @@
+{
+  "about": "Published rows where the reference package has fewer errors than Andrey, each with its cause. qa/reference_parity.py accepts an entry only when its cause is correct-by-paper or reference-defect, it gives a reason and a citation, and it pins the row's current error values.",
+  "entries": [
+    {
+      "summary": "alpha-2026-09",
+      "method": "FCI",
+      "comparator": "causal-learn",
+      "row": {"d": 50},
+      "andrey_errors": 42.0,
+      "comparator_errors": 40.0,
+      "cause": "reference-defect",
+      "reason": "causal-learn's FCI output depends on the process hash seed. Its possible-d-sep step walks a Python set of graph nodes hashed by name, which Python randomizes per process, and it decides membership while the walk is still growing, so the order changes which edges it removes. On the series that differs, causal-learn returns Andrey's graph under four of six hash seeds; the published value is one draw. Andrey's possible-d-sep sets in this build follow the column order, which is also a tie-break rather than a rule error.",
+      "citation": "causal-learn 0.1.4.8 (MIT): causallearn/graph/GraphNode.py, GraphNode.__hash__ returns hash(self.name); causallearn/search/ConstraintBased/FCI.py, getPossibleDsep iterates set(graph.get_adjacent_nodes(x)). Possible-D-Sep: Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search, 2nd ed. MIT Press."
+    },
+    {
+      "summary": "alpha-2026-09",
+      "method": "FCI",
+      "comparator": "causal-learn",
+      "row": {"d": 100},
+      "andrey_errors": 135.0,
+      "comparator_errors": 134.0,
+      "cause": "correct-by-paper",
+      "reason": "Two series differ. On seed 0, Andrey applies rule R4 on every sweep until no rule applies, as Zhang (2008) states; causal-learn runs R4 only in a sweep where R1-R3 changed a mark, so it skips one R4 step that Andrey takes; there a finite-sample independence test makes one endpoint wrong. Skipping R4 this way changes the output on 1 of 721 latent_gauss_er datasets. On seed 1, the difference is the possible-d-sep visit order: causal-learn's result depends on the process hash seed (see the d = 50 entry), and Andrey's falls inside the range of causal-learn's draws.",
+      "citation": "Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the presence of latent confounders and selection bias. Artificial Intelligence 172(16-17), 1873-1896. causal-learn 0.1.4.8 (MIT): causallearn/search/ConstraintBased/FCI.py, the orientation loop and getPossibleDsep."
+    },
+    {
+      "summary": "score-search-2026-10",
+      "method": "Hill climbing",
+      "comparator": "bnlearn",
+      "row": {"mean_degree": 2.0, "d": 50, "n": 500},
+      "andrey_errors": 55.0,
+      "comparator_errors": 54.0,
+      "cause": "correct-by-paper",
+      "reason": "The two packages optimize different scores. Andrey's hill climbing maximizes the BIC with the maximum-likelihood residual variance, as Schwarz (1978) and Chickering (2002) define it. bnlearn's Gaussian BIC divides each node's residual sum of squares by n - p - 1, where p is the node's parent count, which adds a small cost per parent. On both series that differ, the searches end one edge apart: the last edge Andrey adds improves the maximum-likelihood BIC, and bnlearn's estimator rejects it, so Andrey's graph has the lower BIC by the paper's definition. With bnlearn's estimator patched into Andrey's search, it returns bnlearn's equivalence class on all 35 series of the lane.",
+      "citation": "Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2), 461-464. Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3, 507-554."
+    }
+  ]
+}
