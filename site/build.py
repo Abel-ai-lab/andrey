@@ -1472,6 +1472,47 @@ def tile_art(name: str, size: str) -> str:
     )
 
 
+# The prompt that installs the agent skill, as the README and the FAQ give it.
+AGENT_PROMPT = (
+    "Install Andrey's agent skill: make sure the andrey-core package is installed, run "
+    "`andrey --skill`, and save its output as andrey/SKILL.md in your skills folder."
+)
+
+
+# Coding agents, and open models that drive them, as the pill shows them: each one's mono mark
+# from Lobe Icons (site/agents/, MIT), drawn in the text's color. GLM's is Z.ai's.
+AGENTS = {
+    "claude": "Claude Code",
+    "codex": "Codex",
+    "cursor": "Cursor",
+    "zai": "GLM",
+    "deepseek": "DeepSeek",
+}
+
+
+def agent_logo(name: str) -> str:
+    """``name``'s mark, its name as the tooltip."""
+    svg = (SITE / "agents" / f"{name}.svg").read_text()
+    paths = re.sub(r"<title>.*?</title>", "", re.search(r"<svg[^>]*>(.*)</svg>", svg, re.S)[1])
+    return (
+        '<svg class="agent-logo" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd">'
+        f"<title>{escape(AGENTS[name])}</title>{paths}</svg>"
+    )
+
+
+def agent_pill() -> str:
+    """The pill above the headline: it copies ``AGENT_PROMPT`` to paste into a coding agent
+    (``prompt.js``), and without the script it leads to the FAQ answer that gives the prompt."""
+    logos = "".join(agent_logo(name) for name in AGENTS)
+    return (
+        f'<a class="agent-pill" href="docs/faq.html#how-does-an-agent-use-it" '
+        f'data-prompt="{escape(AGENT_PROMPT)}" title="Copy a prompt for your coding agent">'
+        '<span class="agent-pill__label">Onboard your agent<span class="agent-pill__more"> to '
+        'Andrey</span></span><span class="agent-logos" aria-hidden="true">'
+        f"{logos}</span></a>"
+    )
+
+
 def hero_chips() -> str:
     """The buttons beside the install line: Get started, and the live demo once its Space is
     public."""
@@ -2071,6 +2112,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "robots": '<meta name="robots" content="noindex">' if placeholder else "",
         "banner": banner if placeholder else "",
         "lede": escape(lede()),
+        "agent_pill": agent_pill(),
         "hero_chips": hero_chips(),
         "hero_art": hero_art(),
         "tile_art": tile_art,

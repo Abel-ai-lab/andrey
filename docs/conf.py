@@ -502,7 +502,7 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     if pagename == "index":
         context["home"] = app.andrey_home
         context["newest_post"] = _newest_post_card(app)
-        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js"]
+        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js", "prompt.js"]
     elif pagename == "blog/index":
         # The posts in the Release cards page's blocks.
         css = ["benchmarks.css", "blog.css"]

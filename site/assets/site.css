@@ -272,6 +272,52 @@
   background: color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
 }
 
+/* The pill above the headline, which copies the agent prompt: the install line's glass, rounded. */
+.andrey-home .agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ground-ink) 32%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.andrey-home .agent-pill:hover,
+.andrey-home .agent-pill.is-copied {
+  border-color: var(--andrey-ground-ink);
+}
+
+.andrey-home .agent-logos {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.andrey-home .agent-logo {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.85;
+}
+
+/* On a phone the pill stays on one line: its label and its confirmation drop their second half. */
+@media (max-width: 27rem) {
+  .andrey-home .agent-pill__more {
+    display: none;
+  }
+
+  .andrey-home .agent-pill__label {
+    white-space: nowrap;
+  }
+
+  .andrey-home .agent-logos {
+    gap: 0.3rem;
+  }
+}
+
 /* Cobalt in both themes: the dark theme's lighter accent is too pale under the light type. */
 .andrey-home .hero .chip--primary {
   border-color: color-mix(in srgb, var(--andrey-ground-ink) 35%, transparent);
