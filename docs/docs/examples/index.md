@@ -109,6 +109,17 @@ BottomUpParceLiNGAM orders the variables and leaves those a hidden cause confoun
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Pairwise direction
+:link: pairwise
+:link-type: doc
+:img-top: /_generated/thumbs/pairwise.svg
+:img-alt: The true graph of this notebook's pair
+
+ANM and PNL test which of two variables causes the other.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Drawing a recovered structure
 :link: viz
 :link-type: doc
@@ -133,5 +144,6 @@ score_search
 lingam
 rcd
 bottom_up_parce_lingam
+pairwise
 viz
 ```

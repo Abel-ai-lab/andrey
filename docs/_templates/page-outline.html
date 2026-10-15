@@ -1,0 +1,21 @@
+{#- The page's headings in the phone's menu, above the documentation tree, as the right sidebar
+    draws them on a wider screen. A tap on one closes the menu and scrolls to the heading. -#}
+{%- from "nav-icons.html" import icon %}
+{%- set page_toc = generate_toc_html() %}
+{%- if page_toc | length >= 1 %}
+<nav class="page-outline" aria-label="{{ _('On this page') }}">
+  <p class="onthispage">{{ icon("outline") }}{{ _("On this page") }}</p>
+  {{ page_toc }}
+</nav>
+<script>
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest(".page-outline a[href^='#']");
+    const menu = link?.closest("dialog");
+    if (!menu) return;
+    event.preventDefault();
+    menu.close();
+    history.pushState(null, "", link.hash);
+    document.getElementById(decodeURIComponent(link.hash.slice(1)))?.scrollIntoView();
+  });
+</script>
+{%- endif %}

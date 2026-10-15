@@ -1,0 +1,16 @@
+{#- The sidebars' line icons, drawn in the text's color: a group's mark in the documentation tree,
+    a fold's chevron, an outside link's arrow, and the outline's and its links' marks. -#}
+{%- macro icon(name) -%}
+{%- set paths = {
+  "book": '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/>',
+  "notebook": '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  "play": '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/>',
+  "code": '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/>',
+  "chevron": '<path d="M9 6l6 6-6 6"/>',
+  "out": '<path d="M7 17L17 7M9 7h8v8"/>',
+  "outline": '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  "edit": '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6 8.5v7M18 11.5c0 4-6 3-11 4.5"/>',
+  "bug": '<rect x="7" y="7" width="10" height="13" rx="5"/><path d="M12 7V4M7 12H3M21 12h-4M7 17l-3 2M17 17l3 2M9 4l1.5 2M15 4l-1.5 2"/>',
+} -%}
+<svg class="nav-icon nav-icon--{{ name }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">{{ paths[name] }}</svg>
+{%- endmacro %}

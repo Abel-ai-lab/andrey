@@ -34,8 +34,8 @@ uv run python -m qa.quality_gate
 
 The `quality-gate` workflow runs the same command. Every job that publishes to PyPI must need a job
 that calls it; `tests/unit/test_release_gates.py` fails otherwise. Pull requests do not run the
-gate. It checks PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, RCD, and
-BottomUpParceLiNGAM on the datasets whose assumptions each method needs:
+gate. It checks PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, RCD,
+BottomUpParceLiNGAM, ANM, and PNL on the datasets whose assumptions each method needs:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -43,6 +43,8 @@ BottomUpParceLiNGAM on the datasets whose assumptions each method needs:
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
+| `anm_pair` at `n = 1000` | 10 seeds | ANM |
+| `pnl_pair` at `n = 1000` | 10 seeds | PNL |
 | ASIA, linear-Gaussian | 10 seeds | PC, GES, XGES, HC, Tabu, BOSS, GRaSP, FCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
 | Sachs, measured | 1 | PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM |
@@ -54,6 +56,10 @@ BottomUpParceLiNGAM on the datasets whose assumptions each method needs:
   the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
+- **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
+  edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
+  with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when
+  they name the true direction on most draws.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -64,11 +70,11 @@ BottomUpParceLiNGAM on the datasets whose assumptions each method needs:
   and caches it, so the first run needs network access.
 
 SHD follows the published summaries: PC, GES, XGES, HC, Tabu, BOSS, and GRaSP against the truth's
-CPDAG, the LiNGAM methods against the DAG, and FCI by endpoint SHD against the PAG of the observed
-variables. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent projection,
-the edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j` through
-hidden nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden nodes only.
-On each dataset, a method passes when its median SHD over the draws is:
+CPDAG, the LiNGAM methods, ANM, and PNL against the DAG, and FCI by endpoint SHD against the PAG of
+the observed variables. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent
+projection, the edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j`
+through hidden nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden
+nodes only. On each dataset, a method passes when its median SHD over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.

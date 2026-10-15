@@ -22,6 +22,25 @@ change names its pull request.
 - A method run with a continuous test or score refuses a DataFrame's categorical and string
   columns, and names the discrete options, instead of reading category labels as numbers. ([#94])
 
+## [0.4.0] - 2026-10-15
+
+### Highlights
+
+- `anm` and `pnl` are supported. On cause-effect pairs, ANM names the same direction as
+  causal-learn on every pair and runs about 2x faster; PNL runs up to 1,470x faster and names the
+  true direction on more pairs. The 0.4.0 release card gives the numbers and each method's limits.
+  ([#95])
+
+### Added
+
+- `anm`: a direction test for a pair of variables under the additive noise model, returning a
+  two-node DAG and both p-values, as `pnl` does. ([#95])
+
+### Changed
+
+- With `alpha=None`, `pnl` breaks a tie between equal p-values by the HSIC statistics, which
+  `metadata` now holds, instead of drawing no edge. ([#95])
+
 ## [0.3.0] - 2026-10-13
 
 ### Highlights
@@ -112,7 +131,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.1.0...v0.2.0
@@ -127,3 +147,4 @@ First alpha release.
 [#59]: https://github.com/Abel-ai-lab/andrey/pull/59
 [#64]: https://github.com/Abel-ai-lab/andrey/pull/64
 [#94]: https://github.com/Abel-ai-lab/andrey/pull/94
+[#95]: https://github.com/Abel-ai-lab/andrey/pull/95

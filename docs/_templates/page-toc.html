@@ -1,0 +1,11 @@
+{#- The page's outline in the right sidebar: its headings on a guide line, the section being read
+    marked by the theme's script and page-outline.js. The theme's script finds the list by its id. -#}
+{%- from "nav-icons.html" import icon %}
+{%- set page_toc = generate_toc_html() %}
+{%- if page_toc | length >= 1 %}
+{%- set heading_id = unique_html_id("pst-page-navigation-heading") %}
+<p id="{{ heading_id }}" class="page-toc tocsection onthispage">{{ icon("outline") }}{{ _("On this page") }}</p>
+<nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="{{ heading_id }}">
+  {{ page_toc }}
+</nav>
+{%- endif %}

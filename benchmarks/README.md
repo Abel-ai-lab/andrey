@@ -9,6 +9,7 @@ folder under `published/` with the summary its numbers come from:
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.4.0 | [Pairwise direction](../docs/docs/benchmarks/0.4.0.md) | [`published/pairwise-2026-10/summary.json`](published/pairwise-2026-10/summary.json) |
 | 0.3.0 | [Score-based search](../docs/docs/benchmarks/0.3.0.md) | [`published/score-search-2026-10/summary.json`](published/score-search-2026-10/summary.json) |
 | 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
 | 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |
@@ -17,7 +18,8 @@ A summary holds one row per comparison and size. It is generated from the record
 records and the script that writes it are kept outside this repository. A released report and its
 folder do not change: new measurements go into the next release's report and folder. To rerun a
 comparison, use its driver with the builds, versions, and settings its report lists under
-Reproduce ([0.3.0](../docs/docs/benchmarks/0.3.0.md#reproduce),
+Reproduce ([0.4.0](../docs/docs/benchmarks/0.4.0.md#reproduce),
+[0.3.0](../docs/docs/benchmarks/0.3.0.md#reproduce),
 [0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
 [0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
 
@@ -141,6 +143,8 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
+| ANM | Andrey, causal-learn |
+| PNL | Andrey, causal-learn |
 | PC, GES, HC, Tabu, BOSS on categorical data | Andrey, causal-learn, pgmpy (`hc`), bnlearn (`pc.stable`, `hc`, `tabu`) |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
@@ -149,26 +153,6 @@ identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selec
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
 
 The harness does not submit jobs. One file is one job.
-
-### Categorical data
-
-`discrete_cpu.py` compares Andrey's discrete tests and scores with causal-learn, pgmpy, and bnlearn
-on ASIA, ALARM, and HEPAR2 sampled from their own probability tables, at 1,000 and 5,000 rows, and
-on random discrete networks (`DiscreteBN`, Erdos-Renyi, mean degree 2, 2 to 4 states) of 10, 20,
-and 50 variables at 2,000 rows. Each comparison runs one objective in every package: PC's chi-square
-and G-square tests with degrees of freedom adjusted for empty rows and columns (bnlearn's `x2-adf`
-and `mi-adf`); BDeu with equivalent sample size 1 and a structure prior of one expected parent per
-variable (bnlearn's `bde` with `prior = "vsp"`) for GES, hill climbing, Tabu search, and BOSS; and
-the multinomial BIC for hill climbing against pgmpy and bnlearn. pgmpy's hill climbing runs with
-its tabu list off. Every estimate is scored against the network's DAG through its equivalence class.
-
-The driver downloads each network once before any fit. A campaign split into several jobs that
-share `ANDREY_DATA_DIR` loads each network once first, so no two jobs download the same file at
-once. bnlearn needs the R lane; without it, leave bnlearn out:
-
-```shell
-$ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-smoke --smoke --no-r
-```
 
 ### Hidden confounders
 
@@ -344,6 +328,79 @@ The two tabu searches can end on different graphs from the same data. At hill cl
 the best non-improving moves are often several reversals of covered edges, which leave the score
 unchanged, and each package takes the first in its own scan order. bnlearn scans additions, then
 removals, then reversals; Andrey ranks all moves by score change, then by the edge's endpoints.
+
+### ANM direction test
+
+`anm_pairs.py` compares Andrey's `anm` with causal-learn's `ANM` on cause-effect pairs from the
+`anm_pair` regime: two nodes at density 1.0, so every pair has one edge, in a direction the seed
+draws, with a nonlinear additive-noise mechanism and Gaussian noise. The ladder runs over the
+number of rows, not over `d`, since a pair always has two columns. causal-learn returns the two
+p-values only, so its adapter decides the edge with Andrey's function: both solutions draw the
+direction with the larger p-value. On equal p-values, Andrey takes the direction with the smaller
+HSIC statistic relative to its mean under independence, and causal-learn draws no edge.
+
+The defaults are sizes of 200, 500, 1000, and 2000 rows, 20 seeds, one repeat without warm-up, and
+`--cap-wall-s` of 1800. The Gaussian-process regression's time grows with the cube of the rows. A
+smoke run fits one pair of 100 rows:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/anm_pairs.py --out outputs/anm-smoke --smoke
+```
+
+Each record gets `direction_correct`, `direction_reversed`, and `direction_none`, one of them 1.0,
+from the estimate stored in `structures/`. The summary prints, per size and solution, the median
+wall time, the share of pairs with the true direction, and `agree`, the share of pairs on which the
+two solutions return the same graph. A rescore recomputes the direction columns without fitting
+anything, as in [Hidden-confounder methods](#hidden-confounder-methods); pass the first run's flags:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/anm_pairs.py --out outputs/anm-pairs --rescore
+```
+
+Both packages fit the same Gaussian process and the same HSIC test. Andrey standardizes each
+column first, so its answer does not depend on the units; causal-learn fits the data as given. The
+regime's data are standardized, so the two compute the same p-values here up to rounding, and the
+comparison measures time.
+
+### PNL direction test
+
+`pnl_pairs.py` compares Andrey's `pnl` with causal-learn's `PNL` and the empty baseline on
+cause-effect pairs from the `pnl_pair` regime: two nodes at density 1.0, so every pair has one
+edge, in a direction the seed draws, with a post-nonlinear mechanism `y = g2(w * x + e)` and Laplace
+noise. The inner transform is linear and the outer one, `g2(z) = z + 0.5 tanh(z)`, nonlinear and
+invertible. The driver takes the ANM driver's flags and writes the same direction columns. Its
+`agree` column compares the two PNL solutions only, since the baseline never draws an edge.
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/pnl_pairs.py --out outputs/pnl-smoke --smoke
+```
+
+The two packages fit the same model by different means and test it differently. causal-learn
+trains two small neural networks per direction for 3000 epochs in batches of 128 rows and drops the
+last partial batch, so the smoke pair of 100 rows trains nothing. It then compares the mean of the
+assumed cause with the mean of the estimated noise by a two-sample t-test, rounded to three
+decimals. Andrey fits smooth basis expansions by Newton's method and tests independence with HSIC.
+causal-learn's fit takes over a minute at 1000 rows and grows with the rows.
+
+### Categorical data
+
+`discrete_cpu.py` compares Andrey's discrete tests and scores with causal-learn, pgmpy, and bnlearn
+on ASIA, ALARM, and HEPAR2 sampled from their own probability tables, at 1,000 and 5,000 rows, and
+on random discrete networks (`DiscreteBN`, Erdos-Renyi, mean degree 2, 2 to 4 states) of 10, 20,
+and 50 variables at 2,000 rows. Each comparison runs one objective in every package: PC's chi-square
+and G-square tests with degrees of freedom adjusted for empty rows and columns (bnlearn's `x2-adf`
+and `mi-adf`); BDeu with equivalent sample size 1 and a structure prior of one expected parent per
+variable (bnlearn's `bde` with `prior = "vsp"`) for GES, hill climbing, Tabu search, and BOSS; and
+the multinomial BIC for hill climbing against pgmpy and bnlearn. pgmpy's hill climbing runs with
+its tabu list off. Every estimate is scored against the network's DAG through its equivalence class.
+
+The driver downloads each network once before any fit. A campaign split into several jobs that
+share `ANDREY_DATA_DIR` loads each network once first, so no two jobs download the same file at
+once. bnlearn needs the R lane; without it, leave bnlearn out:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-smoke --smoke --no-r
+```
 
 ### Where the clock starts
 
@@ -646,6 +703,10 @@ Read `params` before comparing solutions because their defaults may optimize dif
   package's and with Andrey GES, by time, SHD, and BIC under one scorer.
 - `tabu_cpu.py` - compares tabu search and hill climbing with bnlearn, and scores each graph's
   BIC.
+- `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
+- `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
+- `discrete_cpu.py` - compares the discrete tests and scores with causal-learn, pgmpy, and bnlearn
+  on categorical data.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.
