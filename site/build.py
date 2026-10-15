@@ -430,8 +430,8 @@ def ratio_label(row: dict) -> str:
 
 
 # ---- the README's speedup cards --------------------------------------------------------------
-# The methods the README chart shows, in order, each from a release's summary: (folder in
-# RELEASES, method).
+# The methods the README chart shows, each from a release's summary: (folder in RELEASES,
+# method). The chart orders them by speedup.
 PANEL = (
     ("alpha-2026-09", "PC"),
     ("alpha-2026-09", "FCI"),
@@ -451,8 +451,9 @@ def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str
     """Each ``PANEL`` method's speedups at its largest size with a published ratio, fastest first.
 
     A slide is the method, its size as it prints, and its bars: each package, its speed relative
-    to the slowest package (1x), and the label it prints. ``summaries`` are in ``RELEASES`` order,
-    and each method comes from its own release's summary, rows at ``MEAN_DEGREE``.
+    to the slowest package (1x), and the label it prints. The slides go by Andrey's speed, largest
+    first. ``summaries`` are in ``RELEASES`` order, and each method comes from its own release's
+    summary, rows at ``MEAN_DEGREE``.
 
     The packages at that size come from the comparisons run with the same data, hardware, and
     build as the one with the ratio. Every bar comes from Andrey's paired ratios: Andrey's is its
@@ -492,7 +493,7 @@ def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str
             speed = ours / row["ratio"]
             bars.append((package, speed, speedup_text(speed)))
         slides.append((name, f"{d:,} {lead['unit']}", sorted(bars, key=lambda bar: -bar[1])))
-    return slides
+    return sorted(slides, key=lambda slide: -next(s for p, s, _ in slide[2] if p == "Andrey"))
 
 
 def slug(name: str) -> str:

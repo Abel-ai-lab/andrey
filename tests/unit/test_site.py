@@ -538,18 +538,22 @@ def test_a_page_without_a_description_takes_its_first_paragraph(
 def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
     slides = build.speedup_slides(summaries)
-    assert [name for _, name in build.PANEL] == [
+    assert {name for _, name in build.PANEL} == {
         "PC",
         "FCI",
         "GES",
         "XGES",
         "Tabu search",
         "DirectLiNGAM",
-    ]
+    }
     assert len(slides) == 6
+    # The strongest speedup leads.
+    speeds = [next(s for p, s, _ in bars if p == "Andrey") for _, _, bars in slides]
+    assert speeds == sorted(speeds, reverse=True)
     by_release = dict(zip(build.RELEASES, summaries, strict=True))
-    for (release, name), (shown, size, bars) in zip(build.PANEL, slides, strict=True):
-        assert shown == name
+    shown = {name: (size, bars) for name, size, bars in slides}
+    for release, name in build.PANEL:
+        size, bars = shown[name]
         # The slide is the method's largest size with a published ratio, at the panel's mean
         # degree, and Andrey's bar prints that ratio, "≥" before a lower bound. A pair's size is
         # its rows.
@@ -653,9 +657,13 @@ def test_the_readme_chart_takes_rows_at_its_mean_degree():
     # The same sizes again at a denser mean degree, each with a larger ratio: the panel keeps the
     # rows at MEAN_DEGREE.
     denser = [dict(r, mean_degree=4.0, ratio=r["ratio"] * 2) for r in method["rows"]]
-    before = build.speedup_slides(summaries)[0]
+
+    def slide():
+        return next(s for s in build.speedup_slides(summaries) if s[0] == name)
+
+    before = slide()
     method["rows"] = [dict(r, mean_degree=build.MEAN_DEGREE) for r in method["rows"]] + denser
-    assert build.speedup_slides(summaries)[0] == before
+    assert slide() == before
     kept = {r["ratio"] for m in build.comparisons(summary) for r in m["rows"]}
     assert kept.isdisjoint(r["ratio"] for r in denser)
 
