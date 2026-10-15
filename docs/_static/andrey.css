@@ -598,15 +598,42 @@ html:not(:has(.andrey-home)) .bd-header::before {
 }
 
 /* ---------- the 404 page ---------- */
-/* 404.md's art spans the text column, its corners rounded like a post's cover; the cards under it
-   are the documentation's own. */
-.bd-content img.missing-link-art {
-  display: block;
+/* 404.md opens like a section cover, not an article: its title over its art (an engraved chain
+   broken where a link is missing, _static/missing-link.jpg), a small "404" above it, and no
+   breadcrumbs, permalink, or source link. Its cards are the documentation's own. */
+.bd-page-width:has(.not-found) :is(.bd-breadcrumbs, .bd-sidebar-secondary) {
+  display: none;
+}
+
+.bd-article:has(.not-found) h1 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.6rem;
+  box-sizing: border-box;
   width: 100%;
-  height: auto;
-  margin: 0.25rem 0 1.5rem;
+  height: clamp(11rem, 22vw, 16rem);
+  margin: 0 0 1.75rem;
+  padding: 0 clamp(1.25rem, 6%, 3.5rem);
   border-radius: 14px;
-  background: var(--andrey-ground-navy);
+  background:
+    url("missing-link.jpg") 100% 50% / cover no-repeat,
+    var(--andrey-ground-navy);
+  color: var(--andrey-ground-ink);
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  letter-spacing: -0.03em;
+}
+
+.bd-article:has(.not-found) h1::before {
+  content: "404";
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  opacity: 0.8;
+}
+
+.bd-article:has(.not-found) h1 .headerlink {
+  display: none;
 }
 
 /* ---------- documentation sidebars ---------- */
