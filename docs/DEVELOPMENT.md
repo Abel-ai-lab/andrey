@@ -303,12 +303,12 @@ head carries its Twitter card fields and one JSON-LD graph: the organization (wi
 (with Andrey's icon, the favicon) at the release the page belongs to (a post's `version`, a release
 card's number, else the current release), the page, a `BlogPosting` for a post with its date and
 authors, and the page's breadcrumbs. The search page is `noindex`. After the build,
-`_write_discovery` in `conf.py` writes three files at the site's root from the built pages:
+`_write_discovery` in `conf.py` writes two files at the site's root from the built pages:
 `llms.txt`, the pages in `LLMS_SECTIONS` under Docs, Release cards, and Blog, each with its own
-title and description, every release card and published post following its section's pages;
-`sitemap.xml`, the address of every indexable page; and `robots.txt`, which lets every crawler read
-every page and names the sitemap. A page listed in `LLMS_SECTIONS` that is renamed or removed fails
-the build until the list follows it.
+title and description, every release card and published post following its section's pages; and
+`sitemap.xml`, the address of every indexable page. `robots.txt` is a plain file
+(`_extra/robots.txt`) that lets every crawler read every page and names the sitemap. A page listed
+in `LLMS_SECTIONS` that is renamed or removed fails the build until the list follows it.
 
 ## Validation
 
@@ -322,7 +322,7 @@ The unit tests check the sources and the claims: `tests/unit/test_site.py` (the 
 `tests/unit/test_launch_material.py` (the README and the launch post),
 `tests/unit/test_examples_gallery.py` (the gallery), `tests/unit/test_why_fast.py` (the speed
 scenes), `tests/unit/test_compare_example.py` (the comparison on one dataset), and
-`tests/unit/test_discovery.py` (the head tags, `llms.txt`, `sitemap.xml`, and `robots.txt`).
+`tests/unit/test_discovery.py` (the head tags, `llms.txt`, and `sitemap.xml`).
 `test_built_site.py` builds the site once from a clean workspace and checks what only a built site
 shows:
 

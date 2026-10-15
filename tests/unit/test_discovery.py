@@ -1,5 +1,5 @@
 """The site's search and answer-engine metadata (docs/discovery.py): head tags and structured data,
-llms.txt, sitemap.xml, and robots.txt."""
+llms.txt, and sitemap.xml."""
 
 import importlib.util
 import json
@@ -244,9 +244,3 @@ def test_the_sitemap_lists_the_indexable_pages_by_their_address(tmp_path):
     xml = discovery.sitemap_xml(urls)
     assert xml.startswith('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns=')
     assert f"<url><loc>{SITE}docs/faq.html</loc></url>" in xml
-
-
-def test_robots_txt_lets_every_crawler_read_the_site_and_names_the_sitemap():
-    assert discovery.robots_txt(SITE) == (
-        "User-agent: *\nAllow: /\n\nSitemap: https://andrey.abel.ai/sitemap.xml\n"
-    )

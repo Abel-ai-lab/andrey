@@ -1,5 +1,6 @@
 """The site's search and answer-engine metadata: structured data and sharing tags in each page's
-head, and the root files crawlers read, ``robots.txt``, ``sitemap.xml``, and ``llms.txt``."""
+head, and the root files crawlers read, ``sitemap.xml`` and ``llms.txt`` (``robots.txt`` is a
+plain file, ``docs/_extra/robots.txt``)."""
 
 from __future__ import annotations
 
@@ -267,8 +268,3 @@ def sitemap_xml(urls: Sequence[str]) -> str:
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         f"{entries}</urlset>\n"
     )
-
-
-def robots_txt(site_url: str) -> str:
-    """``robots.txt``: every crawler may read every page, and the sitemap's address."""
-    return f"User-agent: *\nAllow: /\n\nSitemap: {site_url}sitemap.xml\n"

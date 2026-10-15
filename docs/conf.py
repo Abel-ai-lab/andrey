@@ -185,7 +185,7 @@ html_static_path = ["_static", "_generated/static", "../site/brand", "../site/as
 # The wordmark's "A" in the accent blue: a placeholder mark until the brand has one.
 html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
-html_extra_path = ["_generated/extra"]
+html_extra_path = ["_generated/extra", "_extra"]
 html_css_files = ["andrey-tokens.css", "andrey.css", "graph-guides.css"]
 # The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill), the dot
 # on Release cards until the reader has seen the latest release, and the outline's mark on the
@@ -520,10 +520,10 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
 
 
 def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
-    """Write ``llms.txt``, ``sitemap.xml``, and ``robots.txt`` at the site's root from the built
-    pages (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt``
-    lists ``LLMS_SECTIONS``, then every release card and published post; a listed page that is
-    missing or ``noindex`` fails the build."""
+    """Write ``llms.txt`` and ``sitemap.xml`` at the site's root from the built pages
+    (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt`` lists
+    ``LLMS_SECTIONS``, then every release card and published post; a listed page that is missing
+    or ``noindex`` fails the build."""
     if exception is not None or app.builder.name != "html":
         return
     outdir = pathlib.Path(app.outdir)
@@ -553,7 +553,6 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
     logo = resvg_py.svg_to_bytes(svg_string=ABEL_SYMBOL.read_text(), width=ABEL_LOGO_WIDTH)
     _write_bytes(outdir / ABEL_LOGO, bytes(logo))
     _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
-    _write(outdir / "robots.txt", discovery.robots_txt(SITE_URL))
 
 
 # The pages that show the "Why Andrey is fast" scenes.
