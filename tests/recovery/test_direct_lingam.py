@@ -67,3 +67,25 @@ def test_score_candidates_single_candidate():
 
     scores = pwling.score_candidates(_random_linear_sem(seed=1, n=200, d=3, noise="uniform"), [1])
     assert scores.shape == (1,)
+
+
+def test_least_squares_residual_is_orthogonal_to_its_regressor():
+    from andrey.lingam import pwling
+
+    rng = np.random.default_rng(0)
+    b = rng.uniform(-1, 1, 50)
+    a = 0.7 * b + rng.uniform(-1, 1, 50)
+    r = pwling.compute_residual(a, b, least_squares=True)
+    assert abs(np.dot(r - r.mean(), b - b.mean())) < 1e-12
+
+
+@pytest.mark.parametrize("noise", ["uniform", "gaussian"])
+def test_pwling_serial_vectorized_agree_least_squares(noise: str):
+    from andrey.lingam import pwling
+
+    X = _random_linear_sem(seed=0, n=600, d=8, noise=noise)
+    vectorized = pwling.find_causal_order(X, least_squares=True)
+    reference = pwling.find_causal_order(
+        X, scores=pwling.score_candidates_serial, least_squares=True
+    )
+    assert vectorized == reference
