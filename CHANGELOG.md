@@ -11,17 +11,19 @@ change names its pull request.
 
 ### Added
 
-- `pcmci`, `pcmciplus`, and `lpcmci`, experimental time-series methods: PCMCI for lagged links,
+- `pcmci`, `pcmciplus`, and `lpcmci`, supported time-series methods: PCMCI for lagged links,
   PCMCI+ for lagged and same-step links, and LPCMCI for a time-series PAG over series with
   unobserved variables. ([#TBD])
 - `pc`, `fci`, `gfci`, and `cdnod` take `indep_test="student_t"`, a partial-correlation test with
   a Student-t p-value. ([#TBD])
-- `granger`, experimental lasso Granger causality for a multivariate time series: it returns a
+- `granger`, supported lasso Granger causality for a multivariate time series: it returns a
   temporal structure with lags 1 to `maxlag` and the coefficients as weights, and does not depend
   on the units of any variable. ([#TBD])
 
 ### Changed
 
+- `varma_lingam` and `longitudinal_lingam` are supported and no longer warn with
+  `ExperimentalWarning`. ([#TBD])
 - `varma_lingam` with `prune=True` refits the weights it keeps by least squares, so they are no
   longer shrunk toward zero. ([#TBD])
 

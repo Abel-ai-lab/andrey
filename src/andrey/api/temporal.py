@@ -21,7 +21,6 @@ from ._adapt import (
     shared_labels,
     with_labels,
 )
-from ._experimental import warn_experimental
 from ._temporal import (
     _adapt_granger,
     _adapt_longitudinal_lingam,
@@ -93,12 +92,6 @@ def varma_lingam(
         If ``criterion`` is not one of ``"aic"``, ``"bic"``, ``"hqic"``, or ``None``, if ``order``
         holds a negative count or is ``(0, 0)``, or if ``data`` has fewer than 2 columns.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     With ``prune=True`` each variable is regressed on its causal predecessors at the same step,
@@ -108,10 +101,14 @@ def varma_lingam(
     from a lag-0 matrix refit the same way. The regressions start at time step ``max(p, q)``: the
     first steps serve only as lagged values, and no step is regressed on a later one.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on one series of 500 time steps over 3
-    variables. It assumes linear effects and non-Gaussian noise. The likelihood fit stops after 100
-    iterations and gives no warning when it has not converged; with ``criterion`` set, it fits one
-    model for every ``(p, q)`` in the grid.
+    **Limitations.** Measured on simulated linear series with non-Gaussian noise, one autoregressive
+    and one moving-average lag, from 3 to 20 variables with 100 to 1,000 time steps, with
+    ``order=(1, 1)`` and ``prune=True``. Its median errors (missing and extra cross-links) stayed
+    below the empty graph's from 300 time steps at every size; at 100 time steps they exceeded it
+    from 10 variables on. The fit takes minutes at 20 variables and 1,000 time steps. It assumes
+    linear effects and non-Gaussian noise. The likelihood fit stops after 100 iterations and gives
+    no warning when it has not converged; with ``criterion`` set, it fits one model for every
+    ``(p, q)`` in the grid.
 
     References
     ----------
@@ -132,7 +129,6 @@ def varma_lingam(
     >>> out.structure.lag(1).oriented_edges()
     [(0, 1, 'directed')]
     """
-    warn_experimental("varma_lingam")
     from andrey.temporal.varma import varma_lingam as _native
 
     X = data_matrix(data)
@@ -196,18 +192,15 @@ def longitudinal_lingam(
         If ``data_list`` has fewer than two time points, if ``n_lags`` is outside its range, if
         the per-time arrays differ in shape, or if the DataFrames' column names differ.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
-    **Limitations.** Not benchmarked yet. Its tests run it on 4 time points of 600 units and 4
-    variables. It assumes linear effects and non-Gaussian noise. Each time point's fit uses only the
-    units' rows at that time, so its accuracy depends on the number of units, not on the number of
-    time points.
+    **Limitations.** Measured on simulated panels with non-Gaussian noise, a dense same-step DAG and
+    a dense lag-1 matrix drawn anew at every time point, and a hidden common cause at the first,
+    from 2 to 5 variables at 20 or 50 time points with 100 to 1,000 units, with ``n_lags=1``. Its
+    median errors (missing and extra cross-links) stayed far below the empty graph's at every size.
+    It assumes linear effects and non-Gaussian noise. Each time point's fit uses only the units'
+    rows at that time, so its accuracy depends on the number of units, not on the number of time
+    points.
 
     References
     ----------
@@ -225,7 +218,6 @@ def longitudinal_lingam(
     >>> out.structure.type
     'temporal'
     """
-    warn_experimental("longitudinal_lingam")
     from andrey.temporal.longitudinal import LongitudinalLiNGAM
 
     panel = [data_matrix(X, name=f"data_list[{t}]") for t, X in enumerate(data_list)]
@@ -295,12 +287,6 @@ def pcmci(
         2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the length at which
         every test keeps a degree of freedom.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     Every test is a partial-correlation test. The default, ``"student_t"``, takes the p-value from
@@ -319,12 +305,16 @@ def pcmci(
     candidate, then drops those that test independent. A candidate's strength is the smallest
     absolute partial correlation it has had so far.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over 5
-    variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no hidden
-    common causes. It does not test same-step (lag 0) links: an effect within one time step is
-    missed and can show up as a false lagged link. An MCI test conditions on up to
-    ``2 * n_variables * tau_max - 1`` lagged values, so the series needs many more time steps than
-    that. The MCI step alone runs ``n_variables ** 2 * tau_max`` tests.
+    **Limitations.** Measured on simulated linear-Gaussian series with an autodependency in every
+    variable and one cross-link per variable at lag 1 or 2, from 10 to 160 variables with 500 to
+    2,000 time steps, with ``tau_max=2``. It found nearly every true link at every size, but its
+    false links grew with the number of variables: its median errors (lag-resolved SHD) stayed below
+    the empty graph's at 10 variables, came close to it at 20, and exceeded it from 40 on. It
+    assumes linear effects, a stationary series, and no hidden common causes. It does not test
+    same-step (lag 0) links: an effect within one time step is missed and can show up as a false
+    lagged link. An MCI test conditions on up to ``2 * n_variables * tau_max - 1`` lagged values, so
+    the series needs many more time steps than that. The MCI step alone runs
+    ``n_variables ** 2 * tau_max`` tests.
 
     References
     ----------
@@ -345,7 +335,6 @@ def pcmci(
     >>> out.structure.lag(2).oriented_edges()
     []
     """
-    warn_experimental("pcmci")
     from andrey.temporal.pcmci import pcmci as _native
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
@@ -437,12 +426,6 @@ def pcmciplus(
         at least ``2 * tau_max * (n_variables + 1) + n_variables + 1`` rows, the length at which
         every test keeps a degree of freedom.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     The method runs in four phases. The lagged phase selects the lagged parents of each variable
@@ -467,12 +450,15 @@ def pcmciplus(
     correlation matrix, and from the residuals themselves when the conditions are collinear to
     working precision, as lagged copies of a strongly autocorrelated series can be.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over
-    5 variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no hidden
-    common causes. The skeleton and collider phases test every subset of a variable's same-step
-    neighbors, so the number of tests grows exponentially with the number of same-step links at
-    one variable. A test conditions on up to ``2 * n_variables * tau_max + n_variables - 2``
-    values, so the series needs many more time steps than that.
+    **Limitations.** Measured on simulated linear-Gaussian series with strong autocorrelation and
+    1.5 cross-links per variable, 30% of them within a time step and the rest at lags 1 to 5, from
+    10 to 80 variables with 500 to 2,000 time steps, with ``tau_max=5``. Its median errors (endpoint
+    SHD) stayed well below the empty graph's at every size. It assumes linear effects, a stationary
+    series, and no hidden common causes. The skeleton and collider phases test every subset of a
+    variable's same-step neighbors, so the number of tests grows exponentially with the number of
+    same-step links at one variable. A test conditions on up to
+    ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs many more time steps
+    than that.
 
     References
     ----------
@@ -494,7 +480,6 @@ def pcmciplus(
     >>> out.structure.lag(1).oriented_edges()
     [(1, 2, 'directed')]
     """
-    warn_experimental("pcmciplus")
     from andrey.temporal.pcmciplus import pcmciplus as _native
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
@@ -587,12 +572,6 @@ def lpcmci(
         not a usable 2-D matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1``
         rows, the length at which every test keeps a degree of freedom.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     The graph starts complete, with every lagged link ``o->`` (time order rules out the later end
@@ -618,13 +597,16 @@ def lpcmci(
     earlier end of a lagged link is searched with the empty set only, since time order already
     rules out the later end as its cause.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on one series of 1,000 time steps over 5
-    variables with ``tau_max=2``. It assumes linear effects, a stationary series, and no selection
+    **Limitations.** Measured on simulated linear-Gaussian series with strong autocorrelation, one
+    cross-link per variable, 30% of them within a time step and the rest at lags 1 to 3, and 30% of
+    the series unobserved, from 5 to 20 variables with 500 to 2,000 time steps, with ``tau_max=3``.
+    Its median errors (endpoint SHD against the true PAG of the observed series) stayed below the
+    empty graph's at every size. It assumes linear effects, a stationary series, and no selection
     bias; hidden common causes are allowed. The graph covers ``tau_max + 1`` time steps, and a
     hidden cause that acts through earlier steps can add links within that window. The removal and
     rule steps test subsets of a node's neighbors, so the number of tests grows exponentially with
-    the number of links at one node. A test conditions on up to ``n_variables * (tau_max + 1) -
-    2`` values, so the series needs many more time steps than that.
+    the number of links at one node. A test conditions on up to ``n_variables * (tau_max + 1) - 2``
+    values, so the series needs many more time steps than that.
 
     References
     ----------
@@ -648,7 +630,6 @@ def lpcmci(
     >>> out.structure.lag(1).oriented_edges()
     [(0, 0, 'directed'), (1, 1, 'directed')]
     """
-    warn_experimental("lpcmci")
     from andrey.temporal.lpcmci import lpcmci as _native
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
@@ -709,12 +690,6 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
         ``maxlag + cv`` rows, so that some fold would hold no time step, or if ``data`` has fewer
         than 2 columns.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     An edge says that the past of one variable helps predict another beyond the past of every
@@ -731,8 +706,11 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     The penalty is the plain lasso of Arnold et al. [2]_. Shojaie and Michailidis [3]_ propose a
     truncating lasso penalty that also selects the lag order; it is not implemented here.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 4 variables with 500 time
-    steps, and on 1,000 time steps with 3 variables. It assumes linear effects. Each variable's
+    **Limitations.** Measured on simulated linear-Gaussian VAR(2) series with no same-step links,
+    standardized, from 10 to 160 variables with 1,000 time steps, with ``maxlag=2``. It found most
+    true lagged edges but returned many false ones, so its median errors (missing and extra lagged
+    edges) exceeded the empty graph's at every size: on half the series at 10 variables and on all
+    of them from 20 on. It assumes linear effects and tests no same-step effects. Each variable's
     regression takes ``maxlag`` lags of every variable as inputs, so the work grows with ``maxlag``
     and with the square of the number of variables.
 
@@ -756,7 +734,6 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     >>> round(float(out.structure.lag_weights[0][0, 1]), 1)
     0.8
     """
-    warn_experimental("granger")
     from andrey.temporal.granger import granger_lasso
 
     maxlag = int_in_range(maxlag, "maxlag", 1)

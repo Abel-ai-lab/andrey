@@ -581,7 +581,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="order",
@@ -640,7 +640,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="n_lags",
@@ -683,7 +683,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="tau_max",
@@ -741,7 +741,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="tau_max",
@@ -802,7 +802,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="tau_max",
@@ -859,7 +859,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="maxlag",

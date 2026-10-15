@@ -1000,20 +1000,20 @@ def test_a_family_where_andrey_is_not_faster_shows_no_number():
 
 def test_a_new_family_gets_a_tile_with_no_code_change(monkeypatch):
     summaries = placeholder_summaries()
-    monkeypatch.setattr(build, "SPEC_FAMILIES", {**build.SPEC_FAMILIES, "temporal": "Time series"})
-    assert "temporal" not in [t["family"] for t in build.family_tiles(summaries)]
+    monkeypatch.setattr(build, "SPEC_FAMILIES", {**build.SPEC_FAMILIES, "spectral": "Spectral"})
+    assert "spectral" not in [t["family"] for t in build.family_tiles(summaries)]
     original = build.comparisons
 
     def moved(summary):
         out = original(summary)
         for m in out:
             if m["method"] == "PNL":
-                m["family"] = "temporal"
+                m["family"] = "spectral"
         return out
 
     monkeypatch.setattr(build, "comparisons", moved)
     titles = [t["title"] for t in build.family_tiles(summaries)]
-    assert "Time series" in titles
+    assert "Spectral" in titles
 
 
 def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_page):

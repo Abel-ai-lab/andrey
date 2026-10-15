@@ -127,7 +127,6 @@ def test_no_columns_give_an_empty_graph(method):
     assert SINGLE[method](_data(d=0)).structure.n_nodes == 0
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("fit", [andrey.varma_lingam, andrey.granger], ids=lambda f: f.__name__)
 def test_time_series_methods_need_two_variables(fit):
     with pytest.raises(ValueError, match="data needs at least 2 columns"):
@@ -149,7 +148,6 @@ def test_granger_checks_maxlag_and_cv(setting, value, error):
         andrey.granger(_data(), **{setting: value})
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_granger_needs_a_time_step_in_every_fold():
     with pytest.raises(ValueError, match="data needs at least 8 rows"):
         andrey.granger(_data()[:7], maxlag=3, cv=5)
@@ -185,7 +183,6 @@ def test_multi_group_direct_lingam_needs_the_same_columns_in_every_group():
         andrey.multi_group_direct_lingam([_data(d=3), _data(d=4)])
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(("n_lags", "error"), [(0, ValueError), (3, ValueError), (1.5, TypeError)])
 def test_longitudinal_lingam_takes_n_lags_up_to_the_time_points_minus_one(n_lags, error):
     data = [_data() for _ in range(3)]
@@ -222,7 +219,6 @@ def test_pcmci_checks_its_parameters(params, error, name):
         andrey.pcmci(_data(), **params)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_pcmci_needs_enough_time_steps_for_every_test():
     # 2 * tau_max * (n_variables + 1) + 3 = 27 rows for tau_max=3 over 3 variables.
     with pytest.raises(ValueError, match="data needs at least 27 rows"):
@@ -247,7 +243,6 @@ def test_pcmciplus_checks_its_parameters(params, error, name):
         andrey.pcmciplus(_data(), **params)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_pcmciplus_needs_enough_time_steps_for_every_test():
     # 2 * tau_max * (n_variables + 1) + n_variables + 1 = 28 rows for tau_max=3 over 3 variables.
     with pytest.raises(ValueError, match="data needs at least 28 rows"):
@@ -257,7 +252,6 @@ def test_pcmciplus_needs_enough_time_steps_for_every_test():
     assert len(out.structure.lag(0).oriented_edges()) == 3  # nothing removed: the largest tests ran
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_pcmciplus_takes_one_variable():
     out = andrey.pcmciplus(_data(d=1))
     assert out.structure.n_nodes == 1
@@ -282,7 +276,6 @@ def test_lpcmci_checks_its_parameters(params, error, name):
         andrey.lpcmci(_data(), **params)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_lpcmci_needs_enough_time_steps_for_every_test():
     # n_variables * (tau_max + 1) + 2 * tau_max + 1 = 19 rows for tau_max=3 over 3 variables.
     with pytest.raises(ValueError, match="data needs at least 19 rows"):
@@ -292,14 +285,12 @@ def test_lpcmci_needs_enough_time_steps_for_every_test():
     assert len(out.structure.lag(0).oriented_edges()) == 3
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_lpcmci_takes_one_variable():
     out = andrey.lpcmci(_data(d=1))
     assert out.structure.n_nodes == 1
     assert out.metadata["parents"] == [[]]
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_pcmci_takes_one_variable():
     out = andrey.pcmci(_data(d=1))
     assert out.structure.n_nodes == 1

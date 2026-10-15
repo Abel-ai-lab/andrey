@@ -40,7 +40,6 @@ def series() -> tuple[np.ndarray, np.ndarray]:
     return (data - data.mean(axis=0)) / data.std(axis=0), truth
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_both_packages_return_the_same_coefficients_on_standardized_data(series) -> None:
     data, _ = series
     natives = []
@@ -51,7 +50,6 @@ def test_both_packages_return_the_same_coefficients_on_standardized_data(series)
     np.testing.assert_allclose(natives[0], natives[1], atol=1e-8)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_the_parallel_variant_returns_the_serial_coefficients(series, monkeypatch) -> None:
     data, _ = series
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
@@ -59,7 +57,6 @@ def test_the_parallel_variant_returns_the_serial_coefficients(series, monkeypatc
     assert np.array_equal(PARALLEL.fit(data, {"maxlag": 2}), SERIAL.fit(data, {"maxlag": 2}))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("adapter", ADAPTERS, ids=lambda a: a.name)
 def test_the_structure_holds_the_nonzero_coefficients_as_lagged_edges(adapter, series) -> None:
     data, _ = series

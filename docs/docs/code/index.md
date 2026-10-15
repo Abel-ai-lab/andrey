@@ -54,6 +54,12 @@ and Tabu search do from 50 variables with ten rows per variable.
    pnl
    rcd
    bottom_up_parce_lingam
+   varma_lingam
+   longitudinal_lingam
+   pcmci
+   pcmciplus
+   lpcmci
+   granger
 ```
 
 FCI and GFCI use uncovered possibly-directed paths for their R9 and R10 tail orientations:
@@ -77,12 +83,6 @@ in a process.
    exact_search
    calm
    multi_group_direct_lingam
-   varma_lingam
-   longitudinal_lingam
-   pcmci
-   pcmciplus
-   lpcmci
-   granger
    gin
    camuv
 ```
