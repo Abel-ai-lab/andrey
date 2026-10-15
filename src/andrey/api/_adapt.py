@@ -113,7 +113,9 @@ def checked_data(
 
     The test or score ``value`` names decides what is checked (:func:`data_kind`): a mixed-data one
     reads ``categorical`` through :func:`mixed_matrix` and returns its mask; a categorical one
-    checks every value is a whole number; a continuous one gets :func:`data_matrix`'s checks and a
+    numbers the values of columns that do not hold numbers, such as text and pandas ``category``
+    columns of text (:func:`categories_as_numbers`), and checks every value is a whole number; a
+    continuous one gets :func:`data_matrix`'s checks and a
     one-time :class:`~andrey.DataTypeWarning` naming the columns that look like category codes:
     at most ``max_categories`` distinct whole numbers. The mask is ``None`` unless the data are
     mixed. ``index_categorical`` passes to :func:`mixed_matrix`.
@@ -138,10 +140,11 @@ def checked_data(
             "categorical names the categorical columns for a mixed-data test or score, but "
             f"{setting} reads {reads}; leave categorical as None"
         )
-    X = data_matrix(data)
     if kind == "categorical":
+        X = data_matrix(categories_as_numbers(data, setting))
         check_categories(X, data, setting)
         return X, None
+    X = data_matrix(data)
     codes = np.flatnonzero(_category_counts(X, max_categories))
     if codes.size:
         mixed = (
@@ -157,6 +160,24 @@ def checked_data(
             DataTypeWarning,
         )
     return X, None
+
+
+def categories_as_numbers(data: npt.ArrayLike, setting: str, *, name: str = "data") -> object:
+    """Return ``data`` with each column that does not hold numbers numbered by its values.
+
+    For a categorical setting, every column is categorical, so a text, ``string``, or pandas
+    ``category`` column of text has each distinct value numbered as one category, as
+    :func:`mixed_matrix` numbers its categorical columns. Data that convert to numbers, booleans
+    included, are returned unchanged, as is anything that is not a 2-D table, which
+    :func:`data_matrix` then rejects. Raises ``ValueError``, naming ``setting``, on a missing value
+    in a numbered column.
+    """
+    try:
+        np.asarray(data, dtype=np.float64)
+    except (TypeError, ValueError):
+        if np.ndim(data) == 2:
+            return _encode_categories(data, np.ones(np.shape(data)[1], dtype=bool), setting, name)
+    return data
 
 
 def mixed_matrix(

@@ -140,16 +140,17 @@ def ges(
     gets no new edges. The backward phase has no cap.
 
     **Categorical data.** ``"local_score_BDeu"`` takes each distinct value of a column as one
-    category, so the codes need not start at 0 or be consecutive. It scores a variable given its
-    parents by the marginal likelihood of its counts in each parent configuration, under a
-    Dirichlet prior with an equivalent sample size of 1 spread evenly over the cells [3]_. A
-    structure prior with one expected parent per variable multiplies it, from three variables up.
-    Equivalent graphs score the same, as GES requires. Moves are scored in this process, without
-    the worker processes the BIC search can use. ``"local_score_BIC_categorical"`` reads the
-    columns the same way and scores a variable by ``-2`` times the log-likelihood of its counts in
-    each parent configuration, plus ``lambda_value * log(n)`` for each of the ``q * (r - 1)`` free
-    parameters, with ``r`` its categories and ``q`` its parents' joint categories [7]_. Both
-    scores are on the scale of the BIC: ``-2`` times a log score.
+    category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
+    ``category`` columns are read the same way. It scores a variable given its parents by the
+    marginal likelihood of its counts in each parent configuration, under a Dirichlet prior with an
+    equivalent sample size of 1 spread evenly over the cells [3]_. A structure prior with one
+    expected parent per variable multiplies it, from three variables up. Equivalent graphs score the
+    same, as GES requires. Moves are scored in this process, without the worker processes the BIC
+    search can use. ``"local_score_BIC_categorical"`` reads the columns the same way and scores a
+    variable by ``-2`` times the log-likelihood of its counts in each parent configuration, plus
+    ``lambda_value * log(n)`` for each of the ``q * (r - 1)`` free parameters, with ``r`` its
+    categories and ``q`` its parents' joint categories [7]_. Both scores are on the scale of the
+    BIC: ``-2`` times a log score.
 
     **Mixed data.** ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` score data with
     continuous and categorical columns; the categorical columns are read as :func:`~andrey.pc`

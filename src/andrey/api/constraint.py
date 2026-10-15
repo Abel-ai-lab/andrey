@@ -143,12 +143,13 @@ def pc(
     simulated mixed networks of at most 10 variables with 5,000 rows.
 
     **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
-    category, so the codes need not start at 0 or be consecutive. A test compares the counts of
-    ``x`` and ``y`` with independence within each configuration of the conditioning set that
-    occurs in the data [2]_. Each configuration adds ``(r_x - 1) * (r_y - 1)`` degrees of freedom,
-    counting only the values of ``x`` and ``y`` present in it [6]_; with none, the p-value is 1.
-    A test needs several rows per cell of its table: with many categories or a large conditioning
-    set, most cells are empty, and the p-value is unreliable.
+    category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
+    ``category`` columns are read the same way. A test compares the counts of ``x`` and ``y`` with
+    independence within each configuration of the conditioning set that occurs in the data [2]_.
+    Each configuration adds ``(r_x - 1) * (r_y - 1)`` degrees of freedom, counting only the values
+    of ``x`` and ``y`` present in it [6]_; with none, the p-value is 1. A test needs several rows
+    per cell of its table: with many categories or a large conditioning set, most cells are empty,
+    and the p-value is unreliable.
 
     **Mixed data.** ``"degen_gauss"`` and ``"cond_gauss"`` test data with continuous and categorical
     columns. Each distinct value of a categorical column is one category, and a DataFrame column of

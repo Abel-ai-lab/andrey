@@ -282,8 +282,8 @@ mixed ones. `gfci` takes a score and a test
 that read the same kind of data, such as
 `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
 
-**Categorical data.** Code each category as a whole number. Each distinct value of a column is one
-category, so the codes need not start at 0.
+**Categorical data.** Each distinct value of a column is one category. A column may hold whole
+numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
 
 **Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
 `andrey.pc(data, indep_test="cond_gauss")` or

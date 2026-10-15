@@ -21,13 +21,13 @@ method is either supported or experimental; `andrey list` prints the status.
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column names.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
-`"local_score_BIC_categorical"`, also need whole numbers, each distinct value of a column one
-category. The mixed-data settings, `indep_test="degen_gauss"` or `"cond_gauss"` and
-`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`, read the categorical columns
-that `categorical` lists, or infer them, as [Data types](../guides/getting-started.md#data-types)
-describes; a categorical column of numbers needs whole numbers. Other data raises a `ValueError`
-that names the argument and, for a bad cell, its row and column. A single column gives a one-node
-graph.
+`"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
+whole numbers in a column of numbers, each distinct value of a column one category. The mixed-data
+settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
+`"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
+[Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
+needs whole numbers. Other data raises a `ValueError` that names the argument and, for a bad cell,
+its row and column. A single column gives a one-node graph.
 
 ### Supported methods
 

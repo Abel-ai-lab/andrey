@@ -330,6 +330,43 @@ def test_a_categorical_setting_rejects_a_fractional_value(setting):
     assert CATEGORICAL[setting](_categories()).structure.n_nodes == 3
 
 
+# Columns that hold categories as something other than whole numbers, built from whole codes.
+_LEVELS = np.array(["low", "mid", "high"])
+CATEGORY_COLUMNS = {
+    "text": lambda pd, codes: _LEVELS[codes],
+    "category of text": lambda pd, codes: pd.Categorical(_LEVELS[codes]),
+    "string": lambda pd, codes: pd.array(_LEVELS[codes], dtype="string"),
+    "bool": lambda pd, codes: codes > 0,
+}
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("kind", list(CATEGORY_COLUMNS))
+@pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
+def test_a_categorical_setting_reads_a_column_of_categories_like_its_codes(setting, kind):
+    """Each distinct value is one category, so a column of text, a pandas ``category`` or
+    ``string`` column, or a boolean column gives the graph its codes give."""
+    pd = pytest.importorskip("pandas")
+    codes = _categories(n=400)
+    codes[:, 1] = np.where(np.random.default_rng(1).random(400) < 0.8, codes[:, 0], codes[:, 1])
+    if kind == "bool":
+        codes[:, 0] = codes[:, 0] > 0
+    frame = pd.DataFrame(codes, columns=["a", "b", "c"])
+    typed = frame.assign(a=CATEGORY_COLUMNS[kind](pd, codes[:, 0].astype(int)))
+    fit = CATEGORICAL[setting]
+    assert np.array_equal(fit(typed).structure.to_numpy(), fit(frame).structure.to_numpy())
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
+def test_a_categorical_setting_names_a_missing_category(setting):
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_categories(), columns=["a", "b", "c"])
+    frame["b"] = np.where(frame["b"] > 0, "yes", None)
+    with pytest.raises(ValueError, match=r"column 'b' has a missing value at row \d+"):
+        CATEGORICAL[setting](frame)
+
+
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("score_func", "indep_test"), [("local_score_BDeu", "fisherz"), ("local_score_BIC", "chisq")]
