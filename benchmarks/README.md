@@ -28,6 +28,7 @@ Packages:
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
+- [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](#categorical-data)
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar - see
   [Mixed data](#mixed-data)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
@@ -338,9 +339,27 @@ $ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-smoke --s
 $ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-cpu --rescore
 ```
 
-The p-values and BDeu scores follow causal-learn's definitions, and on the datasets of
-`benchmarks/tests/test_adapters_discrete.py` the two packages return the same graph. Read the SHD
-columns beside the speed-up: where the graphs differ, the difference is a result to report.
+The p-values and BDeu scores follow causal-learn's definitions (Andrey's BDeu is `-2` times
+causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py` the two
+packages return the same graph. Read the SHD columns beside the speed-up: where the graphs differ,
+the difference is a result to report.
+
+Two more packages have categorical adapters, each running one of Andrey's settings and named by it;
+no driver runs them yet:
+
+| Andrey | bnlearn (`bnlearn_discrete.py`) | pgmpy (`pgmpy_hc.py`) |
+|---|---|---|
+| `pc`, `indep_test="chisq"` / `"gsq"` | `pc.stable`, `test="x2-adf"` / `"mi-adf"` | |
+| `hc`, `score_func="local_score_BDeu"` | `hc`, `score="bde"`, `iss=1`, `prior="vsp"` | |
+| `hc`, `score_func="local_score_BIC_categorical"` | `hc`, `score="bic"` | `HillClimbSearch`, `BIC` |
+| `tabu`, either score | `tabu`, the same score, `tabu=10`, `max.tabu=10` | |
+
+bnlearn's `vsp` prior, with `beta = 1 / (d - 1)`, is Andrey's structure prior less a constant per
+node, and its and pgmpy's scores are `-1/2` times Andrey's; bnlearn's `x2-adf` and `mi-adf` adjust
+the degrees of freedom for empty rows and columns as Andrey's tests do.
+`benchmarks/tests/test_adapters_discrete_comparators.py` checks each of these equalities, where R
+or pgmpy is installed. pgmpy's search runs with `tabu_length=0`, plain hill climbing, and each fit
+names its columns afresh, so pgmpy's score cache never carries over from an earlier fit.
 
 ### Mixed data
 
@@ -715,7 +734,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `tabu_cpu.py` - compares tabu search and hill climbing with bnlearn, and scores each graph's
   BIC.
 - `discrete_cpu.py` - compares PC with the chi-square and G-square tests and GES with BDeu with
-  causal-learn on categorical data.
+  causal-learn on categorical data. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and
+  pgmpy's categorical tests and scores.
 - `mixed_cpu.py` - compares PC, GES, and hill climbing with the degenerate and conditional Gaussian
   tests and scores with Tetrad and bnlearn on mixed data.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
