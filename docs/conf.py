@@ -198,6 +198,28 @@ html_js_files = [
 REPO_URL = "https://github.com/Abel-ai-lab/andrey"
 PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
+ABEL_URL = "https://abel.ai/"
+# The pages llms.txt lists, by section; each release card and published post follows its section's
+# pages, newest first.
+LLMS_SECTIONS = (
+    (
+        "Docs",
+        (
+            "docs/index",
+            "docs/guides/getting-started",
+            "docs/faq",
+            "docs/code/index",
+            "docs/configuration",
+            "docs/guides/graph-types",
+            "docs/guides/graph-representation",
+            "docs/examples/index",
+            "docs/demos/index",
+            "docs/changelog",
+        ),
+    ),
+    ("Release cards", ("docs/benchmarks",)),
+    ("Blog", ("blog/index",)),
+)
 PACKAGE = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
@@ -403,8 +425,10 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 
 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
-    """The page's description, and its Open Graph and Twitter card tags: title, summary, address,
-    and image. The description and ``og:description`` are one value."""
+    """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
+    image), and its structured data (``discovery.head_tags``): the organization, the website, the
+    software at the release the page belongs to, the page or post, and its breadcrumbs. The search
+    page is ``noindex``. The description and ``og:description`` are one value."""
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
@@ -479,6 +503,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         site_url=SITE_URL,
         project=app.config.project,
         author=app.config.author,
+        organization_url=ABEL_URL,
         software=software,
         language=app.config.language or "en",
         post=post,
@@ -487,39 +512,26 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
 
 
 def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
-    """Write discovery files from the pages actually built, without changing their content."""
+    """Write ``llms.txt``, ``sitemap.xml``, and ``robots.txt`` at the site's root from the built
+    pages (``docs/discovery.py``). ``llms.txt`` lists ``LLMS_SECTIONS``, then every release card
+    and published post; a listed page that is missing or ``noindex`` fails the build."""
     if exception is not None or app.builder.name != "html":
         return
     outdir = pathlib.Path(app.outdir)
-    # These are existing public reader pages, followed by each release's card and blog posts.
-    documents = [
-        "docs/index",
-        "docs/guides/getting-started",
-        "docs/faq",
-        "docs/code/index",
-        "docs/configuration",
-        "docs/guides/graph-types",
-        "docs/guides/graph-representation",
-        "docs/examples/index",
-        "docs/demos/index",
-        "docs/benchmarks",
-        "docs/changelog",
-        "blog/index",
-    ]
-    documents.extend(
-        sorted(
-            name
-            for name in app.env.found_docs
-            if re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", name)
-        )
+    cards = sorted(
+        (n for n in app.env.found_docs if re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", n)),
+        key=lambda n: tuple(int(part) for part in n.rsplit("/", 1)[1].split(".")),
+        reverse=True,
     )
-    documents.extend(post.docname for post in Blog(app).posts if post.published)
+    posts = [post.docname for post in Blog(app).posts if post.published]
+    later = {"Release cards": cards, "Blog": posts}
+    sections = [(heading, [*pages, *later.get(heading, ())]) for heading, pages in LLMS_SECTIONS]
     try:
-        entries = discovery.read_pages(outdir, documents)
+        entries = discovery.read_pages(outdir, [n for _, documents in sections for n in documents])
         text = discovery.llms_index(
             app.andrey_home["description"],
             entries,
-            documents,
+            sections,
             site_url=SITE_URL,
             project=app.config.project,
             version=release,
@@ -527,7 +539,8 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
     except ValueError as error:
         raise ConfigError(str(error)) from None
     _write(outdir / "llms.txt", text)
-    _write(outdir / "robots.txt", discovery.robots_txt())
+    _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
+    _write(outdir / "robots.txt", discovery.robots_txt(SITE_URL))
 
 
 # The pages that show the "Why Andrey is fast" scenes.

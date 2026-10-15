@@ -295,6 +295,19 @@ python -m http.server 8123 --bind 127.0.0.1 --directory docs/_build/html
 On a remote machine, keep the server bound to `127.0.0.1` and forward the port from your laptop:
 `ssh -N -L 8123:localhost:8123 <user>@<host>`, then open <http://localhost:8123>.
 
+## Search and answer engines
+
+[`discovery.py`](discovery.py) writes what search engines and AI answer engines read. Each page's
+head carries its Twitter card fields and one JSON-LD graph: the organization, the website, the
+software at the release the page belongs to (a post's `version`, a release card's number, else the
+current release), the page, a `BlogPosting` for a post with its date and authors, and the page's
+breadcrumbs. The search page is `noindex`. After the build, `_write_discovery` in `conf.py` writes
+three files at the site's root from the built pages: `llms.txt`, the pages in `LLMS_SECTIONS`
+under Docs, Release cards, and Blog, each with its own title and description, every release card
+and published post following its section's pages; `sitemap.xml`, the address of every indexable
+page; and `robots.txt`, which lets every crawler read every page and names the sitemap. A page
+listed in `LLMS_SECTIONS` that is renamed or removed fails the build until the list follows it.
+
 ## Validation
 
 CI runs the site's unit tests, then [`test_built_site.py`](test_built_site.py):
@@ -306,7 +319,8 @@ uv run --group docs python -m pytest docs/test_built_site.py
 The unit tests check the sources and the claims: `tests/unit/test_site.py` (the homepage),
 `tests/unit/test_launch_material.py` (the README and the launch post),
 `tests/unit/test_examples_gallery.py` (the gallery), `tests/unit/test_why_fast.py` (the speed
-scenes), and `tests/unit/test_compare_example.py` (the comparison on one dataset).
+scenes), `tests/unit/test_compare_example.py` (the comparison on one dataset), and
+`tests/unit/test_discovery.py` (the head tags, `llms.txt`, `sitemap.xml`, and `robots.txt`).
 `test_built_site.py` builds the site once from a clean workspace and checks what only a built site
 shows:
 
@@ -321,6 +335,10 @@ shows:
   and its cover and lists every other post once, newest first; each post has a built cover and a
   byline with its author and date. Every site address in the README, the
   project URLs, and the citation is built.
+- Search and answer engines: every page's structured data matches its link preview, and each
+  post's date, authors, and release match its front matter; `llms.txt` links public pages by
+  section with their own titles and descriptions; `sitemap.xml` lists each indexable page once,
+  and `robots.txt` names it; only the search page is `noindex`.
 
 To check external links: `uv run --group docs sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 

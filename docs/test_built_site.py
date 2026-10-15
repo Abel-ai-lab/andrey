@@ -12,7 +12,6 @@ import json
 import pathlib
 import posixpath
 import re
-import runpy
 import shutil
 import subprocess
 import sys
@@ -365,7 +364,7 @@ def _discovery_graph(text):
     return {node["@type"]: node for node in data["@graph"]}
 
 
-def test_sharing_metadata_and_structured_data_match_the_existing_page(html):
+def test_every_page_carries_structured_data_that_matches_its_preview(html):
     for page, text in _pages(html):
         nodes = _discovery_graph(text)
         node = nodes.get("BlogPosting", nodes.get("WebPage"))
@@ -375,41 +374,41 @@ def test_sharing_metadata_and_structured_data_match_the_existing_page(html):
             ("description", "description"),
             ("image", "image"),
         ):
-            existing = re.findall(rf'<meta property="og:{suffix}" content="([^"]*)"', text)
+            preview = re.findall(rf'<meta property="og:{suffix}" content="([^"]*)"', text)
             twitter = re.findall(rf'<meta name="twitter:{suffix}" content="([^"]*)"', text)
-            assert len(existing) == 1 and existing == twitter, page
-            assert node[field] == unescape(existing[0]), page
+            assert len(preview) == 1 and preview == twitter, page
+            assert node[field] == unescape(preview[0]), page
         software = nodes["SoftwareSourceCode"]
         assert software["name"] == "Andrey" and software["programmingLanguage"] == "Python"
         assert software["license"]["name"] == "Apache-2.0"
         assert software["license"]["url"].endswith("/blob/main/LICENSE")
         assert software["codeRepository"] == "https://github.com/Abel-ai-lab/andrey"
         assert node["about"]["@id"] == software["@id"]
+        assert nodes["Organization"]["url"] == "https://abel.ai/"
 
 
-def test_blog_discovery_keeps_the_original_dates_and_release_versions(html):
+def test_a_post_carries_the_date_authors_and_release_of_its_front_matter(html):
     for source in (DOCS / "blog").glob("*.md"):
         content = source.read_text()
         if "blogpost: true" not in content:
             continue
-        text = (html / "blog" / (source.stem + ".html")).read_text()
-        nodes = _discovery_graph(text)
+        nodes = _discovery_graph((html / "blog" / (source.stem + ".html")).read_text())
         article = nodes["BlogPosting"]
-        assert article["datePublished"] == re.search(r"^date: (.+)$", content, re.M)[1]
-        assert (
-            nodes["SoftwareSourceCode"]["version"]
-            == re.search(r"^version: (.+)$", content, re.M)[1]
-        )
+        front = {key: re.search(rf"^{key}: (.+)$", content, re.M)[1] for key in ("date", "version")}
+        assert article["datePublished"] == front["date"], source.name
+        assert nodes["SoftwareSourceCode"]["version"] == front["version"], source.name
         assert "dateModified" not in article
-        assert article["author"][0]["name"] == "Shu Wan"
-        author_path = urlsplit(article["author"][0]["url"]).path.lstrip("/")
-        assert (html / author_path).is_file()
+        authors = re.search(r"^author: (.+)$", content, re.M)[1]
+        names = [name.strip() for name in authors.strip("[]").split(",")]
+        assert [person["name"] for person in article["author"]] == names, source.name
+        for person in article["author"]:
+            assert (html / urlsplit(person["url"]).path.lstrip("/")).is_file(), person["url"]
 
 
-def test_discovery_text_files_link_only_existing_public_pages(html):
-    assert (html / "robots.txt").read_text() == "User-agent: *\nAllow: /\n"
+def test_llms_txt_links_public_pages_by_section_with_their_preview_text(html):
     text = (html / "llms.txt").read_text()
     assert text.startswith("# Andrey\n\n> ") and andrey.__version__ in text
+    assert re.findall(r"^## (.+)$", text, re.M) == ["Docs", "Release cards", "Blog"]
     links = re.findall(r"^- \[(.*?)\]\((https://andrey\.abel\.ai/[^)]+)\): (.+)$", text, re.M)
     assert len(links) >= 12
     assert len(links) == len({url for _, url, _ in links})
@@ -419,245 +418,35 @@ def test_discovery_text_files_link_only_existing_public_pages(html):
         assert page.is_file(), url
         assert "PR/" not in path and "_modules/" not in path and "search.html" not in path
         content = page.read_text()
-        original_title = re.search(r'<meta property="og:title" content="([^"]*)"', content)[1]
-        original_description = re.search(
+        preview_title = re.search(r'<meta property="og:title" content="([^"]*)"', content)[1]
+        preview_description = re.search(
             r'<meta property="og:description" content="([^"]*)"', content
         )[1]
-        assert title == unescape(original_title)
-        assert description == unescape(original_description)
+        assert title == unescape(preview_title)
+        assert description == unescape(preview_description)
 
 
-def test_search_is_noindex_and_public_content_remains_indexable(html):
+def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html):
+    assert (html / "robots.txt").read_text() == (
+        "User-agent: *\nAllow: /\n\nSitemap: https://andrey.abel.ai/sitemap.xml\n"
+    )
+    urls = re.findall(r"<loc>([^<]+)</loc>", (html / "sitemap.xml").read_text())
+    assert len(urls) == len(set(urls)) > 50
+    for url in urls:
+        path = urlsplit(url).path.lstrip("/") or "index.html"
+        content = (html / path).read_text()
+        assert f'<meta property="og:url" content="{url}"' in content, url
+        assert 'name="robots"' not in content, url
+    for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
+        assert f"https://andrey.abel.ai/{required}" in urls, required
+    for left_out in ("search.html", "genindex.html", "blog/drafts.html", "demo/index.html"):
+        assert f"https://andrey.abel.ai/{left_out}" not in urls, left_out
+
+
+def test_only_the_search_page_is_noindex(html):
     for page, text in _pages(html):
         robots = re.findall(r'<meta name="robots" content="([^"]*)"', text)
         if page == html / "search.html":
             assert robots == ["noindex, follow"]
         else:
             assert not robots, page
-
-
-SITE = "https://andrey.abel.ai/"
-PAGE = {
-    "title": "Benchmarks",
-    "description": "Andrey benchmark timings, accuracy, and practical limits by method family.",
-    "url": SITE + "docs/benchmarks.html",
-    "image": SITE + "assets/preview/home.jpg",
-}
-SOFTWARE = {
-    "name": "Andrey",
-    "description": "Andrey, a very fast causal discovery package",
-    "version": "0.2.0",
-    "license": {
-        "@type": "CreativeWork",
-        "name": "Apache-2.0",
-        "url": "https://github.com/Abel-ai-lab/andrey/blob/main/LICENSE",
-    },
-    "programmingLanguage": "Python",
-    "runtimePlatform": "Python >=3.11",
-    "codeRepository": "https://github.com/Abel-ai-lab/andrey",
-    "sameAs": ["https://pypi.org/project/andrey-core/"],
-}
-
-
-@pytest.fixture
-def discovery():
-    source = pathlib.Path(__file__).with_name("discovery.py")
-    if not source.is_file():
-
-        def missing(*args, **kwargs):
-            pytest.fail("The site has no machine-readable discovery renderer")
-
-        return dict.fromkeys(("head_tags", "llms_index", "robots_txt"), missing)
-    return runpy.run_path(str(source))
-
-
-class Head(HTMLParser):
-    def __init__(self, text):
-        super().__init__()
-        self.meta = {}
-        self.scripts = []
-        self.feed(text)
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        if tag == "meta":
-            key = attrs.get("name", attrs.get("property"))
-            self.meta[key] = attrs.get("content")
-        elif tag == "script":
-            assert attrs.get("type") == "application/ld+json"
-            self.scripts.append("")
-        else:
-            pytest.fail(f"Discovery metadata includes a visible element: {tag}")
-
-    def handle_data(self, text):
-        if self.scripts:
-            self.scripts[-1] += text
-        else:
-            assert not text.strip()
-
-
-def render(discovery, page=PAGE, **kwargs):
-    return discovery["head_tags"](
-        page, site_url=SITE, project="Andrey", author="Abel AI Lab", software=SOFTWARE, **kwargs
-    )
-
-
-def graph(text):
-    head = Head(text)
-    assert len(head.scripts) == 1
-    data = json.loads(head.scripts[0])
-    assert data["@context"] == "https://schema.org"
-    return {node["@type"]: node for node in data["@graph"]}
-
-
-def test_sharing_fields_reuse_the_existing_page_values(discovery):
-    head = Head(render(discovery))
-    assert head.meta["twitter:title"] == PAGE["title"]
-    assert head.meta["twitter:description"] == PAGE["description"]
-    assert head.meta["twitter:image"] == PAGE["image"]
-    assert "description" not in head.meta  # the existing preview renderer owns this tag
-    assert "robots" not in head.meta
-
-
-def test_software_facts_come_from_the_package_metadata(discovery):
-    nodes = graph(render(discovery))
-    software = nodes["SoftwareSourceCode"]
-    for key, value in SOFTWARE.items():
-        assert software[key] == value
-    assert nodes["Organization"]["name"] == "Abel AI Lab"
-    assert nodes["WebPage"]["name"] == PAGE["title"]
-    assert nodes["WebPage"]["description"] == PAGE["description"]
-    assert nodes["WebPage"]["about"]["@id"] == software["@id"]
-    assert "aggregateRating" not in software and "offers" not in software
-
-
-def test_breadcrumbs_use_the_existing_parent_titles(discovery):
-    nodes = graph(render(discovery, parents=[{"title": "Andrey", "url": SITE + "docs/index.html"}]))
-    items = nodes["BreadcrumbList"]["itemListElement"]
-    assert [x["item"] for x in items] == [SITE, SITE + "docs/index.html", PAGE["url"]]
-    assert [x["name"] for x in items] == ["Andrey", "Andrey", PAGE["title"]]
-    assert [x["position"] for x in items] == [1, 2, 3]
-
-
-def test_a_historical_post_keeps_its_date_author_and_software_version(discovery):
-    post = {
-        "date": "2026-10-08",
-        "authors": [{"name": "Shu Wan", "url": SITE + "blog/author/shu-wan.html"}],
-        "version": "0.1.0",
-    }
-    text = render(discovery, post=post)
-    nodes = graph(text)
-    article = nodes["BlogPosting"]
-    assert article["headline"] == PAGE["title"]
-    assert article["datePublished"] == post["date"]
-    assert "dateModified" not in article
-    assert article["author"] == [{"@type": "Person", **post["authors"][0]}]
-    assert article["mainEntityOfPage"]["@id"] == nodes["WebPage"]["@id"]
-    assert "breadcrumb" not in article
-    assert nodes["SoftwareSourceCode"]["version"] == "0.1.0"
-    assert nodes["SoftwareSourceCode"]["@id"].endswith("#software-0.1.0")
-    head = Head(text)
-    assert head.meta["article:published_time"] == post["date"]
-    assert head.meta["article:author"] == post["authors"][0]["url"]
-
-
-def test_metadata_cannot_close_its_script_or_create_html_elements(discovery):
-    title = '</script><img src=x onerror="alert(1)"> & <tag>'
-    page = {**PAGE, "title": title, "description": title}
-    text = render(discovery, page)
-    assert text.count("</script>") == 1
-    assert "<img" not in text and "<tag>" not in text
-    assert graph(text)["WebPage"]["name"] == title
-    assert Head(text).meta["twitter:title"] == title
-
-
-def test_only_the_search_page_is_marked_noindex(discovery):
-    page = {**PAGE, "indexable": False}
-    assert Head(render(discovery, page)).meta["robots"] == "noindex, follow"
-    assert "robots" not in Head(render(discovery)).meta
-
-
-def test_llms_navigation_reuses_existing_titles_and_descriptions(discovery):
-    entries = {
-        "docs/faq": {**PAGE, "title": "FAQ", "description": "The existing FAQ summary."},
-        "docs/code/index": {
-            **PAGE,
-            "title": "API reference",
-            "description": "Existing API summary.",
-        },
-    }
-    text = discovery["llms_index"](
-        PAGE["description"],
-        entries,
-        ["docs/faq", "docs/code/index"],
-        site_url=SITE,
-        project="Andrey",
-        version="0.2.0",
-    )
-    assert text.startswith("# Andrey\n\n> " + PAGE["description"])
-    assert "[FAQ](https://andrey.abel.ai/docs/faq.html): The existing FAQ summary." in text
-    assert (
-        "[API reference](https://andrey.abel.ai/docs/code/index.html): Existing API summary."
-        in text
-    )
-    assert "0.2.0" in text
-    assert "941" not in text and "100x" not in text
-
-
-def test_llms_navigation_rejects_missing_or_non_public_pages(discovery):
-    render_index = discovery["llms_index"]
-    kwargs = {"site_url": SITE, "project": "Andrey", "version": "0.2.0"}
-    with pytest.raises(ValueError, match="missing"):
-        render_index("Summary", {}, ["docs/missing"], **kwargs)
-    for path in ["search", "_modules/andrey/core", "docs/PR/private", "../private"]:
-        with pytest.raises(ValueError, match="public"):
-            render_index("Summary", {path: PAGE}, [path], **kwargs)
-    with pytest.raises(ValueError, match="indexable"):
-        render_index("Summary", {"docs/faq": {**PAGE, "indexable": False}}, ["docs/faq"], **kwargs)
-
-
-def test_llms_navigation_escapes_markdown_without_changing_the_label(discovery):
-    text = discovery["llms_index"](
-        "Original\nsummary",
-        {"docs/faq": {**PAGE, "title": "FAQ [data]", "description": "One\nline"}},
-        ["docs/faq", "docs/faq"],
-        site_url=SITE,
-        project="Andrey",
-        version="0.2.0",
-    )
-    assert text.count("https://andrey.abel.ai/docs/faq.html") == 1
-    assert "[FAQ \\[data\\]]" in text and ": One line" in text
-
-
-def test_robots_allows_public_search_without_a_training_policy(discovery):
-    text = discovery["robots_txt"]()
-    assert text == "User-agent: *\nAllow: /\n"
-    assert "Sitemap:" not in text and "GPTBot" not in text
-
-
-def test_navigation_reads_the_built_page_on_incremental_builds(discovery, tmp_path):
-    target = tmp_path / "docs" / "faq.html"
-    target.parent.mkdir()
-    target.write_text(
-        '<head><meta property="og:title" content="FAQ &amp; data">'
-        '<meta property="og:description" content="The original summary."></head>'
-        "<body><p>Original body.</p></body>"
-    )
-    entries = discovery["read_pages"](tmp_path, ["docs/faq"])
-    assert entries["docs/faq"]["title"] == "FAQ & data"
-    assert entries["docs/faq"]["description"] == "The original summary."
-    assert entries["docs/faq"]["indexable"] is True
-    target.write_text(
-        target.read_text().replace("</head>", '<meta name="robots" content="noindex"></head>')
-    )
-    assert not discovery["read_pages"](tmp_path, ["docs/faq"])["docs/faq"]["indexable"]
-
-
-def test_navigation_requires_real_built_metadata(discovery, tmp_path):
-    with pytest.raises(ValueError, match="missing"):
-        discovery["read_pages"](tmp_path, ["docs/faq"])
-    target = tmp_path / "docs" / "faq.html"
-    target.parent.mkdir()
-    target.write_text("<html><head></head><body>Page</body></html>")
-    with pytest.raises(ValueError, match="metadata"):
-        discovery["read_pages"](tmp_path, ["docs/faq"])
