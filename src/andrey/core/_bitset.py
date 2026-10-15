@@ -73,12 +73,16 @@ def nodes(mask: int) -> list[int]:
 
 
 def row_masks(matrix: np.ndarray) -> list[int]:
-    """Each row of a square boolean matrix as a Python int, bit ``j`` set iff ``matrix[i, j]``."""
+    """Each row of a square boolean matrix as a Python int, bit ``j`` set iff ``matrix[i, j]``.
+
+    Each row is reversed and left-padded to whole bytes, so its packed big-endian bytes read as the
+    int with bit ``j`` at column ``j``.
+    """
     n = matrix.shape[0]
-    packed = np.packbits(matrix, axis=1, bitorder="little")
-    width = packed.shape[1]
-    raw = packed.tobytes()
-    return [int.from_bytes(raw[i * width : (i + 1) * width], "little") for i in range(n)]
+    width = (n + 7) // 8
+    padded = np.zeros((n, 8 * width), dtype=bool)
+    padded[:, 8 * width - n :] = matrix[:, ::-1]
+    return list(map(int.from_bytes, np.packbits(padded, axis=1).view(f"V{width}").ravel().tolist()))
 
 
 def semidirected_reaches_wide(succ: list[int], start: int, target: int, barrier: int) -> bool:

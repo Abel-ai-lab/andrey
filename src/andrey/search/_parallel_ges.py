@@ -276,12 +276,11 @@ _FULL_RESCAN = False
 # A candidate kept for selection: ``(lowest exact delta, x, t_index, T, base)``.
 _Screened = tuple[float, int, int, tuple[int, ...], tuple[int, ...]]
 
-# A base's group at one target: ``(clique, sources, batch, deltas, bounds, dependent)``. ``clique``
-# and ``sources`` are bitmasks of NA u T and of the group's sources; ``deltas`` and ``bounds`` map
-# each source of ``batch``, a set of sources scored in one call that covers the group's, to its
-# screening delta and bound; ``dependent`` is a bitmask of the batch's sources with a bound
-# other than 0.
-_Group = tuple[int, int, frozenset[int], dict[int, float], dict[int, float], int]
+# A base's group at one target: ``(clique, sources, batch, deltas, bounds)``. ``clique`` and
+# ``sources`` are bitmasks of NA u T and of the group's sources; ``deltas`` and ``bounds`` map each
+# source of ``batch``, a set of sources scored in one call that covers the group's, to its
+# screening delta and bound.
+_Group = tuple[int, int, frozenset[int], dict[int, float], dict[int, float]]
 
 
 def _touched(before: np.ndarray | None, after: np.ndarray) -> np.ndarray:
@@ -399,21 +398,27 @@ class _ForwardScan:
             return  # y already carries the maximum admissible parent count.
         pa_set = set(parents)
         nbrs = lines[y]
-        by_na: dict[int, list[int]] = {}
-        for x in _bitset.nodes(self.everyone & ~adjacent[y] & ~(1 << y)):
-            by_na.setdefault(adjacent[x] & nbrs, []).append(x)
-        members: dict[tuple[int, ...], list[tuple[int, int, tuple[int, ...]]]] = {}
-        for na_mask, sources in by_na.items():
+        nonadjacent = self.everyone & ~adjacent[y] & ~(1 << y)
+        by_na: dict[int, tuple[list[int], int]] = {0: (_bitset.nodes(nonadjacent), nonadjacent)}
+        if nbrs:
+            lists: dict[int, list[int]] = {}
+            for x in by_na[0][0]:
+                lists.setdefault(adjacent[x] & nbrs, []).append(x)
+            by_na = {na: (xs, _bitset.bitmask(xs)) for na, xs in lists.items()}
+        members: dict[tuple[int, ...], tuple[list[tuple[int, int, tuple[int, ...]]], int]] = {}
+        for na_mask, (xs, xs_mask) in by_na.items():
             na = _bitset.nodes(na_mask)
             for t_index, T in ops.clique_extensions(adj, na, _bitset.nodes(nbrs & ~na_mask)):
-                cands = members.setdefault(tuple(sorted(pa_set.union(na, T))), [])
-                cands.extend((x, t_index, T) for x in sources)
-        for base, cands in members.items():
+                base = tuple(sorted(pa_set.union(na, T)))
+                cands, mask = members.get(base, ([], 0))
+                cands.extend((x, t_index, T) for x in xs)
+                members[base] = (cands, mask | xs_mask)
+        for base, (cands, mask) in members.items():
             cands.sort()  # ascending sources, as _insert_candidates yields them
             sources = [x for x, _, _ in cands]
             kept = previous.get(base)
             if kept is not None and kept[2].issuperset(sources):
-                batch, deltas, bounds, dependent = kept[2:]
+                batch, deltas, bounds = kept[2:]
             else:
                 bound_list: list[float] = []
                 delta_list = self.delta_engine.delta_many_with_base(
@@ -422,9 +427,7 @@ class _ForwardScan:
                 batch = frozenset(sources)
                 deltas = dict(zip(sources, delta_list, strict=True))
                 bounds = dict(zip(sources, bound_list, strict=True))
-                dependent = _bitset.bitmask(x for x, b in bounds.items() if b != 0.0)
-            clique = _bitset.bitmask(set(base) - pa_set)
-            groups[base] = (clique, _bitset.bitmask(sources), batch, deltas, bounds, dependent)
+            groups[base] = (_bitset.bitmask(set(base) - pa_set), mask, batch, deltas, bounds)
             if base in exact:
                 self.exact[y][base] = exact[base]
             for x, t_index, T in cands:
@@ -442,19 +445,22 @@ class _ForwardScan:
         group's batch serves when it holds exactly the passing sources, or when every passing
         source's bound is 0; otherwise the last exact batch serves while the same sources pass.
         """
-        clique, sources, batch, deltas, _bounds, dependent = self.groups[y][base]
+        clique, sources, batch, deltas, bounds = self.groups[y][base]
         reach = self.reach.get((y, clique))
         if reach is None:
             if self.succ is None:
                 self.succ = _bitset.row_masks(self.adj == ops.TAIL)
             reach = self.reach[(y, clique)] = _bitset.semidirected_reach_set(self.succ, y, clique)
         passing = sources & ~reach
-        if passing.bit_count() == len(batch) or not passing & dependent:
+        if passing.bit_count() == len(batch):
             return deltas, passing
         last = self.exact[y].get(base)
         if last is not None and last[0] == passing:
             return last[1], passing
         valid = _bitset.nodes(passing)
+        if all(bounds[x] == 0.0 for x in valid):
+            self.exact[y][base] = (passing, deltas)
+            return deltas, passing
         moves = [("add", x) for x in valid]
         exact = dict(
             zip(valid, self.delta_engine.delta_many_with_base(y, base, moves), strict=True)
