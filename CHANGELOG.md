@@ -11,9 +11,7 @@ change names its pull request.
 
 ### Changed
 
-- `ges`, `gfci`, and `gies` return the same graphs in less time. ([#TBD])
-- `ges`, `gfci`, `gies`, and `xges` return the same graphs in less time, with a faster
-  equivalence-class update after each move. ([#TBD])
+- `ges`, `gfci`, `gies`, and `xges` return the same graphs in less time. ([#TBD])
 
 ## [0.3.0] - 2026-10-13
 
