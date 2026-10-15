@@ -21,7 +21,8 @@ def compute_residual(a: np.ndarray, b: np.ndarray, *, least_squares: bool = Fals
     With ``least_squares=True`` both moments divide by ``n``: the slope is the least-squares one,
     and the residual is orthogonal to ``b`` in the sample. By default the covariance divides by
     ``n - 1`` and the variance by ``n``, a slope ``n / (n - 1)`` times the least-squares one;
-    DirectLiNGAM, MultiGroupDirectLiNGAM, VAR-LiNGAM, and VARMA-LiNGAM use it.
+    DirectLiNGAM, MultiGroupDirectLiNGAM, and VAR-LiNGAM use it. LongitudinalLiNGAM and
+    VARMA-LiNGAM pass ``least_squares=True``.
     """
     return a - (np.cov(a, b, bias=least_squares)[0, 1] / np.var(b)) * b
 

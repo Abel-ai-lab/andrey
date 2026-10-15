@@ -94,6 +94,10 @@ def varma_lingam(
 
     Notes
     -----
+    DirectLiNGAM orders the innovations of the fitted model. Each pairwise regression in its
+    ordering takes the least-squares slope, so every residual it scores is uncorrelated with its
+    regressor in the sample.
+
     With ``prune=True`` each variable is regressed on its causal predecessors at the same step,
     the lagged values of every variable, and the lagged independent noise terms. Adaptive Lasso
     selects the regressors, and an ordinary least-squares fit with an intercept on the selected

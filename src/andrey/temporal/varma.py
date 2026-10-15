@@ -3,12 +3,13 @@
 The algorithm, its settings, and its references are described on :func:`andrey.varma_lingam`.
 
 The reduced-form VARMA(p, q) ``x(t) = sum_i Phi_i x(t-i) + e(t) + sum_j Theta_j e(t-j)`` is fit
-by Gaussian maximum likelihood (a Kalman filter), and DirectLiNGAM on the innovations gives the
-causal order and the instantaneous matrix ``B0``. The structural matrices are ``psi[0] = B0``,
-``psi[tau] = (I - B0) Phi_tau``, and ``omega[j] = (I - B0) Theta_j``, or
-``(I - B0) Theta_j (I - B0)^-1`` with ``structural_ma=True``; ``[i, j]`` weights the influence of
-``j`` on ``i``. With ``prune=True`` all structural matrices are re-estimated on the causal order:
-adaptive Lasso selects each variable's regressors and ordinary least squares refits their weights.
+by Gaussian maximum likelihood (a Kalman filter), and DirectLiNGAM on the innovations, with
+least-squares pairwise slopes, gives the causal order and the instantaneous matrix ``B0``. The
+structural matrices are ``psi[0] = B0``, ``psi[tau] = (I - B0) Phi_tau``, and
+``omega[j] = (I - B0) Theta_j``, or ``(I - B0) Theta_j (I - B0)^-1`` with ``structural_ma=True``;
+``[i, j]`` weights the influence of ``j`` on ``i``. With ``prune=True`` all structural matrices
+are re-estimated on the causal order: adaptive Lasso selects each variable's regressors and
+ordinary least squares refits their weights.
 """
 
 from __future__ import annotations
@@ -61,7 +62,7 @@ def varma_lingam(
     else:
         p, q, phis, thetas, residuals = _select_order(X, order, criterion, max_iter)
 
-    causal_order, b0 = direct_lingam(residuals)
+    causal_order, b0 = direct_lingam(residuals, least_squares=True)
 
     if prune:
         psis, omegas = _prune(X, residuals, causal_order, p, q)

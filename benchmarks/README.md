@@ -618,6 +618,12 @@ $ANDREY_BENCH_PYTHON benchmarks/lingam_ts.py --method longitudinal --out outputs
     --ladder 3 5 10 --lengths 20 50 --samples 200 1000 --seeds 10
 ```
 
+Where the two VARMA-LiNGAM graphs differ, two causes remain. lingam's pruning builds the lagged
+columns with `np.roll`, so its first regression row pairs `x(0)` with `x(T-1)` and `e(T-1)`; Andrey
+starts the regressions at step `max(p, q)`. And the likelihood fit stops at 100 iterations, the
+default of both, usually before it converges, so the same statsmodels call returns different
+estimates under the different NumPy and SciPy versions of the two environments.
+
 ### Where the clock starts
 
 Only `fit` is timed. Package imports, interpreter startup, and library loading belong in an optional
