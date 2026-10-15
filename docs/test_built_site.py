@@ -439,8 +439,15 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         assert 'name="robots"' not in content, url
     for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
         assert f"https://andrey.abel.ai/{required}" in urls, required
-    for left_out in ("search.html", "genindex.html", "blog/drafts.html", "demo/index.html"):
-        assert f"https://andrey.abel.ai/{left_out}" not in urls, left_out
+    # Left out: pages with no content of their own, and the redirects from moved addresses.
+    left_out = ("search.html", "genindex.html", "blog/drafts.html", "demo/index.html")
+    moved = (
+        "blog/andrey-0-2-0.html",
+        "blog/introducing-andrey.html",
+        "blog/why-andrey-is-fast.html",
+    )
+    for address in (*left_out, *moved):
+        assert f"https://andrey.abel.ai/{address}" not in urls, address
 
 
 def test_only_the_search_page_is_noindex(html):
