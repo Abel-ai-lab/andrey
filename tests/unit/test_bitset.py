@@ -214,3 +214,11 @@ def test_reach_set_matches_oracle_across_d(seed):
                 continue
             want = _reaches_setbased(succ, start, target, barrier)
             assert bool((reach >> target) & 1) == want, (seed, d, start, target)
+
+
+@pytest.mark.parametrize("d", [1, 8, 9, 63, 64, 65, 128, 129])
+def test_row_masks_across_word_boundary(d):
+    """Each row mask sets exactly the row's columns, at widths on both sides of a 64-bit word."""
+    matrix = np.random.default_rng(d).random((d, d)) < 0.3
+    for i, mask in enumerate(_bitset.row_masks(matrix)):
+        assert _bitset.nodes(mask) == np.flatnonzero(matrix[i]).tolist(), (d, i)

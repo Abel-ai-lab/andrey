@@ -186,12 +186,14 @@ def test_pdag2dag_keeps_directed_edges():
     assert out[1, 2] != NULL and out[2, 1] != NULL  # 1 -- 2 now directed some way
 
 
-def _perturbed_cpdag(rng: np.random.Generator, d: int) -> np.ndarray:
+def _perturbed_cpdag(rng: np.random.Generator, d: int, p: float | None = None) -> np.ndarray:
     """A random DAG's CPDAG with some undirected edges directed and some directed edges undirected.
 
-    Some of these PDAGs have no consistent extension.
+    ``p`` is the DAG's edge density, drawn from ``[0.1, 0.7]`` when not given. Some of these PDAGs
+    have no consistent extension.
     """
-    pdag = dag2cpdag(random_dag(rng, d, float(rng.uniform(0.1, 0.7))))
+    p = float(rng.uniform(0.1, 0.7)) if p is None else p
+    pdag = dag2cpdag(random_dag(rng, d, p))
     for a, b in np.argwhere((pdag == TAIL) & (pdag.T == TAIL)):
         if a < b and rng.random() < 0.3:
             pdag[a, b], pdag[b, a] = (TAIL, ARROW) if rng.random() < 0.5 else (ARROW, TAIL)
@@ -218,6 +220,23 @@ def test_cpdag_of_pdag_matches_extension_then_cpdag():
                 continue
             assert np.array_equal(_cpdag_of_pdag(pdag), expected)
     assert 0 < raised < 600
+
+
+@pytest.mark.parametrize("d", [63, 64, 65, 128, 129])
+def test_cpdag_of_pdag_across_word_boundary(d):
+    # Node masks past 64 nodes span more than one 64-bit word; the rebuild still matches the
+    # reference on sparse DAGs, their CPDAGs, and perturbed CPDAGs.
+    rng = np.random.default_rng(d)
+    for _ in range(4):
+        p = float(rng.uniform(1.0, 4.0)) / d
+        for pdag in (random_dag(rng, d, p), _perturbed_cpdag(rng, d, p)):
+            try:
+                expected = dag2cpdag(pdag2dag(pdag))
+            except ValueError:
+                with pytest.raises(ValueError, match="no consistent"):
+                    _cpdag_of_pdag(pdag)
+                continue
+            assert np.array_equal(_cpdag_of_pdag(pdag), expected)
 
 
 # ---- collider orientation ------------------------------------------------------------------------
