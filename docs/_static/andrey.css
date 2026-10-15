@@ -445,6 +445,40 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   margin: 0;
 }
 
+/* In the phone's menu, the site's sections are rows like the documentation tree's under them: the
+   same size and muted ink, the current section in the accent, and the same focus ring. */
+.bd-sidebar-primary .sidebar-header-items .navbar-nav {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link {
+  margin: 0 -0.6rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  color: var(--andrey-muted);
+  font-size: inherit;
+  text-decoration: none;
+}
+
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link:hover {
+  color: var(--andrey-ink);
+}
+
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-item.current > .nav-link {
+  color: var(--andrey-accent);
+  font-weight: 600;
+}
+
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: -2px;
+}
+
+.bd-sidebar-primary .drawer-search {
+  font-size: 0.875rem;
+}
+
 /* Just above the drawer's width, search keeps only its icon, so the links never crowd. */
 @media (min-width: 960px) and (max-width: 1023.98px) {
   .bd-header .search-button-field .search-button__default-text,
@@ -861,7 +895,8 @@ html:not(:has(.andrey-home)) .bd-header::before {
 @media (max-width: 959.98px) {
   .docs-nav li a,
   .docs-nav__more > summary,
-  .page-outline .toc-entry a.nav-link {
+  .page-outline .toc-entry a.nav-link,
+  .bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link {
     padding-block: 0.45rem;
   }
 
