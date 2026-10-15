@@ -9,6 +9,13 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Fixed
+
+- `direct_lingam`, `multi_group_direct_lingam`, `var_lingam`, `varma_lingam`, and
+  `longitudinal_lingam` now regress by exact least squares in the causal-order search, as the
+  method's paper defines it, so on nearly tied candidates the causal order and the DAG can change
+  and now match the paper's estimator. ([#TBD])
+
 ## [0.4.0] - 2026-10-15
 
 ### Highlights
