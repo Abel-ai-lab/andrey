@@ -636,6 +636,141 @@ html:not(:has(.andrey-home)) .bd-header::before {
   display: none;
 }
 
+/* ---------- the documentation's footer ---------- */
+/* After craft.do's (_templates/docs-footer.html): a rounded navy card set in from the page's edges,
+   the wordmark beside three columns of links under small capitals and a hairline, then the
+   copyright and Abel's mark along its foot. The theme's footer row gives way to it. */
+.bd-footer {
+  padding: 0 0.75rem 0.75rem;
+  border-top: 0;
+  background: transparent;
+}
+
+.bd-footer .bd-footer__inner {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+.bd-footer :is(.footer-items__start, .footer-item) {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.docs-footer {
+  --rule: color-mix(in srgb, var(--andrey-ground-ink) 16%, transparent);
+  margin-top: clamp(3rem, 6vw, 5rem);
+  padding: clamp(2rem, 4vw, 3.25rem) clamp(1.5rem, 5vw, 4rem) 1.5rem;
+  border-radius: 22px;
+  background:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--andrey-ground-cobalt) 30%, transparent),
+      transparent 60%
+    ),
+    var(--andrey-ground-navy);
+  color: color-mix(in srgb, var(--andrey-ground-ink) 72%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.docs-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.docs-footer a:hover {
+  color: var(--andrey-ground-ink);
+}
+
+.docs-footer a:focus-visible {
+  outline: 2px solid var(--andrey-ground-ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.docs-footer__top {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr);
+  gap: 2.5rem;
+}
+
+.docs-footer__brand img {
+  display: block;
+  width: auto;
+  height: 1.75rem;
+}
+
+.docs-footer__columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+.docs-footer__heading {
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--andrey-ground-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.docs-footer ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-footer__base {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin-top: clamp(2rem, 4vw, 3rem);
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.8125rem;
+}
+
+.docs-footer__base p {
+  margin: 0;
+}
+
+.docs-footer__base p a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.docs-footer__abel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--andrey-ground-ink);
+  font-weight: 600;
+}
+
+.docs-footer .abel-mark {
+  width: auto;
+  height: 1.05rem;
+}
+
+@media (max-width: 47.99rem) {
+  .docs-footer__top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .docs-footer__columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ---------- documentation sidebars ---------- */
 /* The documentation tree (_templates/docs-nav.html) lies flat on the paper: a group's heading in
    the ink beside its icon, its pages as plain rows under it, the page being read in the accent,
