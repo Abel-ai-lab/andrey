@@ -395,9 +395,10 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
     n = pdag.shape[0]
     tail = pdag == TAIL
     directed = tail & (pdag == ARROW).T  # (i, j): i -> j
+    lines = tail & tail.T
     children = row_masks(directed)
     parents = row_masks(directed.T)
-    undirected = row_masks(tail & tail.T)
+    undirected = row_masks(lines)
     adjacent = row_masks(pdag != NULL)
     active = (1 << n) - 1
 
@@ -405,9 +406,12 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
         if children[x] & active:
             return False
         around = adjacent[x] & active
-        for nb in nodes(undirected[x] & active):
-            if around & ~(1 << nb) & ~adjacent[nb]:
+        rest = undirected[x] & active
+        while rest:
+            low = rest & -rest
+            if around & ~low & ~adjacent[low.bit_length() - 1]:
                 return False
+            rest ^= low
         return True
 
     ready = [x for x in range(n) if removable(x)]
@@ -420,10 +424,14 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
         active &= ~(1 << x)
         removed.append(x)
         parents[x] |= undirected[x] & active  # each remaining undirected edge points into x
-        for v in nodes(adjacent[x] & active & ~queued):
+        rest = adjacent[x] & active & ~queued
+        while rest:
+            low = rest & -rest
+            v = low.bit_length() - 1
             if removable(v):
                 heapq.heappush(ready, v)
-                queued |= 1 << v
+                queued |= low
+            rest ^= low
     if active:
         pdag2dag(pdag)  # raises: no consistent extension
 
@@ -431,38 +439,30 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
     # topological order. Chickering labels the edges into y from the parent x latest in that order:
     # every edge into y is compelled when some compelled w -> x has w outside Pa(y); otherwise each
     # such w -> y is compelled, and the rest follow x -> y, compelled iff some other parent of y is
-    # not a parent of x.
+    # not a parent of x. The extension keeps every edge, so the CPDAG has the PDAG's directed and
+    # undirected edges as its skeleton; the edges left reversible are undirected.
+    order = removed[::-1]
     pos = [0] * n
-    for rank, v in enumerate(reversed(removed)):
+    for rank, v in enumerate(order):
         pos[v] = rank
     compelled = [0] * n
     heads: list[int] = []
     tails: list[int] = []
-    rev_heads: list[int] = []
-    rev_tails: list[int] = []
-    for y in reversed(removed):
+    for y in order:
         pa = parents[y]
         if not pa:
             continue
-        members = nodes(pa)
-        x = max(members, key=pos.__getitem__)
+        x = max(nodes(pa), key=pos.__getitem__)
         into_x = compelled[x]
-        if into_x & ~pa or pa & ~parents[x] & ~(1 << x):
-            compelled[y] = pa
-        else:
-            compelled[y] = into_x
-        for p in members:
-            if compelled[y] >> p & 1:
-                heads.append(y)
-                tails.append(p)
-            else:
-                rev_heads.append(y)
-                rev_tails.append(p)
+        rest = compelled[y] = pa if into_x & ~pa or pa & ~parents[x] & ~(1 << x) else into_x
+        while rest:
+            low = rest & -rest
+            heads.append(y)
+            tails.append(low.bit_length() - 1)
+            rest ^= low
     out = np.zeros((n, n), dtype=np.int8)
+    out[directed | directed.T | lines] = TAIL
     out[heads, tails] = ARROW
-    out[tails, heads] = TAIL
-    out[rev_heads, rev_tails] = TAIL
-    out[rev_tails, rev_heads] = TAIL
     return out
 
 
