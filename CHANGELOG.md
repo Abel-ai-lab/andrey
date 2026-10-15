@@ -9,6 +9,8 @@ change names its pull request.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
 ### Highlights
 
 - `anm` and `pnl` are supported. On cause-effect pairs, ANM names the same direction as
@@ -116,7 +118,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.1.0...v0.2.0

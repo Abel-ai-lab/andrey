@@ -46,7 +46,7 @@ pair, and PNL runs up to 1,470x faster and names the true direction on more pair
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.4.0.md)
-[Read the post](../blog/20261013-andrey-0-4-0.md)
+[Read the post](../blog/20261015-andrey-0-4-0.md)
 :::
 ::::
 :::::
