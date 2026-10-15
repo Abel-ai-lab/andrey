@@ -429,6 +429,26 @@ def test_balanced_chunks_reduce_skew():
     assert heaviest(pg.balanced_chunks(work, 4)) < heaviest(pg.even_chunks(n, 4))
 
 
+def test_forward_scan_rescores_group_with_mixed_bounds():
+    """A group whose passing sources mix a zero bound with a positive one is scored again.
+
+    Target 0 has an empty base with sources 1, 2, and 3. A semi-directed path reaches 3, so 1 and 2
+    pass. Source 1's bound is 0 (its delta does not depend on the batch) and source 2's is positive,
+    so the group's screening deltas are not exact and the passing sources are scored on their own.
+    """
+    x = _gaussian_sem(0, 200, 4, 0.5)
+    engine = DeltaBICScore(BICScore(x, lambda_value=1.0))
+    scan = pg._ForwardScan([0], engine, 4, None)
+    screening = {1: 1.0, 2: 2.0, 3: 3.0}  # not deltas, so a returned screening value shows
+    scan.groups[0] = {(): (0, 0b1110, frozenset({1, 2, 3}), screening, {1: 0.0, 2: 0.5, 3: 0.5})}
+    scan.exact[0] = {}
+    scan.reach[(0, 0)] = 0b1001  # y = 0 reaches source 3
+    deltas, passing = scan._exact(0, ())
+    assert passing == 0b0110
+    expected = engine.delta_many_with_base(0, (), [("add", 1), ("add", 2)])
+    assert [deltas[1], deltas[2]] == expected
+
+
 def test_pool_created_once_spans_passes(monkeypatch):
     """A GES run with multiple passes creates only one worker pool."""
     calls: list[int] = []
