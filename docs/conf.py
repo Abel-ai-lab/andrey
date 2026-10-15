@@ -407,11 +407,10 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     description = _description(app, context, doctree)
     url = SITE_URL + ("" if pagename == "index" else f"{pagename}.html")
     image = HOME_PREVIEW
-    if pagename in _blog(app):  # each post's card is drawn from its title, once per build
+    if pagename in _blog(app):  # each post's preview is its banner: its art, title, and release
         image = f"assets/preview/{pagename.removeprefix('blog/')}.jpg"
-        target = pathlib.Path(app.outdir) / image
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(cards.card_jpeg(title))
+        preview = cards.preview_jpeg(_cover_kind(app, pagename), title, _cover_line(app, pagename))
+        _write_bytes(pathlib.Path(app.outdir) / image, preview)
     image = SITE_URL + image
     tags = {
         "description": description,
@@ -591,10 +590,10 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
 
 
 def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
-    """Put a post's cover and then its authors, date, and the Andrey version it was written for
-    under its title, where a reader looks for them and where they stay on a narrow screen. A post is
-    not updated after it is published, so the version dates what it says. ABlog has read the posts'
-    front matter by now."""
+    """Put a post's cover and then its authors, date, the Andrey version it was written for, and its
+    tags under its title, where a reader looks for them and where they stay on a narrow screen. A
+    post is not updated after it is published, so the version dates what it says. ABlog has read
+    the posts' front matter by now."""
     blog = _blog(app)
     if app.builder.format != "html" or docname not in blog:
         return
@@ -615,7 +614,10 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     )
     version = app.env.metadata.get(docname, {}).get("version")
     written_for = f" · Andrey {html.escape(str(version))}" if version else ""
-    byline = f'<p class="post-byline">{authors}{" · " if authors else ""}{day}{written_for}</p>'
+    byline = (
+        f'<div class="post-byline"><span>{authors}{" · " if authors else ""}{day}{written_for}'
+        f"</span>{_tag_list(app, docname, post)}</div>"
+    )
     at = title.parent.index(title)
     title.parent.insert(at + 1, nodes.raw("", _post_cover(app, docname), format="html"))
     title.parent.insert(at + 2, nodes.raw("", byline, format="html"))
@@ -638,39 +640,47 @@ def _cover_line(app, docname: str) -> str:  # noqa: ANN001
     return f"{kind} {version}" if kind == "Release" and version else kind
 
 
+def _tag_list(app, page: str, post) -> str:  # noqa: ANN001
+    """The post's tags as a list, each a link to ABlog's page of the posts that share it."""
+    tags = "".join(
+        f'<li><a href="{app.builder.get_relative_uri(page, tag.docname)}">'
+        f"{html.escape(tag.name)}</a></li>"
+        for tag in post.tags
+    )
+    return f'<ul class="blog-tags" aria-label="Tags">{tags}</ul>' if tags else ""
+
+
 def _cover_file(app, docname: str) -> tuple[str, str]:  # noqa: ANN001
-    """Write the post's banner (site/cards.py) into the build: its path from the site's root, and
-    its kind. The post and the blog's front page both show it."""
+    """Write the post's cover, its art (site/cards.py), into the build: its path from the site's
+    root, and its kind. The post and the blog's front page both show it."""
     kind = _cover_kind(app, docname)
-    title = app.env.titles[docname].astext()
     image = f"assets/covers/{docname.removeprefix('blog/')}.jpg"
-    cover = cards.cover_jpeg(kind, title, _cover_line(app, docname))
-    _write_bytes(pathlib.Path(app.outdir) / image, cover)
+    _write_bytes(pathlib.Path(app.outdir) / image, cards.cover_jpeg(kind))
     return image, kind
 
 
-def _tile_file(app, docname: str) -> str:  # noqa: ANN001
-    """Write the post's art as a square tile (site/cards.py) into the build: its path from the
+def _thumb_file(app, docname: str) -> str:  # noqa: ANN001
+    """Write the post's art as a small thumbnail (site/cards.py) into the build: its path from the
     site's root."""
-    image = f"assets/tiles/{docname.removeprefix('blog/')}.jpg"
-    _write_bytes(pathlib.Path(app.outdir) / image, cards.tile_jpeg(_cover_kind(app, docname)))
+    image = f"assets/thumbs/{docname.removeprefix('blog/')}.jpg"
+    _write_bytes(pathlib.Path(app.outdir) / image, cards.thumb_jpeg(_cover_kind(app, docname)))
     return image
 
 
 def _newest_post_card(app) -> str:  # noqa: ANN001
     """The homepage's documentation band leads with the newest post, as the blog's front page
-    does (``_newest_first``): its cover, its date, and its description, linking to it."""
+    does (``_newest_first``): its cover, its date, its title, and its description, linking to
+    it. The cover is the post's art alone, so the title is in the text."""
     docname = _newest_first(_dated_posts(app))[0]
     post = next(post for post in _blog(app).posts if post.docname == docname)
     image, _ = _cover_file(app, docname)
     description = html.escape((app.env.metadata[docname].get("description") or "").strip())
-    # The cover carries the title for the eye; the link names it for a screen reader.
     return (
         f'<a class="band-post" href="{app.builder.get_relative_uri("index", docname)}">'
         f'<img src="{image}" alt="" width="{cards.COVER_W}" height="{cards.COVER_H}" '
         'loading="lazy"><span class="band-post-body"><span class="band-post-kicker">Latest post · '
         f'<time datetime="{post.date:%Y-%m-%d}">{post.date.strftime(app.config.post_date_format)}'
-        f'</time></span><span class="visually-hidden">{html.escape(post.title)}: </span>'
+        f'</time></span><span class="band-post-title">{html.escape(post.title)}</span>'
         f"<span>{description}</span></span></a>"
     )
 
@@ -699,12 +709,27 @@ class _BlogIndex(Directive):
         return [nodes.container(classes=["blog-index"])]
 
 
+# Above the earlier posts, a button reverses their order; the page stays in order without it.
+BLOG_ORDER_SCRIPT = """<script>
+document.querySelectorAll(".blog-order").forEach((button) => {
+  button.hidden = false;
+  button.addEventListener("click", () => {
+    const list = document.getElementById(button.getAttribute("aria-controls"));
+    list.append(...[...list.children].reverse());
+    const newest = button.dataset.order !== "newest";
+    button.dataset.order = newest ? "newest" : "oldest";
+    button.querySelector("span").textContent = newest ? "Newest first" : "Oldest first";
+  });
+});
+</script>"""
+
+
 def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
     """List the dated posts in place of ``blog-index``, newest first (``_newest_first``): the
-    newest beside its whole cover, with its description as its TL;DR, then the others as rows,
-    each with a small square tile of its cover (``_tile_file``), loaded as the reader scrolls to
-    it. Every post lists its front matter's ``tags``. The Release cards page's blocks style both
-    (``_static/benchmarks.css``)."""
+    newest with its cover across the block, then its title, date, tags, and description as its
+    TL;DR; then the others as rows, each with a small thumbnail of its art (``_thumb_file``),
+    loaded as the reader scrolls to it, under a button that reverses their order. The Release
+    cards page's blocks style both (``_static/benchmarks.css``)."""
     places = [node for node in doctree.findall(nodes.container) if "blog-index" in node["classes"]]
     if app.builder.format != "html" or not places:
         return
@@ -724,15 +749,9 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             f"{post.date.strftime(app.config.post_date_format)}</time>"
         )
         read = f'<a href="{href}">Read the post<span class="visually-hidden">: {title}</span></a>'
-        # Each tag links to ABlog's page of the posts that share it.
-        tags = "".join(
-            f'<li><a href="{app.builder.get_relative_uri(docname, tag.docname)}">'
-            f"{html.escape(tag.name)}</a></li>"
-            for tag in post.tags
-        )
-        tags = f'<ul class="blog-tags" aria-label="Tags">{tags}</ul>' if tags else ""
+        tags = _tag_list(app, docname, post)
         # The title links to the post, so the cover's link is for the pointer only.
-        link = f'<a class="release-tile blog-tile" href="{href}" tabindex="-1" aria-hidden="true">'
+        link = f'<a class="blog-tile" href="{href}" tabindex="-1" aria-hidden="true">'
         if not latest:
             image, _ = _cover_file(app, name)
             cover = (
@@ -742,22 +761,33 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             )
             latest = (
                 f'<div class="release-latest blog-latest">{cover}<div class="release-tldr">'
-                f'<h2><a href="{href}">{title}</a></h2><p class="blog-date">{day}</p>{tags}'
+                f'<h2><a href="{href}">{title}</a></h2>'
+                f'<div class="blog-when"><p class="blog-date">{day}</p>{tags}</div>'
                 f'<p>{description}</p><div class="release-actions"><p>{read}</p></div></div></div>'
             )
             continue
-        image = _tile_file(app, name)
+        image = _thumb_file(app, name)
+        width, height = cards.THUMB_W, cards.THUMB_W * cards.COVER_H // cards.COVER_W
         cover = (
             f'{link}<img class="dark-light" '
             f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
-            f'width="{cards.TILE}" height="{cards.TILE}" loading="lazy" decoding="async"></a>'
+            f'width="{width}" height="{height}" loading="lazy" decoding="async"></a>'
         )
         rows.append(
-            f'<div class="release-row">{cover}<div class="release-body">'
+            f'<div class="release-row blog-row">{cover}<div class="release-body">'
             f'<h3><a href="{href}">{title}</a></h3><p>{description}</p>{tags}</div>'
             f'<div class="release-meta"><p>{day}</p><ul><li>{read}</li></ul></div></div>'
         )
-    earlier = f"<section><h2>Earlier posts</h2>{''.join(rows)}</section>" if rows else ""
+    earlier = ""
+    if rows:
+        button = (
+            '<button type="button" class="blog-order" aria-controls="blog-earlier" '
+            'data-order="newest" hidden><span>Newest first</span></button>'
+        )
+        earlier = (
+            f'<section><div class="blog-earlier-head"><h2>Earlier posts</h2>{button}</div>'
+            f'<div id="blog-earlier">{"".join(rows)}</div></section>{BLOG_ORDER_SCRIPT}'
+        )
     for place in places:
         place.parent.replace(place, nodes.raw("", latest + earlier, format="html"))
 

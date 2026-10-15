@@ -1869,6 +1869,13 @@
   letter-spacing: 0.01em;
 }
 
+.andrey-home .band-post-title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .andrey-home .band-post:hover {
     transform: translateY(-2px);

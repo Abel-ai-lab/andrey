@@ -325,15 +325,18 @@ def test_every_post_shows_its_cover_and_byline_under_its_title(html):
             problems.append(f"blog/{post}.html's cover has no alt text")
         byline = re.search(
             r'</h1>\s*(?:<figure class="post-cover">.*?</figure>\s*)?'
-            r'<p class="post-byline">(.*?)</p>',
+            r'<div class="post-byline">(.*?)</div>',
             text,
             re.S,
         )
         author = byline and re.search(r'<a href="([^"]+)">', byline[1])
+        tags = _front_matter(DOCS / "blog" / f"{post}.md").get("tags", "")
         if not author or "<time datetime=" not in byline[1]:
             problems.append(f"blog/{post}.html has no author and date under its title")
         elif not _resolve(html, built, author[1]).is_file():
             problems.append(f"blog/{post}.html links its author to {author[1]}, not built")
+        elif tags and 'class="blog-tags"' not in byline[1]:
+            problems.append(f"blog/{post}.html shows no tags under its title")
     assert not problems, "\n".join(problems)
 
 
