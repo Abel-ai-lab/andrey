@@ -72,9 +72,19 @@ def test_no_degrees_of_freedom_gives_one(test):
 def test_unobserved_configurations_add_nothing():
     # Level 2 of column 0 never meets level 1 of column 1, so their configuration is unobserved.
     x = np.array([[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [2, 0]] * 20, dtype=np.float64)
-    s = DiscreteBICScore(x)
-    counts = s._counts(1, (0,))
-    assert counts.shape == (3, 2) and counts.sum() == len(x)
+    n_j = np.array([40.0, 40.0, 40.0])  # child 1's counts per level of its parent, column 0
+    n_jk = np.array([[20.0, 20.0], [20.0, 20.0], [40.0, 0.0]])
+    log_lik = sum(c * np.log(c / n) for row, n in zip(n_jk, n_j) for c in row if c > 0)
+    penalty = np.log(len(x)) * 3 * (2 - 1)
+    assert DiscreteBICScore(x).score(1, (0,)) == pytest.approx(-2 * log_lik + penalty, rel=1e-12)
+
+
+def test_add_scores_equal_score_and_fill_its_cache():
+    x = _fixed_data()
+    batched, single = BDeuScore(x), BDeuScore(x)
+    got = batched.add_scores(3, [1], [0, 2])
+    assert got.tolist() == [single.score(3, (0, 1)), single.score(3, (1, 2))]
+    assert (3, (0, 1)) in batched._cache and (3, (1, 2)) in batched._cache
 
 
 def test_registered_names_build_the_tests():
@@ -219,3 +229,32 @@ def test_a_dataframe_keeps_its_labels_under_a_discrete_score():
     )
     edges = andrey.ges(frame, score_func="local_score_BDeu").structure.oriented_edges()
     assert edges == [("a", "b", "directed"), ("c", "b", "directed")]
+
+
+@pytest.mark.parametrize("test", [ChiSquare, GSquare])
+def test_a_batch_gives_each_set_its_single_p_value(test):
+    ci = test(_fixed_data())
+    sets = [(), (1,), (2,), (1, 2), (2, 1)]
+    assert ci.batched_call(3, 0, sets) == [ci(0, 3, s) for s in sets]
+
+
+@pytest.mark.parametrize("test", [ChiSquare, GSquare])
+def test_counting_only_the_observed_strata_gives_the_same_p_values(test, monkeypatch):
+    from andrey.core import discrete
+
+    x = _fixed_data()
+    dense = [test(x)(x_, y_, s) for x_, y_, s in _TESTS]
+    monkeypatch.setattr(discrete, "_DENSE_MIN", 0)
+    monkeypatch.setattr(discrete, "_DENSE_ROWS", 0)
+    np.testing.assert_allclose([test(x)(x_, y_, s) for x_, y_, s in _TESTS], dense, rtol=1e-12)
+
+
+@pytest.mark.parametrize("score", [BDeuScore, DiscreteBICScore])
+def test_scores_counting_only_the_observed_strata_agree(score, monkeypatch):
+    from andrey.core import discrete
+
+    x = _fixed_data()
+    dense = [score(x).score(i, pa) for i, pa in _FAMILIES]
+    monkeypatch.setattr(discrete, "_DENSE_MIN", 0)
+    monkeypatch.setattr(discrete, "_DENSE_ROWS", 0)
+    np.testing.assert_allclose([score(x).score(i, pa) for i, pa in _FAMILIES], dense, rtol=1e-12)

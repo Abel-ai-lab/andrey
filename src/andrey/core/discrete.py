@@ -25,12 +25,21 @@ Buntine (1991). Theory refinement on Bayesian networks. UAI, 52-60.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Iterable, Sequence
-from functools import lru_cache
 
 import numpy as np
-from scipy.special import gammaln
-from scipy.stats import chi2
+from scipy.special import chdtrc, gammaln
+
+# A count over every possible configuration is one bincount with no sort; it is used while the
+# table has at most this many cells per row (or _DENSE_MIN cells), so it never costs much more than
+# reading the rows.
+_DENSE_ROWS = 4
+_DENSE_MIN = 1 << 16
+# Cells counted by one bincount in a batch: bounds the batch's memory to a few tens of megabytes.
+_BATCH_CELLS = 1 << 21
+# Bytes of conditioning-set configurations a test keeps for reuse.
+_STRATA_CACHE_BYTES = 64 << 20
 
 
 def encode_discrete(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -57,38 +66,52 @@ def encode_discrete(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return codes, levels
 
 
-def _strata(codes: np.ndarray, levels: np.ndarray, columns: Sequence[int]) -> np.ndarray:
-    """Return each row's configuration of ``columns`` as an index into the observed configurations.
+def _strata(
+    codes: np.ndarray, levels: np.ndarray, columns: Sequence[int], cells: int
+) -> tuple[np.ndarray, int]:
+    """Return ``(index, k)``: each row's configuration of ``columns`` as an index below ``k``.
 
-    The index runs over the configurations that occur, in mixed-radix order; with no columns every
-    row is in stratum 0.
+    The index follows the mixed-radix order of the configurations, the last column varying
+    fastest; with no columns every row is in stratum 0. ``cells`` is the number of table cells
+    each stratum gets. While ``k * cells`` stays within a few times the row count, ``k`` is the
+    number of possible configurations, so a count over the index is one ``bincount`` with no sort,
+    and its empty strata are dropped afterward; beyond that, only the configurations that occur
+    are numbered, in the same order. Either way the occurring strata come out in the same order.
     """
     n = codes.shape[0]
     if not columns:
-        return np.zeros(n, dtype=np.int64)
+        return np.zeros(n, dtype=np.int64), 1
     if len(columns) == 1:
-        return codes[:, columns[0]]
-    if float(np.prod(levels[list(columns)], dtype=np.float64)) < 2.0**62:
+        return codes[:, columns[0]], int(levels[columns[0]])
+    q = float(np.prod(levels[list(columns)], dtype=np.float64))
+    if q < 2.0**62:
         flat = np.zeros(n, dtype=np.int64)
         for c in columns:
             flat *= levels[c]
             flat += codes[:, c]
-        return np.unique(flat, return_inverse=True)[1]
-    return np.unique(codes[:, list(columns)], axis=0, return_inverse=True)[1].reshape(-1)
+        if q * cells <= max(_DENSE_ROWS * n, _DENSE_MIN):
+            return flat, int(q)
+        inverse = np.unique(flat, return_inverse=True)[1]
+    else:
+        inverse = np.unique(codes[:, list(columns)], axis=0, return_inverse=True)[1].reshape(-1)
+    return inverse, int(inverse.max()) + 1
 
 
 class _ContingencyTest:
     """Shared counting for the chi-square and G-square tests.
 
-    ``__init__`` recodes the data once (:func:`encode_discrete`). Each call counts the
-    ``(stratum, x, y)`` table of the query and passes it to :meth:`_statistic`. Queries are
-    canonicalized (``x``, ``y`` ordered, the conditioning set sorted unique) and nothing is
-    memoized.
+    ``__init__`` recodes the data once (:func:`encode_discrete`). A query counts the
+    ``(stratum, x, y)`` table and passes it to :meth:`_pvalues`. :meth:`batched_call` counts many
+    conditioning sets of one pair with one ``bincount`` per table shape; a single query is a batch
+    of one, and a set's p-value is the same whatever batch it is in. Queries are canonicalized
+    (``x``, ``y`` ordered, the conditioning set sorted unique) and nothing is memoized.
     """
 
     def __init__(self, data: np.ndarray) -> None:
         self._codes, self._levels = encode_discrete(data)
         self._n = self._codes.shape[0]
+        self._level_list = [int(r) for r in self._levels]
+        self._strata_cache: OrderedDict[tuple[int, ...], np.ndarray] = OrderedDict()
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
@@ -96,31 +119,91 @@ class _ContingencyTest:
         A larger p-value means more independence. A query with no degrees of freedom left, where
         every stratum has one level of ``x`` or of ``y``, returns 1.
         """
-        cond = sorted(set(int(c) for c in condition_set))
+        return self.batched_call(x, y, [condition_set])[0]
+
+    def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
+        """Return the p-values for one ``(x, y)`` pair over many conditioning sets, in order.
+
+        Each set is canonicalized as in :meth:`__call__`, and its p-value equals that call's.
+        """
         x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
-        assert x_int not in cond and y_int not in cond, "x, y cannot be in condition_set."
-        counts = self._table(x_int, y_int, cond)
-        rows = counts.sum(axis=2)  # (k, rx)
-        cols = counts.sum(axis=1)  # (k, ry)
-        total = rows.sum(axis=1)  # (k,)
-        expected = rows[:, :, None] * cols[:, None, :] / total[:, None, None]
-        dof = int(
-            np.sum((np.count_nonzero(rows, axis=1) - 1) * (np.count_nonzero(cols, axis=1) - 1))
+        levels = self._level_list
+        rx, ry = levels[x_int], levels[y_int]
+        cells = rx * ry
+        xy = self._codes[:, x_int] * ry + self._codes[:, y_int]
+        out: list[float] = []
+        groups: dict[int, list[tuple[int, list[int]]]] = {}
+        sparse: list[tuple[int, list[int]]] = []
+        limit = max(_DENSE_ROWS * self._n, _DENSE_MIN)
+        for i, condition_set in enumerate(condition_sets):
+            cond = sorted(set(int(c) for c in condition_set))
+            assert x_int not in cond and y_int not in cond, "x, y cannot be in condition_set."
+            out.append(1.0)
+            q = 1
+            for c in cond:
+                q *= levels[c]
+            if q * cells > limit:
+                sparse.append((i, cond))
+            else:
+                groups.setdefault(q, []).append((i, cond))
+        codes = self._codes
+        for q, members in groups.items():
+            step = max(1, _BATCH_CELLS // (q * cells))
+            for start in range(0, len(members), step):
+                part = members[start : start + step]
+                # Row b holds set b's stratum index, then its cell index offset into its own block.
+                flat = np.empty((len(part), self._n), dtype=np.int64)
+                for b, (_, cond) in enumerate(part):
+                    flat[b] = self._stratum(cond)
+                flat += (np.arange(len(part), dtype=np.int64) * q)[:, None]
+                flat *= cells
+                flat += xy
+                counts = np.bincount(flat.ravel(), minlength=len(part) * q * cells)
+                pvalues = self._pvalues(counts.reshape(len(part), q, rx, ry).astype(np.float64))
+                for (i, _), p in zip(part, pvalues):
+                    out[i] = float(p)
+        for i, cond in sparse:
+            strata, k = _strata(codes, self._levels, cond, cells)
+            counts = np.bincount(strata * cells + xy, minlength=k * cells)
+            out[i] = float(self._pvalues(counts.reshape(1, k, rx, ry).astype(np.float64))[0])
+        return out
+
+    def _stratum(self, cond: list[int]) -> np.ndarray:
+        """Return each row's mixed-radix configuration of ``cond``, cached.
+
+        PC reuses a conditioning set across the pairs it separates; the cache keeps the most recent
+        sets, up to a byte budget.
+        """
+        key = tuple(cond)
+        cache = self._strata_cache
+        row = cache.get(key)
+        if row is not None:
+            cache.move_to_end(key)
+            return row
+        row = np.zeros(self._n, dtype=np.int64)
+        for c in cond:
+            row *= self._level_list[c]
+            row += self._codes[:, c]
+        cache[key] = row
+        if len(cache) * row.nbytes > _STRATA_CACHE_BYTES:
+            cache.popitem(last=False)
+        return row
+
+    def _pvalues(self, counts: np.ndarray) -> np.ndarray:
+        """P-values for a ``(m, k, r_x, r_y)`` stack of tables; an empty stratum adds nothing."""
+        rows = counts.sum(axis=3)  # (m, k, rx)
+        cols = counts.sum(axis=2)  # (m, k, ry)
+        total = rows.sum(axis=2)  # (m, k)
+        seen = total > 0
+        expected = (
+            rows[..., None] * cols[..., None, :] / np.where(seen, total, 1.0)[..., None, None]
         )
-        if dof <= 0:
-            return 1.0
-        return float(chi2.sf(self._statistic(counts, expected), dof))
+        dof = np.sum(((rows > 0).sum(axis=2) - 1) * ((cols > 0).sum(axis=2) - 1) * seen, axis=1)
+        stat = self._statistic(counts, expected)
+        with np.errstate(invalid="ignore"):
+            return np.where(dof > 0, chdtrc(np.maximum(dof, 1), stat), 1.0)
 
-    def _table(self, x: int, y: int, cond: list[int]) -> np.ndarray:
-        """The ``(k, r_x, r_y)`` counts of ``x`` and ``y`` in each of the ``k`` observed strata."""
-        rx, ry = int(self._levels[x]), int(self._levels[y])
-        strata = _strata(self._codes, self._levels, cond)
-        k = int(strata.max()) + 1
-        flat = (strata * rx + self._codes[:, x]) * ry + self._codes[:, y]
-        counts = np.bincount(flat, minlength=k * rx * ry).reshape(k, rx, ry)
-        return counts[counts.sum(axis=(1, 2)) > 0].astype(np.float64)
-
-    def _statistic(self, counts: np.ndarray, expected: np.ndarray) -> float:
+    def _statistic(self, counts: np.ndarray, expected: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
 
@@ -133,9 +216,9 @@ class ChiSquare(_ContingencyTest):
     where ``r_xk`` and ``r_yk`` count the levels of ``x`` and ``y`` observed in stratum ``k``.
     """
 
-    def _statistic(self, counts: np.ndarray, expected: np.ndarray) -> float:
+    def _statistic(self, counts: np.ndarray, expected: np.ndarray) -> np.ndarray:
         safe = np.where(expected > 0, expected, 1.0)
-        return float(np.sum((counts - expected) ** 2 / safe))
+        return np.sum(np.where(expected > 0, (counts - expected) ** 2 / safe, 0.0), axis=(1, 2, 3))
 
 
 class GSquare(_ContingencyTest):
@@ -146,13 +229,19 @@ class GSquare(_ContingencyTest):
     the same chi-square law as :class:`ChiSquare`.
     """
 
-    def _statistic(self, counts: np.ndarray, expected: np.ndarray) -> float:
+    def _statistic(self, counts: np.ndarray, expected: np.ndarray) -> np.ndarray:
         seen = counts > 0
-        return float(2.0 * np.sum(counts[seen] * np.log(counts[seen] / expected[seen])))
+        ratio = np.where(seen, counts / np.where(seen, expected, 1.0), 1.0)
+        return 2.0 * np.sum(counts * np.log(ratio), axis=(1, 2, 3))
 
 
 class DiscreteScore:
     """The shared counting and memoization of :class:`BDeuScore` and :class:`DiscreteBICScore`.
+
+    Every local score comes from :meth:`_batch`, which counts the node's states under each parent
+    set with one ``bincount`` per table shape and hands the stack to the subclass's
+    :meth:`_log_scores`; a single score is a batch of one, and a score is the same whatever batch it
+    is in. :meth:`add_scores` scores every one-parent extension of a parent set at once.
 
     Parameters
     ----------
@@ -166,7 +255,10 @@ class DiscreteScore:
         self._codes, self.levels = encode_discrete(data)
         self.n = int(self._codes.shape[0])
         self.log_n = float(np.log(self.n))
-        self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
+        self._level_list = [int(r) for r in self.levels]
+        self._cache: dict[tuple[int, tuple[int, ...]], float] = {}
+        self._cache_size = cache_size
+        self._dense_cells = max(_DENSE_ROWS * self.n, _DENSE_MIN)
 
     def score(self, node: int, parents: Sequence[int]) -> float:
         """Return the memoized local score of ``node`` given ``parents`` (lower is better).
@@ -174,28 +266,143 @@ class DiscreteScore:
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
         """
-        key = tuple(sorted(int(p) for p in parents))
-        return self._score_key(int(node), key)
+        key = (int(node), tuple(sorted(int(p) for p in parents)))
+        value = self._cache.get(key)
+        if value is None:
+            value = self._batch(key[0], [key[1]])[0]
+            self._remember(key, value)
+        return value
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
         """Return the local scores for many parent sets, in request order."""
         return [self.score(node, parents) for parents in parent_sets]
 
-    def _counts(self, node: int, parents: tuple[int, ...]) -> np.ndarray:
-        """Return the ``(q_observed, r)`` counts ``N_ijk``: ``node``'s states per parent config."""
-        r = int(self.levels[node])
-        strata = _strata(self._codes, self.levels, list(parents))
-        k = int(strata.max()) + 1
-        flat = strata * r + self._codes[:, node]
-        counts = np.bincount(flat, minlength=k * r).reshape(k, r)
-        return counts[counts.sum(axis=1) > 0].astype(np.float64)
+    def add_scores(self, node: int, base: Sequence[int], candidates: Sequence[int]) -> np.ndarray:
+        """Return ``score(node, base + u)`` for each ``u`` in ``candidates``, in order.
 
-    def _q(self, parents: tuple[int, ...]) -> float:
-        """The number of parent configurations, observed or not: the product of their levels."""
-        return float(np.prod(self.levels[list(parents)], dtype=np.float64))
+        Equal to the :meth:`score` of each extended set, and memoized with them. The extended
+        sets' configurations are built from the base's prefixes and suffixes in sorted-parent
+        order, so each costs a few vector operations whatever the size of ``base``.
+        """
+        node = int(node)
+        base_sorted = sorted(int(p) for p in base)
+        out = np.empty(len(candidates))
+        todo: list[tuple[int, int, tuple[int, ...]]] = []
+        for i, u in enumerate(candidates):
+            key = (node, tuple(sorted([*base_sorted, int(u)])))
+            value = self._cache.get(key)
+            if value is None:
+                todo.append((i, int(u), key[1]))
+            else:
+                out[i] = value
+        if todo:
+            values = self._batch(node, [parents for _, _, parents in todo], base=base_sorted)
+            for (i, _, parents), value in zip(todo, values):
+                out[i] = value
+                self._remember((node, parents), value)
+        return out
 
-    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
+    def _remember(self, key: tuple[int, tuple[int, ...]], value: float) -> None:
+        if self._cache_size is not None and len(self._cache) >= self._cache_size:
+            self._cache.clear()  # values are pure, so a full cache only costs recomputation
+        self._cache[key] = value
+
+    def _batch(
+        self, node: int, parent_sets: list[tuple[int, ...]], base: list[int] | None = None
+    ) -> list[float]:
+        """Score ``node`` under each parent set. With ``base``, each set is ``base`` plus one."""
+        levels, codes = self._level_list, self._codes
+        r = levels[node]
+        out = [0.0] * len(parent_sets)
+        groups: dict[int, list[tuple[int, tuple[int, ...]]]] = {}
+        for i, parents in enumerate(parent_sets):
+            q = 1
+            for c in parents:
+                q *= levels[c]
+            if q * r <= self._dense_cells:
+                groups.setdefault(q, []).append((i, parents))
+            else:
+                strata, k = _strata(codes, self.levels, list(parents), r)
+                counts = np.bincount(strata * r + codes[:, node], minlength=k * r)
+                out[i] = self._log_scores(
+                    node, counts.reshape(1, k, r).astype(np.float64), [parents], q
+                )[0]
+        parts = _BaseParts(codes, levels, base) if base is not None else None
+        for q, members in groups.items():
+            step = max(1, _BATCH_CELLS // (q * r))
+            for start in range(0, len(members), step):
+                part = members[start : start + step]
+                if base == []:  # one parent each: its codes are the configuration
+                    flat = codes[:, [parents[0] for _, parents in part]].T.copy()
+                else:
+                    flat = np.empty((len(part), self.n), dtype=np.int64)
+                    for b, (_, parents) in enumerate(part):
+                        if parts is not None:
+                            parts.extended(flat[b], parents)
+                        else:
+                            _radix(flat[b], codes, levels, parents)
+                flat += (np.arange(len(part), dtype=np.int64) * q)[:, None]
+                flat *= r
+                flat += codes[:, node]
+                counts = np.bincount(flat.ravel(), minlength=len(part) * q * r)
+                scores = self._log_scores(
+                    node,
+                    counts.reshape(len(part), q, r).astype(np.float64),
+                    [parents for _, parents in part],
+                    q,
+                )
+                for (i, _), value in zip(part, scores):
+                    out[i] = float(value)
+        return out
+
+    def _log_scores(
+        self, node: int, counts: np.ndarray, parent_sets: list[tuple[int, ...]], q: int
+    ) -> np.ndarray:
+        """Local scores from a ``(m, k, r)`` stack of counts; ``q`` configurations per set."""
         raise NotImplementedError
+
+
+def _radix(row: np.ndarray, codes: np.ndarray, levels: list[int], columns: Sequence[int]) -> None:
+    """Write each row's mixed-radix configuration of ``columns`` into ``row``, in place."""
+    row[:] = 0
+    for c in columns:
+        row *= levels[c]
+        row += codes[:, c]
+
+
+class _BaseParts:
+    """A parent set's configuration split at every position, for its one-parent extensions.
+
+    For the sorted base ``b_1 < ... < b_m``, ``prefix[i]`` is the mixed-radix configuration of
+    ``b_1 .. b_i`` and ``suffix[i]`` that of ``b_(i+1) .. b_m``, with ``span[i]`` its number of
+    configurations. Inserting ``u`` at position ``i`` of the sorted order gives the configuration
+    ``(prefix[i] * r_u + codes_u) * span[i] + suffix[i]``, exactly the mixed radix of the sorted
+    extended set.
+    """
+
+    def __init__(self, codes: np.ndarray, levels: list[int], base: list[int]) -> None:
+        self._codes, self._levels, self._base = codes, levels, base
+        self._members = set(base)
+        n = codes.shape[0]
+        self._prefix = [np.zeros(n, dtype=np.int64)]
+        for c in base:
+            self._prefix.append(self._prefix[-1] * levels[c] + codes[:, c])
+        self._suffix = [np.zeros(n, dtype=np.int64)]
+        self._span = [1]
+        for c in reversed(base):
+            self._suffix.append(codes[:, c] * self._span[-1] + self._suffix[-1])
+            self._span.append(self._span[-1] * levels[c])
+        self._suffix.reverse()
+        self._span.reverse()
+
+    def extended(self, row: np.ndarray, parents: tuple[int, ...]) -> None:
+        """Write the configuration of ``parents`` (the base plus one variable) into ``row``."""
+        u = next(c for c in parents if c not in self._members)
+        i = sum(1 for c in self._base if c < u)
+        np.multiply(self._prefix[i], self._levels[u], out=row)
+        row += self._codes[:, u]
+        row *= self._span[i]
+        row += self._suffix[i]
 
 
 class BDeuScore(DiscreteScore):
@@ -248,17 +455,18 @@ class BDeuScore(DiscreteScore):
         p = min(structure_prior / others, 0.5) if others else 0.5
         self._log_p, self._log_not_p, self._others = float(np.log(p)), float(np.log1p(-p)), others
 
-    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
-        counts = self._counts(node, parents)
-        a_j = self.ess / self._q(parents)
-        a_jk = a_j / int(self.levels[node])
-        n_j = counts.sum(axis=1)
-        log_score = np.sum(gammaln(a_j) - gammaln(a_j + n_j)) + np.sum(
-            gammaln(a_jk + counts) - gammaln(a_jk)
+    def _log_scores(
+        self, node: int, counts: np.ndarray, parent_sets: list[tuple[int, ...]], q: int
+    ) -> np.ndarray:
+        a_j = self.ess / q
+        a_jk = a_j / self._level_list[node]
+        n_j = counts.sum(axis=2)
+        log_score = np.sum(gammaln(a_j) - gammaln(a_j + n_j), axis=1) + np.sum(
+            gammaln(a_jk + counts) - gammaln(a_jk), axis=(1, 2)
         )
-        k = len(parents)
+        k = np.array([len(parents) for parents in parent_sets])
         log_prior = k * self._log_p + (self._others - k) * self._log_not_p
-        return float(-2.0 * (log_score + log_prior))
+        return -2.0 * (log_score + log_prior)
 
 
 class DiscreteBICScore(DiscreteScore):
@@ -288,10 +496,12 @@ class DiscreteBICScore(DiscreteScore):
         self.lambda_value = lambda_value
         super().__init__(data, cache_size=cache_size)
 
-    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
-        counts = self._counts(node, parents)
-        n_j = counts.sum(axis=1, keepdims=True)
+    def _log_scores(
+        self, node: int, counts: np.ndarray, parent_sets: list[tuple[int, ...]], q: int
+    ) -> np.ndarray:
+        n_j = counts.sum(axis=2, keepdims=True)
         seen = counts > 0
-        log_lik = np.sum(counts[seen] * np.log((counts / n_j)[seen]))
-        n_params = self._q(parents) * (int(self.levels[node]) - 1)
-        return float(-2.0 * log_lik + self.lambda_value * self.log_n * n_params)
+        ratio = np.where(seen, counts / np.where(seen, n_j, 1.0), 1.0)
+        log_lik = np.sum(counts * np.log(ratio), axis=(1, 2))
+        n_params = q * (self._level_list[node] - 1)
+        return -2.0 * log_lik + self.lambda_value * self.log_n * n_params

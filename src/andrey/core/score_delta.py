@@ -955,12 +955,17 @@ class ScoreDifference:
     def score_many_with_base(
         self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
     ) -> list[float]:
-        """Return absolute scores ``[score(i, base +/- delta_k)]`` for a batch of single moves."""
+        """Return absolute scores ``[score(i, base +/- delta_k)]`` for a batch of single moves.
+
+        The added parents are scored together by :meth:`DiscreteScore.add_scores`.
+        """
         base = sorted(int(p) for p in base_parents)
+        adds = [int(u) for op, u in deltas if op == "add"]
+        added = iter(self.score_obj.add_scores(int(i), base, adds).tolist()) if adds else iter(())
         out = []
         for op, u in deltas:
             if op == "add":
-                out.append(self.score_obj.score(i, [*base, int(u)]))
+                out.append(next(added))
             elif op == "remove":
                 out.append(self.score_obj.score(i, [p for p in base if p != int(u)]))
             else:
@@ -971,19 +976,21 @@ class ScoreDifference:
         self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
     ) -> list[float]:
         """Return RAW deltas ``[score(i, base +/- delta_k) - score(i, base)]`` for single moves."""
-        base = tuple(sorted(int(p) for p in base_parents))
-        return [_delta_two_scores(self.score_obj, int(i), base, u, op) for op, u in deltas]
+        base_score = self.score_obj.score(int(i), list(base_parents))
+        return [s - base_score for s in self.score_many_with_base(i, base_parents, deltas)]
 
     def add_deltas(self, i: int, base_parents: Iterable[int]) -> np.ndarray:
-        """Return ``score(i, base + u) - score(i, base)`` for every ``u``.
+        """Return ``score(i, base + u) - score(i, base)`` for every ``u``, scored together.
 
         Entries for ``i`` itself and for the members of ``base`` are ``inf``.
         """
-        base = tuple(sorted(int(p) for p in base_parents))
+        base = sorted(int(p) for p in base_parents)
         out = np.full(self.n_features, np.inf)
-        for u in range(len(out)):
-            if u != i and u not in base:
-                out[u] = _delta_two_scores(self.score_obj, int(i), base, u, "add")
+        taken = set(base) | {int(i)}
+        candidates = [u for u in range(self.n_features) if u not in taken]
+        if candidates:
+            scores = self.score_obj.add_scores(int(i), base, candidates)
+            out[candidates] = scores - self.score_obj.score(int(i), base)
         return out
 
     def remove_deltas(self, i: int, base_parents: Iterable[int]) -> np.ndarray:
