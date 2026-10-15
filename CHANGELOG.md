@@ -26,6 +26,8 @@ change names its pull request.
   `ExperimentalWarning`. ([#TBD])
 - `varma_lingam` with `prune=True` refits the weights it keeps by least squares, so they are no
   longer shrunk toward zero. ([#TBD])
+- `longitudinal_lingam` orders the variables at each time point with least-squares regressions,
+  so its causal orders no longer change when every unit is listed twice. ([#TBD])
 
 ## [0.4.0] - 2026-10-15
 

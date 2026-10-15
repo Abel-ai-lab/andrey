@@ -85,11 +85,15 @@ def _compute_residuals(
 def _estimate_instantaneous(
     N_t: np.ndarray, T: int, p: int, measure: str
 ) -> tuple[np.ndarray, list[list[int]]]:
-    """Apply DirectLiNGAM to each residual set; return ``B(t,t)`` and per-time causal orders."""
+    """Apply DirectLiNGAM to each residual set; return ``B(t,t)`` and per-time causal orders.
+
+    The order search regresses with the least-squares slope, so each residual it scores is
+    orthogonal to its regressor in the sample (:func:`andrey.lingam.pwling.compute_residual`).
+    """
     B_t = np.zeros((T, p, p))
     causal_orders: list[list[int]] = [[]]
     for t in range(1, T):
-        order, B = direct_lingam(N_t[t].T, measure=measure)
+        order, B = direct_lingam(N_t[t].T, measure=measure, least_squares=True)
         causal_orders.append(order)
         B_t[t] = B
     return B_t, causal_orders
