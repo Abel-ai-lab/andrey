@@ -1479,13 +1479,14 @@ AGENT_PROMPT = (
 )
 
 
-# Coding agents that load skills, as the pill shows them: each one's mono mark from Lobe Icons
-# (site/agents/, MIT), drawn in the text's color.
+# Coding agents, and open models that drive them, as the pill shows them: each one's mono mark
+# from Lobe Icons (site/agents/, MIT), drawn in the text's color. GLM's is Z.ai's.
 AGENTS = {
     "claude": "Claude Code",
     "codex": "Codex",
     "cursor": "Cursor",
-    "githubcopilot": "GitHub Copilot",
+    "zai": "GLM",
+    "deepseek": "DeepSeek",
 }
 
 
@@ -1506,7 +1507,8 @@ def agent_pill() -> str:
     return (
         f'<a class="agent-pill" href="docs/faq.html#how-does-an-agent-use-it" '
         f'data-prompt="{escape(AGENT_PROMPT)}" title="Copy a prompt for your coding agent">'
-        f'<span>Onboard your agent to Andrey</span><span class="agent-logos" aria-hidden="true">'
+        '<span class="agent-pill__label">Onboard your agent<span class="agent-pill__more"> to '
+        'Andrey</span></span><span class="agent-logos" aria-hidden="true">'
         f"{logos}</span></a>"
     )
 

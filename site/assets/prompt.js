@@ -4,8 +4,8 @@
 (() => {
   const pill = document.querySelector("a.agent-pill[data-prompt]");
   if (!pill || !navigator.clipboard) return;
-  const label = pill.querySelector("span:first-child");
-  const text = label.textContent;
+  const label = pill.querySelector(".agent-pill__label");
+  const rest = label.innerHTML;
   let reset;
   pill.setAttribute("role", "button");
   label.setAttribute("aria-live", "polite");
@@ -14,11 +14,13 @@
     navigator.clipboard.writeText(pill.dataset.prompt).then(
       () => {
         pill.classList.add("is-copied");
-        label.textContent = "Copied. Paste it into your agent";
+        // The second half, like the label's, is dropped on a phone (site.css).
+        label.innerHTML =
+          'Prompt copied<span class="agent-pill__more">. Paste it into your agent</span>';
         clearTimeout(reset);
         reset = setTimeout(() => {
           pill.classList.remove("is-copied");
-          label.textContent = text;
+          label.innerHTML = rest;
         }, 2500);
       },
       () => { window.location.href = pill.href; },

@@ -39,7 +39,7 @@ The hero is one screen: the headline, "Causal discovery: accelerated, accurate, 
 install line, and a card per section below it, each with its art, its title, and its claim's short
 form. A pill above the headline copies the prompt that installs the agent skill (`AGENT_PROMPT`,
 `site/assets/prompt.js`), the one the README and the FAQ give; it shows the marks of coding agents
-that load skills (`AGENTS`, from Lobe Icons in `site/agents/`, MIT). The four sections follow the
+and open models (`AGENTS`, from Lobe Icons in `site/agents/`, MIT). The four sections follow the
 headline's words, then All-in-one for what the package covers (`ACTS` in `site/build.py`). Each
 opens on its art at full bleed with its title and its claim (`act_covers()`), then shows its
 evidence, two pieces or more: tiles, each with a figure of its own, and a note in plain type beside

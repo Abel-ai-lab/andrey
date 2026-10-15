@@ -303,6 +303,21 @@
   opacity: 0.85;
 }
 
+/* On a phone the pill stays on one line: its label and its confirmation drop their second half. */
+@media (max-width: 27rem) {
+  .andrey-home .agent-pill__more {
+    display: none;
+  }
+
+  .andrey-home .agent-pill__label {
+    white-space: nowrap;
+  }
+
+  .andrey-home .agent-logos {
+    gap: 0.3rem;
+  }
+}
+
 /* Cobalt in both themes: the dark theme's lighter accent is too pale under the light type. */
 .andrey-home .hero .chip--primary {
   border-color: color-mix(in srgb, var(--andrey-ground-ink) 35%, transparent);
