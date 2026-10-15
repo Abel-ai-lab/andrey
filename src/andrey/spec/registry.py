@@ -613,6 +613,13 @@ _add(
                 doc="Map the moving-average weights onto the independent noise terms. Ignored "
                 "when prune is true.",
             ),
+            ParamSpec(
+                name="max_iter",
+                type="int",
+                default=100,
+                doc="Most iterations of the likelihood fit, at least 1. A fit stopped before it "
+                "converges gives no warning; raise this to let it converge.",
+            ),
         ),
         references=("Hyvarinen et al. 2010", "Kawahara, Shimizu & Washio 2011"),
     )

@@ -77,6 +77,13 @@ def test_varma_lingam_output_contract():
     assert out.structure.lag_weights_ma.shape == (1, 3, 3)
 
 
+def test_varma_lingam_rejects_max_iter_below_one():
+    from andrey.api.temporal import varma_lingam
+
+    with pytest.raises(ValueError, match="max_iter"):
+        varma_lingam(datagen.generate("varma_3v"), max_iter=0)
+
+
 def test_varma_lingam_orders_innovations_by_least_squares():
     """The order comes from least-squares pairwise regressions of the fitted innovations.
 

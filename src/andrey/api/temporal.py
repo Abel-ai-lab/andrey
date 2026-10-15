@@ -45,6 +45,7 @@ def varma_lingam(
     criterion: str | None = None,
     prune: bool = False,
     structural_ma: bool = False,
+    max_iter: int = 100,
 ) -> StructureOutput:
     """Learn a temporal causal structure from one multivariate time series with VARMA-LiNGAM.
 
@@ -73,6 +74,9 @@ def varma_lingam(
         noise terms, ``(I - B0) Theta_j (I - B0)^-1`` [1]_; ``False`` uses ``(I - B0) Theta_j``.
         ``B0`` is the lag-0 weight matrix and ``Theta_j`` the fitted moving-average coefficients.
         Ignored when ``prune=True``.
+    max_iter : int, default=100
+        Most iterations of the likelihood fit, at least ``1``. With ``criterion`` set, every fit
+        in the grid gets this limit.
 
     Returns
     -------
@@ -87,10 +91,11 @@ def varma_lingam(
     Raises
     ------
     TypeError
-        If ``order`` is not a pair of ints.
+        If ``order`` is not a pair of ints, or ``max_iter`` is not an int.
     ValueError
         If ``criterion`` is not one of ``"aic"``, ``"bic"``, ``"hqic"``, or ``None``, if ``order``
-        holds a negative count or is ``(0, 0)``, or if ``data`` has fewer than 2 columns.
+        holds a negative count or is ``(0, 0)``, if ``max_iter`` is below 1, or if ``data`` has
+        fewer than 2 columns.
 
     Notes
     -----
@@ -103,16 +108,19 @@ def varma_lingam(
     selects the regressors, and an ordinary least-squares fit with an intercept on the selected
     ones gives their weights, so the kept weights are not shrunk toward zero. The noise terms come
     from a lag-0 matrix refit the same way. The regressions start at time step ``max(p, q)``: the
-    first steps serve only as lagged values, and no step is regressed on a later one.
+    first steps serve only as lagged values. No lagged value wraps around from the end of the
+    series, so no step is regressed on a later one.
 
     **Limitations.** Measured on simulated linear series with non-Gaussian noise, one autoregressive
     and one moving-average lag, from 3 to 20 variables with 100 to 1,000 time steps, with
     ``order=(1, 1)`` and ``prune=True``. Its median errors (missing and extra cross-links) stayed
     below the empty graph's from 300 time steps at every size; at 100 time steps they exceeded it
     from 10 variables on. The fit takes minutes at 20 variables and 1,000 time steps. It assumes
-    linear effects and non-Gaussian noise. The likelihood fit stops after 100 iterations and gives
-    no warning when it has not converged; with ``criterion`` set, it fits one model for every
-    ``(p, q)`` in the grid.
+    linear effects and non-Gaussian noise. The likelihood fit stops after ``max_iter`` iterations
+    and gives no warning when it has not converged. A fit stopped before convergence depends on
+    the versions of the numerical libraries, so the same series can give a different graph in
+    another environment; raise ``max_iter`` to let the fit converge. With ``criterion`` set, it
+    fits one model for every ``(p, q)`` in the grid.
 
     References
     ----------
@@ -143,9 +151,15 @@ def varma_lingam(
     order = (int_in_range(order[0], "order[0]", 0), int_in_range(order[1], "order[1]", 0))
     if order == (0, 0):
         raise ValueError("order must have p or q above 0, got (0, 0)")
+    max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     causal_order, psis, omegas = _native(
-        X, order=order, criterion=criterion, prune=prune, structural_ma=structural_ma
+        X,
+        order=order,
+        criterion=criterion,
+        prune=prune,
+        structural_ma=structural_ma,
+        max_iter=max_iter,
     )
     model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=causal_order)
     return with_labels(_adapt_varma_lingam(model), labels)
@@ -198,6 +212,11 @@ def longitudinal_lingam(
 
     Notes
     -----
+    At each time point DirectLiNGAM orders the residuals of the lag regressions. Each pairwise
+    regression in its ordering takes the least-squares slope, so every residual it scores is
+    uncorrelated with its regressor in the sample, and listing every unit twice leaves the causal
+    orders unchanged.
+
     **Limitations.** Measured on simulated panels with non-Gaussian noise, a dense same-step DAG and
     a dense lag-1 matrix drawn anew at every time point, and a hidden common cause at the first,
     from 2 to 5 variables at 20 or 50 time points with 100 to 1,000 units, with ``n_lags=1``. Its
@@ -584,7 +603,10 @@ def lpcmci(
     not known non-causes of it, plus the parents of both ends, and tests the autodependency links
     first, then the cross links lag by lag. A same-step link is also tested from its other end.
     After each step that removes a link, orientation rules mark new tails and arrowheads on the
-    lagged links; once nothing is left to test, the full set of rules runs, including the collider
+    lagged links and the round restarts at ``p = 0``, as in the paper, so that the separating sets
+    found later stay weakly minimal. In these passes the rules R9' and R10' orient lagged links
+    only, but their paths may run through same-step links, directed or not, as the paper's rules
+    allow. Once nothing is left to test, the full set of rules runs, including the collider
     rule, which first tests the two links of a triple again given each stored separating set of
     the outer pair plus the parents of their ends. A preliminary round keeps only the parents it
     found and starts over from the complete graph. The final round also tests the links that may
@@ -592,7 +614,11 @@ def lpcmci(
     Whether a node lies outside the separating set of two others is a majority vote over the
     distinct separating sets stored and found among the neighbors of the two. A mark that rules
     orient both ways is a conflict. The candidates of a step are ordered by statistics frozen when
-    its group of links starts, so the order in which a group's links are tested changes nothing.
+    its group of links starts, so the order in which a group's links are tested changes nothing
+    and, apart from exact ties, the order of the variables changes nothing either. The collider
+    rule stores every separating set its tests find, each made weakly minimal by dropping first
+    the node whose removal leaves the largest p-value, so the stored sets do not depend on the
+    order of the variables.
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``, and every node a test
     conditions on lies within ``tau_max`` steps of the later end. A test's partial correlation is

@@ -19,6 +19,7 @@ change names its pull request.
 - `granger`, supported lasso Granger causality for a multivariate time series: it returns a
   temporal structure with lags 1 to `maxlag` and the coefficients as weights, and does not depend
   on the units of any variable. ([#TBD])
+- `varma_lingam` takes `max_iter`, the iteration limit of its likelihood fit. ([#TBD])
 
 ### Changed
 
