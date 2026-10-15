@@ -126,7 +126,7 @@ def test_p_values_agree_with_causal_learn(method: str) -> None:
                     )
 
 
-def test_bdeu_is_minus_causal_learns_score() -> None:
+def test_bdeu_is_minus_twice_causal_learns_score() -> None:
     from causallearn.score.LocalScoreFunction import local_score_BDeu
 
     x = _codes(0)
@@ -135,7 +135,7 @@ def test_bdeu_is_minus_causal_learns_score() -> None:
         rest = [c for c in range(x.shape[1]) if c != node]
         for size in range(3):
             for parents in combinations(rest, size):
-                expected = -local_score_BDeu(x, node, list(parents))
+                expected = -2 * local_score_BDeu(x, node, list(parents))
                 assert mine.score(node, list(parents)) == pytest.approx(expected, rel=1e-9)
 
 

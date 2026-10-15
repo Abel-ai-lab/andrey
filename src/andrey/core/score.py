@@ -6,10 +6,10 @@ form, branching on parent-set size for the scalar fast paths.
 
 :func:`local_score_bic` is the pure per-node primitive; :class:`BICScore` precomputes the covariance
 once and memoizes scores behind the :class:`Score` protocol that structure-search engines consume.
-:class:`BDeuScore` scores category codes with the negative log BDeu marginal likelihood behind the
-same protocol. :class:`DGScore` and :class:`CGScore` score mixed data, continuous and categorical
-columns marked by a mask, with the BIC of the degenerate Gaussian and conditional Gaussian models
-of :mod:`andrey.core.mixed`.
+:class:`BDeuScore` scores category codes with ``-2`` times the log BDeu marginal likelihood behind
+the same protocol. :class:`DGScore` and :class:`CGScore` score mixed data, continuous and
+categorical columns marked by a mask, with the BIC of the degenerate Gaussian and conditional
+Gaussian models of :mod:`andrey.core.mixed`.
 
 References
 ----------
@@ -262,10 +262,11 @@ class BICScore:
 
 
 class BDeuScore:
-    """Negative local BDeu score over category codes.
+    """Local BDeu score over category codes, on the scale of :class:`BICScore`.
 
-    The score of ``node`` given ``parents`` is minus the log of the structure prior times the BDeu
-    marginal likelihood [1]_, so lower is better as for :class:`BICScore`. With ``r`` the node's
+    The score of ``node`` given ``parents`` is ``-2`` times the log of the structure prior times the
+    BDeu marginal likelihood [1]_, so lower is better and a difference of scores reads on the
+    scale of :class:`BICScore`'s, ``-2`` times a log-likelihood. With ``r`` the node's
     categories, ``q`` the product of its parents' categories, ``N_ij`` the rows in parent
     configuration ``j``, and ``N_ijk`` those of them where the node takes value ``k``, the log
     marginal likelihood is
@@ -350,10 +351,10 @@ class BDeuScore:
             log_p, log_not_p, others = self._prior
             k = len(parents)
             log_prior = k * log_p + (others - k) * log_not_p
-        return -(log_likelihood + log_prior)
+        return -2.0 * (log_likelihood + log_prior)
 
     def score(self, node: int, parents: Sequence[int]) -> float:
-        """Return the memoized negative local BDeu score for ``node`` given ``parents``.
+        """Return the memoized local BDeu score for ``node`` given ``parents``.
 
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
@@ -362,7 +363,7 @@ class BDeuScore:
         return self._score_key(int(node), key)
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
-        """Return the negative local BDeu scores for many parent sets, in request order."""
+        """Return the local BDeu scores for many parent sets, in request order."""
         return [self.score(node, parents) for parents in parent_sets]
 
 

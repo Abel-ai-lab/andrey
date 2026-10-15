@@ -83,11 +83,11 @@ def ges(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"GES"`` and ``metadata["score"]`` the score of the result; lower is better. For BIC, it is
         the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; for BDeu, minus the log of the structure prior times the marginal likelihood;
-        for the mixed-data scores, see Notes. Directed marks (``->``) are oriented edges, undirected
-        (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        n_parents``; for BDeu, ``-2`` times the log of the structure prior times the marginal
+        likelihood; for the mixed-data scores, see Notes. Directed marks (``->``) are oriented
+        edges, undirected (``--``) the ones the equivalence class leaves open. Under a mixed-data
+        setting, ``metadata["categorical"]`` lists the categorical columns it read, by name or
+        0-based position.
 
     Raises
     ------

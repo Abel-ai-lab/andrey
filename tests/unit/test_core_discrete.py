@@ -114,17 +114,19 @@ def test_bdeu_matches_the_formula():
     score = BDeuScore(x)
     half = math.log(0.5)
     # Node 0 with no parent: counts (4, 2).
-    assert score.score(0, []) == pytest.approx(-(_bdeu(np.array([[4, 2]]), 1) + 2 * half))
+    assert score.score(0, []) == pytest.approx(-2 * (_bdeu(np.array([[4, 2]]), 1) + 2 * half))
     # Node 0 given node 1: (2, 0) where node 1 is 0, (2, 2) where it is 1.
-    assert score.score(0, [1]) == pytest.approx(-(_bdeu(np.array([[2, 0], [2, 2]]), 2) + 2 * half))
+    assert score.score(0, [1]) == pytest.approx(
+        -2 * (_bdeu(np.array([[2, 0], [2, 2]]), 2) + 2 * half)
+    )
 
 
 def test_bdeu_structure_prior_penalizes_each_parent():
-    """From five variables up, p = 1 / (d - 1) makes each parent cost log((1 - p) / p) more."""
+    """From five variables up, p = 1 / (d - 1) makes each parent cost 2 log((1 - p) / p) more."""
     x = _codes(n=300, cards=(2, 3, 2, 3, 2))
     with_prior = BDeuScore(x)
     p = 1 / 4
-    penalty = math.log((1 - p) / p)
+    penalty = 2 * math.log((1 - p) / p)
     likelihood_gain = BDeuScore(x[:, :3]).score(0, [1]) - BDeuScore(x[:, :3]).score(0, [])
     # At d = 3 the prior is flat (p = 1/2), so the difference there is the likelihood's alone.
     assert with_prior.score(0, [1]) - with_prior.score(0, []) == pytest.approx(
@@ -146,7 +148,7 @@ def test_bdeu_leaves_out_an_undefined_structure_prior(d):
     x = _codes()[:, :d]
     score = BDeuScore(x)
     counts = np.bincount(x[:, 0].astype(int))[None, :]
-    assert score.score(0, []) == pytest.approx(-_bdeu(counts, 1))
+    assert score.score(0, []) == pytest.approx(-2 * _bdeu(counts, 1))
     if d == 2:
         assert np.isfinite(score.score(0, [1]))
 
