@@ -276,3 +276,35 @@ def test_make_score_builds_the_categorical_bic_with_its_weight():
     built = make_score("local_score_BIC_categorical", x, lambda_value=2.0)
     assert isinstance(built, CategoricalBICScore)
     assert built.score(1, [0]) == CategoricalBICScore(x, lambda_value=2.0).score(1, [0])
+
+
+def _configuration_counts(x: np.ndarray, node: int, parents: tuple[int, ...]) -> np.ndarray:
+    codes, cards = categorical.encode(x)
+    config, m = categorical.configurations(codes, cards, parents)
+    r = int(cards[node])
+    return np.bincount(config * r + codes[:, node], minlength=m * r).reshape(m, r)
+
+
+def test_batched_table_counts_equal_one_numbering_per_set(monkeypatch):
+    """A batch counts each set's table as :func:`configurations` numbers it, small or large, in one
+    bincount or several."""
+    x = _codes(n=300, cards=(2, 3, 4, 3, 5, 4))
+    codes, cards = categorical.encode(x)
+    sets = [(), (1,), (2, 1), (3, 4, 5), (1, 2, 3, 4, 5), (4,)]
+    expected = [_configuration_counts(x, 0, s) for s in sets]
+    for batch in (1 << 22, 1):  # every set in one bincount, then each in its own
+        monkeypatch.setattr(categorical, "_BATCH_CELLS", batch)
+        for dense in (1 << 16, 0):  # counted over every configuration, then numbered
+            monkeypatch.setattr(categorical, "_DENSE_MIN", dense)
+            monkeypatch.setattr(categorical, "_DENSE_ROWS", 4 if dense else 0)
+            got = categorical.table_counts(codes, cards, 0, sets)
+            for a, b in zip(got, expected, strict=True):
+                np.testing.assert_array_equal(a, b)
+
+
+@pytest.mark.parametrize("cls", [BDeuScore, CategoricalBICScore])
+def test_a_score_is_the_same_alone_or_in_a_batch(cls):
+    x = _codes(n=300)
+    sets = [[], [1], [2, 1], [3, 1, 2]]
+    alone = [cls(x).score(0, s) for s in sets]
+    assert cls(x).score_many(0, sets) == alone

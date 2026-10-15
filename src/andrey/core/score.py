@@ -265,7 +265,51 @@ class BICScore:
         return [self.score(node, parents) for parents in parent_sets]
 
 
-class BDeuScore:
+class _CountScore:
+    """Memoized local scores computed from a node's counts in each configuration of its parents.
+
+    A subclass sets ``_codes`` and ``_cardinalities`` (see :func:`~andrey.core.categorical.encode`)
+    and ``_memo``, and scores one table in :meth:`_local`. :meth:`score_many` counts the tables of
+    every parent set not yet memoized together (:func:`~andrey.core.categorical.table_counts`); a
+    score is the same whether it is computed alone or in a batch.
+    """
+
+    _codes: np.ndarray
+    _cardinalities: np.ndarray
+    _memo: _LRU
+
+    def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
+        raise NotImplementedError
+
+    def score(self, node: int, parents: Sequence[int]) -> float:
+        """Return the memoized local score for ``node`` given ``parents``.
+
+        The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
+        the lookup.
+        """
+        key = (int(node), tuple(sorted(int(p) for p in parents)))
+        value = self._memo.get(key)
+        if value is None:
+            (counts,) = categorical.table_counts(self._codes, self._cardinalities, key[0], [key[1]])
+            value = self._local(key[0], key[1], counts)
+            self._memo.put(key, value)
+        return value
+
+    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
+        """Return the local scores for many parent sets, in request order."""
+        node = int(node)
+        keys = [tuple(sorted(int(p) for p in parents)) for parents in parent_sets]
+        found = {key: self._memo.get((node, key)) for key in keys}
+        todo = [key for key, value in found.items() if value is None]
+        if todo:
+            tables = categorical.table_counts(self._codes, self._cardinalities, node, todo)
+            for key, counts in zip(todo, tables, strict=True):
+                found[key] = self._local(node, key, counts)
+                self._memo.put((node, key), found[key])
+        return [found[key] for key in keys]
+
+
+class BDeuScore(_CountScore):
     """Local BDeu score over category codes, on the scale of :class:`BICScore`.
 
     The score of ``node`` given ``parents`` is ``-2`` times the log of the structure prior times the
@@ -332,14 +376,11 @@ class BDeuScore:
         p = self.structure_prior / others if others > 0 else 1.0
         # Per-parent and per-non-parent log prior, or none when p is not a probability below 1.
         self._prior = (float(np.log(p)), float(np.log1p(-p)), others) if p < 1.0 else None
-        self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
+        self._memo = _LRU(cache_size)
 
-    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
-        codes = self._codes
-        r = int(self._cardinalities[node])
+    def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
+        m, r = counts.shape
         q = float(np.prod([float(self._cardinalities[p]) for p in parents]))
-        config, m = categorical.configurations(codes, self._cardinalities, parents)
-        counts = np.bincount(config * r + codes[:, node], minlength=m * r).reshape(m, r)
         n_ij = counts.sum(axis=1)
         n_ijk = counts[counts > 0]
         a_j = self.sample_prior / q
@@ -357,21 +398,8 @@ class BDeuScore:
             log_prior = k * log_p + (others - k) * log_not_p
         return -2.0 * (log_likelihood + log_prior)
 
-    def score(self, node: int, parents: Sequence[int]) -> float:
-        """Return the memoized local BDeu score for ``node`` given ``parents``.
 
-        The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
-        the lookup.
-        """
-        key = tuple(sorted(int(p) for p in parents))
-        return self._score_key(int(node), key)
-
-    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
-        """Return the local BDeu scores for many parent sets, in request order."""
-        return [self.score(node, parents) for parents in parent_sets]
-
-
-class CategoricalBICScore:
+class CategoricalBICScore(_CountScore):
     """Multinomial BIC score over category codes, on the scale of :class:`BICScore`.
 
     Each node is a categorical variable whose distribution in each configuration of its parents is
@@ -432,31 +460,15 @@ class CategoricalBICScore:
         self.lambda_value = penalty_weight(lambda_value)
         self.log_n = float(np.log(self.n))
         self._codes, self._cardinalities = categorical.encode(arr)
-        self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
+        self._memo = _LRU(cache_size)
 
-    def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
-        codes = self._codes
-        r = int(self._cardinalities[node])
+    def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
+        r = counts.shape[1]
         q = float(np.prod([float(self._cardinalities[p]) for p in parents]))
-        config, m = categorical.configurations(codes, self._cardinalities, parents)
-        counts = np.bincount(config * r + codes[:, node], minlength=m * r).reshape(m, r)
         n_ij = np.repeat(counts.sum(axis=1), r)[counts.ravel() > 0]
         n_ijk = counts[counts > 0]
         log_likelihood = float(np.sum(n_ijk * np.log(n_ijk / n_ij)))
         return -2.0 * log_likelihood + self.lambda_value * self.log_n * q * (r - 1)
-
-    def score(self, node: int, parents: Sequence[int]) -> float:
-        """Return the memoized local categorical BIC score for ``node`` given ``parents``.
-
-        The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
-        the lookup.
-        """
-        key = tuple(sorted(int(p) for p in parents))
-        return self._score_key(int(node), key)
-
-    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
-        """Return the local categorical BIC scores for many parent sets, in request order."""
-        return [self.score(node, parents) for parents in parent_sets]
 
 
 class DGScore:
