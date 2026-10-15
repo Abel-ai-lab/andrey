@@ -29,14 +29,16 @@ at a time. A link ``A - B``, ``A < B``, is tested given ``S`` plus the default c
 ``S_def``, the parents of ``A`` and ``B``. ``S`` runs over the ``p``-subsets of the adjacencies of
 ``B`` that have no arrowhead at themselves (``apds_t``), minus ``S_def``, sorted by the smallest
 absolute test statistic of their link with ``B``, largest first, as it stood when the group
-started. A same-step link is also tested from ``A``'s side; the earlier end of a lagged link is
-searched with the empty set only. The first p-value above ``alpha`` marks the link for removal
-and adds ``S + S_def`` to its separating sets; marked links leave the graph when their group
-ends. A side with fewer than ``p`` candidates is done, and its letter is added to the middle mark
-(``"?"`` + ``"R"`` = ``"R"``, ``"L"`` + ``"R"`` = ``"!"``). When a round removes a link, the
-rules ``APR, R8', R2', R1', R9', R10'`` orient lagged links and ``p`` restarts at 0. The phase
-ends when every middle mark is ``"!"`` or ``""``, and then applies the full rule list ``APR,
-R8', R2', R1', R0'd, R0'c, R3', R4, R9', R10', R0'b, R0'a``.
+started, so the tests of one link do not reorder the search of another link in its group and the
+order does not depend on the order of the variables; equal statistics go to the earlier node,
+then the lower index. A same-step link is also tested from ``A``'s side; the earlier end of a
+lagged link is searched with the empty set only. The first p-value above ``alpha`` marks the
+link for removal and adds ``S + S_def`` to its separating sets; marked links leave the graph when
+their group ends. A side with fewer than ``p`` candidates is done, and its letter is added to the
+middle mark (``"?"`` + ``"R"`` = ``"R"``, ``"L"`` + ``"R"`` = ``"!"``). When a round removes a
+link, the rules ``APR, R8', R2', R1', R9', R10'`` orient lagged links and ``p`` restarts at 0.
+The phase ends when every middle mark is ``"!"`` or ``""``, and then applies the full rule list
+``APR, R8', R2', R1', R0'd, R0'c, R3', R4, R9', R10', R0'b, R0'a``.
 
 The **non-ancestral removal phase** (Algorithm S3) tests every link whose middle mark is not
 empty given subsets of ``napds_t``, a superset of the D-Sep set that uses the orientations found
@@ -52,15 +54,16 @@ middle-mark rule MMR runs once the list is through. An edge mark asked to be bot
 arrowhead, or asked to change a tail or an arrowhead it already has, becomes a conflict. Each
 unshielded triple is read once, in the window whose latest node is at time ``t``. Rules ``R0'a``
 and ``R0'b`` test a link again given each stored separating set of the outer pair plus the
-parents of both ends, and remove it when one of the tests separates; that set is made weakly
-minimal by dropping, one at a time, each node that is not a known ancestor of either end while
-the rest still separates. Whether a node ``B`` is outside the separating set of ``A`` and ``C`` is
-a majority vote over the distinct separating sets among the stored ones and the subsets of the
-``apds_t`` sets of ``A`` and ``C``, given the parents of both; the earlier node of a lagged pair
-contributes the empty subset only. Whether ``B`` is inside reads the vote when both links to
-``B`` have empty middle marks, and otherwise requires ``B`` in every stored separating set. The
-paths of R9' and R10' leave out links whose middle mark is ``"?"``, and R4 reads only links with
-empty middle marks.
+parents of both ends, and remove it when one of the tests separates. Every set that separates,
+from every triple, is stored, each made weakly minimal: while some node that is not a known
+ancestor of either end can be dropped with the rest still separating, the one whose drop leaves
+the largest p-value goes. Neither step depends on the order of the variables. Whether a node
+``B`` is outside the separating set of ``A`` and ``C`` is a majority vote over the distinct
+separating sets among the stored ones and the subsets of the ``apds_t`` sets of ``A`` and ``C``,
+given the parents of both; the earlier node of a lagged pair contributes the empty subset only.
+Whether ``B`` is inside reads the vote when both links to ``B`` have empty middle marks, and
+otherwise requires ``B`` in every stored separating set. The paths of R9' and R10' leave out links
+whose middle mark is ``"?"``, and R4 reads only links with empty middle marks.
 
 Every test reads the lagged design of :func:`~andrey.temporal.pcmci.lagged_design` over
 ``T - 2 * tau_max`` time steps, through any :class:`~andrey.temporal.pcmci.LinkTest`, and is
@@ -633,12 +636,13 @@ class _Search:
         self,
         marks: dict[tuple[Key, bool], set[int]],
         middles: dict[Key, str],
-        removals: dict[Key, tuple[Node, Node, frozenset[Node]]],
+        removals: dict[Key, set[tuple[Node, Node, frozenset[Node]]]],
         lagged_only: bool,
     ) -> bool:
         """Apply a rule's proposals; return whether the graph changed.
 
-        Removals go first: when a rule removes links, its orientations wait for the next pass.
+        Removals go first: when a rule removes links, its orientations wait for the next pass. A
+        removed link stores every separating set the rule found for it, each made weakly minimal.
         """
         changed = False
         if any(not (lagged_only and key[2] == 0) and key in self.edges for key in removals):
@@ -663,11 +667,12 @@ class _Search:
             if self.edges[key][1] != middle:
                 self.edges[key][1] = middle
                 changed = True
-        for key, (a, b, sepset) in removals.items():
+        for key, found in removals.items():
             if lagged_only and key[2] == 0 or key not in self.edges:
                 continue
             self.remove(key)
-            self.add_sepset(key, self.weakly_minimal(a, b, sepset), min(a[1], b[1]))
+            for a, b, sepset in found:
+                self.add_sepset(key, self.weakly_minimal(a, b, sepset), min(a[1], b[1]))
             changed = True
         if changed:
             self.version += 1
@@ -677,18 +682,21 @@ class _Search:
     def weakly_minimal(self, a: Node, b: Node, sepset: frozenset[Node]) -> frozenset[Node]:
         """Drop the nodes of ``sepset`` that are not known ancestors while it still separates.
 
-        The known ancestors are read in the window whose later node is the later of ``a`` and
-        ``b``.
+        Each step drops the node whose removal leaves the largest p-value above ``alpha``, so the
+        result does not depend on the order of the variables. The known ancestors are read in the
+        window whose later node is the later of ``a`` and ``b``.
         """
         later = min(a[1], b[1])
         known = _shift(self.ancestors([(a[0], a[1] - later), (b[0], b[1] - later)]), later)
-        current = set(sepset)
-        for node in sorted(sepset - known, key=_order):
-            trial = frozenset(current - {node})
-            _, (p_value,) = self.run_tests(a, b, [trial], rank=False, report=False)
-            if p_value > self.alpha:
-                current = set(trial)
-        return frozenset(current)
+        current = frozenset(sepset)
+        while droppable := sorted(current - known, key=_order):
+            trials = [current - {node} for node in droppable]
+            _, p_values = self.run_tests(a, b, trials, rank=False, report=False)
+            best = max(range(len(trials)), key=lambda k: p_values[k])
+            if p_values[best] <= self.alpha:
+                break
+            current = trials[best]
+        return current
 
     def full_rules(self) -> list[Callable[[], tuple[dict, dict, dict]]]:
         return [
@@ -774,8 +782,8 @@ class _Search:
             for x in (a, c):
                 if self.middle(x, b) != "":
                     found = self._retest(x, b, a, c)
-                    if found is not None:
-                        removals.setdefault(_key(x, b)[0], (x, b, found))
+                    if found:
+                        removals.setdefault(_key(x, b)[0], set()).update((x, b, s) for s in found)
                         dependent = False
             if not dependent:
                 continue
@@ -787,20 +795,21 @@ class _Search:
                 self._propose(marks, c, b, None, ARROW)
         return marks, {}, removals
 
-    def _retest(self, x: Node, b: Node, a: Node, c: Node) -> frozenset[Node] | None:
+    def _retest(self, x: Node, b: Node, a: Node, c: Node) -> list[frozenset[Node]]:
         """Test ``x`` and ``b`` given each separating set of ``a`` and ``c`` plus their parents.
 
         The sets are read in the window of the triple; nodes in the future of both ``x`` and
-        ``b`` are left out. Return the first conditioning set that separates them.
+        ``b`` are left out. Return every conditioning set that separates them.
         """
         later = min(x[1], b[1])
         parents = (self.parents(x) | self.parents(b)) - {x, b}
+        found = []
         for sepset in self.stored_sepsets(a, c) or [frozenset()]:
             nodes = frozenset(n for n in sepset | parents if later <= n[1] <= self.tau_max)
             _, (p_value,) = self.run_tests(x, b, [nodes - {x, b}])
-            if p_value > self.alpha:
-                return nodes - {x, b}
-        return None
+            if p_value > self.alpha and nodes - {x, b} not in found:
+                found.append(nodes - {x, b})
+        return found
 
     def rule_r0b(self) -> tuple[dict, dict, dict]:
         """R0'b: ``A *-> B o-* C``, unshielded, ``B`` outside the separating set: ``B <-* C``."""
@@ -813,8 +822,8 @@ class _Search:
                 continue
             if self.middle(a, b) != "":
                 found = self._retest(a, b, a, c)
-                if found is not None:
-                    removals.setdefault(_key(a, b)[0], (a, b, found))
+                if found:
+                    removals.setdefault(_key(a, b)[0], set()).update((a, b, s) for s in found)
                     continue
             if self.outside_sepset(a, b, c):
                 self._propose(marks, b, c, ARROW, None)

@@ -330,3 +330,61 @@ def test_the_counted_vote_matches_the_listed_vote_before_and_after_a_change():
     after = _shares(search, listed=False)
     assert after == _shares(search, listed=True)
     assert after != before
+
+
+# ---- separating sets the rules store do not depend on the variable order ----------------------
+
+
+class TableTest:
+    """P-values of ``X0_t`` and ``X1_t`` read from a table keyed by the conditioning variables.
+
+    ``relabel`` maps a table variable to the variable the search sees; any query not in the
+    table is a dependence. ``tau_max`` is 0, so a design column is a variable.
+    """
+
+    def __init__(self, table: dict[frozenset, float], relabel: dict[int, int]) -> None:
+        self.table = {frozenset(relabel[v] for v in key): p for key, p in table.items()}
+
+    def statistic_pvalues(self, x, y, conditions):
+        p_values = np.array(
+            [
+                self.table.get(frozenset(row), 0.01) if {int(a), int(b)} == {0, 1} else 0.01
+                for a, b, row in zip(x, y, np.asarray(conditions).tolist())
+            ]
+        )
+        return 1.0 - p_values, p_values
+
+
+def _relabeled(sets, relabel: dict[int, int]) -> set[frozenset]:
+    return {frozenset((relabel[v], lag) for v, lag in s) for s in sets}
+
+
+SWAP = {0: 0, 1: 1, 2: 3, 3: 2}  # exchanges X2 and X3
+
+
+@pytest.mark.parametrize("relabel", [{v: v for v in range(4)}, SWAP])
+def test_rule_r0a_stores_the_separating_set_of_every_triple(relabel):
+    # X0 - X1 - X2 and X0 - X1 - X3 are unshielded; X0 and X1 are separated given the stored set
+    # of either outer pair, {X3} for (X0, X2) and {X2} for (X0, X3), and not given nothing.
+    table = {frozenset({3}): 0.5, frozenset({2}): 0.4}
+    search = engine._Search(TableTest(table, relabel), 4, 0, 0.05)
+    search.initialize()
+    for outer, sepset in (((0, 2, 0), {(3, 0)}), ((0, 3, 0), {(2, 0)})):
+        i, j, _ = outer
+        key = engine._key((relabel[i], 0), (relabel[j], 0))[0]
+        search.remove(key)
+        search.add_sepset(key, frozenset(_relabeled([sepset], relabel).pop()), 0)
+    assert search._apply(*search.rule_r0a(), lagged_only=False)
+    stored = _relabeled(search.sepsets[(0, 1, 0)], relabel)
+    assert stored == {frozenset({(2, 0)}), frozenset({(3, 0)})}
+
+
+@pytest.mark.parametrize("relabel", [{v: v for v in range(4)}, SWAP])
+def test_weakly_minimal_drops_the_node_that_leaves_the_largest_p_value(relabel):
+    # {X2, X3} separates X0 and X1; dropping X2 leaves p = 0.6, dropping X3 leaves p = 0.3, and
+    # dropping both leaves a dependence, so X2 goes whatever the variables are called.
+    table = {frozenset({2, 3}): 0.9, frozenset({3}): 0.6, frozenset({2}): 0.3}
+    search = engine._Search(TableTest(table, relabel), 4, 0, 0.05)
+    search.initialize()
+    found = search.weakly_minimal((0, 0), (1, 0), frozenset({(2, 0), (3, 0)}))
+    assert _relabeled([found], relabel) == {frozenset({(3, 0)})}
