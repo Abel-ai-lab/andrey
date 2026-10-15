@@ -39,6 +39,7 @@ DECISIONS = [
     (0.60, 0.30, None, (0, 1)),  # the larger p-value wins
     (0.30, 0.60, None, (1, 0)),
     (0.40, 0.40, None, None),  # a tie decides nothing
+    (0.0, 0.0, None, None),  # nor does a tie at zero, without statistics
     (0.23, 0.02, 0.05, (0, 1)),  # forward passes, backward fails
     (0.02, 0.23, 0.05, (1, 0)),
     (0.60, 0.30, 0.05, None),  # both pass: either direction fits
@@ -55,6 +56,39 @@ def test_pairwise_decision_rules(forward, backward, alpha, edge):
     assert _adapt_anm(forward, backward, alpha=alpha).structure == out.structure
 
 
+# (pval_forward, pval_backward, stat_forward, stat_backward, alpha) -> the edge; None for no edge.
+# Each statistic is an HSIC statistic over its mean under independence.
+TIE_BREAKS = [
+    (0.0, 0.0, 16.3, 17.0, None, (0, 1)),  # both p-values zero: the smaller statistic wins
+    (0.0, 0.0, 17.0, 16.3, None, (1, 0)),
+    (0.0, 0.0, 17.0, 17.0, None, None),  # the statistics tie too: no edge
+    (0.60, 0.30, 9.0, 1.1, None, (0, 1)),  # unequal p-values decide whatever the statistics
+    (0.30, 0.60, 1.1, 9.0, None, (1, 0)),
+    (0.0, 0.0, 1.1, 9.0, 0.05, None),  # with a level, only the p-values decide
+]
+
+
+@pytest.mark.parametrize("adapt", [_adapt_anm, _adapt_pnl], ids=["anm", "pnl"])
+@pytest.mark.parametrize(("forward", "backward", "stat_f", "stat_b", "alpha", "edge"), TIE_BREAKS)
+def test_pairwise_breaks_a_pvalue_tie_by_the_statistic(
+    adapt, forward, backward, stat_f, stat_b, alpha, edge
+):
+    out = adapt(forward, backward, stat_forward=stat_f, stat_backward=stat_b, alpha=alpha)
+    expected = [] if edge is None else [(*edge, "directed")]
+    assert out.structure.oriented_edges() == expected
+
+
+def test_pnl_keeps_the_statistics_as_floats(tmp_path):
+    out = _adapt_pnl(
+        np.array([0.0]), 0.0, stat_forward=np.float64(17.0), stat_backward=np.array([16.3])
+    )
+    md = out.metadata
+    assert (md["stat_forward"], md["stat_backward"]) == (17.0, 16.3)
+    assert type(md["stat_forward"]) is float and type(md["stat_backward"]) is float
+    assert out.structure.oriented_edges() == [(1, 0, "directed")]
+    _roundtrips(out, tmp_path, "pnl-stats")
+
+
 def test_anm_decided_graph_and_float_metadata(tmp_path):
     out = _adapt_anm(0.02, 0.81)
     g = out.structure
@@ -68,6 +102,7 @@ def test_anm_decided_graph_and_float_metadata(tmp_path):
     assert md["pval_forward"] == 0.02
     assert md["pval_backward"] == 0.81
     assert isinstance(md["pval_forward"], float) and isinstance(md["pval_backward"], float)
+    assert set(md) == {"algorithm", "pval_forward", "pval_backward"}
     _roundtrips(out, tmp_path, "anm")
 
 

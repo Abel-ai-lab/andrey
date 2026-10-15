@@ -46,12 +46,14 @@
     });
   }
 
-  // Scale each lane's canvas to its track, centered when the track is wider.
+  // Scale each lane's canvas to its track, up to the scene's --wf-scale-max, centered when the
+  // track is wider.
   function fit(figure) {
+    const most = parseFloat(getComputedStyle(figure).getPropertyValue("--wf-scale-max")) || 1.12;
     for (const holder of figure.querySelectorAll(".wf-track")) {
       const canvas = holder.querySelector(".wf-canvas");
       if (!canvas) continue;
-      const scale = Math.min(1.12, holder.clientWidth / WIDTH);
+      const scale = Math.min(most, holder.clientWidth / WIDTH);
       const left = (holder.clientWidth - WIDTH * scale) / 2;
       canvas.style.transform = `translateX(${left}px) scale(${scale})`;
       holder.style.height = `${HEIGHT * scale}px`;
@@ -295,8 +297,9 @@
 
   // ---- playing a scene ----------------------------------------------------------------------
   // Returns controls: done (a promise), pause, resume, stop. With reduced motion the scene jumps
-  // to its last frame.
-  function play(figure, { onProgress, entrance = false, hold = false } = {}) {
+  // to its last frame. With scrub, the scene waits at its start and returns its length (end) and
+  // seek, which shows it at any time, forward or back.
+  function play(figure, { onProgress, entrance = false, hold = false, scrub = false } = {}) {
     const data = settings(figure);
     const L = lanes(figure);
     const S = score();
@@ -336,6 +339,29 @@
     });
 
     const controls = animate(S.seq);
+    if (scrub) {
+      controls.pause();
+      // Each count is the last one its lane has reached by then, and each check shows once its
+      // lane is done; the check eases in and out with a transition of its own (why-fast.css).
+      const seek = (time) => {
+        controls.time = time;
+        L.forEach((lane, k) => {
+          let value = 0;
+          let done = false;
+          for (const e of S.events) {
+            if (e.lane !== k || e.at > time) continue;
+            if (e.done) done = true;
+            else value = Math.max(value, e.value);
+          }
+          lane.num.textContent = value;
+          lane.unit.textContent = value === 1 ? data.units[0] : data.units[1];
+          lane.badge.style.opacity = done ? 1 : 0;
+          lane.badge.style.scale = done ? 1 : 0.4;
+        });
+      };
+      seek(0);
+      return { end, seek };
+    }
     let t = 0;
     let last = performance.now();
     let running = !hold && !still;
@@ -395,92 +421,114 @@
     if (!still) inView(figure, () => { start(); }, { amount: 0.6 });
   }
 
-  // ---- the homepage's dialog: one scene at a time, advancing on its own ----------------------
-  for (const dialog of document.querySelectorAll("dialog.wf-dialog")) {
-    const panels = [...dialog.querySelectorAll(".wf-panel")];
-    const dots = [...dialog.querySelectorAll(".wf-dot")];
-    const button = dialog.querySelector(".wf-play");
-    let index = 0;
-    let run = null;
-    let paused = false;
-    let finished = false;
-    let timer = 0;
-    let ticket = 0;
-    const setState = (state) => {
-      button.dataset.state = state;
-      button.setAttribute("aria-label", { playing: "Pause", paused: "Play", ended: "Replay" }[state]);
-    };
-    const advance = () => {
-      if (paused || !dialog.open) return;
-      if (index < panels.length - 1) timer = setTimeout(() => show(index + 1), 2200);
-      else setState("ended");
-    };
-    function show(k, { fade = true } = {}) {
-      const mine = ++ticket;
-      clearTimeout(timer);
-      if (run) run.stop();
-      const previous = panels[index];
-      index = k;
-      finished = false;
-      dots.forEach((dot, j) => {
-        dot.setAttribute("aria-selected", String(j === k));
-        dot.tabIndex = j === k ? 0 : -1;
-        dot.querySelector("i").style.transform = "scaleX(0)";
+  // ---- the homepage's story: one scene at a time, played by the scroll -----------------------
+  // Without this script, and with reduced motion, the steps stand one after another, each scene
+  // at its last frame. Otherwise, where the section's title and a step fit the screen together,
+  // the run (.wf-run) pins its stage (.wf-pin) under the navbar and splits its scroll evenly among
+  // the scenes: the step whose share the reader is in shows, and the first PLAYED of that share
+  // plays its scene, forward or back; the rest holds the scene's last frame. Where they do not
+  // fit, the title scrolls away and the story alone pins; where even that does not fit, the steps
+  // stay stacked and each scene plays as it rises through the screen.
+  const PLAYED = 0.7;
+  for (const story of document.querySelectorAll(".wf-story")) {
+    const steps = [...story.querySelectorAll(".wf-step")];
+    const figures = steps.map((step) => step.querySelector(".wf-scene"));
+    if (still) {
+      figures.forEach((figure) => play(figure));
+      continue;
+    }
+    const run = story.closest(".wf-run");
+    const stage = run.querySelector(".wf-pin");
+    const scenes = figures.map((figure) => play(figure, { scrub: true }));
+    const under = () => parseFloat(getComputedStyle(stage).top) || 0; // where the stage pins
+    const shown = scenes.map(() => 0);
+    run.style.setProperty("--steps", steps.length);
+
+    // A bar per step, which fills as its scene plays and takes the reader to it.
+    const rail = document.createElement("div");
+    rail.className = "wf-rail";
+    const bars = steps.map((step, k) => {
+      const button = make("button", "wf-bar-step", rail);
+      button.type = "button";
+      const title = step.querySelector("h3").textContent;
+      button.innerHTML = "<i></i><span></span>";
+      button.querySelector("span").textContent = title;
+      button.addEventListener("click", () => {
+        const box = run.getBoundingClientRect();
+        const span = box.height - stage.offsetHeight;
+        const top = window.scrollY + box.top - under() + span * ((k + PLAYED) / steps.length);
+        window.scrollTo({ top, behavior: "smooth" });
       });
-      panels.forEach((panel, j) => { panel.hidden = j !== k; });
-      if (fade && !still && previous !== panels[k]) {
-        animate(panels[k], { opacity: [0, 1], y: [10, 0] }, { type: "spring", bounce: 0, visualDuration: 0.45 });
+      return button;
+    });
+    story.prepend(rail);
+
+    // Where the reader is: through the pinned run, from 0 to 1, or, stacked, through each step.
+    const pinned = () => run.classList.contains("is-pinned");
+    const through = () => {
+      const box = run.getBoundingClientRect();
+      const span = box.height - stage.offsetHeight;
+      return span > 0 ? Math.min(1, Math.max(0, (under() - box.top) / span)) : 0;
+    };
+    const goals = () => {
+      if (!pinned()) {
+        return figures.map((figure, k) => {
+          const box = figure.getBoundingClientRect();
+          const rise = (innerHeight * 0.9 - box.top) / (innerHeight * 0.5);
+          return scenes[k].end * Math.min(1, Math.max(0, rise));
+        });
       }
-      const bar = dots[k].querySelector("i");
-      run = play(panels[k].querySelector(".wf-scene"), {
-        entrance: true,
-        onProgress: (f) => { bar.style.transform = `scaleX(${f})`; },
+      const at = through() * steps.length;
+      const current = Math.min(steps.length - 1, Math.floor(at));
+      steps.forEach((step, k) => step.classList.toggle("is-on", k === current));
+      bars.forEach((bar, k) => {
+        if (k === current) bar.setAttribute("aria-current", "step");
+        else bar.removeAttribute("aria-current");
+        bar.style.setProperty("--fill", Math.min(1, Math.max(0, (at - k) / PLAYED)).toFixed(3));
       });
-      if (paused) run.pause();
-      setState(paused ? "paused" : "playing");
-      // With reduced motion nothing advances on its own; the dots move between scenes.
-      run.done.then(() => { if (mine !== ticket || still) return; finished = true; advance(); });
-    }
-    dots.forEach((dot, k) => {
-      dot.addEventListener("click", () => { paused = false; show(k); });
-      dot.addEventListener("keydown", (event) => {
-        const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
-        if (!step) return;
-        event.preventDefault();
-        const next = (k + step + dots.length) % dots.length;
-        dots[next].focus();
-        paused = false;
-        show(next);
+      return scenes.map((scene, k) =>
+        k < current ? scene.end : k > current ? 0 : scene.end * Math.min(1, (at - k) / PLAYED),
+      );
+    };
+
+    // Each scene eases toward where the scroll puts it, so a step of the wheel still flows.
+    let raf = 0;
+    const frame = () => {
+      raf = 0;
+      let moving = false;
+      goals().forEach((goal, k) => {
+        const next = Math.abs(goal - shown[k]) < 0.01 ? goal : shown[k] + (goal - shown[k]) * 0.22;
+        if (next !== shown[k]) scenes[k].seek((shown[k] = next));
+        if (next !== goal) moving = true;
       });
-    });
-    button.addEventListener("click", () => {
-      if (button.dataset.state === "ended") { paused = false; show(0); return; }
-      paused = !paused;
-      if (paused) { clearTimeout(timer); run.pause(); setState("paused"); return; }
-      setState("playing");
-      if (finished) advance();
-      else run.resume();
-    });
-    if (still) button.hidden = true;
-    dialog.querySelector(".wf-close").addEventListener("click", () => dialog.close());
-    // A click on the backdrop, outside the dialog's box, closes it.
-    dialog.addEventListener("click", (event) => {
-      const box = dialog.getBoundingClientRect();
-      const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
-      if (!inside) dialog.close();
-    });
-    dialog.addEventListener("close", () => { clearTimeout(timer); if (run) run.stop(); });
-    // The opener is a link to the guide's page; with this script it opens the dialog instead.
-    for (const opener of document.querySelectorAll(`[data-wf-open="${dialog.id}"]`)) {
-      opener.setAttribute("role", "button");
-      opener.setAttribute("aria-haspopup", "dialog");
-      opener.addEventListener("click", (event) => {
-        event.preventDefault();
-        dialog.showModal();
-        paused = false;
-        if (!still) animate(dialog, { opacity: [0, 1], y: [24, 0], scale: [0.97, 1] }, { type: "spring", bounce: 0.12, visualDuration: 0.45 });
-        show(0, { fade: false });
-      });
-    }
+      if (moving) raf = requestAnimationFrame(frame);
+    };
+    const request = () => { if (!raf) raf = requestAnimationFrame(frame); };
+
+    // Pin only where the stage fits under the navbar: with the section's title, or else with the
+    // title lifted above the screen's top (--lift), so the story alone stays. The stage's own
+    // boxes measure it, not its scroll height, which counts the hidden steps' offset.
+    const fit = () => {
+      run.classList.add("is-pinned");
+      run.style.setProperty("--lift", "0px");
+      const fits = () =>
+        story.getBoundingClientRect().bottom - stage.getBoundingClientRect().top <=
+        parseFloat(getComputedStyle(stage).maxHeight) + 1;
+      if (!fits()) {
+        const lift = story.getBoundingClientRect().top - stage.getBoundingClientRect().top;
+        run.style.setProperty("--lift", `${Math.round(lift)}px`);
+      }
+      const pinned = fits();
+      run.style.setProperty("--pin-h", `${stage.offsetHeight}px`);
+      run.classList.toggle("is-pinned", pinned);
+      if (!pinned) steps.forEach((step) => step.classList.remove("is-on"));
+      request();
+    };
+    fit();
+    // The web font arrives after the first measure and rewraps the text, so measure again.
+    if (document.fonts) document.fonts.ready.then(fit);
+    addEventListener("scroll", request, { passive: true });
+    let resized = 0;
+    addEventListener("resize", () => { clearTimeout(resized); resized = setTimeout(fit, 150); });
   }
 })();

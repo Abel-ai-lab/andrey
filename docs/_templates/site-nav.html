@@ -1,19 +1,29 @@
 {#- The site's sections, as pydata's navbar-nav draws its links: the current section is marked, and
-    aria-current goes only on the link to the page being read. -#}
+    aria-current goes only on the link to the page being read. Release cards carries a dot that
+    nav-new.js shows until the reader has opened the latest release's cards. -#}
 {%- set sections = [
   ("docs/index", "Docs", pagename.startswith("docs/")
-    and not pagename.startswith(("docs/examples/", "docs/demos/")) and pagename != "docs/faq"),
+    and not pagename.startswith(("docs/examples/", "docs/demos/", "docs/benchmarks/"))
+    and pagename not in ("docs/faq", "docs/benchmarks")),
   ("docs/examples/index", "Examples", pagename.startswith("docs/examples/")),
   ("docs/demos/index", "Demos", pagename.startswith("docs/demos/")),
   ("blog/index", "Blog", pagename == "blog" or pagename.startswith("blog/")),
+  ("docs/benchmarks", "Release cards", pagename == "docs/benchmarks"
+    or pagename.startswith("docs/benchmarks/")),
   ("docs/faq", "FAQ", pagename == "docs/faq"),
 ] %}
 <nav aria-label="{{ _('Site') }}">
   <ul class="bd-navbar-elements navbar-nav">
     {%- for doc, title, current in sections %}
     <li class="nav-item{% if current %} current active{% endif %}">
-      <a class="nav-link nav-internal" href="{{ pathto(doc) }}"{% if pagename == doc %} aria-current="page"{% endif %}>{{ title }}</a>
+      <a class="nav-link nav-internal" href="{{ pathto(doc) }}"{% if pagename == doc %} aria-current="page"{% endif %}>{{ title }}
+        {%- if doc == "docs/benchmarks" %}<span class="nav-new" data-release="{{ release_version }}" hidden><span class="visually-hidden">, new release</span></span>{% endif %}</a>
     </li>
     {%- endfor %}
   </ul>
 </nav>
+{#- Search inside the phone's menu, where the pill shows only the wordmark and the menu button. -#}
+<button type="button" class="btn search-button-field search-button__button pst-js-only drawer-search" aria-label="{{ _('Search') }}">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <span class="search-button__default-text">{{ _('Search') }}</span>
+</button>

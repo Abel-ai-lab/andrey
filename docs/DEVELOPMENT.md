@@ -29,40 +29,123 @@ Every link is relative, so one build serves any hostname.
 
 The homepage is a template, [`site/homepage.html`](../site/homepage.html), on pydata's layout with
 only its navbar. `conf.py` fills it with `homepage_context` from [`site/build.py`](../site/build.py):
-the race, the charts, the claim cards, the comparison table, and the table's footnote.
+the hero's art, the sections' claims and tiles, the charts, and the comparison table with its
+sources.
 `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the page's do
 not meet; `site/assets/figures.css` and `figures.js` hold the timing comparison and the speed
 charts, which the launch post and the benchmark explorer show too.
 
-The speed section's "Why Andrey is fast" pill opens a dialog of four animated scenes, one per idea
-behind the speed, built by [`site/why_fast.py`](../site/why_fast.py). The blog post
-`docs/blog/20261008-why-andrey-is-fast.md` shows the same scenes under its own headings. Each scene compares
-Andrey with a lane labeled Others and names no package. `site/assets/why-fast.js` plays them with
-Motion, vendored unmodified as `site/assets/motion.js` under its MIT license; the version is pinned
-in the file's banner and in `tests/unit/test_why_fast.py`. `conf.py` loads both scripts only on
-those two pages.
+The hero is one screen: the headline, "Causal discovery: accelerated, accurate, agentic.", the
+install line, and a card per section below it, each with its art, its title, and its claim's
+short form. The four sections follow the headline's words, then All-in-one for what the package
+covers (`ACTS` in `site/build.py`). Each opens on its art at full bleed with its title and its
+claim (`act_covers()`), then shows its evidence, two pieces or more: tiles, each with a figure of
+its own, and a note in plain type beside a tile where the evidence is a list a card would only
+frame (`bento-note`). The hero and Accelerated share one art, the fast lanes (`HERO_ART`, `.run` in
+`site/assets/site.css`): it stays on the screen while the hero's type scrolls away and
+Accelerated's title comes up over it right after the hero's cards, with the ideas behind the
+speed, until the tiles rise over it on the page's paper. The run clips the art at its foot, so the
+next section opens on its own art alone.
+
+- Accelerated: the ideas behind the speed, one at a time as the reader scrolls, then a tile per
+  method family.
+- Accurate: where Andrey has fewer errors, as a chart, and beside it a note naming the methods as
+  accurate as the other package's.
+- Agentic: an agent's run of the command line, and the contract it reads first.
+- All-in-one: a note with the methods by family, how many of the comparison table's features each
+  package has, and every kind of causal graph drawn, then "From data to graph", which opens on its
+  own art (`example_cover()`, `EXAMPLE_ART`): the Sachs example's code, output, and graph.
+
+Every claim comes from the summaries and the registry (`act_claims()`): the largest family speedup,
+how many methods are more accurate and how many as accurate (`accuracy_verdicts()`, one count per
+method however many packages it is compared with), and the number of methods. A tile opens its
+dialog, and no two tiles open the same one (Agentic's one tile shows the whole command-line
+session, `agent_tile()`); a tile whose dialog would only repeat it has none, and carries no plus.
+
+The ideas are four animated scenes built by [`site/why_fast.py`](../site/why_fast.py) (`story()`),
+each with its title and narration. Without script, and with reduced motion, they stand one after
+another at their final counts. Otherwise `why-fast.js` pins Accelerated's title and the story
+under the navbar (`.wf-run`, `.wf-pin`) and splits the run's scroll among the scenes: the current
+one shows, the scroll plays it forward or back, and a bar per scene fills as it plays and jumps to
+it. Where the title and a scene do not fit the screen together, the scenes stay stacked and each
+plays as it rises through the screen. The blog post `docs/blog/20261008-why-andrey-is-fast.md`
+shows the same scenes under its own headings. Each scene
+compares Andrey with a lane labeled Others and names no package. `site/assets/why-fast.js` plays
+them with Motion, vendored unmodified as `site/assets/motion.js` under its MIT license; the version
+is pinned in the file's banner and in `tests/unit/test_why_fast.py`. `conf.py` loads both scripts
+only on those two pages.
+
+The hero, the covers, and the tiles look like the blog's covers, in both themes: the stipple ground,
+art in the brand's tones with its subject on the right (`HERO_ART`, `ACTS`, `EXAMPLE_ART`,
+`FAMILY_ART`, and `tile_art()` in `site/build.py`; the files in `site/brand/`), a navy fade under
+the light type, and amber on one element only: the headline's words, the number in a tile, or else
+the art's own key element, as on each section's cover. New art comes from the cover process and is
+stored after `brand_tones`, as sRGB with no embedded profile; site tests check its tones and size,
+and that its median color is `--andrey-ground-art` (`cards.ground_tokens()`), the ground the CSS
+lays around it.
+
+The hero's art keeps nearly its own size, 86% of the screen's width or 60% of its height,
+whichever is more, standing on the screen's foot and held to its right edge, rather than filling
+the screen's height. A section's cover band grows with the screen's width, to 90% of its height,
+so a wide screen shows its art's full height.
+
+The page moves with the scroll, and never under reduced motion. The hero's art pushes in slowly and
+its stipple drifts; as the reader scrolls on, the art stays and the type and cards rise and fade.
+Each section's art settles from a slight push to its own size as it reaches the middle of the screen
+and drifts against the scroll, its title rises in, then its claim, and the tiles fly in. The
+stylesheet drives all of it from the scroll position where the browser can (scroll and view
+timelines); elsewhere the page is still, apart from the tiles, which `tiles.js` brings in with an
+`IntersectionObserver`. Only opacity and transforms move. Every cover's art has one amber line
+(`SWEPT`: the hero's lanes, Accurate's dotted trail, Agentic's arm, All-in-one's ray out of the
+prism, From data to graph's arrow, the documentation's page edge), and a short trace of soft neon
+light runs along it every few seconds while the art is on the screen (`tiles.js`), moving only its
+dash and opacity: `streak()` in `site/build.py` traces the line from the art's warm pixels, a median
+point in each band along its longer extent, from the bottom up, or, for a level beam, left to right,
+so it follows a bend and a trail of dots, and the trace is drawn in the art's own frame
+(`.cover-frame`), so it stays on the line at every width. The documentation section opens on its own
+art (`docs_cover()`, `DOCS_ART`), then leads with the newest post, the one the blog's front page
+leads with: its cover, date, title, and description (`_newest_post_card` in `conf.py`). No section
+ends on a hard edge: the hero's art and the covers fade into the paper. The navbar on every page is
+a frosted glass pill (`docs/_static/andrey.css`), and the search dialog is the same glass, larger;
+the homepage's hero runs up under the navbar. In Chromium the pill is Liquid Glass: `glass.js` draws
+a lens map for the pill's size into the SVG filter in `_templates/site-logo.html` and sets
+`data-glass`; Safari and Firefox keep the frosted pill, and reduced transparency gets the solid
+paper. The section links sit in a recessed glass track, and the current section is a raised glass
+pill on it. A red dot on Release cards marks a release the reader has not opened yet:
+`_templates/site-nav.html` gives it the newest release's version (`_release_post` in `conf.py`), and
+`nav-new.js` shows it until the reader opens a release card page, and again when a newer release is
+out. Without script or storage there is no dot.
+
+Each tile that leads on is a link, and every one behaves alike: `tiles.js` opens its details as a
+dialog, and none leaves the page; without script the details are the dialogs' content, shown in the
+page after the grid (`homepage.html`'s noscript style), and the tile jumps to them. A tile per
+registry family that has a supported method with a published comparison (`family_tiles()`) shows the
+family's largest published ratio rounded down to one digit ("up to 900x faster"), and none where
+Andrey is not at least twice as fast; its dialog holds the family's time charts. A new family gets
+its tile with no change to the page.
 
 The homepage takes every number from the release summaries that `RELEASES` in `site/build.py` names,
 each `benchmarks/published/<label>/summary.json`, or from the method registry,
 `andrey.spec.list_specs()`. Only methods the registry supports count. `comparisons()` reads every
 kind of summary into one layout: rows at mean degree 2 where a summary measures more than one, the
-observed variables on data with hidden variables, a ratio the summary flags as a lower bound printed
-as one, and each comparison's errors in the measure its summary records (`ERRORS`: the structural
-Hamming distance, or directed-edge errors on data with hidden common causes). The claim under the
-heading is the one `claim_sentence()` words from every supported comparison: the largest ratio
-rounded down to a power of ten on its method, then whether the other supported methods are faster
-("the other", "most other", or nothing). The build also fails unless the first summary's headline is
-the claim its own numbers support; the docs index, the notebook, and the live demo repeat it. The
-speedup panel shows one slide per method in `PANEL`, a (release, method) pair each, with every
-package measured in the same runs at its largest size with a paired ratio; the README chart draws
-the same slides as cards and refuses more than six. The hero names every registry family, and the
-method list shows every registered method. The page's description, which search results and link
-previews show, names PC, GES, and FCI, counts the other registered methods, and states the claim's
-first part ("over 100x faster on PC"). Every other page's description is the `description` in its
-front matter; without one, the page's first paragraph, cut at a word to 160 characters (an API
-page's is its docstring's summary line). A page with neither, such as search or the blog archive,
-takes the homepage's. To preview with placeholder numbers, which replace the first release's
-summary:
+observed variables on data with hidden variables, a cause-effect pair's rows as its size, a ratio
+the summary flags as a lower bound printed as one, and each comparison's errors in the measure its
+summary records (`ERRORS`: the structural Hamming distance, directed-edge errors on data with hidden
+common causes, or reversed directions on cause-effect pairs). The speed charts share one size axis
+per unit, variables or rows. The README's claim is the one `claim_sentence()` words from every
+supported comparison: the largest ratio rounded down to a power of ten on its method, then whether
+the other supported methods are faster ("the other", "most other", or nothing). The build
+also fails unless the first summary's headline is the claim its own numbers support; the docs index,
+the notebook, and the live demo repeat it. The README chart shows one card per method in `PANEL`,
+a (release, method) pair each, with every package measured in the same runs at its largest size with
+a paired ratio, and refuses more than six. The methods dialog's first sentence names every registry
+family, and its list shows every registered method. The page's
+description, which search results and link previews show, names PC, GES, and FCI, counts the other
+registered methods, and states the claim's first part ("over 1,000x faster on PNL"). Every other
+page's description is the `description` in its front matter; without one, the page's first
+paragraph, cut at a word to 160 characters (an API page's is its docstring's summary line). A page
+with neither, such as search or the blog archive, takes the homepage's. To preview with placeholder
+numbers, which replace the first release's summary:
 
 ```shell
 uv run --group docs sphinx-build -b html docs docs/_build/html \
@@ -73,7 +156,9 @@ The page is then marked "not for release" and `noindex`. The fixture carries
 `"placeholder": true`, which the build refuses without `andrey_placeholder` wherever the file
 sits. The examples on the page are [`site/example.py`](../site/example.py) and
 [`site/interface.py`](../site/interface.py), run at build time; the page shows what they print and
-draws the graphs they return.
+draws the graphs they return. `interface.py` runs three methods on one table about a lawn, and
+VARMA-LiNGAM on the same lawn day by day, so the graphs tile draws all five kinds: VARMA-LiNGAM's
+graph over two days (`two_days()`) and, with time collapsed, the cyclic graph.
 
 ## The blog
 
@@ -85,19 +170,21 @@ not keep a post private.
 
 The blog's front page, `/blog/`, lists the dated posts in the Release cards page's blocks, from
 their front matter: the `blog-index` directive in `blog/index.md`, which `_blog_index` in
-`conf.py` fills. The newest post leads with its banner beside its title, its date, its
-`description` as its TL;DR, and a button to the post. The earlier posts follow, newest first, each
-in a row with a square tile of its art, its description, and its date. Newest means the latest
-date, a later version breaking a tie, as for the alpha banner below. A tile is a small JPEG that
-`tile_jpeg` in `site/cards.py` crops from the art, so the page loads the newest banner and a few
-small tiles. Each post lists its front matter's
-`tags`, each linking to ABlog's page of the posts that share it. A new post needs no change to the
-page.
+`conf.py` fills. The newest post leads with its cover across the block, then its title, date,
+tags, its `description` as its TL;DR, and a button to the post. The earlier posts follow, newest
+first, each in a row with a small copy of its art (`thumb_jpeg` in `site/cards.py`), its
+description, tags, and date, under a button that reverses their order. Newest means the latest
+date, a later version breaking a tie, as for the alpha banner below. Each tag links to ABlog's
+page of the posts that share it. A new post needs no change to the page.
+
+A post's cover is its art alone: the page's title and byline (authors, date, version, tags) sit
+around it. Its link preview is the banner, the art with the wordmark, title, and release drawn
+over its left side (`preview_jpeg`), the image a shared link shows.
 
 A post belongs to the release in its `version` front matter, and later builds leave it as that
 release rendered it: its numbers are typed text, and every file it includes (a figure, code, or
-output) is stored under `blog/<version>/`. The alpha banner above every page links the newest
-dated post, a later version breaking a tie in date (`_release_post` in `conf.py`).
+output) is stored under `blog/<version>/`. The navbar's dot on Release cards names the newest dated
+post with a version, a later version breaking a tie in date (`_release_post` in `conf.py`).
 
 ## The release cards
 
@@ -139,6 +226,23 @@ A card's figures are finished HTML files in `docs/benchmarks/<release>/`, includ
 `{raw} html`, so later code never redraws a released card. `_static/benchmarks.css` styles the
 page and the cards' covers, and loads on those pages only; a card also loads `figures.css` and
 `figures.js`, the styles and script of the posts' figures.
+
+## The documentation sidebars
+
+The left sidebar ([`_templates/docs-nav.html`](_templates/docs-nav.html)) groups the docs index's
+toctree: each section named in `NAV_SECTIONS` in `conf.py` heads a group of its pages under its
+icon ([`_templates/nav-icons.html`](_templates/nav-icons.html)), folding those past `NAV_SHOWN`,
+and the index's other entries make the Reference group. `_docs_sidebar` in `conf.py` builds the
+groups from the toctrees, so a page added to a toctree appears with no template change. The right
+sidebar holds the page's outline ([`_templates/page-toc.html`](_templates/page-toc.html)), whose
+mark [`_static/page-outline.js`](_static/page-outline.js) moves to the section being read, then
+links to edit the page and report a problem
+([`_templates/page-links.html`](_templates/page-links.html)). Edit this page opens the file that
+holds the page's text: an included Markdown file or notebook, such as `CHANGELOG.md` or a
+notebook in `examples/`, else the page's own source; an API page has none. The page's section
+sits over its title ([`_templates/page-kicker.html`](_templates/page-kicker.html)). On a phone the
+outline moves into the menu, above the tree
+([`_templates/page-outline.html`](_templates/page-outline.html)).
 
 ## The Examples and Demos galleries
 
@@ -227,7 +331,7 @@ To check external links: `uv run --group docs sphinx-build -b linkcheck docs doc
 | Sphinx config (theme, extensions, notebooks, blog, generated pages) | `docs/conf.py` |
 | Homepage template, stylesheet, and content generators | `site/homepage.html`, `site/assets/site.css`, `site/build.py` |
 | Timing comparison and speed charts, shared by three pages | `site/assets/figures.css`, `site/assets/figures.js` |
-| "Why Andrey is fast" scenes: homepage dialog, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
+| "Why Andrey is fast" scenes: homepage story, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
 | Navbar: wordmark and sections | `docs/_templates/site-logo.html`, `docs/_templates/site-nav.html` |
 | Wordmark (Inter outlines, light and dark ink) and its generator | `site/brand/`, `site/wordmark.py` |
 | Palette as CSS custom properties | `docs/palette_css.py` |

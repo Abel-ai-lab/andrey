@@ -95,6 +95,12 @@ html[data-theme="dark"] .release-cover {
     var(--andrey-ground-navy);
 }
 
+.bd-content .sd-card:is(.release-cover, .release-tile).release-art-0-4-0 {
+  background:
+    url("release-cards/0.4.0.jpg") center 62% / cover no-repeat,
+    var(--andrey-ground-navy);
+}
+
 .bd-content .sd-card.release-cover .sd-card-body {
   padding: 1.2rem 1.7rem 1.9rem 2.05rem;
 }
@@ -104,7 +110,7 @@ html[data-theme="dark"] .release-cover {
   border-bottom: 1px solid
     color-mix(in srgb, var(--andrey-ground-ink) 24%, transparent);
   color: color-mix(in srgb, var(--andrey-ground-ink) 82%, transparent);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -112,17 +118,17 @@ html[data-theme="dark"] .release-cover {
 }
 
 .release-cover .sd-card-text:nth-of-type(2) {
-  max-width: 12.5rem;
+  max-width: 14rem;
   margin-top: 1.5rem;
-  font-size: 1.5rem;
-  font-weight: 500;
+  font-size: 2.1rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.22;
 }
 
 .release-cover .sd-card-text:nth-of-type(3) {
   margin-top: auto;
-  font-size: 4.25rem;
+  font-size: 3.25rem;
   font-weight: 600;
   letter-spacing: -0.05em;
   line-height: 0.85;
@@ -342,16 +348,16 @@ html[data-theme="dark"] .release-tile {
 }
 
 .release-opening .release-cover .sd-card-text:nth-of-type(1) {
-  font-size: 0.6rem;
+  font-size: 0.7rem;
 }
 
 .release-opening .release-cover .sd-card-text:nth-of-type(2) {
   margin-top: 1.1rem;
-  font-size: 1.2rem;
+  font-size: 1.65rem;
 }
 
 .release-opening .release-cover .sd-card-text:nth-of-type(3) {
-  font-size: 3.4rem;
+  font-size: 2.6rem;
 }
 
 .release-opening-text > p:first-child {
@@ -503,16 +509,16 @@ html[data-theme="dark"] .release-tile {
   }
 
   .release-cover .sd-card-text:nth-of-type(1) {
-    font-size: 0.6rem;
+    font-size: 0.7rem;
   }
 
   .release-cover .sd-card-text:nth-of-type(2) {
     margin-top: 1.1rem;
-    font-size: 1.2rem;
+    font-size: 1.65rem;
   }
 
   .release-cover .sd-card-text:nth-of-type(3) {
-    font-size: 3.4rem;
+    font-size: 2.6rem;
   }
 
   .release-stats ul {

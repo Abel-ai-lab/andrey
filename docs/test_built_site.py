@@ -161,7 +161,27 @@ def test_every_page_has_one_short_description_equal_to_its_preview(html):
     assert not problems, "\n".join(problems)
 
 
+def test_every_homepage_tile_leads_to_details_that_are_built(html):
+    home = (html / "index.html").read_text(encoding="utf-8")
+    tiles = re.findall(r'<li class="tile[^"]*"><a class="tile-face" href="([^"]+)"', home)
+    assert tiles and len(tiles) == len(set(tiles))  # one tile for each dialog
+    problems = []
+    for href in tiles:
+        if href.startswith("#"):
+            if f'<dialog class="wf tile-dialog" id="{href[1:]}"' not in home:
+                problems.append(f"{href}: no dialog holds its details")
+        elif not _resolve(html, html / "index.html", href).is_file():
+            problems.append(f"{href}: not built")
+    for script in ("tiles.js",):
+        if f"{script}" not in home or not (html / "_static" / script).is_file():
+            problems.append(f"{script}: not loaded or not built")
+    assert not problems, "\n".join(problems)
+
+
 def test_every_header_leads_home_and_to_each_section(html):
+    cards = (DOCS / "docs" / "benchmarks").glob("*.md")
+    newest = max((tuple(map(int, card.stem.split("."))) for card in cards), default=())
+    newest = ".".join(map(str, newest))
     problems = []
     for page, text in _pages(html):
         name = page.relative_to(html)
@@ -177,6 +197,65 @@ def test_every_header_leads_home_and_to_each_section(html):
             )
             if len(hrefs) != 1 or _resolve(html, page, hrefs[0]) != html / expected:
                 problems.append(f"{name}: the header's {label} link is wrong")
+        # Release cards carries the dot that marks the newest release until the reader opens it.
+        cards = re.findall(
+            r'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>Release cards'
+            r'<span class="nav-new" data-release="([^"]+)" hidden>',
+            header,
+        )
+        if len(cards) != 1 or _resolve(html, page, cards[0][0]) != html / "docs/benchmarks.html":
+            problems.append(f"{name}: the header's Release cards link is wrong")
+        elif cards[0][1] != newest:
+            problems.append(f"{name}: the Release cards dot names {cards[0][1]}, not {newest}")
+    assert not problems, "\n".join(problems)
+
+
+class _Marks(HTMLParser):
+    """Collect the links marked as the page being read, and whether their folds are open."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.folds: list[bool] = []
+        self.marked: list[tuple[str, bool]] = []  # (href, every fold around it open)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "details":
+            self.folds.append("open" in values)
+        elif tag == "a" and values.get("aria-current") == "page":
+            self.marked.append((values["href"], all(self.folds)))
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "details":
+            self.folds.pop()
+
+
+def test_every_docs_page_finds_itself_in_its_sidebar_and_edits_a_tracked_file(html):
+    tracked = set(
+        subprocess.run(
+            ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.splitlines()
+    )
+    problems = []
+    for page, text in _pages(html):
+        name = page.relative_to(html).as_posix()
+        start = text.find('<nav class="bd-docs-nav docs-nav"')
+        if start < 0:
+            continue
+        # The tree marks the page in view, unless the page is outside it, and opens its fold.
+        marks = _Marks()
+        marks.feed(text[start : text.index("</nav>", start)])
+        if len(marks.marked) > 1:
+            problems.append(f"{name}: the sidebar marks {len(marks.marked)} pages")
+        for href, shown in marks.marked:
+            if _resolve(html, page, href) != page:
+                problems.append(f"{name}: the sidebar marks {href}, another page")
+            elif not shown:
+                problems.append(f"{name}: the sidebar marks the page inside a closed fold")
+        # Edit this page opens a file in the repository, never one the build writes.
+        for path in re.findall(r'href="https://github\.com/[^"]+/edit/main/([^"]+)"', text):
+            if path not in tracked:
+                problems.append(f"{name}: Edit this page opens {path}, which git does not track")
     assert not problems, "\n".join(problems)
 
 
@@ -246,15 +325,18 @@ def test_every_post_shows_its_cover_and_byline_under_its_title(html):
             problems.append(f"blog/{post}.html's cover has no alt text")
         byline = re.search(
             r'</h1>\s*(?:<figure class="post-cover">.*?</figure>\s*)?'
-            r'<p class="post-byline">(.*?)</p>',
+            r'<div class="post-byline">(.*?)</div>',
             text,
             re.S,
         )
         author = byline and re.search(r'<a href="([^"]+)">', byline[1])
+        tags = _front_matter(DOCS / "blog" / f"{post}.md").get("tags", "")
         if not author or "<time datetime=" not in byline[1]:
             problems.append(f"blog/{post}.html has no author and date under its title")
         elif not _resolve(html, built, author[1]).is_file():
             problems.append(f"blog/{post}.html links its author to {author[1]}, not built")
+        elif tags and 'class="blog-tags"' not in byline[1]:
+            problems.append(f"blog/{post}.html shows no tags under its title")
     assert not problems, "\n".join(problems)
 
 

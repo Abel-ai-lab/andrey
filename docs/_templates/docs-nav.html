@@ -1,16 +1,42 @@
-{#- The whole documentation tree, since the navbar names only the site's sections. -#}
-<nav class="bd-docs-nav bd-links" aria-label="{{ _('Documentation') }}">
-  <p class="bd-links__title" role="heading" aria-level="1">{{ _("Documentation") }}</p>
-  <div class="bd-toc-item navbar-nav">
-    {{- generate_toctree_html(
-      "sidebar",
-      startdepth=0,
-      show_nav_level=1,
-      maxdepth=theme_navigation_depth | int,
-      collapse=theme_collapse_navigation | tobool,
-      includehidden=theme_sidebar_includehidden | tobool,
-      titles_only=True
-      )
-    -}}
+{#- The documentation tree, since the navbar names only the site's sections: a group per section
+    under its icon, then the reference pages, then the project's links (conf.py: _docs_sidebar).
+    The page being read is in the accent, and a fold that holds it starts open. A page with pages of
+    its own folds them under its row, its toggle at the row's end. -#}
+{%- from "nav-icons.html" import icon %}
+{%- macro page(item) -%}
+<a href="{{ pathto(item.doc) }}"{% if item.doc == pagename %} aria-current="page"{% endif %}>{{ item.title }}</a>
+{%- endmacro %}
+{%- macro fold(label, items, open) -%}
+<details{% if open %} open{% endif %}><summary aria-label="{{ label }}">{{ icon("chevron") }}</summary>{{ rows(items) }}</details>
+{%- endmacro %}
+{%- macro rows(items) -%}
+<ul>
+  {%- for item in items %}
+  <li{% if item.doc == pagename %} class="active"{% endif %}>{{ page(item) }}
+    {%- if item.kids %}{{ fold(_("Pages under %(title)s") | format(title=item.title), item.kids, pagename in item.pages) }}{% endif %}</li>
+  {%- endfor %}
+</ul>
+{%- endmacro %}
+<nav class="bd-docs-nav docs-nav" aria-label="{{ _('Documentation') }}">
+  {%- for group in docs_nav %}
+  {%- set shown, more = group.kids[:group.shown], group.kids[group.shown:] %}
+  <div class="docs-nav__group">
+    <p class="docs-nav__head">{{ icon(group.icon) }}
+      {%- if group.doc %}{{ page(group) }}{% else %}<span>{{ group.title }}</span>{% endif %}</p>
+    {{ rows(shown) }}
+    {%- if more %}
+    {%- set held = namespace(open=false) %}
+    {%- for item in more if pagename in item.pages %}{% set held.open = true %}{% endfor %}
+    <details class="docs-nav__more"{% if held.open %} open{% endif %}>
+      <summary>{{ _("More %(title)s") | format(title=group.title | lower) }}{{ icon("chevron") }}</summary>
+      {{ rows(more) }}
+    </details>
+    {%- endif %}
   </div>
+  {%- endfor %}
+  <ul class="docs-nav__foot">
+    <li><a href="{{ repo_url }}">GitHub{{ icon("out") }}</a></li>
+    <li><a href="{{ pypi_url }}">PyPI{{ icon("out") }}</a></li>
+    <li><a href="{{ report_bug_url }}">{{ _("Report a bug") }}{{ icon("out") }}</a></li>
+  </ul>
 </nav>
