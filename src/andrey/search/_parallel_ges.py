@@ -455,6 +455,7 @@ class _ForwardScan:
         reach = self.reach.get((y, clique))
         if reach is None:
             if self.succ is None:
+                assert self.adj is not None  # _refresh keeps the graph before any visit
                 self.succ = _bitset.row_masks(self.adj == ops.TAIL)
             reach = self.reach[(y, clique)] = _bitset.semidirected_reach_set(self.succ, y, clique)
         passing = sources & ~reach
