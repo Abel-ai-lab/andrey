@@ -23,16 +23,31 @@ def test_every_cell_has_a_baseline_and_every_method_a_tolerance() -> None:
     }
 
 
-def empty_answer(draw: qg.Draw, target: qg.Target) -> GraphStructure:
-    return qg.empty_graph(draw.data.shape[1], target)
+def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
+    return qg.empty_estimate(draw, target)
 
 
-def shifted_truth(draw: qg.Draw, target: qg.Target) -> GraphStructure:
+def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
     """The true graph with each variable moved one column: an off-by-one in column handling."""
+    if target in qg.SERIES_TARGETS:
+        return shifted_series_truth(draw.truth, target)
     truth = qg.target_truth(draw.truth, target)
     marks = truth.to_numpy()
     shift = np.roll(np.arange(len(marks)), 1)
     return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=truth.kind)
+
+
+def shifted_series_truth(truth: object, target: qg.Target) -> object:
+    """A time-series truth with each variable moved one place, over the observed variables."""
+    if target == "lagged":
+        links = qg.links_from_temporal(truth)
+        return qg.temporal_from_links(np.roll(links, 1, axis=(1, 2)))
+    if target == "window":
+        n = truth.n_nodes - truth.latents
+        return qg.WindowGraph(np.roll(truth.marks[:, :n, :n], 1, axis=(1, 2)), lag0="cpdag")
+    if target == "cross_links":
+        return qg.CoefficientStack(np.roll(truth.stack, 1, axis=(-2, -1)), kind=truth.kind)
+    return np.roll(truth, 1, axis=(1, 2))
 
 
 @pytest.mark.parametrize("method", sorted(qg.SUPPORTED))
@@ -94,6 +109,22 @@ def test_pairs_match_the_benchmark_drivers(monkeypatch: pytest.MonkeyPatch) -> N
         assert module.REGIME == regime
         for key in module.pair_keys([qg.PAIR_N], 3):
             assert qg.pair_kwargs(regime, qg.PAIR_N, key.seed) == bench.generation_kwargs(key)
+
+
+def test_time_series_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The gate's time-series regimes are the harness's, and its Granger draws its driver's."""
+    pytest.importorskip("fcntl")  # the harness's dataset store locks files with fcntl
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "benchmarks"))
+    bench = importlib.import_module("andrey_bench.datasets")
+    for regime, model in qg.SERIES_MODELS.items():
+        assert bench.REGIMES[regime][1] == model
+    assert bench.REGIMES["longitudinal_lingam_paper"][1] == qg.PANEL_MODEL
+    driver = importlib.import_module("granger_var")
+    assert (driver.LAGS, driver.LAG_DEGREE) == (qg.GRANGER_LAGS, qg.GRANGER_LAG_DEGREE)
+    d, n = qg.GRANGER_SIZES[0]
+    draw = qg.granger_draws(d, n)[3]
+    data, truth = driver.sample(d, n, 3)
+    assert np.array_equal(draw.data, data) and np.array_equal(draw.truth, truth)
 
 
 def test_the_projection_holds_the_edges_and_pairs_the_benchmarks_score(
