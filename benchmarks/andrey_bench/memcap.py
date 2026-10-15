@@ -14,8 +14,6 @@ import signal
 import threading
 from typing import Mapping
 
-import psutil
-
 #: Route names. ``NONE`` is what an uncapped run records.
 POLL = "poll"
 SLURM = "slurm"
@@ -100,6 +98,8 @@ def stderr_reports_oom(text: str | None) -> bool:
 
 def tree_rss_mb(pid: int) -> float:
     """Return summed RSS in MB for a process and its descendants."""
+    import psutil  # the benchmarks' own dependency; importing the harness does not need it
+
     try:
         root = psutil.Process(pid)
         procs = [root, *root.children(recursive=True)]

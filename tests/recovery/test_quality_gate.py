@@ -85,7 +85,6 @@ def test_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) ->
 def test_pairs_match_the_benchmark_drivers(monkeypatch: pytest.MonkeyPatch) -> None:
     """The gate draws each cause-effect pair with the arguments its benchmark driver used."""
     pytest.importorskip("fcntl")  # the harness's dataset store locks files with fcntl
-    pytest.importorskip("psutil")  # the drivers import the harness's memory caps, which need it
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "benchmarks"))
     bench = importlib.import_module("andrey_bench.datasets")
     drivers = {"anm_pair": "anm_pairs", "pnl_pair": "pnl_pairs"}
