@@ -98,7 +98,9 @@ def sample_discrete(
         )
         for c in range(draw.d)
     ]
-    values = _forward_sample(draw, parents, cards, tables, n, _component_rng(root, _NOISE))
+    values = _forward_sample(
+        draw.topo_order.tolist(), parents, cards, tables, n, _component_rng(root, _NOISE)
+    )
     params = SCMParams(
         edges=np.stack([draw.parents, draw.children], axis=1),
         weights=np.empty(0),
@@ -135,17 +137,21 @@ def _parents_of(draw: DAGDraw) -> list[np.ndarray]:
 
 
 def _forward_sample(
-    draw: DAGDraw,
+    order: list[int],
     parents: list[np.ndarray],
     cards: np.ndarray,
     tables: list[np.ndarray],
     n: int,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    """Sample ``n`` rows in causal order: each node by inverse CDF from its parents' table row."""
-    values = np.zeros((n, draw.d), dtype=np.int64)
-    uniforms = rng.random((n, draw.d))
-    for c in draw.topo_order.tolist():
+    """Sample ``n`` rows in causal ``order``: each node by inverse CDF from its table row.
+
+    Row ``i`` of a node's table is its parents' configuration ``i`` in mixed radix, the first parent
+    in ``parents`` the most significant digit.
+    """
+    values = np.zeros((n, len(order)), dtype=np.int64)
+    uniforms = rng.random((n, len(order)))
+    for c in order:
         row = np.zeros(n, dtype=np.int64)
         for p in parents[c].tolist():
             row = row * cards[p] + values[:, p]

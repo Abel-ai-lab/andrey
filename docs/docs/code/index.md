@@ -190,8 +190,9 @@ name.
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
 
-A published network's data come from a linear-Gaussian model on its graph, standardized, since its
-own tables are discrete; `n` (default 1000) and `seed` (default 0) set the rows. The first load
+A published network's data come from a linear-Gaussian model on its graph, standardized, or, with
+`discrete=True`, from its own conditional probability tables, each column a pandas `category` of
+the network's category names; `n` (default 1000) and `seed` (default 0) set the rows. The first load
 downloads the file, checks its SHA-256, and caches it; later loads need no network. The
 cache directory is the `data_home` argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey`
 (`~/.cache/andrey` when `XDG_CACHE_HOME` is unset). Without network access, the error names the
