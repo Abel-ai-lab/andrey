@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from types import SimpleNamespace
 
 import numpy as np
@@ -74,6 +75,34 @@ def test_varma_lingam_output_contract():
     assert out.structure.type == "temporal"
     assert out.structure.lag_weights.shape == (2, 3, 3)
     assert out.structure.lag_weights_ma.shape == (1, 3, 3)
+
+
+def test_varma_lingam_orders_innovations_by_least_squares():
+    """The order comes from least-squares pairwise regressions of the fitted innovations.
+
+    On these 40 steps the ``n / (n - 1)`` slope factor of the default convention orders the
+    innovations [1, 2, 0]; least squares gives the true order, [0, 1, 2].
+    """
+    from statsmodels.tsa.statespace.varmax import VARMAX
+
+    from andrey.lingam import pwling
+    from andrey.temporal.varma import varma_lingam
+
+    rng = np.random.default_rng(80)
+    n, steps = 3, 90
+    inv = np.linalg.inv(np.eye(n) - np.tril(np.full((n, n), 0.4), -1))
+    e = rng.uniform(-1.0, 1.0, (steps, n))
+    x = np.zeros((steps, n))
+    for t in range(1, steps):
+        x[t] = inv @ (0.3 * x[t - 1] + e[t] + 0.2 * e[t - 1])
+    X = x[50:]
+
+    order, _, _ = varma_lingam(X, order=(1, 1), prune=True, max_iter=2000)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = VARMAX(X, order=(1, 1), trend="c").fit(maxiter=2000, disp=False, cov_type="none")
+    innovations = np.asarray(fit.resid)
+    assert order == pwling.find_causal_order(innovations, least_squares=True) == [0, 1, 2]
 
 
 def test_longitudinal_lingam_output_contract():

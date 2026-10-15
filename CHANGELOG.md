@@ -24,6 +24,8 @@ change names its pull request.
 
 - `varma_lingam` with `prune=True` refits the weights it keeps by least squares, so they are no
   longer shrunk toward zero. ([#TBD])
+- `varma_lingam` orders the innovations with least-squares pairwise regressions, so the order no
+  longer depends on an `n / (n - 1)` factor in the slope. ([#TBD])
 
 ## [0.4.0] - 2026-10-15
 

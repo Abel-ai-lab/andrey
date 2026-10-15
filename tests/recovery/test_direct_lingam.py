@@ -67,3 +67,29 @@ def test_score_candidates_single_candidate():
 
     scores = pwling.score_candidates(_random_linear_sem(seed=1, n=200, d=3, noise="uniform"), [1])
     assert scores.shape == (1,)
+
+
+def test_least_squares_residual_is_uncorrelated_with_its_regressor():
+    from andrey.lingam import pwling
+
+    rng = np.random.default_rng(0)
+    b = rng.uniform(-1.0, 1.0, 30)
+    a = 0.8 * b + rng.uniform(-1.0, 1.0, 30)
+    slope = np.polyfit(b, a, 1)[0]
+    residual = pwling.compute_residual(a, b, least_squares=True)
+    np.testing.assert_allclose(residual, a - slope * b, rtol=0, atol=1e-12)
+    assert abs(np.mean((residual - residual.mean()) * (b - b.mean()))) < 1e-12
+
+
+def test_least_squares_order_scores_agree_and_differ_from_default():
+    # On 30 rows the default slope is 30/29 times the least-squares one, enough to change the
+    # order on this sample; the batched and per-pair scores agree under either slope.
+    from andrey.lingam import pwling
+
+    rng = np.random.default_rng(8)
+    X = rng.uniform(-1.0, 1.0, (30, 4)) ** 3
+    X[:, 1:] += 0.5 * X[:, :1]
+    least_squares = pwling.find_causal_order(X, least_squares=True)
+    serial = pwling.find_causal_order(X, scores=pwling.score_candidates_serial, least_squares=True)
+    assert least_squares == serial
+    assert least_squares != pwling.find_causal_order(X)
