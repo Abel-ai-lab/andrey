@@ -38,7 +38,11 @@ def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
 
 
 def shifted_series_truth(truth: object, target: qg.Target) -> object:
-    """A time-series truth with each variable moved one place, over the observed variables."""
+    """A time-series truth with each variable moved one place, over the observed variables.
+
+    A coefficient stack swaps its same-step and lag-1 blocks instead, an off-by-one in the lag: its
+    regimes' graphs can be dense, and moving every variable of a complete graph changes nothing.
+    """
     if target == "lagged":
         links = qg.links_from_temporal(truth)
         return qg.temporal_from_links(np.roll(links, 1, axis=(1, 2)))
@@ -46,7 +50,8 @@ def shifted_series_truth(truth: object, target: qg.Target) -> object:
         n = truth.n_nodes - truth.latents
         return qg.WindowGraph(np.roll(truth.marks[:, :n, :n], 1, axis=(1, 2)), lag0="cpdag")
     if target == "cross_links":
-        return qg.CoefficientStack(np.roll(truth.stack, 1, axis=(-2, -1)), kind=truth.kind)
+        blocks = truth.stack[[1, 0, 2]] if truth.kind == "varma" else truth.stack[:, ::-1]
+        return qg.CoefficientStack(blocks, kind=truth.kind)
     return np.roll(truth, 1, axis=(1, 2))
 
 
