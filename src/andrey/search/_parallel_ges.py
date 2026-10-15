@@ -210,13 +210,15 @@ def backward_chunk_best(
     delta_engine: DeltaEngine,
     n: int,
     state: NeighborState,
+    kept: dict[tuple[int, tuple[int, ...], int], float] | None = None,
 ) -> BackwardResult:
     """The best-improving Delete whose target is in ``targets``, by ``(stable_key, x, y, h_idx)``.
 
     Enumerates the chunk's valid Delete candidates score-free (residual-clique check; Delete carries
     no reachability test) and scores each with one scalar ``("remove", x)`` off ``base = sorted(
     residual u Pa u {x})`` -- the PURE Schur remove delta. Improving iff the raw delta is below
-    ``-_EPS_IMPROVE``; the argmin is over the quantized key.
+    ``-_EPS_IMPROVE``; the argmin is over the quantized key. ``kept``, when given, holds each
+    ``(y, base, x)``'s delta across passes: a scalar remove depends on nothing else.
     """
     adj_sets, par_of, nbr = state
     best: BackwardResult = None
@@ -225,7 +227,7 @@ def backward_chunk_best(
         nbrs_y = nbr[y]
         paj = par_of[y]
         pa_set = set(int(p) for p in paj)
-        for x in range(n):
+        for x in sorted(adj_sets[y]):
             directed = adj[y, x] == ops.ARROW  # x -> y
             undirected = adj[y, x] == ops.TAIL and adj[x, y] == ops.TAIL  # x -- y
             if not (directed or undirected):
@@ -235,7 +237,11 @@ def backward_chunk_best(
             for h_index, H in ops.clique_residuals(adj, h0):
                 residual = h0_set - set(H)
                 base = tuple(sorted(residual | pa_set | {int(x)}))
-                delta = delta_engine.delta_many_with_base(y, base, [("remove", int(x))])[0]
+                delta = None if kept is None else kept.get((y, base, x))
+                if delta is None:
+                    delta = delta_engine.delta_many_with_base(y, base, [("remove", int(x))])[0]
+                    if kept is not None:
+                        kept[(y, base, x)] = delta
                 if delta < -_EPS_IMPROVE:
                     key = (stable_key(delta, n), x, y, h_index)
                     if best_key is None or key < best_key:
@@ -720,6 +726,7 @@ def run_ges(
     warn = workers > 1 and not full_scores and calibrate.cutoff_is_default("ges")
     engine: DeltaEngine = _FullScoreDelta(score) if full_scores else DeltaBICScore(score)
     scan = _ForwardScan(range(n), engine, n, max_parents)
+    kept: dict[tuple[int, tuple[int, ...], int], float] = {}  # the in-process backward deltas
     lazy = _LazyWorkerSet(score, n, workers)
     before: np.ndarray | None = None  # the graph of the previous forward pass
     try:
@@ -758,7 +765,7 @@ def run_ges(
                 wset = lazy.get()
                 best = reduce_best(wset.dispatch(_backward_task, adj, lazy.token))
             else:
-                best = backward_chunk_best(range(n), adj, engine, n, state)
+                best = backward_chunk_best(range(n), adj, engine, n, state, kept)
             if best is None:
                 break
             _key, x, y, H = best
