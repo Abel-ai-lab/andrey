@@ -827,6 +827,17 @@ html:not(:has(.andrey-home)) .bd-header::before {
   border-radius: 50%;
 }
 
+.brand-social {
+  margin: 1rem 0 0.6rem;
+}
+
+.brand-social img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--andrey-radius-md);
+}
+
 .brand-asset__name {
   margin: 0.6rem 0 0.15rem;
   font-weight: 600;

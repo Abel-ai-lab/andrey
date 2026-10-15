@@ -1,6 +1,6 @@
 ---
 name: brand
-description: Andrey's wordmark, icon, and avatar downloads, colors, type, and usage guidelines.
+description: Andrey's wordmark, icon, avatar, and social preview downloads, colors, type, and usage.
 meta:
   type: guide
   tags: [brand]
@@ -58,6 +58,16 @@ corner. The avatar places it on cobalt for profile pictures.
     <p class="brand-asset__files"><a href="../_static/brand/andrey-avatar.png" download>PNG</a></p>
   </li>
 </ul>
+```
+
+## Social preview
+
+Use the social preview, 1280 x 640, where a post, a page, or a repository that links to Andrey
+shows an image.
+
+```{raw} html
+<p class="brand-social"><img class="dark-light" src="../_static/brand/andrey-social-preview.jpg" alt="Andrey's wordmark and the tagline A very fast causal discovery package over the lanes art" width="1280" height="640"></p>
+<p class="brand-asset__files"><a href="../_static/brand/andrey-social-preview.jpg" download>JPEG</a></p>
 ```
 
 ## The A

@@ -163,16 +163,19 @@ def _accent(word: str, x: float, y: float, size: int, key: str) -> tuple[str, st
     )
 
 
-def _title(lines: list[str], size: int, middles: list[float], center: float, accent: str) -> str:
-    """``lines`` in white, each centered on ``center`` at its middle in ``middles``; each word equal
-    to ``accent`` drawn as the accent, with its trace's space added after it."""
+def _title(
+    lines: list[str], size: int, middles: list[float], x0: float, accent: str, *, left: bool = False
+) -> str:
+    """``lines`` in white, each centered on ``x0`` (or starting at it, when ``left``) at its middle
+    in ``middles``; each word equal to ``accent`` drawn as the accent, with its trace's space added
+    after it."""
     space = _width(" ", size, "SemiBold")
     defs, drawing = [], []
     for row, (line, y) in enumerate(zip(lines, middles, strict=True)):
         words = line.split(" ")
         widths = [_width(word, size, "SemiBold") for word in words]
         rooms = [size * ROOM if accent and word == accent else 0 for word in words]
-        x = center - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
+        x = x0 if left else x0 - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
         for i, (word, width, room) in enumerate(zip(words, widths, rooms, strict=True)):
             if accent and word == accent:
                 more, drawn = _accent(word, x, y, size, f"accent-{row}-{i}")
@@ -458,19 +461,12 @@ def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = 
     lines = _lines(title, size, line_width, most) or [title]
     step = round(size * 1.14)
     top = 284 if len(lines) == most else 334
-    navy = grain.NAVY
-    stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
-    fade = "".join(
-        f'<stop offset="{offset:.2f}" stop-color="{navy}" stop-opacity="{opacity:.2f}"/>'
-        for offset, opacity in stops
-    )
     title_text = "".join(
         f'<text x="{BANNER_LEFT}" y="{top + i * step}" font-family="Inter" font-weight="600" '
         f'font-size="{size}" letter-spacing="-2" fill="#ffffff">{html.escape(text)}</text>'
         for i, text in enumerate(lines)
     )
     rule_y = top + (len(lines) - 1) * step + 78
-    art_w = round(height * COVER_W / COVER_H)
     text = (
         _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 96, 56)
         + title_text
@@ -485,11 +481,24 @@ def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = 
     )
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
+        f'{_art_ground(kind, width, height)}<g transform="scale({k:.4f})">{text}</g></svg>'
+    )
+
+
+def _art_ground(kind: str, width: int, height: int) -> str:
+    """``kind``'s art filling the height, its right edge at ``width``, under a navy fade from the
+    left that keeps white text readable."""
+    stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
+    fade = "".join(
+        f'<stop offset="{offset:.2f}" stop-color="{grain.NAVY}" stop-opacity="{opacity:.2f}"/>'
+        for offset, opacity in stops
+    )
+    art_w = round(height * COVER_W / COVER_H)
+    return (
         f'<defs><linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">{fade}</linearGradient>'
         f'</defs><image href="{_jpeg_href(_art(kind))}" x="{width - art_w}" y="0" '
         f'width="{art_w}" height="{height}" preserveAspectRatio="none"/>'
         f'<rect width="{width}" height="{height}" fill="url(#fade)"/>'
-        f'<g transform="scale({k:.4f})">{text}</g></svg>'
     )
 
 
@@ -530,17 +539,22 @@ def cover_alt(kind: str) -> str:
 
 # ---- the brand kit -----------------------------------------------------------------------------
 # Brand kit downloads (`docs/docs/brand.md`): SVG and PNG wordmarks and icons for light and dark
-# grounds, a square avatar, and a zip of all files. Each is drawn from the brand's own files
-# (`site/wordmark.py`), keeping the kit consistent with the site.
+# grounds, a square avatar, a social preview, and a zip of all files. Each is drawn from the
+# brand's own files (`site/wordmark.py`), keeping the kit consistent with the site.
 KIT_WORDMARK_H = 256  # the wordmark PNGs' height
 KIT_ICON = 512  # the icon PNGs' side
 KIT_AVATAR = 1024  # the avatar's side
+# The repository's social preview, at GitHub's recommended size; GitHub takes files up to 1 MB.
+SOCIAL_W, SOCIAL_H = 1280, 640
+SOCIAL_TITLE = 100  # the tagline's size, on two lines
+SOCIAL_LINK = 28  # the site's address at the bottom
+SOCIAL_QUALITY = 85
 KIT_NOTE = """Andrey brand kit
 
-The wordmark and the icon, for a light and a dark ground, as SVG and PNG, and a square avatar.
-Use them as they are to refer or link to Andrey: no recoloring, stretching, effects, or retyped
-lettering, and the A stays whole. The Apache License 2.0 covers Andrey's code, not its name or
-marks. Guidelines: https://andrey.abel.ai/docs/brand.html
+The wordmark and the icon, for a light and a dark ground, as SVG and PNG, a square avatar, and a
+social preview for link cards. Use them as they are to refer or link to Andrey: no recoloring,
+stretching, effects, or retyped lettering, and the A stays whole. The Apache License 2.0 covers
+Andrey's code, not its name or marks. Guidelines: https://andrey.abel.ai/docs/brand.html
 """
 
 
@@ -567,6 +581,23 @@ def _kit_icon(ink: str, ground: str | None = None) -> str:
     )
 
 
+def social_svg() -> str:
+    """The repository's social preview: the wordmark, the tagline with ``ACCENT`` drawn as the
+    accent, and the site's address at the bottom, over the lanes art."""
+    lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_W, 2)
+    step = round(SOCIAL_TITLE * 1.14)
+    top = SOCIAL_H / 2 - (len(lines) - 1) * step / 2 + 10
+    middles = [top + i * step for i in range(len(lines))]
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{SOCIAL_W}" height="{SOCIAL_H}">'
+        + _art_ground("lanes", SOCIAL_W, SOCIAL_H)
+        + _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 80, 56)
+        + _title(lines, SOCIAL_TITLE, middles, BANNER_LEFT, ACCENT, left=True)
+        + f'<text x="{BANNER_LEFT}" y="{SOCIAL_H - 72}" font-family="Inter" font-weight="600" '
+        f'font-size="{SOCIAL_LINK}" fill="#ffffff" opacity="0.72">andrey.abel.ai</text></svg>'
+    )
+
+
 def _png(svg: str, **size: int) -> bytes:
     import resvg_py  # the docs group's renderer
 
@@ -587,6 +618,7 @@ def brand_kit() -> dict[str, bytes]:
         files[f"andrey-icon-on-{ground}.svg"] = icon.encode()
         files[f"andrey-icon-on-{ground}.png"] = _png(icon, width=KIT_ICON)
     files["andrey-avatar.png"] = _png(_kit_icon("#ffffff", grain.COBALT), width=KIT_AVATAR)
+    files["andrey-social-preview.jpg"] = _jpeg(social_svg(), SOCIAL_QUALITY)
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as kit:
         for name, data in [("README.txt", KIT_NOTE.encode()), *files.items()]:
