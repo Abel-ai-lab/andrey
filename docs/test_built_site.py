@@ -383,8 +383,19 @@ def test_every_page_carries_structured_data_that_matches_its_preview(html):
         assert software["license"]["name"] == "Apache-2.0"
         assert software["license"]["url"].endswith("/blob/main/LICENSE")
         assert software["codeRepository"] == "https://github.com/Abel-ai-lab/andrey"
+        assert software["image"] == "https://andrey.abel.ai/_static/favicon.svg"
+        assert (html / "_static" / "favicon.svg").is_file()
         assert node["about"]["@id"] == software["@id"]
         assert nodes["Organization"]["url"] == "https://abel.ai/"
+        assert nodes["Organization"]["logo"] == "https://andrey.abel.ai/_static/abel-symbol.png"
+
+
+def test_the_organization_logo_is_a_png_search_results_can_show(html):
+    from PIL import Image
+
+    # Search engines show an organization's logo from 112 x 112 pixels up, on a light ground.
+    with Image.open(html / "_static" / "abel-symbol.png") as logo:
+        assert logo.format == "PNG" and min(logo.size) >= 112, logo.size
 
 
 def test_a_post_carries_the_date_authors_and_release_of_its_front_matter(html):

@@ -70,6 +70,7 @@ def render(page=PAGE, **kwargs):
         project="Andrey",
         author="Abel AI Lab",
         organization_url="https://abel.ai/",
+        organization_logo=SITE + "_static/abel-symbol.png",
         software=SOFTWARE,
         **kwargs,
     )
@@ -102,6 +103,7 @@ def test_the_graph_names_the_organization_the_software_and_the_page():
         "@id": SITE + "#organization",
         "name": "Abel AI Lab",
         "url": "https://abel.ai/",
+        "logo": SITE + "_static/abel-symbol.png",
     }
     assert nodes["WebPage"]["name"] == PAGE["title"]
     assert nodes["WebPage"]["description"] == PAGE["description"]

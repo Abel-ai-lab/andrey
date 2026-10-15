@@ -37,5 +37,8 @@
   same art, in the same tones, with calm areas where the card's text sits.
 - `abel-logo-white.svg`: the Abel AI Lab logotype, from Abel's brand kit. Its last path is the
   mark, which the homepage's footer draws beside Abel's name.
+- `abel-symbol-night.svg`: Abel's logomark in Night Teal, for light backgrounds, unchanged from
+  the brand kit (`Abel-design-branding`, `assets/logos/symbol-night.svg`). The build draws it as
+  `_static/abel-symbol.png`, the organization's logo in the site's structured data.
 - `wordmark-light.svg`, `wordmark-dark.svg`, `favicon.svg`: Andrey's wordmark and icon.
 - `fonts/`: Inter, under the SIL Open Font License (`fonts/OFL.txt`).

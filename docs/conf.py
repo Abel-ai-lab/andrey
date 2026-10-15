@@ -199,6 +199,11 @@ REPO_URL = "https://github.com/Abel-ai-lab/andrey"
 PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
 ABEL_URL = "https://abel.ai/"
+# Abel's logomark in Night Teal, for light backgrounds, from Abel's brand kit: the structured
+# data's organization logo, drawn at the build as a PNG wide enough for search results.
+ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
+ABEL_LOGO = "_static/abel-symbol.png"
+ABEL_LOGO_WIDTH = 600
 # The pages llms.txt lists, by section; each release card and published post follows its section's
 # pages, newest first.
 LLMS_SECTIONS = (
@@ -496,6 +501,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "programmingLanguage": "Python",
         "runtimePlatform": f"Python {PACKAGE['requires-python']}",
         "codeRepository": PACKAGE["urls"]["Source"],
+        # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
+        "image": SITE_URL + "_static/favicon.svg",
         "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/"],
     }
     return preview + discovery.head_tags(
@@ -504,6 +511,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         project=app.config.project,
         author=app.config.author,
         organization_url=ABEL_URL,
+        organization_logo=SITE_URL + ABEL_LOGO,
         software=software,
         language=app.config.language or "en",
         post=post,
@@ -513,8 +521,9 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
 
 def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
     """Write ``llms.txt``, ``sitemap.xml``, and ``robots.txt`` at the site's root from the built
-    pages (``docs/discovery.py``). ``llms.txt`` lists ``LLMS_SECTIONS``, then every release card
-    and published post; a listed page that is missing or ``noindex`` fails the build."""
+    pages (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt``
+    lists ``LLMS_SECTIONS``, then every release card and published post; a listed page that is
+    missing or ``noindex`` fails the build."""
     if exception is not None or app.builder.name != "html":
         return
     outdir = pathlib.Path(app.outdir)
@@ -539,6 +548,10 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
     except ValueError as error:
         raise ConfigError(str(error)) from None
     _write(outdir / "llms.txt", text)
+    import resvg_py  # the docs group's renderer, as site/cards.py uses it
+
+    logo = resvg_py.svg_to_bytes(svg_string=ABEL_SYMBOL.read_text(), width=ABEL_LOGO_WIDTH)
+    _write_bytes(outdir / ABEL_LOGO, bytes(logo))
     _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
     _write(outdir / "robots.txt", discovery.robots_txt(SITE_URL))
 

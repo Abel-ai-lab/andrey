@@ -298,15 +298,17 @@ On a remote machine, keep the server bound to `127.0.0.1` and forward the port f
 ## Search and answer engines
 
 [`discovery.py`](discovery.py) writes what search engines and AI answer engines read. Each page's
-head carries its Twitter card fields and one JSON-LD graph: the organization, the website, the
-software at the release the page belongs to (a post's `version`, a release card's number, else the
-current release), the page, a `BlogPosting` for a post with its date and authors, and the page's
-breadcrumbs. The search page is `noindex`. After the build, `_write_discovery` in `conf.py` writes
-three files at the site's root from the built pages: `llms.txt`, the pages in `LLMS_SECTIONS`
-under Docs, Release cards, and Blog, each with its own title and description, every release card
-and published post following its section's pages; `sitemap.xml`, the address of every indexable
-page; and `robots.txt`, which lets every crawler read every page and names the sitemap. A page
-listed in `LLMS_SECTIONS` that is renamed or removed fails the build until the list follows it.
+head carries its Twitter card fields and one JSON-LD graph: the organization (with Abel's logomark,
+`site/brand/abel-symbol-night.svg`, drawn as `_static/abel-symbol.png`), the website, the software
+(with Andrey's icon, the favicon) at the release the page belongs to (a post's `version`, a release
+card's number, else the current release), the page, a `BlogPosting` for a post with its date and
+authors, and the page's breadcrumbs. The search page is `noindex`. After the build,
+`_write_discovery` in `conf.py` writes three files at the site's root from the built pages:
+`llms.txt`, the pages in `LLMS_SECTIONS` under Docs, Release cards, and Blog, each with its own
+title and description, every release card and published post following its section's pages;
+`sitemap.xml`, the address of every indexable page; and `robots.txt`, which lets every crawler read
+every page and names the sitemap. A page listed in `LLMS_SECTIONS` that is renamed or removed fails
+the build until the list follows it.
 
 ## Validation
 

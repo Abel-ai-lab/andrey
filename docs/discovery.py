@@ -22,13 +22,15 @@ def head_tags(
     project: str,
     author: str,
     organization_url: str,
+    organization_logo: str,
     software: dict,
     language: str = "en",
     post: dict | None = None,
     parents: Sequence[dict] = (),
 ) -> str:
     """The page's Twitter card fields, its robots rule (``noindex`` when ``page["indexable"]`` is
-    false), a post's article tags, and one JSON-LD graph: the organization, the website, the
+    false), a post's article tags, and one JSON-LD graph: the organization (its name, address, and
+    logo's address), the website, the
     software, the page (a ``BlogPosting`` too for a post), and its breadcrumbs. A post or a release
     card describes the software at its own version (``post["version"]`` or
     ``page["software_version"]``); every other page, at ``software["version"]``. No element is
@@ -67,6 +69,7 @@ def head_tags(
             "@id": organization_id,
             "name": author,
             "url": organization_url,
+            "logo": organization_logo,
         },
         {
             "@type": "WebSite",
