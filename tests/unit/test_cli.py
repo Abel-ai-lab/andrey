@@ -75,11 +75,9 @@ def test_list_on_a_terminal_names_its_columns(capsys, monkeypatch):
     assert len(rows) == len(REGISTRY)
 
 
-def test_root_skill_and_llms(capsys):
+def test_root_skill(capsys):
     _, skill, _ = _run(["--skill"], capsys)
     assert "andrey run <method> --help --json" in skill and "andrey config" in skill
-    _, llms, _ = _run(["--llms"], capsys)
-    assert "ANDREY_BACKEND" in llms
 
 
 def test_bare_invocation_prints_help(capsys):
@@ -928,7 +926,6 @@ def test_invalid_configuration_names_every_bad_setting(capsys, monkeypatch):
     [
         ["--json"],
         ["--help", "--skill"],
-        ["--skill", "--llms"],
         ["run"],
         ["run", "--help", "--json"],
         ["agent-context", "hc"],

@@ -91,14 +91,14 @@ def test_readme_quickstart_runs_as_printed(capsys, offline_datasets):
 
 
 def test_readme_chart_is_one_card_per_panel_method():
-    # The README shows both themes' charts from .github/readme/: a card per PANEL method, in its
-    # order, two rows of three at most, and an alt text that lists them.
+    # The README shows both themes' charts from .github/readme/: a card per PANEL method, two rows
+    # of three at most, and an alt text that lists them.
     readme = README.read_text()
     summary = build.load_summary(SUMMARY)
     summaries = build.release_summaries(summary)
     slides = build.readme_slides(summary)
     assert slides == build.speedup_slides(summaries)
-    assert [name for name, _, _ in slides] == [method for _, method in build.PANEL]
+    assert sorted(name for name, _, _ in slides) == sorted(method for _, method in build.PANEL)
     assert len(slides) == 6 == build.README_COLUMNS * build.README_ROWS
     for theme, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         name = build.README_CHART.format(theme=theme)

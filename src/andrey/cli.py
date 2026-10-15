@@ -2,8 +2,8 @@
 
 ``andrey list`` enumerates methods, ``andrey run <method> --help`` explains one method, and
 ``--help --json`` returns its versioned contract without execution. Root ``--help --json`` returns
-all contracts; ``--skill`` and ``--llms`` export package guides. ``andrey config`` reports current
-configuration and backend availability; ``--json`` selects a structured report.
+all contracts; ``--skill`` prints the agent guide. ``andrey config`` reports current configuration
+and backend availability; ``--json`` selects a structured report.
 
 ``andrey run <method> --data <path|-> [key=value ...]`` executes; a CSV / TSV header names the
 nodes. Runs and listings use JSON when piped and readable text on a terminal; ``--json`` forces
@@ -36,7 +36,6 @@ from andrey.spec.generate import (
     env_dict,
     grammar_default,
     grammar_example,
-    render_llms_txt,
     render_skill,
 )
 
@@ -1037,16 +1036,13 @@ def _root(
     skill: bool = typer.Option(
         False, "--skill", help="Print the SKILL.md guide for coding agents."
     ),
-    llms: bool = typer.Option(
-        False, "--llms", help="Print the llms.txt index for language-model tools."
-    ),
 ) -> None:
     """A very fast causal discovery package.
 
     List the methods, run one on a data file, and check the configuration.
     """
-    if sum((show_help, skill, llms)) > 1:
-        raise CliError("usage_error", "Choose one of --help, --skill, or --llms.", EXIT_USAGE)
+    if show_help and skill:
+        raise CliError("usage_error", "Choose one of --help or --skill.", EXIT_USAGE)
     if as_json and not show_help:
         raise CliError(
             "usage_error",
@@ -1057,8 +1053,8 @@ def _root(
     if show_help:
         typer.echo(json.dumps(help_schema(), indent=2) if as_json else ctx.get_help())
         raise typer.Exit(EXIT_OK)
-    if skill or llms:
-        typer.echo(render_skill() if skill else render_llms_txt())
+    if skill:
+        typer.echo(render_skill())
         raise typer.Exit(EXIT_OK)
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help())

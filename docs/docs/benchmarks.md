@@ -119,7 +119,7 @@ Released October 12, 2026
 :::{card}
 :link: benchmarks/0.1.0
 :link-type: doc
-:link-alt: The 0.1.0 release card: the alpha benchmarks
+:link-alt: The 0.1.0 release card: the alpha release
 :class-card: release-tile
 :shadow: none
 :margin: 0
@@ -128,7 +128,7 @@ Released October 12, 2026
 :::
 
 :::{div} release-body
-<h3>The alpha benchmarks</h3>
+<h3>The alpha release</h3>
 
 PC, FCI, GES, BOSS, GRaSP, DirectLiNGAM, and ICA-LiNGAM, compared with causal-learn, gCastle, and
 lingam.
@@ -153,5 +153,5 @@ The homepage's speed claim and charts come from these release cards.
 0.4.0: pairwise direction <benchmarks/0.4.0>
 0.3.0: score-based search <benchmarks/0.3.0>
 0.2.0: hidden common causes <benchmarks/0.2.0>
-0.1.0: the alpha benchmarks <benchmarks/0.1.0>
+0.1.0: the alpha release <benchmarks/0.1.0>
 ```

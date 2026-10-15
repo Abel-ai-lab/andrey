@@ -23,6 +23,10 @@ Reproduce ([0.4.0](../docs/docs/benchmarks/0.4.0.md#reproduce),
 [0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
 [0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
 
+[`published/parity-allowlist.json`](published/parity-allowlist.json) lists the rows where a
+reference package has fewer errors than Andrey, each with its cited cause; any other such row fails
+the quality gate before a release ([reference parity](../qa/README.md#reference-parity)).
+
 ## Comparison packages
 
 Packages:
@@ -340,6 +344,14 @@ The two tabu searches can end on different graphs from the same data. At hill cl
 the best non-improving moves are often several reversals of covered edges, which leave the score
 unchanged, and each package takes the first in its own scan order. bnlearn scans additions, then
 removals, then reversals; Andrey ranks all moves by score change, then by the edge's endpoints.
+
+The two packages also score a graph slightly differently. Both charge `log(n)` per parameter in
+deviance units, but bnlearn's `bic-g` divides each node's residual sum of squares by `n - p - 1`,
+with `p` its parent count. Andrey's BIC divides by a count that does not depend on the parents, so
+its score differences are those of the maximum-likelihood BIC. bnlearn's score therefore adds a
+small cost per parent: it can rank two nearly equal moves the other way, and it rejects a last move
+whose BIC gain is below that cost. The two hill climbs can then end a few edges apart, with
+Andrey's graph at the lower BIC. Read a difference in `shd` together with the `bic` column.
 
 ### ANM direction test
 

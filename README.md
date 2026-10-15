@@ -46,8 +46,8 @@ uv add andrey-core
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/benchmark-chart-dark.svg">
     <img alt="Andrey's speedup over the slowest package on the same data: PC 941x at 400 variables,
-      FCI 8.7x at 800 variables, GES 4.3x at 150 variables, XGES 140x at 200 variables, Tabu
-      search 561x at 800 variables, DirectLiNGAM 3.3x at 200 variables"
+      Tabu search 561x at 800 variables, XGES 140x at 200 variables, DirectLiNGAM 8.9x at 100
+      variables, FCI 8.7x at 800 variables, GES 4.3x at 150 variables"
       src=".github/readme/benchmark-chart-light.svg" width="100%">
   </picture>
 </p>
@@ -139,7 +139,13 @@ variable. From a shell or an agent:
 
 ```shell
 andrey run pc --data your_data.csv   # JSON when piped, a summary in a terminal
-andrey --skill                       # a guide an agent loads as a skill
+```
+
+To give your coding agent Andrey's skill, paste this prompt into it:
+
+```text
+Install Andrey's agent skill: make sure the andrey-core package is installed, run
+`andrey --skill`, and save its output as andrey/SKILL.md in your skills folder.
 ```
 
 ## Learn more
@@ -148,7 +154,7 @@ andrey --skill                       # a guide an agent loads as a skill
 - [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each.
 - [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
   browser.
-- [Benchmarks](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
+- [Release cards](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
 - [Launch post](https://andrey.abel.ai/blog/20261008-introducing-andrey.html),
   [FAQ](https://andrey.abel.ai/docs/faq.html), and
   [changelog](https://andrey.abel.ai/docs/changelog.html).

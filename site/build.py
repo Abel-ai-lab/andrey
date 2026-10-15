@@ -5,10 +5,11 @@
 :func:`readme_chart`. ``docs/DEVELOPMENT.md`` has the build command.
 
 Every number on the homepage comes from a release's published benchmark summary (``RELEASES``) or
-from the method registry. The speed and accuracy sections cover every comparison with another
-package whose method the registry supports; each family's tile shows its largest ratio rounded
-down to one digit, and the README claim is the one :func:`claim_sentence` words from them. The
-README chart shows one card per method in ``PANEL``. The method list comes from the method
+from the method registry. A method measured against the same package in two summaries shows the
+newer summary's rows (:func:`newest`). The speed and accuracy sections cover every comparison with
+another package whose method the registry supports; each family's tile shows its largest ratio
+rounded down to one digit, and the README claim is the one :func:`claim_sentence` words from them.
+The README chart shows one card per method in ``PANEL``. The method list comes from the method
 registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks the
 page as not for release. Links are relative to the site root.
 """
@@ -53,6 +54,7 @@ RELEASES = (
     "hidden-confounders-2026-10",
     "score-search-2026-10",
     "pairwise-2026-10",
+    "direct-lingam-2026-10",
     "time-series-2026-10",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
@@ -189,8 +191,40 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
 
 def release_summaries(summary: dict) -> list[dict]:
     """Every release's summary, in ``RELEASES`` order, with ``summary`` standing in for the
-    first."""
-    return [summary, *(load_summary(PUBLISHED / f / "summary.json") for f in RELEASES[1:])]
+    first, each comparison only in the newest summary that measures it (:func:`newest`)."""
+    return newest([summary, *(load_summary(PUBLISHED / f / "summary.json") for f in RELEASES[1:])])
+
+
+def newest(summaries: list[dict]) -> list[dict]:
+    """``summaries`` with each comparison kept only in the newest summary that measures it.
+
+    A comparison is a summary's method, by its name (``method``), against one package
+    (``comparator``), so a method measured under two settings is two comparisons; this is the key
+    ``qa/reference_parity.py`` judges by. A released summary never changes, so when a later summary
+    measures the same comparison, the page shows the later rows and drops the earlier summary's.
+    "Later" is the summary's ``generated`` date; two summaries generated on the same day that both
+    measure a comparison raise. The list keeps its order and length, so it still lines up with
+    ``RELEASES``.
+    """
+    dated: dict[tuple[str, str], str] = {}
+    for summary in summaries:
+        for key in {(m["method"], m["comparator"]) for m in summary["methods"]}:
+            seen = dated.get(key)
+            if seen == summary["generated"]:
+                raise ValueError(f"{key} is in two summaries generated on {seen}")
+            if seen is None or seen < summary["generated"]:
+                dated[key] = summary["generated"]
+    return [
+        {
+            **summary,
+            "methods": [
+                m
+                for m in summary["methods"]
+                if dated[(m["method"], m["comparator"])] == summary["generated"]
+            ],
+        }
+        for summary in summaries
+    ]
 
 
 def normalized(name: str) -> str:
@@ -411,15 +445,15 @@ def ratio_label(row: dict) -> str:
 
 
 # ---- the README's speedup cards --------------------------------------------------------------
-# The methods the README chart shows, in order, each from a release's summary: (folder in
-# RELEASES, method).
+# The methods the README chart shows, each from a release's summary: (folder in RELEASES,
+# method). The chart orders them by speedup.
 PANEL = (
     ("alpha-2026-09", "PC"),
     ("alpha-2026-09", "FCI"),
     ("alpha-2026-09", "GES"),
     ("score-search-2026-10", "XGES"),
     ("score-search-2026-10", "Tabu search"),
-    ("alpha-2026-09", "DirectLiNGAM"),
+    ("direct-lingam-2026-10", "DirectLiNGAM"),
 )
 
 
@@ -432,8 +466,9 @@ def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str
     """Each ``PANEL`` method's speedups at its largest size with a published ratio, fastest first.
 
     A slide is the method, its size as it prints, and its bars: each package, its speed relative
-    to the slowest package (1x), and the label it prints. ``summaries`` are in ``RELEASES`` order,
-    and each method comes from its own release's summary, rows at ``MEAN_DEGREE``.
+    to the slowest package (1x), and the label it prints. The slides go by Andrey's speed, largest
+    first. ``summaries`` are in ``RELEASES`` order, and each method comes from its own release's
+    summary, rows at ``MEAN_DEGREE``.
 
     The packages at that size come from the comparisons run with the same data, hardware, and
     build as the one with the ratio. Every bar comes from Andrey's paired ratios: Andrey's is its
@@ -473,7 +508,7 @@ def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str
             speed = ours / row["ratio"]
             bars.append((package, speed, speedup_text(speed)))
         slides.append((name, f"{d:,} {lead['unit']}", sorted(bars, key=lambda bar: -bar[1])))
-    return slides
+    return sorted(slides, key=lambda slide: -next(s for p, s, _ in slide[2] if p == "Andrey"))
 
 
 def slug(name: str) -> str:
@@ -1487,6 +1522,47 @@ def tile_art(name: str, size: str) -> str:
     )
 
 
+# The prompt that installs the agent skill, as the README and the FAQ give it.
+AGENT_PROMPT = (
+    "Install Andrey's agent skill: make sure the andrey-core package is installed, run "
+    "`andrey --skill`, and save its output as andrey/SKILL.md in your skills folder."
+)
+
+
+# Coding agents, and open models that drive them, as the pill shows them: each one's mono mark
+# from Lobe Icons (site/agents/, MIT), drawn in the text's color. GLM's is Z.ai's.
+AGENTS = {
+    "claude": "Claude Code",
+    "codex": "Codex",
+    "cursor": "Cursor",
+    "zai": "GLM",
+    "deepseek": "DeepSeek",
+}
+
+
+def agent_logo(name: str) -> str:
+    """``name``'s mark, its name as the tooltip."""
+    svg = (SITE / "agents" / f"{name}.svg").read_text()
+    paths = re.sub(r"<title>.*?</title>", "", re.search(r"<svg[^>]*>(.*)</svg>", svg, re.S)[1])
+    return (
+        '<svg class="agent-logo" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd">'
+        f"<title>{escape(AGENTS[name])}</title>{paths}</svg>"
+    )
+
+
+def agent_pill() -> str:
+    """The pill above the headline: it copies ``AGENT_PROMPT`` to paste into a coding agent
+    (``prompt.js``), and without the script it leads to the FAQ answer that gives the prompt."""
+    logos = "".join(agent_logo(name) for name in AGENTS)
+    return (
+        f'<a class="agent-pill" href="docs/faq.html#how-does-an-agent-use-it" '
+        f'data-prompt="{escape(AGENT_PROMPT)}" title="Copy a prompt for your coding agent">'
+        '<span class="agent-pill__label">Onboard your agent<span class="agent-pill__more"> to '
+        'Andrey</span></span><span class="agent-logos" aria-hidden="true">'
+        f"{logos}</span></a>"
+    )
+
+
 def hero_chips() -> str:
     """The buttons beside the install line: Get started, and the live demo once its Space is
     public."""
@@ -2086,6 +2162,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "robots": '<meta name="robots" content="noindex">' if placeholder else "",
         "banner": banner if placeholder else "",
         "lede": escape(lede()),
+        "agent_pill": agent_pill(),
         "hero_chips": hero_chips(),
         "hero_art": hero_art(),
         "tile_art": tile_art,

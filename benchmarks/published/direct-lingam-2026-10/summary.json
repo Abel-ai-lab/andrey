@@ -1,0 +1,153 @@
+{
+ "release": "0.4.1",
+ "generated": "2026-10-15",
+ "theme": "DirectLiNGAM's causal-order search",
+ "build": "pre-release Andrey 0.4.1 build, 15 October 2026",
+ "regime": {
+  "DirectLiNGAM": {
+   "name": "lingam_sf",
+   "description": "linear structural equations on scale-free DAGs with mean degree 2, uniform noise, standardized columns, n = 10 d rows"
+  }
+ },
+ "packages": {
+  "lingam": "1.13.0"
+ },
+ "hardware": {
+  "DirectLiNGAM": {
+   "cpu": "Intel Core i7-7820X",
+   "cores_per_fit": 4
+  }
+ },
+ "complete": true,
+ "pending_fits": 0,
+ "incomplete": [],
+ "methods": [
+  {
+   "method": "DirectLiNGAM",
+   "family": "functional",
+   "solution": "andrey.direct_lingam.numpy",
+   "comparator": "lingam",
+   "comparator_solution": "lingam.direct_lingam",
+   "regime": "lingam_sf",
+   "hardware": "Intel Core i7-7820X, 4 cores",
+   "cores": 4,
+   "build": "pre-release Andrey 0.4.1 build, 15 October 2026",
+   "same_graph_test": "equal structure_hash (both return a DAG)",
+   "complete": true,
+   "rows": [
+    {
+     "d": 20,
+     "n": 200,
+     "seeds": 3,
+     "repeats": 3,
+     "cap_wall_s": 1800,
+     "fits": 3,
+     "andrey_ok": 3,
+     "andrey_timeouts": 0,
+     "comparator_ok": 3,
+     "comparator_timeouts": 0,
+     "paired": 3,
+     "andrey_s": 0.1157,
+     "comparator_s": 0.7842,
+     "ratio": 6.74,
+     "andrey_shd": 0.67,
+     "comparator_shd": 0.67,
+     "empty_shd": 19.0,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "same_graph": 3,
+     "complete": true
+    },
+    {
+     "d": 30,
+     "n": 300,
+     "seeds": 3,
+     "repeats": 3,
+     "cap_wall_s": 1800,
+     "fits": 3,
+     "andrey_ok": 3,
+     "andrey_timeouts": 0,
+     "comparator_ok": 3,
+     "comparator_timeouts": 0,
+     "paired": 3,
+     "andrey_s": 0.2721,
+     "comparator_s": 2.605,
+     "ratio": 9.57,
+     "andrey_shd": 5.0,
+     "comparator_shd": 5.0,
+     "empty_shd": 29.0,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "same_graph": 3,
+     "complete": true
+    },
+    {
+     "d": 50,
+     "n": 500,
+     "seeds": 3,
+     "repeats": 3,
+     "cap_wall_s": 1800,
+     "fits": 3,
+     "andrey_ok": 3,
+     "andrey_timeouts": 0,
+     "comparator_ok": 3,
+     "comparator_timeouts": 0,
+     "paired": 3,
+     "andrey_s": 1.03,
+     "comparator_s": 12.6,
+     "ratio": 12.2,
+     "andrey_shd": 4.67,
+     "comparator_shd": 4.67,
+     "empty_shd": 49.0,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "same_graph": 3,
+     "complete": true
+    },
+    {
+     "d": 100,
+     "n": 1000,
+     "seeds": 3,
+     "repeats": 3,
+     "cap_wall_s": 1800,
+     "fits": 3,
+     "andrey_ok": 3,
+     "andrey_timeouts": 0,
+     "comparator_ok": 3,
+     "comparator_timeouts": 0,
+     "paired": 3,
+     "andrey_s": 12.62,
+     "comparator_s": 112.2,
+     "ratio": 8.86,
+     "andrey_shd": 6.33,
+     "comparator_shd": 6.33,
+     "empty_shd": 99.0,
+     "andrey_fewer_errors": 0,
+     "comparator_fewer_errors": 0,
+     "same_graph": 3,
+     "complete": true
+    },
+    {
+     "d": 200,
+     "n": 2000,
+     "seeds": 2,
+     "repeats": 1,
+     "cap_wall_s": 1200,
+     "fits": 2,
+     "andrey_ok": 2,
+     "andrey_timeouts": 0,
+     "comparator_ok": 0,
+     "comparator_timeouts": 2,
+     "paired": 0,
+     "andrey_s": 168.6,
+     "comparator_s": null,
+     "ratio": null,
+     "andrey_shd": 14.0,
+     "comparator_shd": null,
+     "empty_shd": 199.0,
+     "complete": true
+    }
+   ]
+  }
+ ]
+}

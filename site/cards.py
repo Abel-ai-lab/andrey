@@ -68,9 +68,17 @@ def _scaled_width(path: Path, height: float) -> float:
 
 
 def _placed(path: Path, x: float, y: float, height: float, opacity: float = 1.0) -> str:
-    """The SVG at ``path`` in white, ``height`` tall with its top left at (``x``, ``y``)."""
+    """The SVG at ``path`` in white, ``height`` tall, with its top left at (``x``, ``y``).
+
+    The wordmark's right stroke stays amber.
+    """
     body = re.sub(r"^.*?<svg[^>]*>|</svg>\s*$", "", path.read_text(), flags=re.S)
-    body = re.sub(r'fill="#[0-9a-fA-F]{6}"', 'fill="#ffffff"', body)
+    keep = grain.AMBER.lower()
+    body = re.sub(
+        r'fill="(#[0-9a-fA-F]{6})"',
+        lambda m: m[0] if m[1].lower() == keep else 'fill="#ffffff"',
+        body,
+    )
     body = body.replace('fill="white"', 'fill="#ffffff"')
     bx, by, bw, bh = _view_box(path)
     return (
@@ -155,16 +163,19 @@ def _accent(word: str, x: float, y: float, size: int, key: str) -> tuple[str, st
     )
 
 
-def _title(lines: list[str], size: int, middles: list[float], center: float, accent: str) -> str:
-    """``lines`` in white, each centered on ``center`` at its middle in ``middles``; each word equal
-    to ``accent`` drawn as the accent, with its trace's space added after it."""
+def _title(
+    lines: list[str], size: int, middles: list[float], x0: float, accent: str, *, left: bool = False
+) -> str:
+    """``lines`` in white, each centered on ``x0`` (or starting at it, when ``left``) at its middle
+    in ``middles``; each word equal to ``accent`` drawn as the accent, with its trace's space added
+    after it."""
     space = _width(" ", size, "SemiBold")
     defs, drawing = [], []
     for row, (line, y) in enumerate(zip(lines, middles, strict=True)):
         words = line.split(" ")
         widths = [_width(word, size, "SemiBold") for word in words]
         rooms = [size * ROOM if accent and word == accent else 0 for word in words]
-        x = center - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
+        x = x0 if left else x0 - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
         for i, (word, width, room) in enumerate(zip(words, widths, rooms, strict=True)):
             if accent and word == accent:
                 more, drawn = _accent(word, x, y, size, f"accent-{row}-{i}")
@@ -443,32 +454,25 @@ def _jpeg_href(image: Image.Image) -> str:
 
 def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = H) -> str:
     """The banner as SVG, ``width`` x ``height``: ``kind``'s art filling the height, its right edge
-    on the banner's, and over its left side the wordmark, ``title``, and ``line`` after a short
-    amber rule. Text sizes follow the height."""
+    aligned with the banner's. The wordmark, ``title``, and ``line`` sit over the left side, with
+    an amber dot before ``line``. Text sizes follow the height."""
     k = height / COVER_H
     size, line_width, most = BANNER_TITLE
     lines = _lines(title, size, line_width, most) or [title]
     step = round(size * 1.14)
     top = 284 if len(lines) == most else 334
-    navy = grain.NAVY
-    stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
-    fade = "".join(
-        f'<stop offset="{offset:.2f}" stop-color="{navy}" stop-opacity="{opacity:.2f}"/>'
-        for offset, opacity in stops
-    )
     title_text = "".join(
         f'<text x="{BANNER_LEFT}" y="{top + i * step}" font-family="Inter" font-weight="600" '
         f'font-size="{size}" letter-spacing="-2" fill="#ffffff">{html.escape(text)}</text>'
         for i, text in enumerate(lines)
     )
     rule_y = top + (len(lines) - 1) * step + 78
-    art_w = round(height * COVER_W / COVER_H)
     text = (
         _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 96, 56)
         + title_text
         + (
-            f'<rect x="{BANNER_LEFT}" y="{rule_y}" width="42" height="5" fill="{grain.AMBER}"/>'
-            f'<text x="{BANNER_LEFT + 60}" y="{rule_y + 17}" font-family="Inter" '
+            f'<circle cx="{BANNER_LEFT + 9}" cy="{rule_y + 2.5}" r="9" fill="{grain.AMBER}"/>'
+            f'<text x="{BANNER_LEFT + 34}" y="{rule_y + 17}" font-family="Inter" '
             f'font-weight="600" font-size="{BANNER_LINE}" fill="#ffffff" opacity="0.9">'
             f"{html.escape(line)}</text>"
             if line
@@ -477,11 +481,24 @@ def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = 
     )
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
+        f'{_art_ground(kind, width, height)}<g transform="scale({k:.4f})">{text}</g></svg>'
+    )
+
+
+def _art_ground(kind: str, width: int, height: int) -> str:
+    """``kind``'s art filling the height, its right edge at ``width``, under a navy fade from the
+    left that keeps white text readable."""
+    stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
+    fade = "".join(
+        f'<stop offset="{offset:.2f}" stop-color="{grain.NAVY}" stop-opacity="{opacity:.2f}"/>'
+        for offset, opacity in stops
+    )
+    art_w = round(height * COVER_W / COVER_H)
+    return (
         f'<defs><linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">{fade}</linearGradient>'
         f'</defs><image href="{_jpeg_href(_art(kind))}" x="{width - art_w}" y="0" '
         f'width="{art_w}" height="{height}" preserveAspectRatio="none"/>'
         f'<rect width="{width}" height="{height}" fill="url(#fade)"/>'
-        f'<g transform="scale({k:.4f})">{text}</g></svg>'
     )
 
 
@@ -518,3 +535,95 @@ def cover_alt(kind: str) -> str:
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
     return f"Cover: {COVERS[kind]}, drawn in navy lines"
+
+
+# ---- the brand kit -----------------------------------------------------------------------------
+# Brand kit downloads (`docs/docs/brand.md`): SVG and PNG wordmarks and icons for light and dark
+# grounds, a square avatar, a social preview, and a zip of all files. Each is drawn from the
+# brand's own files (`site/wordmark.py`), keeping the kit consistent with the site.
+KIT_WORDMARK_H = 256  # the wordmark PNGs' height
+KIT_ICON = 512  # the icon PNGs' side
+KIT_AVATAR = 1024  # the avatar's side
+# The repository's social preview, at GitHub's recommended size; GitHub takes files up to 1 MB.
+SOCIAL_W, SOCIAL_H = 1280, 640
+SOCIAL_TITLE = 100  # the tagline's size, on two lines
+SOCIAL_LINK = 28  # the site's address at the bottom
+SOCIAL_QUALITY = 85
+KIT_NOTE = """Andrey brand kit
+
+The wordmark and the icon, for a light and a dark ground, as SVG and PNG, a square avatar, and a
+social preview for link cards. Use them as they are to refer or link to Andrey: no recoloring,
+stretching, effects, or retyped lettering, and the A stays whole. The Apache License 2.0 covers
+Andrey's code, not its name or marks. Guidelines: https://andrey.abel.ai/docs/brand.html
+"""
+
+
+def _icon_paths() -> tuple[str, str, str]:
+    """The icon's viewBox, ink path, and amber stroke path."""
+    icon = (BRAND / "favicon.svg").read_text()
+    view_box = re.search(r'viewBox="([^"]+)"', icon)[1]
+    ink, amber = re.findall(r'<path[^>]* d="([^"]+)"', icon)
+    return view_box, ink, amber
+
+
+def _kit_icon(ink: str, ground: str | None = None) -> str:
+    """The A in ``ink`` with its amber stroke, at 62% on a square ``ground`` when given."""
+    view_box, ink_d, amber_d = _icon_paths()
+    x, y, side, _ = (float(v) for v in view_box.split())
+    a = f'<path fill="{ink}" d="{ink_d}"/><path fill="{grain.AMBER}" d="{amber_d}"/>'
+    if ground is None:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view_box}">{a}</svg>\n'
+    pad = side * (1 / 0.62 - 1) / 2
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x - pad:g} {y - pad:g} '
+        f'{side + 2 * pad:g} {side + 2 * pad:g}"><rect x="{x - pad:g}" y="{y - pad:g}" '
+        f'width="{side + 2 * pad:g}" height="{side + 2 * pad:g}" fill="{ground}"/>{a}</svg>\n'
+    )
+
+
+def social_svg() -> str:
+    """The repository's social preview: the wordmark, the tagline with ``ACCENT`` drawn as the
+    accent, and the site's address at the bottom, over the lanes art."""
+    lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_W, 2)
+    step = round(SOCIAL_TITLE * 1.14)
+    top = SOCIAL_H / 2 - (len(lines) - 1) * step / 2 + 10
+    middles = [top + i * step for i in range(len(lines))]
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{SOCIAL_W}" height="{SOCIAL_H}">'
+        + _art_ground("lanes", SOCIAL_W, SOCIAL_H)
+        + _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 80, 56)
+        + _title(lines, SOCIAL_TITLE, middles, BANNER_LEFT, ACCENT, left=True)
+        + f'<text x="{BANNER_LEFT}" y="{SOCIAL_H - 72}" font-family="Inter" font-weight="600" '
+        f'font-size="{SOCIAL_LINK}" fill="#ffffff" opacity="0.72">andrey.abel.ai</text></svg>'
+    )
+
+
+def _png(svg: str, **size: int) -> bytes:
+    import resvg_py  # the docs group's renderer
+
+    return bytes(resvg_py.svg_to_bytes(svg_string=svg, **size))
+
+
+def brand_kit() -> dict[str, bytes]:
+    """The kit's files by name, including ``andrey-brand-kit.zip`` with all files."""
+    import zipfile
+
+    light, dark = andrey.viz.LIGHT.ink, andrey.viz.DARK.ink
+    files = {}
+    for ground, theme in (("light", "light"), ("dark", "dark")):
+        svg = (BRAND / f"wordmark-{theme}.svg").read_text()
+        files[f"andrey-wordmark-on-{ground}.svg"] = svg.encode()
+        files[f"andrey-wordmark-on-{ground}.png"] = _png(svg, height=KIT_WORDMARK_H)
+        icon = _kit_icon(light if ground == "light" else dark)
+        files[f"andrey-icon-on-{ground}.svg"] = icon.encode()
+        files[f"andrey-icon-on-{ground}.png"] = _png(icon, width=KIT_ICON)
+    files["andrey-avatar.png"] = _png(_kit_icon("#ffffff", grain.COBALT), width=KIT_AVATAR)
+    files["andrey-social-preview.jpg"] = _jpeg(social_svg(), SOCIAL_QUALITY)
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as kit:
+        for name, data in [("README.txt", KIT_NOTE.encode()), *files.items()]:
+            info = zipfile.ZipInfo(f"andrey-brand-kit/{name}", date_time=(2026, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            kit.writestr(info, data)  # a fixed date keeps zip bytes consistent across builds
+    files["andrey-brand-kit.zip"] = out.getvalue()
+    return files

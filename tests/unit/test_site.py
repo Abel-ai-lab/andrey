@@ -372,10 +372,16 @@ def test_a_graph_in_parts_is_drawn_part_by_part():
     assert all(0 <= c <= 1 for position in positions.values() for c in position)
 
 
-def test_wordmark_takes_the_palette_ink():
+def test_wordmark_takes_the_palette_ink_and_its_a_one_amber_stroke():
+    # The word uses the palette's ink, with the A's right stroke in the art's amber. The icon is
+    # that A alone, with ink that follows the browser's light or dark bar.
+    amber = andrey.viz.LIGHT.categorical[1]
     for name, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         svg = (ROOT / "site" / "brand" / f"wordmark-{name}.svg").read_text()
-        assert re.findall(r'fill="([^"]+)"', svg) == [palette.ink]
+        assert re.findall(r'fill="([^"]+)"', svg) == [palette.ink, amber]
+    icon = (ROOT / "site" / "brand" / "favicon.svg").read_text()
+    assert f".ink{{fill:{andrey.viz.LIGHT.ink}}}" in icon and f'fill="{amber}"' in icon
+    assert f"prefers-color-scheme: dark){{.ink{{fill:{andrey.viz.DARK.ink}}}" in icon
 
 
 def test_a_ratio_needs_both_times_and_not_better_graphs(tmp_path):
@@ -532,18 +538,22 @@ def test_a_page_without_a_description_takes_its_first_paragraph(
 def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
     slides = build.speedup_slides(summaries)
-    assert [name for _, name in build.PANEL] == [
+    assert {name for _, name in build.PANEL} == {
         "PC",
         "FCI",
         "GES",
         "XGES",
         "Tabu search",
         "DirectLiNGAM",
-    ]
+    }
     assert len(slides) == 6
+    # The strongest speedup leads.
+    speeds = [next(s for p, s, _ in bars if p == "Andrey") for _, _, bars in slides]
+    assert speeds == sorted(speeds, reverse=True)
     by_release = dict(zip(build.RELEASES, summaries, strict=True))
-    for (release, name), (shown, size, bars) in zip(build.PANEL, slides, strict=True):
-        assert shown == name
+    shown = {name: (size, bars) for name, size, bars in slides}
+    for release, name in build.PANEL:
+        size, bars = shown[name]
         # The slide is the method's largest size with a published ratio, at the panel's mean
         # degree, and Andrey's bar prints that ratio, "≥" before a lower bound. A pair's size is
         # its rows.
@@ -565,6 +575,80 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
         assert bars[-1][2] == "1x" and andrey == bars[0][2]
 
 
+def _remeasured() -> tuple[dict, dict]:
+    """``SUMMARY`` with DirectLiNGAM also measured against causal-learn, and a later summary that
+    measures DirectLiNGAM against lingam again."""
+    earlier = copy.deepcopy(SUMMARY)
+    earlier["methods"].append(
+        _method(
+            "DirectLiNGAM",
+            "functional",
+            "causal-learn",
+            [_row(100, 8.4, 57.8, 6.87, 7, 7, 99)],
+            regime="lingam_sf",
+        )
+    )
+    later = {
+        "generated": "2026-10-15",
+        "methods": [
+            _method(
+                "DirectLiNGAM",
+                "functional",
+                "lingam",
+                [_row(100, 10.4, 110.2, 10.6, 6.3, 6.3, 99)],
+                regime="lingam_sf",
+            )
+        ],
+    }
+    return earlier, later
+
+
+def test_a_remeasured_comparison_shows_only_the_newest_summarys_rows():
+    earlier, later = _remeasured()
+    for summaries in ([earlier, later], [later, earlier]):
+        kept = build.newest(copy.deepcopy(summaries))
+        assert len(kept) == len(summaries)
+        found = build.supported(kept)
+        pairs = [(m["spec"], m["comparator"]) for m in found]
+        assert len(pairs) == len(set(pairs))
+        lingam = next(
+            m for m in found if (m["spec"], m["comparator"]) == ("direct_lingam", "lingam")
+        )
+        assert lingam["rows"] == build.comparisons(later)[0]["rows"]
+        # The earlier summary keeps every comparison the later one does not measure.
+        assert ("direct_lingam", "causal-learn") in pairs
+        assert {"PC", "FCI", "ICA-LiNGAM"} <= {m["method"] for m in found}
+
+
+def test_two_summaries_of_one_day_cannot_both_measure_a_comparison():
+    earlier, later = _remeasured()
+    later["generated"] = earlier["generated"]
+    with pytest.raises(ValueError, match="two summaries"):
+        build.newest([earlier, later])
+
+
+@pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
+def test_each_published_comparison_comes_from_one_summary():
+    summaries = build.release_summaries(build.load_summary(build.SUMMARY))
+    shown = [
+        (s["generated"], m["method"], m["comparator"])
+        for s in summaries
+        for m in build.comparisons(s)
+    ]
+    dates = {}
+    for generated, *pair in shown:
+        dates.setdefault(tuple(pair), set()).add(generated)
+    assert all(len(found) == 1 for found in dates.values())
+    # No published summary measures a comparison later than the one shown.
+    every = [build.load_summary(build.SUMMARY)] + [
+        build.load_summary(build.PUBLISHED / f / "summary.json") for f in build.RELEASES[1:]
+    ]
+    for summary in every:
+        for m in summary["methods"]:
+            (kept,) = dates[(m["method"], m["comparator"])]
+            assert kept >= summary["generated"]
+
+
 def test_the_readme_chart_takes_rows_at_its_mean_degree():
     summaries = placeholder_summaries()
     release, name = build.PANEL[0]
@@ -573,9 +657,13 @@ def test_the_readme_chart_takes_rows_at_its_mean_degree():
     # The same sizes again at a denser mean degree, each with a larger ratio: the panel keeps the
     # rows at MEAN_DEGREE.
     denser = [dict(r, mean_degree=4.0, ratio=r["ratio"] * 2) for r in method["rows"]]
-    before = build.speedup_slides(summaries)[0]
+
+    def slide():
+        return next(s for s in build.speedup_slides(summaries) if s[0] == name)
+
+    before = slide()
     method["rows"] = [dict(r, mean_degree=build.MEAN_DEGREE) for r in method["rows"]] + denser
-    assert build.speedup_slides(summaries)[0] == before
+    assert slide() == before
     kept = {r["ratio"] for m in build.comparisons(summary) for r in m["rows"]}
     assert kept.isdisjoint(r["ratio"] for r in denser)
 
@@ -1048,6 +1136,14 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
         r'<a class="tile-face" href="#[\w-]+" data-tile="([\w-]+)"', placeholder_page
     )
     assert opened and len(opened) == len(set(opened))
+
+
+def test_the_hero_pill_copies_the_agent_prompt_the_readme_and_the_faq_give(placeholder_page):
+    assert f'data-prompt="{html.escape(build.AGENT_PROMPT)}"' in placeholder_page
+    for name in build.AGENTS.values():  # each agent's mark, named
+        assert f"<title>{html.escape(name)}</title>" in placeholder_page
+    for page in (ROOT / "README.md", ROOT / "docs" / "docs" / "faq.md"):
+        assert build.AGENT_PROMPT in " ".join(page.read_text().split()), page.name
 
 
 def test_the_hero_and_the_first_section_share_one_art(placeholder_page):

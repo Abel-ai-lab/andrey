@@ -6,7 +6,8 @@ linear SCM on the ASIA network, the measured Sachs protein-signaling data, and t
 time-series regimes, drawn and scored by the benchmark harness. On each dataset, the method's
 median SHD over the draws must be below the empty graph's and within the tolerance of its recorded
 baseline. ``quality_baselines.json`` holds the baselines and, in one block, every tolerance with
-the reason for its size.
+the reason for its size. Before any fit, the gate runs :mod:`qa.reference_parity` over the
+published benchmark summaries.
 
     uv run python -m qa.quality_gate                  # exit 1 if any check fails
     uv run python -m qa.quality_gate PC FCI
@@ -35,6 +36,7 @@ from andrey import GraphStructure, data, metrics
 from andrey.core import ARROW, LATENT, TAIL
 from andrey.data.latent import marginal
 from andrey.data.real import SACHS_ARCS, SACHS_NODES
+from qa import reference_parity
 
 # The time-series regimes, the published settings, and the scores of the published errors live in
 # the benchmark harness; the gate draws and scores the time-series methods with them.
@@ -630,7 +632,8 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         ap.error(f"unknown methods {unknown}; known: {list(SUPPORTED)}")
 
-    print("Quality gate: median SHD over each dataset's draws, against the known graph.\n")
+    parity_failed = 0 if args.capture else reference_parity.main()
+    print("\nQuality gate: median SHD over each dataset's draws, against the known graph.\n")
     results = []
     for method, dataset in cells(args.methods or None):
         results.append(evaluate(method, dataset))
@@ -644,7 +647,9 @@ def main(argv: list[str] | None = None) -> int:
         for reason in r.failures:
             print(f"FAIL {r.method} on {r.dataset}: {reason}")
     print(f"\n{len(results)} checks, {len(failed)} failed.")
-    return 1 if failed else 0
+    if parity_failed:
+        print("Reference parity failed; its rows are listed first.")
+    return 1 if failed or parity_failed else 0
 
 
 if __name__ == "__main__":

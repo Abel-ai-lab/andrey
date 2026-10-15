@@ -19,6 +19,8 @@ import re
 import runpy
 import sys
 import textwrap
+import tomllib
+from urllib.parse import urljoin
 
 import ablog.blog
 from ablog.blog import Blog
@@ -56,6 +58,7 @@ sys.path.insert(0, str(ROOT / "apps"))
 sys.path.insert(0, str(ROOT / "apps" / "live-discovery"))
 build_assets = _module("andrey_build_assets", ROOT / "apps" / "build_assets.py")
 compare = _module("andrey_compare", ROOT / "apps" / "compare.py")
+discovery = _module("andrey_discovery", HERE / "discovery.py")
 
 # ---- project ---------------------------------------------------------------------------------
 project = "Andrey"
@@ -179,10 +182,10 @@ html_theme = "pydata_sphinx_theme"
 html_title = "Andrey"
 # site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script.
 html_static_path = ["_static", "_generated/static", "../site/brand", "../site/assets"]
-# The wordmark's "A" in the accent blue: a placeholder mark until the brand has one.
+# The wordmark's A with its right stroke in amber (`site/wordmark.py`).
 html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
-html_extra_path = ["_generated/extra"]
+html_extra_path = ["_generated/extra", "_extra"]
 html_css_files = ["andrey-tokens.css", "andrey.css", "graph-guides.css"]
 # The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill), the dot
 # on Release cards until the reader has seen the latest release, and the outline's mark on the
@@ -195,6 +198,37 @@ html_js_files = [
 REPO_URL = "https://github.com/Abel-ai-lab/andrey"
 PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
+ABEL_URL = "https://abel.ai/"
+# Abel's logomark in Night Teal, for light backgrounds, from Abel's brand kit: the structured
+# data's organization logo, drawn at the build as a PNG wide enough for search results.
+ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
+ABEL_LOGO = "_static/abel-symbol.png"
+ABEL_LOGO_WIDTH = 600
+# Pages a search engine should not list: the search page, and the page the server shows for a
+# missing address (404.md).
+UNINDEXED = {"search", "404"}
+# The pages llms.txt lists, by section; each release card and published post follows its section's
+# pages, newest first.
+LLMS_SECTIONS = (
+    (
+        "Docs",
+        (
+            "docs/index",
+            "docs/guides/getting-started",
+            "docs/faq",
+            "docs/code/index",
+            "docs/configuration",
+            "docs/guides/graph-types",
+            "docs/guides/graph-representation",
+            "docs/examples/index",
+            "docs/demos/index",
+            "docs/changelog",
+        ),
+    ),
+    ("Release cards", ("docs/benchmarks",)),
+    ("Blog", ("blog/index",)),
+)
+PACKAGE = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
     # release to the changelog, then Docs, Examples, Blog, and FAQ, then search, theme, and GitHub.
@@ -204,7 +238,10 @@ html_theme_options = {
     "navigation_with_keys": True,
     "show_prev_next": False,
     "icon_links": [{"name": "GitHub", "url": REPO_URL, "icon": "fa-brands fa-github"}],
-    "footer_center": ["report-bug"],
+    # The documentation footer (`_templates/docs-footer.html`); the theme's three areas are empty.
+    "footer_start": ["docs-footer"],
+    "footer_center": [],
+    "footer_end": [],
     "use_edit_page_button": False,
     # A documentation page's section over its title (_templates/page-kicker.html); other pages
     # keep the breadcrumbs.
@@ -220,6 +257,8 @@ html_context = {
     "report_bug_url": f"{REPO_URL}/issues/new",
     "repo_url": REPO_URL,
     "pypi_url": PYPI_URL,
+    # Abel's mark uses the text color in the documentation footer.
+    "abel_mark": site.abel_mark(),
 }
 # A post's author and date sit under its title (_post_byline); the blog index links the archive.
 BLOG_SIDEBAR = ["ablog/archives.html"]
@@ -334,6 +373,30 @@ def _methods_text() -> dict[str, str]:
     }
 
 
+# Brand kit colors: each color's name, role, and palette value.
+BRAND_COLORS = (
+    ("Ink", "Text and the wordmark on light grounds", andrey.viz.LIGHT.ink),
+    ("Paper", "The light ground", andrey.viz.LIGHT.paper),
+    ("Cobalt", "Links, selection, and the art's ground", cards.grain.COBALT),
+    ("Navy", "The art's deep ground and the footer", cards.grain.NAVY),
+    ("Night", "The dark ground", andrey.viz.DARK.paper),
+    ("Pale ink", "Text and the wordmark on dark grounds", andrey.viz.DARK.ink),
+    ("Amber", "The sole accent: one node or one edge", cards.grain.AMBER),
+)
+
+
+def _brand_colors() -> str:
+    """Brand kit swatches (``docs/brand.md``), each with its palette value."""
+    items = "".join(
+        f'<li class="brand-color"><span class="brand-color__chip" style="background:{value}">'
+        f'</span><span class="brand-color__name">{name}</span>'
+        f'<code class="brand-color__value">{value.upper()}</code>'
+        f'<span class="brand-color__role">{role}</span></li>'
+        for name, role, value in BRAND_COLORS
+    )
+    return f'<ul class="brand-colors">{items}</ul>\n'
+
+
 def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its application objects
     """Fill the homepage's context from the summary, and the FAQ's method counts."""
     (GENERATED / "static").mkdir(parents=True, exist_ok=True)
@@ -349,6 +412,10 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
         _write_bytes(GENERATED / "static" / name, tile)
     # A release cover or tile without its own art (_static/benchmarks.css).
     _write_bytes(GENERATED / "static" / "release-ground.jpg", cards.release_ground_jpeg())
+    # Brand kit downloads (`_static/brand/`) and colors from the palette.
+    for name, data in cards.brand_kit().items():
+        _write_bytes(GENERATED / "static" / "brand" / name, data)
+    _write(GENERATED / "brand-colors.html", _brand_colors())
 
 
 # Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage's card carries the
@@ -399,8 +466,10 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 
 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
-    """The page's description, and its Open Graph and Twitter card tags: title, summary, address,
-    and image. The description and ``og:description`` are one value."""
+    """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
+    image), and its structured data (``discovery.head_tags``): the organization, the website, the
+    software at the release the page belongs to, the page or post, and its breadcrumbs. The pages
+    in ``UNINDEXED`` are ``noindex``. The description and ``og:description`` are one value."""
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
@@ -425,11 +494,101 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "og:image:height": str(cards.H),
         "twitter:card": "summary_large_image",
     }
-    return "".join(
+    preview = "".join(
         f'<meta {"property" if key.startswith("og:") else "name"}="{key}" '
         f'content="{html.escape(value, quote=True)}">\n'
         for key, value in tags.items()
     )
+    page = {"title": title, "description": description, "url": url, "image": image}
+    if pagename in UNINDEXED:
+        page["indexable"] = False
+    if match := re.fullmatch(r"docs/benchmarks/(\d+\.\d+\.\d+)", pagename):
+        page["software_version"] = match[1]
+    post = None
+    if pagename in Blog(app):
+        article = Blog(app)[pagename]
+        post = {
+            "date": article.date.strftime("%Y-%m-%d") if article.date else None,
+            "authors": [
+                {
+                    "name": str(person),
+                    "url": urljoin(url, app.builder.get_relative_uri(pagename, person.docname)),
+                }
+                for person in article.author or ()
+            ],
+            "version": app.env.metadata.get(pagename, {}).get("version"),
+        }
+    parents = [
+        {
+            "title": html.unescape(re.sub(r"<[^>]+>", "", parent["title"])),
+            "url": urljoin(url, parent["link"]),
+        }
+        for parent in context.get("parents", [])
+    ]
+    software = {
+        "name": app.config.project,
+        "description": PACKAGE["description"],
+        "version": release,
+        "license": {
+            "@type": "CreativeWork",
+            "name": PACKAGE["license"],
+            "url": f"{PACKAGE['urls']['Source']}/blob/main/{PACKAGE['license-files'][0]}",
+        },
+        "programmingLanguage": "Python",
+        "runtimePlatform": f"Python {PACKAGE['requires-python']}",
+        "codeRepository": PACKAGE["urls"]["Source"],
+        # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
+        "image": SITE_URL + "_static/favicon.svg",
+        "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/"],
+    }
+    return preview + discovery.head_tags(
+        page,
+        site_url=SITE_URL,
+        project=app.config.project,
+        author=app.config.author,
+        organization_url=ABEL_URL,
+        organization_logo=SITE_URL + ABEL_LOGO,
+        software=software,
+        language=app.config.language or "en",
+        post=post,
+        parents=parents,
+    )
+
+
+def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Write ``llms.txt`` and ``sitemap.xml`` at the site's root from the built pages
+    (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt`` lists
+    ``LLMS_SECTIONS``, then every release card and published post; a listed page that is missing
+    or ``noindex`` fails the build."""
+    if exception is not None or app.builder.name != "html":
+        return
+    outdir = pathlib.Path(app.outdir)
+    cards = sorted(
+        (n for n in app.env.found_docs if re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", n)),
+        key=lambda n: tuple(int(part) for part in n.rsplit("/", 1)[1].split(".")),
+        reverse=True,
+    )
+    posts = [post.docname for post in Blog(app).posts if post.published]
+    later = {"Release cards": cards, "Blog": posts}
+    sections = [(heading, [*pages, *later.get(heading, ())]) for heading, pages in LLMS_SECTIONS]
+    try:
+        entries = discovery.read_pages(outdir, [n for _, documents in sections for n in documents])
+        text = discovery.llms_index(
+            app.andrey_home["description"],
+            entries,
+            sections,
+            site_url=SITE_URL,
+            project=app.config.project,
+            version=release,
+        )
+    except ValueError as error:
+        raise ConfigError(str(error)) from None
+    _write(outdir / "llms.txt", text)
+    import resvg_py  # the docs group's renderer, as site/cards.py uses it
+
+    logo = resvg_py.svg_to_bytes(svg_string=ABEL_SYMBOL.read_text(), width=ABEL_LOGO_WIDTH)
+    _write_bytes(outdir / ABEL_LOGO, bytes(logo))
+    _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
 
 
 # The pages that show the "Why Andrey is fast" scenes.
@@ -502,7 +661,7 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     if pagename == "index":
         context["home"] = app.andrey_home
         context["newest_post"] = _newest_post_card(app)
-        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js"]
+        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js", "prompt.js"]
     elif pagename == "blog/index":
         # The posts in the Release cards page's blocks.
         css = ["benchmarks.css", "blog.css"]
@@ -529,6 +688,17 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     context["metatags"] = context.get("metatags", "") + _preview_tags(
         app, pagename, context, doctree
     )
+    # The server answers a missing address with the 404 page at that address, at any depth, so the
+    # page resolves its links and files from the site's root; its in-page links (the skip link and
+    # the heading's) stay on the page.
+    if pagename == "404":
+        context["metatags"] = (
+            '<base href="/">\n'
+            + context["metatags"]
+            + "<script>addEventListener('DOMContentLoaded', () => { for (const a of "
+            "document.querySelectorAll('a[href^=\"#\"]')) "
+            "a.href = location.pathname + a.getAttribute('href') })</script>\n"
+        )
 
 
 def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
@@ -918,6 +1088,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
+    app.connect("build-finished", _write_discovery)
     app.connect("doctree-resolved", _post_byline)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)

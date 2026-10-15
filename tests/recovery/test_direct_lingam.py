@@ -60,6 +60,33 @@ def test_pwling_serial_vectorized_property(d: int, noise: str):
     assert vectorized == reference
 
 
+def test_pwling_residual_is_least_squares():
+    # The order search regresses one variable on another by least squares (Shimizu et al. 2011,
+    # Lemma 1): the residual equals the lstsq residual and is uncorrelated with the regressor.
+    # A small n makes a slope off by n / (n - 1) visible.
+    from andrey.lingam import pwling
+
+    rng = np.random.default_rng(0)
+    b = rng.uniform(-1.0, 1.0, 40)
+    a = 0.7 * b + rng.uniform(-1.0, 1.0, 40)
+    r = pwling.compute_residual(a, b)
+    slope = np.linalg.lstsq(np.column_stack([np.ones_like(b), b]), a, rcond=None)[0][1]
+    expected = a - slope * b
+    np.testing.assert_allclose(r, expected, atol=1e-12)
+    assert abs(np.mean((r - r.mean()) * (b - b.mean()))) < 1e-12
+
+
+def test_pwling_batched_scores_match_serial():
+    # The batched scores use the same least-squares slopes as the per-pair reference.
+    from andrey.lingam import pwling
+
+    X = _random_linear_sem(seed=2, n=40, d=6, noise="uniform")
+    U = list(range(6))
+    np.testing.assert_allclose(
+        pwling.score_candidates(X, U), pwling.score_candidates_serial(X, U), rtol=1e-9, atol=1e-12
+    )
+
+
 def test_score_candidates_single_candidate():
     # The foundation must survive a lone candidate (MultiGroup calls it directly in its peel loop);
     # DirectLiNGAM is shielded by causal_order's guard, but the primitive must not crash.

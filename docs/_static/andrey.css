@@ -235,8 +235,8 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   }
 }
 
-/* A newer release than the reader has seen: a dot at the top right of Release cards, in the navbar
-   and the drawer alike (nav-new.js shows it). */
+/* An amber dot, the brand's node, marks a release the reader has not seen at the top right of
+   Release cards in both the navbar and the drawer (`nav-new.js`; `DESIGN.md`, "Node and edge"). */
 .nav-new:not([hidden]) {
   display: inline-block;
   flex: none;
@@ -244,7 +244,7 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   height: 0.4rem;
   margin-left: 0.2rem;
   border-radius: 50%;
-  background-color: var(--andrey-categorical-4);
+  background-color: var(--andrey-ground-amber);
   transform: translateY(-0.45em);
 }
 
@@ -594,6 +594,343 @@ html:not(:has(.andrey-home)) .bd-header::before {
     order: 1;
     margin: 0;
     font-size: 0.95rem;
+  }
+}
+
+/* ---------- the 404 page ---------- */
+/* 404.md opens like a section cover, not an article: its title over its art (an engraved chain
+   broken where a link is missing, _static/missing-link.jpg), a small "404" above it, and no
+   breadcrumbs, permalink, or source link. Its cards are the documentation's own. */
+.bd-page-width:has(.not-found) :is(.bd-breadcrumbs, .bd-sidebar-secondary) {
+  display: none;
+}
+
+.bd-article:has(.not-found) h1 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.6rem;
+  box-sizing: border-box;
+  width: 100%;
+  height: clamp(11rem, 22vw, 16rem);
+  margin: 0 0 1.75rem;
+  padding: 0 clamp(1.25rem, 6%, 3.5rem);
+  border-radius: 14px;
+  background:
+    url("missing-link.jpg") 100% 50% / cover no-repeat,
+    var(--andrey-ground-navy);
+  color: var(--andrey-ground-ink);
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  letter-spacing: -0.03em;
+}
+
+.bd-article:has(.not-found) h1::before {
+  content: "404";
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  opacity: 0.8;
+}
+
+.bd-article:has(.not-found) h1 .headerlink {
+  display: none;
+}
+
+/* ---------- the documentation's footer ---------- */
+/* The documentation footer (`_templates/docs-footer.html`), modeled on craft.do's: a rounded navy
+   card inset from the page's edges, with the wordmark beside three link columns under small
+   capitals and a hairline, and the copyright and Abel's mark at the bottom. The theme's footer
+   row is disabled. */
+.bd-footer {
+  padding: 0 0.75rem 0.75rem;
+  border-top: 0;
+  background: transparent;
+}
+
+.bd-footer .bd-footer__inner {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+.bd-footer :is(.footer-items__start, .footer-item) {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.docs-footer {
+  --rule: color-mix(in srgb, var(--andrey-ground-ink) 16%, transparent);
+  margin-top: clamp(3rem, 6vw, 5rem);
+  padding: clamp(2rem, 4vw, 3.25rem) clamp(1.5rem, 5vw, 4rem) 1.5rem;
+  border-radius: 22px;
+  background:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--andrey-ground-cobalt) 30%, transparent),
+      transparent 60%
+    ),
+    var(--andrey-ground-navy);
+  color: color-mix(in srgb, var(--andrey-ground-ink) 72%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.docs-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.docs-footer a:hover {
+  color: var(--andrey-ground-ink);
+}
+
+.docs-footer a:focus-visible {
+  outline: 2px solid var(--andrey-ground-ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.docs-footer__top {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr);
+  gap: 2.5rem;
+}
+
+.docs-footer__brand img {
+  display: block;
+  width: auto;
+  height: 1.75rem;
+}
+
+.docs-footer__columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+.docs-footer__heading {
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--andrey-ground-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.docs-footer ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-footer__base {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin-top: clamp(2rem, 4vw, 3rem);
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.8125rem;
+}
+
+.docs-footer__base p {
+  margin: 0;
+}
+
+.docs-footer__base p a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.docs-footer__abel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--andrey-ground-ink);
+  font-weight: 600;
+}
+
+.docs-footer .abel-mark {
+  width: auto;
+  height: 1.05rem;
+}
+
+@media (max-width: 47.99rem) {
+  .docs-footer__top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .docs-footer__columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- the brand kit ---------- */
+/* `docs/brand.md`: each download appears on its intended ground (white or cobalt in either
+   theme), with its name and files. Colors appear as chips; the node and edge appear as an amber
+   dot and line. */
+.brand-all {
+  margin: 0.5rem 0 2rem;
+}
+
+.brand-assets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-assets--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.brand-asset {
+  margin: 0;
+}
+
+.brand-asset__view {
+  display: grid;
+  place-items: center;
+  height: 9rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-asset__view--light {
+  background: var(--andrey-ground-ink);
+}
+
+.brand-asset__view--dark {
+  border-color: transparent;
+  background: var(--andrey-ground-cobalt);
+}
+
+.brand-asset__view--plain {
+  background: var(--andrey-surface-2);
+}
+
+.brand-asset__view img {
+  max-width: 70%;
+  height: auto;
+}
+
+.brand-asset__avatar {
+  border-radius: 50%;
+}
+
+.brand-social {
+  margin: 1rem 0 0.6rem;
+}
+
+.brand-social img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-asset__name {
+  margin: 0.6rem 0 0.15rem;
+  font-weight: 600;
+}
+
+.brand-asset__files {
+  display: flex;
+  gap: 0.9rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.brand-marks {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-marks li {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-marks p {
+  margin: 0;
+}
+
+.brand-mark {
+  justify-self: center;
+  background: var(--andrey-ground-amber);
+}
+
+.brand-mark--node {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+}
+
+.brand-mark--edge {
+  width: 2.4rem;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.brand-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-color {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.brand-color__chip {
+  height: 4.5rem;
+  margin-bottom: 0.4rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-color__name {
+  font-weight: 600;
+}
+
+.brand-color__value {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--andrey-ink);
+  font-size: 0.8125rem;
+}
+
+.brand-color__role {
+  color: var(--andrey-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 47.99rem) {
+  .brand-assets,
+  .brand-assets--three {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
