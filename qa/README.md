@@ -110,8 +110,9 @@ re-measured against the same reference in a later summary is judged by the later
 
 `benchmarks/published/parity-allowlist.json` exempts a failing row only when it names the cause:
 `correct-by-paper` (Andrey follows the method's paper and the reference does not) or
-`reference-defect`, with a reason and a citation. Each entry pins the row's two error values, so a
-re-run that changes the row voids it, and an entry that matches no failing row fails the check.
+`reference-defect`, with a reason and a citation. Each entry pins the row's two error values (its
+two series counts, where the row has them), so a re-run that changes the row voids it, and an
+entry that matches no failing row fails the check.
 
 ```shell
 uv run python -m qa.reference_parity  # exit 1 if any row fails
