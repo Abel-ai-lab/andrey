@@ -17,6 +17,7 @@ import subprocess
 import sys
 from html import unescape
 from html.parser import HTMLParser
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -353,3 +354,117 @@ def test_every_site_address_in_the_readme_and_package_metadata_is_built(html):
             if not target.is_file():
                 problems.append(f"{source} uses https://andrey.abel.ai/{path}, which is not built")
     assert not problems, "\n".join(problems)
+
+
+def _discovery_graph(text):
+    scripts = re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)
+    assert len(scripts) == 1, "Each page must have one valid JSON-LD graph"
+    data = json.loads(scripts[0])
+    assert data["@context"] == "https://schema.org"
+    return {node["@type"]: node for node in data["@graph"]}
+
+
+def test_every_page_carries_structured_data_that_matches_its_preview(html):
+    for page, text in _pages(html):
+        nodes = _discovery_graph(text)
+        node = nodes.get("BlogPosting", nodes.get("WebPage"))
+        assert node is not None, page
+        for suffix, field in (
+            ("title", "name"),
+            ("description", "description"),
+            ("image", "image"),
+        ):
+            preview = re.findall(rf'<meta property="og:{suffix}" content="([^"]*)"', text)
+            twitter = re.findall(rf'<meta name="twitter:{suffix}" content="([^"]*)"', text)
+            assert len(preview) == 1 and preview == twitter, page
+            assert node[field] == unescape(preview[0]), page
+        software = nodes["SoftwareSourceCode"]
+        assert software["name"] == "Andrey" and software["programmingLanguage"] == "Python"
+        assert software["license"]["name"] == "Apache-2.0"
+        assert software["license"]["url"].endswith("/blob/main/LICENSE")
+        assert software["codeRepository"] == "https://github.com/Abel-ai-lab/andrey"
+        assert software["image"] == "https://andrey.abel.ai/_static/favicon.svg"
+        assert (html / "_static" / "favicon.svg").is_file()
+        assert node["about"]["@id"] == software["@id"]
+        assert nodes["Organization"]["url"] == "https://abel.ai/"
+        assert nodes["Organization"]["logo"] == "https://andrey.abel.ai/_static/abel-symbol.png"
+
+
+def test_the_organization_logo_is_a_png_search_results_can_show(html):
+    from PIL import Image
+
+    # Search engines show an organization's logo from 112 x 112 pixels up, on a light ground.
+    with Image.open(html / "_static" / "abel-symbol.png") as logo:
+        assert logo.format == "PNG" and min(logo.size) >= 112, logo.size
+
+
+def test_a_post_carries_the_date_authors_and_release_of_its_front_matter(html):
+    for source in (DOCS / "blog").glob("*.md"):
+        content = source.read_text()
+        if "blogpost: true" not in content:
+            continue
+        nodes = _discovery_graph((html / "blog" / (source.stem + ".html")).read_text())
+        article = nodes["BlogPosting"]
+        front = {key: re.search(rf"^{key}: (.+)$", content, re.M)[1] for key in ("date", "version")}
+        assert article["datePublished"] == front["date"], source.name
+        assert nodes["SoftwareSourceCode"]["version"] == front["version"], source.name
+        assert "dateModified" not in article
+        authors = re.search(r"^author: (.+)$", content, re.M)[1]
+        names = [name.strip() for name in authors.strip("[]").split(",")]
+        assert [person["name"] for person in article["author"]] == names, source.name
+        for person in article["author"]:
+            assert (html / urlsplit(person["url"]).path.lstrip("/")).is_file(), person["url"]
+
+
+def test_llms_txt_links_public_pages_by_section_with_their_preview_text(html):
+    text = (html / "llms.txt").read_text()
+    assert text.startswith("# Andrey\n\n> ") and andrey.__version__ in text
+    assert re.findall(r"^## (.+)$", text, re.M) == ["Docs", "Release cards", "Blog"]
+    links = re.findall(r"^- \[(.*?)\]\((https://andrey\.abel\.ai/[^)]+)\): (.+)$", text, re.M)
+    assert len(links) >= 12
+    assert len(links) == len({url for _, url, _ in links})
+    for title, url, description in links:
+        path = urlsplit(url).path.lstrip("/")
+        page = html / path
+        assert page.is_file(), url
+        assert "PR/" not in path and "_modules/" not in path and "search.html" not in path
+        content = page.read_text()
+        preview_title = re.search(r'<meta property="og:title" content="([^"]*)"', content)[1]
+        preview_description = re.search(
+            r'<meta property="og:description" content="([^"]*)"', content
+        )[1]
+        assert title == unescape(preview_title)
+        assert description == unescape(preview_description)
+
+
+def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html):
+    assert (html / "robots.txt").read_text() == (
+        "User-agent: *\nAllow: /\n\nSitemap: https://andrey.abel.ai/sitemap.xml\n"
+    )
+    urls = re.findall(r"<loc>([^<]+)</loc>", (html / "sitemap.xml").read_text())
+    assert len(urls) == len(set(urls)) > 50
+    for url in urls:
+        path = urlsplit(url).path.lstrip("/") or "index.html"
+        content = (html / path).read_text()
+        assert f'<meta property="og:url" content="{url}"' in content, url
+        assert 'name="robots"' not in content, url
+    for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
+        assert f"https://andrey.abel.ai/{required}" in urls, required
+    # Left out: pages with no content of their own, and the redirects from moved addresses.
+    left_out = ("search.html", "genindex.html", "blog/drafts.html", "demo/index.html")
+    moved = (
+        "blog/andrey-0-2-0.html",
+        "blog/introducing-andrey.html",
+        "blog/why-andrey-is-fast.html",
+    )
+    for address in (*left_out, *moved):
+        assert f"https://andrey.abel.ai/{address}" not in urls, address
+
+
+def test_only_the_search_page_is_noindex(html):
+    for page, text in _pages(html):
+        robots = re.findall(r'<meta name="robots" content="([^"]*)"', text)
+        if page == html / "search.html":
+            assert robots == ["noindex, follow"]
+        else:
+            assert not robots, page

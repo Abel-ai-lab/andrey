@@ -19,6 +19,8 @@ import re
 import runpy
 import sys
 import textwrap
+import tomllib
+from urllib.parse import urljoin
 
 import ablog.blog
 from ablog.blog import Blog
@@ -56,6 +58,7 @@ sys.path.insert(0, str(ROOT / "apps"))
 sys.path.insert(0, str(ROOT / "apps" / "live-discovery"))
 build_assets = _module("andrey_build_assets", ROOT / "apps" / "build_assets.py")
 compare = _module("andrey_compare", ROOT / "apps" / "compare.py")
+discovery = _module("andrey_discovery", HERE / "discovery.py")
 
 # ---- project ---------------------------------------------------------------------------------
 project = "Andrey"
@@ -182,7 +185,7 @@ html_static_path = ["_static", "_generated/static", "../site/brand", "../site/as
 # The wordmark's "A" in the accent blue: a placeholder mark until the brand has one.
 html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
-html_extra_path = ["_generated/extra"]
+html_extra_path = ["_generated/extra", "_extra"]
 html_css_files = ["andrey-tokens.css", "andrey.css", "graph-guides.css"]
 # The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill), the dot
 # on Release cards until the reader has seen the latest release, and the outline's mark on the
@@ -195,6 +198,34 @@ html_js_files = [
 REPO_URL = "https://github.com/Abel-ai-lab/andrey"
 PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
+ABEL_URL = "https://abel.ai/"
+# Abel's logomark in Night Teal, for light backgrounds, from Abel's brand kit: the structured
+# data's organization logo, drawn at the build as a PNG wide enough for search results.
+ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
+ABEL_LOGO = "_static/abel-symbol.png"
+ABEL_LOGO_WIDTH = 600
+# The pages llms.txt lists, by section; each release card and published post follows its section's
+# pages, newest first.
+LLMS_SECTIONS = (
+    (
+        "Docs",
+        (
+            "docs/index",
+            "docs/guides/getting-started",
+            "docs/faq",
+            "docs/code/index",
+            "docs/configuration",
+            "docs/guides/graph-types",
+            "docs/guides/graph-representation",
+            "docs/examples/index",
+            "docs/demos/index",
+            "docs/changelog",
+        ),
+    ),
+    ("Release cards", ("docs/benchmarks",)),
+    ("Blog", ("blog/index",)),
+)
+PACKAGE = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
     # release to the changelog, then Docs, Examples, Blog, and FAQ, then search, theme, and GitHub.
@@ -399,8 +430,10 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 
 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
-    """The page's description, and its Open Graph and Twitter card tags: title, summary, address,
-    and image. The description and ``og:description`` are one value."""
+    """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
+    image), and its structured data (``discovery.head_tags``): the organization, the website, the
+    software at the release the page belongs to, the page or post, and its breadcrumbs. The search
+    page is ``noindex``. The description and ``og:description`` are one value."""
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
@@ -425,11 +458,101 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "og:image:height": str(cards.H),
         "twitter:card": "summary_large_image",
     }
-    return "".join(
+    preview = "".join(
         f'<meta {"property" if key.startswith("og:") else "name"}="{key}" '
         f'content="{html.escape(value, quote=True)}">\n'
         for key, value in tags.items()
     )
+    page = {"title": title, "description": description, "url": url, "image": image}
+    if pagename == "search":
+        page["indexable"] = False
+    if match := re.fullmatch(r"docs/benchmarks/(\d+\.\d+\.\d+)", pagename):
+        page["software_version"] = match[1]
+    post = None
+    if pagename in Blog(app):
+        article = Blog(app)[pagename]
+        post = {
+            "date": article.date.strftime("%Y-%m-%d") if article.date else None,
+            "authors": [
+                {
+                    "name": str(person),
+                    "url": urljoin(url, app.builder.get_relative_uri(pagename, person.docname)),
+                }
+                for person in article.author or ()
+            ],
+            "version": app.env.metadata.get(pagename, {}).get("version"),
+        }
+    parents = [
+        {
+            "title": html.unescape(re.sub(r"<[^>]+>", "", parent["title"])),
+            "url": urljoin(url, parent["link"]),
+        }
+        for parent in context.get("parents", [])
+    ]
+    software = {
+        "name": app.config.project,
+        "description": PACKAGE["description"],
+        "version": release,
+        "license": {
+            "@type": "CreativeWork",
+            "name": PACKAGE["license"],
+            "url": f"{PACKAGE['urls']['Source']}/blob/main/{PACKAGE['license-files'][0]}",
+        },
+        "programmingLanguage": "Python",
+        "runtimePlatform": f"Python {PACKAGE['requires-python']}",
+        "codeRepository": PACKAGE["urls"]["Source"],
+        # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
+        "image": SITE_URL + "_static/favicon.svg",
+        "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/"],
+    }
+    return preview + discovery.head_tags(
+        page,
+        site_url=SITE_URL,
+        project=app.config.project,
+        author=app.config.author,
+        organization_url=ABEL_URL,
+        organization_logo=SITE_URL + ABEL_LOGO,
+        software=software,
+        language=app.config.language or "en",
+        post=post,
+        parents=parents,
+    )
+
+
+def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Write ``llms.txt`` and ``sitemap.xml`` at the site's root from the built pages
+    (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt`` lists
+    ``LLMS_SECTIONS``, then every release card and published post; a listed page that is missing
+    or ``noindex`` fails the build."""
+    if exception is not None or app.builder.name != "html":
+        return
+    outdir = pathlib.Path(app.outdir)
+    cards = sorted(
+        (n for n in app.env.found_docs if re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", n)),
+        key=lambda n: tuple(int(part) for part in n.rsplit("/", 1)[1].split(".")),
+        reverse=True,
+    )
+    posts = [post.docname for post in Blog(app).posts if post.published]
+    later = {"Release cards": cards, "Blog": posts}
+    sections = [(heading, [*pages, *later.get(heading, ())]) for heading, pages in LLMS_SECTIONS]
+    try:
+        entries = discovery.read_pages(outdir, [n for _, documents in sections for n in documents])
+        text = discovery.llms_index(
+            app.andrey_home["description"],
+            entries,
+            sections,
+            site_url=SITE_URL,
+            project=app.config.project,
+            version=release,
+        )
+    except ValueError as error:
+        raise ConfigError(str(error)) from None
+    _write(outdir / "llms.txt", text)
+    import resvg_py  # the docs group's renderer, as site/cards.py uses it
+
+    logo = resvg_py.svg_to_bytes(svg_string=ABEL_SYMBOL.read_text(), width=ABEL_LOGO_WIDTH)
+    _write_bytes(outdir / ABEL_LOGO, bytes(logo))
+    _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
 
 
 # The pages that show the "Why Andrey is fast" scenes.
@@ -918,6 +1041,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
+    app.connect("build-finished", _write_discovery)
     app.connect("doctree-resolved", _post_byline)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)
