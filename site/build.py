@@ -54,6 +54,7 @@ RELEASES = (
     "hidden-confounders-2026-10",
     "score-search-2026-10",
     "pairwise-2026-10",
+    "direct-lingam-2026-10",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -185,16 +186,17 @@ def release_summaries(summary: dict) -> list[dict]:
 def newest(summaries: list[dict]) -> list[dict]:
     """``summaries`` with each comparison kept only in the newest summary that measures it.
 
-    A comparison is a registry method against one package (``comparator``). A released summary
-    never changes, so when a later summary measures the same method against the same package, the
-    page shows the later rows and drops the earlier summary's, as ``qa/reference_parity.py`` judges
-    them. "Later" is the summary's ``generated`` date; two summaries generated on the same day that
-    both measure a comparison raise. The list keeps its order and length, so it still lines up
-    with ``RELEASES``.
+    A comparison is a summary's method, by its name (``method``), against one package
+    (``comparator``), so a method measured under two settings is two comparisons; this is the key
+    ``qa/reference_parity.py`` judges by. A released summary never changes, so when a later summary
+    measures the same comparison, the page shows the later rows and drops the earlier summary's.
+    "Later" is the summary's ``generated`` date; two summaries generated on the same day that both
+    measure a comparison raise. The list keeps its order and length, so it still lines up with
+    ``RELEASES``.
     """
     dated: dict[tuple[str, str], str] = {}
     for summary in summaries:
-        for key in {(registry_name(m), m["comparator"]) for m in summary["methods"]}:
+        for key in {(m["method"], m["comparator"]) for m in summary["methods"]}:
             seen = dated.get(key)
             if seen == summary["generated"]:
                 raise ValueError(f"{key} is in two summaries generated on {seen}")
@@ -206,7 +208,7 @@ def newest(summaries: list[dict]) -> list[dict]:
             "methods": [
                 m
                 for m in summary["methods"]
-                if dated[(registry_name(m), m["comparator"])] == summary["generated"]
+                if dated[(m["method"], m["comparator"])] == summary["generated"]
             ],
         }
         for summary in summaries
@@ -436,7 +438,7 @@ PANEL = (
     ("alpha-2026-09", "GES"),
     ("score-search-2026-10", "XGES"),
     ("score-search-2026-10", "Tabu search"),
-    ("alpha-2026-09", "DirectLiNGAM"),
+    ("direct-lingam-2026-10", "DirectLiNGAM"),
 )
 
 

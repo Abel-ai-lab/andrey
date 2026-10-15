@@ -621,7 +621,7 @@ def test_two_summaries_of_one_day_cannot_both_measure_a_comparison():
 def test_each_published_comparison_comes_from_one_summary():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
     shown = [
-        (s["generated"], m["spec"], m["comparator"])
+        (s["generated"], m["method"], m["comparator"])
         for s in summaries
         for m in build.comparisons(s)
     ]
@@ -635,7 +635,7 @@ def test_each_published_comparison_comes_from_one_summary():
     ]
     for summary in every:
         for m in summary["methods"]:
-            (kept,) = dates[(build.registry_name(m), m["comparator"])]
+            (kept,) = dates[(m["method"], m["comparator"])]
             assert kept >= summary["generated"]
 
 
