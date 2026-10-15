@@ -36,16 +36,17 @@ not meet; `site/assets/figures.css` and `figures.js` hold the timing comparison 
 charts, which the launch post and the benchmark explorer show too.
 
 The hero is one screen: the headline, "Causal discovery: accelerated, accurate, agentic.", the
-install line, and a card per section below it, each with its art, its title, and its claim's
-short form. The four sections follow the headline's words, then All-in-one for what the package
-covers (`ACTS` in `site/build.py`). Each opens on its art at full bleed with its title and its
-claim (`act_covers()`), then shows its evidence, two pieces or more: tiles, each with a figure of
-its own, and a note in plain type beside a tile where the evidence is a list a card would only
-frame (`bento-note`). The hero and Accelerated share one art, the fast lanes (`HERO_ART`, `.run` in
-`site/assets/site.css`): it stays on the screen while the hero's type scrolls away and
-Accelerated's title comes up over it right after the hero's cards, with the ideas behind the
-speed, until the tiles rise over it on the page's paper. The run clips the art at its foot, so the
-next section opens on its own art alone.
+install line, and a card per section below it, each with its art, its title, and its claim's short
+form. A pill above the headline copies the prompt that installs the agent skill (`AGENT_PROMPT`,
+`site/assets/prompt.js`), the one the README and the FAQ give. The four sections follow the
+headline's words, then All-in-one for what the package covers (`ACTS` in `site/build.py`). Each
+opens on its art at full bleed with its title and its claim (`act_covers()`), then shows its
+evidence, two pieces or more: tiles, each with a figure of its own, and a note in plain type beside
+a tile where the evidence is a list a card would only frame (`bento-note`). The hero and Accelerated
+share one art, the fast lanes (`HERO_ART`, `.run` in `site/assets/site.css`): it stays on the screen
+while the hero's type scrolls away and Accelerated's title comes up over it right after the hero's
+cards, with the ideas behind the speed, until the tiles rise over it on the page's paper. The run
+clips the art at its foot, so the next section opens on its own art alone.
 
 - Accelerated: the ideas behind the speed, one at a time as the reader scrolls, then a tile per
   method family.

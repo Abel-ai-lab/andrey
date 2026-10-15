@@ -172,7 +172,7 @@ def test_every_homepage_tile_leads_to_details_that_are_built(html):
                 problems.append(f"{href}: no dialog holds its details")
         elif not _resolve(html, html / "index.html", href).is_file():
             problems.append(f"{href}: not built")
-    for script in ("tiles.js",):
+    for script in ("tiles.js", "prompt.js"):
         if f"{script}" not in home or not (html / "_static" / script).is_file():
             problems.append(f"{script}: not loaded or not built")
     assert not problems, "\n".join(problems)

@@ -1050,6 +1050,12 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
     assert opened and len(opened) == len(set(opened))
 
 
+def test_the_hero_pill_copies_the_agent_prompt_the_readme_and_the_faq_give(placeholder_page):
+    assert f'data-prompt="{html.escape(build.AGENT_PROMPT)}"' in placeholder_page
+    for page in (ROOT / "README.md", ROOT / "docs" / "docs" / "faq.md"):
+        assert build.AGENT_PROMPT in " ".join(page.read_text().split()), page.name
+
+
 def test_the_hero_and_the_first_section_share_one_art(placeholder_page):
     # The fast lanes stay on the screen from the hero into the first section's title, so nothing
     # breaks between them: the first section shows no art of its own before its tiles.

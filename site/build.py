@@ -1389,6 +1389,8 @@ ICON = {
     '<circle cx="12" cy="12" r="2"/>',
     "minus": '<line x1="5" y1="12" x2="19" y2="12"/>',
     "x": '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    "copy": '<rect width="14" height="14" x="8" y="8" rx="2"/>'
+    '<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
 }
 # The documentation pages a first visit wants, in the order the band lists them.
 DOC_PAGES = (
@@ -1469,6 +1471,23 @@ def tile_art(name: str, size: str) -> str:
     return (
         f'<img class="tile-art" src="_static/bento/{name}.jpg" alt="" width="{width}" '
         f'height="{height}" loading="lazy">'
+    )
+
+
+# The prompt that installs the agent skill, as the README and the FAQ give it.
+AGENT_PROMPT = (
+    "Install Andrey's agent skill: make sure the andrey-core package is installed, run "
+    "`andrey --skill`, and save its output as andrey/SKILL.md in your skills folder."
+)
+
+
+def agent_pill() -> str:
+    """The pill above the headline: it copies ``AGENT_PROMPT`` to paste into a coding agent
+    (``prompt.js``), and without the script it leads to the FAQ answer that gives the prompt."""
+    return (
+        f'<a class="agent-pill" href="docs/faq.html#how-does-an-agent-use-it" '
+        f'data-prompt="{escape(AGENT_PROMPT)}">{glyph("bot")}'
+        f"<span>Onboard your agent to Andrey</span>{glyph('copy')}</a>"
     )
 
 
@@ -2071,6 +2090,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "robots": '<meta name="robots" content="noindex">' if placeholder else "",
         "banner": banner if placeholder else "",
         "lede": escape(lede()),
+        "agent_pill": agent_pill(),
         "hero_chips": hero_chips(),
         "hero_art": hero_art(),
         "tile_art": tile_art,
