@@ -373,8 +373,8 @@ def test_a_graph_in_parts_is_drawn_part_by_part():
 
 
 def test_wordmark_takes_the_palette_ink_and_its_a_one_amber_stroke():
-    # The word in the palette's ink, then its A's right stroke in the art's amber; the icon is
-    # that A, its ink following the browser's light or dark bar.
+    # The word uses the palette's ink, with the A's right stroke in the art's amber. The icon is
+    # that A alone, with ink that follows the browser's light or dark bar.
     amber = andrey.viz.LIGHT.categorical[1]
     for name, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         svg = (ROOT / "site" / "brand" / f"wordmark-{name}.svg").read_text()

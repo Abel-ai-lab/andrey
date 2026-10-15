@@ -493,8 +493,8 @@ def test_the_404_page_resolves_its_links_from_the_site_root(html):
 
 
 def test_every_documentation_page_ends_on_the_documentation_footer(html):
-    # The documentation's own footer in place of the theme's ("Created using Sphinx", "Built with
-    # the PyData Sphinx Theme"); the homepage keeps its own.
+    # Documentation pages use their own footer without the theme's credits ("Created using
+    # Sphinx", "Built with the PyData Sphinx Theme"); the homepage has a separate footer.
     for page, text in _pages(html):
         if page == html / "index.html":
             assert 'class="docs-footer"' not in text

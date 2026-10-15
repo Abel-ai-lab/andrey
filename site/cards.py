@@ -68,8 +68,10 @@ def _scaled_width(path: Path, height: float) -> float:
 
 
 def _placed(path: Path, x: float, y: float, height: float, opacity: float = 1.0) -> str:
-    """The SVG at ``path`` in white, ``height`` tall with its top left at (``x``, ``y``); the
-    wordmark's amber stroke keeps its amber."""
+    """The SVG at ``path`` in white, ``height`` tall, with its top left at (``x``, ``y``).
+
+    The wordmark's right stroke stays amber.
+    """
     body = re.sub(r"^.*?<svg[^>]*>|</svg>\s*$", "", path.read_text(), flags=re.S)
     keep = grain.AMBER.lower()
     body = re.sub(
@@ -449,8 +451,8 @@ def _jpeg_href(image: Image.Image) -> str:
 
 def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = H) -> str:
     """The banner as SVG, ``width`` x ``height``: ``kind``'s art filling the height, its right edge
-    on the banner's, and over its left side the wordmark, ``title``, and ``line`` after an amber
-    dot. Text sizes follow the height."""
+    aligned with the banner's. The wordmark, ``title``, and ``line`` sit over the left side, with
+    an amber dot before ``line``. Text sizes follow the height."""
     k = height / COVER_H
     size, line_width, most = BANNER_TITLE
     lines = _lines(title, size, line_width, most) or [title]
@@ -527,9 +529,9 @@ def cover_alt(kind: str) -> str:
 
 
 # ---- the brand kit -----------------------------------------------------------------------------
-# The files the Brand kit page offers for download (docs/docs/brand.md): the wordmark and the icon
-# for a light and a dark ground, as SVG and PNG, a square avatar, and all of them in one zip, each
-# drawn from the brand's own files (site/wordmark.py), so the kit never drifts from the site.
+# Brand kit downloads (`docs/docs/brand.md`): SVG and PNG wordmarks and icons for light and dark
+# grounds, a square avatar, and a zip of all files. Each is drawn from the brand's own files
+# (`site/wordmark.py`), keeping the kit consistent with the site.
 KIT_WORDMARK_H = 256  # the wordmark PNGs' height
 KIT_ICON = 512  # the icon PNGs' side
 KIT_AVATAR = 1024  # the avatar's side
@@ -543,7 +545,7 @@ marks. Guidelines: https://andrey.abel.ai/docs/brand.html
 
 
 def _icon_paths() -> tuple[str, str, str]:
-    """The icon's viewBox, the path of the A's ink, and the path of its amber stroke."""
+    """The icon's viewBox, ink path, and amber stroke path."""
     icon = (BRAND / "favicon.svg").read_text()
     view_box = re.search(r'viewBox="([^"]+)"', icon)[1]
     ink, amber = re.findall(r'<path[^>]* d="([^"]+)"', icon)
@@ -551,7 +553,7 @@ def _icon_paths() -> tuple[str, str, str]:
 
 
 def _kit_icon(ink: str, ground: str | None = None) -> str:
-    """The A in ``ink`` with its amber stroke; on a square ``ground`` when given, the A at 62%."""
+    """The A in ``ink`` with its amber stroke, at 62% on a square ``ground`` when given."""
     view_box, ink_d, amber_d = _icon_paths()
     x, y, side, _ = (float(v) for v in view_box.split())
     a = f'<path fill="{ink}" d="{ink_d}"/><path fill="{grain.AMBER}" d="{amber_d}"/>'
@@ -572,7 +574,7 @@ def _png(svg: str, **size: int) -> bytes:
 
 
 def brand_kit() -> dict[str, bytes]:
-    """The kit's files by name, and ``andrey-brand-kit.zip`` holding them all."""
+    """The kit's files by name, including ``andrey-brand-kit.zip`` with all files."""
     import zipfile
 
     light, dark = andrey.viz.LIGHT.ink, andrey.viz.DARK.ink
@@ -590,6 +592,6 @@ def brand_kit() -> dict[str, bytes]:
         for name, data in [("README.txt", KIT_NOTE.encode()), *files.items()]:
             info = zipfile.ZipInfo(f"andrey-brand-kit/{name}", date_time=(2026, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
-            kit.writestr(info, data)  # a fixed date, so a rebuild writes the same zip
+            kit.writestr(info, data)  # a fixed date keeps zip bytes consistent across builds
     files["andrey-brand-kit.zip"] = out.getvalue()
     return files

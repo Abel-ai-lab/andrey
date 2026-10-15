@@ -40,8 +40,8 @@
 - `abel-symbol-night.svg`: Abel's logomark in Night Teal, for light backgrounds, unchanged from
   the brand kit (`Abel-design-branding`, `assets/logos/symbol-night.svg`). The build draws it as
   `_static/abel-symbol.png`, the organization's logo in the site's structured data.
-- `wordmark-light.svg`, `wordmark-dark.svg`, `favicon.svg`: Andrey's wordmark, "Andrey" in
-  Unbounded SemiBold as outlines in the light or dark ink, its A's right stroke in the art's amber
-  (the A stays whole: apex joined, crossbar intact), and the icon, that A alone, its ink following
-  the browser's light or dark bar. `site/wordmark.py` writes all three.
+- `wordmark-light.svg`, `wordmark-dark.svg`, `favicon.svg`: the wordmark is "Andrey" in Unbounded
+  SemiBold outlines, in light or dark ink with the A's right stroke in the art's amber. The A stays
+  whole, with its apex joined and crossbar intact. The icon is that A alone; its ink follows the
+  browser's light or dark bar. `site/wordmark.py` writes all three.
 - `fonts/`: Inter, under the SIL Open Font License (`fonts/OFL.txt`).

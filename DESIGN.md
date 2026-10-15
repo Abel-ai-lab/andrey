@@ -13,18 +13,18 @@ recolors it to the same palette, and a site test fails on art stored in other bl
 
 ### Name and mark
 
-Andrey is named after Andrey Markov and Andrey Kolmogorov. The wordmark's A carries the pair: one
-letter, two strokes, the right one amber, a step ahead.
+Andrey is named after Andrey Markov and Andrey Kolmogorov. The wordmark's A represents the pair:
+one letter with two strokes, the right one amber and a step ahead.
 
 ### Node and edge
 
-The brand builds on the two parts of a causal graph, used as plain marks, never as drawn graphs:
+The brand uses the two parts of a causal graph as plain marks, never as drawn graphs:
 
-- **Node, a dot**, marks one thing to notice: the dot before a release's version on a link preview
-  and over it on a release card's cover, and the dot on Release cards in the navbar when a newer
-  release is out (`nav-new`).
-- **Edge, a line**, marks a relation or a direction: the A's amber stroke, the one amber stroke in
-  each art's composition, and a hairline under a heading (the documentation's footer).
+- **Node, a dot**, marks one thing to notice: the dot before a release's version on a link preview,
+  above the version on a release card's cover, and on Release cards in the navbar for a release
+  the reader has not seen (`nav-new`).
+- **Edge, a line**, marks a relation or direction: the A's amber stroke, the single amber stroke
+  in each artwork, and the hairline under a heading in the documentation footer.
 - **Amber is the one accent.** A composition (a cover, a card, a link preview, a page's header)
   holds one amber node or one amber edge; the rest is ink, cobalt, and navy.
 - **No drawn graph in a brand mark.** A wordmark, an icon, or a marker never shows nodes joined by
@@ -33,9 +33,9 @@ The brand builds on the two parts of a causal graph, used as plain marks, never 
 ### Wordmark and icon
 
 - The wordmark is "Andrey" in Unbounded SemiBold, drawn as outlines in [`site/brand/`](site/brand/)
-  by [`site/wordmark.py`](site/wordmark.py): the light or dark ink, the A's right stroke in amber.
-  The A stays one letter, its apex joined and its crossbar whole; a split, gapped, or
-  crossbar-less A reads as another company's mark. The word is never retyped in a font.
+  by [`site/wordmark.py`](site/wordmark.py). It uses light or dark ink with the A's right stroke in
+  amber. The A stays one letter, with a joined apex and an intact crossbar; a split, gapped, or
+  crossbar-less A resembles another company's mark. The word is never retyped in a font.
 - The icon (`site/brand/favicon.svg`) is that A alone; its ink follows the browser's light or dark
   bar.
 - Over art (a link preview, the README banner) the wordmark is white and keeps its amber stroke
@@ -43,23 +43,23 @@ The brand builds on the two parts of a causal graph, used as plain marks, never 
 
 ### Type
 
-Unbounded is the wordmark's alone. Everything else is set in Inter: interface, text, and the titles
-over art (SemiBold, white). Code is in the system's monospace.
+Unbounded is reserved for the wordmark. Everything else uses Inter: interface, text, and titles
+over art (SemiBold, white). Code uses the system's monospace font.
 
 ### Color
 
-The brand's grounds are the palette's paper and ink in the light theme and navy in the dark,
-with cobalt for links, selection, and the art's ground, and amber as the one accent. On the
-website they are the `--andrey-ground-*` and `--andrey-*` custom properties (`site/grain.py`,
-`docs/palette_css.py`); no stylesheet names a hex value.
+The light theme is ink on paper and the dark theme pale ink on night. Cobalt marks links, selection,
+and the art's ground; navy is the art's deep ground and the footer's; amber is the sole accent. The
+website uses the `--andrey-ground-*` and `--andrey-*` custom properties (`site/grain.py`,
+`docs/palette_css.py`); no stylesheet specifies a hex value.
 
 ### Art
 
-Every cover is engraved line art: thin, even white and pale-cobalt lines on a flat cobalt ground
-with a fine stipple, after the Soviet space-age posters of 1958-1963. It holds one amber element
-(its node or its edge), puts its subject on the right where text sits on the left, and is stored
-after `brand_tones`. [`site/brand/README.md`](site/brand/README.md) lists each art and what it
-shows.
+Every cover uses engraved line art: thin, even white and pale-cobalt lines on a flat cobalt ground
+with fine stippling, modeled on Soviet space-age posters of 1958-1963. Each has one amber element
+(a node or an edge), with the subject on the right and text on the left, and is stored after
+`brand_tones` processing. [`site/brand/README.md`](site/brand/README.md) lists each artwork and its
+subject.
 
 ## Figures
 

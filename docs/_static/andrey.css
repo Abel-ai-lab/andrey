@@ -235,9 +235,8 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   }
 }
 
-/* A newer release than the reader has seen: the brand's node, an amber dot, at the top right of
-   Release cards, in the navbar and the drawer alike (nav-new.js shows it; DESIGN.md, "Node and
-   edge"). */
+/* An amber dot, the brand's node, marks a release the reader has not seen at the top right of
+   Release cards in both the navbar and the drawer (`nav-new.js`; `DESIGN.md`, "Node and edge"). */
 .nav-new:not([hidden]) {
   display: inline-block;
   flex: none;
@@ -638,9 +637,10 @@ html:not(:has(.andrey-home)) .bd-header::before {
 }
 
 /* ---------- the documentation's footer ---------- */
-/* After craft.do's (_templates/docs-footer.html): a rounded navy card set in from the page's edges,
-   the wordmark beside three columns of links under small capitals and a hairline, then the
-   copyright and Abel's mark along its foot. The theme's footer row gives way to it. */
+/* The documentation footer (`_templates/docs-footer.html`), modeled on craft.do's: a rounded navy
+   card inset from the page's edges, with the wordmark beside three link columns under small
+   capitals and a hairline, and the copyright and Abel's mark at the bottom. The theme's footer
+   row is disabled. */
 .bd-footer {
   padding: 0 0.75rem 0.75rem;
   border-top: 0;
@@ -773,9 +773,9 @@ html:not(:has(.andrey-home)) .bd-header::before {
 }
 
 /* ---------- the brand kit ---------- */
-/* docs/brand.md: each download on a panel of the ground it is made for (white or cobalt, in either
-   theme), its name, and its files; the colors as chips; the node and the edge as an amber dot and
-   an amber line. */
+/* `docs/brand.md`: each download appears on its intended ground (white or cobalt in either
+   theme), with its name and files. Colors appear as chips; the node and edge appear as an amber
+   dot and line. */
 .brand-all {
   margin: 0.5rem 0 2rem;
 }

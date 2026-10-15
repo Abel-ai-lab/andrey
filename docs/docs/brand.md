@@ -1,6 +1,6 @@
 ---
 name: brand
-description: Andrey's brand kit - the wordmark, the icon, and an avatar to download, with the colors, type, and how to use them.
+description: Andrey's wordmark, icon, and avatar downloads, colors, type, and usage guidelines.
 meta:
   type: guide
   tags: [brand]
@@ -8,8 +8,8 @@ meta:
 
 # Brand kit
 
-Andrey's wordmark and icon, for writing about Andrey or linking to it. Download what you need, or
-everything at once.
+Use our wordmark and icon when you write about Andrey or link to it. Download what you need or
+the full kit.
 
 ```{raw} html
 <p class="brand-all"><a class="sd-btn sd-btn-primary" href="../_static/brand/andrey-brand-kit.zip" download>Download the brand kit (ZIP)</a></p>
@@ -17,8 +17,8 @@ everything at once.
 
 ## Wordmark
 
-The wordmark is "Andrey" in Unbounded, its A's right stroke in amber. Use the ink version on light
-grounds and the pale one on dark grounds.
+Our wordmark is "Andrey" in Unbounded, with the A's right stroke in amber. Use the ink version on
+light grounds and the pale version on dark grounds.
 
 ```{raw} html
 <ul class="brand-assets">
@@ -37,8 +37,8 @@ grounds and the pale one on dark grounds.
 
 ## Icon and avatar
 
-The icon is the wordmark's A alone, for small spaces: a favicon, an app tile, a slide's corner. The
-avatar sets it on cobalt for profile pictures.
+Use the icon, the wordmark's A alone, in small spaces such as a favicon, an app tile, or a slide's
+corner. The avatar places it on cobalt for profile pictures.
 
 ```{raw} html
 <ul class="brand-assets brand-assets--three">
@@ -62,23 +62,26 @@ avatar sets it on cobalt for profile pictures.
 
 ## The A
 
-Andrey is named after two mathematicians, Andrey Markov and Andrey Kolmogorov. The A carries the
-pair: one letter, two strokes, the right one amber, a step ahead. The letter always stays whole,
-its apex joined and its crossbar intact.
+Andrey is named after two mathematicians, Andrey Markov and Andrey Kolmogorov. The A represents
+the pair: one letter with two strokes, the right one amber and a step ahead. Keep the letter
+whole, with its apex joined and its crossbar intact.
 
 ## Node and edge
 
-The brand builds on the two parts of a causal graph, used as plain marks.
+We use the two parts of a causal graph as plain marks.
 
 ```{raw} html
 <ul class="brand-marks">
-  <li><span class="brand-mark brand-mark--node" aria-hidden="true"></span><p><strong>Node, a dot,</strong> marks one thing to notice: the dot before a release on a link preview, over the version on a release card, on Release cards in the navigation when a release is new.</p></li>
-  <li><span class="brand-mark brand-mark--edge" aria-hidden="true"></span><p><strong>Edge, a line,</strong> marks a relation or a direction: the A's amber stroke, the one amber stroke in each cover's art, the hairline under a heading.</p></li>
+  <li><span class="brand-mark brand-mark--node" aria-hidden="true"></span><p><strong>Node,
+    a dot,</strong> marks one thing to notice: the dot before a release on a link preview, above the version on a
+    release card, and on Release cards in the navigation for a release you have not seen.</p></li>
+  <li><span class="brand-mark brand-mark--edge" aria-hidden="true"></span><p><strong>Edge,
+    a line,</strong> marks a relation or direction: the A's amber stroke, the single amber stroke in each cover's
+    art, and the hairline under a heading.</p></li>
 </ul>
 ```
 
-Each composition holds one amber node or one amber edge; everything else is ink, cobalt, and
-navy.
+Each composition has one amber node or edge; everything else is ink, cobalt, and navy.
 
 ## Colors
 
@@ -88,11 +91,12 @@ navy.
 
 ## Type
 
-- **Unbounded** sets the wordmark, and nothing else; the wordmark files are outlines, so no font
-  is needed to use them.
+- **Unbounded** is reserved for the wordmark. The files are outlines, so you can use them without
+  the font.
 - **Inter** sets everything else: text, interface, and titles over art.
 
-Both are free under the SIL Open Font License, on [Google Fonts](https://fonts.google.com/).
+Both fonts are free under the SIL Open Font License and available on
+[Google Fonts](https://fonts.google.com/).
 
 ## Using the logo
 
@@ -106,8 +110,8 @@ Don't:
 
 - Recolor, stretch, outline, or add effects to the wordmark or the icon.
 - Split the A, separate its strokes, or drop its crossbar.
-- Retype "Andrey" in a font in place of the wordmark.
+- Retype the wordmark as "Andrey" in a font.
 - Use the marks in a way that suggests Andrey endorses you or your product.
 
-The Apache License 2.0 covers Andrey's code, not its name or marks. Questions:
+The Apache License 2.0 covers Andrey's code, not its name or marks. For questions,
 [open an issue](https://github.com/Abel-ai-lab/andrey/issues/new).
