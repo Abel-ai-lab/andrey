@@ -37,7 +37,8 @@ right, make it fast." For algorithm implementations:
   `blogpost`, `date`, and `author`, a `description`, which the blog index shows, and two `tags`:
   its kind (`Release` or `Engineering`) and its topic (a method family as the README's method
   table names it, or `Speed`). Its `cover` names an art in `site/brand/art-<cover>.jpg`, its
-  subject on the right; the link preview's banner adds the title and the release. A
+  subject on the right; the link preview's banner adds the title and the release. A centered
+  `art-<cover>-center.jpg`, when there is one, is the post's cover and thumbnail instead. A
   published post that is renamed keeps its old address with `redirect`.
 
 ## Documentation style

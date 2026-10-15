@@ -1266,7 +1266,7 @@ def test_every_raster_is_srgb_with_no_profile_and_meets_the_css_ground(cards):
             assert image.mode == "RGB" and not image.info.get("icc_profile"), path.name
     # The page's ground behind and around the art is the art's own median color.
     ground = cards._rgb(cards.ground_tokens()["--andrey-ground-art"])
-    for path in cards.ART.values():
+    for path in [*cards.ART.values(), *cards.CENTERED.values()]:
         with Image.open(path) as image:
             median = np.median(np.asarray(image.convert("RGB"), float).reshape(-1, 3), axis=0)
         assert np.abs(median - ground).max() < 16, path.name
@@ -1609,7 +1609,7 @@ def test_every_published_art_is_stored_in_the_brand_tones(cards):
     # other blues or ambers moves tens of levels. A failure: store the file through
     # cards.brand_tones (match_ground=False for a release card's art).
     ground = cards._ground_lightness()[1]
-    for path in cards.ART.values():
+    for path in [*cards.ART.values(), *cards.CENTERED.values()]:
         assert drift(path, True) < 8, path.name
         with Image.open(path) as image:
             light = np.asarray(image.convert("RGB"), float) @ cards.LUMA

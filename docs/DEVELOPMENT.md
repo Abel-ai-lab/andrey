@@ -134,10 +134,11 @@ date, tags, and description, then the earlier ones, newest first, each with a sm
 (`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a later version breaking a tie. A
 new post needs no change to the page.
 
-A post's cover is its art alone; its link preview is the banner, the art with the wordmark, title,
-and release over its left side (`preview_jpeg`). A post belongs to the release in its `version`
-front matter, and later builds leave it as that release rendered it: its numbers are typed text, and
-every file it includes is stored under `blog/<version>/`.
+A post's cover is its art alone; an art with a centered version (`CENTERED` in `site/cards.py`)
+shows the version on its cover and thumbnail. Its link preview is the banner, the art with the
+wordmark, title, and release over its left side (`preview_jpeg`). A post belongs to the release in
+its `version` front matter, and later builds leave it as that release rendered it: its numbers are
+typed text, and every file it includes is stored under `blog/<version>/`.
 
 ## The release cards
 
