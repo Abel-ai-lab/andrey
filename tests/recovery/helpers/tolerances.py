@@ -81,6 +81,13 @@ SPEC: dict[str, dict] = {
             "omegas": {"atol": 1e-6, "rtol": 1e-5},
         },
     },
+    "VARMALiNGAMPruned": {
+        "structural": ["causal_order"],
+        "numeric": {
+            "psis": {"atol": 1e-6, "rtol": 1e-5},
+            "omegas": {"atol": 1e-6, "rtol": 1e-5},
+        },
+    },
     # Granger has no causal order; its structural gate is the binary support.
     "Granger": {
         "structural": ["adj"],

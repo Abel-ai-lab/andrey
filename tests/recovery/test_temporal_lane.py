@@ -56,6 +56,17 @@ def test_varma_lingam_baseline():
     )
 
 
+def test_varma_lingam_pruned_baseline():
+    from andrey.temporal.varma import varma_lingam
+
+    order, psis, omegas = varma_lingam(datagen.generate("varma_3v"), order=(1, 1), prune=True)
+    harness.assert_baseline(
+        "VARMALiNGAMPruned",
+        {"causal_order": list(order), "psis": np.asarray(psis), "omegas": np.asarray(omegas)},
+        case="varma_3v",
+    )
+
+
 def test_varma_lingam_output_contract():
     from andrey.api.temporal import varma_lingam
 
@@ -88,6 +99,23 @@ def test_granger_recovery():
     harness.assert_baseline("Granger", {"coeff": coeff, "adj": coeff != 0}, case="var_4v_stable")
 
 
+@pytest.mark.parametrize("workers", [1, 3])
+def test_granger_equals_lassocv_on_each_variable(workers):
+    """Each row is scikit-learn's ``LassoCV`` on the lagged design, bit for bit, on any workers."""
+    from sklearn.linear_model import LassoCV
+    from threadpoolctl import threadpool_limits
+
+    import andrey
+
+    data = datagen.generate("var_4v_stable")
+    n, d = data.shape
+    design = np.hstack([data[2 - k : n - k] for k in (1, 2)])
+    with threadpool_limits(limits=1):  # BLAS reductions may round by thread count
+        expected = np.vstack([LassoCV(cv=5).fit(design, data[2:, i]).coef_ for i in range(d)])
+        with andrey.config(num_workers=workers):
+            assert np.array_equal(granger_lasso(data), expected)
+
+
 def test_var_lingam_output_contract():
     order, adj = var_lingam(datagen.generate("var_4v_stable"))
     assert list(order) == [0, 1, 2, 3] and np.asarray(adj).shape == (2, 4, 4)
@@ -96,3 +124,66 @@ def test_var_lingam_output_contract():
 def test_granger_output_contract():
     coeff = granger_lasso(datagen.generate("var_4v_stable"))
     assert coeff.shape == (4, 8)
+
+
+@pytest.fixture(scope="module")
+def var_lag2_fit():
+    from andrey.api.temporal import granger
+
+    return granger(datagen.generate("var_3v_lag2"))
+
+
+def _var_lag2_truth() -> np.ndarray:
+    """The planted lag weights of ``var_3v_lag2`` as ``[lag - 1, cause, effect]``."""
+    return np.asarray(datagen.CASES["var_3v_lag2"]["lags"]).transpose(0, 2, 1)
+
+
+def test_granger_finds_the_planted_lagged_edges_as_the_largest_weights(var_lag2_fit):
+    structure, truth = var_lag2_fit.structure, _var_lag2_truth()
+    assert structure.type == "temporal" and structure.lags == (1, 2)
+    assert var_lag2_fit.ordering is None and var_lag2_fit.metadata["algorithm"] == "granger"
+    weights = structure.lag_weights
+    for k in structure.lags:
+        planted = {(int(i), int(j)) for i, j in zip(*np.nonzero(truth[k - 1]), strict=True)}
+        found = {(i, j) for i, j, _ in structure.lag(k).oriented_edges()}
+        assert planted <= found, f"lag {k} misses {planted - found}"
+    # Measured: 0.076 off the planted weights at most, and 0.044 at most elsewhere.
+    assert np.abs(weights - truth)[truth != 0].max() < 0.15
+    assert np.abs(weights[truth == 0]).max() < 0.1
+
+
+def test_granger_keeps_absent_edges_absent_when_units_are_far_apart():
+    from andrey.api.temporal import granger
+
+    # Columns in units 1e-200 and 1e200 with no lag-one dependence: the unit ratio overflows.
+    x = np.column_stack(
+        (
+            1e-200 * np.resize([0.0, 1.0, 0.0, -1.0], 17),
+            1e200 * np.resize([0, 0, 1, 0, 0, 0, -1, 0.0], 17),
+        )
+    )
+    weights = granger(x, maxlag=1, cv=2).structure.lag_weights
+    assert not np.isnan(weights).any()
+
+
+# 1e-200: the squared deviations of that column would underflow to zero.
+@pytest.mark.parametrize("scale", [[100.0, 0.01, 7.0], [1e-200, 1.0, 7.0]])
+def test_granger_does_not_depend_on_the_units(var_lag2_fit, scale):
+    from andrey.api.temporal import granger
+
+    scale = np.array(scale)
+    out = granger(datagen.generate("var_3v_lag2") * scale)
+    weights = var_lag2_fit.structure.lag_weights
+    # A weight of x_i on x_j scales with the units of x_j over those of x_i.
+    np.testing.assert_allclose(
+        out.structure.lag_weights, weights * scale[None, None, :] / scale[None, :, None], rtol=1e-7
+    )
+    assert np.array_equal(out.structure.lag_weights != 0, weights != 0)
+    assert np.array_equal(granger(datagen.generate("var_3v_lag2")).structure.lag_weights, weights)
+
+
+def test_granger_keeps_only_small_weights_between_independent_series():
+    from andrey.api.temporal import granger
+
+    noise = np.random.default_rng(1).standard_normal((1000, 3))
+    assert np.abs(granger(noise).structure.lag_weights).max() < 0.1  # measured 0.043

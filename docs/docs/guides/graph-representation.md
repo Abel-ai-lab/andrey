@@ -80,20 +80,28 @@ in a `dag` or `digraph`.
 - `metadata` - JSON-safe, method-specific values. GES, GIES, XGES, HC, BOSS, and GRaSP report
   `score`; CALM reports `objective`. ExactSearch does not report a score. ANM and PNL report their
   two directional p-values and HSIC statistics; each two-node graph holds the direction they
-  decide, by the rule the method's `alpha` parameter selects.
+  decide, by the rule the method's `alpha` parameter selects. PCMCI reports each lagged link's MCI
+  `p_values` and `statistics`, and the `parents` its first step selected; PCMCI+ reports the same
+  for every lag from 0, plus the same-step `conflicts` and `ambiguous_triples`. LPCMCI reports
+  every link with all its marks as `links`, plus `p_values`, `statistics`, its preliminary
+  `parents`, and the links with a conflicting mark as `conflicts`.
 - `save(path, fmt="json")` and `StructureOutput.load(path)`; `fmt="npz"` supports graphs only.
 
 ## Temporal results
 
 `TemporalStructure` is a stack of `GraphStructure` objects, one per lag. `lags` lists the lag
 values, `lag(k)` selects a graph by lag value, and `lag_weights` holds the `(n_lags, n, n)`
-coefficients (`lag_weights_ma` adds the moving-average stack for VARMA). An autoregressive edge
-`X(t-k) -> X(t)` is a self-loop in its lag graph. A panel result from `longitudinal_lingam` adds a
-time axis: `times`, `at(time, lag)`, and `time_weights`, where `NaN` marks a block that cannot be
-computed. `summary_graph()` merges the lags into one `digraph`, and its `lags_of(i, j)` returns the
-lags at which `i -> j` appears. For a panel, `lag(k)`, `lag_weights`, and `summary_graph()` refer
-to the **final occasion**; use `at(time, lag)` and `time_weights` to inspect earlier occasions.
-The [temporal diagrams](graph-types.md#temporal-graphs) show how collapsing time can create cycles.
+coefficients (`lag_weights_ma` adds the moving-average stack for VARMA); a `pcmci` result has lags 1
+to `tau_max` and no weights, and a `pcmciplus` result adds lag 0 as a `cpdag`. An `lpcmci` result
+has lag 0 as a `pag` and holds only the lagged links whose earlier end is a tail; a lagged link
+with a circle or an arrowhead at its earlier end is in `metadata["links"]`. An autoregressive
+edge `X(t-k) -> X(t)` is a self-loop in its lag graph. A panel result from `longitudinal_lingam`
+adds a time axis: `times`, `at(time, lag)`, and `time_weights`, where `NaN` marks a block that
+cannot be computed. `summary_graph()` merges the lags into one `digraph`, and its `lags_of(i, j)`
+returns the lags at which `i -> j` appears. For a panel, `lag(k)`, `lag_weights`, and
+`summary_graph()` refer to the **final occasion**; use `at(time, lag)` and `time_weights` to inspect
+earlier occasions. The [temporal diagrams](graph-types.md#temporal-graphs) show how collapsing time
+can create cycles.
 
 ## Reading and converting
 

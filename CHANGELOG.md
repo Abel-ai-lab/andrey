@@ -9,6 +9,17 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `granger`, experimental lasso Granger causality for a multivariate time series: it returns a
+  temporal structure with lags 1 to `maxlag` and the coefficients as weights, and does not depend
+  on the units of any variable. ([#TBD])
+
+### Changed
+
+- `varma_lingam` with `prune=True` refits the weights it keeps by least squares, so they are no
+  longer shrunk toward zero. ([#TBD])
+
 ## [0.4.0] - 2026-10-15
 
 ### Highlights
