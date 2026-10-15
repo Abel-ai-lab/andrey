@@ -133,4 +133,7 @@ def test_the_driver_records_every_fit(tmp_path) -> None:
         for ds in ("asia", "er10")
         for s in ("andrey.pc.numpy", "causal-learn.pc", "baseline.empty")
     }
-    assert all("shd" in r for r in records)
+    assert all("shd" in r and "cpdag_hash" in r for r in records)
+    # Andrey's and causal-learn's PC agree on ASIA's smoke sample.
+    pc = {r["solution"]: r["cpdag_hash"] for r in records if r["dataset"] == "asia"}
+    assert pc["andrey.pc.numpy"] == pc["causal-learn.pc"]

@@ -16,8 +16,8 @@ per variable. Each method runs every package with matched settings:
 Every network is downloaded once, here in the parent, before any fit starts. Each fit runs isolated
 after one warm-up, with one numeric thread, under a per-repeat wall cap; a fit past the cap is
 recorded as ``timeout``. Every estimate is scored against the network's DAG through its equivalence
-class. A sample in which a variable takes one value is refused by the methods, so it is recorded as
-``skipped``. One JSON line per timed repeat goes to ``<out>/records.jsonl``.
+class; ``cpdag_hash`` names that class, so a DAG and a CPDAG result compare on it. A sample in
+which a variable takes one value is refused by the methods, so it is recorded as ``skipped``. One JSON line per timed repeat goes to ``<out>/records.jsonl``.
 
     $ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete --seeds 0 1 2
 
@@ -35,6 +35,7 @@ import numpy as np
 from andrey.data import load_dataset
 from andrey.data.discrete import DiscreteBN
 from andrey.data.graphs import erdos_renyi
+from andrey.metrics import to_cpdag
 from andrey_bench import scoring
 from andrey_bench.adapters.andrey_boss import AndreyBOSS
 from andrey_bench.adapters.andrey_ges import andrey_ges_adapters
@@ -185,6 +186,9 @@ def main(argv: list[str] | None = None) -> int:
                             est = adapter.to_structure(m["adj"])
                             record.update(scoring.score_result(est, truth))
                             record["structure_hash"] = scoring.structure_hash(est)
+                            # A DAG and a CPDAG compare through the DAG's equivalence class.
+                            cpdag = to_cpdag(est) if est.kind == "dag" else est
+                            record["cpdag_hash"] = scoring.structure_hash(cpdag)
                         elif m.get("status") == "error":
                             errors += 1
                             record["error_text"] = m.get("error_text")
