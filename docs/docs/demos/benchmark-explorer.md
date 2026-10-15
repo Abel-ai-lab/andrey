@@ -10,7 +10,7 @@ html_theme.sidebar_secondary.remove: true
 
 The controlled benchmark results: fit time against the number of variables for each method, every
 measurement in a table, the largest error reductions, and the hardware, build, and seeds behind each
-comparison. The [0.1.0 benchmark report](../benchmarks/0.1.0.md) explains the conditions and how to
+comparison. The [0.1.0 release card](../benchmarks/0.1.0.md) explains the conditions and how to
 rerun them.
 
 ```{raw} html

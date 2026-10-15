@@ -154,7 +154,7 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 - [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each.
 - [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
   browser.
-- [Benchmarks](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
+- [Release cards](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
 - [Launch post](https://andrey.abel.ai/blog/20261008-introducing-andrey.html),
   [FAQ](https://andrey.abel.ai/docs/faq.html), and
   [changelog](https://andrey.abel.ai/docs/changelog.html).

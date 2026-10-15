@@ -71,24 +71,24 @@ relationships are linear and the noise is not Gaussian; it returns a DAG with ed
 
 ### Are the classic methods accurate on very large graphs?
 
-Not always. In the benchmarks, which use sparse simulated graphs with ten samples per variable, FCI
-at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
-causal-learn, so there the limit is the algorithm's, not the software's. PC's graphs
-in gCastle are worse than the empty graph at 200 and 400 variables, while PC in Andrey and
-causal-learn stays below it. The benchmarks' [large graphs](benchmarks/0.1.0.md#large-graphs) section
-lists every case, including Andrey's GES at 200 variables with the default penalty.
+Not always. In the release cards, which use sparse simulated graphs with ten samples per variable,
+FCI at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
+causal-learn, so there the limit is the algorithm's, not the software's. PC's graphs in gCastle are
+worse than the empty graph at 200 and 400 variables, while PC in Andrey and causal-learn stays below
+it. The 0.1.0 release card's [large graphs](benchmarks/0.1.0.md#large-graphs) section lists every
+case, including Andrey's GES at 200 variables with the default penalty.
 
 ### Why does a result differ from another package's?
 
 Methods can break ties in a different order, use different defaults, or treat the column order
-differently; FCI, for one, depends on column order. The [benchmarks](benchmarks.md) score every
+differently; FCI, for one, depends on column order. The [release cards](benchmarks.md) score every
 package on the same true graphs, so compare accuracy there rather than edge by edge.
 
 ## Speed and hardware
 
 ### How does it compare with other packages?
 
-The [benchmarks](benchmarks.md) show Andrey side by side with causal-learn, gCastle, and lingam
+The [release cards](benchmarks.md) show Andrey side by side with causal-learn, gCastle, and lingam
 on the same data and machines: fit time, error counts, and where Andrey is not faster. The
 [homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and
 speed support.
