@@ -66,9 +66,9 @@ def varma_lingam(
         over ``0 <= p <= order[0]`` and ``0 <= q <= order[1]``, excluding ``(0, 0)``; ``None``
         uses ``order`` directly.
     prune : bool, default=False
-        Re-estimate the lagged weights by adaptive Lasso on the causal order, which sets small
-        weights to zero. With ``False`` every lagged weight is nonzero, so every lag graph links
-        every pair of variables, self-loops included.
+        Re-estimate the weights on the causal order: adaptive Lasso sets small weights to zero and
+        least squares refits the rest. With ``False`` every lagged weight is nonzero, so every lag
+        graph links every pair of variables, self-loops included.
     structural_ma : bool, default=False
         How the moving-average weights are expressed: ``True`` maps them onto the independent
         noise terms, ``(I - B0) Theta_j (I - B0)^-1`` [1]_; ``False`` uses ``(I - B0) Theta_j``.
@@ -101,6 +101,13 @@ def varma_lingam(
 
     Notes
     -----
+    With ``prune=True`` each variable is regressed on its causal predecessors at the same step,
+    the lagged values of every variable, and the lagged independent noise terms. Adaptive Lasso
+    selects the regressors, and an ordinary least-squares fit with an intercept on the selected
+    ones gives their weights, so the kept weights are not shrunk toward zero. The noise terms come
+    from a lag-0 matrix refit the same way. The regressions start at time step ``max(p, q)``: the
+    first steps serve only as lagged values, and no step is regressed on a later one.
+
     **Limitations.** Not benchmarked yet. Its tests run it on one series of 500 time steps over 3
     variables. It assumes linear effects and non-Gaussian noise. The likelihood fit stops after 100
     iterations and gives no warning when it has not converged; with ``criterion`` set, it fits one
