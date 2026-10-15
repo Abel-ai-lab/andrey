@@ -565,6 +565,80 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
         assert bars[-1][2] == "1x" and andrey == bars[0][2]
 
 
+def _remeasured() -> tuple[dict, dict]:
+    """``SUMMARY`` with DirectLiNGAM also measured against causal-learn, and a later summary that
+    measures DirectLiNGAM against lingam again."""
+    earlier = copy.deepcopy(SUMMARY)
+    earlier["methods"].append(
+        _method(
+            "DirectLiNGAM",
+            "functional",
+            "causal-learn",
+            [_row(100, 8.4, 57.8, 6.87, 7, 7, 99)],
+            regime="lingam_sf",
+        )
+    )
+    later = {
+        "generated": "2026-10-15",
+        "methods": [
+            _method(
+                "DirectLiNGAM",
+                "functional",
+                "lingam",
+                [_row(100, 10.4, 110.2, 10.6, 6.3, 6.3, 99)],
+                regime="lingam_sf",
+            )
+        ],
+    }
+    return earlier, later
+
+
+def test_a_remeasured_comparison_shows_only_the_newest_summarys_rows():
+    earlier, later = _remeasured()
+    for summaries in ([earlier, later], [later, earlier]):
+        kept = build.newest(copy.deepcopy(summaries))
+        assert len(kept) == len(summaries)
+        found = build.supported(kept)
+        pairs = [(m["spec"], m["comparator"]) for m in found]
+        assert len(pairs) == len(set(pairs))
+        lingam = next(
+            m for m in found if (m["spec"], m["comparator"]) == ("direct_lingam", "lingam")
+        )
+        assert lingam["rows"] == build.comparisons(later)[0]["rows"]
+        # The earlier summary keeps every comparison the later one does not measure.
+        assert ("direct_lingam", "causal-learn") in pairs
+        assert {"PC", "FCI", "ICA-LiNGAM"} <= {m["method"] for m in found}
+
+
+def test_two_summaries_of_one_day_cannot_both_measure_a_comparison():
+    earlier, later = _remeasured()
+    later["generated"] = earlier["generated"]
+    with pytest.raises(ValueError, match="two summaries"):
+        build.newest([earlier, later])
+
+
+@pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
+def test_each_published_comparison_comes_from_one_summary():
+    summaries = build.release_summaries(build.load_summary(build.SUMMARY))
+    shown = [
+        (s["generated"], m["spec"], m["comparator"])
+        for s in summaries
+        for m in build.comparisons(s)
+    ]
+    dates = {}
+    for generated, *pair in shown:
+        dates.setdefault(tuple(pair), set()).add(generated)
+    assert all(len(found) == 1 for found in dates.values())
+    # No published summary measures a comparison later than the one shown.
+    every = [build.load_summary(build.SUMMARY)] + [
+        build.load_summary(build.PUBLISHED / f / "summary.json") for f in build.RELEASES[1:]
+    ]
+    for summary in every:
+        for m in summary["methods"]:
+            (kept,) = dates[(build.registry_name(m), m["comparator"])]
+            assert kept >= summary["generated"]
+
+
 def test_the_readme_chart_takes_rows_at_its_mean_degree():
     summaries = placeholder_summaries()
     release, name = build.PANEL[0]

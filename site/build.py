@@ -5,10 +5,11 @@
 :func:`readme_chart`. ``docs/DEVELOPMENT.md`` has the build command.
 
 Every number on the homepage comes from a release's published benchmark summary (``RELEASES``) or
-from the method registry. The speed and accuracy sections cover every comparison with another
-package whose method the registry supports; each family's tile shows its largest ratio rounded
-down to one digit, and the README claim is the one :func:`claim_sentence` words from them. The
-README chart shows one card per method in ``PANEL``. The method list comes from the method
+from the method registry. A method measured against the same package in two summaries shows the
+newer summary's rows (:func:`newest`). The speed and accuracy sections cover every comparison with
+another package whose method the registry supports; each family's tile shows its largest ratio
+rounded down to one digit, and the README claim is the one :func:`claim_sentence` words from them.
+The README chart shows one card per method in ``PANEL``. The method list comes from the method
 registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks the
 page as not for release. Links are relative to the site root.
 """
@@ -177,8 +178,39 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
 
 def release_summaries(summary: dict) -> list[dict]:
     """Every release's summary, in ``RELEASES`` order, with ``summary`` standing in for the
-    first."""
-    return [summary, *(load_summary(PUBLISHED / f / "summary.json") for f in RELEASES[1:])]
+    first, each comparison only in the newest summary that measures it (:func:`newest`)."""
+    return newest([summary, *(load_summary(PUBLISHED / f / "summary.json") for f in RELEASES[1:])])
+
+
+def newest(summaries: list[dict]) -> list[dict]:
+    """``summaries`` with each comparison kept only in the newest summary that measures it.
+
+    A comparison is a registry method against one package (``comparator``). A released summary
+    never changes, so when a later summary measures the same method against the same package, the
+    page shows the later rows and drops the earlier summary's, as ``qa/reference_parity.py`` judges
+    them. "Later" is the summary's ``generated`` date; two summaries generated on the same day that
+    both measure a comparison raise. The list keeps its order and length, so it still lines up
+    with ``RELEASES``.
+    """
+    dated: dict[tuple[str, str], str] = {}
+    for summary in summaries:
+        for key in {(registry_name(m), m["comparator"]) for m in summary["methods"]}:
+            seen = dated.get(key)
+            if seen == summary["generated"]:
+                raise ValueError(f"{key} is in two summaries generated on {seen}")
+            if seen is None or seen < summary["generated"]:
+                dated[key] = summary["generated"]
+    return [
+        {
+            **summary,
+            "methods": [
+                m
+                for m in summary["methods"]
+                if dated[(registry_name(m), m["comparator"])] == summary["generated"]
+            ],
+        }
+        for summary in summaries
+    ]
 
 
 def normalized(name: str) -> str:
