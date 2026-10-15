@@ -89,7 +89,7 @@ lays around it.
 The hero's art keeps nearly its own size, 86% of the screen's width or 60% of its height,
 whichever is more, standing on the screen's foot and held to its right edge, rather than filling
 the screen's height. A section's cover band grows with the screen's width, to 90% of its height,
-so a wide screen shows its art's full height.
+so a wide screen shows its art's full height; there its tiles rise into the band's fading foot.
 
 The page moves with the scroll, and never under reduced motion. The hero's art pushes in slowly and
 its stipple drifts; as the reader scrolls on, the art stays and the type and cards rise and fade.
