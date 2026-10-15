@@ -131,7 +131,7 @@ def _scored_marks(graph: W.WindowGraph) -> np.ndarray:
 
 
 def window_scores(estimate: object, truth: object) -> dict[str, Any]:
-    """Score a window graph link by link against a window truth whose lag 0 is a DAG.
+    """Score a window graph link by link against a window truth.
 
     A link is a same-step pair ``{i, j}`` or a lagged pair ``(X_i(t-k), X_j(t))``, ``k >= 1``,
     self-links included. Columns, all over every link of lags ``0..L``:
@@ -147,17 +147,21 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
     - ``lagged_tail``, ``lagged_circle``, ``lagged_arrow``: the true lagged links found, by the mark
       at their earlier end (a tail is the true one).
 
-    Conflicts are read by :func:`_scored_marks`. A truth with unobserved variables is not scored:
-    its estimate is a PAG over the observed ones, and the true PAG is not computed here, so only
-    ``family`` is returned. Raises ``TypeError`` unless both are window graphs and ``ValueError``
-    unless the truth's lag 0 is a DAG and both cover the same variables.
+    Conflicts are read by :func:`_scored_marks`. A truth with unobserved variables is scored as its
+    true PAG over the observed ones at the estimate's ``tau_max``
+    (:func:`andrey_bench.window_pag.true_window_pag`), the class LPCMCI recovers: a circle in both
+    is a match, and a tail or an arrowhead where the true PAG has a circle differs from it but is
+    not a ``wrong_marks`` claim. Raises ``TypeError`` unless both are window graphs and
+    ``ValueError`` unless the truth's lag 0 is a DAG and it covers the estimate's variables.
     """
     if not isinstance(estimate, W.WindowGraph) or not isinstance(truth, W.WindowGraph):
         raise TypeError("window_scores needs a window estimate and a window truth")
+    if truth.lag0 != "dag":
+        raise ValueError("window_scores needs a truth whose lag 0 is a DAG")
     if truth.latents:
-        return {"family": "temporal_window"}
-    if truth.lag0 != "dag" or estimate.n_nodes != truth.n_nodes:
-        raise ValueError("window_scores needs a DAG lag-0 truth over the estimate's variables")
+        truth = _window_pag_of(truth, estimate.tau_max)
+    if estimate.n_nodes != truth.n_nodes:
+        raise ValueError("window_scores needs a truth over the estimate's variables")
     lags = max(estimate.tau_max, truth.tau_max) + 1
     n = truth.n_nodes
     raw, est, true_ = (
@@ -180,8 +184,9 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
         (both & (est[1:] != true_[1:])).sum()
     )
 
-    # A claim is a tail or an arrowhead the solution returned; an unoriented link claims nothing.
-    definite = np.isin(raw, (W.TAIL, W.ARROW))
+    # A claim is a tail or an arrowhead the solution returned; an unoriented link claims nothing,
+    # and a claim where the true PAG has a circle contradicts nothing.
+    definite = np.isin(raw, (W.TAIL, W.ARROW)) & np.isin(true_, (W.TAIL, W.ARROW))
     held0 = (true0 | true0.T) & off
     wrong0 = int((definite[0] & held0 & (est[0] != true_[0])).sum())
     wrong_lagged = int((definite[1:] & both & (est[1:] != true_[1:])).sum())
@@ -206,6 +211,20 @@ def window_scores(estimate: object, truth: object) -> dict[str, Any]:
         "lagged_circle": float((found == W.CIRCLE).sum()),
         "lagged_arrow": float((found == W.ARROW).sum()),
     }
+
+
+#: The last window truth, its ``tau_max``, and its true PAG; one truth serves all solutions of a dataset.
+_WINDOW_PAG_OF: dict[int, tuple[W.WindowGraph, int, W.WindowGraph]] = {}
+
+
+def _window_pag_of(truth: W.WindowGraph, tau_max: int) -> W.WindowGraph:
+    from andrey_bench.window_pag import true_window_pag
+
+    hit = _WINDOW_PAG_OF.get(id(truth))
+    if hit is None or hit[0] is not truth or hit[1] != tau_max:
+        _WINDOW_PAG_OF.clear()
+        hit = _WINDOW_PAG_OF[id(truth)] = (truth, tau_max, true_window_pag(truth, tau_max))
+    return hit[2]
 
 
 def coefficient_scores(estimate: object, truth: object) -> dict[str, Any]:

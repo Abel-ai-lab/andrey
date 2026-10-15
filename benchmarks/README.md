@@ -464,9 +464,13 @@ PCMCI accepts.
 `pcmci_cpu.py --method pcmciplus` and `--method lpcmci` compare Andrey's PCMCI+ and LPCMCI with
 tigramite's on `pcmciplus_paper` and `lpcmci_paper`, where some links act within a time step. The
 truth is a window over lags 0 to the largest true lag: the same-step DAG and the lagged links.
-`lpcmci_paper` generates N series and drops 30% of them, so its rows compare the two packages'
-graphs only; their errors against the truth would need the true PAG, which the harness does not
-compute.
+`lpcmci_paper` generates N series and drops 30% of them, so its rows are scored against the true
+PAG over the observed series instead (`andrey_bench/window_pag.py`), the graph LPCMCI estimates
+(Gerhardus and Runge, 2020, Sect. 2.3). It is built from the generating graph over lags 0 to
+`tau_max`: the unobserved series and the observed ones before the window are marginalized, a link
+is kept only when all its copies in the window are adjacent, and time order, the FCI rules, and
+repeating orientations mark its ends. A truth with hidden series is rescored without fitting by
+`rescore_window_pag.py`, which writes `window_pag.parquet`, one row per `run_id`.
 
 Every solution tests lags 0 to `tau_max` (default 5 for PCMCI+ and 3 for LPCMCI, each paper's
 largest true lag) with the Student-t partial-correlation test and the method's defaults, which are
@@ -498,9 +502,11 @@ same-step pair or a lagged pair, self-links included:
 | `wrong_marks` | tails and arrowheads on true links that contradict the truth |
 | `lagged_tail`, `lagged_circle`, `lagged_arrow` | the true lagged links found, by the mark at their earlier end |
 
-The truth's lag 0 is the DAG, not the class of graphs the data can tell apart, so an unoriented
-PCMCI+ link or a PAG circle costs its open ends in `endpoint_shd`; `wrong_marks` counts only the
-marks a solution claims. A CPDAG's conflicting link is read as undirected and a PAG's conflict mark
+Without hidden series the truth's lag 0 is the DAG, not the class of graphs the data can tell
+apart, so an unoriented PCMCI+ link or a PAG circle costs its open ends in `endpoint_shd`;
+`wrong_marks` counts only the marks a solution claims. Against a true PAG a circle in both is a
+match, and a tail or an arrowhead where the true PAG has a circle costs one in `endpoint_shd` but
+is not in `wrong_marks`. A CPDAG's conflicting link is read as undirected and a PAG's conflict mark
 as a circle, as Andrey returns them.
 
 ```shell
@@ -561,8 +567,8 @@ variables are adjacent (`cross_*`) and, in `cross_oriented_*`, only when it also
 way. A panel pools its time points from the second. `rescore_cross_links.py` adds these scores to a
 finished `pcmci_cpu.py` or `lingam_ts.py` run without fitting anything: it reads the stored graphs
 and the dataset truths and writes `cross_links.parquet`, one row per `run_id`. A truth with
-unobserved series is left out, since its true graph over the observed series is not computed, so
-LPCMCI on `lpcmci_paper` is compared with tigramite only. `granger_var.py` records the same scores
+unobserved series is left out of these scores; LPCMCI on `lpcmci_paper` is scored against its true
+PAG instead (`rescore_window_pag.py`). `granger_var.py` records the same scores
 as `cross_precision`, `cross_recall`, and `cross_f1`.
 
 ```shell
