@@ -13,7 +13,7 @@ as one function call, on CPU cores or a GPU. It is for people who use these meth
 variables than the usual packages handle quickly, or from a script or a coding agent.
 
 **Over 100x faster on PC, and faster on most other supported methods.**
-The [0.1.0 benchmarks](benchmarks/0.1.0.md) give each measured speedup compared with
+The [0.1.0 release card](benchmarks/0.1.0.md) gives each measured speedup compared with
 causal-learn, gCastle, and lingam, including where Andrey is not faster.
 
 ```shell
