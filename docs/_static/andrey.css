@@ -235,8 +235,9 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   }
 }
 
-/* A newer release than the reader has seen: a dot at the top right of Release cards, in the navbar
-   and the drawer alike (nav-new.js shows it). */
+/* A newer release than the reader has seen: the brand's node, an amber dot, at the top right of
+   Release cards, in the navbar and the drawer alike (nav-new.js shows it; DESIGN.md, "Node and
+   edge"). */
 .nav-new:not([hidden]) {
   display: inline-block;
   flex: none;
@@ -244,7 +245,7 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   height: 0.4rem;
   margin-left: 0.2rem;
   border-radius: 50%;
-  background-color: var(--andrey-categorical-4);
+  background-color: var(--andrey-ground-amber);
   transform: translateY(-0.45em);
 }
 
