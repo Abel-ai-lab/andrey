@@ -4,7 +4,7 @@
 (() => {
   const pill = document.querySelector("a.agent-pill[data-prompt]");
   if (!pill || !navigator.clipboard) return;
-  const label = pill.querySelector("span");
+  const label = pill.querySelector("span:first-child");
   const text = label.textContent;
   let reset;
   pill.setAttribute("role", "button");

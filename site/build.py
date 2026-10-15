@@ -1389,8 +1389,6 @@ ICON = {
     '<circle cx="12" cy="12" r="2"/>',
     "minus": '<line x1="5" y1="12" x2="19" y2="12"/>',
     "x": '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
-    "copy": '<rect width="14" height="14" x="8" y="8" rx="2"/>'
-    '<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
 }
 # The documentation pages a first visit wants, in the order the band lists them.
 DOC_PAGES = (
@@ -1481,13 +1479,35 @@ AGENT_PROMPT = (
 )
 
 
+# Coding agents that load skills, as the pill shows them: each one's mono mark from Lobe Icons
+# (site/agents/, MIT), drawn in the text's color.
+AGENTS = {
+    "claude": "Claude Code",
+    "codex": "Codex",
+    "cursor": "Cursor",
+    "githubcopilot": "GitHub Copilot",
+}
+
+
+def agent_logo(name: str) -> str:
+    """``name``'s mark, its name as the tooltip."""
+    svg = (SITE / "agents" / f"{name}.svg").read_text()
+    paths = re.sub(r"<title>.*?</title>", "", re.search(r"<svg[^>]*>(.*)</svg>", svg, re.S)[1])
+    return (
+        '<svg class="agent-logo" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd">'
+        f"<title>{escape(AGENTS[name])}</title>{paths}</svg>"
+    )
+
+
 def agent_pill() -> str:
     """The pill above the headline: it copies ``AGENT_PROMPT`` to paste into a coding agent
     (``prompt.js``), and without the script it leads to the FAQ answer that gives the prompt."""
+    logos = "".join(agent_logo(name) for name in AGENTS)
     return (
         f'<a class="agent-pill" href="docs/faq.html#how-does-an-agent-use-it" '
-        f'data-prompt="{escape(AGENT_PROMPT)}">{glyph("bot")}'
-        f"<span>Onboard your agent to Andrey</span>{glyph('copy')}</a>"
+        f'data-prompt="{escape(AGENT_PROMPT)}" title="Copy a prompt for your coding agent">'
+        f'<span>Onboard your agent to Andrey</span><span class="agent-logos" aria-hidden="true">'
+        f"{logos}</span></a>"
     )
 
 
