@@ -490,3 +490,22 @@ def test_the_404_page_resolves_its_links_from_the_site_root(html):
     assert {"docs/index.html", "docs/benchmarks.html", "blog/index.html"} <= targets
     for target in targets:
         assert (html / target).exists(), target
+
+
+def test_every_documentation_page_ends_on_the_documentation_footer(html):
+    # The documentation's own footer in place of the theme's ("Created using Sphinx", "Built with
+    # the PyData Sphinx Theme"); the homepage keeps its own.
+    for page, text in _pages(html):
+        if page == html / "index.html":
+            assert 'class="docs-footer"' not in text
+            continue
+        footer = text[text.index('<footer class="bd-footer">') :]
+        assert 'class="docs-footer"' in footer, page
+        assert re.findall(r'<p class="docs-footer__heading">([^<]+)</p>', footer) == [
+            "Documentation",
+            "Learn",
+            "Project",
+        ], page
+        assert "Created using" not in footer and "PyData Sphinx Theme" not in footer, page
+        for href in re.findall(r'href="([^"#:]+\.html)"', footer):
+            assert (page.parent / href).resolve().is_file(), (page, href)

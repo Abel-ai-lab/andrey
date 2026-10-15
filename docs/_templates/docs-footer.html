@@ -1,0 +1,44 @@
+{#- The documentation's footer, after craft.do's: a rounded navy card under the page, the wordmark
+    and three columns of links under small capitals, then the copyright, the license, and Abel's
+    mark along its foot. The homepage keeps its own footer (site/homepage.html). -#}
+<div class="docs-footer">
+  <div class="docs-footer__top">
+    <a class="docs-footer__brand" href="{{ pathto('', 1) }}" aria-label="Andrey home">
+      <img src="{{ pathto('_static/wordmark-dark.svg', 1) }}" alt="Andrey" width="98" height="28"/>
+    </a>
+    <nav class="docs-footer__columns" aria-label="{{ _('Footer') }}">
+      <div>
+        <p class="docs-footer__heading">Documentation</p>
+        <ul>
+          <li><a href="{{ pathto('docs/guides/getting-started') }}">Get started</a></li>
+          <li><a href="{{ pathto('docs/code/index') }}">API reference</a></li>
+          <li><a href="{{ pathto('docs/configuration') }}">Configuration</a></li>
+          <li><a href="{{ pathto('docs/faq') }}">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="docs-footer__heading">Learn</p>
+        <ul>
+          <li><a href="{{ pathto('docs/examples/index') }}">Examples</a></li>
+          <li><a href="{{ pathto('docs/demos/index') }}">Demos</a></li>
+          <li><a href="{{ pathto('docs/benchmarks') }}">Release cards</a></li>
+          <li><a href="{{ pathto('blog/index') }}">Blog</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="docs-footer__heading">Project</p>
+        <ul>
+          <li><a href="{{ repo_url }}">GitHub</a></li>
+          <li><a href="{{ pypi_url }}">PyPI</a></li>
+          <li><a href="{{ pathto('docs/changelog') }}">Changelog</a></li>
+          <li><a href="{{ report_bug_url }}">Report a bug</a></li>
+        </ul>
+      </div>
+    </nav>
+  </div>
+  <div class="docs-footer__base">
+    <p>© 2026 Abel AI Lab. Andrey is open source under the
+      <a href="{{ repo_url }}/blob/main/LICENSE">Apache License 2.0</a>.</p>
+    <a class="docs-footer__abel" href="https://abel.ai/">{{ abel_mark }}Abel AI Lab</a>
+  </div>
+</div>

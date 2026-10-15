@@ -238,7 +238,10 @@ html_theme_options = {
     "navigation_with_keys": True,
     "show_prev_next": False,
     "icon_links": [{"name": "GitHub", "url": REPO_URL, "icon": "fa-brands fa-github"}],
-    "footer_center": ["report-bug"],
+    # The documentation's own footer (_templates/docs-footer.html) in place of the theme's three.
+    "footer_start": ["docs-footer"],
+    "footer_center": [],
+    "footer_end": [],
     "use_edit_page_button": False,
     # A documentation page's section over its title (_templates/page-kicker.html); other pages
     # keep the breadcrumbs.
@@ -254,6 +257,8 @@ html_context = {
     "report_bug_url": f"{REPO_URL}/issues/new",
     "repo_url": REPO_URL,
     "pypi_url": PYPI_URL,
+    # Abel's mark in the text's color, for the documentation's footer.
+    "abel_mark": site.abel_mark(),
 }
 # A post's author and date sit under its title (_post_byline); the blog index links the archive.
 BLOG_SIDEBAR = ["ablog/archives.html"]

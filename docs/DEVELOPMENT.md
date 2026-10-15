@@ -254,6 +254,7 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Timing comparison and speed charts | `site/assets/figures.css`, `site/assets/figures.js` |
 | "Why Andrey is fast" scenes: homepage story, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
 | Navbar: wordmark and sections | `docs/_templates/site-logo.html`, `docs/_templates/site-nav.html` |
+| Documentation footer: a navy card, three columns of links, the license, Abel's mark | `docs/_templates/docs-footer.html`, `docs/_static/andrey.css` |
 | Wordmark (Inter outlines, light and dark ink) and its generator | `site/brand/`, `site/wordmark.py` |
 | Palette as CSS custom properties (`--andrey-*`, from `andrey.viz`) | `docs/palette_css.py` |
 | Blog posts and the front page that lists them | `docs/blog/`, `docs/_static/blog.css` |
