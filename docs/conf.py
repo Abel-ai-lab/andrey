@@ -180,13 +180,14 @@ katex_prerender = True
 # ---- HTML theme ------------------------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"
 html_title = "Andrey"
-# site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script.
+# site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script,
+# and the segmented control every choice on the site uses.
 html_static_path = ["_static", "_generated/static", "../site/brand", "../site/assets"]
 # The wordmark's A with its right stroke in amber (`site/wordmark.py`).
 html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
 html_extra_path = ["_generated/extra", "_extra"]
-html_css_files = ["andrey-tokens.css", "andrey.css", "graph-guides.css"]
+html_css_files = ["andrey-tokens.css", "andrey.css", "segmented.css", "graph-guides.css"]
 # The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill), the dot
 # on Release cards until the reader has seen the latest release, and the outline's mark on the
 # section being read.
