@@ -71,6 +71,15 @@ _COLLIDER_RULE = ParamSpec(
     "neighbors, and z is a collider when fewer than half of the separating subsets contain it "
     "(exactly half: unoriented). Majority costs up to 2**degree tests per triple.",
 )
+_POSSIBLE_DSEP = ParamSpec(
+    name="possible_dsep",
+    type="str",
+    default="fast",
+    choices=("fast", "order_free"),
+    doc="How each possible-d-separation set is built: fast = a node's check runs when the search "
+    "reaches it, so the set depends on the order the search visits nodes; order_free = the checks "
+    "run after the search, so it does not. order_free can run more tests.",
+)
 _COLLIDER_ORDER = ParamSpec(
     name="collider_order",
     type="str",
@@ -158,7 +167,14 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        params=(_ALPHA, _INDEP_TEST, _COLLIDER_RULE, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+            _POSSIBLE_DSEP,
+        ),
         references=(
             "Spirtes, Meek & Richardson 1995",
             "Spirtes, Glymour & Scheines 2000",
@@ -201,6 +217,7 @@ _add(
             _COLLIDER_RULE,
             _CATEGORICAL,
             _MAX_CATEGORIES,
+            _POSSIBLE_DSEP,
         ),
         references=("Ogarrio, Spirtes & Ramsey 2016", "Colombo & Maathuis 2014"),
     )

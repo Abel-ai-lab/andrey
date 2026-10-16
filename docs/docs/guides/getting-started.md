@@ -352,11 +352,12 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-FCI and GFCI depend on column order, and GES was more accurate with a stronger penalty on the large
-sparse benchmark graphs. PC is practical to roughly 1,000 variables; FCI's errors passed the empty
-graph's at 800 ([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API
-page states the data and sizes it was measured on. See
-[Known limits](../benchmarks/0.1.0.md#known-limits).
+FCI and GFCI depend on column order: `possible_dsep="order_free"` builds possible-d-separation sets
+that do not, but on sampled data the result can still change with the column order. GES was more
+accurate with a stronger penalty on the large sparse benchmark graphs. PC is practical to roughly
+1,000 variables; FCI's errors passed the empty graph's at 800
+([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API page states the
+data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 

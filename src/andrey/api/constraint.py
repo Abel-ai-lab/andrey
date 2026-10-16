@@ -271,6 +271,7 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    possible_dsep: str = "fast",
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -311,6 +312,12 @@ def fci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    possible_dsep : {"fast", "order_free"}, default="fast"
+        How FCI builds each possible-d-separation set [2]_ [3]_, the nodes it conditions on to
+        remove edges the first step kept. ``"fast"`` checks each node when the search reaches it,
+        so the set depends on the order the search visits nodes. ``"order_free"`` checks every
+        node once the search ends, so the set does not depend on that order; its sets can be
+        larger, so it can run more tests. See Notes.
 
     Returns
     -------
@@ -330,8 +337,8 @@ def fci(
         an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
-        is not in ``(0, 1)``, if ``collider_rule`` is not a supported choice, or if ``data`` or
-        ``categorical`` does not suit the test, as for :func:`~andrey.pc`.
+        is not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice,
+        or if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`.
 
     Warns
     -----
@@ -363,6 +370,11 @@ def fci(
     removed. ``"majority"`` tests the pair again given every subset of either endpoint's neighbors
     and follows the majority [4]_, at the cost of the extra tests described under the parameter.
 
+    **Choosing possible_dsep.** ``"fast"`` builds each possible-d-separation set in the order the
+    search visits nodes, so the set, and with it the PAG, can change with the column order.
+    ``"order_free"`` builds sets that do not depend on that order, at the cost of more tests on
+    some graphs. The possible-d-separation paragraph below describes both.
+
     **How it works.** FCI runs in three steps. First, it removes edges by conditional-independence
     tests, as PC does, and orients colliders from the separating sets. Next, it tests each remaining
     pair given subsets of its possible-d-separation set: nodes that can separate the pair when some
@@ -370,8 +382,10 @@ def fci(
     applies Zhang's orientation rules R1-R10 [3]_ until no mark changes. An endpoint no rule
     resolves stays a circle.
 
-    The result can depend on the column order, for example, through the possible-d-separation step.
-    Keep a fixed column order for reproducible results.
+    The result can depend on the column order, for example, through the order in which the
+    possible-d-separation step visits pairs and conditioning sets, and with
+    ``possible_dsep="fast"`` through the sets themselves. Keep a fixed column order for reproducible
+    results.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
@@ -379,9 +393,15 @@ def fci(
     never hides an uncovered route through the same node. Rule R8 checks each pair of endpoints in
     both orders, so whether it fires does not depend on the node labels.
 
-    **Possible-d-separation set.** FCI builds each possible-d-separation set with a search that
-    keeps only nodes reached through possible parents. This set can be smaller than the published
-    definition [2]_, so FCI can keep an edge that the published set would remove, even with exact
+    **Possible-d-separation set.** FCI builds each possible-d-separation set [2]_ [3]_ with a search
+    that walks out from one endpoint of the pair and keeps a node when a node it was reached from
+    has a possibly directed path, one with no arrowhead pointing back along it, to the endpoint or
+    to the node. With ``possible_dsep="fast"``, FCI checks a node when the search reaches it,
+    against the nodes it was reached from so far, so the set depends on the order the search visits
+    nodes. With ``"order_free"``, it checks every node once the search ends, against all the nodes
+    it was reached from, so the set does not depend on that order; it holds every node of the
+    ``"fast"`` set and sometimes more. Either set can be smaller than the published definition of
+    the set [2]_, so FCI can keep an edge that the published set would remove, even with exact
     tests. FCI keeps this search because the published set grows quickly with the graph, the
     search's set is the one FCI has been measured with, and on simulated data the published set did
     not give more accurate PAGs. FCI tests every subset of the set, except the empty set and the
@@ -400,8 +420,9 @@ def fci(
     cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
     passed the empty graph's (696 against 676). Rule R5 stops searching a pair after a fixed number
     of partial paths and leaves its circles, so on graphs with many circle-circle edges it can miss
-    an undirected cycle. With the mixed-data tests, it is experimental and not benchmarked yet; its
-    tests run it on 5 variables with 3,000 rows.
+    an undirected cycle. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
+    data the result can still depend on the column order. With the mixed-data tests, it is
+    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -432,7 +453,14 @@ def fci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pag = _fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule, categorical=mask)
+    pag = _fci(
+        X,
+        alpha=alpha,
+        indep_test=indep_test,
+        collider_rule=collider_rule,
+        categorical=mask,
+        possible_dsep=possible_dsep,
+    )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
     )
@@ -448,6 +476,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    possible_dsep: str = "fast",
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -495,6 +524,12 @@ def gfci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    possible_dsep : {"fast", "order_free"}, default="fast"
+        How GFCI builds each possible-d-separation set [2]_ [4]_, the nodes it conditions on to
+        remove edges the adjacency search kept. ``"fast"`` checks each node when the search reaches
+        it, so the set depends on the order the search visits nodes. ``"order_free"`` checks every
+        node once the search ends, so the set does not depend on that order; its sets can be
+        larger, so it can run more tests. See Notes.
 
     Returns
     -------
@@ -514,9 +549,9 @@ def gfci(
         an int.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
-        ``collider_rule`` is not a supported choice, if ``score_func`` and ``indep_test`` read
-        different data (continuous, categorical, or mixed), or if ``data`` or ``categorical`` does
-        not suit them, as for :func:`~andrey.pc`.
+        ``collider_rule`` or ``possible_dsep`` is not a supported choice, if ``score_func`` and
+        ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
+        ``categorical`` does not suit them, as for :func:`~andrey.pc`.
 
     Warns
     -----
@@ -539,15 +574,21 @@ def gfci(
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
     It considers every circle path, up to a fixed search bound, and rule R8 checks each pair of
-    endpoints in both orders. GFCI shares FCI's possible-d-separation set and separating sets; the
-    Notes of :func:`~andrey.fci` describe both choices and the reasons for keeping them.
+    endpoints in both orders. GFCI shares FCI's possible-d-separation sets [2]_ [4]_, built as
+    ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
+    both and the reasons for keeping them. With ``possible_dsep="fast"``, GFCI checks each node
+    when the search reaches it, against the nodes it was reached from so far, so the set depends on
+    the order the search visits nodes. With ``"order_free"``, it checks every node once the search
+    ends, against all the nodes it was reached from, so the set does not depend on that order, and
+    it can be larger.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
     and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
     linear relations with Gaussian noise. Rule R5 has the search bound described under
-    :func:`~andrey.fci`. With the mixed-data score and test, its tests run it on 5 variables with
-    3,000 rows.
+    :func:`~andrey.fci`. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
+    data the result can still depend on the column order. With the mixed-data score and test, its
+    tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -558,6 +599,8 @@ def gfci(
        1873-1896.
     .. [3] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
+    .. [4] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd ed. MIT Press.
 
     Examples
     --------
@@ -594,6 +637,7 @@ def gfci(
         indep_test=indep_test,
         collider_rule=collider_rule,
         categorical=mask,
+        possible_dsep=possible_dsep,
     )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}

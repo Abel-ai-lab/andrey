@@ -36,6 +36,7 @@ def fci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
+    possible_dsep: str = "fast",
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
 
@@ -43,17 +44,19 @@ def fci(
     significance level in ``(0, 1)``. Skeleton pruning requires a p-value above ``alpha``;
     the optional majority collider rule also counts equality as a separating vote.
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
+    ``possible_dsep`` (``"fast"`` or ``"order_free"``) selects how each possible-d-sep set is built.
     Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
 
     _validate_collider_rule(collider_rule)
+    _validate_possible_dsep(possible_dsep)
     test = make_indep_test(indep_test, X, categorical=categorical)
     support, sepsets = _fast_adjacency_search(X, test, alpha)
 
     marks = _circle_pag(support)
     _orient_colliders(marks, sepsets)
-    _remove_by_possible_dsep(marks, test, alpha, sepsets)
+    _remove_by_possible_dsep(marks, test, alpha, sepsets, order_free=possible_dsep == "order_free")
     marks = _circle_pag(marks != NULL)
     ambiguous = (
         _majority_sepsets(marks, test, alpha, sepsets)
@@ -222,6 +225,11 @@ def _validate_collider_rule(collider_rule: str) -> None:
         raise ValueError(f"collider_rule must be 'sepsets' or 'majority', got {collider_rule!r}")
 
 
+def _validate_possible_dsep(possible_dsep: str) -> None:
+    if possible_dsep not in ("fast", "order_free"):
+        raise ValueError(f"possible_dsep must be 'fast' or 'order_free', got {possible_dsep!r}")
+
+
 def _triple(a: int, b: int, c: int) -> tuple[int, int, int]:
     """Canonical key for a triple with middle node ``b``."""
     return (a, b, c) if a < c else (c, b, a)
@@ -361,7 +369,21 @@ def _exists_possible_parent_path(
     return False
 
 
-def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
+def _semidirected_reach(step: np.ndarray, src: int) -> np.ndarray:
+    """Mask of the nodes a semidirected path ``src o-> ... o-> v`` reaches from ``src``.
+
+    ``step[u, v]`` allows the step ``u -> v``: the endpoint at ``u`` on edge ``u-v`` is a tail or a
+    circle.
+    """
+    seen = step[src].copy()
+    frontier = seen.copy()
+    while frontier.any():
+        frontier = step[frontier].any(axis=0) & ~seen
+        seen |= frontier
+    return seen
+
+
+def _possible_dsep(marks: np.ndarray, x: int, y: int, order_free: bool = False) -> list[int]:
     """Possible-d-separating nodes for the pair ``(x, y)`` (descending), from a reachability BFS.
 
     Grows a frontier of node pairs from ``x``, extending through definite colliders and adjacent
@@ -369,9 +391,15 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     holds ``(a, c)`` pairs rather than the last edge of each path, so the set can be smaller than
     Possible-D-Sep as Spirtes, Glymour, and Scheines (2000) define it; :func:`andrey.fci` gives the
     reasons for keeping it.
+
+    By default a node's possible-parent check runs when the frontier reaches it, over the
+    predecessors recorded so far, so the set depends on the order the frontier is visited in. With
+    ``order_free``, the check runs once the frontier is exhausted, over every predecessor recorded
+    for the node, so the set does not depend on that order, nor on the column order.
     """
     n = marks.shape[0]
     dsep: set[int] = set()
+    reached: set[int] = set()
     queue: deque[tuple[int, int]] = deque()
     visited: set[tuple[int, int]] = set()
     previous: dict[int, set[int]] = {}
@@ -397,7 +425,9 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
             if distance > _UNBOUNDED_PATH:
                 break
         a, b = t
-        if _exists_possible_parent_path(previous, b, x, marks):
+        if order_free:
+            reached.add(b)
+        elif _exists_possible_parent_path(previous, b, x, marks):
             dsep.add(b)
         for c in range(n):
             if not _adjacent(marks, b, c) or c in (a, x, y):
@@ -412,6 +442,22 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
                 if first is None:
                     first = u
 
+    if order_free:
+        step = (marks == TAIL) | (marks == CIRCLE)
+        reach: dict[int, np.ndarray] = {}
+
+        def possible_parent_path(b: int) -> bool:
+            """A predecessor of ``b`` other than ``x`` has a semidirected path to ``x`` or ``b``."""
+            for r in previous.get(b, ()):
+                if r in (b, x):
+                    continue
+                if r not in reach:
+                    reach[r] = _semidirected_reach(step, r)
+                if reach[r][x] or reach[r][b]:
+                    return True
+            return False
+
+        dsep.update(filter(possible_parent_path, reached))
     dsep.discard(x)
     dsep.discard(y)
     # Sort by descending labels "X{i+1}". Lexicographic order differs from numeric order
@@ -448,9 +494,10 @@ def _try_remove_by_dsep(
     test: CITest,
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
+    order_free: bool,
 ) -> bool:
     """Remove edge ``x-y`` if some possible-d-sep subset makes ``x`` and ``y`` independent."""
-    dsep = _possible_dsep(marks, a, b)
+    dsep = _possible_dsep(marks, a, b, order_free)
     for cond in _iter_dsep_choices(dsep, adj_a, adj_b):
         if test(x, y, cond) > alpha:
             marks[x, y] = NULL
@@ -476,11 +523,13 @@ def _remove_by_possible_dsep(
     test: CITest,
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
+    order_free: bool = False,
 ) -> None:
     """Prune edges the plain skeleton kept but a possible-d-sep conditioning set separates.
 
-    Search each endpoint's possible-d-sep set for a conditioning subset outside either endpoint's
-    adjacency. Store a successful subset under the endpoint order returned by ``_edge_order``.
+    Search each endpoint's possible-d-sep set (built as ``order_free`` selects) for a conditioning
+    subset outside either endpoint's adjacency. Store a successful subset under the endpoint order
+    returned by ``_edge_order``.
     """
     n = marks.shape[0]
     edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
@@ -489,9 +538,11 @@ def _remove_by_possible_dsep(
             continue
         adj_a = set(_adjacent_nodes(marks, na))
         adj_b = set(_adjacent_nodes(marks, nb))
-        _try_remove_by_dsep(marks, na, nb, na, nb, adj_a, adj_b, test, alpha, sepsets)
+        _try_remove_by_dsep(marks, na, nb, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free)
         if _adjacent(marks, na, nb):
-            _try_remove_by_dsep(marks, nb, na, na, nb, adj_a, adj_b, test, alpha, sepsets)
+            _try_remove_by_dsep(
+                marks, nb, na, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free
+            )
 
 
 # ---- FCI orientation rules ----------------------------------------------------------------------

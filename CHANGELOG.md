@@ -9,6 +9,12 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `fci` and `gfci` take `possible_dsep`: `"fast"`, the default, builds each possible-d-separation
+  set as before, in the order the search visits nodes, and `"order_free"` builds sets that do not
+  depend on that order, at the cost of more tests on some graphs. ([#TBD])
+
 ### Changed
 
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
