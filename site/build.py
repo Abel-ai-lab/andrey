@@ -1660,7 +1660,7 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
             f"{accuracy} <b>{fewer}%</b> fewer errors than other popular packages.",
         ),
         "agentic": (
-            "Built for agents",
+            "Runs with no one watching",
             "A command line that never prompts and answers in JSON, so an agent can run it alone.",
         ),
         "all-in-one": (
