@@ -35,13 +35,14 @@ Time series
 
 0.5.0 is here: PCMCI, PCMCI+, LPCMCI, lasso Granger causality, VARMA-LiNGAM, and LongitudinalLiNGAM,
 methods for data ordered in time, are now supported. Tested against tigramite on the same series,
-PCMCI+ and PCMCI return the same graphs and run up to 100x and 20x faster.
+PCMCI+ returns the same graphs and runs more than 50x faster at every size, and more than 100x at 80
+variables and 2,000 time steps.
 
 :::{div} release-stats
 
 - **110 of 110** datasets with the same PCMCI+ graph as tigramite
-- **Up to 100x** PCMCI+ speedup over tigramite
-- **Up to 20x** PCMCI speedup over tigramite
+- **More than 50x** PCMCI+ speedup over tigramite at every size
+- **More than 20x** PCMCI speedup over tigramite at 10 variables
 :::
 
 :::{div} release-actions
