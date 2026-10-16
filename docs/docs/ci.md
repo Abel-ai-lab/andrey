@@ -16,6 +16,9 @@ repeat exactly.
 
 Before each release, a quality gate fits the nine supported methods to data with known graphs,
 seven of them to the Sachs data too, and the release is published only when every method passes.
+Every pull request also checks the published benchmarks: a method fails when its reference package
+has fewer errors at any size, unless a cited source shows that Andrey follows the method's paper or
+that the reference has a defect.
 
 | Platform | What is tested |
 |---|---|

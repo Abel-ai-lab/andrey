@@ -6,7 +6,7 @@ All algorithm tests run on every PR. GPU device parity lives in `tests/gpu/`.
 Recorded outputs are regression baselines: a mismatch identifies a change to review.
 Ground-truth tests establish whether the recovered structure is correct.
 
-- `baselines/` holds 24 small recorded outputs and hashes of their seeded inputs.
+- `baselines/` holds 26 small recorded outputs and hashes of their seeded inputs.
 - `helpers/` holds the fixed generators, output projection, tolerance ledger, and comparisons.
 - `test_quality_gate.py` self-checks the pre-publish gate of `qa/quality_gate.py` without fitting
   a method: the gate covers the supported methods and rejects wrong answers. The gate itself

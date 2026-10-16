@@ -72,15 +72,6 @@ html[data-theme="dark"] {
    contrast-tested. */
 
 /* ---------- navigation ---------- */
-/* uppercase, tracked section labels: a quiet hierarchy cue that keeps the sidebar scannable */
-.bd-sidebar-primary .caption-text {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 600;
-  font-size: 0.72rem;
-  color: var(--andrey-muted);
-}
-
 /* pydata sizes this column at 25% of the page, 352px at full width, mostly empty for our short
    navigation. 18rem keeps the longest API name, andrey.multi_group_direct_lingam, on one line;
    narrower, the theme's overflow-wrap cuts it mid-word. Below 960px the sidebar is a drawer. */
@@ -90,27 +81,1191 @@ html[data-theme="dark"] {
   }
 }
 
+/* The navbar is a floating glass pill: the header itself is clear, and its inner row is a
+   translucent, frosted bar inset from the edges, so the page (and the homepage's hero art) shows
+   through it blurred. Its rim is a hairline lit from the top left and shaded at the bottom right,
+   with a soft glow inside. The tint thickens over the first screen of scrolling, so the pill reads
+   over the homepage's covers and over a page of text. Without backdrop-filter, or under reduced
+   transparency, the bar is the solid paper. */
+@property --glass-tint {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 80%;
+}
+
 .bd-header {
-  border-bottom: 1px solid var(--andrey-line);
+  --nav-gap: 0.5rem;
+  padding: var(--nav-gap) 1rem;
+  border: 0;
+  /* pydata paints the header with !important. */
+  background-color: transparent !important;
   box-shadow: none;
+  pointer-events: none;
 }
 
-/* the wordmark at the height of the navbar's text, as on the homepage */
-.navbar-brand img.logo__image {
-  height: 1.6rem;
-  width: auto;
+/* The rim's light and shade, shared by the navbar and the search dialog, which is the same glass. */
+.bd-header .bd-header__inner,
+#pst-search-dialog form.bd-search,
+#pst-search-dialog #search-results {
+  --rim-light: color-mix(in srgb, var(--andrey-ground-ink) 70%, transparent);
+  --rim-shade: color-mix(in srgb, var(--andrey-ground-navy) 16%, transparent);
 }
 
-nav.bd-links li > a:hover {
+html[data-theme="dark"] .bd-header .bd-header__inner,
+html[data-theme="dark"] #pst-search-dialog form.bd-search,
+html[data-theme="dark"] #pst-search-dialog #search-results {
+  --rim-light: color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent);
+  --rim-shade: color-mix(in srgb, var(--andrey-paper) 70%, transparent);
+}
+
+.bd-header .bd-header__inner {
+  height: calc(var(--pst-header-height) - var(--nav-gap) * 2);
+  max-width: 70rem;
+  margin-inline: auto;
+  padding-inline: 0.6rem 0.45rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-paper) var(--glass-tint), transparent);
+  box-shadow:
+    inset 1px 1px 0 var(--rim-light),
+    inset -1px -1px 0 var(--rim-shade),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-ink) 7%, transparent),
+    inset 0 8px 18px -12px var(--rim-light),
+    0 10px 30px -16px color-mix(in srgb, var(--andrey-ground-navy) 42%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+  pointer-events: auto;
+}
+
+/* The pill's contents: every item is one control height on the pill's center line, with one gap
+   between them. The links are small, medium-weight Inter, as on the covers, in a recessed glass
+   track; the current section is a raised glass pill on it, lit along its top edge, as a segmented
+   control marks its choice. Search, the theme switcher, the GitHub link, and the menu are quiet
+   ghost buttons: no fill until hovered. */
+.bd-header .bd-header__inner {
+  --nav-control: 2rem;
+  --nav-step: 0.5rem;
+  padding-block: 0;
+}
+
+.bd-header .navbar-header-items {
+  flex-wrap: nowrap;
+  padding-left: calc(var(--nav-step) * 2);
+}
+
+.bd-header .navbar-header-items__start {
+  gap: var(--nav-step);
+}
+
+.bd-header .navbar-header-items__center,
+.bd-header .navbar-header-items__end {
+  column-gap: calc(var(--nav-step) / 2);
+}
+
+.bd-header ul.navbar-nav {
+  --track-inset: 0.15rem;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.1rem;
+  padding: var(--track-inset);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-ink) 5%, transparent);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--andrey-ground-navy) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-ink) 5%, transparent);
+}
+
+.bd-header ul.navbar-nav > li.nav-item {
+  margin-inline: 0;
+}
+
+.bd-header ul.navbar-nav > li.nav-item > .nav-link {
+  --glass-top: var(--andrey-surface);
+  --glass-foot: color-mix(in srgb, var(--andrey-surface-2) 88%, transparent);
+  --glass-drop: color-mix(in srgb, var(--andrey-ground-navy) 26%, transparent);
+  display: flex;
+  align-items: center;
+  height: calc(var(--nav-control) - var(--track-inset) * 2);
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  color: var(--andrey-muted);
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: background-color var(--andrey-dur) var(--andrey-ease),
+              box-shadow var(--andrey-dur) var(--andrey-ease),
+              color var(--andrey-dur) var(--andrey-ease),
+              transform var(--andrey-dur) var(--andrey-ease);
+}
+
+html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
+  --glass-top: color-mix(in srgb, var(--andrey-ink) 30%, transparent);
+  --glass-foot: color-mix(in srgb, var(--andrey-ink) 10%, transparent);
+  --glass-drop: color-mix(in srgb, var(--andrey-paper) 80%, transparent);
+}
+
+.bd-header ul.navbar-nav > li.nav-item > .nav-link:hover {
+  background-color: color-mix(in srgb, var(--andrey-ink) 6%, transparent);
+  color: var(--andrey-ink);
   text-decoration: none;
-  color: var(--andrey-accent);
 }
 
-/* the active page reads as a cobalt rail, matching how selection is drawn in a graph */
-nav.bd-links li.current > a {
-  border-left: 2px solid var(--andrey-accent);
-  padding-left: 0.6rem;
+/* The current section: the raised pane, its top edge catching the light. */
+.bd-header ul.navbar-nav > li.nav-item.current > .nav-link {
+  background: linear-gradient(180deg, var(--glass-top), var(--glass-foot));
+  box-shadow:
+    inset 0 1px 0 var(--glass-top),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-ink) 9%, transparent),
+    0 1px 2px var(--glass-drop),
+    0 4px 10px -4px var(--glass-drop);
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+/* pydata's underline for the current link: the pill marks it instead. */
+.bd-header ul.navbar-nav > li.nav-item > .nav-link::before {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bd-header ul.navbar-nav > li.nav-item > .nav-link:active {
+    transform: scale(0.96);
+  }
+}
+
+/* An amber dot, the brand's node, marks a release the reader has not seen at the top right of
+   Release cards in both the navbar and the drawer (`nav-new.js`; `DESIGN.md`, "Node and edge"). */
+.nav-new:not([hidden]) {
+  display: inline-block;
+  flex: none;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-left: 0.2rem;
+  border-radius: 50%;
+  background-color: var(--andrey-ground-amber);
+  transform: translateY(-0.45em);
+}
+
+.bd-header .navbar-item {
+  height: var(--nav-control);
+}
+
+.bd-header .search-button-field,
+.bd-header .theme-switch-button,
+.bd-header .navbar-icon-links .nav-link {
+  display: inline-flex;
+}
+
+.bd-header .search-button-field,
+.bd-header .theme-switch-button,
+.bd-header .navbar-icon-links .nav-link,
+.bd-header button.sidebar-toggle {
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  height: var(--nav-control);
+  min-width: var(--nav-control);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--andrey-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  transition: background-color var(--andrey-dur) var(--andrey-ease),
+              color var(--andrey-dur) var(--andrey-ease);
+}
+
+.bd-header .search-button-field:hover,
+.bd-header .theme-switch-button:hover,
+.bd-header .navbar-icon-links .nav-link:hover,
+.bd-header button.sidebar-toggle:hover {
+  background: color-mix(in srgb, var(--andrey-ink) 7%, transparent);
+  box-shadow: none;
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+/* The icons share one glyph size; the switcher's caret goes, since the button itself opens it. */
+.bd-header .theme-switch-button svg,
+.bd-header .navbar-icon-links svg,
+.bd-header .search-button-field svg,
+.bd-header button.sidebar-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+  vertical-align: 0;
+}
+
+.bd-header .theme-switch-button::after {
+  display: none;
+}
+
+.bd-header ul.navbar-icon-links {
+  column-gap: calc(var(--nav-step) / 2);
+}
+
+/* Search is a ghost button with its label and shortcut, the shortcut as a faint key cap. */
+.bd-header .search-button-field {
+  padding-inline: 0.65rem 0.4rem;
+}
+
+.bd-header .search-button-field .search-button__default-text {
+  margin: 0 0.35rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.bd-header .search-button-field .search-button__kbd-shortcut {
+  gap: 0.15rem;
+  color: var(--andrey-muted);
+  font-size: 0;
+}
+
+.bd-header .search-button-field .kbd-shortcut__modifier {
+  margin: 0;
+  padding: 0.12rem 0.32rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ink) 12%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--andrey-muted);
+  font: 500 0.68rem/1 var(--andrey-font-sans);
+}
+
+/* The search dialog is the navbar's glass, larger: a frosted pill with the same lit rim, its
+   field clear inside it, the shortcut in the navbar's faint key caps, and a soft accent ring
+   while it has focus, over the page dimmed and blurred. The results as one types sit below on the
+   same glass. Without backdrop-filter the pill is nearly solid paper, so it still reads. */
+#pst-search-dialog[open] {
+  max-width: 40rem;
+  margin-top: 18vh;
+  padding: 0.5rem;
+}
+
+#pst-search-dialog::backdrop {
+  background-color: color-mix(in srgb, var(--andrey-ground-navy) 35%, transparent);
+  opacity: 1;
+  -webkit-backdrop-filter: blur(6px) saturate(1.2);
+  backdrop-filter: blur(6px) saturate(1.2);
+}
+
+#pst-search-dialog form.bd-search,
+#pst-search-dialog #search-results {
+  border: 0;
+  background: color-mix(in srgb, var(--andrey-paper) 86%, transparent);
+  box-shadow:
+    inset 1px 1px 0 var(--rim-light),
+    inset -1px -1px 0 var(--rim-shade),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-ink) 8%, transparent),
+    0 28px 60px -28px color-mix(in srgb, var(--andrey-ground-navy) 60%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+}
+
+#pst-search-dialog form.bd-search {
+  height: 3.25rem;
+  padding-inline: 1.2rem 0.85rem;
+  gap: 0.8rem;
+  border-radius: 999px;
+}
+
+#pst-search-dialog form.bd-search:focus-within {
+  box-shadow:
+    inset 1px 1px 0 var(--rim-light),
+    inset -1px -1px 0 var(--rim-shade),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-accent) 45%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--andrey-accent) 18%, transparent),
+    0 28px 60px -28px color-mix(in srgb, var(--andrey-ground-navy) 60%, transparent);
+}
+
+/* Above pydata's open-dialog rule, which sizes the icon for its own larger field. */
+#pst-search-dialog[open] form.bd-search .fa-magnifying-glass,
+#pst-search-dialog[open] form.bd-search svg {
+  position: static;
+  color: var(--andrey-muted);
+  font-size: 1rem;
+}
+
+#pst-search-dialog[open] form.bd-search input.form-control {
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  color: var(--andrey-ink);
+  font: 400 1.05rem/1 var(--andrey-font-sans);
+}
+
+#pst-search-dialog form.bd-search input.form-control::placeholder {
+  color: var(--andrey-muted);
+}
+
+#pst-search-dialog .search-button__kbd-shortcut {
+  gap: 0.15rem;
+  margin: 0;
+  font-size: 0;
+}
+
+#pst-search-dialog .search-button__kbd-shortcut kbd {
+  margin: 0;
+  padding: 0.14rem 0.36rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ink) 12%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--andrey-muted);
+  font: 500 0.7rem/1 var(--andrey-font-sans);
+}
+
+#pst-search-dialog #search-results {
+  margin-top: 0.6rem;
+  border-radius: 18px;
+}
+
+/* The menu's own search button shows only in the phone's menu. */
+.bd-header .drawer-search {
+  display: none;
+}
+
+.bd-sidebar-primary .drawer-search {
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--andrey-line);
+  background: transparent;
+}
+
+.bd-sidebar-primary .drawer-search > span {
+  display: flex;
+  margin: 0;
+}
+
+/* In the phone's menu, the site's sections are rows like the documentation tree's under them: the
+   same size and muted ink, the current section in the accent, and the same focus ring. */
+.bd-sidebar-primary .sidebar-header-items .navbar-nav {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link {
+  margin: 0 -0.6rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  color: var(--andrey-muted);
+  font-size: inherit;
+  text-decoration: none;
+}
+
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link:hover {
+  color: var(--andrey-ink);
+}
+
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-item.current > .nav-link {
+  color: var(--andrey-accent);
   font-weight: 600;
+}
+
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: -2px;
+}
+
+.bd-sidebar-primary .drawer-search {
+  font-size: 0.875rem;
+}
+
+/* Just above the drawer's width, search keeps only its icon, so the links never crowd. */
+@media (min-width: 960px) and (max-width: 1023.98px) {
+  .bd-header .search-button-field .search-button__default-text,
+  .bd-header .search-button-field .search-button__kbd-shortcut {
+    display: none;
+  }
+
+  .bd-header .search-button-field {
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .bd-header .bd-header__inner {
+      animation: glass-settle linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 60svh;
+    }
+  }
+}
+
+@keyframes glass-settle {
+  from {
+    --glass-tint: 66%;
+  }
+
+  to {
+    --glass-tint: 86%;
+  }
+}
+
+/* Liquid Glass, in Chromium (glass.js sets data-glass): the backdrop bends at the pill's rounded
+   edges through the SVG lens in _templates/site-logo.html, as light through the rim of a thick
+   pane, and a specular highlight lies along its top. The tint is thinner, so the bending shows. */
+html[data-glass="liquid"] .bd-header .bd-header__inner {
+  background: color-mix(in srgb, var(--andrey-paper) calc(var(--glass-tint) - 14%), transparent);
+  backdrop-filter: url(#andrey-lens) blur(5px) saturate(1.8) brightness(1.04);
+  box-shadow:
+    inset 1px 1px 0 var(--rim-light),
+    inset -1px -1px 0 var(--rim-shade),
+    inset 0 0 0 1px color-mix(in srgb, var(--andrey-ink) 6%, transparent),
+    inset 0 10px 14px -10px var(--rim-light),
+    inset 0 -6px 12px -8px color-mix(in srgb, var(--andrey-ground-cobalt-light) 30%, transparent),
+    0 10px 30px -16px color-mix(in srgb, var(--andrey-ground-navy) 42%, transparent);
+}
+
+html[data-glass="liquid"][data-theme="dark"] .bd-header .bd-header__inner {
+  backdrop-filter: url(#andrey-lens) blur(5px) saturate(1.5) brightness(0.92);
+}
+
+.andrey-lens {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bd-header .bd-header__inner {
+    background: var(--andrey-paper);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bd-header .bd-header__inner,
+  html[data-glass] .bd-header .bd-header__inner {
+    background: var(--andrey-paper);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* On a docs page, the text scrolling up beside the pill dims out under a soft, frosted fade of the
+   paper, so no line shows sharp in the gaps. The homepage's hero runs up under the pill instead. */
+html:not(:has(.andrey-home)) .bd-header::before {
+  --fade: linear-gradient(180deg, var(--andrey-ink) 45%, transparent);
+  content: "";
+  position: absolute;
+  inset: 0 0 -2.25rem;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--andrey-paper) 92%, transparent),
+    color-mix(in srgb, var(--andrey-paper) 70%, transparent) 55%,
+    transparent
+  );
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
+  pointer-events: none;
+}
+
+@media (max-width: 959.98px) {
+  .bd-header {
+    padding-inline: 0.5rem;
+  }
+
+  /* On a phone, the pill holds the wordmark at its left and the menu at its right. */
+  .bd-header .bd-header__inner {
+    padding-inline: 0.75rem 0.5rem;
+  }
+
+  .bd-header .navbar-item:has(> .site-version),
+  .bd-header .navbar-persistent--mobile,
+  .bd-header button.secondary-toggle {
+    display: none;
+  }
+
+  .bd-header button.primary-toggle {
+    display: inline-flex;
+    order: 1;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+/* ---------- the 404 page ---------- */
+/* 404.md opens like a section cover, not an article: its title over its art (an engraved chain
+   broken where a link is missing, _static/missing-link.jpg), a small "404" above it, and no
+   breadcrumbs, permalink, or source link. Its cards are the documentation's own. */
+.bd-page-width:has(.not-found) :is(.bd-breadcrumbs, .bd-sidebar-secondary) {
+  display: none;
+}
+
+.bd-article:has(.not-found) h1 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.6rem;
+  box-sizing: border-box;
+  width: 100%;
+  height: clamp(11rem, 22vw, 16rem);
+  margin: 0 0 1.75rem;
+  padding: 0 clamp(1.25rem, 6%, 3.5rem);
+  border-radius: 14px;
+  background:
+    url("missing-link.jpg") 100% 50% / cover no-repeat,
+    var(--andrey-ground-navy);
+  color: var(--andrey-ground-ink);
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  letter-spacing: -0.03em;
+}
+
+.bd-article:has(.not-found) h1::before {
+  content: "404";
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  opacity: 0.8;
+}
+
+.bd-article:has(.not-found) h1 .headerlink {
+  display: none;
+}
+
+/* ---------- the documentation's footer ---------- */
+/* The documentation footer (`_templates/docs-footer.html`), modeled on craft.do's: a rounded navy
+   card inset from the page's edges, with the wordmark beside three link columns under small
+   capitals and a hairline, and the copyright and Abel's mark at the bottom. The theme's footer
+   row is disabled. */
+.bd-footer {
+  padding: 0 0.75rem 0.75rem;
+  border-top: 0;
+  background: transparent;
+}
+
+.bd-footer .bd-footer__inner {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+.bd-footer :is(.footer-items__start, .footer-item) {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.docs-footer {
+  --rule: color-mix(in srgb, var(--andrey-ground-ink) 16%, transparent);
+  margin-top: clamp(3rem, 6vw, 5rem);
+  padding: clamp(2rem, 4vw, 3.25rem) clamp(1.5rem, 5vw, 4rem) 1.5rem;
+  border-radius: 22px;
+  background:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--andrey-ground-cobalt) 30%, transparent),
+      transparent 60%
+    ),
+    var(--andrey-ground-navy);
+  color: color-mix(in srgb, var(--andrey-ground-ink) 72%, transparent);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.docs-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.docs-footer a:hover {
+  color: var(--andrey-ground-ink);
+}
+
+.docs-footer a:focus-visible {
+  outline: 2px solid var(--andrey-ground-ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.docs-footer__top {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr);
+  gap: 2.5rem;
+}
+
+.docs-footer__brand img {
+  display: block;
+  width: auto;
+  height: 1.75rem;
+}
+
+.docs-footer__columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+.docs-footer__heading {
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--andrey-ground-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.docs-footer ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-footer__base {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin-top: clamp(2rem, 4vw, 3rem);
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.8125rem;
+}
+
+.docs-footer__base p {
+  margin: 0;
+}
+
+.docs-footer__base p a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.docs-footer__abel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--andrey-ground-ink);
+  font-weight: 600;
+}
+
+.docs-footer .abel-mark {
+  width: auto;
+  height: 1.05rem;
+}
+
+@media (max-width: 47.99rem) {
+  .docs-footer__top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .docs-footer__columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- the brand kit ---------- */
+/* `docs/brand.md`: each download appears on its intended ground (white or cobalt in either
+   theme), with its name and files. Colors appear as chips; the node and edge appear as an amber
+   dot and line. */
+.brand-all {
+  margin: 0.5rem 0 2rem;
+}
+
+.brand-assets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-assets--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.brand-asset {
+  margin: 0;
+}
+
+.brand-asset__view {
+  display: grid;
+  place-items: center;
+  height: 9rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-asset__view--light {
+  background: var(--andrey-ground-ink);
+}
+
+.brand-asset__view--dark {
+  border-color: transparent;
+  background: var(--andrey-ground-cobalt);
+}
+
+.brand-asset__view--plain {
+  background: var(--andrey-surface-2);
+}
+
+.brand-asset__view img {
+  max-width: 70%;
+  height: auto;
+}
+
+.brand-asset__avatar {
+  border-radius: 50%;
+}
+
+.brand-social {
+  margin: 1rem 0 0.6rem;
+}
+
+.brand-social img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-asset__name {
+  margin: 0.6rem 0 0.15rem;
+  font-weight: 600;
+}
+
+.brand-asset__files {
+  display: flex;
+  gap: 0.9rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.brand-marks {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-marks li {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-marks p {
+  margin: 0;
+}
+
+.brand-mark {
+  justify-self: center;
+  background: var(--andrey-ground-amber);
+}
+
+.brand-mark--node {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+}
+
+.brand-mark--edge {
+  width: 2.4rem;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.brand-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-color {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.brand-color__chip {
+  height: 4.5rem;
+  margin-bottom: 0.4rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md);
+}
+
+.brand-color__name {
+  font-weight: 600;
+}
+
+.brand-color__value {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--andrey-ink);
+  font-size: 0.8125rem;
+}
+
+.brand-color__role {
+  color: var(--andrey-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 47.99rem) {
+  .brand-assets,
+  .brand-assets--three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- documentation sidebars ---------- */
+/* The documentation tree (_templates/docs-nav.html) lies flat on the paper: a group's heading in
+   the ink beside its icon, its pages as plain rows under it, the page being read in the accent,
+   and a fold for a long list, its chevron at the row's end. The project's links close it, under a
+   rule. */
+@media (min-width: 960px) {
+  .bd-sidebar-primary {
+    border-right: 0;
+  }
+}
+
+.docs-nav {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.docs-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-nav__group {
+  margin-bottom: 1.4rem;
+}
+
+.docs-nav__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.35rem;
+  color: var(--andrey-ink);
+  font-weight: 600;
+}
+
+.docs-nav__head a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.docs-nav .nav-icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  color: var(--andrey-muted);
+}
+
+.docs-nav li {
+  position: relative;
+}
+
+.docs-nav li a,
+.docs-nav__more > summary {
+  display: block;
+  padding: 0.3rem 1.9rem 0.3rem 1.6rem;
+  border-radius: 6px;
+  color: var(--andrey-muted);
+  text-decoration: none;
+}
+
+.docs-nav li li a,
+.docs-nav__more li a {
+  padding-left: 2.6rem;
+  font-size: 0.8438rem;
+}
+
+.docs-nav a:hover,
+.docs-nav summary:hover {
+  color: var(--andrey-ink);
+}
+
+.docs-nav a[aria-current="page"] {
+  color: var(--andrey-accent);
+  font-weight: 600;
+}
+
+.docs-nav a:focus-visible,
+.docs-nav summary:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: -2px;
+}
+
+.docs-nav summary {
+  color: var(--andrey-muted);
+  list-style: none;
+  cursor: pointer;
+}
+
+.docs-nav summary::-webkit-details-marker {
+  display: none;
+}
+
+.docs-nav .nav-icon--chevron {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.docs-nav details[open] > summary .nav-icon--chevron {
+  rotate: 90deg;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .docs-nav .nav-icon--chevron {
+    transition: rotate 200ms var(--andrey-ease);
+  }
+}
+
+/* A page's own fold: its toggle sits over the end of the page's row. */
+.docs-nav li > details > summary {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: calc(1.4em + 0.6rem);
+  border-radius: 6px;
+}
+
+/* A section's fold of its later pages, a row of its own with its chevron at the end. */
+.docs-nav__more > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 0.6rem;
+}
+
+.docs-nav__foot {
+  padding-top: 1rem;
+  border-top: 1px solid var(--andrey-line);
+}
+
+.docs-nav .docs-nav__foot a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.6rem 0.3rem 0;
+}
+
+.docs-nav__foot .nav-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* The page's outline (_templates/page-toc.html; the phone's menu has it too, page-outline.html):
+   its headings on a guide line, the section being read in the accent with a bar on the line
+   (page-outline.js), a subsection set in under its section. The page's links follow, under a
+   rule. pydata's border beside each item and its inset bar give way to the line. */
+@media (min-width: 1200px) {
+  .bd-sidebar-secondary .sidebar-secondary-item {
+    border-left: 0;
+    padding-left: 0.5rem;
+  }
+}
+
+.bd-sidebar-secondary {
+  font-size: 0.8125rem;
+}
+
+:is(.bd-sidebar-secondary, .page-outline) .onthispage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.6rem;
+  color: var(--andrey-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+:is(.bd-sidebar-secondary, .page-outline) .nav-icon {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--andrey-muted);
+}
+
+:is(.page-toc, .page-outline) .section-nav {
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--andrey-line);
+}
+
+:is(.page-toc, .page-outline) .section-nav ul {
+  padding-left: 0;
+}
+
+:is(.page-toc, .page-outline) .toc-entry a.nav-link {
+  margin-left: -1px;
+  padding: 0.3rem 0 0.3rem 0.9rem;
+  border-left: 2px solid transparent;
+  box-shadow: none;
+  color: var(--andrey-muted);
+  font-size: inherit;
+  line-height: 1.4;
+}
+
+:is(.page-toc, .page-outline) .toc-entry a.nav-link:hover {
+  color: var(--andrey-ink);
+  text-decoration: none;
+}
+
+:is(.page-toc, .page-outline) .toc-entry a.nav-link.active {
+  border-left-color: var(--andrey-accent);
+  box-shadow: none;
+  color: var(--andrey-accent);
+  font-weight: 600;
+}
+
+:is(.page-toc, .page-outline) .section-nav ul a.nav-link {
+  padding-left: 1.7rem;
+}
+
+.bd-sidebar-secondary nav.page-toc {
+  margin-bottom: 0;
+}
+
+.page-links {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--andrey-line);
+}
+
+.page-links a {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--andrey-muted);
+  text-decoration: none;
+}
+
+.page-links a:hover {
+  color: var(--andrey-ink);
+}
+
+.page-links .nav-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* A documentation page's section over its title (_templates/page-kicker.html), in the breadcrumbs'
+   place: in line with the title and just above it. */
+.header-article__inner:has(.page-kicker) {
+  padding-inline: 0;
+}
+
+.header-article__inner .header-article-item:has(.page-kicker) {
+  min-height: 0;
+}
+
+@media (min-width: 1200px) {
+  .bd-header-article:has(.page-kicker) {
+    padding-left: 2rem;
+  }
+
+  .bd-main .bd-content .bd-article-container:has(.page-kicker) .bd-article {
+    padding-top: 0.3rem;
+  }
+}
+
+.page-kicker {
+  margin: 0.6rem 0 0;
+  color: var(--andrey-accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.page-kicker a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page-kicker a:hover {
+  text-decoration: underline;
+}
+
+/* A click on the outline glides to its heading, except for readers who ask for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html:not(:has(.andrey-home)) {
+    scroll-behavior: smooth;
+  }
+}
+
+/* The phone menu's outline of the page: its top-level headings only, set off from the
+   documentation tree below by a rule. A wider screen has the right sidebar instead. */
+.page-outline {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--andrey-line);
+  font-size: 0.875rem;
+}
+
+/* In the phone's menu the rows are taller, for a finger. */
+@media (max-width: 959.98px) {
+  .docs-nav li a,
+  .docs-nav__more > summary,
+  .page-outline .toc-entry a.nav-link,
+  .bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link {
+    padding-block: 0.45rem;
+  }
+
+  .docs-nav li > details > summary {
+    height: calc(1.4em + 0.9rem);
+  }
+}
+
+.page-outline ul ul {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .page-outline {
+    display: none;
+  }
+}
+
+/* The wordmark's box holds the descender of its "y", so the box sits a little low to center the
+   capitals on the pill's line. */
+.bd-header .navbar-brand {
+  display: flex;
+  align-items: center;
+  height: var(--nav-control);
+  margin: 0;
+  padding: 0 0.25rem;
+}
+
+.navbar-brand img.logo__image {
+  height: 1.375rem;
+  width: auto;
+  transform: translateY(0.1rem);
 }
 
 /* ---------- code ---------- */
@@ -210,15 +1365,15 @@ code.literal {
    tag outlined like the site's cards and code windows. */
 .site-version {
   align-self: center;
-  margin-left: 0.6rem;
-  padding: 0.1rem 0.45rem;
-  border: 1px solid var(--andrey-line);
+  padding: 0.25rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--andrey-ink) 12%, transparent);
   border-radius: 6px;
   color: var(--andrey-muted);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  line-height: 1.4;
+  letter-spacing: 0.01em;
+  line-height: 1;
   text-decoration: none;
   white-space: nowrap;
 }

@@ -114,7 +114,7 @@ def build_app(pool):
         gr.HTML(
             logos + "<h1>Causal discovery, fast.</h1><p>Analyze the same data with "
             "Andrey, causal-learn, and lingam. Compare fit times and recovered graphs.</p>"
-            "<p>Over 100x faster on PC, and faster on most other supported methods. "
+            "<p>Over 1,000x faster on PNL, and faster on most other supported methods. "
             '<a href="https://andrey.abel.ai/docs/benchmarks.html">Controlled benchmarks</a>; '
             "live results depend on this server and the dataset.</p>",
             elem_id="hero",

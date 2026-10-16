@@ -17,6 +17,7 @@ import subprocess
 import sys
 from html import unescape
 from html.parser import HTMLParser
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -169,7 +170,27 @@ def test_every_page_has_one_short_description_equal_to_its_preview(html):
     assert not problems, "\n".join(problems)
 
 
+def test_every_homepage_tile_leads_to_details_that_are_built(html):
+    home = (html / "index.html").read_text(encoding="utf-8")
+    tiles = re.findall(r'<li class="tile[^"]*"><a class="tile-face" href="([^"]+)"', home)
+    assert tiles and len(tiles) == len(set(tiles))  # one tile for each dialog
+    problems = []
+    for href in tiles:
+        if href.startswith("#"):
+            if f'<dialog class="wf tile-dialog" id="{href[1:]}"' not in home:
+                problems.append(f"{href}: no dialog holds its details")
+        elif not _resolve(html, html / "index.html", href).is_file():
+            problems.append(f"{href}: not built")
+    for script in ("tiles.js", "prompt.js"):
+        if f"{script}" not in home or not (html / "_static" / script).is_file():
+            problems.append(f"{script}: not loaded or not built")
+    assert not problems, "\n".join(problems)
+
+
 def test_every_header_leads_home_and_to_each_section(html):
+    cards = (DOCS / "docs" / "benchmarks").glob("*.md")
+    newest = max((tuple(map(int, card.stem.split("."))) for card in cards), default=())
+    newest = ".".join(map(str, newest))
     problems = []
     for page, text in _pages(html):
         name = page.relative_to(html)
@@ -185,6 +206,65 @@ def test_every_header_leads_home_and_to_each_section(html):
             )
             if len(hrefs) != 1 or _resolve(html, page, hrefs[0]) != html / expected:
                 problems.append(f"{name}: the header's {label} link is wrong")
+        # Release cards carries the dot that marks the newest release until the reader opens it.
+        cards = re.findall(
+            r'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>Release cards'
+            r'<span class="nav-new" data-release="([^"]+)" hidden>',
+            header,
+        )
+        if len(cards) != 1 or _resolve(html, page, cards[0][0]) != html / "docs/benchmarks.html":
+            problems.append(f"{name}: the header's Release cards link is wrong")
+        elif cards[0][1] != newest:
+            problems.append(f"{name}: the Release cards dot names {cards[0][1]}, not {newest}")
+    assert not problems, "\n".join(problems)
+
+
+class _Marks(HTMLParser):
+    """Collect the links marked as the page being read, and whether their folds are open."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.folds: list[bool] = []
+        self.marked: list[tuple[str, bool]] = []  # (href, every fold around it open)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "details":
+            self.folds.append("open" in values)
+        elif tag == "a" and values.get("aria-current") == "page":
+            self.marked.append((values["href"], all(self.folds)))
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "details":
+            self.folds.pop()
+
+
+def test_every_docs_page_finds_itself_in_its_sidebar_and_edits_a_tracked_file(html):
+    tracked = set(
+        subprocess.run(
+            ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.splitlines()
+    )
+    problems = []
+    for page, text in _pages(html):
+        name = page.relative_to(html).as_posix()
+        start = text.find('<nav class="bd-docs-nav docs-nav"')
+        if start < 0:
+            continue
+        # The tree marks the page in view, unless the page is outside it, and opens its fold.
+        marks = _Marks()
+        marks.feed(text[start : text.index("</nav>", start)])
+        if len(marks.marked) > 1:
+            problems.append(f"{name}: the sidebar marks {len(marks.marked)} pages")
+        for href, shown in marks.marked:
+            if _resolve(html, page, href) != page:
+                problems.append(f"{name}: the sidebar marks {href}, another page")
+            elif not shown:
+                problems.append(f"{name}: the sidebar marks the page inside a closed fold")
+        # Edit this page opens a file in the repository, never one the build writes.
+        for path in re.findall(r'href="https://github\.com/[^"]+/edit/main/([^"]+)"', text):
+            if path not in tracked:
+                problems.append(f"{name}: Edit this page opens {path}, which git does not track")
     assert not problems, "\n".join(problems)
 
 
@@ -254,15 +334,18 @@ def test_every_post_shows_its_cover_and_byline_under_its_title(html):
             problems.append(f"blog/{post}.html's cover has no alt text")
         byline = re.search(
             r'</h1>\s*(?:<figure class="post-cover">.*?</figure>\s*)?'
-            r'<p class="post-byline">(.*?)</p>',
+            r'<div class="post-byline">(.*?)</div>',
             text,
             re.S,
         )
         author = byline and re.search(r'<a href="([^"]+)">', byline[1])
+        tags = _front_matter(DOCS / "blog" / f"{post}.md").get("tags", "")
         if not author or "<time datetime=" not in byline[1]:
             problems.append(f"blog/{post}.html has no author and date under its title")
         elif not _resolve(html, built, author[1]).is_file():
             problems.append(f"blog/{post}.html links its author to {author[1]}, not built")
+        elif tags and 'class="blog-tags"' not in byline[1]:
+            problems.append(f"blog/{post}.html shows no tags under its title")
     assert not problems, "\n".join(problems)
 
 
@@ -279,3 +362,178 @@ def test_every_site_address_in_the_readme_and_package_metadata_is_built(html):
             if not target.is_file():
                 problems.append(f"{source} uses https://andrey.abel.ai/{path}, which is not built")
     assert not problems, "\n".join(problems)
+
+
+def _discovery_graph(text):
+    scripts = re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S)
+    assert len(scripts) == 1, "Each page must have one valid JSON-LD graph"
+    data = json.loads(scripts[0])
+    assert data["@context"] == "https://schema.org"
+    return {node["@type"]: node for node in data["@graph"]}
+
+
+def test_every_page_carries_structured_data_that_matches_its_preview(html):
+    for page, text in _pages(html):
+        nodes = _discovery_graph(text)
+        node = nodes.get("BlogPosting", nodes.get("WebPage"))
+        assert node is not None, page
+        for suffix, field in (
+            ("title", "name"),
+            ("description", "description"),
+            ("image", "image"),
+        ):
+            preview = re.findall(rf'<meta property="og:{suffix}" content="([^"]*)"', text)
+            twitter = re.findall(rf'<meta name="twitter:{suffix}" content="([^"]*)"', text)
+            assert len(preview) == 1 and preview == twitter, page
+            assert node[field] == unescape(preview[0]), page
+        software = nodes["SoftwareSourceCode"]
+        assert software["name"] == "Andrey" and software["programmingLanguage"] == "Python"
+        assert software["license"]["name"] == "Apache-2.0"
+        assert software["license"]["url"].endswith("/blob/main/LICENSE")
+        assert software["codeRepository"] == "https://github.com/Abel-ai-lab/andrey"
+        assert software["image"] == "https://andrey.abel.ai/_static/favicon.svg"
+        assert (html / "_static" / "favicon.svg").is_file()
+        assert node["about"]["@id"] == software["@id"]
+        assert nodes["Organization"]["url"] == "https://abel.ai/"
+        assert nodes["Organization"]["logo"] == "https://andrey.abel.ai/_static/abel-symbol.png"
+
+
+def test_the_organization_logo_is_a_png_search_results_can_show(html):
+    from PIL import Image
+
+    # Search engines show an organization's logo from 112 x 112 pixels up, on a light ground.
+    with Image.open(html / "_static" / "abel-symbol.png") as logo:
+        assert logo.format == "PNG" and min(logo.size) >= 112, logo.size
+
+
+def test_a_post_carries_the_date_authors_and_release_of_its_front_matter(html):
+    for source in (DOCS / "blog").glob("*.md"):
+        content = source.read_text()
+        if "blogpost: true" not in content:
+            continue
+        nodes = _discovery_graph((html / "blog" / (source.stem + ".html")).read_text())
+        article = nodes["BlogPosting"]
+        front = {key: re.search(rf"^{key}: (.+)$", content, re.M)[1] for key in ("date", "version")}
+        assert article["datePublished"] == front["date"], source.name
+        assert nodes["SoftwareSourceCode"]["version"] == front["version"], source.name
+        assert "dateModified" not in article
+        authors = re.search(r"^author: (.+)$", content, re.M)[1]
+        names = [name.strip() for name in authors.strip("[]").split(",")]
+        assert [person["name"] for person in article["author"]] == names, source.name
+        for person in article["author"]:
+            assert (html / urlsplit(person["url"]).path.lstrip("/")).is_file(), person["url"]
+
+
+def test_llms_txt_links_public_pages_by_section_with_their_preview_text(html):
+    text = (html / "llms.txt").read_text()
+    assert text.startswith("# Andrey\n\n> ") and andrey.__version__ in text
+    assert re.findall(r"^## (.+)$", text, re.M) == ["Docs", "Release cards", "Blog"]
+    links = re.findall(r"^- \[(.*?)\]\((https://andrey\.abel\.ai/[^)]+)\): (.+)$", text, re.M)
+    assert len(links) >= 12
+    assert len(links) == len({url for _, url, _ in links})
+    for title, url, description in links:
+        path = urlsplit(url).path.lstrip("/")
+        page = html / path
+        assert page.is_file(), url
+        assert "PR/" not in path and "_modules/" not in path and "search.html" not in path
+        content = page.read_text()
+        preview_title = re.search(r'<meta property="og:title" content="([^"]*)"', content)[1]
+        preview_description = re.search(
+            r'<meta property="og:description" content="([^"]*)"', content
+        )[1]
+        assert title == unescape(preview_title)
+        assert description == unescape(preview_description)
+
+
+def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html):
+    assert (html / "robots.txt").read_text() == (
+        "User-agent: *\nAllow: /\n\nSitemap: https://andrey.abel.ai/sitemap.xml\n"
+    )
+    urls = re.findall(r"<loc>([^<]+)</loc>", (html / "sitemap.xml").read_text())
+    assert len(urls) == len(set(urls)) > 50
+    for url in urls:
+        path = urlsplit(url).path.lstrip("/") or "index.html"
+        content = (html / path).read_text()
+        assert f'<meta property="og:url" content="{url}"' in content, url
+        assert 'name="robots"' not in content, url
+    for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
+        assert f"https://andrey.abel.ai/{required}" in urls, required
+    # Left out: pages with no content of their own, and the redirects from moved addresses.
+    left_out = ("search.html", "404.html", "genindex.html", "blog/drafts.html", "demo/index.html")
+    moved = (
+        "blog/andrey-0-2-0.html",
+        "blog/introducing-andrey.html",
+        "blog/why-andrey-is-fast.html",
+    )
+    for address in (*left_out, *moved):
+        assert f"https://andrey.abel.ai/{address}" not in urls, address
+
+
+def test_only_the_search_page_and_the_404_page_are_noindex(html):
+    for page, text in _pages(html):
+        robots = re.findall(r'<meta name="robots" content="([^"]*)"', text)
+        if page in (html / "search.html", html / "404.html"):
+            assert robots == ["noindex, follow"], page
+        else:
+            assert not robots, page
+
+
+def test_the_404_page_resolves_its_links_from_the_site_root(html):
+    # The server shows 404.html at whatever address was missing, so its links and files resolve
+    # from the root, whatever the depth: a <base href="/"> ahead of the first relative address.
+    text = (html / "404.html").read_text()
+    head = text.split("</head>", 1)[0]
+    assert head.count('<base href="/">') == 1
+    first = min(head.index(m) for m in ('href="_static', 'src="_static') if m in head)
+    assert head.index('<base href="/">') < first
+    # Its in-page links stay on the page rather than resolving to the homepage.
+    assert "a.href = location.pathname + a.getAttribute('href')" in head
+    assert "<h1>Page not found" in text and (html / "_static" / "missing-link.jpg").is_file()
+    body = text.split("</head>", 1)[1]
+    targets = {
+        h.split("#")[0]
+        for h in re.findall(r'href="([^"#:][^":]*)"', body)
+        if not h.startswith(("/", "//")) and h.split("#")[0]
+    }
+    assert {"docs/index.html", "docs/benchmarks.html", "blog/index.html"} <= targets
+    for target in targets:
+        assert (html / target).exists(), target
+
+
+def test_every_documentation_page_ends_on_the_documentation_footer(html):
+    # Documentation pages use their own footer without the theme's credits ("Created using
+    # Sphinx", "Built with the PyData Sphinx Theme"); the homepage has a separate footer.
+    for page, text in _pages(html):
+        if page == html / "index.html":
+            assert 'class="docs-footer"' not in text
+            continue
+        footer = text[text.index('<footer class="bd-footer">') :]
+        assert 'class="docs-footer"' in footer, page
+        assert re.findall(r'<p class="docs-footer__heading">([^<]+)</p>', footer) == [
+            "Documentation",
+            "Learn",
+            "Project",
+        ], page
+        assert "Created using" not in footer and "PyData Sphinx Theme" not in footer, page
+        for href in re.findall(r'href="([^"#:]+\.html)"', footer):
+            assert (page.parent / href).resolve().is_file(), (page, href)
+
+
+def test_the_brand_kit_offers_every_file_it_shows_and_zips_them(html):
+    import zipfile
+
+    from PIL import Image
+
+    page = (html / "docs" / "brand.html").read_text()
+    files = sorted(set(re.findall(r'href="\.\./_static/brand/([^"]+)" download', page)))
+    assert files and "andrey-brand-kit.zip" in files
+    kit = html / "_static" / "brand"
+    for name in files:
+        assert (kit / name).is_file(), name
+    with zipfile.ZipFile(kit / "andrey-brand-kit.zip") as zipped:
+        names = {pathlib.PurePosixPath(n).name for n in zipped.namelist()}
+    assert set(files) - {"andrey-brand-kit.zip"} <= names and "README.txt" in names
+    with Image.open(kit / "andrey-avatar.png") as avatar:
+        assert avatar.size == (1024, 1024)
+    with Image.open(kit / "andrey-icon-on-light.png") as icon:
+        assert icon.size == (512, 512)

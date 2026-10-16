@@ -51,6 +51,8 @@ and Tabu search do from 50 variables with ten rows per variable.
    grasp
    direct_lingam
    ica_lingam
+   anm
+   pnl
    rcd
    bottom_up_parce_lingam
 ```
@@ -78,7 +80,6 @@ in a process.
    multi_group_direct_lingam
    varma_lingam
    longitudinal_lingam
-   pnl
    gin
    camuv
 ```
@@ -356,7 +357,7 @@ and `rc_params` return plain data and need no import.
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
 | `andrey calibrate` | Measured GES worker-pool cutoff for this machine, as a setting to export |
-| `andrey --skill` / `andrey --llms` | Generated package guides |
+| `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs

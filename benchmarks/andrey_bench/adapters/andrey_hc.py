@@ -26,7 +26,8 @@ from typing import Any, Mapping
 import numpy as np
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
-#: Deviance units, matching bnlearn's `bic-g` at `k = log(n)/2` and pcalg's `0.5*log(n)`.
+#: Deviance units: the penalty of bnlearn's `bic-g` at `k = log(n)/2` and pcalg's `0.5*log(n)`.
+#: `bic-g` divides the residual sum of squares by n - p - 1, so its likelihood differs.
 _DEFAULT_LAMBDA = 1.0
 #: High enough never to bind: the search stops when no move improves. The shipped default is None.
 _DEFAULT_MAX_ITER = 100_000

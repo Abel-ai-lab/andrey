@@ -1,0 +1,30 @@
+{
+  "algorithm": "PNL",
+  "case": "anm_pair_cubic",
+  "input": {
+    "case": "anm_pair_cubic",
+    "seed": 20240615,
+    "sha256": "4bb873df682d4d2b0546c7438535bae9880a0c3a8b97973c4b1bd13c723d16d8",
+    "shape": [
+      200,
+      2
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        1
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "pval_backward": 0.01989273405111902,
+    "pval_forward": 0.22597081473440506,
+    "stat_backward": 1.827055544304714,
+    "stat_forward": 1.2398987750174175
+  },
+  "schema_version": 3
+}

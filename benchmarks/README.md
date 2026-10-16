@@ -9,6 +9,7 @@ folder under `published/` with the summary its numbers come from:
 
 | Release | Release card | Summary |
 |---|---|---|
+| 0.4.0 | [Pairwise direction](../docs/docs/benchmarks/0.4.0.md) | [`published/pairwise-2026-10/summary.json`](published/pairwise-2026-10/summary.json) |
 | 0.3.0 | [Score-based search](../docs/docs/benchmarks/0.3.0.md) | [`published/score-search-2026-10/summary.json`](published/score-search-2026-10/summary.json) |
 | 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
 | 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |
@@ -17,9 +18,14 @@ A summary holds one row per comparison and size. It is generated from the record
 records and the script that writes it are kept outside this repository. A released report and its
 folder do not change: new measurements go into the next release's report and folder. To rerun a
 comparison, use its driver with the builds, versions, and settings its report lists under
-Reproduce ([0.3.0](../docs/docs/benchmarks/0.3.0.md#reproduce),
+Reproduce ([0.4.0](../docs/docs/benchmarks/0.4.0.md#reproduce),
+[0.3.0](../docs/docs/benchmarks/0.3.0.md#reproduce),
 [0.2.0](../docs/docs/benchmarks/0.2.0.md#reproduce),
 [0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
+
+[`published/parity-allowlist.json`](published/parity-allowlist.json) lists the rows where a
+reference package has fewer errors than Andrey, each with its cited cause; any other such row fails
+the quality gate before a release ([reference parity](../qa/README.md#reference-parity)).
 
 ## Comparison packages
 
@@ -152,6 +158,8 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
+| ANM | Andrey, causal-learn |
+| PNL | Andrey, causal-learn |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -347,6 +355,67 @@ The two tabu searches can end on different graphs from the same data. At hill cl
 the best non-improving moves are often several reversals of covered edges, which leave the score
 unchanged, and each package takes the first in its own scan order. bnlearn scans additions, then
 removals, then reversals; Andrey ranks all moves by score change, then by the edge's endpoints.
+
+The two packages also score a graph slightly differently. Both charge `log(n)` per parameter in
+deviance units, but bnlearn's `bic-g` divides each node's residual sum of squares by `n - p - 1`,
+with `p` its parent count. Andrey's BIC divides by a count that does not depend on the parents, so
+its score differences are those of the maximum-likelihood BIC. bnlearn's score therefore adds a
+small cost per parent: it can rank two nearly equal moves the other way, and it rejects a last move
+whose BIC gain is below that cost. The two hill climbs can then end a few edges apart, with
+Andrey's graph at the lower BIC. Read a difference in `shd` together with the `bic` column.
+
+### ANM direction test
+
+`anm_pairs.py` compares Andrey's `anm` with causal-learn's `ANM` on cause-effect pairs from the
+`anm_pair` regime: two nodes at density 1.0, so every pair has one edge, in a direction the seed
+draws, with a nonlinear additive-noise mechanism and Gaussian noise. The ladder runs over the
+number of rows, not over `d`, since a pair always has two columns. causal-learn returns the two
+p-values only, so its adapter decides the edge with Andrey's function: both solutions draw the
+direction with the larger p-value. On equal p-values, Andrey takes the direction with the smaller
+HSIC statistic relative to its mean under independence, and causal-learn draws no edge.
+
+The defaults are sizes of 200, 500, 1000, and 2000 rows, 20 seeds, one repeat without warm-up, and
+`--cap-wall-s` of 1800. The Gaussian-process regression's time grows with the cube of the rows. A
+smoke run fits one pair of 100 rows:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/anm_pairs.py --out outputs/anm-smoke --smoke
+```
+
+Each record gets `direction_correct`, `direction_reversed`, and `direction_none`, one of them 1.0,
+from the estimate stored in `structures/`. The summary prints, per size and solution, the median
+wall time, the share of pairs with the true direction, and `agree`, the share of pairs on which the
+two solutions return the same graph. A rescore recomputes the direction columns without fitting
+anything, as in [Hidden-confounder methods](#hidden-confounder-methods); pass the first run's flags:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/anm_pairs.py --out outputs/anm-pairs --rescore
+```
+
+Both packages fit the same Gaussian process and the same HSIC test. Andrey standardizes each
+column first, so its answer does not depend on the units; causal-learn fits the data as given. The
+regime's data are standardized, so the two compute the same p-values here up to rounding, and the
+comparison measures time.
+
+### PNL direction test
+
+`pnl_pairs.py` compares Andrey's `pnl` with causal-learn's `PNL` and the empty baseline on
+cause-effect pairs from the `pnl_pair` regime: two nodes at density 1.0, so every pair has one
+edge, in a direction the seed draws, with a post-nonlinear mechanism `y = g2(w * x + e)` and Laplace
+noise. The inner transform is linear and the outer one, `g2(z) = z + 0.5 tanh(z)`, nonlinear and
+invertible. The driver takes the ANM driver's flags and writes the same direction columns. Its
+`agree` column compares the two PNL solutions only, since the baseline never draws an edge.
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/pnl_pairs.py --out outputs/pnl-smoke --smoke
+```
+
+The two packages fit the same model by different means and test it differently. causal-learn
+trains two small neural networks per direction for 3000 epochs in batches of 128 rows and drops the
+last partial batch, so the smoke pair of 100 rows trains nothing. It then compares the mean of the
+assumed cause with the mean of the estimated noise by a two-sample t-test, rounded to three
+decimals. Andrey fits smooth basis expansions by Newton's method and tests independence with HSIC.
+causal-learn's fit takes over a minute at 1000 rows and grows with the rows.
 
 ### Where the clock starts
 
@@ -649,6 +718,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
   package's and with Andrey GES, by time, SHD, and BIC under one scorer.
 - `tabu_cpu.py` - compares tabu search and hill climbing with bnlearn, and scores each graph's
   BIC.
+- `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
+- `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.

@@ -666,6 +666,46 @@ _add(
 
 _add(
     MethodSpec(
+        name="anm",
+        family="pairwise",
+        summary="Additive-noise-model pairwise direction test: decides whether column 0 causes "
+        "column 1, the reverse, or neither, from a two-column table.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data",
+                    kind="matrix",
+                    doc="The two variables, one per column: column 0 is x, column 1 is y.",
+                ),
+            ),
+            layout="(n_samples, 2), rows are samples",
+        ),
+        params=(
+            ParamSpec(
+                name="alpha",
+                type="float",
+                default=None,
+                doc="How the two p-values decide the edge. null: the direction with the larger "
+                "p-value, or with the smaller HSIC statistic when the p-values are equal. A level "
+                "such as 0.05: an edge only when exactly one direction's p-value is above it.",
+                nullable=True,
+            ),
+        ),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="two-node graph with the decided edge, or none; metadata pval_forward (x->y) "
+            "and pval_backward (y->x), and stat_forward and stat_backward, each HSIC statistic "
+            "divided by its mean under independence.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        references=("Hoyer et al. 2008", "Gretton et al. 2008", "Mooij et al. 2016"),
+    )
+)
+_add(
+    MethodSpec(
         name="pnl",
         family="pairwise",
         summary="Post-nonlinear pairwise direction test: decides whether column 0 causes "
@@ -686,8 +726,8 @@ _add(
                 type="float",
                 default=None,
                 doc="How the two p-values decide the edge. null: the direction with the larger "
-                "p-value. A level such as 0.05: an edge only when exactly one direction's p-value "
-                "is above it.",
+                "p-value, or with the smaller HSIC statistic when the p-values are equal. A level "
+                "such as 0.05: an edge only when exactly one direction's p-value is above it.",
                 nullable=True,
             ),
         ),
@@ -695,11 +735,12 @@ _add(
             structure_type="graph",
             graph_kind="dag",
             doc="two-node graph with the decided edge, or none; metadata pval_forward (x->y) "
-            "and pval_backward (y->x).",
+            "and pval_backward (y->x), and stat_forward and stat_backward, each HSIC statistic "
+            "divided by its mean under independence.",
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         references=(
             "Zhang & Hyvarinen 2009",
             "Zhang & Hyvarinen 2010",

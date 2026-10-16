@@ -7,6 +7,7 @@
 {{ home.robots }}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<noscript><style>.andrey-home .tile-dialog { display: block; position: static; margin: 2rem auto; } .andrey-home .tile-dialog .wf-close { display: none; }</style></noscript>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap">
 <style>{{ home.style }}</style>
 {%- endblock extrahead %}
@@ -14,7 +15,6 @@
   <div id="pst-scroll-pixel-helper"></div>
   {%- block search_dialog %}{{ super() }}{% endblock search_dialog %}
   {%- if home.banner %}<div class="andrey-home">{{ home.banner }}</div>{% endif %}
-  {%- include "sections/announcement.html" %}
   {%- block docs_navbar %}{{ super() }}{% endblock docs_navbar %}
   {#- The navbar's links move into this drawer on a narrow screen. #}
   <dialog id="pst-primary-sidebar-modal"></dialog>
@@ -23,80 +23,59 @@
   </div>
 <div class="andrey-home">
 <main id="main-content">
-  <section class="hero wrap" aria-labelledby="headline">
-    <div class="hero-intro">
-      <h1 id="headline">Causal discovery, <span class="fast">fast</span>.</h1>
-      <p class="claim">{{ home.claim }}</p>
-      <p class="lede">
-        {{ home.lede }} CPU-parallel and GPU backends speed up the methods that use them.
-      </p>
-      <div class="hero-actions">
-        <div class="install-line">
-          <code>uv add andrey-core</code>
-        </div>
-        {{ home.hero_chips }}
-      </div>
-    </div>
-    {{ home.race }}
-  </section>
-
-  <ul class="pillars wrap" aria-label="What Andrey offers">{{ home.pillars }}</ul>
-
-  <section class="section wrap" id="speed" aria-labelledby="speed-title">
-    <h2 id="speed-title">{{ home.speed_title }}</h2>
-    <p>{{ home.speed_intro }}</p>
-    <div class="speed-why">{{ home.why_fast }}</div>
-    {{ home.speed_chart }}
-  </section>
-
-  <section class="section wrap" id="accuracy" aria-labelledby="accuracy-title">
-    <h2 id="accuracy-title">{{ home.accuracy_title }}</h2>
-    <p>{{ home.quality_intro }}</p>
-    {{ home.quality_chart }}
-  </section>
-
-  <section class="section wrap" id="graphs" aria-labelledby="graphs-title">
-    <h2 id="graphs-title">One graph for every method</h2>
-    <p>A method returns a <code>StructureOutput</code> whose <code>structure</code> is a
-      <code>GraphStructure</code>: the graph type, a mark at each end of every edge, and the
-      variable names. Draw it, convert it to NetworkX or a NumPy matrix, or compare it with
-      another method's graph, with the same code for every method. Time-series methods return a
-      graph over time lags.</p>
-    <div class="step">
-      <div>
-        <h3>Three methods, three answers</h3>
-        <p>The sprinkler network: season drives rain and the sprinkler, both wet the grass, and wet
-          grass is slippery. The methods agree on everything downstream of season, and differ on
-          the two edges out of it.</p>
-        <p><a href="docs/guides/graph-types.html">What each graph type claims</a></p>
-      </div>
-      <div>
-        <div class="window">
-          <div class="window-bar"><span class="window-title">interface.py</span></div>
-<div class="code-copy"><pre class="hl"><code>{{ home.interface_code }}</code></pre></div>
-        </div>
-        <div class="window">
-          <div class="window-bar"><span class="window-title">interface.py</span></div>
-<div class="code-copy"><pre class="output"><code>{{ home.interface_output }}</code></pre></div>
+  {#- The hero and the first section share one art, the fast lanes: it stays on the screen while
+      the hero's type scrolls away and the section's title comes up over it with the four ideas
+      behind the speed, until the section's tiles rise over it on the page's paper. #}
+  <div class="run">
+    <div class="run-art" aria-hidden="true">{{ home.hero_art }}</div>
+    <section class="hero" aria-labelledby="headline">
+      <div class="hero-ground">
+        <div class="hero-intro">
+          {{ home.agent_pill }}
+          <h1 id="headline">Causal discovery: <span class="word">accelerated, accurate, agentic.</span></h1>
+          <p class="lede">Learn causal graphs from observational data, in Python.</p>
+          <div class="hero-actions">
+            <div class="install-line">
+              <code>uv add andrey-core</code>
+            </div>
+            {{ home.hero_chips }}
+          </div>
+          <ul class="act-cards" aria-label="On this page">{{ home.act_cards }}</ul>
         </div>
       </div>
-    </div>
-    <div class="interface-figures">{{ home.interface_figures }}</div>
+    </section>
+
+    {#- Each section opens on its art with its claim, then shows the evidence. #}
+    <section class="section wrap act act--hero" id="accelerated" aria-labelledby="accelerated-title">
+      {#- The title stays while the ideas play one at a time (why-fast.js). #}
+      <div class="wf-run">
+        <div class="wf-pin">
+          {{ home.act_covers["accelerated"] }}
+          {{ home.why_fast_story }}
+        </div>
+      </div>
+      <div class="run-sheet">
+        <ul class="bento-grid">{{ home.family_tiles }}</ul>
+      </div>
+    </section>
+  </div>
+
+  <section class="section wrap act" id="accurate" aria-labelledby="accurate-title">
+    {{ home.act_covers["accurate"] }}
+    <ul class="bento-grid">{{ home.accuracy_tiles }}</ul>
   </section>
 
-  <section class="section wrap" id="agents" aria-labelledby="agents-title">
-    <h2 id="agents-title">Agent support</h2>
-    <p>The <code>andrey</code> command never prompts and answers in JSON, and it describes every
-      method's parameters, so an agent can use it with no person watching.
-      <code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
-    {{ home.agent_demo }}
-    <p><a href="docs/code/index.html#command-line-interface">Command-line reference</a></p>
+  <section class="section wrap act" id="agentic" aria-labelledby="agentic-title">
+    {{ home.act_covers["agentic"] }}
+    <ul class="bento-grid">{{ home.agent_tile }}</ul>
   </section>
-  <section class="section wrap" id="start" aria-labelledby="start-title">
-    <h2 id="start-title">From data to graph</h2>
+
+  <section class="section wrap act" id="all-in-one" aria-labelledby="all-in-one-title">
+    {{ home.act_covers["all-in-one"] }}
+    <ul class="bento-grid">{{ home.coverage_tiles }}</ul>
+    {{ home.example_cover }}
     <div class="step" id="example">
       <div>
-        <h3>Recover a causal graph</h3>
         <p>Sachs and colleagues measured 11 proteins and phospholipids in 853 human immune cells.
           PC finds 8 of the 17 links in the known signaling network, and none outside it.</p>
         <figure class="example-figure">
@@ -118,45 +97,57 @@
     </div>
   </section>
 
-  <section class="section wrap" id="methods" aria-labelledby="methods-title">
-    <h2 id="methods-title">Methods for every kind of data</h2>
-    <p>{{ home.methods_title }}. Every method name links to its API reference. An experimental
-      method has no published benchmark, and its API may change without deprecation.</p>
+  <div class="tile-details">
+    {{ home.family_dialogs }}
+    {{ home.dialog_head("graphs", home.graph_title) }}
+    <p>A causal graph says which variables drive which, and how much the data can tell decides its
+      kind. Four methods on data about a lawn, its sprinkler, and the rain: three on a table of
+      measurements, and VARMA-LiNGAM on the same lawn day by day.</p>
+    <div class="interface-figures">{{ home.interface_figures }}</div>
+    <p class="tile-more"><a href="docs/guides/graph-types.html">What each kind of graph means</a></p>
+    {{ home.dialog_tail }}
+    {{ home.dialog_head("agents", "Agent support") }}
+    <p>The <code>andrey</code> command never prompts and answers in JSON, and it describes every
+      method's parameters, so an agent can use it with no person watching.
+      <code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
+    {{ home.agent_demo }}
+    <p><a href="docs/code/index.html#command-line-interface">Command-line reference</a></p>
+    {{ home.dialog_tail }}
+    {{ home.dialog_head("methods", "Methods for every kind of data") }}
+    <p>{{ home.lede }} {{ home.methods_title }}. Every method name links to its API reference. An
+      experimental method has no published benchmark, and its API may change without
+      deprecation.</p>
     {{ home.methods }}
-  </section>
-
-
-  <section class="section wrap" id="compare" aria-labelledby="compare-title">
-    <h2 id="compare-title">How Andrey compares</h2>
-    <p>What each package offers, by method family.{{ home.compare_note }} The speed and accuracy
-      sections measure Andrey against these and other packages on the same data.</p>
+    {{ home.dialog_tail }}
+    {{ home.dialog_head("compare", "How Andrey compares") }}
+    <p>What each package offers, by method family. {{ home.compare_source }} The speed and accuracy
+      tiles measure Andrey against these and other packages on the same data.</p>
     {{ home.comparison }}
-  </section>
+    {{ home.dialog_tail }}
+  </div>
 
-  <section class="band" id="docs" aria-labelledby="docs-title">
-    <div class="wrap">
-      <h2 id="docs-title">Documentation</h2>
-      <p>Guides, the graph model, and every method's parameters, with the benchmark tables and the
-        settings to rerun them.</p>
+  <section class="section wrap docs-section" id="docs" aria-labelledby="docs-title">
+    {{ home.docs_cover }}
+    <div class="band-row">
+      {{ newest_post }}
       <ul class="docs-grid">{{ home.docs_grid }}</ul>
     </div>
   </section>
 </main>
 
-<aside class="footnotes" aria-label="Notes">
-  <ol class="wrap">{{ home.footnotes }}</ol>
-</aside>
 
 <footer class="site-footer wrap">
   <a class="footer-abel" href="https://abel.ai/">{{ home.abel_mark }}Abel AI Lab</a>
   <nav aria-label="Footer">
     <a href="docs/">Documentation</a>
-    <a href="docs/benchmarks.html">Benchmarks</a>
+    <a href="docs/benchmarks.html">Release cards</a>
     <a href="docs/code/index.html">API reference</a>
     <a href="docs/faq.html">FAQ</a>
     <a href="docs/changelog.html">Changelog</a>
     <a href="{{ report_bug_url }}">Report a bug</a>
   </nav>
+  <p class="footer-legal">© 2026 Abel AI Lab. Andrey is open source under the
+    <a href="{{ repo_url }}/blob/main/LICENSE">Apache License 2.0</a>.</p>
 </footer>
 </div>
   {%- block scripts_end %}{{ super() }}{% endblock scripts_end %}

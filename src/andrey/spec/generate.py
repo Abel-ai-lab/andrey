@@ -3,7 +3,6 @@
 - :func:`to_json_schema`: a method's parameter schema.
 - :func:`help_schema`: methods, the ``ANDREY_*`` variables, and CLI invocation, discovery, and
   exit-code contracts, emitted by ``andrey --help --json``.
-- :func:`render_llms_txt`: the compact discovery index.
 - :func:`render_skill`: the generated ``SKILL.md`` guide.
 
 ``SCHEMA_VERSION`` versions structured help, configuration reports, and run-result envelopes
@@ -189,7 +188,6 @@ def cli_meta() -> dict:
             "environment": "andrey config --help --json -- environment defaults and effects",
             "calibrate": "andrey calibrate -- measure the GES worker-pool cutoff here",
             "skill": "andrey --skill -- the SKILL.md guide",
-            "llms": "andrey --llms -- the compact discovery index",
         },
         "output": (
             "runs and listings -> JSON on a non-interactive stdout (piped, an agent, CI); "
@@ -264,36 +262,6 @@ def by_family() -> dict[str, list[MethodSpec]]:
     for spec in list_specs():
         groups.setdefault(spec.family, []).append(spec)
     return groups
-
-
-def render_llms_txt() -> str:
-    """The compact discovery index (llms.txt): one line per method, and the ANDREY_* variables."""
-    lines = [
-        "# Andrey",
-        "",
-        "> Scalable causal discovery with a familiar API, accelerated on CPU and GPU. Every method "
-        "returns one uniform StructureOutput. `andrey run <method> --data <path|-> "
-        "[key=value ...] --json` prints a JSON result envelope on stdout.",
-        "",
-        f"Schema version: {SCHEMA_VERSION}. Discover: `andrey list`, "
-        "`andrey run <method> --help --json`, `andrey --help --json`, `andrey --skill`.",
-        "",
-        "## Methods",
-        "",
-        EXPERIMENTAL_NOTE,
-        "",
-    ]
-    for family, specs in by_family().items():
-        lines.append(f"### {_FAMILY_TITLES[family]}")
-        for spec in specs:
-            status = " (experimental)" if spec.status == "experimental" else ""
-            lines.append(f"- `{spec.name}`{status}: {spec.summary}")
-        lines.append("")
-    lines += ["## Environment (`ANDREY_*`)", ""]
-    for v in ENV_VARS:
-        lines.append(f"- `{v.name}` (default `{v.default}`): {v.effect}")
-    lines.append("")
-    return "\n".join(lines)
 
 
 # What each edge ``type`` in a result means, read from the edge's source to its target.

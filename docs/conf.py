@@ -19,9 +19,12 @@ import re
 import runpy
 import sys
 import textwrap
+import tomllib
+from urllib.parse import urljoin
 
 import ablog.blog
 from ablog.blog import Blog
+from ablog.post import register_posts
 from docutils import nodes
 from docutils.parsers.rst import Directive
 from sphinx import addnodes
@@ -55,6 +58,7 @@ sys.path.insert(0, str(ROOT / "apps"))
 sys.path.insert(0, str(ROOT / "apps" / "live-discovery"))
 build_assets = _module("andrey_build_assets", ROOT / "apps" / "build_assets.py")
 compare = _module("andrey_compare", ROOT / "apps" / "compare.py")
+discovery = _module("andrey_discovery", HERE / "discovery.py")
 
 # ---- project ---------------------------------------------------------------------------------
 project = "Andrey"
@@ -178,13 +182,53 @@ html_theme = "pydata_sphinx_theme"
 html_title = "Andrey"
 # site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script.
 html_static_path = ["_static", "_generated/static", "../site/brand", "../site/assets"]
-# The wordmark's "A" in the accent blue: a placeholder mark until the brand has one.
+# The wordmark's A with its right stroke in amber (`site/wordmark.py`).
 html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
-html_extra_path = ["_generated/extra"]
+html_extra_path = ["_generated/extra", "_extra"]
 html_css_files = ["andrey-tokens.css", "andrey.css", "graph-guides.css"]
+# The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill), the dot
+# on Release cards until the reader has seen the latest release, and the outline's mark on the
+# section being read.
+html_js_files = [
+    ("glass.js", {"defer": "defer"}),
+    ("nav-new.js", {"defer": "defer"}),
+    ("page-outline.js", {"defer": "defer"}),
+]
 REPO_URL = "https://github.com/Abel-ai-lab/andrey"
+PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
+ABEL_URL = "https://abel.ai/"
+# Abel's logomark in Night Teal, for light backgrounds, from Abel's brand kit: the structured
+# data's organization logo, drawn at the build as a PNG wide enough for search results.
+ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
+ABEL_LOGO = "_static/abel-symbol.png"
+ABEL_LOGO_WIDTH = 600
+# Pages a search engine should not list: the search page, and the page the server shows for a
+# missing address (404.md).
+UNINDEXED = {"search", "404"}
+# The pages llms.txt lists, by section; each release card and published post follows its section's
+# pages, newest first.
+LLMS_SECTIONS = (
+    (
+        "Docs",
+        (
+            "docs/index",
+            "docs/guides/getting-started",
+            "docs/faq",
+            "docs/code/index",
+            "docs/configuration",
+            "docs/guides/graph-types",
+            "docs/guides/graph-representation",
+            "docs/examples/index",
+            "docs/demos/index",
+            "docs/changelog",
+        ),
+    ),
+    ("Release cards", ("docs/benchmarks",)),
+    ("Blog", ("blog/index",)),
+)
+PACKAGE = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 html_theme_options = {
     # One header on every page (_templates/site-*.html): the wordmark to the homepage and the
     # release to the changelog, then Docs, Examples, Blog, and FAQ, then search, theme, and GitHub.
@@ -194,24 +238,49 @@ html_theme_options = {
     "navigation_with_keys": True,
     "show_prev_next": False,
     "icon_links": [{"name": "GitHub", "url": REPO_URL, "icon": "fa-brands fa-github"}],
-    "footer_center": ["report-bug"],
+    # The documentation footer (`_templates/docs-footer.html`); the theme's three areas are empty.
+    "footer_start": ["docs-footer"],
+    "footer_center": [],
+    "footer_end": [],
     "use_edit_page_button": False,
-    # The alpha status, once, above every page's header (_templates/sections/announcement.html).
-    "announcement": "Andrey is in alpha: the API may change between releases.",
+    # A documentation page's section over its title (_templates/page-kicker.html); other pages
+    # keep the breadcrumbs.
+    "article_header_start": ["page-kicker"],
+    # The page's outline (_templates/page-toc.html), then, on a documentation page, a link that
+    # edits it and one that reports a problem with it (_templates/page-links.html).
+    "secondary_sidebar_items": ["page-toc", "page-links"],
 }
 # The theme follows the reader's system setting until they pick one; unset, its script logs
 # "invalid theme mode" on a first visit.
-html_context = {"default_mode": "auto", "report_bug_url": f"{REPO_URL}/issues/new"}
+html_context = {
+    "default_mode": "auto",
+    "report_bug_url": f"{REPO_URL}/issues/new",
+    "repo_url": REPO_URL,
+    "pypi_url": PYPI_URL,
+    # Abel's mark uses the text color in the documentation footer.
+    "abel_mark": site.abel_mark(),
+}
 # A post's author and date sit under its title (_post_byline); the blog index links the archive.
 BLOG_SIDEBAR = ["ablog/archives.html"]
 html_sidebars = {
     "index": [],
-    # The whole documentation tree, since the navbar names only the site's sections.
-    "docs/**": ["docs-nav.html"],
+    # The page's outline (phones only) and the whole documentation tree, since the navbar names
+    # only the site's sections.
+    "docs/**": ["page-outline.html", "docs-nav.html"],
     "blog": BLOG_SIDEBAR,
     # A post takes the full width beside its contents, so its charts have room.
     "blog/**": [],
 }
+# The documentation tree's groups (_docs_sidebar): each section of the docs index named here heads
+# a group of its pages under its icon (_templates/nav-icons.html), and the index's other entries
+# make the last group. A section folds its pages past the first NAV_SHOWN.
+NAV_SECTIONS = {
+    "docs/guides/index": "book",
+    "docs/examples/index": "notebook",
+    "docs/demos/index": "play",
+}
+NAV_REFERENCE = ("Reference", "code")
+NAV_SHOWN = 5
 html_additional_pages = {"index": "homepage.html", "demo/index": "demo-redirect.html"}
 
 # ---- blog (ABlog) ----------------------------------------------------------------------------
@@ -271,7 +340,7 @@ def _write_tokens(app) -> None:  # noqa: ANN001 -- Sphinx passes its application
         f":root {{\n  --andrey-light-paper: {andrey.viz.LIGHT.paper};\n}}",
         # The stipple ground's tones (site/grain.py), the same in both themes.
         ":root {\n"
-        + "".join(f"  {name}: {value};\n" for name, value in cards.grain.ground_tokens().items())
+        + "".join(f"  {name}: {value};\n" for name, value in cards.ground_tokens().items())
         + "}",
     ]
     _write(_TOKENS_CSS, header + "\n" + "\n\n".join(blocks) + "\n")
@@ -304,6 +373,30 @@ def _methods_text() -> dict[str, str]:
     }
 
 
+# Brand kit colors: each color's name, role, and palette value.
+BRAND_COLORS = (
+    ("Ink", "Text and the wordmark on light grounds", andrey.viz.LIGHT.ink),
+    ("Paper", "The light ground", andrey.viz.LIGHT.paper),
+    ("Cobalt", "Links, selection, and the art's ground", cards.grain.COBALT),
+    ("Navy", "The art's deep ground and the footer", cards.grain.NAVY),
+    ("Night", "The dark ground", andrey.viz.DARK.paper),
+    ("Pale ink", "Text and the wordmark on dark grounds", andrey.viz.DARK.ink),
+    ("Amber", "The sole accent: one node or one edge", cards.grain.AMBER),
+)
+
+
+def _brand_colors() -> str:
+    """Brand kit swatches (``docs/brand.md``), each with its palette value."""
+    items = "".join(
+        f'<li class="brand-color"><span class="brand-color__chip" style="background:{value}">'
+        f'</span><span class="brand-color__name">{name}</span>'
+        f'<code class="brand-color__value">{value.upper()}</code>'
+        f'<span class="brand-color__role">{role}</span></li>'
+        for name, role, value in BRAND_COLORS
+    )
+    return f'<ul class="brand-colors">{items}</ul>\n'
+
+
 def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its application objects
     """Fill the homepage's context from the summary, and the FAQ's method counts."""
     (GENERATED / "static").mkdir(parents=True, exist_ok=True)
@@ -319,6 +412,10 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
         _write_bytes(GENERATED / "static" / name, tile)
     # A release cover or tile without its own art (_static/benchmarks.css).
     _write_bytes(GENERATED / "static" / "release-ground.jpg", cards.release_ground_jpeg())
+    # Brand kit downloads (`_static/brand/`) and colors from the palette.
+    for name, data in cards.brand_kit().items():
+        _write_bytes(GENERATED / "static" / "brand" / name, data)
+    _write(GENERATED / "brand-colors.html", _brand_colors())
 
 
 # Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage's card carries the
@@ -369,23 +466,24 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 
 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
-    """The page's description, and its Open Graph and Twitter card tags: title, summary, address,
-    and image. The description and ``og:description`` are one value."""
+    """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
+    image), and its structured data (``discovery.head_tags``): the organization, the website, the
+    software at the release the page belongs to, the page or post, and its breadcrumbs. The pages
+    in ``UNINDEXED`` are ``noindex``. The description and ``og:description`` are one value."""
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
     description = _description(app, context, doctree)
     url = SITE_URL + ("" if pagename == "index" else f"{pagename}.html")
     image = HOME_PREVIEW
-    if pagename in Blog(app):  # each post's card is drawn from its title, once per build
+    if pagename in _blog(app):  # each post's preview is its banner: its art, title, and release
         image = f"assets/preview/{pagename.removeprefix('blog/')}.jpg"
-        target = pathlib.Path(app.outdir) / image
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(cards.card_jpeg(title))
+        preview = cards.preview_jpeg(_cover_kind(app, pagename), title, _cover_line(app, pagename))
+        _write_bytes(pathlib.Path(app.outdir) / image, preview)
     image = SITE_URL + image
     tags = {
         "description": description,
-        "og:type": "article" if pagename in Blog(app) else "website",
+        "og:type": "article" if pagename in _blog(app) else "website",
         "og:site_name": app.config.project,
         "og:title": title,
         "og:description": description,
@@ -396,11 +494,101 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "og:image:height": str(cards.H),
         "twitter:card": "summary_large_image",
     }
-    return "".join(
+    preview = "".join(
         f'<meta {"property" if key.startswith("og:") else "name"}="{key}" '
         f'content="{html.escape(value, quote=True)}">\n'
         for key, value in tags.items()
     )
+    page = {"title": title, "description": description, "url": url, "image": image}
+    if pagename in UNINDEXED:
+        page["indexable"] = False
+    if match := re.fullmatch(r"docs/benchmarks/(\d+\.\d+\.\d+)", pagename):
+        page["software_version"] = match[1]
+    post = None
+    if pagename in Blog(app):
+        article = Blog(app)[pagename]
+        post = {
+            "date": article.date.strftime("%Y-%m-%d") if article.date else None,
+            "authors": [
+                {
+                    "name": str(person),
+                    "url": urljoin(url, app.builder.get_relative_uri(pagename, person.docname)),
+                }
+                for person in article.author or ()
+            ],
+            "version": app.env.metadata.get(pagename, {}).get("version"),
+        }
+    parents = [
+        {
+            "title": html.unescape(re.sub(r"<[^>]+>", "", parent["title"])),
+            "url": urljoin(url, parent["link"]),
+        }
+        for parent in context.get("parents", [])
+    ]
+    software = {
+        "name": app.config.project,
+        "description": PACKAGE["description"],
+        "version": release,
+        "license": {
+            "@type": "CreativeWork",
+            "name": PACKAGE["license"],
+            "url": f"{PACKAGE['urls']['Source']}/blob/main/{PACKAGE['license-files'][0]}",
+        },
+        "programmingLanguage": "Python",
+        "runtimePlatform": f"Python {PACKAGE['requires-python']}",
+        "codeRepository": PACKAGE["urls"]["Source"],
+        # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
+        "image": SITE_URL + "_static/favicon.svg",
+        "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/"],
+    }
+    return preview + discovery.head_tags(
+        page,
+        site_url=SITE_URL,
+        project=app.config.project,
+        author=app.config.author,
+        organization_url=ABEL_URL,
+        organization_logo=SITE_URL + ABEL_LOGO,
+        software=software,
+        language=app.config.language or "en",
+        post=post,
+        parents=parents,
+    )
+
+
+def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Write ``llms.txt`` and ``sitemap.xml`` at the site's root from the built pages
+    (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt`` lists
+    ``LLMS_SECTIONS``, then every release card and published post; a listed page that is missing
+    or ``noindex`` fails the build."""
+    if exception is not None or app.builder.name != "html":
+        return
+    outdir = pathlib.Path(app.outdir)
+    cards = sorted(
+        (n for n in app.env.found_docs if re.fullmatch(r"docs/benchmarks/\d+\.\d+\.\d+", n)),
+        key=lambda n: tuple(int(part) for part in n.rsplit("/", 1)[1].split(".")),
+        reverse=True,
+    )
+    posts = [post.docname for post in Blog(app).posts if post.published]
+    later = {"Release cards": cards, "Blog": posts}
+    sections = [(heading, [*pages, *later.get(heading, ())]) for heading, pages in LLMS_SECTIONS]
+    try:
+        entries = discovery.read_pages(outdir, [n for _, documents in sections for n in documents])
+        text = discovery.llms_index(
+            app.andrey_home["description"],
+            entries,
+            sections,
+            site_url=SITE_URL,
+            project=app.config.project,
+            version=release,
+        )
+    except ValueError as error:
+        raise ConfigError(str(error)) from None
+    _write(outdir / "llms.txt", text)
+    import resvg_py  # the docs group's renderer, as site/cards.py uses it
+
+    logo = resvg_py.svg_to_bytes(svg_string=ABEL_SYMBOL.read_text(), width=ABEL_LOGO_WIDTH)
+    _write_bytes(outdir / ABEL_LOGO, bytes(logo))
+    _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
 
 
 # The pages that show the "Why Andrey is fast" scenes.
@@ -424,6 +612,16 @@ def _newest_post(posts: list[tuple[str, str, str]]) -> tuple[str, str]:
     return newest[0], newest[2]
 
 
+def _blog(app) -> Blog:  # noqa: ANN001
+    """ABlog's posts, registered from the environment if ABlog has not yet done so. ABlog registers
+    them only when it resolves a doctree or collects its pages, so an incremental build that
+    rewrites no page reaches the index pages with none."""
+    blog = Blog(app)
+    if not blog:
+        register_posts(app)
+    return blog
+
+
 def _newest_first(posts: list[tuple[str, str, str]]) -> list[str]:
     """The docnames of ``posts``, each as for ``_newest_post``: the newest post, then the others
     newest first by ``_post_key``. Others that tie in both date and version keep their order in
@@ -433,15 +631,23 @@ def _newest_first(posts: list[tuple[str, str, str]]) -> list[str]:
     return [newest, *(post[0] for post in others)]
 
 
-def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
-    """The post about the latest release, which the alpha banner links: the newest dated blog post
-    with a version, as its docname and version."""
-    posts = [
-        (post.docname, f"{post.date:%Y-%m-%d}", str(version))
-        for post in Blog(app).posts
-        if post.date and (version := app.env.metadata[post.docname].get("version"))
+def _dated_posts(app) -> list[tuple[str, str, str]]:  # noqa: ANN001
+    """Every dated blog post as (docname, ISO date, version), the version "" where it has none."""
+    return [
+        (
+            post.docname,
+            f"{post.date:%Y-%m-%d}",
+            str(app.env.metadata[post.docname].get("version") or ""),
+        )
+        for post in _blog(app).posts
+        if post.date
     ]
-    return _newest_post(posts)
+
+
+def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
+    """The post about the latest release, whose version the navbar's dot on Release cards names:
+    the newest dated blog post with a version, as its docname and version."""
+    return _newest_post([post for post in _dated_posts(app) if post[2]])
 
 
 def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
@@ -449,12 +655,13 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
 
     Page styles load after the shared ones (priority 900), so they win a tie.
     """
-    # The alpha banner on every page (_templates/sections/announcement.html) links this post.
-    context["release_post"], context["release_version"] = _release_post(app)
+    # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release.
+    context["release_version"] = _release_post(app)[1]
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
-        css, js = ["figures.css", "site.css"], ["figures.js"]
+        context["newest_post"] = _newest_post_card(app)
+        css, js = ["figures.css", "site.css"], ["figures.js", "tiles.js", "prompt.js"]
     elif pagename == "blog/index":
         # The posts in the Release cards page's blocks.
         css = ["benchmarks.css", "blog.css"]
@@ -481,14 +688,83 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     context["metatags"] = context.get("metatags", "") + _preview_tags(
         app, pagename, context, doctree
     )
+    # The server answers a missing address with the 404 page at that address, at any depth, so the
+    # page resolves its links and files from the site's root; its in-page links (the skip link and
+    # the heading's) stay on the page.
+    if pagename == "404":
+        context["metatags"] = (
+            '<base href="/">\n'
+            + context["metatags"]
+            + "<script>addEventListener('DOMContentLoaded', () => { for (const a of "
+            "document.querySelectorAll('a[href^=\"#\"]')) "
+            "a.href = location.pathname + a.getAttribute('href') })</script>\n"
+        )
+
+
+def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
+    """Give a documentation page its sidebars' context.
+
+    ``docs_nav`` is the documentation tree's groups (_templates/docs-nav.html): a group per entry
+    of ``NAV_SECTIONS`` holding its pages, then the docs index's other entries. A row carries its
+    ``pages``, itself and every page under it, so the fold that holds the current page opens.
+    ``page_kicker`` names the page's section over its title: the page that lists it, or the last
+    group for a page the docs index lists itself. ``edit_url`` opens the file that holds the page's
+    text on GitHub: a Markdown file or notebook it includes (the changelog, a staged notebook's
+    canonical copy), else its own source, and none for a page autosummary writes.
+    """
+    if not pagename.startswith("docs/"):
+        return
+    includes = app.env.toctree_includes
+
+    def title(doc: str) -> str:
+        return app.env.titles[doc].astext()
+
+    def pages(doc: str) -> set[str]:
+        return {doc}.union(*(pages(child) for child in includes.get(doc, ())))
+
+    def row(doc: str) -> dict:
+        kids = dict.fromkeys(includes.get(doc, ()))
+        return {
+            "doc": doc,
+            "title": title(doc),
+            "pages": pages(doc),
+            "kids": [row(k) for k in kids],
+        }
+
+    top = list(dict.fromkeys(includes[root_doc]))
+    groups = [
+        {**row(doc), "icon": NAV_SECTIONS[doc], "shown": NAV_SHOWN}
+        for doc in top
+        if doc in NAV_SECTIONS
+    ]
+    rest = [row(doc) for doc in top if doc not in NAV_SECTIONS]
+    name, icon = NAV_REFERENCE
+    groups.append({"doc": None, "title": name, "icon": icon, "kids": rest, "shown": len(rest)})
+    context["docs_nav"] = groups
+
+    parent = next((doc for doc, kids in includes.items() if pagename in kids), None)
+    if parent == root_doc:
+        kicker = None if pagename in NAV_SECTIONS else {"doc": None, "title": name}
+    else:
+        kicker = parent and {"doc": parent, "title": title(parent)}
+    context["page_kicker"] = kicker
+
+    included = sorted(
+        path
+        for path in (pathlib.Path(dep).resolve() for dep in app.env.dependencies.get(pagename, ()))
+        if path.suffix in {".md", ".ipynb"} and GENERATED not in path.parents
+    )
+    source = included[0] if included else pathlib.Path(app.env.doc2path(pagename))
+    generated = "generated" in source.parts
+    context["edit_url"] = None if generated else f"{REPO_URL}/edit/main/{source.relative_to(ROOT)}"
 
 
 def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
-    """Put a post's cover and then its authors, date, and the Andrey version it was written for
-    under its title, where a reader looks for them and where they stay on a narrow screen. A post is
-    not updated after it is published, so the version dates what it says. ABlog has read the posts'
-    front matter by now."""
-    blog = Blog(app)
+    """Put a post's cover and then its authors, date, the Andrey version it was written for, and its
+    tags under its title, where a reader looks for them and where they stay on a narrow screen. A
+    post is not updated after it is published, so the version dates what it says. ABlog has read
+    the posts' front matter by now."""
+    blog = _blog(app)
     if app.builder.format != "html" or docname not in blog:
         return
     post = blog[docname]
@@ -508,7 +784,10 @@ def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     )
     version = app.env.metadata.get(docname, {}).get("version")
     written_for = f" · Andrey {html.escape(str(version))}" if version else ""
-    byline = f'<p class="post-byline">{authors}{" · " if authors else ""}{day}{written_for}</p>'
+    byline = (
+        f'<div class="post-byline"><span>{authors}{" · " if authors else ""}{day}{written_for}'
+        f"</span>{_tag_list(app, docname, post)}</div>"
+    )
     at = title.parent.index(title)
     title.parent.insert(at + 1, nodes.raw("", _post_cover(app, docname), format="html"))
     title.parent.insert(at + 2, nodes.raw("", byline, format="html"))
@@ -531,23 +810,49 @@ def _cover_line(app, docname: str) -> str:  # noqa: ANN001
     return f"{kind} {version}" if kind == "Release" and version else kind
 
 
+def _tag_list(app, page: str, post) -> str:  # noqa: ANN001
+    """The post's tags as a list, each a link to ABlog's page of the posts that share it."""
+    tags = "".join(
+        f'<li><a href="{app.builder.get_relative_uri(page, tag.docname)}">'
+        f"{html.escape(tag.name)}</a></li>"
+        for tag in post.tags
+    )
+    return f'<ul class="blog-tags" aria-label="Tags">{tags}</ul>' if tags else ""
+
+
 def _cover_file(app, docname: str) -> tuple[str, str]:  # noqa: ANN001
-    """Write the post's banner (site/cards.py) into the build: its path from the site's root, and
-    its kind. The post and the blog's front page both show it."""
+    """Write the post's cover, its art (site/cards.py), into the build: its path from the site's
+    root, and its kind. The post and the blog's front page both show it."""
     kind = _cover_kind(app, docname)
-    title = app.env.titles[docname].astext()
     image = f"assets/covers/{docname.removeprefix('blog/')}.jpg"
-    cover = cards.cover_jpeg(kind, title, _cover_line(app, docname))
-    _write_bytes(pathlib.Path(app.outdir) / image, cover)
+    _write_bytes(pathlib.Path(app.outdir) / image, cards.cover_jpeg(kind))
     return image, kind
 
 
-def _tile_file(app, docname: str) -> str:  # noqa: ANN001
-    """Write the post's art as a square tile (site/cards.py) into the build: its path from the
+def _thumb_file(app, docname: str) -> str:  # noqa: ANN001
+    """Write the post's art as a small thumbnail (site/cards.py) into the build: its path from the
     site's root."""
-    image = f"assets/tiles/{docname.removeprefix('blog/')}.jpg"
-    _write_bytes(pathlib.Path(app.outdir) / image, cards.tile_jpeg(_cover_kind(app, docname)))
+    image = f"assets/thumbs/{docname.removeprefix('blog/')}.jpg"
+    _write_bytes(pathlib.Path(app.outdir) / image, cards.thumb_jpeg(_cover_kind(app, docname)))
     return image
+
+
+def _newest_post_card(app) -> str:  # noqa: ANN001
+    """The homepage's documentation band leads with the newest post, as the blog's front page
+    does (``_newest_first``): its cover, its date, its title, and its description, linking to
+    it. The cover is the post's art alone, so the title is in the text."""
+    docname = _newest_first(_dated_posts(app))[0]
+    post = next(post for post in _blog(app).posts if post.docname == docname)
+    image, _ = _cover_file(app, docname)
+    description = html.escape((app.env.metadata[docname].get("description") or "").strip())
+    return (
+        f'<a class="band-post" href="{app.builder.get_relative_uri("index", docname)}">'
+        f'<img src="{image}" alt="" width="{cards.COVER_W}" height="{cards.COVER_H}" '
+        'loading="lazy"><span class="band-post-body"><span class="band-post-kicker">Latest post · '
+        f'<time datetime="{post.date:%Y-%m-%d}">{post.date.strftime(app.config.post_date_format)}'
+        f'</time></span><span class="band-post-title">{html.escape(post.title)}</span>'
+        f"<span>{description}</span></span></a>"
+    )
 
 
 def _post_cover(app, docname: str) -> str:  # noqa: ANN001
@@ -574,23 +879,33 @@ class _BlogIndex(Directive):
         return [nodes.container(classes=["blog-index"])]
 
 
+# Above the earlier posts, a button reverses their order; the page stays in order without it.
+BLOG_ORDER_SCRIPT = """<script>
+document.querySelectorAll(".blog-order").forEach((button) => {
+  button.hidden = false;
+  button.addEventListener("click", () => {
+    const list = document.getElementById(button.getAttribute("aria-controls"));
+    list.append(...[...list.children].reverse());
+    const newest = button.dataset.order !== "newest";
+    button.dataset.order = newest ? "newest" : "oldest";
+    button.querySelector("span").textContent = newest ? "Newest first" : "Oldest first";
+  });
+});
+</script>"""
+
+
 def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
     """List the dated posts in place of ``blog-index``, newest first (``_newest_first``): the
-    newest beside its whole cover, with its description as its TL;DR, then the others as rows,
-    each with a small square tile of its cover (``_tile_file``), loaded as the reader scrolls to
-    it. Every post lists its front matter's ``tags``. The Release cards page's blocks style both
-    (``_static/benchmarks.css``)."""
+    newest with its cover across the block, then its title, date, tags, and description as its
+    TL;DR; then the others as rows, each with a small thumbnail of its art (``_thumb_file``),
+    loaded as the reader scrolls to it, under a button that reverses their order. The Release
+    cards page's blocks style both (``_static/benchmarks.css``)."""
     places = [node for node in doctree.findall(nodes.container) if "blog-index" in node["classes"]]
     if app.builder.format != "html" or not places:
         return
     meta = app.env.metadata
-    posts = {post.docname: post for post in Blog(app).posts if post.date}
-    order = _newest_first(
-        [
-            (name, f"{post.date:%Y-%m-%d}", str(meta[name].get("version") or ""))
-            for name, post in posts.items()
-        ]
-    )
+    posts = {post.docname: post for post in _blog(app).posts if post.date}
+    order = _newest_first(_dated_posts(app))
     latest, rows = "", []
     for name in order:
         post = posts[name]
@@ -604,15 +919,9 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             f"{post.date.strftime(app.config.post_date_format)}</time>"
         )
         read = f'<a href="{href}">Read the post<span class="visually-hidden">: {title}</span></a>'
-        # Each tag links to ABlog's page of the posts that share it.
-        tags = "".join(
-            f'<li><a href="{app.builder.get_relative_uri(docname, tag.docname)}">'
-            f"{html.escape(tag.name)}</a></li>"
-            for tag in post.tags
-        )
-        tags = f'<ul class="blog-tags" aria-label="Tags">{tags}</ul>' if tags else ""
+        tags = _tag_list(app, docname, post)
         # The title links to the post, so the cover's link is for the pointer only.
-        link = f'<a class="release-tile blog-tile" href="{href}" tabindex="-1" aria-hidden="true">'
+        link = f'<a class="blog-tile" href="{href}" tabindex="-1" aria-hidden="true">'
         if not latest:
             image, _ = _cover_file(app, name)
             cover = (
@@ -622,22 +931,33 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             )
             latest = (
                 f'<div class="release-latest blog-latest">{cover}<div class="release-tldr">'
-                f'<h2><a href="{href}">{title}</a></h2><p class="blog-date">{day}</p>{tags}'
+                f'<h2><a href="{href}">{title}</a></h2>'
+                f'<div class="blog-when"><p class="blog-date">{day}</p>{tags}</div>'
                 f'<p>{description}</p><div class="release-actions"><p>{read}</p></div></div></div>'
             )
             continue
-        image = _tile_file(app, name)
+        image = _thumb_file(app, name)
+        width, height = cards.THUMB_W, cards.THUMB_W * cards.COVER_H // cards.COVER_W
         cover = (
             f'{link}<img class="dark-light" '
             f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
-            f'width="{cards.TILE}" height="{cards.TILE}" loading="lazy" decoding="async"></a>'
+            f'width="{width}" height="{height}" loading="lazy" decoding="async"></a>'
         )
         rows.append(
-            f'<div class="release-row">{cover}<div class="release-body">'
+            f'<div class="release-row blog-row">{cover}<div class="release-body">'
             f'<h3><a href="{href}">{title}</a></h3><p>{description}</p>{tags}</div>'
             f'<div class="release-meta"><p>{day}</p><ul><li>{read}</li></ul></div></div>'
         )
-    earlier = f"<section><h2>Earlier posts</h2>{''.join(rows)}</section>" if rows else ""
+    earlier = ""
+    if rows:
+        button = (
+            '<button type="button" class="blog-order" aria-controls="blog-earlier" '
+            'data-order="newest" hidden><span>Newest first</span></button>'
+        )
+        earlier = (
+            f'<section><div class="blog-earlier-head"><h2>Earlier posts</h2>{button}</div>'
+            f'<div id="blog-earlier">{"".join(rows)}</div></section>{BLOG_ORDER_SCRIPT}'
+        )
     for place in places:
         place.parent.replace(place, nodes.raw("", latest + earlier, format="html"))
 
@@ -767,6 +1087,8 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("env-before-read-docs", _gallery_last)
     app.connect("doctree-read", _notebook_thumbnail)
     app.connect("html-page-context", _page_assets)
+    app.connect("html-page-context", _docs_sidebar)
+    app.connect("build-finished", _write_discovery)
     app.connect("doctree-resolved", _post_byline)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)

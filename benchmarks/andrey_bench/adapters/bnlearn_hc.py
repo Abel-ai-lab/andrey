@@ -5,9 +5,13 @@ class. Its `output_type` declares this, and `andrey.metrics.score` reports both 
 and the MEC pair (`mec_shd`, `mec_arrowhead_f1`) computed through the DAG's essential graph. Those
 two are the columns comparable with a GES CPDAG; the raw `shd` is not.
 
-`score="bic-g"` is Gaussian BIC with bnlearn's default `k = log(n)/2`, matching the objective of
-pcalg's `GaussL0penObsScore` and Andrey's `BICScore`. `maxp` caps parents, in the same units
-as the `max_parents=4` setting in the Andrey and causal-learn GES adapters.
+`score="bic-g"` is Gaussian BIC with bnlearn's default `k = log(n)/2`, the penalty of Andrey's
+`BICScore` at `lambda_value=1.0`. The likelihood term differs: `bic-g` divides each node's
+residual sum of squares by `n - p - 1`, with `p` its parent count, while the denominator in
+`BICScore` does not depend on the parents. That adds a small cost per parent, so bnlearn can rank
+two nearly equal moves the other way and rejects an edge whose BIC gain is below that cost; the two
+searches can end a few edges apart. `maxp` caps parents, in the same units as the `max_parents=4`
+setting in the Andrey and causal-learn GES adapters.
 """
 
 from __future__ import annotations

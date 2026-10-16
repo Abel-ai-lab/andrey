@@ -152,15 +152,15 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 
 | Structure | Methods |
 |---|---|
-| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `gin` |
+| `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `gin`, `anm`, `pnl` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp` |
 | `pag` | `fci`, `gfci`, `rcd`, `camuv`, `bottom_up_parce_lingam` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam` |
 
 `multi_group_direct_lingam` returns a list of results, one per group. GIN includes explicit latent
-nodes, marked by `node_types` (`OBSERVED=0`, `LATENT=1`). PNL is a direction test on two variables:
-it returns a two-node `dag` with the direction its p-values decide, or no edge, and both p-values
-in `metadata`.
+nodes, marked by `node_types` (`OBSERVED=0`, `LATENT=1`). ANM and PNL are direction tests on two
+variables: each returns a two-node `dag` with the direction its tests decide, or no edge, and
+both p-values and test statistics in `metadata`.
 
 Draw any `GraphStructure`, including a temporal lag or summary, with `andrey.viz.draw`:
 

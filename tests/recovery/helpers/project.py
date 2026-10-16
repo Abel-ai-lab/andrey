@@ -14,6 +14,9 @@ _GRAPH = frozenset({"PC", "FCI", "GFCI", "CDNOD", "ExactSearch", "BOSS", "GRaSP"
 _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})
 # Hidden-confounder PAGs: candidate = graph + weighted_adjacency as returned.
 _CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
+# Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
+_PAIRWISE = frozenset({"ANM", "PNL"})
+_PAIRWISE_FIELDS = ("pval_forward", "pval_backward", "stat_forward", "stat_backward")
 
 
 def project_output(out: Any, algorithm: str) -> dict:
@@ -36,6 +39,8 @@ def project_output(out: Any, algorithm: str) -> dict:
         if algorithm == "BottomUpParceLiNGAM":  # the order, unordered variables nested in a list
             candidate["causal_order"] = out.metadata["causal_order"]
         return candidate
+    if algorithm in _PAIRWISE:
+        return {"graph": out.structure.to_numpy()} | {k: out.metadata[k] for k in _PAIRWISE_FIELDS}
     if algorithm == "MultiGroupDirectLiNGAM":
         if not out:
             raise ValueError("MultiGroupDirectLiNGAM projection needs a non-empty list of outputs")

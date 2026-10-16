@@ -1,0 +1,14 @@
+{#- Under a documentation page's outline: a link that edits its source on GitHub, where it has one,
+    and one that opens an issue named for it (conf.py: _docs_sidebar). Other pages keep the theme's
+    link to their source. -#}
+{%- from "nav-icons.html" import icon %}
+{%- if pagename.startswith("docs/") %}
+<div class="page-links">
+  {%- if edit_url %}
+  <a href="{{ edit_url }}">{{ icon("edit") }}{{ _("Edit this page") }}</a>
+  {%- endif %}
+  <a href="{{ report_bug_url }}?title={{ ('Docs: ' ~ (title | striptags)) | urlencode }}">{{ icon("bug") }}{{ _("Report a problem") }}</a>
+</div>
+{%- else %}
+{%- include "sourcelink.html" %}
+{%- endif %}
