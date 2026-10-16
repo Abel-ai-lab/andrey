@@ -214,10 +214,11 @@ def test_charts_cover_only_comparisons_with_a_published_ratio():
     # them once, hidden from assistive technology, so the loop is seamless.
     assert chart.count('<figure class="tchart">') == 3  # PC, FCI, DirectLiNGAM
     assert chart.count('<figure class="tchart" aria-hidden="true">') == 3
-    ups = re.findall(r"up to <b>([^<]+)</b>", chart)
-    # FCI's largest is at d = 400, where both graphs are worse than the empty graph: a speed
-    # ratio does not depend on accuracy.
-    assert ups == ["941x", "8.9x", "3.6x"] * 2
+    ups = re.findall(r"(more than|at least) <b>([^<]+)</b>", chart)
+    # Each title rounds its largest ratio (941.05x, 8.9x, 3.59x) down, to one digit or below 10 to
+    # a tenth, and says "at least" where nothing is rounded off. FCI's largest is at d = 400, where
+    # both graphs are worse than the empty graph: a speed ratio does not depend on accuracy.
+    assert ups == [("more than", "900x"), ("at least", "8.9x"), ("more than", "3.5x")] * 2
     # Sizes without a ratio are plotted hollow: DirectLiNGAM 200 (Andrey only; lingam passed its
     # time cap).
     assert chart.count("is-open") == 1 * 2
@@ -321,7 +322,9 @@ def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_pa
             best = max(claimed, key=lambda r: r["ratio"])
             family = methods[0]["family"]
             dialog = page[page.index(f'id="speed-{family}"') :]
-            assert f"up to <b>{build.ratio_label(best)}</b>" in dialog[: dialog.index("</dialog>")]
+            lead, shown = build.more_than(best["ratio"])
+            up = f"{lead.lower()} <b>{shown:,}x</b>"
+            assert up in dialog[: dialog.index("</dialog>")]
     assert not re.search(r"/scratch/|/home/|\bsc\d{3}\b|\bsol\b", page, re.IGNORECASE)
     # A summary's notes on its runs stay on the release cards.
     for summary in summaries:
@@ -683,7 +686,7 @@ def test_a_lower_bound_prints_as_one():
     _lower_bound(summaries, "FCI", 20.0)
     slide = next(s for s in build.speedup_slides(summaries) if s[0] == "FCI")
     assert slide[2][0] == ("Andrey", 20.0, "\u226520x")
-    assert "up to <b>\u226520x</b>" in build.speed_chart(summaries)
+    assert "at least <b>20x</b>" in build.speed_chart(summaries)
     # A bound divides into no other package's bar: PC is compared with two packages.
     _lower_bound(summaries, "PC", 1000.0)
     with pytest.raises(ValueError, match="lower bound"):
@@ -1191,10 +1194,12 @@ def test_the_accuracy_bars_draw_only_the_methods_with_fewer_errors():
 
 def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
     # The claim is the largest cut in errors, the chart's first row, not a count of methods.
-    fewer = f"{build.fewest_errors(placeholder_summaries()):.0f}%"
+    fewer = build.fewest_errors(placeholder_summaries())
+    lead, shown = build.more_than(fewer)
     section = placeholder_page[placeholder_page.index('id="accurate"') :]
     section = section[: section.index("</section>")]
-    assert f"Up to <b>{fewer}</b> fewer errors than other popular packages." in section
+    assert f"{lead} <b>{shown}%</b> fewer errors than other popular packages." in section
+    fewer = f"{fewer:.0f}%"
     assert re.findall(r">(\d+%) fewer errors<", section)[0] == fewer
     # The tile under it names what its chart shows rather than repeating the number.
     assert '<h3 class="tile-title">Fewer errors than the other package</h3>' in section
