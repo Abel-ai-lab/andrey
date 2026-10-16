@@ -16,6 +16,9 @@ Two settings keep the pair on the same search:
   unbounded; this is set high enough never to bind and the value is declared in `params`.
 * Andrey has no parent cap, so bnlearn's `maxp` is left at its own unbounded default rather than
   pinned to a number Andrey cannot honor.
+
+:class:`AndreyHCCategorical` runs the same search with a categorical score, BDeu or the multinomial
+BIC, for the discrete lane, where bnlearn's and pgmpy's hill climbing run the same scores.
 """
 
 from __future__ import annotations
@@ -55,6 +58,8 @@ class AndreyHC:
     package_version: str = ""
     algorithm: str = "hc"
     output_type: str = "cpdag"
+    #: The local score. A variant with another score has its own ``name``.
+    score_func: str = _DEFAULT_SCORE_FUNC
 
     def setup(self) -> None:
         """Import Andrey and its hill-climbing implementation before timing.
@@ -82,7 +87,7 @@ class AndreyHC:
         import andrey
         from andrey.search.hc import hc as _hc
 
-        score_func = params.get("score_func", _DEFAULT_SCORE_FUNC)
+        score_func = params.get("score_func", self.score_func)
         lambda_value = float(params.get("lambda_value", _DEFAULT_LAMBDA))
         max_iter = int(params.get("max_iter", _DEFAULT_MAX_ITER))
 
@@ -110,3 +115,50 @@ def andrey_hc_adapters() -> list[AndreyHC]:
             package_version=_andrey_version(),
         )
     ]
+
+
+#: BDeu's priors, the defaults of :class:`andrey.core.score.BDeuScore`, which ``hc`` builds: an
+#: equivalent sample size of 1, and a structure prior under which each of the other ``d - 1``
+#: variables is a parent with probability ``1 / (d - 1)``.
+_BDEU_SAMPLE_PRIOR = 1.0
+_BDEU_STRUCTURE_PRIOR = 1.0
+
+
+@dataclass(frozen=True)
+class AndreyHCCategorical(AndreyHC):
+    """Andrey hill climbing with a categorical score, on category codes.
+
+    ``score_func`` is ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``. ``params`` names
+    every setting the search runs with, each a value the other packages' hill climbing is set to:
+    BDeu's two priors, or the BIC weight; the accepted-move budget; and no parent cap, since
+    :func:`andrey.search.hc.hc` has none.
+    """
+
+    score_func: str = "local_score_BDeu"
+
+    def params(self) -> dict[str, Any]:
+        """The score with its priors or its BIC weight, the move budget, and no parent cap."""
+        params: dict[str, Any] = {
+            "score_func": self.score_func,
+            "max_iter": _DEFAULT_MAX_ITER,
+            "max_parents": None,
+        }
+        if self.score_func == "local_score_BDeu":
+            params["sample_prior"] = _BDEU_SAMPLE_PRIOR
+            params["structure_prior"] = _BDEU_STRUCTURE_PRIOR
+        else:
+            params["lambda_value"] = _DEFAULT_LAMBDA
+        return params
+
+
+def andrey_hc_categorical(score_func: str) -> AndreyHCCategorical:
+    """Hill climbing with a categorical score: numpy, serial, named by its score."""
+    if score_func not in ("local_score_BDeu", "local_score_BIC_categorical"):
+        raise ValueError(f"score_func must be a categorical score, got {score_func!r}")
+    return AndreyHCCategorical(
+        name=f"andrey.hc.{score_func.removeprefix('local_score_')}",
+        backend="numpy",
+        mode="serial",
+        package_version=_andrey_version(),
+        score_func=score_func,
+    )
