@@ -140,9 +140,14 @@ def pc(
     1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
     practical to roughly 1,000 variables on sparse data with ten rows per variable; runtime grows
     combinatorially with the largest neighborhood, so sparser graphs can stay feasible beyond that.
-    The mixed-data tests are experimental and not benchmarked yet: their tests check each against
-    a direct likelihood computation and its p-values on simulated independent data, and run PC on
-    simulated mixed networks of at most 10 variables with 5,000 rows.
+    On simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the
+    first half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with
+    2,000 rows, its median errors stayed below the empty graph's at every size: at 40 variables,
+    18.5 with ``"degen_gauss"`` and 9.5 with ``"cond_gauss"``, against 40. On simulated categorical
+    networks with 2 or 3 categories per variable, of the same sizes and rows, they were 14 with
+    ``"chisq"`` and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s
+    with ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test,
+    on 4 cores.
 
     **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and

@@ -432,7 +432,9 @@ class CategoricalBICScore(_CountScore):
     **Limitations.** It counts ``q * (r - 1)`` parameters whether or not every parent configuration
     occurs, so with many parent categories and few rows the penalty outgrows the likelihood gain
     and the score prefers fewer parents than the data support. Its tests check it against the
-    formula on fixed tables; the searches that take it are not benchmarked on it yet.
+    formula on fixed tables. Hill climbing was measured with it on simulated categorical networks
+    of 10 to 40 variables with 2,000 rows (``andrey.hc``); the other searches that take it are not
+    benchmarked on it yet.
 
     References
     ----------

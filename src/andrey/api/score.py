@@ -174,11 +174,15 @@ def ges(
     below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against
     200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
     and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
-    the default parent cap, its median errors passed the empty graph's (612 against 338). The
-    mixed-data scores are experimental and not benchmarked yet: their tests check each against a
-    direct likelihood computation, and run GES on simulated mixed networks of at most 10 variables
-    with 5,000 rows. The multinomial BIC is not benchmarked yet: its tests check it against the
-    formula and run GES on small fixed categorical networks.
+    the default parent cap, its median errors passed the empty graph's (612 against 338). On
+    simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the first
+    half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000
+    rows, its median errors at 40 variables were 8 with ``"local_score_degen_gauss"`` and 6.5 with
+    ``"local_score_cond_gauss"``, against 40, and the median fit took 0.75 s and 1.2 s on 4 cores.
+    On simulated categorical networks with 2 or 3 categories per variable, of the same sizes and
+    rows, ``"local_score_BDeu"`` gave 6 against 40 at 40 variables, in 0.60 s. The multinomial BIC
+    is not benchmarked with GES yet: its tests check it against the formula and run GES on small
+    fixed categorical networks.
 
     References
     ----------
@@ -505,8 +509,13 @@ def hc(
     exceeded the empty graph's. The median fit took under a second at 800 variables and about 20 s
     at 3,200, on 4 cores. It has no move limit by default; run time grows with the moves the search
     takes. A graph that no single move improves need not be the best-scoring one. Its BIC score
-    assumes linear relations with Gaussian noise. With a mixed-data score, its tests run it on 5
-    variables with 3,000 rows; with a categorical score, on small fixed categorical networks.
+    assumes linear relations with Gaussian noise. On simulated mixed data (conditional linear
+    Gaussian networks on sparse random graphs, the first half of the variables categorical with 2 to
+    5 categories), from 10 to 40 variables with 2,000 rows, its median errors at 40 variables were
+    12.5 with ``"local_score_degen_gauss"`` and 11 with ``"local_score_cond_gauss"``, against 40. On
+    simulated categorical networks with 2 or 3 categories per variable, of the same sizes and rows,
+    they were 18 with ``"local_score_BDeu"`` and 20 with ``"local_score_BIC_categorical"``. Every
+    median fit took under 0.2 s at 40 variables, on 4 cores.
 
     References
     ----------
