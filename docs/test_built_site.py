@@ -183,6 +183,10 @@ def test_every_homepage_tile_leads_to_details_that_are_built(html):
     assert not problems, "\n".join(problems)
 
 
+# The section's line icon before a header link's name.
+ICON = r'<svg class="nav-icon[^"]*"[^>]*>.*?</svg>'
+
+
 def test_every_header_leads_home_and_to_each_section(html):
     cards = (DOCS / "docs" / "benchmarks").glob("*.md")
     newest = max((tuple(map(int, card.stem.split("."))) for card in cards), default=())
@@ -198,13 +202,13 @@ def test_every_header_leads_home_and_to_each_section(html):
             problems.append(f"{name}: the wordmark does not lead home")
         for label, expected in HEADER.items():
             hrefs = re.findall(
-                rf'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>{label}</a>', header
+                rf'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>{ICON}{label}</a>', header
             )
             if len(hrefs) != 1 or _resolve(html, page, hrefs[0]) != html / expected:
                 problems.append(f"{name}: the header's {label} link is wrong")
         # Release cards carries the dot that marks the newest release until the reader opens it.
         cards = re.findall(
-            r'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>Release cards'
+            rf'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>{ICON}Release cards'
             r'<span class="nav-new" data-release="([^"]+)" data-date="\d{4}-\d{2}-\d{2}" hidden>',
             header,
         )
