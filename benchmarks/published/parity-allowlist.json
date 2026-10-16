@@ -33,6 +33,39 @@
       "cause": "correct-by-paper",
       "reason": "The two packages optimize different scores. Andrey's hill climbing maximizes the BIC with the maximum-likelihood residual variance, as Schwarz (1978) and Chickering (2002) define it. bnlearn's Gaussian BIC divides each node's residual sum of squares by n - p - 1, where p is the node's parent count, which adds a small cost per parent. On both series that differ, the searches end one edge apart: the last edge Andrey adds improves the maximum-likelihood BIC, and bnlearn's estimator rejects it, so Andrey's graph has the lower BIC by the paper's definition. With bnlearn's estimator patched into Andrey's search, it returns bnlearn's equivalence class on all 35 series of the lane.",
       "citation": "Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2), 461-464. Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3, 507-554."
+    },
+    {
+      "summary": "time-series-2026-10",
+      "method": "VARMA-LiNGAM",
+      "comparator": "lingam",
+      "row": {"d": 10, "n": 100},
+      "andrey_errors": 5,
+      "comparator_errors": 4,
+      "cause": "reference-defect",
+      "reason": "lingam's pruning step builds the lag-1 columns of its regression with np.roll, so its first regression row pairs x(1) with x(T) and e(T), values from the end of the series that are not its past. The model defines the regression only where the lagged values are observed, so Andrey starts the regressions at the first step with a full lag. On this row all 10 series differ, and each differs only through that row: with lingam's residuals and causal order, Andrey's pruning with lingam's wrapped row returns lingam's graph on all 10, and without it Andrey's graph. The row has no consistent effect on accuracy: across the 54 series of the lane where it changes the graph, on identical residuals and order, dropping it has fewer errors on 18, keeping it on 18, and 18 tie.",
+      "citation": "lingam 1.13.0 (MIT): lingam/varma_lingam.py, VARMALiNGAM._pruning, np.roll(X, p, axis=0) and np.roll(ee, q + 1, axis=0). Hyvarinen, A., Zhang, K., Shimizu, S., and Hoyer, P. O. (2010). Estimation of a structural vector autoregression model using non-Gaussianity. JMLR 11, 1709-1731, Sect. 2.1-2.2, Eqs. (1) and (3): x(t) regressed on x(t - tau) for observed t = 1, ..., T. Kawahara, Y., Shimizu, S., and Washio, T. (2011). Analyzing relationships among ARMA processes based on non-Gaussianity of external influences. Neurocomputing 74(12-13), 2212-2221."
+    },
+    {
+      "summary": "time-series-2026-10",
+      "method": "VARMA-LiNGAM",
+      "comparator": "lingam",
+      "row": {"d": 20, "n": 300},
+      "andrey_errors": 4,
+      "comparator_errors": 1,
+      "cause": "reference-defect",
+      "reason": "lingam's pruning step builds the lag-1 columns of its regression with np.roll, so its first regression row pairs x(1) with x(T) and e(T), values from the end of the series that are not its past. The model defines the regression only where the lagged values are observed, so Andrey starts the regressions at the first step with a full lag. On this row all 5 series differ, and each differs only through that row: with lingam's residuals and causal order, Andrey's pruning with lingam's wrapped row returns lingam's graph on all 5, and without it Andrey's graph. The row has no consistent effect on accuracy: across the 54 series of the lane where it changes the graph, on identical residuals and order, dropping it has fewer errors on 18, keeping it on 18, and 18 tie.",
+      "citation": "lingam 1.13.0 (MIT): lingam/varma_lingam.py, VARMALiNGAM._pruning, np.roll(X, p, axis=0) and np.roll(ee, q + 1, axis=0). Hyvarinen, A., Zhang, K., Shimizu, S., and Hoyer, P. O. (2010). Estimation of a structural vector autoregression model using non-Gaussianity. JMLR 11, 1709-1731, Sect. 2.1-2.2, Eqs. (1) and (3): x(t) regressed on x(t - tau) for observed t = 1, ..., T. Kawahara, Y., Shimizu, S., and Washio, T. (2011). Analyzing relationships among ARMA processes based on non-Gaussianity of external influences. Neurocomputing 74(12-13), 2212-2221."
+    },
+    {
+      "summary": "time-series-2026-10",
+      "method": "LPCMCI",
+      "comparator": "tigramite",
+      "row": {"d": 20, "observed": 14, "n": 500},
+      "andrey_errors": 1,
+      "comparator_errors": 0,
+      "cause": "reference-defect",
+      "reason": "The one series where tigramite has fewer errors differs only in the order of candidate separating sets. tigramite orders candidates using a memory updated while a group of links is tested, so its order follows the variable indices; Andrey orders by the memory as it stood when the group started, which does not depend on column order. Over 20 random column orders of that series, Andrey returns the same graph every time; tigramite matches Andrey's error count in 18 orders and has one fewer error in 2, so its advantage on this row comes from the column order of the stored data.",
+      "citation": "Gerhardus and Runge (2020), High-recall causal discovery for autocorrelated time series with latent confounders, NeurIPS; Supplement S5 (Algorithm S2 line 7; order-independent separating sets)."
     }
   ]
 }

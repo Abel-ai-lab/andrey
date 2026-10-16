@@ -17,6 +17,9 @@ _CONFOUNDED = frozenset({"RCD", "BottomUpParceLiNGAM"})
 # Pairwise direction tests: candidate = the two-node graph, both p-values, and both statistics.
 _PAIRWISE = frozenset({"ANM", "PNL"})
 _PAIRWISE_FIELDS = ("pval_forward", "pval_backward", "stat_forward", "stat_backward")
+# PCMCI family: candidate = the per-lag graphs (LPCMCI's links with both marks), the conflicts,
+# and the test p-values and statistics.
+_PCMCI = frozenset({"PCMCI", "PCMCIplus", "LPCMCI"})
 
 
 def project_output(out: Any, algorithm: str) -> dict:
@@ -41,6 +44,24 @@ def project_output(out: Any, algorithm: str) -> dict:
         return candidate
     if algorithm in _PAIRWISE:
         return {"graph": out.structure.to_numpy()} | {k: out.metadata[k] for k in _PAIRWISE_FIELDS}
+    if algorithm in _PCMCI:
+        s = out.structure
+        candidate = {
+            "p_values": np.asarray(out.metadata["p_values"]),
+            "statistics": np.asarray(out.metadata["statistics"]),
+        }
+        if algorithm == "LPCMCI":
+            candidate["links"] = out.metadata["links"]
+        else:
+            candidate["graph"] = np.stack([s.lag(lag).to_numpy() for lag in s.lags])
+        if algorithm != "PCMCI":
+            candidate["conflicts"] = out.metadata["conflicts"]
+        return candidate
+    if algorithm == "LongitudinalLiNGAM":
+        return {
+            "causal_orders": [list(order) for order in out.metadata["causal_orders"]],
+            "time_weights": np.asarray(out.structure.time_weights),
+        }
     if algorithm == "MultiGroupDirectLiNGAM":
         if not out:
             raise ValueError("MultiGroupDirectLiNGAM projection needs a non-empty list of outputs")

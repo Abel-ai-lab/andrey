@@ -27,7 +27,37 @@ change names its pull request.
 - `hc` with a mixed-data score never adds a continuous -> categorical edge, which the conditional
   linear Gaussian model cannot express, and scores its candidate parent sets in batches. ([#TBD])
 
+## [0.5.0] - 2026-10-16
+
+### Highlights
+
+- `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `varma_lingam`, and `longitudinal_lingam` are
+  supported. PCMCI+ runs more than 50x faster than tigramite at every size and PCMCI more than 20x
+  at 10 variables, each returning the same graph as tigramite on every dataset. The 0.5.0 release
+  card gives the numbers and each method's limits. ([#133])
+
+### Added
+
+- `pcmci`, `pcmciplus`, and `lpcmci`, supported time-series methods: PCMCI for lagged links,
+  PCMCI+ for lagged and same-step links, and LPCMCI for a time-series PAG over series with
+  unobserved variables. ([#133])
+- `pc`, `fci`, `gfci`, and `cdnod` take `indep_test="student_t"`, a partial-correlation test with
+  a Student-t p-value. ([#133])
+- `granger`, supported lasso Granger causality for a multivariate time series: it returns a
+  temporal structure with lags 1 to `maxlag` and the coefficients as weights, and does not depend
+  on the units of any variable. ([#133])
+- `varma_lingam` takes `max_iter`, the iteration limit of its likelihood fit. ([#133])
+
+### Changed
+
+- `varma_lingam` and `longitudinal_lingam` are supported and no longer warn with
+  `ExperimentalWarning`. ([#133])
+- `varma_lingam` with `prune=True` refits the weights it keeps by least squares, so they are no
+  longer shrunk toward zero. ([#133])
+
 ## [0.4.1] - 2026-10-15
+
+### Removed
 
 ### Breaking
 
@@ -150,7 +180,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.2.1...v0.3.0
@@ -168,5 +199,6 @@ First alpha release.
 [#64]: https://github.com/Abel-ai-lab/andrey/pull/64
 [#122]: https://github.com/Abel-ai-lab/andrey/pull/122
 [#127]: https://github.com/Abel-ai-lab/andrey/pull/127
+[#133]: https://github.com/Abel-ai-lab/andrey/pull/133
 [#95]: https://github.com/Abel-ai-lab/andrey/pull/95
 [#94]: https://github.com/Abel-ai-lab/andrey/pull/94

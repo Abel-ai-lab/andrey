@@ -13,6 +13,7 @@ from tests.recovery.helpers.tolerances import SPEC
 NEW_CASES = {
     "var_4v_stable": (500, 4),
     "varma_3v": (500, 3),
+    "var_3v_lag2": (1000, 3),
     "anm_pair_cubic": (200, 2),
     "confounded_6v": (300, 6),
 }

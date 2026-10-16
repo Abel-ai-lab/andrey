@@ -33,10 +33,12 @@ _INDEP_TEST = ParamSpec(
     name="indep_test",
     type="str",
     default="fisherz",
-    doc="Conditional-independence test: fisherz = partial correlation (Fisher's z), for continuous "
-    "data; chisq = Pearson's chi-square and gsq = G-square, for categorical data coded by whole "
-    "numbers; degen_gauss = degenerate Gaussian and cond_gauss = conditional Gaussian likelihood "
-    "ratio, for mixed data, with the categorical columns named by categorical (experimental).",
+    doc="Conditional-independence test. For continuous data, on the partial correlation: "
+    "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
+    "distribution, exact for Gaussian data at any sample size. For categorical data coded by whole "
+    "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
+    "columns named by categorical (experimental): degen_gauss = degenerate Gaussian and "
+    "cond_gauss = conditional Gaussian likelihood ratio.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _CATEGORICAL = ParamSpec(
@@ -686,7 +688,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="order",
@@ -718,6 +720,13 @@ _add(
                 doc="Map the moving-average weights onto the independent noise terms. Ignored "
                 "when prune is true.",
             ),
+            ParamSpec(
+                name="max_iter",
+                type="int",
+                default=100,
+                doc="Most iterations of the likelihood fit, at least 1. A fit stopped before it "
+                "converges gives no warning; raise this to let it converge.",
+            ),
         ),
         references=("Hyvarinen et al. 2010", "Kawahara, Shimizu & Washio 2011"),
     )
@@ -745,7 +754,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="n_lags",
@@ -763,6 +772,224 @@ _add(
             ),
         ),
         references=("Kadowaki, Shimizu & Washio 2013",),
+    )
+)
+_add(
+    MethodSpec(
+        name="pcmci",
+        family="temporal",
+        summary="PCMCI for a single multivariate time series: lagged causal links, tested with "
+        "partial correlation given the parents of both ends, which controls false links from "
+        "autocorrelation. No same-step links. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="lag graphs for lags 1..tau_max; MCI p_values and statistics, and the PC1 parents, "
+            "in metadata.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        params=(
+            ParamSpec(
+                name="tau_max",
+                type="int",
+                default=1,
+                doc="The largest lag tested; links at lags 1 to tau_max are tested.",
+            ),
+            ParamSpec(
+                name="pc_alpha",
+                type="float",
+                default=0.2,
+                doc="Significance level of the PC1 parent selection; larger keeps more parents as "
+                "conditions.",
+            ),
+            ParamSpec(
+                name="alpha_level",
+                type="float",
+                default=0.05,
+                doc="Significance level of the MCI test; a link is kept when its p-value is at "
+                "most this.",
+            ),
+            ParamSpec(
+                name="indep_test",
+                type="str",
+                default="student_t",
+                choices=("student_t", "fisherz"),
+                doc="Partial-correlation test behind every p-value: student_t = Student-t "
+                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
+                "z-transform.",
+            ),
+        ),
+        references=("Runge et al. 2019",),
+    )
+)
+_add(
+    MethodSpec(
+        name="pcmciplus",
+        family="temporal",
+        summary="PCMCI+ for a single multivariate time series: lagged and same-step causal links. "
+        "Lagged links point forward in time; same-step links are oriented by collider and Meek "
+        "rules where the data allow. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="a cpdag at lag 0 and lag graphs for lags 1..tau_max; p_values, statistics, the "
+            "lagged parents, conflicting and ambiguous orientations in metadata.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        params=(
+            ParamSpec(
+                name="tau_max",
+                type="int",
+                default=1,
+                doc="The largest lag tested; links at lags 0 to tau_max are tested.",
+            ),
+            ParamSpec(
+                name="pc_alpha",
+                type="float",
+                default=0.01,
+                doc="Significance level of every test; a link is removed when a test gives it a "
+                "p-value above this.",
+            ),
+            ParamSpec(
+                name="collider_rule",
+                type="str",
+                default="majority",
+                choices=("majority", "conservative", "none"),
+                doc="How a same-step collider is judged: majority = fewer than half of the "
+                "separating subsets hold the middle; conservative = none does; none = the middle "
+                "is not in the one separating set found.",
+            ),
+            ParamSpec(
+                name="indep_test",
+                type="str",
+                default="student_t",
+                choices=("student_t", "fisherz"),
+                doc="Partial-correlation test behind every p-value: student_t = Student-t "
+                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
+                "z-transform.",
+            ),
+        ),
+        references=("Runge 2020",),
+    )
+)
+_add(
+    MethodSpec(
+        name="lpcmci",
+        family="temporal",
+        summary="LPCMCI for a single multivariate time series with possible hidden common causes: "
+        "lagged and same-step links as a partial ancestral graph over a time window, where a "
+        "two-headed link marks a hidden common cause. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="a pag at lag 0 and the definite lagged causes for lags 1..tau_max; every link "
+            "with its marks, p_values, statistics, the preliminary parents, and the conflicting "
+            "marks in metadata.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        params=(
+            ParamSpec(
+                name="tau_max",
+                type="int",
+                default=1,
+                doc="The largest lag; the graph covers time steps t - tau_max to t.",
+            ),
+            ParamSpec(
+                name="pc_alpha",
+                type="float",
+                default=0.05,
+                doc="Significance level of every test; a link is removed when a test gives it a "
+                "p-value above this.",
+            ),
+            ParamSpec(
+                name="n_preliminary_iterations",
+                type="int",
+                default=1,
+                doc="Preliminary rounds before the final one; each passes the parents it found "
+                "to the next as conditions.",
+            ),
+            ParamSpec(
+                name="indep_test",
+                type="str",
+                default="student_t",
+                choices=("student_t", "fisherz"),
+                doc="Partial-correlation test behind every p-value: student_t = Student-t "
+                "distribution, as in the authors' reference implementation; fisherz = Fisher's "
+                "z-transform.",
+            ),
+        ),
+        references=("Gerhardus & Runge 2020",),
+    )
+)
+
+_add(
+    MethodSpec(
+        name="granger",
+        family="temporal",
+        summary="Lasso Granger causality for a single multivariate time series: lagged effects "
+        "only, one cross-validated lasso per variable. Returns a temporal structure.",
+        data=DataSpec(
+            inputs=(
+                InputSpec(
+                    name="data", kind="matrix", doc="A multivariate time series, row = step."
+                ),
+            ),
+            layout="(n_samples, n_variables), row = time step",
+        ),
+        output=OutputSpec(
+            structure_type="temporal",
+            graph_kind=None,
+            doc="lag_weights at lags 1..maxlag (the lasso coefficients, no lag 0); no ordering.",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="supported",
+        params=(
+            ParamSpec(
+                name="maxlag",
+                type="int",
+                default=2,
+                doc="Number of past time steps each regression uses, at least 1.",
+            ),
+            ParamSpec(
+                name="cv",
+                type="int",
+                default=5,
+                doc="Cross-validation folds that choose each regression's lasso penalty, at "
+                "least 2.",
+            ),
+        ),
+        references=("Granger 1969", "Arnold, Liu & Abe 2007", "Shojaie & Michailidis 2010"),
     )
 )
 

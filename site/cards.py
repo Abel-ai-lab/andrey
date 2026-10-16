@@ -296,8 +296,9 @@ def readme_banner(quality: int = BANNER_QUALITY) -> str:
 # the right, the art, at the card size (``W`` x ``H``) link previews expect. Each art (``ART``), its
 # subject on the right, is stored already recolored to the brand's tones (``brand_tones``), so the
 # file is what the page shows and cobalt and amber match across posts; a test fails on art stored
-# otherwise. A post without art shows the stipple ground. A JPEG takes the first quality in
-# ``COVER_QUALITIES`` under MAX_BYTES.
+# otherwise. A post without art shows the stipple ground. An art may also come centered
+# (``CENTERED``), its subject in the middle, for the cover and the thumbnail, which carry no text.
+# A JPEG takes the first quality in ``COVER_QUALITIES`` under MAX_BYTES.
 COVER_W, COVER_H = 1600, 640
 COVER_QUALITIES = (75, 70, 65, 60, 55)
 ART = {
@@ -312,8 +313,10 @@ ART = {
         "start",
         "docs",
         "methods",
+        "tide",
     )
 }
+CENTERED = {kind: BRAND / f"art-{kind}-center.jpg" for kind in ("tide",)}
 COVERS = {
     "pair": "portraits of Andrey Markov and Andrey Kolmogorov, side by side",
     "lanes": "lanes rising into the sky, one amber streak far ahead",
@@ -324,6 +327,7 @@ COVERS = {
     "start": "a cloud of data points gathering into a small graph, one arrow amber",
     "docs": "the pages of a vast atlas fanning open, one edge amber like a bookmark",
     "methods": "a prism fanning one beam into many rays, one amber",
+    "tide": "the moon over a swelling sea, its light an amber path on the waves",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge, at the cover's height
@@ -436,13 +440,14 @@ def release_ground_jpeg() -> bytes:
     return out.getvalue()
 
 
-def _art(kind: str) -> Image.Image:
-    """The post's art as stored (already in the brand's tones), or the stipple ground."""
+def _art(kind: str, centered: bool = False) -> Image.Image:
+    """The post's art as stored (already in the brand's tones), or the stipple ground; with
+    ``centered``, its centered version when it has one (``CENTERED``)."""
     if kind not in COVERS:
         raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
     if kind == "ground":
         return grain.stipple(COVER_W, COVER_H).convert("RGB")
-    with Image.open(ART[kind]) as art:
+    with Image.open(CENTERED[kind] if centered and kind in CENTERED else ART[kind]) as art:
         return art.convert("RGB").resize((COVER_W, COVER_H), Image.LANCZOS)
 
 
@@ -518,13 +523,14 @@ def preview_jpeg(kind: str, title: str, line: str = "") -> bytes:
 
 
 def cover_jpeg(kind: str) -> bytes:
-    """A post's cover: its art at the cover's size."""
-    return _jpeg_under_cap(_art(kind))
+    """A post's cover: its art at the cover's size, centered when it has a centered version."""
+    return _jpeg_under_cap(_art(kind, centered=True))
 
 
 def thumb_jpeg(kind: str) -> bytes:
-    """An earlier post's thumbnail on the blog's front page: its art, ``THUMB_W`` wide."""
-    thumb = _art(kind).resize((THUMB_W, THUMB_W * COVER_H // COVER_W), Image.LANCZOS)
+    """An earlier post's thumbnail on the blog's front page: its art, ``THUMB_W`` wide, centered
+    when it has a centered version."""
+    thumb = _art(kind, centered=True).resize((THUMB_W, THUMB_W * COVER_H // COVER_W), Image.LANCZOS)
     out = io.BytesIO()
     thumb.save(out, "JPEG", quality=THUMB_QUALITY, subsampling=0, optimize=True)
     return out.getvalue()

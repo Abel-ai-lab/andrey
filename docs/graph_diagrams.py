@@ -89,7 +89,10 @@ def comparison() -> str:
         ("circles", "X o-o Y", CIRCLE, CIRCLE, "pag", "Both endpoints are unresolved."),
     ]
     panels = ['<div class="graph-explorer" data-graph-explorer>']
-    panels.append('<fieldset class="graph-controls" hidden><legend>Choose an edge</legend>')
+    panels.append(
+        '<fieldset class="graph-controls" hidden><legend>Choose an edge</legend>'
+        '<div class="segmented">'
+    )
     for index, (key, label, *_, description) in enumerate(cases):
         checked = " checked" if index == 0 else ""
         panels.append(
@@ -97,7 +100,7 @@ def comparison() -> str:
             f'aria-label="{escape(label + ": " + description)}">'
             f"<span>{escape(label)}</span></label>"
         )
-    panels.append("</fieldset>")
+    panels.append("</div></fieldset>")
     for key, label, left, right, kind, description in cases:
         g = graph([[0, left], [right, 0]], kind, ("X", "Y"))
         marks = g.to_numpy()

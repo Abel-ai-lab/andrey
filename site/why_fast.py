@@ -1,8 +1,8 @@
 """The "Why Andrey is fast" scenes: one animation per idea behind Andrey's speed.
 
 Each scene runs the same illustrative work in two lanes: Andrey's, and a quieter lane for other
-packages, which are never named. The scenes appear in the homepage's story, one at a time as the
-reader scrolls, and under the headings of the blog post "Why Andrey is fast". The markup is
+packages, which are never named. The scenes appear on the homepage as a carousel of cards, one
+playing at a time, and under the headings of the blog post "Why Andrey is fast". The markup is
 complete without script: each counter already shows its lane's final count.
 ``site/assets/why-fast.js`` plays the scenes with Motion; they are illustrations of the ideas, not
 measurements.
@@ -126,7 +126,7 @@ def figure(scene: dict, *, play: str = "view") -> str:
     """One scene's stage.
 
     ``play="view"`` plays once when the scene scrolls into view, then offers a replay;
-    ``play="scroll"`` is played by the scroll, forward or back, with no control of its own.
+    ``play="belt"`` is played by the carousel when its card is the current one.
     """
     size = " ".join(
         f'data-{name}="{" ".join(map(str, value)) if isinstance(value, tuple) else value}"'
@@ -149,15 +149,39 @@ def fragment(key: str) -> str:
     return figure(BY_KEY[key])
 
 
-def story() -> str:
-    """The homepage's story: each scene in order, its title and narration above its stage.
+def slug(title: str) -> str:
+    """The id Sphinx gives the post's heading "<number>. <title>": its words, lowercase, joined by
+    hyphens, the number dropped."""
+    words = "".join(c if c.isalnum() else " " for c in title.lower()).split()
+    return "-".join(words)
 
-    Without script the steps stand one after another at their final counts. ``why-fast.js`` pins
-    them under the section's title and shows one at a time, each played by the scroll.
+
+def belt(post: str = "blog/20261008-why-andrey-is-fast.html") -> str:
+    """The homepage's carousel: a card per scene, in order, with its title, narration, a link to
+    its part of the post, and its stage; under the cards, a dot per card.
+
+    Without script the cards are a row to scroll, each at its final counts, and the dots are
+    hidden. ``why-fast.js`` centers one card at a time, plays its scene, fills its dot as it
+    plays, and moves on to the next.
     """
-    steps = "".join(
-        f'<li class="wf-step"><div class="wf-words"><h3>{escape(s["title"])}</h3>'
-        f"<p>{escape(s['text'])}</p></div>{figure(s, play='scroll')}</li>"
-        for s in SCENES
+    cards = "".join(
+        f'<li class="wf-card" id="wf-card-{s["key"]}" role="tabpanel" '
+        f'aria-labelledby="wf-dot-{s["key"]}" aria-roledescription="slide" '
+        f'aria-label="{i} of {len(SCENES)}">'
+        f'<div class="wf-words"><h3>{escape(s["title"])}</h3>'
+        f'<a class="wf-more" href="{post}#{slug(s["title"])}">How it works</a>'
+        f"<p>{escape(s['text'])}</p></div>{figure(s, play='belt')}</li>"
+        for i, s in enumerate(SCENES, 1)
     )
-    return f'<div class="wf wf-story"><ol class="wf-steps">{steps}</ol></div>'
+    dots = "".join(
+        f'<button class="wf-dot" type="button" role="tab" id="wf-dot-{s["key"]}" '
+        f'aria-controls="wf-card-{s["key"]}" aria-selected="{str(i == 1).lower()}" '
+        f'aria-label="{escape(s["title"])}" tabindex="{0 if i == 1 else -1}"><i></i></button>'
+        for i, s in enumerate(SCENES, 1)
+    )
+    return (
+        '<div class="wf wf-belt" role="region" aria-roledescription="carousel" '
+        'aria-label="Why Andrey is fast">'
+        f'<ol class="wf-cards">{cards}</ol>'
+        f'<div class="wf-dots" role="tablist" aria-label="Ideas" hidden>{dots}</div></div>'
+    )

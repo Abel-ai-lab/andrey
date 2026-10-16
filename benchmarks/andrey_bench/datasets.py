@@ -7,6 +7,23 @@ its samples are category codes. The ``conditional_gaussian`` functional samples 
 ``andrey.data.sample_mixed``: category codes in its categorical columns, values in the rest.
 :class:`DatasetKey` supplies the ``dataset_id``; :func:`load` casts to ``float32`` for those fits
 outside timing, without storing another copy.
+
+A temporal dataset (functional ``var``) is one series of ``n`` time steps. Its truth is stored as
+the ``(L, d, d)`` int8 marks of lags ``1..L`` (:func:`~andrey_bench.contracts.lag_marks`), with
+``graph_kind`` ``"temporal"`` in the registry.
+
+The regimes of the PCMCI, PCMCI+, and LPCMCI papers are drawn by
+:mod:`andrey_bench.temporal_models` instead (functional ``pcmci2019``, ``pcmciplus2020``, or
+``lpcmci2020``; the key's density is the model's cross-links per variable). A model without
+same-step links stores its truth as lag marks with the kind ``"temporal"``; a model with them
+stores the ``(L + 1, d, d)`` window marks of lags ``0..L`` (:mod:`andrey_bench.window`) with the
+kind ``"temporal_window"``. Unobserved variables are the key's ``latents``, last in the truth.
+
+The regimes of the VAR-LiNGAM and longitudinal LiNGAM papers are drawn by
+:mod:`andrey_bench.lingam_models` (functional ``varma2010`` or ``panel2013``) and store their truth
+as a coefficient stack (:mod:`andrey_bench.coefficients`), with the kind ``"temporal_coefficients"``
+or ``"panel_coefficients"``. A panel key's ``times`` is its number of time points, and its ``n``
+the number of units observed at each; a panel dataset's data has shape ``(times, n, d)``.
 """
 
 from __future__ import annotations
@@ -24,7 +41,10 @@ from typing import Any, Iterable, Iterator
 import numpy as np
 
 import andrey.data as data
+from andrey import TemporalStructure
 from andrey.core import LATENT, OBSERVED
+from andrey_bench import lingam_models, temporal_models
+from andrey_bench.contracts import lag_marks
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
 CANONICAL_DTYPE = np.float64
@@ -45,6 +65,7 @@ FUNCTIONAL_TO_ANDREY = {
     "linear": "linear",
     "anm": "additive_noise",
     "pnl": "post_nonlinear",
+    "var": "var",
 }
 STANDARDIZE_TO_SCALE = {
     "standardized": "standardize",
@@ -86,6 +107,22 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # conditional Gaussian tests and scores. The key's `categorical_share` and `categories` set the
     # categorical columns; codes and values are never rescaled.
     "mixed_er": ("er", "conditional_gaussian", "gaussian", "raw"),
+    # A lagged linear-Gaussian series for PCMCI: andrey.data's VAR(1) on an empty instantaneous
+    # graph (the key sets density LAG_ONLY_DENSITY), so every true link has lag 1. Temporal
+    # generation takes raw scale only.
+    "var_lagged": ("er", "var", "gaussian", "raw"),
+    # The simulations of the PCMCI, PCMCI+, and LPCMCI papers, which keep the expected number of
+    # cross-links per variable fixed at every d; andrey_bench.temporal_models gives each setup and
+    # its source: Runge et al. (2019), Supplementary Sect. S4.1; Runge (2020), Sect. 4; Gerhardus
+    # and Runge (2020), Sect. 4.
+    "pcmci_paper": ("random", "pcmci2019", "gaussian", "raw"),
+    "pcmciplus_paper": ("random", "pcmciplus2020", "gaussian", "raw"),
+    "lpcmci_paper": ("random", "lpcmci2020", "gaussian", "raw"),
+    # The simulations of the VAR-LiNGAM and longitudinal LiNGAM papers, with non-Gaussian noise;
+    # andrey_bench.lingam_models gives each setup and its source: Hyvarinen et al. (2010), Sect.
+    # 5.4, with one moving-average matrix; Kadowaki et al. (2013), JSAI Sect. 6.1.
+    "varma_lingam_paper": ("random", "varma2010", "nongaussian", "raw"),
+    "longitudinal_lingam_paper": ("random", "panel2013", "nongaussian", "raw"),
 }
 
 #: The functional label of :data:`REGIMES` that ``andrey.data.sample_discrete`` generates, with the
@@ -100,6 +137,27 @@ DISCRETE_SETTINGS: dict[str, object] = {"categories": [2, 3], "concentration": 1
 #: share and the categories per categorical column travel on the key.
 MIXED_FUNCTIONAL = "conditional_gaussian"
 MIXED_SETTINGS: dict[str, object] = {"concentration": 1.0}
+
+#: Temporal regimes and the density their keys set. At density 0 the instantaneous graph has no
+#: edges, so the truth is lag-only: lag 1 holds every link.
+LAG_ONLY_DENSITY = 0.0
+TEMPORAL_REGIMES: dict[str, float] = {
+    "var_lagged": LAG_ONLY_DENSITY,
+    # The paper models' cross-links per variable.
+    **{
+        regime: temporal_models.MODELS[REGIMES[regime][1]].cross_degree
+        for regime in ("pcmci_paper", "pcmciplus_paper", "lpcmci_paper")
+    },
+    # The LiNGAM paper models record no density: each fixes its own link counts.
+    "varma_lingam_paper": 0.0,
+    "longitudinal_lingam_paper": 0.0,
+}
+
+#: The registry's ``graph_kind`` for a truth stored as window marks.
+WINDOW_KIND = "temporal_window"
+
+#: The registry's ``graph_kind`` for a truth stored as a coefficient stack, by model.
+COEFFICIENT_KINDS = {"varma2010": "temporal_coefficients", "panel2013": "panel_coefficients"}
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
 #: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
@@ -150,6 +208,9 @@ def latents_for(regime: str, d: int) -> int:
     """Return how many of `d` nodes `regime` hides, or 0 for a regime without hidden nodes."""
     if regime not in REGIMES:
         raise KeyError(f"unknown regime {regime!r}; known: {sorted(REGIMES)}")
+    functional = REGIMES[regime][1]
+    if functional in temporal_models.MODELS:
+        return temporal_models.hidden_count(functional, d)
     per = LATENT_REGIMES.get(regime)
     return 0 if per is None else max(1, d // per)
 
@@ -185,6 +246,9 @@ class DatasetKey:
     columns; the stored truth keeps all ``d`` nodes. At ``0``, ``latents`` affects neither the label
     nor the generator call. Datasets without hidden nodes therefore keep their identity.
 
+    ``times`` is a panel's number of time points, with ``n`` units at each. At ``0``, its default, it
+    affects neither the label nor the generator call either.
+
     ``categorical_share`` and ``categories`` reach the generator only for the mixed functional,
     :data:`MIXED_FUNCTIONAL`, where they join the label too. Every other key keeps its identity.
     """
@@ -200,6 +264,7 @@ class DatasetKey:
     latents: int = 0
     categorical_share: float = 0.5
     categories: tuple[int, int] = (2, 3)
+    times: int = 0
 
     @property
     def label(self) -> str:
@@ -214,9 +279,10 @@ class DatasetKey:
             if self.functional == MIXED_FUNCTIONAL
             else ""
         )
+        panel = f"-T{self.times}" if self.times else ""
         return (
             f"{self.topology}-{self.functional}-{self.noise}-deg{self.density:g}"
-            f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}{mixed}"
+            f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}{mixed}{panel}"
         )
 
     @property
@@ -239,8 +305,39 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
 
     The registry stores this call for reproduction. Unmapped labels raise ``KeyError`` or
     ``ValueError``. A categorical key returns the ``andrey.data.sample_discrete`` arguments, with
-    ``"generator"`` naming it, and a mixed key the ``andrey.data.sample_mixed`` arguments.
+    ``"generator"`` naming it, and a mixed key the ``andrey.data.sample_mixed`` arguments. A paper
+    model's call is :func:`andrey_bench.temporal_models.sample`'s, with the model's whole setup, so a
+    change to the setup is a new dataset.
     """
+    if key.functional in temporal_models.MODELS:
+        call: dict[str, object] = {
+            "generator": "andrey_bench.temporal_models.sample",
+            "model": key.functional,
+            "setup": temporal_models.model_params(key.functional),
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+        }
+        if key.density != temporal_models.MODELS[key.functional].cross_degree:
+            raise ValueError(f"{key.label}: density must be the model's cross-links per variable")
+        if key.latents != temporal_models.hidden_count(key.functional, key.d):
+            raise ValueError(f"{key.label}: latents must be the model's unobserved variables")
+        return call
+    if key.functional in lingam_models.MODELS:
+        panel = key.functional == "panel2013"
+        if panel != bool(key.times) or key.latents:
+            raise ValueError(f"{key.label}: times is set for panel2013 alone, and latents is 0")
+        call = {
+            "generator": f"andrey_bench.lingam_models.{'sample_panel' if panel else 'sample_varma'}",
+            "model": key.functional,
+            "setup": lingam_models.model_params(key.functional),
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+        }
+        if panel:
+            call["times"] = key.times
+        return call
     if key.functional == MIXED_FUNCTIONAL:
         if key.standardize != "raw" or key.latents:
             raise ValueError(
@@ -296,8 +393,22 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
     """Return ``{model, num_nodes, density, params}`` in the ``andrey.data`` provenance format.
 
     ``params_for_density`` maps the key's density to builder parameters. Keys match the sample's
-    ``config.graph`` block.
+    ``config.graph`` block. A paper model records its cross-links per variable.
     """
+    if key.functional in temporal_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": {"cross_links_per_variable": key.density},
+        }
+    if key.functional in lingam_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": lingam_models.model_params(key.functional),
+        }
     model = TOPOLOGY_TO_GRAPH[key.topology]
     return {
         "model": model,
@@ -312,9 +423,24 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
 
     Samples are contiguous canonical ``float64``. Truth uses ``ds.graph.to_numpy()`` endpoint marks,
     as consumed by the scorer and Andrey adapter. With hidden nodes, the truth covers all ``d``
-    nodes. :func:`latent_node_types` rebuilds their types from the key.
+    nodes. :func:`latent_node_types` rebuilds their types from the key. A temporal truth is
+    returned as :func:`lag_only_marks` with the kind ``"temporal"``. A paper model's series and
+    truth come from :mod:`andrey_bench.temporal_models` or :mod:`andrey_bench.lingam_models`, as
+    the module docstring says.
     """
     kwargs = generation_kwargs(key)
+    if key.functional in temporal_models.MODELS:
+        series, window = temporal_models.sample(key.functional, key.d, key.n, key.seed)
+        series = np.ascontiguousarray(series, dtype=CANONICAL_DTYPE)
+        if temporal_models.MODELS[key.functional].same_step:
+            return series, window, WINDOW_KIND
+        return series, lag_marks(window[1:] != 0), "temporal"
+    if key.functional == "varma2010":
+        series, stack = lingam_models.sample_varma(key.functional, key.d, key.n, key.seed)
+        return series, stack, COEFFICIENT_KINDS[key.functional]
+    if key.functional == "panel2013":
+        panel, stack = lingam_models.sample_panel(key.functional, key.d, key.times, key.n, key.seed)
+        return panel, stack, COEFFICIENT_KINDS[key.functional]
     generator = kwargs.pop("generator", None)
     if generator == "sample_discrete":
         ds = data.sample_discrete(**kwargs)  # type: ignore[arg-type]
@@ -325,10 +451,12 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
         ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
     data_arr = np.ascontiguousarray(ds.data, dtype=CANONICAL_DTYPE)
     graph = ds.graph
-    if not hasattr(graph, "to_numpy"):  # Temporal families are unsupported here.
+    if isinstance(graph, TemporalStructure):
+        return data_arr, lag_only_marks(key, graph), "temporal"
+    if not hasattr(graph, "to_numpy"):
         raise TypeError(
             f"graph for {key.label} has no to_numpy() (kind={type(graph).__name__}); "
-            "temporal families are not materialized by this node"
+            "the store holds a GraphStructure or a TemporalStructure truth"
         )
     types = getattr(graph, "node_types", None)
     hidden = np.flatnonzero(types == LATENT) if types is not None else np.arange(0)
@@ -336,6 +464,23 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
         raise ValueError(f"{key.label}: hidden nodes are not the last {key.latents} nodes")
     marks = np.ascontiguousarray(graph.to_numpy())  # int8 endpoint marks
     return data_arr, marks, str(graph.kind)
+
+
+def lag_only_marks(key: DatasetKey, truth: TemporalStructure) -> np.ndarray:
+    """Return the ``(L, d, d)`` int8 marks of lags ``1..L`` of a lag-only temporal truth.
+
+    Raises ``ValueError`` when the instantaneous (lag-0) graph has an edge or the lags are not
+    ``1..L``: the stored stack holds lagged links only, and a lag-0 edge would be dropped unseen.
+    """
+    if 0 in truth.lags and np.asarray(truth.lag(0).to_numpy()).any():
+        raise ValueError(
+            f"{key.label}: the instantaneous graph has edges; a temporal key needs density "
+            f"{LAG_ONLY_DENSITY:g} so that its truth is lag-only"
+        )
+    lags = [lag for lag in truth.lags if lag > 0]
+    if lags != list(range(1, len(lags) + 1)):
+        raise ValueError(f"{key.label}: truth lags {lags} are not 1..L")
+    return np.stack([np.asarray(truth.lag(lag).to_numpy(), dtype=np.int8) for lag in lags])
 
 
 def _same_call(recorded: Any, wanted: Any) -> bool:
@@ -483,6 +628,10 @@ __all__ = [
     "CANONICAL_DENSITY",
     "REGIMES",
     "LATENT_REGIMES",
+    "TEMPORAL_REGIMES",
+    "LAG_ONLY_DENSITY",
+    "WINDOW_KIND",
+    "COEFFICIENT_KINDS",
     "DEFAULT_REGIME",
     "latents_for",
     "latent_node_types",
@@ -490,6 +639,7 @@ __all__ = [
     "DatasetKey",
     "generation_kwargs",
     "generate_one",
+    "lag_only_marks",
     "graph_record",
     "materialize",
     "data_path",

@@ -106,61 +106,9 @@ div[class*="highlight-"].window pre {
   letter-spacing: -0.02em;
 }
 
+/* The method tabs are a segmented control (segmented.css); here only their place in the figure. */
 .race-sizes {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  margin: 0 0 1rem;
-  padding: 0 0 1rem;
-  border: 0;
-  border-bottom: 1px solid var(--andrey-line);
-}
-
-.race-sizes legend {
-  float: left;
-  width: auto;
-  margin: 0 auto 0 0;
-  line-height: inherit;
-  padding: 0.45rem 0.5rem 0.45rem 0;
-  color: var(--andrey-muted);
-  font-size: 0.85rem;
-}
-
-/* The radio stays focusable; its label is the visible control. */
-.race-choice {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  clip-path: inset(50%);
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.race-choice + label {
-  padding: 0.45rem 0.65rem;
-  border: 1px solid var(--andrey-surface);
-  border-radius: 5px;
-  color: var(--andrey-muted);
-  font-size: 0.85rem;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-
-.race-choice + label:hover {
-  background: var(--andrey-surface-2);
-  color: var(--andrey-ink);
-}
-
-.race-choice:checked + label {
-  border-color: var(--andrey-accent);
-  background: var(--andrey-surface);
-  color: var(--andrey-accent);
-}
-
-.race-choice:focus-visible + label {
-  outline: 2px solid var(--andrey-accent);
-  outline-offset: 2px;
+  margin: 0 0 1.25rem;
 }
 
 .race-row {
@@ -289,10 +237,6 @@ div[class*="highlight-"].window pre {
   /* The speedup panel has no clock: each bar grows to its speedup, one row after another. */
   .race--speedup .race-fill {
     animation: race-fill 900ms var(--ease) calc(200ms + var(--i, 0) * 140ms) both;
-  }
-
-  .race-choice + label {
-    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
   }
 }
 
@@ -707,11 +651,6 @@ div[class*="highlight-"].window pre {
   .race-title {
     font-size: 1.1rem;
   }
-
-  .race-sizes legend {
-    float: none;
-    margin-bottom: 0.25rem;
-  }
 }
 
 @supports not selector(:has(a)) {
@@ -723,5 +662,59 @@ div[class*="highlight-"].window pre {
     margin-top: 2rem;
     padding-top: 1rem;
     border-top: 1px solid var(--andrey-line);
+  }
+}
+
+/* A figure with tabs shows only the chosen tab's panel, so it is as tall as that panel's rows, not
+   its tallest one's. Each figure stacks its panels in one grid cell in its own style; this sets the
+   panels aside instead, the k-th choice showing the k-th panel. The figure element's selector
+   outweighs the figures' own. */
+@supports selector(:has(a)) {
+  figure.race:has(.race-choice) .race-panels {
+    display: block;
+  }
+
+  figure.race:has(.race-choice) .race-panels > .race-panel {
+    display: none;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(1):checked)
+    .race-panels > .race-panel:nth-of-type(1) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(2):checked)
+    .race-panels > .race-panel:nth-of-type(2) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(3):checked)
+    .race-panels > .race-panel:nth-of-type(3) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(4):checked)
+    .race-panels > .race-panel:nth-of-type(4) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(5):checked)
+    .race-panels > .race-panel:nth-of-type(5) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(6):checked)
+    .race-panels > .race-panel:nth-of-type(6) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(7):checked)
+    .race-panels > .race-panel:nth-of-type(7) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(8):checked)
+    .race-panels > .race-panel:nth-of-type(8) {
+    display: block;
   }
 }
