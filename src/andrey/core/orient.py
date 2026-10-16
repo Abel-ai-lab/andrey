@@ -163,8 +163,9 @@ def meek(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
     Returns a new endpoint-mark matrix. Each rule directs an undirected edge only when doing so
     avoids a new unshielded collider (R1), a directed cycle (R2), or an inconsistency around a
     shared child (R3); an orientation that would close a directed cycle is skipped. Adjacency (which
-    pairs share an edge) is never changed -- only tails become arrowheads. R4 is not required to
-    complete a v-structure pattern in the absence of background knowledge.
+    pairs share an edge) is never changed -- only tails become arrowheads. A bidirected edge counts
+    as an adjacency only: no rule reads it as directed or undirected, or orients it. R4 is not
+    required to complete a v-structure pattern in the absence of background knowledge.
 
     The completion is defined for a collider-consistent PDAG (as produced by
     :func:`orient_colliders`); on an inconsistent PDAG the fixed point can depend on rule-firing

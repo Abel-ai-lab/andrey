@@ -2,18 +2,16 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.cdnod`.
 
-The context index joins the data as a last variable. Every edge it keeps is oriented out of it
-before the collider and Meek passes, which follow PC's conflict rule and so never overwrite those
-orientations. The context node is dropped from the returned CPDAG.
+The context index joins the data as a last variable. Colliders are oriented as PC orients them,
+then every edge the context keeps is oriented out of it before Meek's rules run. The context node
+is dropped from the returned CPDAG.
 """
 
 from __future__ import annotations
 
-from itertools import combinations
-
 import numpy as np
 
-from andrey.constraint.pc import _discover_skeleton, _lookup_sepset, _points_to
+from andrey.constraint.pc import _discover_skeleton, _orient_colliders, _undirect_conflicts
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
 from andrey.core.orient import meek, to_structure
 
@@ -59,7 +57,7 @@ def cdnod(
         mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
         skeleton, sepsets = _discover_skeleton(augmented, alpha, indep_test, categorical=mask)
         pdag = _orient_with_context(skeleton, sepsets, context=d)
-    completed = meek(pdag)
+    completed = _undirect_conflicts(meek(pdag))
     return to_structure(completed[:d, :d], kind="cpdag")
 
 
@@ -69,31 +67,16 @@ def _orient_with_context(
     *,
     context: int | None,
 ) -> np.ndarray:
-    """Orient the augmented skeleton: context edges outward, then unshielded colliders.
+    """Orient the augmented skeleton: unshielded colliders, then context edges outward.
 
-    Every edge the ``context`` node retains is oriented ``context -> neighbor`` up front, so the
-    context is a source in every triple it touches. Unshielded colliders are then oriented with the
-    prioritize-existing rule (``uc_priority=2``): a collider ``x -> y <- z`` is oriented only when
-    ``y`` is absent from the separating set of ``x`` and ``z`` and neither ``y -> x`` nor ``y -> z``
-    is already directed, so the context orientations survive. ``context=None`` orients colliders
-    only, for a skeleton without a context node.
+    Colliders are oriented as PC orients them (:func:`~andrey.constraint.pc._orient_colliders`).
+    Every edge the ``context`` node keeps then becomes ``context -> neighbor``, replacing any
+    arrowhead a collider set at the context, so the context is a source in every triple it touches.
+    ``context=None`` orients colliders only, for a skeleton without a context node.
     """
-    n = skeleton.shape[0]
-    pdag = np.where(skeleton != NULL, np.int8(TAIL), np.int8(NULL))
-    np.fill_diagonal(pdag, np.int8(NULL))
-    neighbors = [] if context is None else np.nonzero(skeleton[context] != NULL)[0].tolist()
-    for neighbor in neighbors:
-        pdag[context, neighbor], pdag[neighbor, context] = TAIL, ARROW
-    for y in range(n):
-        nbrs = np.nonzero(skeleton[y] != NULL)[0].tolist()
-        for a, b in combinations(range(len(nbrs)), 2):
-            x, z = nbrs[a], nbrs[b]
-            if skeleton[x, z] != NULL:
-                continue
-            if y in _lookup_sepset(sepsets, x, z):
-                continue
-            if _points_to(pdag, y, x) or _points_to(pdag, y, z):
-                continue
-            pdag[x, y], pdag[y, x] = TAIL, ARROW
-            pdag[z, y], pdag[y, z] = TAIL, ARROW
+    pdag = _orient_colliders(skeleton, sepsets)
+    if context is not None:
+        neighbors = np.flatnonzero(skeleton[context] != NULL)
+        pdag[context, neighbors] = TAIL
+        pdag[neighbors, context] = ARROW
     return pdag

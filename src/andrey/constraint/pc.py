@@ -46,36 +46,39 @@ def pc(
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
-    (``step="collider"``, from :func:`_orient_colliders_prioritize_existing`), and each Meek rule
-    firing (``step="meek"``, with the fields :func:`~andrey.core.orient.meek` records).
+    (``step="collider"``, from :func:`_orient_colliders`), each Meek rule firing (``step="meek"``,
+    with the fields :func:`~andrey.core.orient.meek` records), and, when colliders conflict, the
+    edges left undirected (``step="conflict"``, from :func:`_undirect_conflicts`).
     """
     X = np.asarray(data, dtype=np.float64)
     skeleton, sepsets = _discover_skeleton(
         X, alpha, indep_test, categorical=categorical, warn_expensive=True, _trace=_trace
     )
-    pdag = _orient_colliders_prioritize_existing(skeleton, sepsets, _trace=_trace)
+    pdag = _orient_colliders(skeleton, sepsets, _trace=_trace)
     if _trace is None:
-        return to_structure(meek(pdag), kind="cpdag")
+        return to_structure(_undirect_conflicts(meek(pdag)), kind="cpdag")
     firings: list[dict] = []
     cpdag = meek(pdag, _trace=firings)
     _trace.extend(dict(step="meek", **firing) for firing in firings)
-    return to_structure(cpdag, kind="cpdag")
+    return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 
 
-def _orient_colliders_prioritize_existing(
+def _orient_colliders(
     skeleton: np.ndarray,
     sepsets: Mapping[tuple[int, int], Iterable[int] | None],
     *,
     _trace: list[dict] | None = None,
 ) -> np.ndarray:
-    """Orient unshielded colliders with the prioritize-existing conflict rule (``uc_priority=2``).
+    """Orient every unshielded collider at once; an edge two colliders dispute becomes bidirected.
 
     Starts from the fully undirected skeleton and visits every unshielded triple ``x - y - z``
     (``x`` and ``z`` both adjacent to ``y`` but not to each other) with ``y`` the middle node,
     ordered by middle node then by endpoint pair ``(x, z)`` with ``x < z`` ascending. ``y`` is a
-    collider ``x -> y <- z`` iff ``y`` is not in the separating set of ``x`` and ``z``. A collider
-    is oriented only when neither ``y -> x`` nor ``y -> z`` is already a fully directed edge;
-    otherwise it is skipped, so an earlier orientation is never overwritten.
+    collider ``x *-> y <-* z`` iff ``y`` is not in the separating set of ``x`` and ``z``; it then
+    sets the arrowhead at ``y`` on both edges and changes no other mark. An edge that receives an
+    arrowhead at each end, from colliders at both of its nodes, ends bidirected (``x <-> y``). The
+    result is the set of all the colliders' arrowheads, so the visiting order does not change it:
+    the list rule of Colombo and Maathuis (2014), Section 4.3.
 
     The private ``_trace`` sink records every unshielded triple visited: ``step="collider"``, the
     ``triple`` ``(x, y, z)``, the pair's ``sepset``, whether ``y`` was ``oriented`` as a collider,
@@ -91,13 +94,11 @@ def _orient_colliders_prioritize_existing(
             if skeleton[x, z] != NULL:
                 continue
             sepset = _lookup_sepset(sepsets, x, z)
-            # Skip the collider when either endpoint already points away from the middle.
-            collider = y not in sepset and not (_points_to(pdag, y, x) or _points_to(pdag, y, z))
+            collider = y not in sepset
             if _trace is not None:
                 before = pdag.copy()
             if collider:
-                pdag[x, y], pdag[y, x] = TAIL, ARROW
-                pdag[z, y], pdag[y, z] = TAIL, ARROW
+                pdag[y, x] = pdag[y, z] = ARROW
             if _trace is not None:
                 _trace.append(
                     dict(
@@ -112,9 +113,24 @@ def _orient_colliders_prioritize_existing(
     return pdag
 
 
-def _points_to(pdag: np.ndarray, a: int, b: int) -> bool:
-    """True when ``a -> b`` is a fully directed edge (tail at ``a``, arrowhead at ``b``)."""
-    return bool(pdag[a, b] == TAIL and pdag[b, a] == ARROW)
+def _undirect_conflicts(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
+    """Make every bidirected edge, where two colliders conflict, undirected.
+
+    It runs after Meek's rules, which neither use nor orient a bidirected edge, so a conflicting
+    edge stays undirected in the CPDAG. Returns ``pdag`` itself when no edge is bidirected,
+    otherwise a copy. The private ``_trace`` sink receives one record when an edge changes:
+    ``step="conflict"``, the ``edges`` ``(x, y)`` with ``x < y``, and the ``before``/``after``
+    endpoint matrices.
+    """
+    bidirected = (pdag == ARROW) & (pdag.T == ARROW)
+    if not bidirected.any():
+        return pdag
+    out = pdag.copy()
+    out[bidirected] = TAIL
+    if _trace is not None:
+        edges = [tuple(e) for e in np.argwhere(np.triu(bidirected)).tolist()]
+        _trace.append(dict(step="conflict", edges=edges, before=pdag.copy(), after=out.copy()))
+    return out
 
 
 def _lookup_sepset(

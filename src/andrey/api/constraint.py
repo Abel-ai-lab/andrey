@@ -129,7 +129,9 @@ def pc(
     **How it works.** Edge removal is order-independent (PC-stable) [3]_. At each conditioning-set
     size, every test uses the adjacencies from the start of that size. Edges found independent are
     removed together. A removed pair's separating set combines all conditioning sets that separated
-    it. If two colliders conflict, the one found first in column order is kept.
+    it. Every collider is found before any is oriented, so the colliders do not depend on the
+    column order [3]_. When two colliders orient one edge in opposite directions, the edge stays
+    undirected, and Meek's rules do not orient it.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 400 variables with ten rows per variable: its median errors (SHD) stayed

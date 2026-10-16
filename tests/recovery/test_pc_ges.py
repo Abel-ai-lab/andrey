@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 import andrey
+from andrey import data
+from andrey.constraint.pc import pc as pc_engine
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -19,6 +22,20 @@ _BASELINE_LAMBDA = 2.0
 
 def test_pc_recovery():
     assert_recorded_output(andrey.pc(datagen.generate("gauss_5v")), "PC", case="gauss_5v")
+
+
+def test_pc_is_invariant_to_column_order():
+    # A seed on which colliders conflict on some edges, so the conflict rule runs.
+    x = data.sample_scm(d=20, n=200, seed=0, density=2.0, scale="standardize").data
+    trace: list[dict] = []
+    pc_engine(x, _trace=trace)
+    assert any(record["step"] == "conflict" for record in trace)
+    marks = andrey.pc(x).structure.to_numpy()
+    for seed in range(3):
+        order = np.random.default_rng(seed).permutation(x.shape[1])
+        back = np.argsort(order)
+        permuted = andrey.pc(x[:, order]).structure.to_numpy()
+        assert np.array_equal(permuted[np.ix_(back, back)], marks)
 
 
 def test_ges_recovery():

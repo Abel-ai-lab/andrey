@@ -26,7 +26,7 @@ def observations(d, density, seed):
 def replay(trace, d):
     """Rebuild the CPDAG and separating sets from the trace, checking each record on the way."""
     steps = [r["step"] for r in trace]
-    assert steps == sorted(steps, key=["test", "collider", "meek"].index)
+    assert steps == sorted(steps, key=["test", "collider", "meek", "conflict"].index)
     tests = [r for r in trace if r["step"] == "test"]
     assert [r["depth"] for r in tests] == sorted(r["depth"] for r in tests)
     adj = np.ones((d, d), dtype=np.int8) - np.eye(d, dtype=np.int8)
@@ -90,7 +90,7 @@ def test_cases_reach_every_skeleton_path_and_step():
         steps |= {r["step"] for r in trace}
         steps |= {"oriented" for r in trace if r.get("oriented")}
     assert {0, 1, 2, 3} <= depths  # both closed-form passes and the batched scan
-    assert steps == {"test", "collider", "meek", "oriented"}
+    assert steps == {"test", "collider", "meek", "conflict", "oriented"}
 
 
 def test_trace_is_identical_across_runs():
