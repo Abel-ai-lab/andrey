@@ -18,6 +18,7 @@ from scipy.integrate import quad
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import chi2, gamma
 from sklearn.gaussian_process import GaussianProcessRegressor
+from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
 from andrey.core import ci
@@ -402,3 +403,34 @@ def test_every_constraint_method_takes_the_nonlinear_tests(method, kind):
         warnings.simplefilter("ignore", andrey.ExperimentalWarning)
         for name in TESTS:
             assert getattr(andrey, method)(*args, indep_test=name).structure.kind == kind
+
+
+def _blas_threads() -> int:
+    return max(info["num_threads"] for info in threadpool_info() if info["user_api"] == "blas")
+
+
+@pytest.mark.parametrize("method", ["pc", "fci"])
+@pytest.mark.parametrize("pin_blas", [None, False])
+def test_skeleton_pins_blas_unless_the_test_opts_out(method, pin_blas, monkeypatch):
+    """The skeleton scan runs a test on one BLAS thread, as Fisher-Z needs, unless the test sets
+    ``pin_blas = False``, as the nonlinear tests do."""
+    assert all(cls.pin_blas is False for cls, _ in TESTS.values())
+    assert getattr(ci.FisherZ, "pin_blas", True) and getattr(ci.StudentT, "pin_blas", True)
+    seen = []
+
+    class Recording:
+        def __init__(self, data):
+            self._test = ci.FisherZ(data)
+
+        def __call__(self, x, y, condition_set=()):
+            seen.append(_blas_threads())
+            return self._test(x, y, condition_set)
+
+    if pin_blas is not None:
+        Recording.pin_blas = pin_blas
+    monkeypatch.setitem(ci._CI_REGISTRY, "recording", Recording)
+    with threadpool_limits(limits=2, user_api="blas"):
+        if _blas_threads() < 2:
+            pytest.skip("the BLAS library runs one thread")
+        getattr(andrey, method)(_common_cause(seed=0, n=60, n_cond=2), indep_test="recording")
+    assert seen and set(seen) == {1 if pin_blas is None else 2}

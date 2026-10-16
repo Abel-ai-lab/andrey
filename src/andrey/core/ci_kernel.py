@@ -131,6 +131,8 @@ class KCI:
        independence test and application in causal discovery. UAI, 804-813.
     """
 
+    pin_blas = False  # the skeleton scans run it on every BLAS thread
+
     def __init__(self, data: np.ndarray, *, ridge: float = 1e-3) -> None:
         if not 0.0 < ridge < np.inf:
             raise ValueError(f"ridge must be positive and finite, got {ridge}")
@@ -272,6 +274,8 @@ class RCoT:
        (2007). A kernel statistical test of independence. Advances in Neural Information
        Processing Systems 20, 585-592.
     """
+
+    pin_blas = False  # the skeleton scans run it on every BLAS thread
 
     def __init__(
         self,

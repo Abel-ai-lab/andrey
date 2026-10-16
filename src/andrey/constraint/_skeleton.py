@@ -11,11 +11,13 @@ one chunk in memory however many subsets it visits.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Iterable
 from itertools import combinations, islice
 
 import numpy as np
 
+from andrey.core import backend
 from andrey.core.ci import CITest
 
 Removal = tuple[int, int, tuple[int, ...]]  # (x, y, separating set) for one removed pair
@@ -24,6 +26,21 @@ Removal = tuple[int, int, tuple[int, ...]]  # (x, y, separating set) for one rem
 # stack holds at once so a huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one
 # array. Each row's inverse is computed independently, so the chunk boundary never changes a result.
 _CHUNK = 4096
+
+
+def blas_scope(test: CITest) -> contextlib.AbstractContextManager:
+    """The BLAS threads of a serial scan with ``test``: one, unless the test sets ``pin_blas``
+    false.
+
+    One thread makes a partial-correlation test's submatrix inversions match the one-thread
+    parallel skeleton workers whatever the host's thread count, and a registered test keeps it too.
+    The nonlinear tests set ``pin_blas = False``: they have no parallel workers, their kernel
+    products and Gaussian-process fits use every BLAS thread, and their p-values are reproducible
+    for a fixed thread count.
+    """
+    if getattr(test, "pin_blas", True):
+        return backend.one_blas_thread()
+    return contextlib.nullcontext()
 
 
 def scan_conditioning_sets(

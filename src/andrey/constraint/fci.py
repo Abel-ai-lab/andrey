@@ -14,12 +14,13 @@ import numpy as np
 from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
     adjacent_pairs,
+    blas_scope,
     first_order_separating,
     marginal_removals,
     prescreen_capable,
     scan_pairs,
 )
-from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
+from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure
 from andrey.core.ci import CITest, make_indep_test
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
@@ -121,9 +122,7 @@ def _fast_adjacency_search(
                 if pool is not None:
                     removals = pool.scan(pairs, support.copy(), size, alpha)
                 else:
-                    # Pin BLAS to one thread: the conditioning-submatrix inversions then match the
-                    # (1-thread) parallel skeleton workers regardless of the host thread count.
-                    with backend.one_blas_thread():
+                    with blas_scope(test):
                         removals = scan_pairs(test, pairs, neighbors, size, alpha)
                 for x, y, separating in removals:
                     remove.append((x, y))

@@ -102,6 +102,8 @@ class GPDC:
        in Genetics and Molecular Biology 9(1), Article 39.
     """
 
+    pin_blas = False  # the skeleton scans run it on every BLAS thread
+
     def __init__(self, data: np.ndarray, *, n_null: int = 1000, seed: int | None = None) -> None:
         if n_null < 1:
             raise ValueError(f"n_null must be at least 1, got {n_null}")

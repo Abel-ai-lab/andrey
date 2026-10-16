@@ -114,7 +114,9 @@ PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_tes
 
 The experimental tests detect nonlinear dependence that partial correlation misses, at a far
 higher cost per test, and have no published benchmark yet. Each warns with
-{py:class}`~andrey.ExperimentalWarning` the first time a process builds it. By name, a test runs
+{py:class}`~andrey.ExperimentalWarning` the first time a process builds it. Inside the search
+they use every BLAS thread, where the partial-correlation tests use one: their p-values repeat for
+a fixed thread count and can differ in the last digits between thread counts. By name, a test runs
 with its default settings; to change one, register a variant with
 {py:func}`~andrey.core.ci.register_indep_test` and select it by its new name:
 

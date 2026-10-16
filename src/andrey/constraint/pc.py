@@ -14,12 +14,13 @@ import numpy as np
 from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
     adjacent_pairs,
+    blas_scope,
     first_order_separating,
     marginal_removals,
     prescreen_capable,
     scan_pairs,
 )
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core import ARROW, NULL, TAIL, GraphStructure
 from andrey.core.ci import make_indep_test
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
@@ -201,9 +202,7 @@ def _discover_skeleton(
                 if pool is not None:
                     removals = pool.scan(pairs, adj != NULL, size, alpha)
                 else:
-                    # Pin BLAS to one thread: the conditioning-submatrix inversions then match the
-                    # (1-thread) parallel skeleton workers regardless of the host thread count.
-                    with backend.one_blas_thread():
+                    with blas_scope(test):
                         removals = scan_pairs(test, pairs, neighbors, size, alpha, _trace)
                 for x, y, separating in removals:
                     remove.append((x, y))
