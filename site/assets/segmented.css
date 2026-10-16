@@ -1,0 +1,117 @@
+/* The segmented control: the one style for a choice anywhere on the site, from a figure's method
+   tabs to a demo's switches. A rounded track holds the options; the chosen one fills with the
+   accent and takes the paper's color for its text.
+
+   The track is any element with the class `segmented` (the release cards' figures use their
+   `race-sizes` fieldset). It holds radio or checkbox inputs, each either followed by its `label`
+   or wrapped in a `label` with a `span` for its text, or tab buttons marked with `aria-selected`.
+   A long track scrolls sideways inside itself rather than wrapping. `segmented--compact` sets
+   denser options for small figures. Every color is an --andrey-* token, so the control follows
+   the light and dark themes, here and in the standalone demos that inline this file. The
+   figures' tabs take the compact size. */
+
+.segmented,
+.race-sizes {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 2px;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-md, 10px);
+  background: var(--andrey-surface);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.segmented::-webkit-scrollbar,
+.race-sizes::-webkit-scrollbar {
+  display: none;
+}
+
+/* The input stays focusable and announced; the face beside it is the visible option. */
+.segmented input,
+.race-sizes input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+
+.segmented label:has(> input) {
+  position: relative;
+  display: flex;
+  margin: 0;
+}
+
+.segmented :is(input + label, label > input + span, button[role="tab"]),
+.race-sizes input + label {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  margin: 0;
+  padding: 0.4rem 0.9rem;
+  border: 0;
+  border-radius: calc(var(--andrey-radius-md, 10px) - 3px);
+  background: transparent;
+  color: var(--andrey-muted);
+  font: 600 0.875rem/1.3 var(--andrey-font-sans, Inter, system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.segmented :is(input:not(:checked):not(:disabled) + label,
+  label > input:not(:checked):not(:disabled) + span,
+  button[role="tab"]:not([aria-selected="true"]):not(:disabled)):hover,
+.race-sizes input:not(:checked) + label:hover {
+  background: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+}
+
+.segmented :is(input:checked + label, label > input:checked + span,
+  button[role="tab"][aria-selected="true"]),
+.race-sizes input:checked + label {
+  background: var(--andrey-accent);
+  color: var(--andrey-paper);
+}
+
+.segmented :is(input:focus-visible + label, label > input:focus-visible + span,
+  button[role="tab"]:focus-visible),
+.race-sizes input:focus-visible + label {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+
+.segmented :is(input:disabled + label, label > input:disabled + span,
+  button[role="tab"]:disabled) {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Figures' tabs are compact, so a figure's methods fit its width on a wide screen. */
+.segmented--compact :is(input + label, label > input + span, button[role="tab"]),
+.race-sizes input + label {
+  min-width: 2.25rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .segmented :is(input + label, label > input + span, button[role="tab"]),
+  .race-sizes input + label {
+    transition: background-color 160ms ease, color 160ms ease;
+  }
+}

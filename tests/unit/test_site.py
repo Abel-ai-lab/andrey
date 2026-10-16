@@ -1088,20 +1088,20 @@ def test_a_family_where_andrey_is_not_faster_shows_no_number():
 
 def test_a_new_family_gets_a_tile_with_no_code_change(monkeypatch):
     summaries = placeholder_summaries()
-    monkeypatch.setattr(build, "SPEC_FAMILIES", {**build.SPEC_FAMILIES, "temporal": "Time series"})
-    assert "temporal" not in [t["family"] for t in build.family_tiles(summaries)]
+    monkeypatch.setattr(build, "SPEC_FAMILIES", {**build.SPEC_FAMILIES, "spectral": "Spectral"})
+    assert "spectral" not in [t["family"] for t in build.family_tiles(summaries)]
     original = build.comparisons
 
     def moved(summary):
         out = original(summary)
         for m in out:
             if m["method"] == "PNL":
-                m["family"] = "temporal"
+                m["family"] = "spectral"
         return out
 
     monkeypatch.setattr(build, "comparisons", moved)
     titles = [t["title"] for t in build.family_tiles(summaries)]
-    assert "Time series" in titles
+    assert "Spectral" in titles
 
 
 def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_page):
@@ -1203,21 +1203,20 @@ def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
     assert re.findall(r'<div class="err-bar"><span>([^<]+)</span>', section)
 
 
-def test_the_first_section_tells_why_it_is_fast_one_scene_at_a_time(placeholder_page):
-    # Under the first section's title, on the shared art, every scene in order with its title and
-    # narration, each played by the scroll: no tile, no opener, no dialog of their own.
+def test_the_first_section_shows_why_it_is_fast_as_a_carousel(placeholder_page):
+    # Under the first section's title, on the shared art, a card per scene in order with its title
+    # and narration, played by the carousel: no tile, no opener, no dialog of its own.
     section = placeholder_page[placeholder_page.index('id="accelerated"') :]
     section = section[: section.index('<div class="run-sheet">')]
-    pin = section[section.index('<div class="wf-pin">') :]
-    assert pin.index('id="accelerated-title"') < pin.index('<div class="wf wf-story">')
+    assert section.index('id="accelerated-title"') < section.index('<div class="wf wf-belt"')
     scenes = build._why_fast["SCENES"]
-    assert re.findall(r'data-scene="(\w+)" data-play="scroll"', pin) == [s["key"] for s in scenes]
-    titles = re.findall(r'<li class="wf-step"><div class="wf-words"><h3>([^<]+)</h3>', pin)
+    assert re.findall(r'data-scene="(\w+)" data-play="belt"', section) == [s["key"] for s in scenes]
+    titles = re.findall(r'<div class="wf-words"><h3>([^<]+)</h3>', section)
     assert titles == [html.escape(s["title"]) for s in scenes]
-    assert all(html.escape(s["text"]) in pin for s in scenes)
+    assert all(html.escape(s["text"]) in section for s in scenes)
     assert "data-wf-open" not in placeholder_page and "wf-dialog" not in placeholder_page
-    assert '<li class="tile' not in pin and "wf-plus" not in pin
-    assert "wf-note" not in pin  # no footnote under the story
+    assert '<li class="tile' not in section and "wf-plus" not in section
+    assert "wf-pin" not in placeholder_page and "wf-story" not in placeholder_page
 
 
 def test_a_list_is_a_note_in_plain_type_not_a_card(placeholder_page):
@@ -1266,7 +1265,7 @@ def test_every_raster_is_srgb_with_no_profile_and_meets_the_css_ground(cards):
             assert image.mode == "RGB" and not image.info.get("icc_profile"), path.name
     # The page's ground behind and around the art is the art's own median color.
     ground = cards._rgb(cards.ground_tokens()["--andrey-ground-art"])
-    for path in cards.ART.values():
+    for path in [*cards.ART.values(), *cards.CENTERED.values()]:
         with Image.open(path) as image:
             median = np.median(np.asarray(image.convert("RGB"), float).reshape(-1, 3), axis=0)
         assert np.abs(median - ground).max() < 16, path.name
@@ -1609,7 +1608,7 @@ def test_every_published_art_is_stored_in_the_brand_tones(cards):
     # other blues or ambers moves tens of levels. A failure: store the file through
     # cards.brand_tones (match_ground=False for a release card's art).
     ground = cards._ground_lightness()[1]
-    for path in cards.ART.values():
+    for path in [*cards.ART.values(), *cards.CENTERED.values()]:
         assert drift(path, True) < 8, path.name
         with Image.open(path) as image:
             light = np.asarray(image.convert("RGB"), float) @ cards.LUMA

@@ -28,10 +28,11 @@ column. A single column gives a one-node graph.
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
 workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs),
-[0.2.0](../benchmarks/0.2.0.md#known-limits), and [0.3.0](../benchmarks/0.3.0.md#known-limits)
-release cards show where a method scores worse than the empty graph, as ICA-LiNGAM does at the
-0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, and hill climbing
-and Tabu search do from 50 variables with ten rows per variable.
+[0.2.0](../benchmarks/0.2.0.md#known-limits), [0.3.0](../benchmarks/0.3.0.md#known-limits), and
+[0.5.0](../benchmarks/0.5.0.md#known-limits) release cards show where a method scores worse than
+the empty graph, as ICA-LiNGAM does at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from
+8 observed variables, hill climbing and Tabu search do from 50 variables with ten rows per
+variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 time steps.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -54,6 +55,12 @@ and Tabu search do from 50 variables with ten rows per variable.
    pnl
    rcd
    bottom_up_parce_lingam
+   varma_lingam
+   longitudinal_lingam
+   pcmci
+   pcmciplus
+   lpcmci
+   granger
 ```
 
 FCI and GFCI use uncovered possibly-directed paths for their R9 and R10 tail orientations:
@@ -77,8 +84,6 @@ in a process.
    exact_search
    calm
    multi_group_direct_lingam
-   varma_lingam
-   longitudinal_lingam
    gin
    camuv
 ```

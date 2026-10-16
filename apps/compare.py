@@ -34,7 +34,7 @@ from andrey.viz.theme import DARK, LIGHT
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps" / "live-discovery"))
 
-from learn import FRAME_SCRIPT, TOKEN_PALETTE, palette_css  # noqa: E402
+from learn import FRAME_SCRIPT, SEGMENTED_CSS, TOKEN_PALETTE, palette_css  # noqa: E402
 from runners import signed_marks  # noqa: E402
 
 RECORDING = Path(__file__).with_name("compare-causal-learn.json")
@@ -462,17 +462,8 @@ h1{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 p{max-width:72ch;margin:0 0 10px}
 .note{color:var(--andrey-muted);font-size:.9rem}
 .controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin:16px 0 12px}
-fieldset{display:flex;gap:0;border:0;margin:0;padding:0}
-legend{float:left;margin-right:10px;font-weight:600;line-height:36px}
-.choice{position:relative}
-.choice input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
-.choice span{display:block;min-width:64px;padding:6px 16px;text-align:center;
-border:1px solid var(--andrey-line);background:var(--andrey-surface);font-weight:600}
-.choice:first-of-type span{border-radius:8px 0 0 8px}
-.choice:last-of-type span{border-radius:0 8px 8px 0;border-left:0}
-.choice input:checked+span{background:var(--andrey-accent);border-color:var(--andrey-accent);
-color:var(--andrey-paper)}
-.choice input:focus-visible+span{outline:2px solid var(--andrey-accent);outline-offset:3px}
+fieldset{display:flex;align-items:center;gap:10px;border:0;margin:0;padding:0}
+legend{float:left;padding:0;font-weight:600}
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0;padding:0;list-style:none;
 font-size:.9rem}
 .legend li{display:flex;align-items:center;gap:6px}
@@ -522,7 +513,7 @@ def compare_page(heading=True):
     ours, theirs = andrey_graphs(), causal_learn_graphs()
     version = json.loads(RECORDING.read_text())["causal-learn"]
     choices = "".join(
-        f'<label class="choice"><input type="radio" name="method" value="{method}"'
+        f'<label><input type="radio" name="method" value="{method}"'
         f"{' checked' if method == METHODS[0] else ''}><span>{method}</span></label>"
         for method in METHODS
     )
@@ -548,7 +539,8 @@ def compare_page(heading=True):
         f"standardized and rounded to six decimals, seed {SEED}. causal-learn's graphs were "
         "recorded with causal-learn "
         f"{escape(version)} on the same data.</p>"
-        f'<div class="controls"><fieldset><legend>Method</legend>{choices}</fieldset>'
+        f'<div class="controls"><fieldset><legend>Method</legend>'
+        f'<div class="segmented">{choices}</div></fieldset>'
         f"{legend()}</div>"
         f'<p class="note">PC uses the Fisher-z test at alpha {ALPHA}. GES uses the BIC score with '
         "the same penalty and parent limit in both packages. A wrong direction includes an edge "
@@ -562,6 +554,7 @@ def compare_page(heading=True):
         '<!doctype html><html lang="en"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>Compare on one dataset</title><style>{palette_css()}{categorical_css()}{CSS}"
+        f"{SEGMENTED_CSS}"
         f"</style><body>{body}<script>{FRAME_SCRIPT}{SCRIPT}</script></body></html>"
     )
 

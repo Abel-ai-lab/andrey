@@ -23,7 +23,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: Over 1,000x faster on PNL, and faster on most other supported methods.
 - **Accurate**: up to 89% fewer errors than other popular packages.
-- **One API**: 24 methods, each one function call.
+- **One API**: 28 methods, each one function call.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
 <!-- PITCH:END -->
@@ -84,7 +84,7 @@ Four ideas make it fast; each is animated in
 | Score-based | [`ges`](https://andrey.abel.ai/docs/code/generated/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/code/generated/andrey.gies.html)\*, [`xges`](https://andrey.abel.ai/docs/code/generated/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/code/generated/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/code/generated/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/code/generated/andrey.exact_search.html)\*, [`calm`](https://andrey.abel.ai/docs/code/generated/andrey.calm.html)\* | CPDAG, DAG |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/code/generated/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/code/generated/andrey.grasp.html) | CPDAG |
 | Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.multi_group_direct_lingam.html)\* | DAG |
-| Time series | [`varma_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.varma_lingam.html)\*, [`longitudinal_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.longitudinal_lingam.html)\* | Temporal graph |
+| Time series | [`varma_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/code/generated/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/code/generated/andrey.pcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/code/generated/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/code/generated/andrey.granger.html) | Temporal graph |
 | Latent variables | [`gin`](https://andrey.abel.ai/docs/code/generated/andrey.gin.html)\*, [`rcd`](https://andrey.abel.ai/docs/code/generated/andrey.rcd.html), [`camuv`](https://andrey.abel.ai/docs/code/generated/andrey.camuv.html)\*, [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.bottom_up_parce_lingam.html) | DAG, PAG |
 | Pairwise direction | [`anm`](https://andrey.abel.ai/docs/code/generated/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/code/generated/andrey.pnl.html) | Two-node DAG |
 
@@ -174,7 +174,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: A very fast causal discovery package},
   year = {2026},
-  version = {0.4.1},
+  version = {0.5.0},
   url = {https://andrey.abel.ai},
 }
 ```

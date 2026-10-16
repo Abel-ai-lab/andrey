@@ -122,7 +122,8 @@ does this must put its entry point under `if __name__ == "__main__":`, because s
 re-imports the script; [Getting started](guides/getting-started.md#backends-and-parallelism) shows
 how. A pass uses the workers only above a work cutoff. GES's default suits one fit per process; for
 a process that runs many fits, `andrey calibrate` measures the cutoff on your machine and prints
-the setting.
+the setting. With the same setting, `granger` fits its variables on worker threads, which need no
+`__main__` guard, and returns the same coefficients.
 
 ## Data
 
@@ -141,9 +142,10 @@ noise.
 
 ### Time series and several datasets?
 
-`varma_lingam` and `longitudinal_lingam` learn graphs over time lags. `multi_group_direct_lingam`
-fits several datasets that share one causal order, and `cdnod` takes data from several domains.
-All four are experimental.
+`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, and `granger` learn graphs
+over time lags; `lpcmci` also allows hidden common causes. `multi_group_direct_lingam` fits several
+datasets that share one causal order, and `cdnod` takes data from several domains. All eight are
+experimental.
 
 ## Command line and agents
 
@@ -223,7 +225,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: A very fast causal discovery package},
   year = {2026},
-  version = {0.4.1},
+  version = {0.5.0},
   url = {https://andrey.abel.ai},
 }
 ```

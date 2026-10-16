@@ -30,7 +30,7 @@ import pytest
 from andrey.constraint.fci import _fast_adjacency_search
 from andrey.constraint.pc import _discover_skeleton
 from andrey.core import NULL, TAIL
-from andrey.core.ci import FisherZ, make_indep_test
+from andrey.core.ci import make_indep_test
 
 Skeleton = tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]
 
@@ -73,16 +73,18 @@ _CASES = [(seed, d, n, p) for seed in range(3) for (d, n, p) in _SWEEP]
 _CASE_IDS = [f"seed{s}-d{d}-n{n}-p{p}" for (s, d, n, p) in _CASES]
 
 
-def _reference_skeleton(X: np.ndarray, alpha: float, *, mode: str) -> Skeleton:
+def _reference_skeleton(
+    X: np.ndarray, alpha: float, *, mode: str, indep_test: str = "fisherz"
+) -> Skeleton:
     """A naive scalar adjacency search -- the semantic oracle the fast paths must reproduce.
 
     Both conventions condition on either endpoint's snapshot neighborhood and union the separating
     sets; ``mode`` selects only how the pair is recorded -- ``"pc"`` once (``x < y``), ``"fci"``
     both ways.
-    Every conditioning set is scored with the scalar Fisher-Z call directly -- no batching, no
+    Every conditioning set is scored with the scalar test call directly -- no batching, no
     vectorization -- so this path shares nothing with the production search but the oracle itself.
     """
-    test = FisherZ(X)
+    test = make_indep_test(indep_test, X)
     d = X.shape[1]
     adj = np.full((d, d), TAIL, dtype=np.int8)
     np.fill_diagonal(adj, NULL)
@@ -258,3 +260,58 @@ def test_fci_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> Non
     serial = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05, workers=1)
     parallel = _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05, workers=3)
     _assert_same(serial, parallel, f"FCI serial/parallel seed={seed} d={d} n={n} p={p}")
+
+
+# ---- Student-t takes the same fast paths ---------------------------------------------------------
+#
+# The Student-t test shares the partial-correlation base, so the prescreen, the batched scan, and
+# the worker pool engage for it too. The checks above repeat on a smaller sweep with
+# ``indep_test="student_t"``. The parallel cases are small samples where Student-t and Fisher-Z
+# give different skeletons, so a worker that rebuilt the wrong test would be caught.
+
+_T_SWEEP = [(8, 11, 0.30), (15, 500, 0.30), (30, 400, 0.18)]
+_T_CASES = [(seed, d, n, p) for seed in range(2) for (d, n, p) in _T_SWEEP]
+_T_IDS = [f"seed{s}-d{d}-n{n}-p{p}" for (s, d, n, p) in _T_CASES]
+_T_PARALLEL_CASES = [(3, 10, 25, 0.30), (4, 10, 30, 0.30), (0, 8, 30, 0.30)]
+_T_PARALLEL_IDS = [f"seed{s}-d{d}-n{n}-p{p}" for (s, d, n, p) in _T_PARALLEL_CASES]
+
+
+@pytest.mark.parametrize(("seed", "d", "n", "p"), _T_CASES, ids=_T_IDS)
+def test_student_t_skeletons_match_scalar_reference(seed: int, d: int, n: int, p: float) -> None:
+    x = _gaussian_dag(seed, n, d, p)
+    label = f"seed={seed} d={d} n={n} p={p}"
+    pc = _discover_skeleton(x, 0.05, "student_t")
+    _assert_same(pc, _reference_skeleton(x, 0.05, mode="pc", indep_test="student_t"), f"PC {label}")
+    fci = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05)
+    _assert_same(
+        fci, _reference_skeleton(x, 0.05, mode="fci", indep_test="student_t"), f"FCI {label}"
+    )
+
+
+@pytest.mark.parametrize(("seed", "d", "n", "p"), _T_CASES, ids=_T_IDS)
+def test_student_t_prescreen_matches_unprescreened(seed: int, d: int, n: int, p: float) -> None:
+    x = _gaussian_dag(seed, n, d, p)
+    label = f"seed={seed} d={d} n={n} p={p}"
+    _assert_same(
+        _discover_skeleton(x, 0.05, "student_t", prescreen=True),
+        _discover_skeleton(x, 0.05, "student_t", prescreen=False),
+        f"PC {label}",
+    )
+    _assert_same(
+        _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, prescreen=True),
+        _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, prescreen=False),
+        f"FCI {label}",
+    )
+
+
+@pytest.mark.parametrize(("seed", "d", "n", "p"), _T_PARALLEL_CASES, ids=_T_PARALLEL_IDS)
+def test_student_t_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
+    x = _gaussian_dag(seed, n, d, p)
+    label = f"seed={seed} d={d} n={n} p={p}"
+    serial = _discover_skeleton(x, 0.05, "student_t", workers=1)
+    fisherz = _discover_skeleton(x, 0.05, "fisherz", workers=1)
+    assert serial[1] != fisherz[1] or not np.array_equal(serial[0], fisherz[0]), "case too easy"
+    _assert_same(serial, _discover_skeleton(x, 0.05, "student_t", workers=3), f"PC {label}")
+    fci_serial = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, workers=1)
+    fci_parallel = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, workers=3)
+    _assert_same(fci_serial, fci_parallel, f"FCI {label}")
