@@ -725,3 +725,57 @@ div[class*="highlight-"].window pre {
     border-top: 1px solid var(--andrey-line);
   }
 }
+
+/* A figure with tabs shows only the chosen tab's panel, so it is as tall as that panel's rows, not
+   its tallest one's. Each figure stacks its panels in one grid cell in its own style; this sets the
+   panels aside instead, the k-th choice showing the k-th panel. The figure element's selector
+   outweighs the figures' own. */
+@supports selector(:has(a)) {
+  figure.race:has(.race-choice) .race-panels {
+    display: block;
+  }
+
+  figure.race:has(.race-choice) .race-panels > .race-panel {
+    display: none;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(1):checked)
+    .race-panels > .race-panel:nth-of-type(1) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(2):checked)
+    .race-panels > .race-panel:nth-of-type(2) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(3):checked)
+    .race-panels > .race-panel:nth-of-type(3) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(4):checked)
+    .race-panels > .race-panel:nth-of-type(4) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(5):checked)
+    .race-panels > .race-panel:nth-of-type(5) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(6):checked)
+    .race-panels > .race-panel:nth-of-type(6) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(7):checked)
+    .race-panels > .race-panel:nth-of-type(7) {
+    display: block;
+  }
+
+  figure.race:has(.race-choice:nth-of-type(8):checked)
+    .race-panels > .race-panel:nth-of-type(8) {
+    display: block;
+  }
+}
