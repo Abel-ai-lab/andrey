@@ -1,8 +1,13 @@
-"""PC orients colliders from the highest separating p-value down; an exact tie leaves a dispute."""
+"""PC orients colliders from the highest separating p-value down; an exact tie leaves a dispute.
+
+With ``collider_order="column"``, it orients them in column order and keeps the first of two that
+conflict.
+"""
 
 import numpy as np
 import pytest
 
+import andrey
 from andrey.constraint.cdnod import _orient_with_context
 from andrey.constraint.pc import _orient_colliders, _undirect_conflicts
 from andrey.core import ARROW, NULL, TAIL
@@ -69,6 +74,24 @@ def test_the_orientation_follows_the_nodes_not_their_order(ranks, order):
 
     relabeled = orient(relabel(CHAIN, order), moved(CHAIN_SEPSETS), moved(pvalues))
     np.testing.assert_array_equal(relabeled, relabel(orient(CHAIN, CHAIN_SEPSETS, pvalues), order))
+
+
+@pytest.mark.parametrize("ranks", [(0.9, 0.3), (0.3, 0.9), (0.5, 0.5)])
+def test_column_order_keeps_the_collider_visited_first(ranks):
+    # The collider at node 1 comes first in column order, whatever the ranks; the one at 2 is
+    # skipped, and no edge is left disputed.
+    pvalues = dict(zip(CHAIN_SEPSETS, ranks))
+    pdag = _orient_colliders(CHAIN, CHAIN_SEPSETS, pvalues, order="column")
+    out = _undirect_conflicts(meek(pdag))
+    np.testing.assert_array_equal(out, marks(4, directed=[(0, 1), (2, 1)], undirected=[(2, 3)]))
+
+
+@pytest.mark.parametrize("method", ["pc", "cdnod"])
+def test_an_unknown_collider_order_is_rejected(method):
+    x = np.random.default_rng(0).standard_normal((40, 2))
+    args = (x, np.repeat([0.0, 1.0], 20)) if method == "cdnod" else (x,)
+    with pytest.raises(ValueError, match="collider_order must be 'p_value' or 'column'"):
+        getattr(andrey, method)(*args, collider_order="first")
 
 
 def test_cdnod_directs_context_edges_before_ranking_colliders():

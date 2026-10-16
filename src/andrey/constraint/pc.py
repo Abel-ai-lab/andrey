@@ -27,6 +27,8 @@ from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
 
 _EXPENSIVE_PASS_TESTS = 10_000_000
+#: The orders in which :func:`_orient_colliders` orients the colliders.
+COLLIDER_ORDERS = ("p_value", "column")
 
 
 def pc(
@@ -34,6 +36,7 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    collider_order: str = "p_value",
     categorical: np.ndarray | None = None,
     _trace: list[dict] | None = None,
 ) -> GraphStructure:
@@ -41,9 +44,10 @@ def pc(
 
     ``data`` is an ``(n_samples, n_features)`` array; ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
-    ``indep_test`` selects the conditional-independence test from the registry, and
-    ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test. Returns
-    the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
+    ``indep_test`` selects the conditional-independence test from the registry, ``collider_order``
+    the order of :func:`_orient_colliders`, and ``categorical``, a boolean mask of the categorical
+    columns, reaches a mixed-data test. Returns the CPDAG as a ``GraphStructure`` of kind
+    ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -51,11 +55,12 @@ def pc(
     with the fields :func:`~andrey.core.orient.meek` records), and, when colliders of equal rank
     conflict, the edges left undirected (``step="conflict"``, from :func:`_undirect_conflicts`).
     """
+    check_collider_order(collider_order)
     X = np.asarray(data, dtype=np.float64)
     skeleton, sepsets, pvalues = _discover_skeleton(
         X, alpha, indep_test, categorical=categorical, warn_expensive=True, _trace=_trace
     )
-    pdag = _orient_colliders(skeleton, sepsets, pvalues, _trace=_trace)
+    pdag = _orient_colliders(skeleton, sepsets, pvalues, order=collider_order, _trace=_trace)
     if _trace is None:
         return to_structure(_undirect_conflicts(meek(pdag)), kind="cpdag")
     firings: list[dict] = []
@@ -64,27 +69,38 @@ def pc(
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 
 
+def check_collider_order(collider_order: str) -> None:
+    """Raise ``ValueError`` unless ``collider_order`` is one of :data:`COLLIDER_ORDERS`."""
+    if collider_order not in COLLIDER_ORDERS:
+        raise ValueError(f"collider_order must be 'p_value' or 'column', got {collider_order!r}")
+
+
 def _orient_colliders(
     pdag: np.ndarray,
     sepsets: Mapping[tuple[int, int], Iterable[int] | None],
     pvalues: Mapping[tuple[int, int], float],
     *,
+    order: str = "p_value",
     _trace: list[dict] | None = None,
 ) -> np.ndarray:
-    """Orient the unshielded colliders, from the most clearly separated pair to the least.
+    """Orient the unshielded colliders in ``order``, by default most clearly separated pair first.
 
     ``pdag`` holds the skeleton's endpoint marks, every edge undirected or some already directed
     (CDNOD directs the context's edges first); the result is a new matrix. An unshielded triple
     ``x - y - z`` (``x`` and ``z`` both adjacent to ``y`` but not to each other) is a collider
-    ``x -> y <- z`` iff ``y`` is not in the separating set of ``x`` and ``z``. The collider's rank
-    is ``pvalues[(x, z)]``, keyed with the lower index first: the largest p-value among the
-    conditioning sets that separated ``x`` and ``z``. Colliders are oriented from the highest rank
-    to the lowest, and a collider is skipped when an edge it would orient already has an arrowhead
-    at ``x`` or ``z``, which it would make bidirected; so of two conflicting colliders, the
-    higher-ranked one is kept. Colliders of exactly equal rank are each checked against the marks
-    set before their rank, then all set: an edge two of them dispute ends bidirected, and
-    :func:`_undirect_conflicts` leaves it undirected after Meek's rules. The result depends on the
-    ranks, not on the column order.
+    ``x -> y <- z`` iff ``y`` is not in the separating set of ``x`` and ``z``. A collider is skipped
+    when an edge it would orient already has an arrowhead at ``x`` or ``z``, which it would make
+    bidirected; so of two conflicting colliders, the one oriented first is kept.
+
+    With ``order="p_value"``, the collider's rank is ``pvalues[(x, z)]``, keyed with the lower index
+    first: the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders
+    are oriented from the highest rank to the lowest. Colliders of exactly equal rank are each
+    checked against the marks set before their rank, then all set: an edge two of them dispute ends
+    bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's rules. The result
+    depends on the ranks, not on the column order. With ``order="column"``, the triples are visited
+    by middle node ``y``, then by endpoint pair ``(x, z)``, in ascending column order, each decided
+    against the marks set before it, so no edge ends bidirected and the result depends on the column
+    order.
 
     The private ``_trace`` sink records every unshielded triple in the order decided:
     ``step="collider"``, the ``triple`` ``(x, y, z)``, the pair's ``sepset`` and rank ``p``,
@@ -98,10 +114,14 @@ def _orient_colliders(
         for x, z in combinations(nbrs, 2):
             if pdag[x, z] == NULL:
                 triples.append((pvalues[(x, z)], x, y, z))
-    triples.sort(key=itemgetter(0), reverse=True)
-    for _, tied in groupby(triples, key=itemgetter(0)):
+    if order == "column":
+        groups = [[triple] for triple in triples]
+    else:
+        triples.sort(key=itemgetter(0), reverse=True)
+        groups = [list(tied) for _, tied in groupby(triples, key=itemgetter(0))]
+    for group in groups:
         decided = []
-        for p, x, y, z in tied:
+        for p, x, y, z in group:
             sepset = _lookup_sepset(sepsets, x, z)
             collider = y not in sepset and ARROW not in (pdag[x, y], pdag[z, y])
             decided.append((p, x, y, z, sepset, collider))
