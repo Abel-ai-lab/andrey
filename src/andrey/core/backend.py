@@ -141,8 +141,9 @@ class _Config:
     ``backend`` is a preference: ``"auto"`` (the default), ``"numpy"``, ``"numba"``, ``"cuda"``,
     ``"mps"``, or ``"cpu"`` (torch on the CPU); ``"none"`` means ``"cpu"`` and ``"metal"`` means
     ``"mps"``. An operation without the requested backend uses its default, and an unavailable
-    backend warns once with ``BackendFallbackWarning``. ``num_workers`` counts worker processes:
-    ``-1`` uses every usable core, and ``0`` or ``1`` runs serially (the default).
+    backend warns once with ``BackendFallbackWarning``. ``num_workers`` counts worker processes
+    (threads for ``granger``): ``-1`` uses every usable core, and ``0`` or ``1`` runs serially (the
+    default).
     """
 
     _backend: str | None = None

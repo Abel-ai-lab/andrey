@@ -16,7 +16,13 @@
       "RCD": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "BottomUpParceLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "ANM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
-      "PNL": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."}
+      "PNL": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
+      "PCMCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "PCMCIplus": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "LPCMCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "VARMA-LiNGAM": {"median_shd": 2, "reason": "The likelihood fit ends within rounding of its optimum. Under a relative 1e-12 input perturbation, three times, 4 of 60 draws changed and no median moved. Two covers a moved median with one to spare."},
+      "LongitudinalLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline ordering decision to differ on another host."},
+      "Granger": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline lasso selection to differ on another host."}
     },
     "baselines": {
       "PC": {
@@ -92,6 +98,30 @@
       },
       "PNL": {
         "pnl_pair_n1000": {"median_shd": 0.0, "empty_median_shd": 1.0, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+      },
+      "PCMCI": {
+        "pcmci_paper_d10_n500": {"median_shd": 8.0, "empty_median_shd": 20.0, "shd": [6, 8, 14, 7, 9, 7, 11, 3, 8, 9]},
+        "pcmci_paper_d10_n1000": {"median_shd": 9.5, "empty_median_shd": 20.0, "shd": [4, 9, 12, 7, 5, 6, 12, 10, 14, 12]}
+      },
+      "PCMCIplus": {
+        "pcmciplus_paper_d10_n500": {"median_shd": 12.0, "empty_median_shd": 50.0, "shd": [10, 12, 4, 12, 16, 18, 5, 14, 8, 16]},
+        "pcmciplus_paper_d20_n1000": {"median_shd": 26.0, "empty_median_shd": 100.0, "shd": [23, 33, 34, 30, 32, 18, 16, 21, 26, 26]}
+      },
+      "LPCMCI": {
+        "lpcmci_paper_d5_n500": {"median_shd": 4.5, "empty_median_shd": 16.0, "shd": [6, 26, 0, 16, 0, 2, 25, 2, 21, 3]},
+        "lpcmci_paper_d10_n1000": {"median_shd": 41.5, "empty_median_shd": 62.0, "shd": [49, 3, 73, 34, 50, 20, 24, 19, 103, 99]}
+      },
+      "VARMA-LiNGAM": {
+        "varma_lingam_paper_d3_n300": {"median_shd": 2.0, "empty_median_shd": 7.0, "shd": [4, 5, 2, 2, 2, 1, 0, 1, 4, 2]},
+        "varma_lingam_paper_d5_n300": {"median_shd": 5.0, "empty_median_shd": 12.0, "shd": [3, 10, 7, 5, 5, 5, 5, 10, 5, 6]}
+      },
+      "LongitudinalLiNGAM": {
+        "longitudinal_lingam_paper_d3_n20_m200": {"median_shd": 0.0, "empty_median_shd": 171.0, "shd": [0, 0, 0, 0, 1, 0, 0, 1, 1, 1]},
+        "longitudinal_lingam_paper_d5_n20_m500": {"median_shd": 2.5, "empty_median_shd": 570.0, "shd": [0, 7, 4, 1, 4, 0, 5, 0, 2, 3]}
+      },
+      "Granger": {
+        "var2_lagged_d5_n1000": {"median_shd": 13.5, "empty_median_shd": 28.5, "shd": [14, 14, 11, 21, 8, 9, 15, 15, 13, 13]},
+        "var2_lagged_d5_n2000": {"median_shd": 13.0, "empty_median_shd": 28.5, "shd": [13, 10, 14, 17, 10, 9, 13, 13, 14, 9]}
       }
     }
   }

@@ -41,3 +41,30 @@ def test_unavailable_lag_blocks_are_nan_not_zero():
     assert np.isfinite(adj[2, 2]).all()  # lag-2 at t=2 is available
     assert np.isnan(adj[2, 3]).all()  # lag-3 at t=2 reaches before the panel start
     assert np.isfinite(adj[3, 3]).all()  # lag-3 at t=3 is available (reaches occasion 0)
+
+
+def _panel(seed: int, n: int = 100, p: int = 4, T: int = 12) -> list[np.ndarray]:
+    """A longitudinal non-Gaussian SEM: a random instantaneous DAG and a dense lag-1 block."""
+    rng = np.random.default_rng(seed)
+    order = rng.permutation(p)
+    B = np.zeros((p, p))
+    for a in range(p):
+        for b in range(a):
+            if rng.random() < 0.5:
+                B[order[a], order[b]] = rng.choice([-1, 1]) * rng.uniform(0.5, 1.5)
+    A = rng.uniform(-0.4, 0.4, (p, p))
+    inv = np.linalg.inv(np.eye(p) - B)
+    panel = [rng.uniform(-1, 1, (n, p))]
+    for _ in range(1, T):
+        noise = rng.uniform(-1, 1, (n, p)) ** 3
+        panel.append((panel[-1] @ A.T + noise) @ inv.T)
+    return panel
+
+
+def test_causal_orders_unchanged_when_every_unit_repeats():
+    # Least-squares slopes, standardized columns, and entropy approximations are all sample means,
+    # so listing every unit twice leaves each time point's causal order unchanged.
+    panel = _panel(5)
+    twice = [np.vstack([x, x]) for x in panel]
+    orders = LongitudinalLiNGAM().fit(panel).causal_orders_
+    assert LongitudinalLiNGAM().fit(twice).causal_orders_ == orders
