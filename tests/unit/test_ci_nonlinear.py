@@ -10,6 +10,7 @@ rejection rates over many draws are a measurement, made by ``qa/ci_calibration.p
 
 from __future__ import annotations
 
+import math
 import warnings
 
 import numpy as np
@@ -22,7 +23,7 @@ from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
 from andrey.constraint.pc import pc as pc_engine
-from andrey.core import ci, ci_cmiknn, ci_kernel
+from andrey.core import backend, ci, ci_cmiknn, ci_kernel
 from andrey.core.ci_cmiknn import (
     CMIknn,
     _cmi,
@@ -521,3 +522,63 @@ def test_skeleton_pins_blas_unless_the_test_opts_out(method, pin_blas, monkeypat
             pytest.skip("the BLAS library runs one thread")
         getattr(andrey, method)(_common_cause(seed=0, n=60, n_cond=2), indep_test="recording")
     assert seen and set(seen) == {1 if pin_blas is None else 2}
+
+
+# ---- device dispatch ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("name", "module"), [("kci", ci_kernel), ("cmiknn", ci_cmiknn)])
+def test_device_dispatch_gates_on_rows_squared(name, module, monkeypatch):
+    """KCI and CMIknn ask for a device by rows squared, may start one, and never take ``mps``."""
+    seen = []
+
+    def spy(pinnable, auto_order, *, metric=None, thresholds=None, amortized=True, op=None):
+        seen.append((metric, amortized, op, "mps" in pinnable))
+        return "numpy"
+
+    monkeypatch.setattr(module.backend, "select", spy)
+    _build(name, _common_cause(seed=0, n=60, n_cond=1))(0, 1, [2])
+    assert set(seen) == {(60 * 60, True, name, False)}
+
+
+@pytest.mark.parametrize(
+    ("choose", "cutoffs", "var"),
+    [
+        (ci_kernel._kci_backend, ci_kernel._KCI_GPU_THRESHOLDS, "ANDREY_KCI_GPU_THRESHOLD"),
+        (
+            ci_cmiknn._cmiknn_backend,
+            ci_cmiknn._CMIKNN_GPU_THRESHOLDS,
+            "ANDREY_CMIKNN_GPU_THRESHOLD",
+        ),
+    ],
+)
+def test_device_cutoff_is_rows_squared_and_reads_its_variable(choose, cutoffs, var, monkeypatch):
+    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", var):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
+    first = math.isqrt(cutoffs["cuda"] - 1) + 1  # the fewest rows whose square reaches the cutoff
+    assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
+    monkeypatch.setenv(var, "100")
+    assert (choose(9), choose(10)) == ("numpy", "cuda")
+    with andrey.config(backend="mps"):
+        assert choose(10) == "cuda"  # float32 mps is not a backend of these tests
+
+
+def test_device_cutoffs_never_choose_mps():
+    assert ci_kernel._KCI_GPU_THRESHOLDS["mps"] is None
+    assert ci_cmiknn._CMIKNN_GPU_THRESHOLDS["mps"] is None
+
+
+@pytest.mark.parametrize("n_cond", [0, 1, 2])
+def test_torch_paths_match_numpy(n_cond):
+    """On torch's CPU backend, KCI's p-value matches within rounding and CMIknn's is the same,
+    with and without an ``alpha`` that stops the shuffles."""
+    pytest.importorskip("torch")
+    x = _common_cause(seed=3, n=150, n_cond=max(n_cond, 1), shared=0.3)
+    kci, cmiknn = KCI(x), CMIknn(x, n_permutations=60)
+    cond = list(range(2, 2 + n_cond))
+    expected = (kci(0, 1, cond), [cmiknn._bounded_pvalue(0, 1, cond, a) for a in (None, 0.05)])
+    with andrey.config(backend="cpu"):
+        got = (kci(0, 1, cond), [cmiknn._bounded_pvalue(0, 1, cond, a) for a in (None, 0.05)])
+    assert got[0] == pytest.approx(expected[0], abs=1e-9)
+    assert got[1] == expected[1]

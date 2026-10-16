@@ -7,12 +7,13 @@ where a larger value means more independent.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from functools import lru_cache
 
 import numpy as np
 from scipy.special import digamma
 
+from . import backend, env
 from .ci import _canonical, _checked_data
 from .seeding import resolve_seed
 
@@ -20,6 +21,14 @@ __all__ = ["CMIknn"]
 
 # The cache of CMIknn's shuffles holds about this many bytes.
 _CACHE_BYTES = 2**28
+
+# Smallest distance matrix (rows squared) at which `auto` runs a CMIknn query on a CUDA GPU.
+# `qa/gpu_calibration_validate.py` on an A100-SXM4-80GB found its probe floor, 1,024 (32 rows); per
+# query with 500 shuffles, the GPU was 8x the CPU's speed at 100 rows and 40x at 1,000.
+_CMIKNN_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 1_024, "mps": None}
+
+# Device memory one batch of shuffled estimates uses, about 20 bytes per distance-matrix entry.
+_DEVICE_BATCH_BYTES = 2**30
 
 
 def _rank_columns(data: np.ndarray, rng: np.random.Generator) -> np.ndarray:
@@ -51,6 +60,27 @@ def _cmi_given_yz(dx: np.ndarray, dyz: np.ndarray, dz: np.ndarray, k: int) -> fl
     return float(digamma(k) + np.mean(digamma(k_z) - digamma(k_xz) - digamma(k_yz)))
 
 
+def _cmi_from_counts(
+    k: int, k_xz: np.ndarray, k_yz: np.ndarray, k_z: np.ndarray
+) -> Iterator[float]:
+    """The estimate of :func:`_cmi_given_yz` for each row of the ``(b, n)`` neighbor counts."""
+    for terms in digamma(k_z) - digamma(k_xz) - digamma(k_yz):
+        yield float(digamma(k) + np.mean(terms))
+
+
+def _counts_torch(dx, dyz, dz, k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The neighbor counts of :func:`_cmi_given_yz` for a ``(b, n, n)`` stack of x distances, on
+    the device of the torch tensors; the counts return as ``(b, n)`` arrays."""
+    torch = backend.torch()
+    eps = torch.maximum(dx, dyz).topk(k + 1, dim=-1, largest=False).values[..., k:]
+    counts = (
+        (torch.maximum(dx, dz) < eps).sum(dim=-1),
+        (dyz < eps).sum(dim=-1),
+        (dz < eps).sum(dim=-1),
+    )
+    return tuple(c.cpu().numpy() for c in counts)
+
+
 def _nearest_in_z(dz: np.ndarray, k_perm: int, rng: np.random.Generator) -> np.ndarray:
     """Each row's ``k_perm`` nearest rows in z, itself included; ties are broken at random."""
     # Distances are integers, so a uniform draw below 0.5 reorders only tied entries.
@@ -78,6 +108,19 @@ def _local_permutation(nearest: np.ndarray, rng: np.random.Generator) -> np.ndar
         perm[i] = j
         used[j] = True
     return perm
+
+
+def _cmiknn_backend(n: int) -> str:
+    """Where a CMIknn query on ``n`` rows runs: ``numpy``, or torch on ``cpu`` or ``cuda``."""
+    manual = env.CMIKNN_GPU_THRESHOLD.read()
+    return backend.select(
+        ("numpy", "cpu", "cuda"),
+        ("cuda", "numpy"),
+        metric=n * n,
+        thresholds=_CMIKNN_GPU_THRESHOLDS if manual is None else {"cuda": manual},
+        amortized=True,
+        op="cmiknn",
+    )
 
 
 class CMIknn:
@@ -132,6 +175,10 @@ class CMIknn:
     generator seeded by ``seed`` and the conditioning set, so every query with the same
     conditioning set uses the same shuffles, and the test object keeps them for later queries. A
     p-value does not depend on the order of queries or of the arguments.
+
+    The distances and neighbor counts run on a CUDA GPU under the ``cuda`` backend, or under
+    ``auto`` from ``ANDREY_CMIKNN_GPU_THRESHOLD`` rows squared, a batch of shuffles at a time. The
+    counts are integers, so the p-value equals the CPU's.
 
     **Limitations.** Not benchmarked yet. Each query computes ``n_permutations + 1`` estimates,
     each over ``n x n`` distance matrices, so its time grows with the square of the number of rows
@@ -199,21 +246,55 @@ class CMIknn:
         decided as with every shuffle.
         """
         x_int, y_int, cond = _canonical(x, y, condition_set)
-        ranks, dtype, k = self._ranks, self._dtype, self._k
-        dx = _distances(ranks[:, x_int], dtype)
-        dz = self._cond_distances(tuple(cond))
-        dyz = np.maximum(_distances(ranks[:, y_int], dtype), dz)
-        observed = _cmi_given_yz(dx, dyz, dz, k)
+        cond = tuple(cond)
+        dev = _cmiknn_backend(self._n)
+        if dev == "numpy":
+            hits = self._hits(x_int, y_int, cond)
+        else:
+            hits = self._hits_torch(x_int, y_int, cond, dev)
         total = self._n_permutations + 1
         exceed = 0
-        for left, perm in zip(range(self._n_permutations, 0, -1), self._permutations(tuple(cond))):
+        for left, hit in zip(range(self._n_permutations, 0, -1), hits):
             if alpha is not None:
                 if (exceed + 1) / total > alpha:
                     return (exceed + 1) / total
                 if (exceed + left + 1) / total <= alpha:
                     return (exceed + left + 1) / total
-            exceed += _cmi_given_yz(_distances(ranks[perm, x_int], dtype), dyz, dz, k) >= observed
+            exceed += hit
         return (exceed + 1) / total
+
+    def _hits(self, x: int, y: int, cond: tuple[int, ...]) -> Iterator[bool]:
+        """Whether each shuffle's estimate reaches the observed one, computed as they are read."""
+        ranks, dtype, k = self._ranks, self._dtype, self._k
+        dx = _distances(ranks[:, x], dtype)
+        dz = self._cond_distances(cond)
+        dyz = np.maximum(_distances(ranks[:, y], dtype), dz)
+        observed = _cmi_given_yz(dx, dyz, dz, k)
+        for perm in self._permutations(cond):
+            yield _cmi_given_yz(_distances(ranks[perm, x], dtype), dyz, dz, k) >= observed
+
+    def _hits_torch(self, x: int, y: int, cond: tuple[int, ...], dev: str) -> Iterator[bool]:
+        """:meth:`_hits` with the distances and neighbor counts on ``dev``, a batch of shuffles at
+        a time. The counts are integers and the estimates are formed from them as :meth:`_hits`
+        forms them, so every estimate is the same."""
+        torch = backend.torch()
+        n, k = self._n, self._k
+        ranks = torch.as_tensor(self._ranks[:, [x, y, *cond]], device=dev).to(torch.int32)
+
+        def distances(column):
+            return (column[..., :, None] - column[..., None, :]).abs()
+
+        dz = torch.zeros((n, n), dtype=torch.int32, device=dev)
+        for j in range(2, ranks.shape[1]):
+            dz = torch.maximum(dz, distances(ranks[:, j]))
+        dyz = torch.maximum(distances(ranks[:, 1]), dz)
+        (observed,) = _cmi_from_counts(k, *_counts_torch(distances(ranks[None, :, 0]), dyz, dz, k))
+        perms = torch.as_tensor(self._permutations(cond), device=dev).long()
+        batch = max(1, _DEVICE_BATCH_BYTES // (20 * n * n))
+        for start in range(0, perms.shape[0], batch):
+            shuffled = ranks[:, 0][perms[start : start + batch]]
+            for estimate in _cmi_from_counts(k, *_counts_torch(distances(shuffled), dyz, dz, k)):
+                yield estimate >= observed
 
     def _cond_distances(self, cond: tuple[int, ...]) -> np.ndarray:
         """Max-norm distances between the rows in the conditioning set; zero when it is empty."""

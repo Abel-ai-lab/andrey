@@ -15,6 +15,7 @@ from scipy.linalg import cho_factor, cho_solve
 from scipy.spatial.distance import pdist, squareform
 from scipy.special import gammaincc
 
+from . import backend, env
 from .ci import _canonical, _checked_data
 from .independence import hsic_test
 from .seeding import resolve_seed
@@ -28,6 +29,13 @@ _RCOT_MIN_ROWS = 500
 
 # Each cache of RCoT's features holds about this many bytes.
 _CACHE_BYTES = 2**28
+
+# Smallest kernel matrix (rows squared) at which `auto` runs a KCI query with a conditioning set on
+# a CUDA GPU. `qa/gpu_calibration_validate.py` on an A100-SXM4-80GB against 8 CPU threads found
+# 31,250 (177 rows); per query with two conditioning variables, the GPU took 0.52x the CPU's speed
+# at 100 rows, 1.4x at 200, and 9.5x at 1,000. KCI computes in float64, so `mps` (float32) is never
+# used.
+_KCI_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 31_250, "mps": None}
 
 
 def _cache_entries(floats_per_entry: int) -> int:
@@ -138,6 +146,10 @@ class KCI:
     ``A`` and ``B`` are products of ``n x rank`` factors and no ``n x n`` system is solved. The
     factorization stops before ``rank`` columns when ``L L'`` reproduces the kernel to rounding.
 
+    An exact query with a conditioning set runs on a CUDA GPU, in float64, under the ``cuda``
+    backend, or under ``auto`` from ``ANDREY_KCI_GPU_THRESHOLD`` rows squared. Its p-value then
+    matches the CPU's to rounding.
+
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. Each query with a conditioning set costs an eigendecomposition and four products of
     ``n x n`` matrices, so time grows as the cube of the number of rows and memory as its square:
@@ -180,7 +192,13 @@ class KCI:
         z = data[:, cond]
         if self._rank is not None:
             return self._low_rank_pvalue(data[:, x_int], data[:, y_int], z, width)
-        kxs = _centered_gaussian_kernel(np.column_stack([data[:, x_int], 0.5 * z]), width)
+        xs = np.column_stack([data[:, x_int], 0.5 * z])
+        dev = _kci_backend(n)
+        if dev != "numpy":
+            return _gamma_pvalue(
+                *_kci_moments_torch(xs, data[:, [y_int]], z, width, self._ridge, dev)
+            )
+        kxs = _centered_gaussian_kernel(xs, width)
         ky = _centered_gaussian_kernel(data[:, [y_int]], width)
         ks = _centered_gaussian_kernel(z, width)
         eigval, eigvec = np.linalg.eigh(ks)
@@ -202,6 +220,47 @@ class KCI:
         p = lxs - ls @ np.linalg.solve(inner, ls.T @ lxs)
         q = ly - ls @ np.linalg.solve(inner, ls.T @ ly)
         return _gamma_pvalue(*_kci_moments(p @ p.T, q @ q.T))
+
+
+def _kci_backend(n: int) -> str:
+    """Where a KCI query with a conditioning set on ``n`` rows runs: ``numpy``, or torch on ``cpu``
+    or ``cuda``."""
+    manual = env.KCI_GPU_THRESHOLD.read()
+    return backend.select(
+        ("numpy", "cpu", "cuda"),
+        ("cuda", "numpy"),
+        metric=n * n,
+        thresholds=_KCI_GPU_THRESHOLDS if manual is None else {"cuda": manual},
+        amortized=True,
+        op="kci",
+    )
+
+
+def _kci_moments_torch(
+    xs: np.ndarray, y: np.ndarray, z: np.ndarray, width: float, ridge: float, dev: str
+) -> tuple[float, float, float]:
+    """KCI's statistic and null moments as :meth:`KCI.__call__` computes them, in float64 torch on
+    ``dev``."""
+    torch = backend.torch()
+    n = xs.shape[0]
+
+    def kernel(points: np.ndarray):
+        p = torch.as_tensor(points, dtype=torch.float64, device=dev)
+        sq = torch.zeros((n, n), dtype=torch.float64, device=dev)
+        for c in range(p.shape[1]):
+            sq += (p[:, c, None] - p[None, :, c]) ** 2
+        k = torch.exp(sq / (-2.0 * width * width))
+        col_mean = k.mean(dim=0)
+        return k - col_mean[None, :] - col_mean[:, None] + col_mean.mean()
+
+    eigval, eigvec = torch.linalg.eigh(kernel(z))
+    resid = (eigvec * (ridge / (eigval.clamp(min=0.0) + ridge))) @ eigvec.T
+    del eigvec
+    ab = (resid @ kernel(xs) @ resid) * (resid @ kernel(y) @ resid)
+    statistic = float(ab.sum()) / n
+    mean = float(torch.trace(ab)) / n
+    var = 2.0 * float((ab * ab).sum()) / n**2
+    return statistic, mean, var
 
 
 def _centered_cholesky_factor(points: np.ndarray, width: float, rank: int) -> np.ndarray:

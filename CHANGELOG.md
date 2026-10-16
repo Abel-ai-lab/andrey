@@ -22,6 +22,8 @@ change names its pull request.
   factor of at most `rank` columns. ([#TBD])
 - `andrey.data.sample_scm(functional="nonmonotone")`, additive noise through `cos`, whose effects
   partial correlation does not see. ([#TBD])
+- KCI and CMIknn run on a CUDA GPU, KCI in float64 and CMIknn with the CPU's p-values, from the
+  cutoffs `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`. ([#TBD])
 
 ## [0.5.0] - 2026-10-16
 

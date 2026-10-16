@@ -14,6 +14,8 @@ import pytest
 
 import andrey
 from andrey.core import backend, stats
+from andrey.core.ci_cmiknn import CMIknn
+from andrey.core.ci_kernel import KCI
 
 pytest.importorskip("torch")
 
@@ -82,3 +84,35 @@ def test_on_device_determinism(device, standardized, data):
         # docs/docs/ci.md).
         assert np.allclose(e1, e2, rtol=1e-5, atol=1e-6)
         assert np.allclose(c1, c2, rtol=1e-5, atol=1e-6)
+
+
+@pytest.fixture
+def nonlinear():
+    """Columns ``x, y, z1, z2, w``: ``x`` and ``y`` nonlinear in ``z``, ``w`` driven by ``y``."""
+    rng = np.random.default_rng(2)
+    z = rng.standard_normal((600, 2))
+    s = z.sum(axis=1)
+    x = np.tanh(s) + 0.4 * rng.standard_normal(600)
+    y = s**2 + 0.4 * rng.standard_normal(600)
+    return np.column_stack([x, y, z, np.cos(y) + 0.3 * rng.standard_normal(600)])
+
+
+def test_kci_and_cmiknn_match_the_cpu(device, nonlinear):
+    """KCI on cuda matches the CPU's p-values within 1e-9 and CMIknn's equal them, and PC with each
+    finds the same graph."""
+    if device != "cuda":
+        pytest.skip("KCI and CMIknn have no mps backend")
+    queries = [(0, 1, (2,)), (0, 1, (2, 3)), (1, 4, (0,)), (0, 4, (1, 2, 3))]
+    kci, cmiknn = KCI(nonlinear), CMIknn(nonlinear, n_permutations=100)
+    cpu_kci = [kci(*q) for q in queries]
+    cpu_cmiknn = [cmiknn(*q) for q in queries]
+    cpu_graphs = [andrey.pc(nonlinear, indep_test=t).structure for t in ("kci", "cmiknn")]
+    backend.reset_dispatch_stats()
+    with andrey.config(backend=device):
+        got_kci = [kci(*q) for q in queries]
+        got_cmiknn = [cmiknn(*q) for q in queries]
+        graphs = [andrey.pc(nonlinear, indep_test=t).structure for t in ("kci", "cmiknn")]
+    assert {("kci", "cuda"), ("cmiknn", "cuda")} <= backend.dispatch_stats().keys()
+    assert np.allclose(got_kci, cpu_kci, rtol=0, atol=1e-9)
+    assert got_cmiknn == cpu_cmiknn
+    assert [g.oriented_edges() for g in graphs] == [g.oriented_edges() for g in cpu_graphs]
