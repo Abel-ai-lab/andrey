@@ -214,11 +214,11 @@ def test_charts_cover_only_comparisons_with_a_published_ratio():
     # them once, hidden from assistive technology, so the loop is seamless.
     assert chart.count('<figure class="tchart">') == 3  # PC, FCI, DirectLiNGAM
     assert chart.count('<figure class="tchart" aria-hidden="true">') == 3
-    ups = re.findall(r"(more than|at least) <b>([^<]+)</b>", chart)
+    ups = re.findall(r'class="tchart-up"><b>([^<]+)</b>', chart)
     # Each title rounds its largest ratio (941.05x, 8.9x, 3.59x) down, to one digit or below 10 to
-    # a tenth, and says "at least" where nothing is rounded off. FCI's largest is at d = 400, where
-    # both graphs are worse than the empty graph: a speed ratio does not depend on accuracy.
-    assert ups == [("more than", "900x"), ("at least", "8.9x"), ("more than", "3.5x")] * 2
+    # a tenth, and marks it "+". FCI's largest is at d = 400, where both graphs are worse than the
+    # empty graph: a speed ratio does not depend on accuracy.
+    assert ups == ["900x+", "8.9x+", "3.5x+"] * 2
     # Sizes without a ratio are plotted hollow: DirectLiNGAM 200 (Andrey only; lingam passed its
     # time cap).
     assert chart.count("is-open") == 1 * 2
@@ -315,15 +315,15 @@ def test_unpublished_summary_needs_the_placeholder_flag():
 def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_page):
     summaries = placeholder_summaries()
     page = placeholder_page
-    # Each chart's largest speedup, as "up to"; every size is on the release cards.
+    # Each chart's largest speedup, as "NNNx+"; every size is on the release cards.
     for _, methods in build.time_groups(summaries):
         if all(build.faster(m) for m in methods):
             claimed = [r for m in methods for r in m["rows"] if r["ratio"] is not None]
             best = max(claimed, key=lambda r: r["ratio"])
             family = methods[0]["family"]
             dialog = page[page.index(f'id="speed-{family}"') :]
-            lead, shown = build.more_than(best["ratio"])
-            up = f"{lead.lower()} <b>{shown:,}x</b>"
+            _, shown = build.more_than(best["ratio"])
+            up = f"<b>{shown:,}x+</b>"
             assert up in dialog[: dialog.index("</dialog>")]
     assert not re.search(r"/scratch/|/home/|\bsc\d{3}\b|\bsol\b", page, re.IGNORECASE)
     # A summary's notes on its runs stay on the release cards.
@@ -686,7 +686,7 @@ def test_a_lower_bound_prints_as_one():
     _lower_bound(summaries, "FCI", 20.0)
     slide = next(s for s in build.speedup_slides(summaries) if s[0] == "FCI")
     assert slide[2][0] == ("Andrey", 20.0, "\u226520x")
-    assert "at least <b>20x</b>" in build.speed_chart(summaries)
+    assert "<b>20x+</b>" in build.speed_chart(summaries)
     # A bound divides into no other package's bar: PC is compared with two packages.
     _lower_bound(summaries, "PC", 1000.0)
     with pytest.raises(ValueError, match="lower bound"):

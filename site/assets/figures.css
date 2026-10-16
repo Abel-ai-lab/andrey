@@ -332,8 +332,8 @@ div[class*="highlight-"].window pre {
   background: var(--andrey-surface);
 }
 
-/* The claim sits right of the method's name, its words over its number, so a long name fits; on a
-   card too narrow for both, it moves under the name. */
+/* The claim sits right of the method's name; on a card too narrow for both, it moves under the
+   name. */
 .tchart figcaption {
   display: flex;
   flex-wrap: wrap;
@@ -361,10 +361,6 @@ div[class*="highlight-"].window pre {
 }
 
 .tchart-up {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.15;
   white-space: nowrap;
 }
 
