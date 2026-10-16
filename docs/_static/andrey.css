@@ -224,6 +224,15 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
   text-decoration: none;
 }
 
+/* Each section's line icon, in the link's color, before its name. */
+.bd-header ul.navbar-nav .nav-link .nav-icon,
+.bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link .nav-icon {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-inline-end: 0.4rem;
+}
+
 /* pydata's underline for the current link: the pill marks it instead. */
 .bd-header ul.navbar-nav > li.nav-item > .nav-link::before {
   display: none;
@@ -453,6 +462,8 @@ html[data-theme="dark"] .bd-header ul.navbar-nav > li.nav-item > .nav-link {
 }
 
 .bd-sidebar-primary .sidebar-header-items .navbar-nav .nav-link {
+  display: flex;
+  align-items: center;
   margin: 0 -0.6rem;
   padding: 0.3rem 0.6rem;
   border-radius: 6px;
