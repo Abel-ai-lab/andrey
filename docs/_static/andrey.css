@@ -1062,6 +1062,18 @@ html:not(:has(.andrey-home)) .bd-header::before {
   padding-right: 0.6rem;
 }
 
+/* A reference page's icon and a project link's mark sit in the rows' indent, in the column of the
+   groups' icons, so every row's text still starts at the same place. */
+.docs-nav li > a > .nav-icon:first-child {
+  position: absolute;
+  top: calc(0.3rem + 0.7em - 0.5rem);
+  left: 0;
+}
+
+.docs-nav a[aria-current="page"] > .nav-icon:first-child {
+  color: inherit;
+}
+
 .docs-nav__foot {
   padding-top: 1rem;
   border-top: 1px solid var(--andrey-line);
@@ -1071,10 +1083,10 @@ html:not(:has(.andrey-home)) .bd-header::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.3rem 0.6rem 0.3rem 0;
+  padding: 0.3rem 0.6rem 0.3rem 1.6rem;
 }
 
-.docs-nav__foot .nav-icon {
+.docs-nav__foot .nav-icon--out {
   width: 0.75rem;
   height: 0.75rem;
 }

@@ -281,6 +281,16 @@ NAV_SECTIONS = {
     "docs/demos/index": "play",
 }
 NAV_REFERENCE = ("Reference", "code")
+# The reference pages' icons in the documentation tree (_templates/nav-icons.html).
+NAV_ICONS = {
+    "docs/code/index": "braces",
+    "docs/configuration": "sliders",
+    "docs/benchmarks": "chart",
+    "docs/faq": "help",
+    "docs/changelog": "history",
+    "docs/roadmap": "map",
+    "docs/brand": "palette",
+}
 NAV_SHOWN = 5
 html_additional_pages = {"index": "homepage.html", "demo/index": "demo-redirect.html"}
 
@@ -789,7 +799,7 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
         for doc in top
         if doc in NAV_SECTIONS
     ]
-    rest = [row(doc) for doc in top if doc not in NAV_SECTIONS]
+    rest = [{**row(doc), "mark": NAV_ICONS.get(doc)} for doc in top if doc not in NAV_SECTIONS]
     name, icon = NAV_REFERENCE
     groups.append({"doc": None, "title": name, "icon": icon, "kids": rest, "shown": len(rest)})
     context["docs_nav"] = groups
