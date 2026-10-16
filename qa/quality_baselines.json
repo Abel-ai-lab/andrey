@@ -26,9 +26,9 @@
     },
     "baselines": {
       "PC": {
-        "linear_gauss_er_d20": {"median_shd": 4.0, "empty_median_shd": 20.0, "shd": [4, 9, 7, 1, 3, 3, 8, 4, 12, 0]},
-        "linear_gauss_er_d50": {"median_shd": 10.0, "empty_median_shd": 50.0, "shd": [12, 14, 18, 10, 9, 6, 13, 10, 10, 5]},
-        "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [0, 0, 3, 3, 0, 0, 3, 2, 3, 5]},
+        "linear_gauss_er_d20": {"median_shd": 4.5, "empty_median_shd": 20.0, "shd": [4, 12, 7, 1, 0, 2, 6, 5, 12, 0]},
+        "linear_gauss_er_d50": {"median_shd": 12.0, "empty_median_shd": 50.0, "shd": [13, 14, 23, 15, 11, 11, 13, 11, 6, 5]},
+        "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [2, 0, 3, 3, 2, 0, 3, 2, 3, 5]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "FCI": {

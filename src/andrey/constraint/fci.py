@@ -105,8 +105,7 @@ def _fast_adjacency_search(
             neighbors = [np.flatnonzero(support[i]) for i in range(d)]
             remove: list[tuple[int, int]] = []
             if can_prescreen and size == 0:
-                upper = np.triu(support, 1)
-                for x, y, _ in marginal_removals(test, upper, alpha, record_pvalues=False):
+                for x, y in marginal_removals(test, np.triu(support, 1), alpha):
                     remove.append((x, y))
                     sepsets[(x, y)] = ()
                     sepsets[(y, x)] = ()  # skeleton separations are recorded both ways
@@ -115,9 +114,7 @@ def _fast_adjacency_search(
                     candidates = sorted(
                         (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
-                    separating, _ = first_order_separating(
-                        test, x, y, candidates, alpha, record_pvalues=False
-                    )
+                    separating = first_order_separating(test, x, y, candidates, alpha)
                     if separating:
                         remove.append((x, y))
                         key = tuple(separating)
@@ -126,16 +123,14 @@ def _fast_adjacency_search(
             else:
                 pairs = adjacent_pairs(support)
                 if pool is not None:
-                    removals = pool.scan(pairs, support.copy(), size, alpha, record_pvalues=False)
+                    removals = pool.scan(pairs, support.copy(), size, alpha)
                 else:
                     # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
                     # match the (1-thread) parallel skeleton workers, where it has them, whatever
                     # the host thread count.
                     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
-                        removals = scan_pairs(
-                            test, pairs, neighbors, size, alpha, record_pvalues=False
-                        )
-                for x, y, separating, _ in removals:
+                        removals = scan_pairs(test, pairs, neighbors, size, alpha)
+                for x, y, separating in removals:
                     remove.append((x, y))
                     sepsets[(x, y)] = separating
                     sepsets[(y, x)] = separating

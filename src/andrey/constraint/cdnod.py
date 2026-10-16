@@ -2,21 +2,18 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.cdnod`.
 
-The context index joins the data as a last variable. Every edge the context keeps is oriented out
-of it, then colliders are oriented as PC orients them, before Meek's rules run. The context node is
-dropped from the returned CPDAG.
+The context index joins the data as a last variable. Every edge it keeps is oriented out of it
+before the collider and Meek passes, which follow PC's conflict rule and so never overwrite those
+orientations. The context node is dropped from the returned CPDAG.
 """
 
 from __future__ import annotations
 
+from itertools import combinations
+
 import numpy as np
 
-from andrey.constraint.pc import (
-    _discover_skeleton,
-    _orient_colliders,
-    _undirect_conflicts,
-    check_collider_order,
-)
+from andrey.constraint.pc import _discover_skeleton, _lookup_sepset, _points_to
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
 from andrey.core.orient import meek, to_structure
 
@@ -27,7 +24,6 @@ def cdnod(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    collider_order: str = "p_value",
     categorical: np.ndarray | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from nonstationary ``data`` with the CDNOD algorithm and the ``indep_test``.
@@ -37,12 +33,10 @@ def cdnod(
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
     ``indep_test`` selects the CI test, run over the augmented matrix. The context is appended as an
     extra variable and the result is projected back to the ``n_features`` data variables.
-    ``collider_order`` orders the colliders as in :func:`~andrey.constraint.pc.pc`.
     ``categorical``, a boolean mask of the data's categorical columns, reaches a mixed-data test,
     which also takes the context as categorical. Returns the CPDAG as a ``GraphStructure`` of kind
     ``"cpdag"``.
     """
-    check_collider_order(collider_order)
     X = np.asarray(data, dtype=np.float64)
     context = np.asarray(c_indx, dtype=np.float64)
     # One value per row: a wider index reshaped to a column would pair rows with the wrong values.
@@ -55,45 +49,51 @@ def cdnod(
         raise ValueError("c_indx contains NaN or inf")
     context = context.reshape(-1, 1)
     d = X.shape[1]
-    ranked = collider_order == "p_value"
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
-        skeleton, sepsets, pvalues = _discover_skeleton(
-            X, alpha, indep_test, categorical=categorical, record_pvalues=ranked
-        )
-        pdag = _orient_with_context(skeleton, sepsets, pvalues, context=None, order=collider_order)
+        skeleton, sepsets = _discover_skeleton(X, alpha, indep_test, categorical=categorical)
+        pdag = _orient_with_context(skeleton, sepsets, context=None)
     else:
         augmented = np.concatenate([X, context], axis=1)
         mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
-        skeleton, sepsets, pvalues = _discover_skeleton(
-            augmented, alpha, indep_test, categorical=mask, record_pvalues=ranked
-        )
-        pdag = _orient_with_context(skeleton, sepsets, pvalues, context=d, order=collider_order)
-    completed = _undirect_conflicts(meek(pdag))
+        skeleton, sepsets = _discover_skeleton(augmented, alpha, indep_test, categorical=mask)
+        pdag = _orient_with_context(skeleton, sepsets, context=d)
+    completed = meek(pdag)
     return to_structure(completed[:d, :d], kind="cpdag")
 
 
 def _orient_with_context(
     skeleton: np.ndarray,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
-    pvalues: dict[tuple[int, int], float],
     *,
     context: int | None,
-    order: str = "p_value",
 ) -> np.ndarray:
     """Orient the augmented skeleton: context edges outward, then unshielded colliders.
 
-    Every edge the ``context`` node keeps becomes ``context -> neighbor`` first, so the context is
-    a source in every triple it touches. Colliders are then oriented as PC orients them, in
-    ``order`` (:func:`~andrey.constraint.pc._orient_colliders`), which skips a collider when an edge
-    it would orient already has an arrowhead at the other end; so none puts an arrowhead at the
-    context.
-    ``context=None`` orients colliders only, for a skeleton without a context node.
+    Every edge the ``context`` node retains is oriented ``context -> neighbor`` up front, so the
+    context is a source in every triple it touches. Unshielded colliders are then oriented with the
+    prioritize-existing rule (``uc_priority=2``): a collider ``x -> y <- z`` is oriented only when
+    ``y`` is absent from the separating set of ``x`` and ``z`` and neither ``y -> x`` nor ``y -> z``
+    is already directed, so the context orientations survive. ``context=None`` orients colliders
+    only, for a skeleton without a context node.
     """
-    pdag = skeleton.copy()
-    if context is not None:
-        neighbors = np.flatnonzero(skeleton[context] != NULL)
-        pdag[context, neighbors] = TAIL
-        pdag[neighbors, context] = ARROW
-    return _orient_colliders(pdag, sepsets, pvalues, order=order)
+    n = skeleton.shape[0]
+    pdag = np.where(skeleton != NULL, np.int8(TAIL), np.int8(NULL))
+    np.fill_diagonal(pdag, np.int8(NULL))
+    neighbors = [] if context is None else np.nonzero(skeleton[context] != NULL)[0].tolist()
+    for neighbor in neighbors:
+        pdag[context, neighbor], pdag[neighbor, context] = TAIL, ARROW
+    for y in range(n):
+        nbrs = np.nonzero(skeleton[y] != NULL)[0].tolist()
+        for a, b in combinations(range(len(nbrs)), 2):
+            x, z = nbrs[a], nbrs[b]
+            if skeleton[x, z] != NULL:
+                continue
+            if y in _lookup_sepset(sepsets, x, z):
+                continue
+            if _points_to(pdag, y, x) or _points_to(pdag, y, z):
+                continue
+            pdag[x, y], pdag[y, x] = TAIL, ARROW
+            pdag[z, y], pdag[y, z] = TAIL, ARROW
+    return pdag

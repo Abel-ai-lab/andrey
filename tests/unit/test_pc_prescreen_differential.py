@@ -4,8 +4,7 @@ The prescreen replaces the scalar size-0 and size-1 skeleton passes with vectori
 Fisher-Z correlation matrix, the ``|S| >= 2`` scan evaluates conditioning sets through
 ``FisherZ.batched_call``, and the skeleton pass may fan out across worker processes. All three are
 *output-preserving*: the recovered adjacency and every removed pair's separating set must be
-identical to the plain scalar adjacency search, pair for pair and byte for byte, and PC's largest
-separating p-value per removed pair must be the same float on every path.
+identical to the plain scalar adjacency search, pair for pair and byte for byte.
 
 This module pins that with an independent, deliberately naive scalar reference adjacency search --
 one that calls the Fisher-Z oracle (:meth:`FisherZ.__call__`) directly, with no batching, no
@@ -33,11 +32,7 @@ from andrey.constraint.pc import _discover_skeleton
 from andrey.core import NULL, TAIL
 from andrey.core.ci import make_indep_test
 
-# Adjacency, separating sets, and, from PC's search, the largest separating p-value per pair.
-Skeleton = (
-    tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]
-    | tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]
-)
+Skeleton = tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]
 
 
 @pytest.fixture(autouse=True)
@@ -130,16 +125,11 @@ def _reference_skeleton(
 
 
 def _assert_same(lhs: Skeleton, rhs: Skeleton, label: str) -> None:
-    """Assert two skeletons share adjacency (byte for byte) and separating sets (key for key).
-
-    When both carry PC's separating p-values, every removed pair has one, and they are equal
-    floats, pair for pair.
-    """
-    assert np.array_equal(lhs[0] != NULL, rhs[0] != NULL), f"{label}: adjacency differs"
-    assert lhs[1] == rhs[1], f"{label}: separating sets differ"
-    if len(lhs) == len(rhs) == 3:
-        assert lhs[2].keys() == lhs[1].keys(), f"{label}: a removed pair has no p-value"
-        assert lhs[2] == rhs[2], f"{label}: separating p-values differ"
+    """Assert two skeletons share adjacency (byte for byte) and separating sets (key for key)."""
+    lhs_adj, lhs_sep = lhs
+    rhs_adj, rhs_sep = rhs
+    assert np.array_equal(lhs_adj != NULL, rhs_adj != NULL), f"{label}: adjacency differs"
+    assert lhs_sep == rhs_sep, f"{label}: separating sets differ"
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _CASES, ids=_CASE_IDS)
@@ -262,18 +252,6 @@ def test_pc_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None
     serial = _discover_skeleton(x, 0.05, "fisherz", workers=1)
     parallel = _discover_skeleton(x, 0.05, "fisherz", workers=3)
     _assert_same(serial, parallel, f"PC serial/parallel seed={seed} d={d} n={n} p={p}")
-
-
-@pytest.mark.parametrize(("prescreen", "workers"), [(True, 1), (False, 1), (True, 3)])
-def test_pc_skeleton_without_pvalues_is_the_same(prescreen: bool, workers: int) -> None:
-    # The column collider order skips the p-values on the prescreen, scan, and worker paths.
-    x = _gaussian_dag(0, 600, 20, 0.25)
-    full = _discover_skeleton(x, 0.05, "fisherz", prescreen=prescreen, workers=workers)
-    bare = _discover_skeleton(
-        x, 0.05, "fisherz", prescreen=prescreen, workers=workers, record_pvalues=False
-    )
-    assert full[2] and bare[2] == {}
-    _assert_same(bare[:2], full[:2], f"PC without p-values prescreen={prescreen} workers={workers}")
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _PARALLEL_CASES, ids=_PARALLEL_IDS)
