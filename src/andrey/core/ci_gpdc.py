@@ -69,6 +69,8 @@ class GPDC:
     Gaussian-process regression on ``z`` with a radial-basis-function kernel plus white noise,
     whose length scale and noise level maximize the marginal likelihood [2]_; the residuals are the
     observations minus the fitted means. An empty conditioning set uses ``x`` and ``y`` themselves.
+    A fit depends only on the variable and the conditioning set, so its residuals are kept on the
+    test object and reused by every later query on the same pair of them.
     The residuals are replaced by their ranks, which gives them uniform marginals; tied values
     are ordered by a random key per row and variable, drawn once from ``seed``, so that every
     ranking stays equally likely under the null. The statistic is their squared distance
@@ -117,6 +119,7 @@ class GPDC:
         self._seed = resolve_seed(seed)
         self._tie_keys = np.random.default_rng(self._seed).random(arr.shape)
         self._null: np.ndarray | None = None
+        self._residuals: dict[tuple[int, tuple[int, ...]], np.ndarray] = {}
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the GPDC p-value for ``x`` independent of ``y`` given ``condition_set``."""
@@ -131,17 +134,23 @@ class GPDC:
         return (exceed + 1) / (self._n_null + 1)
 
     def _residual(self, column: int, cond: list[int]) -> np.ndarray:
+        """``column`` minus its Gaussian-process fit on ``cond``, kept for later queries."""
         target = self._data[:, column]
         if not cond:
             return target
-        regressor = GaussianProcessRegressor(kernel=RBF() + WhiteKernel(), alpha=0.0)
-        features = self._data[:, cond]
-        with warnings.catch_warnings():
-            # A length scale or noise level at its bound is a valid fit (a target unrelated to the
-            # conditioning set, or explained by it exactly), not a failure.
-            warnings.simplefilter("ignore", ConvergenceWarning)
-            regressor.fit(features, target)
-        return target - regressor.predict(features)
+        key = (column, tuple(cond))
+        residual = self._residuals.get(key)
+        if residual is None:
+            regressor = GaussianProcessRegressor(kernel=RBF() + WhiteKernel(), alpha=0.0)
+            features = self._data[:, cond]
+            with warnings.catch_warnings():
+                # A length scale or noise level at its bound is a valid fit (a target unrelated to
+                # the conditioning set, or explained by it exactly), not a failure.
+                warnings.simplefilter("ignore", ConvergenceWarning)
+                regressor.fit(features, target)
+            residual = target - regressor.predict(features)
+            self._residuals[key] = residual
+        return residual
 
     def _ranks(self, values: np.ndarray, column: int) -> np.ndarray:
         """Ranks 0 to n - 1, ties broken by the random key of ``column``."""

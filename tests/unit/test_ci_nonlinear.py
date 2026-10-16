@@ -17,6 +17,7 @@ import pytest
 from scipy.integrate import quad
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import chi2, gamma
+from sklearn.gaussian_process import GaussianProcessRegressor
 
 import andrey
 from andrey.core import ci
@@ -234,6 +235,22 @@ def test_gpdc_statistic_is_the_squared_distance_correlation():
     expected = dcov2(u, v) / np.sqrt(dcov2(u, u) * dcov2(v, v))
     statistic = _squared_distance_correlation(_centered_distances(u), _centered_distances(v))
     assert statistic == pytest.approx(expected, rel=1e-12)
+
+
+def test_gpdc_fits_each_variable_and_conditioning_set_once(monkeypatch):
+    """A regression is reused by later queries on the same variable and conditioning set, and the
+    p-values equal those of a test that fits every query afresh."""
+    data = _common_cause(seed=3, n=120, n_cond=2)
+    fits = []
+    fit = GaussianProcessRegressor.fit
+    monkeypatch.setattr(
+        GaussianProcessRegressor, "fit", lambda self, X, y: fits.append(1) or fit(self, X, y)
+    )
+    queries = [(0, 1, (2,)), (0, 3, (2,)), (1, 3, (2,)), (0, 1, (2, 3))]
+    test = _build("gpdc", data)
+    pvalues = [test(*query) for query in queries]
+    assert len(fits) == 5  # (0, {2}), (1, {2}), (3, {2}), (0, {2, 3}), (1, {2, 3})
+    assert [_build("gpdc", data)(*query) for query in queries] == pvalues
 
 
 # ---- the contract ------------------------------------------------------------------------------
