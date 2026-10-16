@@ -1,9 +1,9 @@
 """Constraint-based facade adapters.
 
-The underlying searches use :mod:`andrey.core` for the conditional-independence tests (Fisher-Z on
-continuous data, chi-square and G-square on categorical data, degenerate and conditional Gaussian
-likelihood ratios on mixed data) and orientation. ``pc`` and ``cdnod`` produce CPDAGs; ``fci`` and
-``gfci`` produce PAGs. GFCI also uses GES with a BIC, BDeu, or mixed-data score.
+The underlying searches use :mod:`andrey.core` for the conditional-independence tests (Fisher-Z and
+Student-t on continuous data, chi-square and G-square on categorical data, degenerate and
+conditional Gaussian likelihood ratios on mixed data) and orientation. ``pc`` and ``cdnod`` produce
+CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with a BIC, BDeu, or mixed-data score.
 """
 
 from __future__ import annotations
@@ -54,12 +54,14 @@ def pc(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "chisq", "gsq", "degen_gauss", "cond_gauss"}, default="fisherz"
-        Conditional-independence test. ``"fisherz"`` tests partial correlation (Fisher's z), for
-        continuous data. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
-        Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
-        categorical columns, by a likelihood ratio. See Notes.
+    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
+        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` and ``"student_t"``
+        test partial correlation, for continuous data: ``"fisherz"`` applies Fisher's z-transform
+        and the normal distribution; ``"student_t"`` applies the Student-t distribution, which is
+        exact for Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and
+        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
+        ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
+        mixed data, continuous and categorical columns, by a likelihood ratio. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -266,12 +268,14 @@ def fci(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "chisq", "gsq", "degen_gauss", "cond_gauss"}, default="fisherz"
-        Conditional-independence test. ``"fisherz"`` tests partial correlation (Fisher's z), for
-        continuous data. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers. ``"degen_gauss"`` (degenerate
-        Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test mixed data, continuous and
-        categorical columns. See Notes.
+    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
+        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` and ``"student_t"``
+        test partial correlation, for continuous data: ``"fisherz"`` applies Fisher's z-transform
+        and the normal distribution; ``"student_t"`` applies the Student-t distribution, which is
+        exact for Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and
+        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
+        ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
+        mixed data, continuous and categorical columns. See Notes.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -430,11 +434,12 @@ def gfci(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
         BDeu ignores it.
-    indep_test : {"fisherz", "chisq", "gsq", "degen_gauss", "cond_gauss"}, default="fisherz"
-        Conditional-independence test for the FCI phase. ``"fisherz"`` tests partial correlation
-        (Fisher's z), for continuous data. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
-        (G-square, the likelihood ratio) test categorical data, coded by whole numbers, and
-        ``"degen_gauss"`` and ``"cond_gauss"`` mixed data, as for :func:`~andrey.pc`.
+    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
+        Conditional-independence test for the FCI phase, by default ``"fisherz"``. ``"fisherz"``
+        (Fisher's z) and ``"student_t"`` (Student-t) test partial correlation, for continuous data.
+        ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test
+        categorical data, coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed
+        data, as for :func:`~andrey.pc`.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
@@ -584,11 +589,12 @@ def cdnod(
         equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "chisq", "gsq", "degen_gauss", "cond_gauss"}, default="fisherz"
-        Conditional-independence test. ``"fisherz"`` tests partial correlation (Fisher's z), for
-        continuous data. ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood
-        ratio) test categorical data, coded by whole numbers, and ``"degen_gauss"`` and
-        ``"cond_gauss"`` mixed data, as for :func:`~andrey.pc`; see Notes for the index.
+    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
+        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` (Fisher's z) and
+        ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
+        (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
+        coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data, as for
+        :func:`~andrey.pc`; see Notes for the index.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -639,19 +645,19 @@ def cdnod(
     changes with the index, the edge from the index into it is directed, and Meek's rules can then
     orient edges that PC leaves undirected on the same data.
 
-    Fisher-Z tests the index as a number, by linear correlation, so it finds a shift only when the
-    shift follows the index's values. With two domains the coding does not matter. With three
-    domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go undetected, and recoding the
-    domains can change the result. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"``
-    take each index value as a category, so they find a shift in any domain, whatever the coding.
-    With ``"degen_gauss"`` or ``"cond_gauss"``, the index is categorical, so every data column may
-    be continuous.
+    ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
+    find a shift only when the shift follows the index's values. With two domains the coding does
+    not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
+    undetected, and recoding the domains can change the result. ``"chisq"``, ``"gsq"``,
+    ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they find a
+    shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the index
+    is categorical, so every data column may be continuous.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 500 rows,
     and on 1,200 rows with 7 variables. It runs the PC search with the index as one more variable,
-    so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its Fisher-Z tests
-    assume linear relations with Gaussian noise. With a mixed-data test, its tests run it on 5
-    variables with 3,000 rows.
+    so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
+    partial-correlation tests assume linear relations with Gaussian noise. With a mixed-data test,
+    its tests run it on 5 variables with 3,000 rows.
 
     References
     ----------

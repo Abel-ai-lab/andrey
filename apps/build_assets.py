@@ -57,6 +57,7 @@ def benchmarks_page(summary, *, links=SITE_URL, race_tab=False, heading=True):
     css = (
         builder.tokens_css()
         + (ROOT / "site" / "assets" / "figures.css").read_text()
+        + (ROOT / "site" / "assets" / "segmented.css").read_text()
         + "body{margin:0;padding:20px;background:var(--andrey-paper);color:var(--andrey-ink);"
         "font:16px/1.6 Inter,system-ui,sans-serif}h1{font-size:1.6rem;font-weight:600}"
         "h2{font-weight:600}details{margin-block:12px}a{color:var(--andrey-accent)}"

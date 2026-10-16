@@ -26,6 +26,11 @@ uv run --group docs sphinx-build -W -b html docs docs/_build/html
 
 Every link is relative, so one build serves any hostname.
 
+After the build, `_version_assets` in `conf.py` adds each local image's content hash to its
+address (`?v=<hash>`) in the pages and stylesheets, and gives each stylesheet link the hash of
+the rewritten stylesheet, so a deploy never shows an image Cloudflare or a browser cached from an
+earlier build. Download links keep their plain addresses.
+
 ## The homepage
 
 The homepage is a template, [`site/homepage.html`](../site/homepage.html), on pydata's layout with
@@ -45,7 +50,7 @@ each with a figure of its own, and a note in plain type where the evidence is a 
 The hero and Accelerated share the fast lanes (`HERO_ART`, `.run` in `site.css`), which stay on the
 screen while Accelerated's title comes up over them, until the tiles rise over the art.
 
-- Accelerated: the ideas behind the speed, one at a time as the reader scrolls, then a tile per
+- Accelerated: the ideas behind the speed as a carousel, one card playing at a time, then a tile per
   method family.
 - Accurate: where Andrey has fewer errors, as a chart, and beside it a note: every release is
   tested against true graphs, and its release card gives every method's errors.
@@ -62,14 +67,17 @@ with a published comparison (`family_tiles()`) shows the family's largest ratio 
 digit ("up to 900x faster"), and none where Andrey is not at least twice as fast; a new family gets
 its tile with no change to the page.
 
-The ideas are four animated scenes from [`site/why_fast.py`](../site/why_fast.py) (`story()`),
-which the post `docs/blog/20261008-why-andrey-is-fast.md` shows too; each compares Andrey with a
-lane labeled Others and names no package. `why-fast.js` pins Accelerated's title and the story
-under the navbar and splits the run's scroll among the scenes; where they do not fit the screen
-together, the scenes stack and each plays as it rises. Without script, and under reduced motion,
-they stand at their final counts. They play with Motion, vendored unmodified as
-`site/assets/motion.js` under its MIT license and pinned in `tests/unit/test_why_fast.py`; `conf.py`
-loads both scripts only on those two pages.
+The ideas are four animated scenes from [`site/why_fast.py`](../site/why_fast.py), which the post
+`docs/blog/20261008-why-andrey-is-fast.md` shows too; each compares Andrey with a lane labeled
+Others and names no package. Under Accelerated's title they are a carousel (`belt()`): a card per
+scene, with its title, narration, a link to its part of the post, and its stage, in a row that
+scrolls sideways across the screen and snaps each card to the center. `why-fast.js` plays the
+current card while its dot fills, rests on its last frame, and moves on to the next, looping; it
+waits while the pointer or focus is on the carousel or it is off the screen, and the dots, arrow
+keys, a swipe, or a drag pick a card. Without script the cards are a row to scroll by hand, and
+under reduced motion no card plays or moves on by itself; both show the final counts. The scenes
+play with Motion, vendored unmodified as `site/assets/motion.js` under its MIT license and pinned
+in `tests/unit/test_why_fast.py`; `conf.py` loads both scripts only on those two pages.
 
 The page moves with the scroll, never under reduced motion: the stylesheet drives it from scroll and
 view timelines where the browser has them, and only opacity and transforms move; elsewhere the page
@@ -91,10 +99,11 @@ color is `--andrey-ground-art` (`cards.ground_tokens()`), the ground the CSS lay
 The navbar on every page is a frosted glass pill (`docs/_static/andrey.css`), as is the search
 dialog. In Chromium the pill is Liquid Glass: `glass.js` draws a lens map for the pill's size into
 the SVG filter in `_templates/site-logo.html` and sets `data-glass`; other browsers keep the frosted
-pill, and reduced transparency gets the solid paper. A dot on Release cards marks a release the
-reader has not opened: `_templates/site-nav.html` gives it the newest release's version
-(`_release_post` in `conf.py`), and `nav-new.js` shows it until the reader opens a release card, and
-again when a newer release is out.
+pill, and reduced transparency gets the solid paper. A dot on Release cards marks a new release
+for a week: `_templates/site-nav.html` gives it the newest release's version and its post's date
+(`_release_post` in `conf.py`), and `nav-new.js` shows it within seven days of that date until the
+reader opens a release card, a fact it keeps in the browser's local storage, which no request
+carries; a newer release shows it again.
 
 The homepage takes every number from the release summaries `RELEASES` names
 (`benchmarks/published/<label>/summary.json`) or from the registry (`andrey.spec.list_specs()`),
@@ -134,10 +143,11 @@ date, tags, and description, then the earlier ones, newest first, each with a sm
 (`thumb_jpeg` in `site/cards.py`). Newest means the latest date, a later version breaking a tie. A
 new post needs no change to the page.
 
-A post's cover is its art alone; its link preview is the banner, the art with the wordmark, title,
-and release over its left side (`preview_jpeg`). A post belongs to the release in its `version`
-front matter, and later builds leave it as that release rendered it: its numbers are typed text, and
-every file it includes is stored under `blog/<version>/`.
+A post's cover is its art alone; an art with a centered version (`CENTERED` in `site/cards.py`)
+shows the version on its cover and thumbnail. Its link preview is the banner, the art with the
+wordmark, title, and release over its left side (`preview_jpeg`). A post belongs to the release in
+its `version` front matter, and later builds leave it as that release rendered it: its numbers are
+typed text, and every file it includes is stored under `blog/<version>/`.
 
 ## The release cards
 
@@ -191,6 +201,13 @@ d-separation explorer, and the benchmark explorer from
 [`apps/build_assets.py`](../apps/build_assets.py). The comparison reads causal-learn's graphs from
 `apps/compare-causal-learn.json`, recorded once (see [`apps/README.md`](../apps/README.md)); the
 build refuses a recording made on different data.
+
+Every choice on the site is one segmented control, `site/assets/segmented.css`: a track whose
+chosen option fills with the accent. The documentation pages load it with the shared stylesheets,
+and the demos and the benchmark explorer, which are standalone pages, inline the same file. It
+styles the release cards' and posts' figure tabs (`race-sizes`), the comparison's method switch,
+the PC replay's examples, the d-separation explorer's conditioning set, and the graph guide's
+edges.
 
 Thumbnails come from each page's own output: a demo draws its own; a notebook's is its first figure,
 or its dataset's true graph (`NOTEBOOK_DATA` in `conf.py`). They are drawn in the light palette in
@@ -252,7 +269,8 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Sphinx config (theme, extensions, notebooks, blog, generated pages) | `docs/conf.py` |
 | Homepage template, stylesheet, and content generators | `site/homepage.html`, `site/assets/site.css`, `site/build.py` |
 | Timing comparison and speed charts | `site/assets/figures.css`, `site/assets/figures.js` |
-| "Why Andrey is fast" scenes: homepage story, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
+| Segmented control: every choice, in the figures, the demos, and the graph guide | `site/assets/segmented.css` |
+| "Why Andrey is fast" scenes: homepage carousel, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
 | Navbar: wordmark and sections | `docs/_templates/site-logo.html`, `docs/_templates/site-nav.html` |
 | Documentation footer: a navy card, three columns of links, the license, Abel's mark | `docs/_templates/docs-footer.html`, `docs/_static/andrey.css` |
 | Brand kit page: the downloads (`brand_kit` and `social_svg` in `site/cards.py`, written to `_static/brand/`) and the colors (`BRAND_COLORS` in `conf.py`) | `docs/docs/brand.md`, `docs/_static/andrey.css` |
@@ -266,4 +284,5 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Examples and demos galleries and pages | `docs/docs/examples/`, `docs/docs/demos/` |
 | Notebook sources | `examples/*.ipynb` -> staged into `docs/docs/examples/` |
 | Docs chrome over the palette tokens | `docs/_static/andrey.css` |
+| Docs tables: a framed header band over a card of rows, a fade where a wide table scrolls, short values and labels on one line (`_short_cells` in `conf.py`); the API reference's summary tables get a Name and Description header (`_summary_headers`) and stack on a phone | `docs/_static/andrey.css`, `docs/conf.py` |
 | The old demo address, redirected to the gallery | `docs/_templates/demo-redirect.html` |

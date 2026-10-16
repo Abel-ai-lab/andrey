@@ -4,7 +4,7 @@ The algorithm, its settings, and its references are described on :func:`andrey.g
 
 The GES CPDAG's adjacencies, reset to circle marks, go through the collider,
 possible-d-separation, and R0-R10 passes of :mod:`andrey.constraint.fci`, with its rule
-implementations, Fisher-Z test, and mark convention.
+implementations, conditional-independence tests, and mark convention.
 """
 
 from __future__ import annotations

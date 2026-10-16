@@ -55,6 +55,7 @@ RELEASES = (
     "score-search-2026-10",
     "pairwise-2026-10",
     "direct-lingam-2026-10",
+    "time-series-2026-10",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -93,6 +94,12 @@ REGIMES = {
     "latent_lingam_er": "linear non-Gaussian data from Erdos-Renyi graphs with hidden confounders",
     "anm_pair": "cause-effect pairs with additive noise",
     "pnl_pair": "cause-effect pairs with post-nonlinear noise",
+    "pcmci_paper": "lagged linear-Gaussian time series",
+    "pcmciplus_paper": "linear-Gaussian time series with same-step links",
+    "lpcmci_paper": "linear-Gaussian time series with unobserved series",
+    "varma_lingam_paper": "linear non-Gaussian time series with a moving average",
+    "longitudinal_lingam_paper": "linear non-Gaussian longitudinal data",
+    "var2_lagged": "lagged linear-Gaussian time series",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
@@ -112,6 +119,11 @@ ERRORS = {
     "direction": (
         ("andrey_reversed", "comparator_reversed", None),
         "on a cause-effect pair, the reversed direction",
+    ),
+    "temporal": (
+        ("andrey_errors", "comparator_errors", "empty_errors"),
+        "in a time series, a link that the learned and true graphs do not share, or a link end "
+        "they mark differently",
     ),
 }
 # The density the homepage shows. A summary that measures more than one mean degree at a size
@@ -248,6 +260,9 @@ def error_kind(method: dict) -> str:
     - ``direction``: on cause-effect pairs, the pairs whose direction is reversed (the
       pairwise-2026-10 summary). Each package names a direction on every pair it fits, so a fitted
       pair is either right or reversed; a summary with a pair left without an edge fails to load.
+    - ``temporal``: in a time series, the errors in the method's own unit, which its summary's
+      ``error_metric`` defines: the lag-resolved SHD, the endpoint SHD over a window of lags, or
+      the lagged or cross-link edges missed plus those added (the time-series-2026-10 summary).
 
     Fewer is better in each. A comparison whose rows give none of them fails, rather than drop out
     of the count.
@@ -2152,7 +2167,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "hero_art": hero_art(),
         "tile_art": tile_art,
         "plus": plus(),
-        "why_fast_story": _why_fast["story"](),
+        "why_fast_belt": _why_fast["belt"](),
         "act_cards": act_cards(claims),
         "act_covers": act_covers(claims),
         "example_cover": example_cover(),

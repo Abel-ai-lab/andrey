@@ -272,7 +272,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default) | `local_score_BIC` (the default) |
+| Continuous | `fisherz` (the default), `student_t` | `local_score_BIC` (the default) |
 | Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
 
@@ -326,7 +326,8 @@ Andrey reads its numeric backend and its worker count from `andrey.config`, or f
 `ANDREY_BACKEND` and `ANDREY_NUM_WORKERS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
 worker, GES, GIES, and GFCI scan each pass in worker processes, and GES returns the same graph as it
-does serially.
+does serially. `granger` fits its variables on worker threads, with the same coefficients, and
+needs none of the guard below.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_NUM_WORKERS` above 1, or `-1` for every core) must put its entry

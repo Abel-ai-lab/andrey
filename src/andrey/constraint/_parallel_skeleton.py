@@ -9,20 +9,22 @@ identical to the serial scan regardless of how the pairs are partitioned or the 
 complete.
 
 Workers are seeded once with the parent's exact correlation-matrix bytes (via
-:meth:`~andrey.core.ci.FisherZ.from_corr`) and pin BLAS to one thread, so every process feeds
-identical float64 into the Fisher-Z closed forms and the skeleton is bit-identical to the serial
-oracle. A worker rebuilds the start-of-size neighborhood from the adjacency snapshot the task
-carries and delegates to the shared :func:`~andrey.constraint._skeleton.scan_pairs`.
+:meth:`~andrey.core.ci.PartialCorrelationTest.from_corr` of the parent's test class) and pin BLAS
+to one thread, so every process feeds identical float64 into the same closed forms and the
+skeleton is bit-identical to the serial oracle. A worker rebuilds the start-of-size neighborhood
+from the adjacency snapshot the task carries and delegates to the shared
+:func:`~andrey.constraint._skeleton.scan_pairs`.
 """
 
 from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor
+from typing import cast
 
 import numpy as np
 
 from andrey.constraint._skeleton import Removal, scan_pairs
-from andrey.core.ci import CITest, FisherZ
+from andrey.core.ci import CITest, PartialCorrelationTest
 
 # The start-method policy and fail-loud collect are the same primitives the parallel greedy search
 # uses, so the skeleton reuses those helpers rather than redefining them; only the pair-axis
@@ -31,7 +33,7 @@ from andrey.search._parallel import collect as _collect
 from andrey.search._parallel import pick_context as _pick_context
 
 # Per-worker state installed once by _init_worker and reused across every task and size pass.
-_WORKER_TEST: FisherZ | None = None
+_WORKER_TEST: PartialCorrelationTest | None = None
 _WORKER_TOKEN: object = None
 _WORKER_BLAS: object = (
     None  # a held threadpoolctl controller capping this worker's BLAS to 1 thread
@@ -47,13 +49,15 @@ def even_pair_chunks(pairs: list[tuple[int, int]], n_chunks: int) -> list[list[t
     return [[pairs[i] for i in part.tolist()] for part in parts if len(part)]
 
 
-def _init_worker(corr: np.ndarray, n_samples: int, run_token: object) -> None:
+def _init_worker(
+    test_class: type[PartialCorrelationTest], corr: np.ndarray, n_samples: int, run_token: object
+) -> None:
     """Seed a worker with the shared correlation matrix and pin its numeric environment.
 
     Runs once per worker process: caps BLAS to one thread (a large pool would otherwise
     oversubscribe, and multi-thread BLAS reduction order is not bit-stable on the larger
-    conditioning submatrices), pins the numpy backend, and rebuilds the Fisher-Z test over the
-    parent's exact correlation bytes.
+    conditioning submatrices), pins the numpy backend, and rebuilds the parent's test class over
+    the parent's exact correlation bytes.
     """
     global _WORKER_TEST, _WORKER_TOKEN, _WORKER_BLAS
     from threadpoolctl import threadpool_limits
@@ -62,7 +66,7 @@ def _init_worker(corr: np.ndarray, n_samples: int, run_token: object) -> None:
 
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
     _backend.config.backend = "numpy"
-    _WORKER_TEST = FisherZ.from_corr(corr, n_samples)
+    _WORKER_TEST = test_class.from_corr(corr, n_samples)
     _WORKER_TOKEN = run_token
 
 
@@ -87,6 +91,7 @@ class SkeletonWorkerPool:
 
     def __init__(self, test: CITest, workers: int) -> None:
         corr, n_samples = test.to_seed()  # ty: ignore[unresolved-attribute]  # gated by caller
+        self._test_class = cast("type[PartialCorrelationTest]", type(test))  # gated by caller
         self._corr = np.ascontiguousarray(corr, dtype=np.float64)
         self._n = int(n_samples)
         self._workers = max(1, workers)
@@ -100,7 +105,7 @@ class SkeletonWorkerPool:
                 max_workers=self._workers,
                 mp_context=_pick_context(),
                 initializer=_init_worker,
-                initargs=(self._corr, self._n, self._token),
+                initargs=(self._test_class, self._corr, self._n, self._token),
             )
         return self._pool, self._token
 

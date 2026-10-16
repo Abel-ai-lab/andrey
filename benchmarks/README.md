@@ -40,6 +40,8 @@ Packages:
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar - see
   [Mixed data](#mixed-data)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
+- [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
+  and is compared by its outputs only; see below
 
 ## Setup
 
@@ -85,6 +87,14 @@ An adapter selects another environment by setting `python_env` to the name of th
 holds its interpreter. The runner starts that solution's `fit` calls there. `to_structure` and
 scoring remain in `.venv-bench`, so every solution uses the same graph model and scorer. An unset
 declared variable stops the run at launch.
+
+tigramite is GPL-licensed, so it is installed only in an environment of its own, and the harness
+calls its public API there and compares the graphs it returns:
+
+```shell
+benchmarks/start_tigramite.sh
+export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
+```
 
 Drivers pass each additional environment to `rundir.provenance_once(..., extra_venvs={...})`.
 `run_id` excludes interpreter identity; `provenance.json` records every environment used, and
@@ -140,7 +150,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 |---|---|
 | GES | Andrey (numpy/serial, numpy/parallel, numba/serial), causal-learn, gCastle, pcalg |
 | XGES (GES family) | Andrey and xges, each with and without the extended search |
-| HC | Andrey, bnlearn (`hc`) |
+| HC | Andrey, bnlearn (`hc`), pgmpy (categorical data) |
 | Tabu | Andrey, bnlearn (`tabu`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
@@ -151,6 +161,10 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
 | ANM | Andrey, causal-learn |
 | PNL | Andrey, causal-learn |
+| PCMCI | Andrey (Student-t, Fisher-z), tigramite |
+| PCMCI+, LPCMCI | Andrey (Student-t), tigramite |
+| VARMA-LiNGAM, LongitudinalLiNGAM | Andrey, lingam |
+| Granger (lasso) | Andrey (serial, parallel), causal-learn |
 
 Include `baseline.empty` to bound the solutions run on the same datasets. Keep one method per file.
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
@@ -397,48 +411,92 @@ causal-learn's fit takes over a minute at 1000 rows and grows with the rows.
 
 ### Categorical data
 
-`discrete_cpu.py` compares Andrey's PC with the chi-square and the G-square test and GES with the
-BDeu score against causal-learn's, with the empty-graph baseline. It runs on `discrete_er`:
-category codes from a discrete network on an Erdos-Renyi graph, each node with 2 or 3 categories
-and each row of its conditional probability table drawn from a flat Dirichlet
-(`datasets.DISCRETE_SETTINGS`, recorded in each dataset's generator call). The codes are never
-rescaled. Both packages run each method with the same settings, listed in `params`: `alpha=0.05`
-for PC; BDeu's default priors and at most four parents for GES. Andrey's GES runs serially on the
-numpy backend; BDeu moves are scored in one process.
+`discrete_cpu.py` compares Andrey's PC with the chi-square and the G-square test, GES with the BDeu
+score, and hill climbing with the BDeu score and the multinomial BIC against the same method in
+causal-learn, bnlearn, and pgmpy, with the empty-graph baseline. It runs on `discrete_er`: category
+codes from a discrete network on an Erdos-Renyi graph, each node with 2 or 3 categories and each row
+of its conditional probability table drawn from a flat Dirichlet (`datasets.DISCRETE_SETTINGS`,
+recorded in each dataset's generator call). The codes are never rescaled. Every solution is serial.
+Andrey's GES runs on the numpy backend; BDeu moves are scored in one process.
+
+| method | Andrey | causal-learn | bnlearn | pgmpy |
+|---|---|---|---|---|
+| PC, chi-square | `andrey.pc.chisq` | `causal-learn.pc.chisq` | `bnlearn.pc-stable.chisq` | |
+| PC, G-square | `andrey.pc.gsq` | `causal-learn.pc.gsq` | `bnlearn.pc-stable.gsq` | |
+| GES, BDeu | `andrey.ges.bdeu` | `causal-learn.ges.bdeu` | | |
+| HC, BDeu | `andrey.hc.BDeu` | | `bnlearn.hc.BDeu` | `pgmpy.hc.BDeu` |
+| HC, BIC | `andrey.hc.BIC_categorical` | | `bnlearn.hc.BIC_categorical` | `pgmpy.hc.BIC_categorical` |
+
+A run can keep to some of these solutions, by name, with `baseline.empty`. Each pair runs one
+method with one test or score and the same settings, each set explicitly and listed in `params`.
+Where a package's default differs, the adapter overrides it:
+
+| setting | Andrey | bnlearn | pgmpy 1.1.2 |
+|---|---|---|---|
+| PC test | `chisq`, `gsq` | `x2-adf`, `mi-adf` | |
+| PC level, conditioning-set size | `alpha=0.05`, no limit | `alpha=0.05`, no limit (`max.sx`) | |
+| BDeu equivalent sample size | 1 (`sample_prior`) | `iss=1` | `equivalent_sample_size=1` (default 10) |
+| BDeu structure prior | each other variable a parent with probability `1 / (d - 1)` | `prior="vsp"`, `beta = 1 / (d - 1)` | the same, added through `structure_prior_ratio` (pgmpy has none) |
+| BIC penalty | `lambda_value=1`: `log(n)` per parameter, in deviance units | `k = log(n) / 2`, in log-likelihood units | `log(n) / 2`, fixed |
+| parent cap | none | `maxp=Inf` | `max_indegree=None` |
+| move budget | `max_iter=100000` | `max.iter=100000` | `max_iter=100000` |
+| restarts, tabu list | none | `restart=0` | `tabu_length=0` (default 100) |
+
+Andrey's scores are `-2` times the log-likelihood scale of bnlearn and pgmpy. Hill climbing stops
+at the first pass with no improving move; pgmpy's threshold is its default `epsilon=1e-4`, and
+Andrey's is `1e-9` in deviance units, both far below the gain of a real move. pgmpy is pinned to
+1.1.2, which installs on Python 3.13 with NumPy 2.5 and pandas 3 (`start.sh` installs it; the
+driver stops when another version is installed). bnlearn is the R
+library of [The R lane](#the-r-lane); its version is in `run_meta.json`.
+
+bnlearn names Pearson's chi-square test `x2` and the G-square test `mi`, the mutual information
+times `2 n`, which is the G statistic. Each has an `-adf` form that takes the empty rows and
+columns of a table out of the degrees of freedom, as Andrey's tests do, so the `-adf` forms are the
+ones paired with Andrey's: the plain `x2` and `mi` differ from Andrey's p-values on tables with an
+empty row or column. The `-adf` p-values are Andrey's to rounding, with one exception: when a table
+has fewer than 5 observations per cell on average (`n < 5 * r * c * q`, for `r` and `c` categories
+in the two variables and `q` configurations of the conditioning set), bnlearn returns `p = 1` and
+Andrey's tests have no such rule. At 2000 rows and three-category variables that starts at four
+conditioning variables, where bnlearn's PC removes the edge and Andrey's PC tests it.
 
 The defaults are 2000 rows, `d` of 10, 20, and 40, five seeds, one repeat after one warm-up fit, and
 `--cap-wall-s` of 1800. Each estimate is scored against the true DAG's CPDAG: `shd` and the
-skeleton and arrowhead columns. The summary prints each solution's median wall time and SHD per
-`d`, then each method's speed-up, causal-learn's median wall time over Andrey's on the datasets
-where both finished. A smoke run covers every solution on one small dataset, and a rescore
-recomputes the score columns from the stored estimates; pass the first run's flags:
+skeleton and arrowhead columns. Andrey's PC, GES, and hill climbing return CPDAGs. bnlearn's and
+pgmpy's hill climbing return DAGs, whose comparable columns are `mec_shd` and `mec_arrowhead_f1`,
+scored through the DAG's essential graph. The summary prints each solution's median wall time and
+error per `d`, with the F1 columns in the same comparable form, then each pair's speed-up: the other
+package's median wall time over Andrey's on the datasets where both finished. A smoke run covers
+every solution on one small dataset, and a rescore recomputes the score columns from the stored
+estimates; pass the first run's flags. The bnlearn rows need the R lane and the pgmpy rows need
+pgmpy; a run that names neither needs neither:
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-smoke --smoke
 $ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-cpu --rescore
 ```
 
-The p-values and BDeu scores follow causal-learn's definitions (Andrey's BDeu is `-2` times
-causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py` the two
-packages return the same graph. Read the SHD columns beside the speed-up: where the graphs differ,
-the difference is a result to report.
+To run only some solutions, name them. `--resume` requires the first run's solution list, so a run
+of other solutions takes a fresh `--out`; pointing `ANDREY_BENCH_DATA` at the first run's `data/`
+gives it the same datasets, and `andrey_bench.aggregate.pool` joins the two runs' records:
 
-Two more packages have categorical adapters, each running one of Andrey's settings and named by it;
-no driver runs them yet:
+```shell
+ANDREY_BENCH_DATA=outputs/discrete-cpu/data $ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py \
+    --out outputs/discrete-comparators --solutions andrey.hc.BDeu andrey.hc.BIC_categorical \
+    bnlearn.pc-stable.chisq bnlearn.pc-stable.gsq bnlearn.hc.BDeu bnlearn.hc.BIC_categorical \
+    pgmpy.hc.BDeu pgmpy.hc.BIC_categorical
+```
 
-| Andrey | bnlearn (`bnlearn_discrete.py`) | pgmpy (`pgmpy_hc.py`) |
-|---|---|---|
-| `pc`, `indep_test="chisq"` / `"gsq"` | `pc.stable`, `test="x2-adf"` / `"mi-adf"` | |
-| `hc`, `score_func="local_score_BDeu"` | `hc`, `score="bde"`, `iss=1`, `prior="vsp"` | |
-| `hc`, `score_func="local_score_BIC_categorical"` | `hc`, `score="bic"` | `HillClimbSearch`, `BIC` |
-| `tabu`, either score | `tabu`, the same score, `tabu=10`, `max.tabu=10` | |
-
-bnlearn's `vsp` prior, with `beta = 1 / (d - 1)`, is Andrey's structure prior less a constant per
-node, and its and pgmpy's scores are `-1/2` times Andrey's; bnlearn's `x2-adf` and `mi-adf` adjust
-the degrees of freedom for empty rows and columns as Andrey's tests do.
-`benchmarks/tests/test_adapters_discrete_comparators.py` checks each of these equalities, where R
-or pgmpy is installed. pgmpy's search runs with `tabu_length=0`, plain hill climbing, and each fit
-names its columns afresh, so pgmpy's score cache never carries over from an earlier fit.
+The p-values and BDeu scores of Andrey and causal-learn follow the same definitions (Andrey's BDeu
+is `-2` times causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py`
+the two packages return the same graph. Each comparator's objective is checked against Andrey's in
+`benchmarks/tests/test_adapters_discrete_comparators.py`, where R or pgmpy is installed: the scores
+agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets,
+and each declared setting takes effect. pgmpy's search ends in a different local optimum on some
+datasets: each package takes the first of equal moves in its own scan order, and the graphs can
+differ at equal settings. pgmpy breaks ties by the iteration order of a set of column-name pairs,
+so its columns are named by integer position, which keeps the graph the same under any
+`PYTHONHASHSEED`. Read the error columns beside the speed-up: where the graphs differ, the
+difference is a result to report.
 
 ### Mixed data
 
@@ -529,6 +587,236 @@ $ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-andrey --soluti
     andrey.pc.degen_gauss andrey.ges.cond_gauss baseline.empty
 $ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-cpu --rescore
 ```
+
+### PCMCI on lagged series
+
+`pcmci_cpu.py` compares Andrey's PCMCI with tigramite's, with the empty lag stack as the floor.
+Time-series sizes are written N x T: N variables (nodes) and a series of T time steps (the window
+length), and where a cell holds several trajectories or samples, M of them per N x T cell. A rung
+is one N x T size; the driver runs every N in its ladder at every T in its lengths, and a
+dataset is one series, stored with `d = N` and `n = T`.
+
+Each method runs on the simulation of its own paper, drawn by `andrey_bench/temporal_models.py`,
+which keeps the expected number of cross-links per variable fixed as N grows. Every variable
+depends on its own previous step, and a model whose process is not stationary is drawn again:
+
+| regime | method | source | cross-links per variable | same-step share | lags |
+|---|---|---|---|---|---|
+| `pcmci_paper` | PCMCI | Runge et al. (2019), Supplementary Sect. S4.1 | 1 | 0 | 1-2 |
+| `pcmciplus_paper` | PCMCI+ | Runge (2020), Sect. 4 | 1.5 | 30% | 1-5 |
+| `lpcmci_paper` | LPCMCI | Gerhardus and Runge (2020), Sect. 4 | 1, 30% of series unobserved | 30% | 1-3 |
+
+The coefficients, autocorrelations, and noise follow each paper as well; the module docstring lists
+them. A truth without same-step links is stored as the marks of lags `1..L`. `var_lagged`, the
+earlier regime, draws each lag-1 cross-link with probability 0.3, so its links per variable grow
+with N.
+
+Every solution tests lags 1 to `tau_max`, at `pc_alpha=0.2` and `alpha_level=0.05`:
+
+| solution | test |
+|---|---|
+| `andrey.pcmci.student_t.tau<k>` | partial correlation, Student-t p-value (Andrey's default) |
+| `andrey.pcmci.fisherz.tau<k>` | partial correlation, Fisher-z p-value |
+| `tigramite.pcmci.parcorr.tau<k>` | `ParCorr(significance="analytic")`, Student-t p-value |
+| `baseline.empty.temporal.tau<k>` | none: no link at any lag |
+
+tigramite runs `run_pcmci` with `tau_min=1` and `fdr_method="none"` and its other defaults; its own
+`tau_min=0` would also test lag 0, which is PCMCI+'s scope. `tau_max` is in every name because
+`params` are not part of a `run_id`, and the record carries it as `tau_max`. Andrey's PCMCI runs
+its tests with one BLAS thread whatever the core budget, while tigramite's fits get the budget's
+BLAS threads; set the core budget to 1 to compare one core with one core. Andrey's Student-t test
+and tigramite's analytic `ParCorr` share their test, so their graphs should match; the driver ends
+by listing, per dataset, the solutions that returned identical graphs (`structure_hash`).
+
+A temporal estimate is scored lag by lag with `andrey.metrics.temporal_scores`; its CPDAG and PAG
+columns (`shd`, `skeleton_*`, `arrowhead_*`) stay empty. Each lag is a directed graph, so a link in
+the wrong direction counts 2:
+
+| columns | what they score |
+|---|---|
+| `lag<k>_shd`, `lag<k>_precision`, `lag<k>_recall`, `lag<k>_f1` | the links at lag `k`, for every lag in the estimate or the truth |
+| `temporal_shd` | the lag-resolved SHD: the per-lag SHDs summed |
+| `lagged_*` | the lags merged into one graph, self-loops included |
+| `summary_*` | the lags merged into one graph, self-loops left out |
+
+A lag with no true link has recall 1, and a lag with no estimated link precision 1, so read them
+beside the SHD: with every true link at lag 1, the columns of lag 2 and above count false links
+only. A smoke run covers every solution on one series of 200 steps over five variables:
+
+```shell
+ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python \
+    $ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py --out outputs/pcmci-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py --out outputs/pcmci \
+    --ladder 5 10 20 --lengths 500 1000 --tau-max 2 --cores 1
+```
+
+The driver refuses a series shorter than `2 * tau_max * (N + 1) + 3` steps, the shortest Andrey's
+PCMCI accepts.
+
+### PCMCI+ and LPCMCI on series with same-step links
+
+`pcmci_cpu.py --method pcmciplus` and `--method lpcmci` compare Andrey's PCMCI+ and LPCMCI with
+tigramite's on `pcmciplus_paper` and `lpcmci_paper`, where some links act within a time step. The
+truth is a window over lags 0 to the largest true lag: the same-step DAG and the lagged links.
+`lpcmci_paper` generates N series and drops 30% of them, so its rows are scored against the true
+PAG over the observed series instead (`andrey_bench/window_pag.py`), the graph LPCMCI estimates
+(Gerhardus and Runge, 2020, Sect. 2.3). It is built from the generating graph over lags 0 to
+`tau_max`: the unobserved series and the observed ones before the window are marginalized, a link
+is kept only when all its copies in the window are adjacent, and time order, the FCI rules, and
+repeating orientations mark its ends. A truth with hidden series is rescored without fitting by
+`rescore_window_pag.py`, which writes `window_pag.parquet`, one row per `run_id`.
+
+Every solution tests lags 0 to `tau_max` (default 5 for PCMCI+ and 3 for LPCMCI, each paper's
+largest true lag) with the Student-t partial-correlation test and the method's defaults, which are
+both packages' defaults:
+
+| solution | settings |
+|---|---|
+| `andrey.pcmciplus.student_t.tau<k>` | `pc_alpha=0.01`, `collider_rule="majority"` |
+| `tigramite.pcmciplus.parcorr.tau<k>` | `run_pcmciplus(tau_min=0, pc_alpha=0.01, contemp_collider_rule="majority")` |
+| `andrey.lpcmci.student_t.tau<k>` | `pc_alpha=0.05`, `n_preliminary_iterations=1` |
+| `tigramite.lpcmci.parcorr.tau<k>` | `run_lpcmci(tau_min=0, pc_alpha=0.05, n_preliminary_iterations=1)` |
+| `baseline.empty.window.tau<k>` | none: no link at any lag |
+
+A link carries a mark at each end, so these solutions return window marks
+(`andrey_bench/window.py`), an `(L + 1, n, n)` int8 stack: lag 0 as endpoint marks, and at each
+lag `k >= 1` the mark at the earlier end of each link, whose later end is always an arrowhead. Both
+packages' marks come from the same three-character link strings (`-->`, `o->`, `<->`, `o-o`,
+`x-x`, ...): tigramite's `results["graph"]`, Andrey's LPCMCI `metadata["links"]`, and the same
+strings built from Andrey's PCMCI+ structure and its `metadata["conflicts"]`. Two solutions return
+the same graph when their marks are equal, conflicts included (`structure_hash`, `output_hash`).
+
+A window estimate is scored link by link against the truth (`scoring.window_scores`); a link is a
+same-step pair or a lagged pair, self-links included:
+
+| columns | what they score |
+|---|---|
+| `endpoint_shd`, `lag0_endpoint_shd`, `lagged_endpoint_shd` | marks that differ from the truth's: two for a missing or extra link, one per wrong end |
+| `adjacency_precision`, `adjacency_recall`, `adjacency_f1` | the links, whatever their marks |
+| `wrong_marks` | tails and arrowheads on true links that contradict the truth |
+| `lagged_tail`, `lagged_circle`, `lagged_arrow` | the true lagged links found, by the mark at their earlier end |
+
+Without hidden series the truth's lag 0 is the DAG, not the class of graphs the data can tell
+apart, so an unoriented PCMCI+ link or a PAG circle costs its open ends in `endpoint_shd`;
+`wrong_marks` counts only the marks a solution claims. Against a true PAG a circle in both is a
+match, and a tail or an arrowhead where the true PAG has a circle costs one in `endpoint_shd` but
+is not in `wrong_marks`. A CPDAG's conflicting link is read as undirected and a PAG's conflict mark
+as a circle, as Andrey returns them.
+
+```shell
+ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python \
+    $ANDREY_BENCH_PYTHON benchmarks/pcmci_cpu.py --method lpcmci --out outputs/lpcmci-smoke --smoke
+```
+
+The driver refuses a series shorter than the shortest Andrey's method accepts:
+`2 * tau_max * (N + 1) + N + 1` steps for PCMCI+, `N * (tau_max + 1) + 2 * tau_max + 1` for LPCMCI.
+
+### Lasso Granger causality
+
+`granger_var.py` compares Andrey's `granger` with causal-learn's `Granger.granger_lasso` on
+vector-autoregressive series with known lagged edges, drawn by `andrey.data`: two lags, Gaussian
+noise, and no effects within a time step, so the true lagged edges are the nonzero entries of the
+lag matrices. Every variable keeps its own past, and each other variable enters a lag with
+probability `2 / (N - 1)`; the lag matrices are scaled so the series is stationary. Each variable
+is z-scored before the fits, so both packages get the same standardized series, and both fit with
+the same `maxlag` and `cv`. The data do not fit the dataset store, which holds one graph
+per dataset, so the driver draws each series itself and calls the runner directly, as
+`public_datasets.py` does.
+
+The defaults are N of 5, 10, 20, 40, and 80 variables, T of 1000 time steps, five seeds, `maxlag` 2,
+`cv` 5, one repeat without warm-up, and `--cap-wall-s` of 1800. A fit past the cap is a `timeout`
+record with no scores. A smoke run fits one series of 5 variables:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/granger_var.py --out outputs/granger-smoke --smoke
+```
+
+A lagged edge is a nonzero coefficient at lags 1 to `maxlag`. `precision`, `recall`, and `f1`
+score every lagged edge; `cross_precision`, `cross_recall`, and `cross_f1` leave out each
+variable's edges from its own past, which every true series holds. The summary prints their means
+per N and solution, the median wall time, and `agree`, the share of series on which every
+solution returns the same lagged edges. Andrey runs twice: serially, and with its per-variable fits
+on `--cores` threads (`andrey.granger.numpy.parallel`); both return the same coefficients.
+
+Each fit is one JSON line in `records.jsonl`, with its coefficients. A resumed run skips the fits
+already recorded, and a rescore recomputes the scores without fitting anything:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/granger_var.py --out outputs/granger-var --rescore
+```
+
+Both packages fit the same cross-validated lasso per variable. Andrey standardizes each variable
+first and returns the coefficients in the data's units, so its edges do not depend on the units;
+causal-learn fits the series as given, so on raw series with unequal variances the two keep
+different small coefficients. The driver gives both the z-scored series, so `agree` compares the
+same fit.
+
+### Cross-link F1 of a time-series run
+
+Every time-series row is scored by one measure: precision, recall, and F1 of the window causal
+graph over its cross-links (`scoring.cross_link_scores`), the F1 of Assaad et al. (2022), Sect. 9.1,
+with the autodependencies left out, as Runge et al. (2019) leave them out. A cross-link joins two
+different variables: at a lag, oriented by time, or within a time step, counted when the two
+variables are adjacent (`cross_*`) and, in `cross_oriented_*`, only when it also points the same
+way. A panel pools its time points from the second. `rescore_cross_links.py` adds these scores to a
+finished `pcmci_cpu.py` or `lingam_ts.py` run without fitting anything: it reads the stored graphs
+and the dataset truths and writes `cross_links.parquet`, one row per `run_id`. A truth with
+unobserved series is left out of these scores; LPCMCI on `lpcmci_paper` is scored against its true
+PAG instead (`rescore_window_pag.py`). `granger_var.py` records the same scores
+as `cross_precision`, `cross_recall`, and `cross_f1`.
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/rescore_cross_links.py outputs/pcmci outputs/pcmciplus
+```
+
+### VARMA-LiNGAM and longitudinal LiNGAM
+
+`lingam_ts.py --method varma` and `--method longitudinal` compare Andrey's VARMA-LiNGAM and
+longitudinal LiNGAM with lingam's (`VARMALiNGAM`, `LongitudinalLiNGAM`), each on the simulation of
+its paper, drawn by `andrey_bench/lingam_models.py`:
+
+| regime | method | source | size |
+|---|---|---|---|
+| `varma_lingam_paper` | VARMA-LiNGAM | Hyvarinen et al. (2010), Sect. 5.4, plus one moving-average matrix | N x T, one series |
+| `longitudinal_lingam_paper` | LongitudinalLiNGAM | Kadowaki et al. (2013), JSAI Sect. 6.1 | N x T, M units per time point |
+
+`varma_lingam_paper` draws a strictly lower-triangular same-step matrix with 0.8 N links and a
+lag-1 matrix with 2 N links, the paper's 40% of entries at N = 5 held per variable as N grows,
+weights 0.05 to 0.5 in magnitude with a random sign, and super-Gaussian noise. The paper's model
+has no moving-average part, so the series adds one moving-average matrix drawn like the lag-1 one.
+`longitudinal_lingam_paper` draws, at every time point, a dense same-step DAG with weights 0.5 to
+1.5 in magnitude and a dense lag-1 matrix with weights up to 0.5, a hidden common cause at the
+first time point, and non-Gaussian noise; Bach and Jordan's (2002) densities that the paper names
+are specified in full for 5 of the 18, which are the ones used. A panel's data has shape `(T, M,
+N)`, stored with `d = N`, `n = M`, and `times = T`.
+
+Both packages run the same settings: VARMA-LiNGAM with `order=(1, 1)`, no order search, and the lag
+blocks pruned by adaptive Lasso (lingam's defaults are an order search by BIC and pruning);
+LongitudinalLiNGAM with one lag and the pairwise likelihood-ratio measure. Every estimate is a
+coefficient stack in the `[effect, cause]` layout both packages report
+(`andrey_bench/coefficients.py`), scored by `scoring.coefficient_scores`:
+
+| columns | what they score |
+|---|---|
+| `precision`, `recall`, `f1` | the directed cross-links of the same-step and lag-1 blocks, a link counted when its lag, cause, and effect match; `instantaneous_*` and `lagged_*` split them |
+| `instantaneous_rmse`, `lagged_rmse`, `ma_rmse` | the root mean square error of the blocks' weights, the papers' accuracy measure |
+
+Two solutions return the same graph when the same weights are nonzero (`structure_hash`). lingam
+1.13.0, the release with both estimators, installs on Python 3.12, so its fits run in an environment
+of their own:
+
+```shell
+benchmarks/start_lingam_ts.sh
+export ANDREY_BENCH_LINGAM_TS_PYTHON=$PWD/benchmarks/.venv-lingam-ts/bin/python
+$ANDREY_BENCH_PYTHON benchmarks/lingam_ts.py --method longitudinal --out outputs/longitudinal \
+    --ladder 3 5 10 --lengths 20 50 --samples 200 1000 --seeds 10
+```
+
+Where the two VARMA-LiNGAM graphs differ, two causes remain. lingam's pruning builds the lagged
+columns with `np.roll`, so its first regression row pairs `x(0)` with `x(T-1)` and `e(T-1)`; Andrey
+starts the regressions at step `max(p, q)`. And the likelihood fit stops at 100 iterations, the
+default of both, usually before it converges, so the same statsmodels call returns different
+estimates under the different NumPy and SciPy versions of the two environments.
 
 ### Where the clock starts
 
@@ -707,7 +995,10 @@ runner removes the directory after the fit.
 A record stores its data (`d`, `n`, `latents`, regime coordinates, `data_seed`, `repeat`), run
 settings (`cap_wall_s`, `cap_mem_mb`, `cores`, `device`, `dtype`, `backend`, `mode`, `machine_id`, `params`),
 and results (`status`, `wall_s`, `process_s`, `cpu_s`, `warmup_s`, `setup_s`, `peak_rss_mb`,
-`output_hash`, `shd`, `skeleton_f1`, `arrowhead_f1`).
+`output_hash`, `shd`, `skeleton_f1`, `arrowhead_f1`). A temporal solution's record also carries
+`tau_max`, and its scores are the lag columns of [PCMCI on lagged series](#pcmci-on-lagged-series),
+or the link columns of [PCMCI+ and LPCMCI](#pcmci-and-lpcmci-on-series-with-same-step-links) for a
+window.
 
 `device_id` records `cpu` or the CUDA device index and name. The backend determines the device, so a
 pin inside `fit` outranks `ANDREY_DEVICE`; the record keeps the request separately as `device`.
@@ -831,6 +1122,12 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.
 - `lingam_cpu.py` - compares DirectLiNGAM and ICA-LiNGAM with causal-learn on CPU.
 - `fci_latent.py` - compares FCI with causal-learn on data with hidden confounders.
+- `pcmci_cpu.py` - compares PCMCI, PCMCI+, or LPCMCI with tigramite on series, over variables and
+  series lengths.
+- `lingam_ts.py` - compares VARMA-LiNGAM and longitudinal LiNGAM with lingam on their papers'
+  simulations.
+- `rescore_cross_links.py` - adds cross-link F1 to a finished time-series run, from its stored
+  graphs.
 - `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
   hidden confounders.
 - `xges_cpu.py` - compares Andrey's XGES, with and without the extended search, with the xges
@@ -839,15 +1136,20 @@ Read `params` before comparing solutions because their defaults may optimize dif
   BIC.
 - `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
 - `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
-- `discrete_cpu.py` - compares PC with the chi-square and G-square tests and GES with BDeu with
-  causal-learn on categorical data. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and
-  pgmpy's categorical tests and scores.
+- `discrete_cpu.py` - compares PC with the chi-square and G-square tests, GES with BDeu, and hill
+  climbing with BDeu and the multinomial BIC with causal-learn, bnlearn, and pgmpy on categorical
+  data. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical tests and
+  scores.
 - `mixed_cpu.py` - compares PC, GES, and hill climbing with the degenerate and conditional Gaussian
   tests and scores with Tetrad and bnlearn on mixed data.
+- `granger_var.py` - compares lasso Granger causality with causal-learn on vector-autoregressive
+  series.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
   `andrey.data.load_dataset`.
 - `r_packages.py` - compares Andrey with pcalg and bnlearn, one lane per job.
 - `start_r.sh` - builds the R package library and installs `rpy2`.
+- `start_xges.sh`, `start_tigramite.sh`, `start_lingam_ts.sh` - build the separate xges, tigramite,
+  and lingam time-series environments.
 - `andrey_bench/contracts.py` - adapter protocol, record schema, dataset and run identity.
 - `andrey_bench/adapters/` - one adapter per package, method, backend, and mode.
 - `andrey_bench/rsession.py` - embedded R interpreter, data transfer, and result retrieval within

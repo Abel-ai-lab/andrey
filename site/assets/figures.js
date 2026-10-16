@@ -87,6 +87,34 @@
       animation.play();
     }
   };
+  // Switching a figure's method eases its panels' height from the shown panel's to the next one's
+  // instead of jumping: the last settled height is kept, and the switch animates from it, clipped
+  // while it runs. Reduced motion keeps the jump.
+  const settled = new WeakMap();
+  const sizes = new ResizeObserver((entries) => {
+    for (const { target } of entries) {
+      if (target.getAnimations().length) continue;
+      settled.set(target, target.getBoundingClientRect().height);
+    }
+  });
+  const ease = (race) => {
+    const panels = race.querySelector(".race-panels");
+    const from = panels && settled.get(panels);
+    if (motion.matches || from === undefined) return;
+    for (const animation of panels.getAnimations()) animation.cancel();
+    const to = panels.getBoundingClientRect().height;
+    if (Math.abs(to - from) < 1) return;
+    panels.style.overflow = "hidden";
+    const growth = panels.animate(
+      [{ height: `${from}px` }, { height: `${to}px` }],
+      { duration: 420, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    );
+    growth.onfinish = growth.oncancel = () => {
+      panels.style.overflow = "";
+      settled.set(panels, panels.getBoundingClientRect().height);
+    };
+  };
+  for (const panels of document.querySelectorAll(".race .race-panels")) sizes.observe(panels);
   // The speedup panel plays through its methods every few seconds, from the moment it first comes
   // into view (at once in the hero, on scrolling in the launch post). It holds under the pointer or
   // focus, and stops for good once a reader picks one. Reduced motion keeps the first method.
@@ -101,6 +129,7 @@
       const at = choices.findIndex((choice) => choice.checked);
       choices[(at + 1) % choices.length].checked = true;
       restart(race);
+      ease(race);
     };
     const seen = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
@@ -126,7 +155,10 @@
     race.addEventListener("focusout", () => { paused = false; });
   }
   for (const race of document.querySelectorAll(".race")) {
-    race.addEventListener("change", () => restart(race));
+    race.addEventListener("change", () => {
+      restart(race);
+      ease(race);
+    });
   }
   // The agent session types each command, then shows its answer and lights its step; the graph
   // comes last. It plays once when it scrolls into view, and again from Replay.

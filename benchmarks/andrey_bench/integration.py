@@ -15,9 +15,17 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from andrey import GraphStructure
+from andrey import GraphStructure, TemporalStructure
 from andrey_bench import datasets, rundir, scoring
-from andrey_bench.contracts import RunRecord, SolutionAdapter, Status, environment_id, run_id
+from andrey_bench.coefficients import CoefficientStack
+from andrey_bench.contracts import (
+    RunRecord,
+    SolutionAdapter,
+    Status,
+    environment_id,
+    run_id,
+    temporal_from_lag_marks,
+)
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.oracle import OracleGES
 from andrey_bench.runner import (
@@ -27,15 +35,30 @@ from andrey_bench.runner import (
     run_task,
     split_cores,
 )
+from andrey_bench.window import WindowGraph
 
 
-def _truth(marks: np.ndarray, kind: str = "dag", latents: int = 0) -> GraphStructure:
+def _truth(
+    marks: np.ndarray, kind: str = "dag", latents: int = 0
+) -> GraphStructure | TemporalStructure | WindowGraph:
     """Convert endpoint marks for the true graph into a ``GraphStructure``.
 
     Flag the last ``latents`` nodes as hidden. Scoring then projects the truth onto the observed
-    nodes present in the data.
+    nodes present in the data. A ``temporal`` truth is a stack of lag marks and becomes a
+    ``TemporalStructure`` with lags ``1..L``; a ``temporal_window`` truth is a stack of window marks
+    and becomes a :class:`~andrey_bench.window.WindowGraph` whose lag 0 is a DAG, its last
+    ``latents`` variables unobserved. A ``temporal_coefficients`` or ``panel_coefficients`` truth is
+    a :class:`~andrey_bench.coefficients.CoefficientStack`.
     """
     marks = np.asarray(marks)
+    if kind == "temporal":
+        return temporal_from_lag_marks(marks)
+    if kind == datasets.WINDOW_KIND:
+        return WindowGraph(marks, lag0="dag", latents=latents)
+    if kind == "temporal_coefficients":
+        return CoefficientStack(marks, kind="varma")
+    if kind == "panel_coefficients":
+        return CoefficientStack(marks, kind="panel")
     types = datasets.latent_node_types(len(marks), latents)
     return GraphStructure.from_numpy(marks, kind=kind, node_types=types)
 
@@ -56,6 +79,7 @@ def assemble_record(
     ``run_id`` identifies the dataset, solution, repeat, and execution environment. Solution
     parameters are serialized with sorted keys.
     """
+    params = dict(adapter.params())
     # Required keys: missing values indicate runner/record schema drift.
     env = {
         "backend": adapter.backend,
@@ -80,7 +104,7 @@ def assemble_record(
         backend=adapter.backend,
         mode=adapter.mode,
         output_type=adapter.output_type,
-        params=json.dumps(dict(adapter.params()), sort_keys=True),
+        params=json.dumps(params, sort_keys=True),
         machine_id=machine_id,
         cores=cores,
         device=measures["env_device"],
@@ -96,6 +120,8 @@ def assemble_record(
         repeat=repeat,
         status=measures.get("status", Status.OK.value),
         latents=key.latents,
+        tau_max=params.get("tau_max"),
+        times=key.times,
         wall_s=measures.get("wall_s"),
         process_s=measures.get("process_s"),
         cpu_s=measures.get("cpu_s"),

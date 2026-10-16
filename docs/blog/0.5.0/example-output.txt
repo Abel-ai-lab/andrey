@@ -1,0 +1,30 @@
+pcmci  temporal  |  3 nodes  |  1 lags
+
+  lag 1  |  6 edges (6 directed)
+    rain -> rain
+    rain -> traffic
+    traffic -> traffic
+    traffic -> sales
+    sales -> traffic
+    sales -> sales
+
+  p_values: a list of 1, too long to print; read metadata['p_values']
+  statistics: a list of 1, too long to print; read metadata['statistics']
+  parents: [[[0, 1]], [[1, 1], [0, 1]], [[1, 1], [2, 1], [0, 1]]]
+
+pcmciplus  temporal  |  3 nodes  |  2 lags
+
+  lag 0  |  1 edges (1 directed)
+    rain -> traffic
+
+  lag 1  |  4 edges (4 directed)
+    rain -> rain
+    traffic -> traffic
+    traffic -> sales
+    sales -> sales
+
+  p_values: a list of 2, too long to print; read metadata['p_values']
+  statistics: a list of 2, too long to print; read metadata['statistics']
+  parents: [[[0, 1]], [[1, 1], [0, 1]], [[1, 1], [2, 1]]]
+  conflicts: []
+  ambiguous_triples: []

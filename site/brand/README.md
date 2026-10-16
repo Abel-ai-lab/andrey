@@ -21,6 +21,10 @@
   - `art-start.jpg` and `art-docs.jpg`: the homepage's "From data to graph" (data points
     gathering into a small graph, one arrow amber) and its documentation (an atlas's pages fanning
     open, one edge amber).
+  - `art-tide.jpg`: 0.5.0, the moon over a swelling sea, drawn in engraved lines: each swell
+    crests a little after the one before, and the moon's lower half and its glitter path on the
+    waves are amber. `art-tide-center.jpg` is the same art with the moon in the middle, the post's
+    cover and thumbnail (`CENTERED` in `site/cards.py`).
   - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
     fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
     crop to the cover's size, so it is softer than the others until the art is drawn again at

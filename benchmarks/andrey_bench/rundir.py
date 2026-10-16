@@ -17,7 +17,9 @@ import numpy as np
 import pandas as pd
 
 from andrey_bench import provenance
-from andrey_bench.contracts import RunRecord
+from andrey_bench.coefficients import CoefficientStack
+from andrey_bench.contracts import RunRecord, links_from_temporal, temporal_from_links
+from andrey_bench.window import WindowGraph
 
 RECORDS_DIRNAME = "records"
 RUN_META_NAME = "run_meta.json"
@@ -32,9 +34,41 @@ def structure_path(out: str | Path, run_id: str) -> Path:
 
 
 def write_structure(out: str | Path, run_id: str, structure) -> None:
-    """Write the graph a solution returned to ``structures/``, normalized, as its edge set."""
+    """Write the graph a solution returned to ``structures/``, normalized, as its edge set.
+
+    A temporal structure is written as its ``(L, n, n)`` link stack, with the kind ``temporal``, a
+    window graph as its window marks, with the kind ``temporal_window``, and a coefficient stack as
+    its coefficients, with the kind ``coefficients``.
+    """
+    from andrey import TemporalStructure
+
     path = structure_path(out, run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(structure, CoefficientStack):
+        np.savez_compressed(
+            path,
+            stack=structure.stack,
+            kind=np.asarray("coefficients"),
+            stack_kind=np.asarray(structure.kind),
+        )
+        return
+    if isinstance(structure, WindowGraph):
+        np.savez_compressed(
+            path,
+            marks=structure.marks,
+            kind=np.asarray("temporal_window"),
+            lag0=np.asarray(structure.lag0),
+            n_nodes=np.asarray(structure.n_nodes),
+        )
+        return
+    if isinstance(structure, TemporalStructure):
+        np.savez_compressed(
+            path,
+            links=links_from_temporal(structure),
+            kind=np.asarray("temporal"),
+            n_nodes=np.asarray(structure.n_nodes),
+        )
+        return
     np.savez_compressed(
         path,
         edges=np.asarray(structure.to_edges()),
@@ -51,6 +85,12 @@ def read_structure(out: str | Path, run_id: str):
     if not path.exists():
         return None
     with np.load(path, allow_pickle=False) as z:
+        if str(z["kind"]) == "temporal":
+            return temporal_from_links(z["links"])
+        if str(z["kind"]) == "coefficients":
+            return CoefficientStack(z["stack"], kind=str(z["stack_kind"]))
+        if str(z["kind"]) == "temporal_window":
+            return WindowGraph(z["marks"], lag0=str(z["lag0"]))
         return GraphStructure.from_edges(z["edges"], n_nodes=int(z["n_nodes"]), kind=str(z["kind"]))
 
 

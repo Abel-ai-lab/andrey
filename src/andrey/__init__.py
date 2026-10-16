@@ -20,12 +20,16 @@ from .api import (
     gfci,
     gies,
     gin,
+    granger,
     grasp,
     hc,
     ica_lingam,
     longitudinal_lingam,
+    lpcmci,
     multi_group_direct_lingam,
     pc,
+    pcmci,
+    pcmciplus,
     pnl,
     rcd,
     tabu,
@@ -44,7 +48,7 @@ from .core.warning_policy import (
     SearchLimitWarning,
 )
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 
 __all__ = [
     "__version__",
@@ -88,6 +92,10 @@ __all__ = [
     # Temporal family - one StructureOutput over a per-lag stack.
     "varma_lingam",
     "longitudinal_lingam",
+    "pcmci",
+    "pcmciplus",
+    "lpcmci",
+    "granger",
     # Pairwise direction tests.
     "anm",
     "pnl",
