@@ -9,7 +9,7 @@ meta:
 
 `andrey.abel.ai` is one Sphinx project, this folder: the homepage at `/`, the blog at `/blog/`, and
 the documentation under `/docs/`, whose sources are in [`docs/`](docs/index.md). [`conf.py`](conf.py)
-configures MyST for Markdown, autodoc for `andrey.__all__`, cached MyST-NB notebooks, ABlog, and
+configures MyST for Markdown, autodoc for `andrey.__all__`, MyST-NB notebooks, ABlog, and
 pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Examples,
 Demos, Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
 the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art, and
@@ -215,8 +215,16 @@ both themes.
 
 ## Notebooks
 
-Canonical notebooks live in `examples/`. The build stages them in `docs/examples/` and executes
-them with MyST-NB's cache, so a failed cell fails the build; the speed notebook is not executed.
+Canonical notebooks live in `examples/` with their outputs. The build stages them in
+`docs/examples/` and renders the stored outputs without running any cell, so a slow build server
+cannot time out. After changing a notebook, or code a notebook calls, store fresh outputs:
+
+```shell
+uv run --group docs python scripts/execute_notebooks.py
+```
+
+The docs workflow reruns every notebook with `--check` and fails when a cell fails or an output
+differs from the stored one. The speed notebook is never run and ships without outputs.
 Run them locally with `uv run --with jupyter jupyter lab`. Notebook dependencies stay out of
 `pyproject.toml`: each notebook has an Open in Colab link and a Colab-only setup cell that installs
 the pinned release from PyPI, a pin to update with every release. The rendered page's download link
@@ -252,7 +260,7 @@ then [`test_built_site.py`](test_built_site.py), which builds the site once from
 uv run --group docs python -m pytest docs/test_built_site.py
 ```
 
-It checks a strict `-W` build including notebook execution; API coverage (every public symbol of
+It checks a strict `-W` build; API coverage (every public symbol of
 `andrey`, `andrey.metrics`, and `andrey.viz`, and every loader of `andrey.data`, documented, no
 private symbol exposed); KaTeX-ready math; one description per page, the same as its link preview's,
 at most 160 characters; the navbar's links; the favicon and the link-preview cards; the blog's front
@@ -283,6 +291,7 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Guides | `docs/docs/guides/` |
 | Examples and demos galleries and pages | `docs/docs/examples/`, `docs/docs/demos/` |
 | Notebook sources | `examples/*.ipynb` -> staged into `docs/docs/examples/` |
+| Notebook outputs | `scripts/execute_notebooks.py` |
 | Docs chrome over the palette tokens | `docs/_static/andrey.css` |
 | Docs tables: a framed header band over a card of rows, a fade where a wide table scrolls, short values and labels on one line (`_short_cells` in `conf.py`); the API reference's summary tables get a Name and Description header (`_summary_headers`) and stack on a phone | `docs/_static/andrey.css`, `docs/conf.py` |
 | The old demo address, redirected to the gallery | `docs/_templates/demo-redirect.html` |
