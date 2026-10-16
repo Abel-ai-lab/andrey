@@ -50,7 +50,7 @@ each with a figure of its own, and a note in plain type where the evidence is a 
 The hero and Accelerated share the fast lanes (`HERO_ART`, `.run` in `site.css`), which stay on the
 screen while Accelerated's title comes up over them, until the tiles rise over the art.
 
-- Accelerated: the ideas behind the speed, one at a time as the reader scrolls, then a tile per
+- Accelerated: the ideas behind the speed as a carousel, one card playing at a time, then a tile per
   method family.
 - Accurate: where Andrey has fewer errors, as a chart, and beside it a note: every release is
   tested against true graphs, and its release card gives every method's errors.
@@ -67,14 +67,17 @@ with a published comparison (`family_tiles()`) shows the family's largest ratio 
 digit ("up to 900x faster"), and none where Andrey is not at least twice as fast; a new family gets
 its tile with no change to the page.
 
-The ideas are four animated scenes from [`site/why_fast.py`](../site/why_fast.py) (`story()`),
-which the post `docs/blog/20261008-why-andrey-is-fast.md` shows too; each compares Andrey with a
-lane labeled Others and names no package. `why-fast.js` pins Accelerated's title and the story
-under the navbar and splits the run's scroll among the scenes; where they do not fit the screen
-together, the scenes stack and each plays as it rises. Without script, and under reduced motion,
-they stand at their final counts. They play with Motion, vendored unmodified as
-`site/assets/motion.js` under its MIT license and pinned in `tests/unit/test_why_fast.py`; `conf.py`
-loads both scripts only on those two pages.
+The ideas are four animated scenes from [`site/why_fast.py`](../site/why_fast.py), which the post
+`docs/blog/20261008-why-andrey-is-fast.md` shows too; each compares Andrey with a lane labeled
+Others and names no package. Under Accelerated's title they are a carousel (`belt()`): a card per
+scene, with its title, narration, a link to its part of the post, and its stage, in a row that
+scrolls sideways across the screen and snaps each card to the center. `why-fast.js` plays the
+current card while its dot fills, rests on its last frame, and moves on to the next, looping; it
+waits while the pointer or focus is on the carousel or it is off the screen, and the dots, arrow
+keys, a swipe, or a drag pick a card. Without script the cards are a row to scroll by hand, and
+under reduced motion no card plays or moves on by itself; both show the final counts. The scenes
+play with Motion, vendored unmodified as `site/assets/motion.js` under its MIT license and pinned
+in `tests/unit/test_why_fast.py`; `conf.py` loads both scripts only on those two pages.
 
 The page moves with the scroll, never under reduced motion: the stylesheet drives it from scroll and
 view timelines where the browser has them, and only opacity and transforms move; elsewhere the page
@@ -259,7 +262,7 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Sphinx config (theme, extensions, notebooks, blog, generated pages) | `docs/conf.py` |
 | Homepage template, stylesheet, and content generators | `site/homepage.html`, `site/assets/site.css`, `site/build.py` |
 | Timing comparison and speed charts | `site/assets/figures.css`, `site/assets/figures.js` |
-| "Why Andrey is fast" scenes: homepage story, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
+| "Why Andrey is fast" scenes: homepage carousel, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
 | Navbar: wordmark and sections | `docs/_templates/site-logo.html`, `docs/_templates/site-nav.html` |
 | Documentation footer: a navy card, three columns of links, the license, Abel's mark | `docs/_templates/docs-footer.html`, `docs/_static/andrey.css` |
 | Brand kit page: the downloads (`brand_kit` and `social_svg` in `site/cards.py`, written to `_static/brand/`) and the colors (`BRAND_COLORS` in `conf.py`) | `docs/docs/brand.md`, `docs/_static/andrey.css` |

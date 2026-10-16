@@ -2167,7 +2167,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "hero_art": hero_art(),
         "tile_art": tile_art,
         "plus": plus(),
-        "why_fast_story": _why_fast["story"](),
+        "why_fast_belt": _why_fast["belt"](),
         "act_cards": act_cards(claims),
         "act_covers": act_covers(claims),
         "example_cover": example_cover(),

@@ -296,10 +296,9 @@
   }
 
   // ---- playing a scene ----------------------------------------------------------------------
-  // Returns controls: done (a promise), pause, resume, stop. With reduced motion the scene jumps
-  // to its last frame. With scrub, the scene waits at its start and returns its length (end) and
-  // seek, which shows it at any time, forward or back.
-  function play(figure, { onProgress, entrance = false, hold = false, scrub = false } = {}) {
+  // Returns controls: done (a promise), pause, resume, stop. With reduced motion, or with last,
+  // the scene jumps to its last frame.
+  function play(figure, { onProgress, entrance = false, hold = false, last = false } = {}) {
     const data = settings(figure);
     const L = lanes(figure);
     const S = score();
@@ -328,7 +327,7 @@
         lane.unit.textContent = n === 1 ? data.units[0] : data.units[1];
       };
       if (state.roll) state.roll.stop();
-      if (still) { show(value); return; }
+      if (jump) { show(value); return; }
       state.roll = animate(from, value, { duration: 0.28, ease: "easeOut", onUpdate: (v) => show(Math.round(v)) });
     };
     L.forEach((lane, k) => {
@@ -339,43 +338,21 @@
     });
 
     const controls = animate(S.seq);
-    if (scrub) {
-      controls.pause();
-      // Each count is the last one its lane has reached by then, and each check shows once its
-      // lane is done; the check eases in and out with a transition of its own (why-fast.css).
-      const seek = (time) => {
-        controls.time = time;
-        L.forEach((lane, k) => {
-          let value = 0;
-          let done = false;
-          for (const e of S.events) {
-            if (e.lane !== k || e.at > time) continue;
-            if (e.done) done = true;
-            else value = Math.max(value, e.value);
-          }
-          lane.num.textContent = value;
-          lane.unit.textContent = value === 1 ? data.units[0] : data.units[1];
-          lane.badge.style.opacity = done ? 1 : 0;
-          lane.badge.style.scale = done ? 1 : 0.4;
-        });
-      };
-      seek(0);
-      return { end, seek };
-    }
+    const jump = still || last;
     let t = 0;
-    let last = performance.now();
-    let running = !hold && !still;
+    let before = performance.now();
+    let running = !hold && !jump;
     let raf = 0;
     const tick = () => {
       const now = performance.now();
-      if (running) t = Math.min(end, t + (now - last) / 1000);
-      last = now;
+      if (running) t = Math.min(end, t + (now - before) / 1000);
+      before = now;
       for (const e of S.events) {
         if (e.at > t) continue;
         const state = shown[e.lane];
         if (e.done && !state.done) {
           state.done = true;
-          if (still) L[e.lane].badge.style.opacity = 1;
+          if (jump) L[e.lane].badge.style.opacity = 1;
           else animate(L[e.lane].badge, { opacity: [0, 1], scale: [0.4, 1] }, { type: "spring", bounce: 0.45, visualDuration: 0.35 });
         } else if (!e.done && e.value > state.value) {
           setCount(e.lane, e.value);
@@ -384,7 +361,7 @@
       if (onProgress) onProgress(t / end);
     };
     const loop = () => { tick(); raf = requestAnimationFrame(loop); };
-    if (still) {
+    if (jump) {
       controls.complete();
       t = end;
       tick();
@@ -396,7 +373,7 @@
     return {
       done,
       pause() { running = false; controls.pause(); },
-      resume() { last = performance.now(); running = true; controls.play(); },
+      resume() { before = performance.now(); running = true; controls.play(); },
       stop() { cancelAnimationFrame(raf); controls.stop(); },
     };
   }
@@ -421,114 +398,167 @@
     if (!still) inView(figure, () => { start(); }, { amount: 0.6 });
   }
 
-  // ---- the homepage's story: one scene at a time, played by the scroll -----------------------
-  // Without this script, and with reduced motion, the steps stand one after another, each scene
-  // at its last frame. Otherwise, where the section's title and a step fit the screen together,
-  // the run (.wf-run) pins its stage (.wf-pin) under the navbar and splits its scroll evenly among
-  // the scenes: the step whose share the reader is in shows, and the first PLAYED of that share
-  // plays its scene, forward or back; the rest holds the scene's last frame. Where they do not
-  // fit, the title scrolls away and the story alone pins; where even that does not fit, the steps
-  // stay stacked and each scene plays as it rises through the screen.
-  const PLAYED = 0.7;
-  for (const story of document.querySelectorAll(".wf-story")) {
-    const steps = [...story.querySelectorAll(".wf-step")];
-    const figures = steps.map((step) => step.querySelector(".wf-scene"));
-    if (still) {
-      figures.forEach((figure) => play(figure));
-      continue;
+  // ---- the homepage's carousel: one card at a time --------------------------------------------
+  // The cards sit in a row that scrolls sideways and snaps each card to the center. The current
+  // card plays its scene while its dot fills, rests on the last frame for REST seconds, and hands
+  // over to the next card, the last to the first. The others show their last frame. It waits
+  // while the pointer or focus is on the carousel, while it is off the screen, and while the page
+  // is hidden. Dots, arrow keys, a swipe, or a drag pick a card. Under reduced motion no card plays
+  // or moves on by itself: each shows its last frame, and the dots still pick one.
+  const REST = 1.6;
+  for (const belt of document.querySelectorAll(".wf-belt")) {
+    const row = belt.querySelector(".wf-cards");
+    const cards = [...row.querySelectorAll(".wf-card")];
+    const figures = cards.map((card) => card.querySelector(".wf-scene"));
+    const tablist = belt.querySelector(".wf-dots");
+    const dots = [...tablist.querySelectorAll(".wf-dot")];
+    tablist.hidden = false;
+    belt.classList.add("is-driven");
+
+    let current = 0;
+    let run = null;
+    let wait = 0;
+    let held = false; // pointer or focus on the carousel
+    let seen = false; // on the screen and the page visible
+    figures.forEach((figure) => play(figure, { last: true }));
+
+    const fill = (value) => dots[current].style.setProperty("--fill", value.toFixed(3));
+    const select = (k) => {
+      cards.forEach((card, i) => card.classList.toggle("is-current", i === k));
+      dots.forEach((dot, i) => {
+        dot.setAttribute("aria-selected", String(i === k));
+        dot.tabIndex = i === k ? 0 : -1;
+        dot.style.setProperty("--fill", i === k && still ? "1" : "0");
+      });
+    };
+    const center = (k, smooth = true) => {
+      const card = cards[k];
+      row.scrollTo({
+        left: card.offsetLeft - (row.clientWidth - card.offsetWidth) / 2,
+        behavior: smooth && !still ? "smooth" : "auto",
+      });
+    };
+    const going = () => seen && !held && !still;
+    const advance = () => go((current + 1) % cards.length);
+    const start = () => {
+      clearTimeout(wait);
+      if (run) run.stop();
+      run = null;
+      if (still) return;
+      run = play(figures[current], { hold: !going(), onProgress: fill });
+      run.done.then(() => {
+        fill(1);
+        if (going()) wait = setTimeout(advance, REST * 1000);
+      });
+    };
+    // Make card k the current one: center it, then play it.
+    function go(k, smooth = true) {
+      if (k === current && run) return center(k, smooth);
+      if (run) {
+        run.stop();
+        play(figures[current], { last: true });
+      }
+      current = k;
+      select(k);
+      center(k, smooth);
+      start();
     }
-    const run = story.closest(".wf-run");
-    const stage = run.querySelector(".wf-pin");
-    const scenes = figures.map((figure) => play(figure, { scrub: true }));
-    const under = () => parseFloat(getComputedStyle(stage).top) || 0; // where the stage pins
-    const shown = scenes.map(() => 0);
-    run.style.setProperty("--steps", steps.length);
+    const pause = () => { clearTimeout(wait); if (run) run.pause(); };
+    const resume = () => {
+      if (!going() || !run) return;
+      run.resume();
+      if (dots[current].style.getPropertyValue("--fill") === "1.000") {
+        wait = setTimeout(advance, REST * 1000);
+      }
+    };
 
-    // A bar per step, which fills as its scene plays and takes the reader to it.
-    const rail = document.createElement("div");
-    rail.className = "wf-rail";
-    const bars = steps.map((step, k) => {
-      const button = make("button", "wf-bar-step", rail);
-      button.type = "button";
-      const title = step.querySelector("h3").textContent;
-      button.innerHTML = "<i></i><span></span>";
-      button.querySelector("span").textContent = title;
-      button.addEventListener("click", () => {
-        const box = run.getBoundingClientRect();
-        const span = box.height - stage.offsetHeight;
-        const top = window.scrollY + box.top - under() + span * ((k + PLAYED) / steps.length);
-        window.scrollTo({ top, behavior: "smooth" });
-      });
-      return button;
+    dots.forEach((dot, k) => dot.addEventListener("click", () => go(k)));
+    tablist.addEventListener("keydown", (event) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+      if (!step) return;
+      event.preventDefault();
+      go((current + step + cards.length) % cards.length);
+      dots[current].focus();
     });
-    story.prepend(rail);
+    row.addEventListener("keydown", (event) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+      if (!step) return;
+      event.preventDefault();
+      go(Math.min(cards.length - 1, Math.max(0, current + step)));
+    });
+    belt.addEventListener("pointerenter", (event) => {
+      if (event.pointerType === "mouse") { held = true; pause(); }
+    });
+    belt.addEventListener("pointerleave", (event) => {
+      if (event.pointerType === "mouse") { held = false; resume(); }
+    });
+    belt.addEventListener("focusin", () => { held = true; pause(); });
+    belt.addEventListener("focusout", (event) => {
+      if (belt.contains(event.relatedTarget)) return;
+      held = false;
+      resume();
+    });
 
-    // Where the reader is: through the pinned run, from 0 to 1, or, stacked, through each step.
-    const pinned = () => run.classList.contains("is-pinned");
-    const through = () => {
-      const box = run.getBoundingClientRect();
-      const span = box.height - stage.offsetHeight;
-      return span > 0 ? Math.min(1, Math.max(0, (under() - box.top) / span)) : 0;
-    };
-    const goals = () => {
-      if (!pinned()) {
-        return figures.map((figure, k) => {
-          const box = figure.getBoundingClientRect();
-          const rise = (innerHeight * 0.9 - box.top) / (innerHeight * 0.5);
-          return scenes[k].end * Math.min(1, Math.max(0, rise));
-        });
-      }
-      const at = through() * steps.length;
-      const current = Math.min(steps.length - 1, Math.floor(at));
-      steps.forEach((step, k) => step.classList.toggle("is-on", k === current));
-      bars.forEach((bar, k) => {
-        if (k === current) bar.setAttribute("aria-current", "step");
-        else bar.removeAttribute("aria-current");
-        bar.style.setProperty("--fill", Math.min(1, Math.max(0, (at - k) / PLAYED)).toFixed(3));
-      });
-      return scenes.map((scene, k) =>
-        k < current ? scene.end : k > current ? 0 : scene.end * Math.min(1, (at - k) / PLAYED),
-      );
-    };
+    // A swipe or a scroll that settles on another card makes it the current one.
+    let settle = 0;
+    row.addEventListener("scroll", () => {
+      clearTimeout(settle);
+      settle = setTimeout(() => {
+        const middle = row.scrollLeft + row.clientWidth / 2;
+        const nearest = cards.reduce((best, card, k) => {
+          const d = Math.abs(card.offsetLeft + card.offsetWidth / 2 - middle);
+          return d < best.d ? { k, d } : best;
+        }, { k: current, d: Infinity }).k;
+        if (nearest !== current) go(nearest);
+      }, 120);
+    }, { passive: true });
 
-    // Each scene eases toward where the scroll puts it, so a step of the wheel still flows.
-    let raf = 0;
-    const frame = () => {
-      raf = 0;
-      let moving = false;
-      goals().forEach((goal, k) => {
-        const next = Math.abs(goal - shown[k]) < 0.01 ? goal : shown[k] + (goal - shown[k]) * 0.22;
-        if (next !== shown[k]) scenes[k].seek((shown[k] = next));
-        if (next !== goal) moving = true;
-      });
-      if (moving) raf = requestAnimationFrame(frame);
-    };
-    const request = () => { if (!raf) raf = requestAnimationFrame(frame); };
+    // A mouse drags the row; a touch scrolls it natively.
+    let drag = null;
+    row.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "mouse" || event.button !== 0) return;
+      drag = { x: event.clientX, left: row.scrollLeft, moved: false };
+    });
+    addEventListener("pointermove", (event) => {
+      if (!drag) return;
+      const dx = event.clientX - drag.x;
+      if (!drag.moved && Math.abs(dx) < 6) return;
+      if (!drag.moved) { drag.moved = true; row.classList.add("is-dragging"); }
+      row.scrollLeft = drag.left - dx;
+    });
+    addEventListener("pointerup", () => {
+      if (!drag) return;
+      const moved = drag.moved;
+      const dx = row.scrollLeft - drag.left;
+      drag = null;
+      row.classList.remove("is-dragging");
+      if (!moved) return;
+      // The click that ends a drag follows no link.
+      row.classList.add("was-dragged");
+      setTimeout(() => row.classList.remove("was-dragged"));
+      const k = Math.abs(dx) > row.clientWidth * 0.08 ? current + Math.sign(dx) : current;
+      go(Math.min(cards.length - 1, Math.max(0, k)));
+    });
+    row.addEventListener("click", (event) => {
+      if (row.classList.contains("was-dragged")) event.preventDefault();
+    }, true);
 
-    // Pin only where the stage fits under the navbar: with the section's title, or else with the
-    // title lifted above the screen's top (--lift), so the story alone stays. The stage's own
-    // boxes measure it, not its scroll height, which counts the hidden steps' offset.
-    const fit = () => {
-      run.classList.add("is-pinned");
-      run.style.setProperty("--lift", "0px");
-      const fits = () =>
-        story.getBoundingClientRect().bottom - stage.getBoundingClientRect().top <=
-        parseFloat(getComputedStyle(stage).maxHeight) + 1;
-      if (!fits()) {
-        const lift = story.getBoundingClientRect().top - stage.getBoundingClientRect().top;
-        run.style.setProperty("--lift", `${Math.round(lift)}px`);
-      }
-      const pinned = fits();
-      run.style.setProperty("--pin-h", `${stage.offsetHeight}px`);
-      run.classList.toggle("is-pinned", pinned);
-      if (!pinned) steps.forEach((step) => step.classList.remove("is-on"));
-      request();
+    // Waits off the screen and while the page is hidden.
+    const watch = () => {
+      const was = going();
+      seen = belt.dataset.visible === "1" && !document.hidden;
+      if (going() && !was) resume();
+      else if (!going() && was) pause();
     };
-    fit();
-    // The web font arrives after the first measure and rewraps the text, so measure again.
-    if (document.fonts) document.fonts.ready.then(fit);
-    addEventListener("scroll", request, { passive: true });
-    let resized = 0;
-    addEventListener("resize", () => { clearTimeout(resized); resized = setTimeout(fit, 150); });
+    new IntersectionObserver(([entry]) => {
+      belt.dataset.visible = entry.isIntersecting ? "1" : "0";
+      watch();
+    }, { threshold: 0.35 }).observe(belt);
+    document.addEventListener("visibilitychange", watch);
+
+    select(0);
+    start();
+    center(0, false);
+    addEventListener("resize", () => center(current, false));
   }
 })();
