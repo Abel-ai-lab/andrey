@@ -17,41 +17,71 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.4.0
+:link: benchmarks/0.5.0
 :link-type: doc
-:link-alt: The 0.4.0 release card: pairwise direction
-:class-card: release-cover release-art release-art-0-4-0
+:link-alt: The 0.5.0 release card: time series
+:class-card: release-cover release-art release-art-0-5-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Pairwise direction
+Time series
 
-0.4.0
+0.5.0
 :::
 
 ::::{div} release-tldr
 
-0.4.0 is here: ANM and PNL, two tests of which of two variables causes the other, are now
-supported. Tested against causal-learn on the same pairs, ANM names the same direction on every
-pair, and PNL runs up to 1,470x faster and names the true direction on more pairs.
+0.5.0 is here: PCMCI, PCMCI+, LPCMCI, lasso Granger causality, VARMA-LiNGAM, and LongitudinalLiNGAM,
+methods for data ordered in time, are now supported. Tested against tigramite on the same series,
+PCMCI and PCMCI+ return the same graphs and run up to 166x faster.
 
 :::{div} release-stats
 
-- **95 of 95** pairs with the same ANM direction as causal-learn
-- **Up to 1,470x** PNL speedup over causal-learn
-- **94%** of pairs with the true PNL direction, against 45% for causal-learn
+- **125 of 125** datasets with the same PCMCI graph as tigramite
+- **Up to 166x** PCMCI speedup over tigramite
+- **Up to 116x** PCMCI+ speedup over tigramite
 :::
 
+% Link the post after the card's button once the post is out (docs/DEVELOPMENT.md).
 :::{div} release-actions
-[Read the release card](benchmarks/0.4.0.md)
-[Read the post](../blog/20261015-andrey-0-4-0.md)
+[Read the release card](benchmarks/0.5.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.4.0
+:link-type: doc
+:link-alt: The 0.4.0 release card: pairwise direction
+:class-card: release-tile release-art-0-4-0
+:shadow: none
+:margin: 0
+
+0.4.0
+:::
+
+:::{div} release-body
+<h3>Pairwise direction</h3>
+
+ANM and PNL, two tests of which of two variables causes the other, compared with causal-learn.
+
+- **2** methods
+- PNL **1,470x** faster than causal-learn at 200 rows
+:::
+
+:::{div} release-meta
+Released October 15, 2026
+
+- [Release card<span class="visually-hidden"> 0.4.0</span>](benchmarks/0.4.0.md)
+- [Post: Pairwise direction](../blog/20261015-andrey-0-4-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -150,6 +180,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.5.0: time series <benchmarks/0.5.0>
 0.4.0: pairwise direction <benchmarks/0.4.0>
 0.3.0: score-based search <benchmarks/0.3.0>
 0.2.0: hidden common causes <benchmarks/0.2.0>
