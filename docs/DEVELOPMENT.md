@@ -202,6 +202,13 @@ d-separation explorer, and the benchmark explorer from
 `apps/compare-causal-learn.json`, recorded once (see [`apps/README.md`](../apps/README.md)); the
 build refuses a recording made on different data.
 
+Every choice on the site is one segmented control, `site/assets/segmented.css`: a track whose
+chosen option fills with the accent. The documentation pages load it with the shared stylesheets,
+and the demos and the benchmark explorer, which are standalone pages, inline the same file. It
+styles the release cards' and posts' figure tabs (`race-sizes`), the comparison's method switch,
+the PC replay's examples, the d-separation explorer's conditioning set, and the graph guide's
+edges.
+
 Thumbnails come from each page's own output: a demo draws its own; a notebook's is its first figure,
 or its dataset's true graph (`NOTEBOOK_DATA` in `conf.py`). They are drawn in the light palette in
 both themes.
@@ -262,6 +269,7 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Sphinx config (theme, extensions, notebooks, blog, generated pages) | `docs/conf.py` |
 | Homepage template, stylesheet, and content generators | `site/homepage.html`, `site/assets/site.css`, `site/build.py` |
 | Timing comparison and speed charts | `site/assets/figures.css`, `site/assets/figures.js` |
+| Segmented control: every choice, in the figures, the demos, and the graph guide | `site/assets/segmented.css` |
 | "Why Andrey is fast" scenes: homepage carousel, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
 | Navbar: wordmark and sections | `docs/_templates/site-logo.html`, `docs/_templates/site-nav.html` |
 | Documentation footer: a navy card, three columns of links, the license, Abel's mark | `docs/_templates/docs-footer.html`, `docs/_static/andrey.css` |

@@ -8,6 +8,7 @@ import json
 import xml.etree.ElementTree as ET
 from collections import Counter
 from html import escape
+from pathlib import Path
 
 import networkx as nx
 import numpy as np
@@ -73,6 +74,13 @@ HOST_SCRIPT = """
 """
 
 
+# The site's segmented control (site/assets/segmented.css), inlined in every teaching page so a
+# choice looks the same here as on the documentation site.
+SEGMENTED_CSS = (
+    Path(__file__).resolve().parents[2] / "site" / "assets" / "segmented.css"
+).read_text()
+
+
 def palette_css():
     """Produce light/dark tokens that follow the host's theme, or the system's without a host."""
 
@@ -133,6 +141,7 @@ def document(title, body, script="", style=""):
     @media(prefers-reduced-motion:no-preference){.step{animation:reveal .15s ease-out}
     @keyframes reveal{from{opacity:.75}to{opacity:1}}}
     """
+        + SEGMENTED_CSS
         + style
     )
     payload = f"<script>{FRAME_SCRIPT}{script}</script>"
@@ -509,11 +518,6 @@ def pc_by_depth(X, alpha=0.05):
 
 
 PC_CSS = """
-.scenes{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--andrey-line);
-border-radius:9px;background:var(--andrey-surface-2)}
-.scenes button{border:0;background:none;padding:5px 14px}
-.scenes button[aria-selected=true]{background:var(--andrey-surface);font-weight:600;
-box-shadow:0 1px 2px color-mix(in srgb,var(--andrey-ink) 18%,transparent)}
 .lede{color:var(--andrey-muted);margin:14px 0 0}
 .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0 16px}
 .controls .play{min-width:6.5em;background:var(--andrey-accent);border-color:var(--andrey-accent);
@@ -728,7 +732,8 @@ def pc_replay(example, labels, heading=True):
         "replays them.</p>"
     )
     body = (
-        (intro if heading else "") + '<div class="scenes" role="tablist" aria-label="Examples">'
+        (intro if heading else "")
+        + '<div class="scenes segmented" role="tablist" aria-label="Examples">'
         '<button role="tab" id="tab-small" aria-controls="small" aria-selected="true">'
         f"{len(labels)} variables</button>"
         '<button role="tab" id="tab-large" aria-controls="large" aria-selected="false" '
@@ -807,7 +812,9 @@ def dsep_document(heading=True):
                 key = f"{x},{y}:" + ",".join(map(str, condition))
                 answers[key] = dsep_html(x, y, condition)
     options = "".join(f'<option value="{n}">{n}</option>' for n in dag)
-    checks = "".join(f'<label><input type="checkbox" value="{n}"> {n}</label>' for n in dag)
+    checks = "".join(
+        f'<label><input type="checkbox" value="{n}"><span>{n}</span></label>' for n in dag
+    )
     intro = (
         "<h1>Which paths are open?</h1><p>Choose two nodes and a conditioning set. "
         "Conditioning blocks a chain or fork, but opens a collider path when the collider "
@@ -817,7 +824,8 @@ def dsep_document(heading=True):
         (intro if heading else "") + f'<div class="graph">{drawing(graph)}</div>'
         f'<label>From <select id="x">{options}</select></label>'
         f'<label>To <select id="y">{options}</select></label>'
-        f"<fieldset><legend>Condition on</legend>{checks}</fieldset>"
+        '<fieldset class="given"><legend>Condition on</legend>'
+        f'<div class="segmented">{checks}</div></fieldset>'
         '<div id="answer" aria-live="polite"></div>'
     )
     encoded = json.dumps(answers).replace("<", "\\u003c")
@@ -834,7 +842,11 @@ def dsep_document(heading=True):
     document.querySelectorAll('input,select').forEach(c=>c.onchange=show);show();
     """
     )
-    return document("d-separation explorer", body, script)
+    style = (
+        ".given{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:14px 0;"
+        "padding:0;border:0}.given legend{float:left;padding:0;font-weight:600}"
+    )
+    return document("d-separation explorer", body, script, style)
 
 
 def iframe(page, title, height=760):
