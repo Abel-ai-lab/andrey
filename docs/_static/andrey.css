@@ -1420,6 +1420,45 @@ html:not(:has(.andrey-home)) .bd-header::before {
   white-space: nowrap;
 }
 
+/* On a narrow screen the API reference's summary tables stack each entry, its name over its
+   description, in the same card, since a long name would leave its description a thin column. */
+@media (max-width: 36rem) {
+  .bd-article .pst-scrollable-table-container:has(> table.autosummary) {
+    padding-top: 0.3rem;
+  }
+
+  .bd-article table.table.autosummary,
+  .bd-article table.table.autosummary tbody,
+  .bd-article table.table.autosummary tbody tr,
+  .bd-article table.table.autosummary tbody tr td:nth-child(n) {
+    display: block;
+  }
+
+  .bd-article table.table.autosummary thead {
+    display: none;
+  }
+
+  .bd-article table.table.autosummary tbody {
+    overflow: hidden;
+    border: 1px solid var(--andrey-line);
+    border-radius: 8px;
+    background: var(--andrey-surface);
+  }
+
+  .bd-article table.table.autosummary tbody tr:nth-child(n) + tr {
+    border-top: 1px solid var(--andrey-line);
+  }
+
+  .bd-article table.table.autosummary tbody tr td:nth-child(n) {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .bd-article table.table.autosummary tbody tr td:first-child {
+    padding-bottom: 0;
+  }
+}
+
 /* A link in a table takes the prose's link color, not the theme's table color. */
 .bd-article table.table a {
   color: var(--pst-color-link);
