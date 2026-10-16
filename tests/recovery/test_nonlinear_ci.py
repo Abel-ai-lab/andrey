@@ -72,9 +72,16 @@ def test_pc_finds_no_edges_between_independent_columns(indep_test):
 # ---- ground truth ------------------------------------------------------------------------------
 
 
-#: Each test's additive-noise case: rows and the graph's seed. RCoT's has 500 rows, the smallest
-#: sample size it is documented for; at 200 rows its result on this graph follows its seed.
-ADDITIVE_NOISE = {"KCI": (200, 0), "RCoT": (500, 12), "CMIknn": (200, 0), "GPDC": (200, 0)}
+#: Each test's additive-noise case: rows and the graph's seed.
+ADDITIVE_NOISE = {"KCI": (200, 0), "CMIknn": (200, 0), "GPDC": (200, 0)}
+
+#: RCoT's random features make one graph's result follow its seed, so RCoT is scored over the
+#: graphs of seeds 0-19 at 500 rows, the smallest sample size it is documented for. Over 100 graphs
+#: and 10 RCoT seeds, a fit had at most one skeleton error with probability 0.97, so fewer than 17
+#: of 20 such fits has probability 0.004; a random set of 20 fits erred in total at least as often
+#: as Fisher-Z on its graphs with probability 0.006.
+RCOT_GRAPHS = range(20)
+RCOT_ROWS = 500
 
 
 def _additive_noise_case(n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
@@ -103,6 +110,23 @@ def test_partial_correlation_errs_on_the_additive_noise_case(case):
 def test_pc_recovers_the_additive_noise_graph(indep_test, case):
     x, truth = _additive_noise_case(*case)
     assert shd(andrey.pc(x, indep_test=indep_test).structure, truth) <= 1
+
+
+def _skeleton_errors(estimated, truth) -> int:
+    """Pairs adjacent in one graph and not in the other."""
+    a, b = estimated.to_numpy() != 0, truth.to_numpy() != 0
+    return int(np.triu((a | a.T) != (b | b.T), 1).sum())
+
+
+@pytest.mark.parametrize("indep_test", ["RCoT"], indirect=True)
+def test_pc_with_rcot_recovers_most_additive_noise_skeletons(indep_test):
+    errors, fisherz_errors = [], []
+    for seed in RCOT_GRAPHS:
+        x, truth = _additive_noise_case(RCOT_ROWS, seed)
+        errors.append(_skeleton_errors(andrey.pc(x, indep_test=indep_test).structure, truth))
+        fisherz_errors.append(_skeleton_errors(andrey.pc(x).structure, truth))
+    assert sum(e <= 1 for e in errors) >= 17
+    assert sum(errors) < sum(fisherz_errors)
 
 
 # ---- recorded outputs --------------------------------------------------------------------------
