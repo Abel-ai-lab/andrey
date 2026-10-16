@@ -312,8 +312,9 @@ LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the pa
 
 
 def _normalized(name: str) -> str:
-    """``ICA-LiNGAM``, ``ICALiNGAM``, and ``ica_lingam`` all read ``icalingam``."""
-    return re.sub(r"[^a-z0-9]", "", name.lower())
+    """``ICA-LiNGAM``, ``ICALiNGAM``, and ``ica_lingam`` all read ``icalingam``; ``PCMCI+`` reads
+    ``pcmciplus``, apart from ``PCMCI``."""
+    return re.sub(r"[^a-z0-9]", "", name.lower().replace("+", "plus"))
 
 
 def _summary_methods() -> list[dict]:
