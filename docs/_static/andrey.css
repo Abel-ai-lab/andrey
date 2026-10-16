@@ -1268,6 +1268,74 @@ html:not(:has(.andrey-home)) .bd-header::before {
   transform: translateY(0.1rem);
 }
 
+/* ---------- tables ---------- */
+/* The documentation's tables are quiet: no column rules and no row fills, a hairline between rows
+   and above and below the table, and a small muted header set on its bottom line. Numbers keep
+   their columns' alignment and tabular figures. A short value never breaks across lines (`nowrap`,
+   from `_short_cells` in conf.py); a table wider than the text scrolls in its own container. */
+.bd-article table.table {
+  --bs-table-bg: transparent;
+  width: 100%;
+  margin: 1.25rem 0 1.75rem;
+  border: 0;
+  border-top: 1px solid var(--andrey-line);
+  border-bottom: 1px solid var(--andrey-line);
+  color: var(--andrey-ink);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The theme's zebra rows and the colored rule under its header give way. */
+.bd-article table.table thead tr,
+.bd-article table.table tbody tr:nth-child(n) {
+  background: transparent;
+}
+
+.bd-article table.table thead tr {
+  border-bottom: 0;
+}
+
+.bd-article table.table :is(th, td) {
+  padding: 0.7rem 0.85rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  vertical-align: top;
+}
+
+.bd-article table.table :is(th, td):first-child {
+  padding-left: 0;
+}
+
+.bd-article table.table :is(th, td):last-child {
+  padding-right: 0;
+}
+
+.bd-article table.table thead th {
+  padding-block: 0.55rem;
+  color: var(--andrey-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  vertical-align: bottom;
+  text-wrap: balance;
+}
+
+.bd-article table.table thead + tbody tr:first-child,
+.bd-article table.table tbody tr:nth-child(n) + tr {
+  border-top: 1px solid var(--andrey-line);
+}
+
+.bd-article table.table .nowrap {
+  white-space: nowrap;
+}
+
+/* A link in a table takes the prose's link color, not the theme's table color. */
+.bd-article table.table a {
+  color: var(--pst-color-link);
+}
+
 /* ---------- code ---------- */
 div.highlight,
 pre {
