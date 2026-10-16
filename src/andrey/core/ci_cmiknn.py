@@ -8,6 +8,7 @@ where a larger value means more independent.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from functools import lru_cache
 
 import numpy as np
 from scipy.special import digamma
@@ -16,6 +17,9 @@ from .ci import _canonical, _checked_data
 from .seeding import resolve_seed
 
 __all__ = ["CMIknn"]
+
+# The cache of CMIknn's shuffles holds about this many bytes.
+_CACHE_BYTES = 2**28
 
 
 def _rank_columns(data: np.ndarray, rng: np.random.Generator) -> np.ndarray:
@@ -35,11 +39,13 @@ def _cmi(dx: np.ndarray, dy: np.ndarray, dz: np.ndarray, k: int) -> float:
     The ``k``-th neighbor distance ``eps_i`` is taken in the joint space; each ``k_*,i`` counts the
     rows strictly closer than ``eps_i`` in a subspace, row ``i`` included.
     """
-    dxz = np.maximum(dx, dz)
-    dyz = np.maximum(dy, dz)
-    joint = np.maximum(dxz, dy)
-    eps = np.partition(joint, k, axis=1)[:, k][:, None]  # position 0 holds row i itself
-    k_xz = np.count_nonzero(dxz < eps, axis=1)
+    return _cmi_given_yz(dx, np.maximum(dy, dz), dz, k)
+
+
+def _cmi_given_yz(dx: np.ndarray, dyz: np.ndarray, dz: np.ndarray, k: int) -> float:
+    """:func:`_cmi` with the distances in the space of y and z, ``max(dy, dz)``, given."""
+    eps = np.partition(np.maximum(dx, dyz), k, axis=1)[:, k][:, None]  # position 0: row i itself
+    k_xz = np.count_nonzero(np.maximum(dx, dz) < eps, axis=1)
     k_yz = np.count_nonzero(dyz < eps, axis=1)
     k_z = np.count_nonzero(dz < eps, axis=1)
     return float(digamma(k) + np.mean(digamma(k_z) - digamma(k_xz) - digamma(k_yz)))
@@ -120,8 +126,9 @@ class CMIknn:
     of the rows, is the low end of the range [1]_ recommends; a larger share smooths the estimate,
     which costs power as the conditioning set grows.
 
-    The tie-breaking is drawn once, from ``seed``, when the test is built; the shuffles of a query
-    come from a generator seeded by ``seed``, the two variables, and the conditioning set, so a
+    The tie-breaking is drawn once, from ``seed``, when the test is built. The shuffles come from a
+    generator seeded by ``seed`` and the conditioning set, so every query with the same
+    conditioning set uses the same shuffles, and the test object keeps them for later queries. A
     p-value does not depend on the order of queries or of the arguments.
 
     **Limitations.** Not benchmarked yet. Each query computes ``n_permutations + 1`` estimates,
@@ -168,24 +175,41 @@ class CMIknn:
         self._k_perm = min(int(k_perm), n)
         self._n_permutations = int(n_permutations)
         self._dtype = np.int16 if n <= np.iinfo(np.int16).max else np.int32
+        # The shuffles depend only on the conditioning set, so queries share them.
+        entries = max(16, _CACHE_BYTES // (self._n_permutations * n * self._dtype().itemsize))
+        self._permutations = lru_cache(entries)(self._draw_permutations)
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the CMIknn p-value for ``x`` independent of ``y`` given ``condition_set``."""
         x_int, y_int, cond = _canonical(x, y, condition_set)
-        rng = np.random.default_rng([self._seed, x_int, y_int, len(cond), *cond])
-        ranks, dtype = self._ranks, self._dtype
+        ranks, dtype, k = self._ranks, self._dtype, self._k
         dx = _distances(ranks[:, x_int], dtype)
-        dy = _distances(ranks[:, y_int], dtype)
-        dz = np.zeros_like(dx)
-        for c in cond:
-            np.maximum(dz, _distances(ranks[:, c], dtype), out=dz)
-        observed = _cmi(dx, dy, dz, self._k)
-        nearest = _nearest_in_z(dz, self._k_perm, rng) if cond else None
+        dz = self._cond_distances(tuple(cond))
+        dyz = np.maximum(_distances(ranks[:, y_int], dtype), dz)
+        observed = _cmi_given_yz(dx, dyz, dz, k)
         exceed = 0
-        for _ in range(self._n_permutations):
-            if nearest is None:
-                perm = rng.permutation(self._n)
-            else:
-                perm = _local_permutation(nearest, rng)
-            exceed += _cmi(dx[np.ix_(perm, perm)], dy, dz, self._k) >= observed
+        for perm in self._permutations(tuple(cond)):
+            exceed += _cmi_given_yz(_distances(ranks[perm, x_int], dtype), dyz, dz, k) >= observed
         return (exceed + 1) / (self._n_permutations + 1)
+
+    def _cond_distances(self, cond: tuple[int, ...]) -> np.ndarray:
+        """Max-norm distances between the rows in the conditioning set; zero when it is empty."""
+        dz = np.zeros((self._n, self._n), dtype=self._dtype)
+        for c in cond:
+            np.maximum(dz, _distances(self._ranks[:, c], self._dtype), out=dz)
+        return dz
+
+    def _draw_permutations(self, cond: tuple[int, ...]) -> np.ndarray:
+        """The ``n_permutations`` shuffles of the rows for ``cond``, one per row of the result,
+        from a generator seeded by the seed and ``cond``."""
+        rng = np.random.default_rng([self._seed, len(cond), *cond])
+        n, dtype = self._n, self._dtype
+        perms = np.empty((self._n_permutations, n), dtype=dtype)
+        if not cond:
+            for row in perms:
+                row[:] = rng.permutation(n)
+            return perms
+        nearest = _nearest_in_z(self._cond_distances(cond), self._k_perm, rng)
+        for row in perms:
+            row[:] = _local_permutation(nearest, rng)
+        return perms

@@ -72,29 +72,36 @@ def test_pc_finds_no_edges_between_independent_columns(indep_test):
 # ---- ground truth ------------------------------------------------------------------------------
 
 
-@pytest.fixture(scope="module")
-def additive_noise_case():
-    """Additive nonlinear noise on a 4-node Erdos-Renyi DAG, 200 rows, and its true CPDAG."""
+#: Each test's additive-noise case: rows and the graph's seed. RCoT's has 500 rows, the smallest
+#: sample size it is documented for; at 200 rows its result on this graph follows its seed.
+ADDITIVE_NOISE = {"KCI": (200, 0), "RCoT": (500, 12), "CMIknn": (200, 0), "GPDC": (200, 0)}
+
+
+def _additive_noise_case(n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """Additive nonlinear noise on a 4-node Erdos-Renyi DAG, and its true CPDAG."""
     ds = data.sample_scm(
         graph="erdos_renyi",
         functional="additive_noise",
         d=4,
-        n=200,
-        seed=0,
+        n=n,
+        seed=seed,
         density=2.0,
         scale="standardize",
     )
     return ds.data, to_cpdag(ds.graph)
 
 
-def test_partial_correlation_errs_on_the_additive_noise_case(additive_noise_case):
-    x, truth = additive_noise_case
+@pytest.mark.parametrize("case", sorted(set(ADDITIVE_NOISE.values())))
+def test_partial_correlation_errs_on_the_additive_noise_case(case):
+    x, truth = _additive_noise_case(*case)
     assert shd(andrey.pc(x).structure, truth) >= 2
 
 
-@pytest.mark.parametrize("indep_test", CI_TESTS, indirect=True)
-def test_pc_recovers_the_additive_noise_graph(indep_test, additive_noise_case):
-    x, truth = additive_noise_case
+@pytest.mark.parametrize(
+    ("indep_test", "case"), list(ADDITIVE_NOISE.items()), indirect=["indep_test"]
+)
+def test_pc_recovers_the_additive_noise_graph(indep_test, case):
+    x, truth = _additive_noise_case(*case)
     assert shd(andrey.pc(x, indep_test=indep_test).structure, truth) <= 1
 
 

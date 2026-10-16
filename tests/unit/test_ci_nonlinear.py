@@ -21,7 +21,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
-from andrey.core import ci
+from andrey.core import ci, ci_cmiknn, ci_kernel
 from andrey.core.ci_cmiknn import (
     CMIknn,
     _cmi,
@@ -252,6 +252,40 @@ def test_gpdc_fits_each_variable_and_conditioning_set_once(monkeypatch):
     pvalues = [test(*query) for query in queries]
     assert len(fits) == 5  # (0, {2}), (1, {2}), (3, {2}), (0, {2, 3}), (1, {2, 3})
     assert [_build("gpdc", data)(*query) for query in queries] == pvalues
+
+
+def test_rcot_draws_the_features_of_each_column_set_once(monkeypatch):
+    """Queries share the features of a variable and of a conditioning set, and the p-values equal
+    those of a test that draws every query's features afresh."""
+    draws = []
+    draw = ci_kernel._fourier_features
+    monkeypatch.setattr(
+        ci_kernel,
+        "_fourier_features",
+        lambda v, count, rng: draws.append(count) or draw(v, count, rng),
+    )
+    data = _common_cause(seed=3, n=120, n_cond=2)
+    queries = [(0, 1, (2,)), (0, 3, (2,)), (1, 3, (2,)), (0, 1, ()), (0, 1, (2, 3))]
+    test = RCoT(data)
+    pvalues = [test(*query) for query in queries]
+    assert sorted(draws) == [5, 5, 5, 100, 100]  # columns 0, 1, 3; sets {2}, {2, 3}
+    assert [RCoT(data)(*query) for query in queries] == pvalues
+
+
+def test_cmiknn_draws_the_shuffles_of_each_conditioning_set_once(monkeypatch):
+    """Queries with the same conditioning set share its shuffles, and the p-values equal those of a
+    test that draws every query's shuffles afresh."""
+    draws = []
+    shuffle = ci_cmiknn._local_permutation
+    monkeypatch.setattr(
+        ci_cmiknn, "_local_permutation", lambda *args: draws.append(1) or shuffle(*args)
+    )
+    data = _common_cause(seed=3, n=120, n_cond=2)
+    queries = [(0, 1, (2,)), (0, 3, (2,)), (1, 3, (2,)), (0, 1, (2, 3))]
+    test = CMIknn(data, n_permutations=20)
+    pvalues = [test(*query) for query in queries]
+    assert len(draws) == 2 * 20  # sets {2} and {2, 3}
+    assert [CMIknn(data, n_permutations=20)(*query) for query in queries] == pvalues
 
 
 # ---- the contract ------------------------------------------------------------------------------

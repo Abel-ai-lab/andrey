@@ -8,8 +8,10 @@ Selected through ``indep_test="kci"`` and ``indep_test="rcot"``. Each test follo
 from __future__ import annotations
 
 from collections.abc import Iterable
+from functools import lru_cache
 
 import numpy as np
+from scipy.linalg import cho_factor, cho_solve
 from scipy.spatial.distance import pdist, squareform
 from scipy.special import gammaincc
 
@@ -23,6 +25,14 @@ __all__ = ["KCI", "RCoT"]
 # The smallest sample size Strobl et al. (2019) evaluate; with two conditioning variables, fewer
 # rows were measured to reject true independences more often than alpha.
 _RCOT_MIN_ROWS = 500
+
+# Each cache of RCoT's features holds about this many bytes.
+_CACHE_BYTES = 2**28
+
+
+def _cache_entries(floats_per_entry: int) -> int:
+    """How many entries of ``floats_per_entry`` float64 values fit in ``_CACHE_BYTES``."""
+    return max(16, _CACHE_BYTES // (8 * floats_per_entry))
 
 
 def _standardize(data: np.ndarray) -> np.ndarray:
@@ -243,9 +253,10 @@ class RCoT:
     chi-squared law (Hall-Buckley-Eagleson) [2]_ [3]_. An empty conditioning set uses ``A`` and
     ``B``, centered.
 
-    The features of a query are drawn from a generator seeded by ``seed``, the two variables, and
-    the conditioning set, so a p-value does not depend on the order of queries or of the
-    arguments, and the same seed reproduces it.
+    The features of a variable, and those of a conditioning set, are drawn from a generator seeded
+    by ``seed`` and its columns, so every query on the same variable or conditioning set uses the
+    same features, and the test object keeps them, and the residuals, for later queries. A p-value
+    does not depend on the order of queries or of the arguments, and the same seed reproduces it.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. Measured on columns independent of each other, its rate of rejecting a true
@@ -295,6 +306,13 @@ class RCoT:
         self._n_features = int(n_features)
         self._n_features_cond = int(n_features_cond)
         self._seed = resolve_seed(seed)
+        # Features and residuals depend only on their columns, so queries share them.
+        n = self._n
+        self._column_features = lru_cache(maxsize=None)(
+            lambda column: self._features((column,), self._n_features)
+        )
+        self._residual = lru_cache(_cache_entries(n * self._n_features))(self._fit_residual)
+        self._cond_factor = lru_cache(_cache_entries(n * self._n_features_cond))(self._factor)
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the RCoT p-value for ``x`` independent of ``y`` given ``condition_set``."""
@@ -305,22 +323,32 @@ class RCoT:
                 "independence more often than alpha.",
                 SampleSizeWarning,
             )
-        rng = np.random.default_rng([self._seed, x_int, y_int, len(cond), *cond])
         n = self._n
-        a = self._features([x_int], self._n_features, rng)
-        b = self._features([y_int], self._n_features, rng)
-        if cond:
-            c = self._features(cond, self._n_features_cond, rng)
-            gram = c.T @ c + 1e-10 * (n - 1) * np.eye(c.shape[1])  # (n - 1)(Sigma_CC + ridge I)
-            coef = np.linalg.solve(gram, c.T @ np.hstack([a, b]))
-            resid = np.hstack([a, b]) - c @ coef
-            a, b = resid[:, : a.shape[1]], resid[:, a.shape[1] :]
+        a, b = self._residual(x_int, tuple(cond)), self._residual(y_int, tuple(cond))
         cross_cov = a.T @ b / (n - 1)
         statistic = n * float(np.sum(cross_cov**2))
         products = (a[:, :, None] * b[:, None, :]).reshape(n, -1)
         weights = np.clip(np.linalg.eigvalsh(products.T @ products / n), 0.0, None)
         return _hall_buckley_eagleson_pvalue(statistic, weights)
 
-    def _features(self, columns: list[int], count: int, rng: np.random.Generator) -> np.ndarray:
-        """Standardized random Fourier features of ``columns``."""
-        return _standardize(_fourier_features(self._data[:, columns], count, rng))
+    def _fit_residual(self, column: int, cond: tuple[int, ...]) -> np.ndarray:
+        """The features of ``column`` minus what a ridge regression on the features of ``cond``
+        explains; the standardized features themselves when ``cond`` is empty."""
+        features = self._column_features(column)
+        if not cond:
+            return features
+        c, factor = self._cond_factor(cond)
+        return features - c @ cho_solve(factor, c.T @ features)
+
+    def _features(self, columns: tuple[int, ...], count: int) -> np.ndarray:
+        """Standardized random Fourier features of ``columns``, drawn from a generator seeded by
+        the seed, ``count``, and ``columns``."""
+        rng = np.random.default_rng([self._seed, count, *columns])
+        return _standardize(_fourier_features(self._data[:, list(columns)], count, rng))
+
+    def _factor(self, cond: tuple[int, ...]) -> tuple[np.ndarray, tuple]:
+        """The conditioning set's features ``C`` and the Cholesky factor of
+        ``C'C + ridge (n - 1) I``, that is ``(n - 1)(Sigma_CC + ridge I)``."""
+        c = self._features(cond, self._n_features_cond)
+        gram = c.T @ c + 1e-10 * (self._n - 1) * np.eye(c.shape[1])
+        return c, cho_factor(gram)
