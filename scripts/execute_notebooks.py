@@ -55,12 +55,12 @@ def outputs(notebook: nbformat.NotebookNode) -> list[str]:
         if cell.cell_type != "code":
             continue
         for output in cell.get("outputs", []):
-            text = json.dumps(
-                {k: v for k, v in output.items() if k != "execution_count"},
-                sort_keys=True,
-                indent=1,
-            )
-            lines += [f"cell {index}: {line}" for line in ADDRESS.sub("0x...", text).splitlines()]
+            kind = output.get("name") or output["output_type"]
+            parts = {kind: output["text"]} if "text" in output else output.get("data", {})
+            for mime, text in sorted(parts.items()):
+                text = text if isinstance(text, str) else json.dumps(text, sort_keys=True)
+                for line in ADDRESS.sub("0x...", text).splitlines():
+                    lines.append(f"cell {index} {mime}: {line}")
     return lines
 
 
@@ -80,7 +80,7 @@ def main() -> int:
         diff = list(difflib.unified_diff(stored, outputs(fresh), "stored", "fresh", lineterm=""))
         if diff:
             stale.append(path.name)
-            print("\n".join(line[:200] for line in diff[:80]))
+            print("\n".join(diff[:80]))
     if stale:
         print(f"Outputs differ in {', '.join(stale)}; run scripts/execute_notebooks.py.")
     return 1 if stale else 0
