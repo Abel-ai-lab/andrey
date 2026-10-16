@@ -180,7 +180,9 @@ identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selec
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
 
 `nonlinear_ci_cpu.py` runs PC with each nonlinear CI test on additive nonlinear noise, with rows
-as an axis of their own. Every reference runs at Andrey's defaults under its own names:
+as an axis of their own. `--regime nonmonotone_er` makes each effect `w cos(parent)`, an even
+function partial correlation does not see. Every reference runs at Andrey's defaults under its own
+names:
 
 | Andrey | causal-learn | tigramite |
 |---|---|---|

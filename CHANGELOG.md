@@ -18,6 +18,10 @@ change names its pull request.
   ([#TBD])
 - `SampleSizeWarning`: RCoT warns when it conditions on fewer than 500 rows, the smallest sample
   size its reference evaluates. ([#TBD])
+- `KCI(rank=...)`, a low-rank KCI for many rows: each kernel becomes an incomplete Cholesky
+  factor of at most `rank` columns. ([#TBD])
+- `andrey.data.sample_scm(functional="nonmonotone")`, additive noise through `cos`, whose effects
+  partial correlation does not see. ([#TBD])
 
 ## [0.5.0] - 2026-10-16
 

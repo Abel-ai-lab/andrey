@@ -21,7 +21,15 @@ import andrey
 
 from . import qa
 from .dataset import CausalDataset, QAReport, SCMParams
-from .functional import Functional, additive_noise, linear, post_nonlinear, var, varma
+from .functional import (
+    Functional,
+    additive_noise,
+    linear,
+    nonmonotone,
+    post_nonlinear,
+    var,
+    varma,
+)
 from .graphs import (
     GraphSpec,
     dag_truth,
@@ -318,6 +326,7 @@ def sample_scm(
         "linear": linear,
         "additive_noise": additive_noise,
         "post_nonlinear": post_nonlinear,
+        "nonmonotone": nonmonotone,
         "var": var,
         "varma": varma,
     }

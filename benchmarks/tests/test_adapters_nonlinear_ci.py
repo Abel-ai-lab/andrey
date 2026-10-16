@@ -16,6 +16,7 @@ import nonlinear_ci_cpu
 import numpy as np
 import pytest
 
+import andrey
 from andrey import GraphStructure
 from andrey_bench import datasets
 from andrey_bench.adapters.andrey_pc import AndreyPC
@@ -69,6 +70,18 @@ def test_the_regime_is_additive_nonlinear_noise() -> None:
     keys = nonlinear_ci_cpu.ladder_keys([5], [200, 500], seeds=2)
     assert sorted({(k.d, k.n) for k in keys}) == [(5, 200), (5, 500)]
     assert len({k.digest for k in keys}) == 4
+
+
+def test_the_nonmonotone_regime_hides_its_edges_from_partial_correlation() -> None:
+    """On ``nonmonotone_er`` Fisher-Z misses edges RCoT finds: the regime's purpose."""
+    (key,) = nonlinear_ci_cpu.ladder_keys([8], [1000], seeds=1, regime="nonmonotone_er")
+    data, marks, _ = datasets.generate_one(key)
+    truth = np.asarray(marks) != 0
+    errors = {}
+    for test in ("fisherz", "rcot"):
+        found = np.asarray(andrey.pc(data, indep_test=test).structure.to_numpy()) != 0
+        errors[test] = int(np.triu((found | found.T) ^ (truth | truth.T), 1).sum())
+    assert errors["rcot"] <= 1 < 3 <= errors["fisherz"]
 
 
 @pytest.mark.parametrize("test", NONLINEAR)

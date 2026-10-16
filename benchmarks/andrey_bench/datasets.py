@@ -62,6 +62,7 @@ FUNCTIONAL_TO_ANDREY = {
     "linear": "linear",
     "anm": "additive_noise",
     "pnl": "post_nonlinear",
+    "nonmonotone": "nonmonotone",
     "var": "var",
 }
 STANDARDIZE_TO_SCALE = {
@@ -99,6 +100,9 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "pnl_pair": ("er", "pnl", "laplace", "standardized"),
     # Nonlinear additive noise without hidden nodes: PC with the nonlinear CI tests.
     "anm_er": ("er", "anm", "gaussian", "standardized"),
+    # Additive noise through cos, an even function: a child is uncorrelated with a symmetric
+    # parent, so partial correlation misses edges the nonlinear CI tests find.
+    "nonmonotone_er": ("er", "nonmonotone", "gaussian", "standardized"),
     # A lagged linear-Gaussian series for PCMCI: andrey.data's VAR(1) on an empty instantaneous
     # graph (the key sets density LAG_ONLY_DENSITY), so every true link has lag 1. Temporal
     # generation takes raw scale only.

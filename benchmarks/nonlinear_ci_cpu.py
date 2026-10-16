@@ -4,9 +4,10 @@
 Runs Andrey's PC with each nonlinear test (KCI, RCoT, CMIknn, GPDC) and with Fisher-Z, causal-learn's
 PC with KCI and RCoT, tigramite's PC with CMIknn and GPDC, and the empty graph as a quality baseline.
 The data is additive nonlinear noise (``x = sum w (p + sin p) + e``, Gaussian ``e``) on Erdos-Renyi
-graphs at average degree 2, standardized. A nonlinear test's cost grows with the rows, so rows are
-their own axis (``--rows``) rather than a multiple of ``d``. Every solution is serial and runs at
-Andrey's defaults; the adapters map them to each package's names.
+graphs at average degree 2, standardized; ``--regime nonmonotone_er`` replaces ``p + sin p`` by
+``cos p``, which partial correlation does not see. A nonlinear test's cost grows with the rows, so
+rows are their own axis (``--rows``) rather than a multiple of ``d``. Every solution is serial and
+runs at Andrey's defaults; the adapters map them to each package's names.
 
 tigramite's solutions run in an environment of their own: build it with
 ``benchmarks/start_tigramite.sh`` and export ``ANDREY_BENCH_TIGRAMITE_PYTHON``. A run whose
@@ -40,8 +41,9 @@ from andrey_bench.runner import available_cores, check_interpreters
 #: Andrey's CI tests in this lane; ``fisherz`` shows what partial correlation gets on this data.
 ANDREY_TESTS = ("fisherz", "kci", "rcot", "cmiknn", "gpdc")
 
-#: Additive nonlinear noise on Erdos-Renyi graphs.
+#: Additive nonlinear noise on Erdos-Renyi graphs, the default; and its non-monotone form.
 REGIME = "anm_er"
+REGIME_CHOICES = ("anm_er", "nonmonotone_er")
 
 #: Smallest run that touches every solution: one tiny dataset.
 SMOKE = {"ladder": [4], "rows": [100], "seeds": 1, "repeats": 1, "cap_wall_s": 300.0}
@@ -62,9 +64,9 @@ def solutions() -> list:
     ]
 
 
-def regime_slice() -> dict:
-    """Return the :class:`DatasetKey` coordinates of :data:`REGIME`."""
-    topology, functional, noise, standardize = datasets.REGIMES[REGIME]
+def regime_slice(regime: str = REGIME) -> dict:
+    """Return the :class:`DatasetKey` coordinates of ``regime``."""
+    topology, functional, noise, standardize = datasets.REGIMES[regime]
     return {
         "topology": topology,
         "functional": functional,
@@ -74,10 +76,12 @@ def regime_slice() -> dict:
     }
 
 
-def ladder_keys(ladder: list[int], rows: list[int], seeds: int) -> list[DatasetKey]:
+def ladder_keys(
+    ladder: list[int], rows: list[int], seeds: int, regime: str = REGIME
+) -> list[DatasetKey]:
     """Return one dataset per ``(d, n, seed)``."""
     return [
-        DatasetKey(**regime_slice(), d=d, n=n, seed=seed)
+        DatasetKey(**regime_slice(regime), d=d, n=n, seed=seed)
         for d in ladder
         for n in rows
         for seed in range(seeds)
@@ -110,6 +114,9 @@ def main(argv: list[str] | None = None) -> int:
         "--rows", type=int, nargs="+", default=[200, 500], help="n sizes (default: 200 500)"
     )
     p.add_argument("--seeds", type=int, default=10, help="datasets per (d, n) (default: 10)")
+    p.add_argument(
+        "--regime", choices=REGIME_CHOICES, default=REGIME, help=f"data (default: {REGIME})"
+    )
     p.add_argument("--repeats", type=int, default=1, help="timed repeats per fit (default: 1)")
     p.add_argument(
         "--warmup", type=int, default=WARMUP, help="untimed fits per repeat (default: 1)"
@@ -169,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         "solution list": [a.name for a in field],
         "params": {a.name: dict(a.params()) for a in field},
         "tigramite_python": {PYTHON_ENV_VAR: os.environ.get(PYTHON_ENV_VAR, "")},
-        "slice": regime_slice(),
+        "slice": regime_slice(args.regime),
         "ladder": args.ladder,
         "rows": args.rows,
         "seeds": args.seeds,
@@ -206,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
             result = run_batch(
                 datasets.store_dir(out),
                 field,
-                ladder_keys([d], [n], args.seeds),
+                ladder_keys([d], [n], args.seeds, args.regime),
                 machine_id=args.machine_id,
                 cap_wall_s=args.cap_wall_s,
                 cap_mem_mb=args.cap_mem_mb,
