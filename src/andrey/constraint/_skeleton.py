@@ -18,7 +18,8 @@ import numpy as np
 
 from andrey.core.ci import CITest
 
-Removal = tuple[int, int, tuple[int, ...]]  # (x, y, separating set) for one removed pair
+#: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``.
+Removal = tuple[int, int, tuple[int, ...], float]
 
 # One batched_call inverts a stack of (k+2, k+2) correlation submatrices; cap how many subsets that
 # stack holds at once so a huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one
@@ -36,13 +37,14 @@ def scan_conditioning_sets(
     separating: set[int],
     skip_within: set[int] | None = None,
     trace: list[dict] | None = None,
-) -> bool:
+) -> float | None:
     """Test every size-``size`` subset of ``candidates`` as a conditioning set for ``(a, b)``.
 
     Each subset whose p-value exceeds ``alpha`` (``a`` conditionally independent of ``b``
-    given the subset) is unioned into ``separating`` in place. Returns whether any subset separated
-    the pair. There is no early exit: the whole subset space is scanned so ``separating``
-    accumulates the union over every separating set, exactly as the scalar loop it replaces did.
+    given the subset) is unioned into ``separating`` in place. Returns the largest p-value among
+    the subsets that separated the pair, or ``None`` when none did. There is no early exit: the
+    whole subset space is scanned so ``separating`` accumulates the union over every separating
+    set, exactly as the scalar loop it replaces did.
 
     With ``skip_within`` given, subsets lying entirely inside it are not tested: the caller passes
     the candidates the pair's other endpoint already scanned at this size, so each shared subset is
@@ -62,7 +64,7 @@ def scan_conditioning_sets(
     batched = getattr(test, "batched_call", None) or (
         lambda a, b, chunk: [test(a, b, subset) for subset in chunk]
     )
-    found = False
+    largest: float | None = None
     while True:
         chunk = list(islice(subsets, _CHUNK))
         if not chunk:
@@ -72,9 +74,9 @@ def scan_conditioning_sets(
             record_tests(trace, size, a, b, chunk, pvalues, alpha)
         for subset, p in zip(chunk, pvalues):
             if p > alpha:
-                found = True
+                largest = float(p) if largest is None else max(largest, float(p))
                 separating.update(subset)
-    return found
+    return largest
 
 
 def record_tests(
@@ -118,13 +120,13 @@ def prescreen_capable(test: CITest) -> bool:
 
 def marginal_removals(
     test: CITest, adjacent_upper: np.ndarray, alpha: float, trace: list[dict] | None = None
-) -> list[tuple[int, int]]:
-    """(size 0) The still-adjacent pairs the marginal test separates, as ``(x, y)`` with ``x < y``.
+) -> list[tuple[int, int, float]]:
+    """(size 0) The still-adjacent pairs the marginal test separates, as ``(x, y, p)``, ``x < y``.
 
     ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized read
     of the correlation matrix flags every pair with marginal ``p > alpha``; the return is those in
-    row-major order (matching the serial loop's visitation). Each carries an empty separating set.
-    With ``trace`` given, every adjacent pair's test is recorded.
+    row-major order (matching the serial loop's visitation), each with its p-value. Each carries an
+    empty separating set. With ``trace`` given, every adjacent pair's test is recorded.
     """
     pmat = test.marginal_pvalues()  # ty: ignore[unresolved-attribute]  # gated by prescreen_capable
     separated = adjacent_upper & (pmat > alpha)
@@ -132,7 +134,7 @@ def marginal_removals(
         for x, y in zip(*np.nonzero(adjacent_upper)):
             record_tests(trace, 0, int(x), int(y), [()], [pmat[x, y]], alpha)
     xs, ys = np.nonzero(separated)
-    return list(zip(xs.tolist(), ys.tolist()))
+    return [(x, y, float(pmat[x, y])) for x, y in zip(xs.tolist(), ys.tolist())]
 
 
 def first_order_separating(
@@ -142,21 +144,25 @@ def first_order_separating(
     candidates: list[int],
     alpha: float,
     trace: list[dict] | None = None,
-) -> list[int]:
-    """(size 1) The sorted candidates whose first-order test separates ``(x, y)`` (``p > alpha``).
+) -> tuple[list[int], float | None]:
+    """(size 1) The candidates whose first-order test separates ``(x, y)``, and their largest p.
 
     ``candidates`` is the pair's start-of-size snapshot conditioners (PC: either endpoint's
     neighbors minus the partner; FCI: the lower endpoint's). Vectorized over the candidates in one
     shot; no cache writes. Returns the separating conditioners sorted ascending (the separating-set
-    key order); empty when none separate. With ``trace`` given, every candidate's test is recorded.
+    key order) and the largest p-value among their tests, ``([], None)`` when none separate. With
+    ``trace`` given, every candidate's test is recorded.
     """
     if not candidates:
-        return []
+        return [], None
     pvals = test.first_order_pvalues(x, y, candidates)  # ty: ignore[unresolved-attribute]
     if trace is not None:
         record_tests(trace, 1, x, y, [(c,) for c in candidates], pvals, alpha)
-    passing = np.asarray(candidates)[pvals > alpha]
-    return sorted(passing.tolist())
+    separated = pvals > alpha
+    if not separated.any():
+        return [], None
+    passing = np.asarray(candidates)[separated]
+    return sorted(passing.tolist()), float(pvals[separated].max())
 
 
 def scan_pairs(
@@ -169,9 +175,10 @@ def scan_pairs(
 ) -> list[Removal]:
     """Scan adjacent ``pairs`` at conditioning ``size`` against a start-of-size neighbor snapshot.
 
-    Returns ``(x, y, separating)`` for every pair some size-``size`` conditioning set separates.
-    Each pair is tested from either endpoint and the separating sets are unioned, so the removals
-    do not depend on column order; a subset both endpoints offer is tested once, from the first.
+    Returns ``(x, y, separating, p)`` for every pair some size-``size`` conditioning set separates,
+    with ``p`` the largest p-value among the separating tests. Each pair is tested from either
+    endpoint and the separating sets are unioned, so the removals do not depend on column order; a
+    subset both endpoints offer is tested once, from the first.
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
     and the parallel workers share it, so they stay identical. With ``trace`` given, every test is
     recorded in the order it runs.
@@ -179,7 +186,7 @@ def scan_pairs(
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()
-        found = False
+        largest: list[float] = []
         from_x = neighbors[x][neighbors[x] != y].tolist()
         from_y = neighbors[y][neighbors[y] != x].tolist()
         # Once the x side has scanned, the y side skips the subsets both sides offer.
@@ -187,10 +194,11 @@ def scan_pairs(
         for a, b, candidates, seen in ((x, y, from_x, None), (y, x, from_y, shared)):
             if len(candidates) < size:
                 continue
-            if scan_conditioning_sets(test, a, b, candidates, size, alpha, separating, seen, trace):
-                found = True
-        if found:
-            removals.append((x, y, tuple(sorted(separating))))
+            p = scan_conditioning_sets(test, a, b, candidates, size, alpha, separating, seen, trace)
+            if p is not None:
+                largest.append(p)
+        if largest:
+            removals.append((x, y, tuple(sorted(separating)), max(largest)))
     return removals
 
 

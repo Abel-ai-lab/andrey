@@ -26,9 +26,10 @@ causal-cmd                             Andrey
 
 PC runs order-independent (``--stableFAS``) and has no depth cap, as Andrey's PC does. It keeps
 Tetrad's default collider conflict rule (``--conflictRule 1``), under which a later collider
-replaces an earlier one; Andrey's PC leaves such an edge undirected. FGES runs with no structure
-prior (``--structurePrior 0``), as Andrey's GES has none, and without the discretization option.
-Each fit's JVM sees only the cores the runner gives the fit (``-XX:ActiveProcessorCount``).
+replaces an earlier one; Andrey's PC keeps the collider whose pair was separated with the larger
+p-value. FGES runs with no structure prior (``--structurePrior 0``), as Andrey's GES has none, and
+without the discretization option. Each fit's JVM sees only the cores the runner gives the fit
+(``-XX:ActiveProcessorCount``).
 
 ``ANDREY_BENCH_TETRAD_JAR`` names the jar and ``ANDREY_BENCH_JAVA`` the ``java`` executable, by
 default the one on ``PATH``; it needs the ``jdk.compiler`` module, which runs a source file. The

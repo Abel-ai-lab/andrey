@@ -4,8 +4,9 @@ At a fixed conditioning size the still-adjacent pairs are scanned independently:
 separating set is a read-only function of the start-of-size neighborhood snapshot and the
 correlation matrix, and removals are applied only after the whole size completes. So the pass is
 embarrassingly parallel across pairs, and the reduce is a plain concatenation of per-chunk removals
-with no tie-break -- the recovered adjacency and separating sets are identical to the serial scan
-regardless of how the pairs are partitioned or the order chunks complete.
+with no tie-break -- the recovered adjacency, separating sets, and largest separating p-values are
+identical to the serial scan regardless of how the pairs are partitioned or the order chunks
+complete.
 
 Workers are seeded once with the parent's exact correlation-matrix bytes (via
 :meth:`~andrey.core.ci.FisherZ.from_corr`) and pin BLAS to one thread, so every process feeds

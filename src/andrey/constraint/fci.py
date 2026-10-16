@@ -105,7 +105,7 @@ def _fast_adjacency_search(
             neighbors = [np.flatnonzero(support[i]) for i in range(d)]
             remove: list[tuple[int, int]] = []
             if can_prescreen and size == 0:
-                for x, y in marginal_removals(test, np.triu(support, 1), alpha):
+                for x, y, _ in marginal_removals(test, np.triu(support, 1), alpha):
                     remove.append((x, y))
                     sepsets[(x, y)] = ()
                     sepsets[(y, x)] = ()  # skeleton separations are recorded both ways
@@ -114,7 +114,7 @@ def _fast_adjacency_search(
                     candidates = sorted(
                         (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
-                    separating = first_order_separating(test, x, y, candidates, alpha)
+                    separating, _ = first_order_separating(test, x, y, candidates, alpha)
                     if separating:
                         remove.append((x, y))
                         key = tuple(separating)
@@ -130,7 +130,7 @@ def _fast_adjacency_search(
                     # the host thread count.
                     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
                         removals = scan_pairs(test, pairs, neighbors, size, alpha)
-                for x, y, separating in removals:
+                for x, y, separating, _ in removals:
                     remove.append((x, y))
                     sepsets[(x, y)] = separating
                     sepsets[(y, x)] = separating

@@ -1,4 +1,4 @@
-"""PC orients every collider at once, and an edge two colliders dispute ends undirected."""
+"""PC orients colliders from the highest separating p-value down; an exact tie leaves a dispute."""
 
 import numpy as np
 import pytest
@@ -9,56 +9,74 @@ from andrey.core import ARROW, NULL, TAIL
 from andrey.core.orient import meek
 
 
-def undirected(edges, d):
-    skeleton = np.zeros((d, d), dtype=np.int8)
-    for a, b in edges:
-        skeleton[a, b] = skeleton[b, a] = TAIL
-    return skeleton
+def marks(d, directed=(), undirected=()):
+    """The endpoint marks of a graph on ``d`` nodes with the given edges."""
+    out = np.zeros((d, d), dtype=np.int8)
+    for a, b in directed:
+        out[a, b], out[b, a] = TAIL, ARROW
+    for a, b in undirected:
+        out[a, b] = out[b, a] = TAIL
+    return out
 
 
-def relabel(marks, order):
-    """The marks of the graph whose node ``k`` is node ``order[k]`` of ``marks``."""
-    return marks[np.ix_(order, order)]
+def relabel(m, order):
+    """The marks of the graph whose node ``k`` is node ``order[k]`` of ``m``."""
+    return m[np.ix_(order, order)]
 
 
-# Chain 0 - 1 - 2 - 3 with empty separating sets: colliders at 1 (0, 1, 2) and at 2 (1, 2, 3)
-# give the edge 1 - 2 an arrowhead at each end.
-CHAIN = undirected([(0, 1), (1, 2), (2, 3)], 4)
-CHAIN_SEPSETS = {(0, 2): (), (1, 3): (), (0, 3): ()}
+# Chain 0 - 1 - 2 - 3 with empty separating sets: the colliders at 1 (0, 1, 2) and at 2 (1, 2, 3)
+# would orient the edge 1 - 2 in opposite directions.
+CHAIN = marks(4, undirected=[(0, 1), (1, 2), (2, 3)])
+CHAIN_SEPSETS = {(0, 2): (), (1, 3): ()}
 
 
-def orient(skeleton, sepsets):
-    return _undirect_conflicts(meek(_orient_colliders(skeleton, sepsets)))
+def orient(skeleton, sepsets, pvalues):
+    return _undirect_conflicts(meek(_orient_colliders(skeleton, sepsets, pvalues)))
 
 
-def test_conflicting_colliders_mark_the_shared_edge_bidirected():
-    pdag = _orient_colliders(CHAIN, CHAIN_SEPSETS)
-    assert pdag[0, 1] == TAIL and pdag[1, 0] == ARROW  # 0 -> 1
-    assert pdag[1, 2] == ARROW and pdag[2, 1] == ARROW  # 1 <-> 2
-    assert pdag[3, 2] == TAIL and pdag[2, 3] == ARROW  # 3 -> 2
+@pytest.mark.parametrize(
+    ("pvalues", "expected"),
+    [
+        ({(0, 2): 0.9, (1, 3): 0.3}, marks(4, directed=[(0, 1), (2, 1)], undirected=[(2, 3)])),
+        ({(0, 2): 0.3, (1, 3): 0.9}, marks(4, directed=[(1, 2), (3, 2)], undirected=[(0, 1)])),
+    ],
+    ids=["first-in-column-order-ranks-higher", "second-ranks-higher"],
+)
+def test_the_higher_ranked_collider_wins_a_conflict(pvalues, expected):
+    np.testing.assert_array_equal(orient(CHAIN, CHAIN_SEPSETS, pvalues), expected)
 
 
-def test_a_conflicting_edge_stays_undirected_through_meek():
-    # Undirected before Meek, R1 would orient 1 - 2 from 0 -> 1 or from 3 -> 2, whichever ran first.
-    out = orient(CHAIN, CHAIN_SEPSETS)
-    assert out[1, 2] == TAIL and out[2, 1] == TAIL
-    assert out[1, 0] == ARROW and out[2, 3] == ARROW
+def test_an_exact_tie_leaves_the_disputed_edge_undirected():
+    pvalues = {(0, 2): 0.5, (1, 3): 0.5}
+    pdag = _orient_colliders(CHAIN, CHAIN_SEPSETS, pvalues)
+    assert pdag[1, 2] == ARROW and pdag[2, 1] == ARROW  # both colliders set: 1 <-> 2
+    trace: list[dict] = []
+    out = _undirect_conflicts(meek(pdag), _trace=trace)
+    # Undirected before Meek, R1 would orient 1 - 2 from 0 -> 1 or from 3 -> 2.
+    np.testing.assert_array_equal(out, marks(4, directed=[(0, 1), (3, 2)], undirected=[(1, 2)]))
+    assert [r["edges"] for r in trace if r["step"] == "conflict"] == [[(1, 2)]]
 
 
+@pytest.mark.parametrize("ranks", [(0.9, 0.3), (0.3, 0.9), (0.5, 0.5)])
 @pytest.mark.parametrize("order", [(3, 2, 1, 0), (1, 3, 0, 2), (2, 0, 3, 1)])
-def test_the_orientation_follows_the_nodes_not_their_order(order):
+def test_the_orientation_follows_the_nodes_not_their_order(ranks, order):
+    pvalues = dict(zip(CHAIN_SEPSETS, ranks))
     order = np.array(order)
     position = {int(node): k for k, node in enumerate(order)}
-    sepsets = {(position[a], position[b]): () for a, b in CHAIN_SEPSETS}
-    relabeled = orient(relabel(CHAIN, order), sepsets)
-    assert np.array_equal(relabeled, relabel(orient(CHAIN, CHAIN_SEPSETS), order))
+
+    def moved(pairs):
+        return {tuple(sorted((position[a], position[b]))): v for (a, b), v in pairs.items()}
+
+    relabeled = orient(relabel(CHAIN, order), moved(CHAIN_SEPSETS), moved(pvalues))
+    np.testing.assert_array_equal(relabeled, relabel(orient(CHAIN, CHAIN_SEPSETS, pvalues), order))
 
 
-def test_cdnod_points_context_edges_out_over_a_collider_at_the_context():
-    # Context 2 adjacent to 0 and 1, which are separated by the empty set: a collider at 2.
-    skeleton = undirected([(0, 2), (1, 2)], 3)
-    pdag = _orient_with_context(skeleton, {(0, 1): ()}, context=2)
-    assert pdag[2, 0] == TAIL and pdag[0, 2] == ARROW  # 2 -> 0
-    assert pdag[2, 1] == TAIL and pdag[1, 2] == ARROW  # 2 -> 1
-    assert not ((pdag == ARROW) & (pdag.T == ARROW)).any()
+def test_cdnod_directs_context_edges_before_ranking_colliders():
+    # Context 3 is adjacent to 0 and 1, which are separated: a collider at the context, ranked
+    # first. Directing 3 -> 0 first skips it, so the collider 2 -> 0 <- 3 is kept.
+    skeleton = marks(4, undirected=[(0, 3), (1, 3), (0, 2)])
+    sepsets = {(0, 1): (), (2, 3): ()}
+    pvalues = {(0, 1): 0.9, (2, 3): 0.5}
+    pdag = _orient_with_context(skeleton, sepsets, pvalues, context=3)
+    np.testing.assert_array_equal(pdag, marks(4, directed=[(3, 0), (3, 1), (2, 0)]))
     assert np.array_equal(pdag != NULL, skeleton != NULL)

@@ -2,9 +2,9 @@
 
 The algorithm, its settings, and its references are described on :func:`andrey.cdnod`.
 
-The context index joins the data as a last variable. Colliders are oriented as PC orients them,
-then every edge the context keeps is oriented out of it before Meek's rules run. The context node
-is dropped from the returned CPDAG.
+The context index joins the data as a last variable. Every edge the context keeps is oriented out
+of it, then colliders are oriented as PC orients them, before Meek's rules run. The context node is
+dropped from the returned CPDAG.
 """
 
 from __future__ import annotations
@@ -50,13 +50,17 @@ def cdnod(
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
-        skeleton, sepsets = _discover_skeleton(X, alpha, indep_test, categorical=categorical)
-        pdag = _orient_with_context(skeleton, sepsets, context=None)
+        skeleton, sepsets, pvalues = _discover_skeleton(
+            X, alpha, indep_test, categorical=categorical
+        )
+        pdag = _orient_with_context(skeleton, sepsets, pvalues, context=None)
     else:
         augmented = np.concatenate([X, context], axis=1)
         mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
-        skeleton, sepsets = _discover_skeleton(augmented, alpha, indep_test, categorical=mask)
-        pdag = _orient_with_context(skeleton, sepsets, context=d)
+        skeleton, sepsets, pvalues = _discover_skeleton(
+            augmented, alpha, indep_test, categorical=mask
+        )
+        pdag = _orient_with_context(skeleton, sepsets, pvalues, context=d)
     completed = _undirect_conflicts(meek(pdag))
     return to_structure(completed[:d, :d], kind="cpdag")
 
@@ -64,19 +68,21 @@ def cdnod(
 def _orient_with_context(
     skeleton: np.ndarray,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
+    pvalues: dict[tuple[int, int], float],
     *,
     context: int | None,
 ) -> np.ndarray:
-    """Orient the augmented skeleton: unshielded colliders, then context edges outward.
+    """Orient the augmented skeleton: context edges outward, then unshielded colliders.
 
-    Colliders are oriented as PC orients them (:func:`~andrey.constraint.pc._orient_colliders`).
-    Every edge the ``context`` node keeps then becomes ``context -> neighbor``, replacing any
-    arrowhead a collider set at the context, so the context is a source in every triple it touches.
+    Every edge the ``context`` node keeps becomes ``context -> neighbor`` first, so the context is
+    a source in every triple it touches. Colliders are then oriented as PC orients them
+    (:func:`~andrey.constraint.pc._orient_colliders`), which skips a collider when an edge it would
+    orient already has an arrowhead at the other end; so none puts an arrowhead at the context.
     ``context=None`` orients colliders only, for a skeleton without a context node.
     """
-    pdag = _orient_colliders(skeleton, sepsets)
+    pdag = skeleton.copy()
     if context is not None:
         neighbors = np.flatnonzero(skeleton[context] != NULL)
         pdag[context, neighbors] = TAIL
         pdag[neighbors, context] = ARROW
-    return pdag
+    return _orient_colliders(pdag, sepsets, pvalues)

@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from contextlib import nullcontext
-from itertools import combinations
+from itertools import combinations, groupby
 from math import comb
+from operator import itemgetter
 
 import numpy as np
 
@@ -47,14 +48,14 @@ def pc(
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
     (``step="collider"``, from :func:`_orient_colliders`), each Meek rule firing (``step="meek"``,
-    with the fields :func:`~andrey.core.orient.meek` records), and, when colliders conflict, the
-    edges left undirected (``step="conflict"``, from :func:`_undirect_conflicts`).
+    with the fields :func:`~andrey.core.orient.meek` records), and, when colliders of equal rank
+    conflict, the edges left undirected (``step="conflict"``, from :func:`_undirect_conflicts`).
     """
     X = np.asarray(data, dtype=np.float64)
-    skeleton, sepsets = _discover_skeleton(
+    skeleton, sepsets, pvalues = _discover_skeleton(
         X, alpha, indep_test, categorical=categorical, warn_expensive=True, _trace=_trace
     )
-    pdag = _orient_colliders(skeleton, sepsets, _trace=_trace)
+    pdag = _orient_colliders(skeleton, sepsets, pvalues, _trace=_trace)
     if _trace is None:
         return to_structure(_undirect_conflicts(meek(pdag)), kind="cpdag")
     firings: list[dict] = []
@@ -64,39 +65,48 @@ def pc(
 
 
 def _orient_colliders(
-    skeleton: np.ndarray,
+    pdag: np.ndarray,
     sepsets: Mapping[tuple[int, int], Iterable[int] | None],
+    pvalues: Mapping[tuple[int, int], float],
     *,
     _trace: list[dict] | None = None,
 ) -> np.ndarray:
-    """Orient every unshielded collider at once; an edge two colliders dispute becomes bidirected.
+    """Orient the unshielded colliders, from the most clearly separated pair to the least.
 
-    Starts from the fully undirected skeleton and visits every unshielded triple ``x - y - z``
-    (``x`` and ``z`` both adjacent to ``y`` but not to each other) with ``y`` the middle node,
-    ordered by middle node then by endpoint pair ``(x, z)`` with ``x < z`` ascending. ``y`` is a
-    collider ``x *-> y <-* z`` iff ``y`` is not in the separating set of ``x`` and ``z``; it then
-    sets the arrowhead at ``y`` on both edges and changes no other mark. An edge that receives an
-    arrowhead at each end, from colliders at both of its nodes, ends bidirected (``x <-> y``). The
-    result is the set of all the colliders' arrowheads, so the visiting order does not change it:
-    the list rule of Colombo and Maathuis (2014), Section 4.3.
+    ``pdag`` holds the skeleton's endpoint marks, every edge undirected or some already directed
+    (CDNOD directs the context's edges first); the result is a new matrix. An unshielded triple
+    ``x - y - z`` (``x`` and ``z`` both adjacent to ``y`` but not to each other) is a collider
+    ``x -> y <- z`` iff ``y`` is not in the separating set of ``x`` and ``z``. The collider's rank
+    is ``pvalues[(x, z)]``, keyed with the lower index first: the largest p-value among the
+    conditioning sets that separated ``x`` and ``z``. Colliders are oriented from the highest rank
+    to the lowest, and a collider is skipped when an edge it would orient already has an arrowhead
+    at ``x`` or ``z``, which it would make bidirected; so of two conflicting colliders, the
+    higher-ranked one is kept. Colliders of exactly equal rank are each checked against the marks
+    set before their rank, then all set: an edge two of them dispute ends bidirected, and
+    :func:`_undirect_conflicts` leaves it undirected after Meek's rules. The result depends on the
+    ranks, not on the column order.
 
-    The private ``_trace`` sink records every unshielded triple visited: ``step="collider"``, the
-    ``triple`` ``(x, y, z)``, the pair's ``sepset``, whether ``y`` was ``oriented`` as a collider,
-    and the ``before``/``after`` endpoint matrices, which are copied only when a trace is requested.
+    The private ``_trace`` sink records every unshielded triple in the order decided:
+    ``step="collider"``, the ``triple`` ``(x, y, z)``, the pair's ``sepset`` and rank ``p``,
+    whether ``y`` was ``oriented`` as a collider, and the ``before``/``after`` endpoint matrices,
+    which are copied only when a trace is requested.
     """
-    n = skeleton.shape[0]
-    pdag = np.where(skeleton != NULL, np.int8(TAIL), np.int8(NULL))
-    np.fill_diagonal(pdag, np.int8(NULL))
-    for y in range(n):
-        nbrs = np.nonzero(skeleton[y] != NULL)[0].tolist()
-        for a, b in combinations(range(len(nbrs)), 2):
-            x, z = nbrs[a], nbrs[b]
-            if skeleton[x, z] != NULL:
-                continue
+    pdag = pdag.copy()
+    triples = []
+    for y in range(pdag.shape[0]):
+        nbrs = np.flatnonzero(pdag[y] != NULL).tolist()
+        for x, z in combinations(nbrs, 2):
+            if pdag[x, z] == NULL:
+                triples.append((pvalues[(x, z)], x, y, z))
+    triples.sort(key=itemgetter(0), reverse=True)
+    for _, tied in groupby(triples, key=itemgetter(0)):
+        decided = []
+        for p, x, y, z in tied:
             sepset = _lookup_sepset(sepsets, x, z)
-            collider = y not in sepset
-            if _trace is not None:
-                before = pdag.copy()
+            collider = y not in sepset and ARROW not in (pdag[x, y], pdag[z, y])
+            decided.append((p, x, y, z, sepset, collider))
+        for p, x, y, z, sepset, collider in decided:
+            before = None if _trace is None else pdag.copy()
             if collider:
                 pdag[y, x] = pdag[y, z] = ARROW
             if _trace is not None:
@@ -105,6 +115,7 @@ def _orient_colliders(
                         step="collider",
                         triple=(x, y, z),
                         sepset=tuple(sorted(sepset)),
+                        p=p,
                         oriented=collider,
                         before=before,
                         after=pdag.copy(),
@@ -114,7 +125,7 @@ def _orient_colliders(
 
 
 def _undirect_conflicts(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
-    """Make every bidirected edge, where two colliders conflict, undirected.
+    """Make every bidirected edge, where two colliders of equal rank conflict, undirected.
 
     It runs after Meek's rules, which neither use nor orient a bidirected edge, so a conflicting
     edge stays undirected in the CPDAG. Returns ``pdag`` itself when no edge is bidirected,
@@ -155,22 +166,23 @@ def _discover_skeleton(
     workers: int = 1,
     warn_expensive: bool = False,
     _trace: list[dict] | None = None,
-) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]:
-    """Learn the undirected skeleton and the separating set of every removed pair.
+) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
+    """Learn the undirected skeleton and, for every removed pair, its separating set and p-value.
 
     Grows the conditioning size from zero; at each size, every currently adjacent pair is tested
     against subsets of a start-of-size neighborhood snapshot (in both directions, as PC does), and
     edges found independent are removed together after the size completes. A removed pair's
-    separating set is the union of every conditioning set that made it independent. ``indep_test``
+    separating set is the union of every conditioning set that made it independent, and its p-value
+    the largest among those sets' tests; both are keyed ``(x, y)`` with ``x < y``. ``indep_test``
     selects the CI test (shared by PC and CDNOD, which pass the augmented matrix); ``categorical``
     marks the categorical columns for a mixed-data test.
 
     When ``prescreen`` is set and the test exposes the vectorized closed forms, the size-0 and
     size-1 passes read the correlation matrix directly (all-pairs marginal threshold, then one
     first-order read per surviving pair) in place of the dense scalar scan -- same removals, same
-    separating sets. With ``workers > 1`` the ``|S| >= 2`` scan fans out across worker processes;
-    the reduce is a plain union of per-chunk removals, so the skeleton is identical to the serial
-    scan whatever the partition.
+    separating sets, same p-values. With ``workers > 1`` the ``|S| >= 2`` scan fans out across
+    worker processes; the reduce is a plain union of per-chunk removals, so the result is identical
+    to the serial scan whatever the partition.
 
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
@@ -185,6 +197,7 @@ def _discover_skeleton(
     adj = np.full((d, d), TAIL, dtype=np.int8)
     np.fill_diagonal(adj, NULL)
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
+    pvalues: dict[tuple[int, int], float] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
     seedable = callable(getattr(test, "to_seed", None))
@@ -199,18 +212,20 @@ def _discover_skeleton(
                 break
             remove: list[tuple[int, int]] = []
             if can_prescreen and size == 0:
-                for x, y in marginal_removals(test, np.triu(adj != NULL, 1), alpha, _trace):
+                for x, y, p in marginal_removals(test, np.triu(adj != NULL, 1), alpha, _trace):
                     remove.append((x, y))
                     sepsets[(x, y)] = ()
+                    pvalues[(x, y)] = p
             elif can_prescreen and size == 1:
                 for x, y in adjacent_pairs(adj):
                     candidates = sorted(
                         (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
-                    separating = first_order_separating(test, x, y, candidates, alpha, _trace)
-                    if separating:
+                    separating, p = first_order_separating(test, x, y, candidates, alpha, _trace)
+                    if p is not None:
                         remove.append((x, y))
                         sepsets[(x, y)] = tuple(separating)
+                        pvalues[(x, y)] = p
             else:
                 pairs = adjacent_pairs(adj)
                 if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbors, size):
@@ -230,9 +245,10 @@ def _discover_skeleton(
                     # the host thread count.
                     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
                         removals = scan_pairs(test, pairs, neighbors, size, alpha, _trace)
-                for x, y, separating in removals:
+                for x, y, separating, p in removals:
                     remove.append((x, y))
                     sepsets[(x, y)] = separating
+                    pvalues[(x, y)] = p
             for x, y in remove:
                 adj[x, y] = NULL
                 adj[y, x] = NULL
@@ -241,7 +257,7 @@ def _discover_skeleton(
         if pool is not None:
             pool.close()
 
-    return adj, sepsets
+    return adj, sepsets, pvalues
 
 
 def _expensive_pass(pairs: list[tuple[int, int]], neighbors: list[np.ndarray], size: int) -> bool:

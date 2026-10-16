@@ -129,9 +129,16 @@ def pc(
     **How it works.** Edge removal is order-independent (PC-stable) [3]_. At each conditioning-set
     size, every test uses the adjacencies from the start of that size. Edges found independent are
     removed together. A removed pair's separating set combines all conditioning sets that separated
-    it. Every collider is found before any is oriented, so the colliders do not depend on the
-    column order [3]_. When two colliders orient one edge in opposite directions, the edge stays
-    undirected, and Meek's rules do not orient it.
+    it. Two colliders conflict when they would orient one edge in opposite directions, so the order
+    in which they are oriented can change the result [3]_. Each collider ``x -> y <- z`` ranks by
+    the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders are
+    oriented from the highest rank to the lowest, and a collider is skipped when it would give an
+    edge an arrowhead at both ends, so of two conflicting colliders the higher-ranked one is kept.
+    When two conflicting colliders rank exactly equal, the edge they dispute stays undirected, and
+    Meek's rules do not orient it. The result therefore does not depend on the column order. This
+    adapts the conflict rule of Ramsey [10]_, which ranks a collider by separating sets that
+    additional tests choose; Andrey ranks it by the tests that removed the edge, so orienting runs
+    no new test.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 400 variables with ten rows per variable: its median errors (SHD) stayed
@@ -189,6 +196,8 @@ def pc(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [9] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
        Statistical Association 84(405), 165-175.
+    .. [10] Ramsey, J. (2016). Improving accuracy and scalability of the PC algorithm by maximizing
+       P-value. arXiv:1610.00378, Section 5.
 
     Examples
     --------

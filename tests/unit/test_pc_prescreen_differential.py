@@ -4,7 +4,8 @@ The prescreen replaces the scalar size-0 and size-1 skeleton passes with vectori
 Fisher-Z correlation matrix, the ``|S| >= 2`` scan evaluates conditioning sets through
 ``FisherZ.batched_call``, and the skeleton pass may fan out across worker processes. All three are
 *output-preserving*: the recovered adjacency and every removed pair's separating set must be
-identical to the plain scalar adjacency search, pair for pair and byte for byte.
+identical to the plain scalar adjacency search, pair for pair and byte for byte, and PC's largest
+separating p-value per removed pair must be the same float on every path.
 
 This module pins that with an independent, deliberately naive scalar reference adjacency search --
 one that calls the Fisher-Z oracle (:meth:`FisherZ.__call__`) directly, with no batching, no
@@ -32,7 +33,11 @@ from andrey.constraint.pc import _discover_skeleton
 from andrey.core import NULL, TAIL
 from andrey.core.ci import FisherZ, make_indep_test
 
-Skeleton = tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]
+# Adjacency, separating sets, and, from PC's search, the largest separating p-value per pair.
+Skeleton = (
+    tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]
+    | tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]
+)
 
 
 @pytest.fixture(autouse=True)
@@ -123,11 +128,16 @@ def _reference_skeleton(X: np.ndarray, alpha: float, *, mode: str) -> Skeleton:
 
 
 def _assert_same(lhs: Skeleton, rhs: Skeleton, label: str) -> None:
-    """Assert two skeletons share adjacency (byte for byte) and separating sets (key for key)."""
-    lhs_adj, lhs_sep = lhs
-    rhs_adj, rhs_sep = rhs
-    assert np.array_equal(lhs_adj != NULL, rhs_adj != NULL), f"{label}: adjacency differs"
-    assert lhs_sep == rhs_sep, f"{label}: separating sets differ"
+    """Assert two skeletons share adjacency (byte for byte) and separating sets (key for key).
+
+    When both carry PC's separating p-values, every removed pair has one, and they are equal
+    floats, pair for pair.
+    """
+    assert np.array_equal(lhs[0] != NULL, rhs[0] != NULL), f"{label}: adjacency differs"
+    assert lhs[1] == rhs[1], f"{label}: separating sets differ"
+    if len(lhs) == len(rhs) == 3:
+        assert lhs[2].keys() == lhs[1].keys(), f"{label}: a removed pair has no p-value"
+        assert lhs[2] == rhs[2], f"{label}: separating p-values differ"
 
 
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _CASES, ids=_CASE_IDS)

@@ -25,11 +25,14 @@ def test_pc_recovery():
 
 
 def test_pc_is_invariant_to_column_order():
-    # A seed on which colliders conflict on some edges, so the conflict rule runs.
+    # A seed on which colliders conflict, so a higher-ranked collider makes PC skip another.
     x = data.sample_scm(d=20, n=200, seed=0, density=2.0, scale="standardize").data
     trace: list[dict] = []
     pc_engine(x, _trace=trace)
-    assert any(record["step"] == "conflict" for record in trace)
+    assert any(
+        r["step"] == "collider" and not r["oriented"] and r["triple"][1] not in r["sepset"]
+        for r in trace
+    )
     marks = andrey.pc(x).structure.to_numpy()
     for seed in range(3):
         order = np.random.default_rng(seed).permutation(x.shape[1])
