@@ -91,10 +91,11 @@ color is `--andrey-ground-art` (`cards.ground_tokens()`), the ground the CSS lay
 The navbar on every page is a frosted glass pill (`docs/_static/andrey.css`), as is the search
 dialog. In Chromium the pill is Liquid Glass: `glass.js` draws a lens map for the pill's size into
 the SVG filter in `_templates/site-logo.html` and sets `data-glass`; other browsers keep the frosted
-pill, and reduced transparency gets the solid paper. A dot on Release cards marks a release the
-reader has not opened: `_templates/site-nav.html` gives it the newest release's version
-(`_release_post` in `conf.py`), and `nav-new.js` shows it until the reader opens a release card, and
-again when a newer release is out.
+pill, and reduced transparency gets the solid paper. A dot on Release cards marks a new release
+for a week: `_templates/site-nav.html` gives it the newest release's version and its post's date
+(`_release_post` in `conf.py`), and `nav-new.js` shows it within seven days of that date until the
+reader opens a release card, a fact it keeps in the browser's local storage, which no request
+carries; a newer release shows it again.
 
 The homepage takes every number from the release summaries `RELEASES` names
 (`benchmarks/published/<label>/summary.json`) or from the registry (`andrey.spec.list_specs()`),

@@ -655,8 +655,10 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
 
     Page styles load after the shared ones (priority 900), so they win a tie.
     """
-    # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release.
-    context["release_version"] = _release_post(app)[1]
+    # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release and the
+    # date of its post, which opens the dot's week.
+    release_doc, context["release_version"] = _release_post(app)
+    context["release_date"] = next(d for doc, d, _ in _dated_posts(app) if doc == release_doc)
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
