@@ -20,10 +20,6 @@ from .seeding import resolve_seed
 
 __all__ = ["GPDC"]
 
-# Rows from which the skeleton scans run GPDC on every BLAS thread. On 8 cores of a shared node, PC
-# fits on 500 rows ran 0.95x to 1.19x the one-thread speed with 8 threads.
-_GPDC_BLAS_THREADS_FROM = 1000
-
 
 def _centered_distances(ranks: np.ndarray) -> np.ndarray:
     """The doubly centered matrix of pairwise distances between the entries of ``ranks``."""
@@ -105,11 +101,6 @@ class GPDC:
        calculating exact p-values when permutations are randomly drawn. Statistical Applications
        in Genetics and Molecular Biology 9(1), Article 39.
     """
-
-    @property
-    def pin_blas(self) -> bool:
-        """Whether the skeleton scans run the test on one BLAS thread: on fewer than 1,000 rows."""
-        return self._n < _GPDC_BLAS_THREADS_FROM
 
     def __init__(self, data: np.ndarray, *, n_null: int = 1000, seed: int | None = None) -> None:
         if n_null < 1:

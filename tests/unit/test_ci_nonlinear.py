@@ -23,7 +23,7 @@ from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
 from andrey.constraint.pc import pc as pc_engine
-from andrey.core import backend, ci, ci_cmiknn, ci_gpdc, ci_kernel
+from andrey.core import backend, ci, ci_cmiknn, ci_kernel
 from andrey.core.ci_cmiknn import (
     CMIknn,
     _cmi,
@@ -523,18 +523,15 @@ def test_skeleton_pins_blas_unless_the_test_opts_out(method, pin_blas, monkeypat
     assert seen and set(seen) == {1 if pin_blas is None else 2}
 
 
-@pytest.mark.parametrize(
-    ("cls", "rows"),
-    [(KCI, ci_kernel._KCI_BLAS_THREADS_FROM), (GPDC, ci_gpdc._GPDC_BLAS_THREADS_FROM)],
-)
-def test_kci_and_gpdc_use_every_blas_thread_from_their_cutoff(cls, rows):
-    x = np.random.default_rng(0).standard_normal((rows, 3))
-    assert (cls(x[:-1]).pin_blas, cls(x).pin_blas) == (True, False)
+def test_kci_uses_every_blas_thread_from_its_cutoff():
+    x = np.random.default_rng(0).standard_normal((ci_kernel._KCI_BLAS_THREADS_FROM, 3))
+    assert (KCI(x[:-1]).pin_blas, KCI(x).pin_blas) == (True, False)
 
 
-def test_rcot_and_cmiknn_use_one_blas_thread():
-    x = np.random.default_rng(0).standard_normal((2000, 3))
-    assert getattr(RCoT(x), "pin_blas", True) and getattr(CMIknn(x[:50]), "pin_blas", True)
+@pytest.mark.parametrize("cls", [RCoT, CMIknn, GPDC])
+def test_the_other_nonlinear_tests_use_one_blas_thread(cls):
+    x = np.random.default_rng(0).standard_normal((4000, 3))
+    assert getattr(cls(x if cls is RCoT else x[:50]), "pin_blas", True)
 
 
 # ---- device dispatch ---------------------------------------------------------------------------
