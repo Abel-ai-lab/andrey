@@ -56,6 +56,7 @@ RELEASES = (
     "pairwise-2026-10",
     "direct-lingam-2026-10",
     "time-series-2026-10",
+    "data-types-2026-10",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -100,6 +101,8 @@ REGIMES = {
     "varma_lingam_paper": "linear non-Gaussian time series with a moving average",
     "longitudinal_lingam_paper": "linear non-Gaussian longitudinal data",
     "var2_lagged": "lagged linear-Gaussian time series",
+    "mixed_er": "mixed continuous and categorical data from Erdos-Renyi graphs",
+    "discrete_er": "categorical data from Erdos-Renyi graphs",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
