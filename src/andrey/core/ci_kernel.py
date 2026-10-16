@@ -100,12 +100,18 @@ class KCI:
     ridge : float, default=1e-3
         Regularization of the kernel ridge regression on the conditioning set. Smaller values fit
         the conditioning set more closely.
+    rank : int or None, default=None
+        With a conditioning set, replace each kernel matrix by a pivoted incomplete Cholesky
+        factorization of at most this many columns, so a query's time grows with the square of the
+        number of rows instead of its cube. The p-value then approximates the exact one. ``None``
+        computes the exact kernels.
 
     Raises
     ------
     ValueError
         If ``data`` is not 2-D, has fewer than 2 rows, contains NaN or infinity, or has values
-        too large or too small to standardize, or ``ridge`` is not positive and finite.
+        too large or too small to standardize, ``ridge`` is not positive and finite, or ``rank`` is
+        below 1.
 
     Notes
     -----
@@ -127,6 +133,11 @@ class KCI:
     is ordered (lower index first) before it runs: the p-value does not depend on argument
     order.
 
+    With ``rank``, each kernel of a conditional query is a pivoted incomplete Cholesky factor
+    ``L`` with ``K ~ L L'`` [2]_, centered, and ``R = I - Ls (Ls' Ls + ridge I)^-1 Ls'``, so
+    ``A`` and ``B`` are products of ``n x rank`` factors and no ``n x n`` system is solved. The
+    factorization stops before ``rank`` columns when ``L L'`` reproduces the kernel to rounding.
+
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. Each query with a conditioning set costs an eigendecomposition and four products of
     ``n x n`` matrices, so time grows as the cube of the number of rows and memory as its square:
@@ -139,17 +150,22 @@ class KCI:
     ----------
     .. [1] Zhang, K., Peters, J., Janzing, D., and Scholkopf, B. (2011). Kernel-based conditional
        independence test and application in causal discovery. UAI, 804-813.
+    .. [2] Fine, S., and Scheinberg, K. (2001). Efficient SVM training using low-rank kernel
+       representations. Journal of Machine Learning Research 2, 243-264.
     """
 
     pin_blas = False  # the skeleton scans run it on every BLAS thread
 
-    def __init__(self, data: np.ndarray, *, ridge: float = 1e-3) -> None:
+    def __init__(self, data: np.ndarray, *, ridge: float = 1e-3, rank: int | None = None) -> None:
         if not 0.0 < ridge < np.inf:
             raise ValueError(f"ridge must be positive and finite, got {ridge}")
+        if rank is not None and rank < 1:
+            raise ValueError(f"rank must be at least 1, got {rank}")
         arr = _checked_data(data, "KCI", min_rows=2)
         self._data = _standardize(arr)
         self._n = arr.shape[0]
         self._ridge = float(ridge)
+        self._rank = None if rank is None else int(rank)
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the KCI p-value for ``x`` independent of ``y`` given ``condition_set``."""
@@ -162,6 +178,8 @@ class KCI:
 
         width = (1.2 if n < 200 else 0.7 if n < 1200 else 0.4) * np.sqrt(len(cond))
         z = data[:, cond]
+        if self._rank is not None:
+            return self._low_rank_pvalue(data[:, x_int], data[:, y_int], z, width)
         kxs = _centered_gaussian_kernel(np.column_stack([data[:, x_int], 0.5 * z]), width)
         ky = _centered_gaussian_kernel(data[:, [y_int]], width)
         ks = _centered_gaussian_kernel(z, width)
@@ -169,6 +187,45 @@ class KCI:
         shrink = self._ridge / (np.clip(eigval, 0.0, None) + self._ridge)
         resid = (eigvec * shrink) @ eigvec.T  # R = ridge (Ks + ridge I)^-1
         return _gamma_pvalue(*_kci_moments(resid @ kxs @ resid, resid @ ky @ resid))
+
+    def _low_rank_pvalue(self, x: np.ndarray, y: np.ndarray, z: np.ndarray, width: float) -> float:
+        """The p-value with each kernel replaced by its centered incomplete Cholesky factors.
+
+        With ``Ks ~ Ls Ls'``, ``R = ridge (Ks + ridge I)^-1 = I - Ls (Ls' Ls + ridge I)^-1 Ls'``,
+        so ``A = R Kxs R = P P'`` with ``P = R Lxs``, and ``B = Q Q'`` with ``Q = R Ly``.
+        """
+        rank = self._rank
+        lxs = _centered_cholesky_factor(np.column_stack([x, 0.5 * z]), width, rank)
+        ly = _centered_cholesky_factor(y[:, None], width, rank)
+        ls = _centered_cholesky_factor(z, width, rank)
+        inner = ls.T @ ls + self._ridge * np.eye(ls.shape[1])
+        p = lxs - ls @ np.linalg.solve(inner, ls.T @ lxs)
+        q = ly - ls @ np.linalg.solve(inner, ls.T @ ly)
+        return _gamma_pvalue(*_kci_moments(p @ p.T, q @ q.T))
+
+
+def _centered_cholesky_factor(points: np.ndarray, width: float, rank: int) -> np.ndarray:
+    """Centered factor ``H L`` of a pivoted incomplete Cholesky ``K ~ L L'`` of the Gaussian kernel
+    of ``points``, with at most ``rank`` columns.
+
+    Each step takes the row with the largest remaining diagonal as the pivot; the factorization
+    stops early when every remaining diagonal entry is below ``1e-12`` (the kernel's diagonal is
+    1), where ``L L'`` equals ``K`` to rounding.
+    """
+    n = points.shape[0]
+    rank = min(rank, n)
+    factor = np.zeros((n, rank))
+    diag = np.ones(n)
+    scale = -0.5 / (width * width)
+    for j in range(rank):
+        pivot = int(np.argmax(diag))
+        if diag[pivot] < 1e-12:
+            factor = factor[:, :j]
+            break
+        column = np.exp(scale * np.sum((points - points[pivot]) ** 2, axis=1))
+        factor[:, j] = (column - factor[:, :j] @ factor[pivot, :j]) / np.sqrt(diag[pivot])
+        diag = np.maximum(diag - factor[:, j] ** 2, 0.0)
+    return factor - factor.mean(axis=0)
 
 
 def _hall_buckley_eagleson_pvalue(statistic: float, weights: np.ndarray) -> float:

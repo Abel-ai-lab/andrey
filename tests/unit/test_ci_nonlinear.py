@@ -161,6 +161,17 @@ def test_kci_null_moments_match_the_explicit_construction():
     np.testing.assert_allclose(_kci_moments(a, b), expected, rtol=1e-10)
 
 
+@pytest.mark.parametrize("n_cond", [1, 2])
+def test_kci_low_rank_matches_the_exact_test(n_cond):
+    """With a rank that reproduces every kernel, the low-rank p-value is the exact one; with a
+    smaller rank it stays close."""
+    data = _common_cause(seed=6, n=150, n_cond=n_cond, shared=0.2)
+    cond = tuple(range(2, 2 + n_cond))
+    exact = KCI(data)(0, 1, cond)
+    assert KCI(data, rank=150)(0, 1, cond) == pytest.approx(exact, rel=1e-6, abs=1e-12)
+    assert KCI(data, rank=40)(0, 1, cond) == pytest.approx(exact, rel=0.05, abs=1e-3)
+
+
 @pytest.mark.parametrize("statistic", [0.5, 1.8, 4.0])
 def test_rcot_pvalue_is_exact_for_equal_weights(statistic):
     """``0.3 * chi2(6)`` is a sum of six equally weighted squares; its law is matched exactly."""
@@ -423,6 +434,7 @@ def test_null_law_of_nan_raises(pvalue):
     [
         (KCI, {"ridge": 0.0}, "ridge"),
         (KCI, {"ridge": np.inf}, "ridge"),
+        (KCI, {"rank": 0}, "rank"),
         (RCoT, {"n_features": 0}, "feature counts"),
         (CMIknn, {"k_cmi": 1.0}, "k_cmi"),
         (CMIknn, {"k_perm": 0}, "k_perm"),
