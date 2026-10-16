@@ -1,5 +1,5 @@
 {
-  "about": "Published rows where the reference package has fewer errors than Andrey, each with its cause. qa/reference_parity.py accepts an entry only when its cause is correct-by-paper or reference-defect, it gives a reason and a citation, and it pins the row's current error values.",
+  "about": "Published rows where the reference package has fewer errors than Andrey, each with its cause. qa/reference_parity.py accepts an entry only when its cause is correct-by-paper, reference-defect, or tie-break, it gives a reason and a citation, and it pins the row's current error values; a tie-break entry's evidence gives the row's error values with the columns in reversed order, where the row passes.",
   "entries": [
     {
       "summary": "alpha-2026-09",
