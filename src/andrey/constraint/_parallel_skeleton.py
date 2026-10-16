@@ -72,13 +72,13 @@ def _init_worker(
 
 def _scan_task(payload: tuple) -> list[Removal]:
     """Worker side of one chunk: rebuild the snapshot neighborhood, scan the chunk's pairs."""
-    pairs, adj_mask, size, alpha, run_token = payload
+    pairs, adj_mask, size, alpha, record_pvalues, run_token = payload
     if run_token != _WORKER_TOKEN:
         raise RuntimeError("skeleton worker pool reused across runs (corr/token mismatch)")
     assert _WORKER_TEST is not None  # _init_worker runs before any task
     d = adj_mask.shape[0]
     neighbors = [np.flatnonzero(adj_mask[i]) for i in range(d)]
-    return scan_pairs(_WORKER_TEST, pairs, neighbors, size, alpha)
+    return scan_pairs(_WORKER_TEST, pairs, neighbors, size, alpha, record_pvalues=record_pvalues)
 
 
 class SkeletonWorkerPool:
@@ -115,11 +115,16 @@ class SkeletonWorkerPool:
         adj_mask: np.ndarray,
         size: int,
         alpha: float,
+        record_pvalues: bool = True,
     ) -> list[Removal]:
-        """Scan ``pairs`` at conditioning ``size`` across the worker pool; return all removals."""
+        """Scan ``pairs`` at conditioning ``size`` across the worker pool; return all removals.
+
+        Each removal carries its pair's largest separating p-value, or ``None`` when
+        ``record_pvalues`` is false (:func:`~andrey.constraint._skeleton.scan_pairs`).
+        """
         pool, token = self._ensure()
         payloads = [
-            (chunk, adj_mask, size, alpha, token)
+            (chunk, adj_mask, size, alpha, record_pvalues, token)
             for chunk in even_pair_chunks(pairs, self._workers)
         ]
         futures = [pool.submit(_scan_task, payload) for payload in payloads]

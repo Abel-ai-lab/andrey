@@ -264,6 +264,18 @@ def test_pc_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None
     _assert_same(serial, parallel, f"PC serial/parallel seed={seed} d={d} n={n} p={p}")
 
 
+@pytest.mark.parametrize(("prescreen", "workers"), [(True, 1), (False, 1), (True, 3)])
+def test_pc_skeleton_without_pvalues_is_the_same(prescreen: bool, workers: int) -> None:
+    # The column collider order skips the p-values on the prescreen, scan, and worker paths.
+    x = _gaussian_dag(0, 600, 20, 0.25)
+    full = _discover_skeleton(x, 0.05, "fisherz", prescreen=prescreen, workers=workers)
+    bare = _discover_skeleton(
+        x, 0.05, "fisherz", prescreen=prescreen, workers=workers, record_pvalues=False
+    )
+    assert full[2] and bare[2] == {}
+    _assert_same(bare[:2], full[:2], f"PC without p-values prescreen={prescreen} workers={workers}")
+
+
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _PARALLEL_CASES, ids=_PARALLEL_IDS)
 def test_fci_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)

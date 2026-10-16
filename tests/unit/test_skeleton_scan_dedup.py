@@ -33,14 +33,14 @@ def _unfiltered_scan_pairs(test, pairs, neighbors, size, alpha):
     removals = []
     for x, y in pairs:
         separating: set[int] = set()
-        largest = []
+        largest: list[float] = []
         for a, b in ((x, y), (y, x)):
             candidates = neighbors[a][neighbors[a] != b]
             if candidates.size < size:
                 continue
-            p = scan_conditioning_sets(test, a, b, candidates.tolist(), size, alpha, separating)
-            if p is not None:
-                largest.append(p)
+            scan_conditioning_sets(
+                test, a, b, candidates.tolist(), size, alpha, separating, largest=largest
+            )
         if largest:
             removals.append((x, y, tuple(sorted(separating)), max(largest)))
     return removals

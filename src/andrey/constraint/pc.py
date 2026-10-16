@@ -15,6 +15,7 @@ import numpy as np
 
 from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
+    Removal,
     adjacent_pairs,
     first_order_separating,
     marginal_removals,
@@ -58,7 +59,13 @@ def pc(
     check_collider_order(collider_order)
     X = np.asarray(data, dtype=np.float64)
     skeleton, sepsets, pvalues = _discover_skeleton(
-        X, alpha, indep_test, categorical=categorical, warn_expensive=True, _trace=_trace
+        X,
+        alpha,
+        indep_test,
+        categorical=categorical,
+        record_pvalues=collider_order == "p_value",
+        warn_expensive=True,
+        _trace=_trace,
     )
     pdag = _orient_colliders(skeleton, sepsets, pvalues, order=collider_order, _trace=_trace)
     if _trace is None:
@@ -97,28 +104,29 @@ def _orient_colliders(
     are oriented from the highest rank to the lowest. Colliders of exactly equal rank are each
     checked against the marks set before their rank, then all set: an edge two of them dispute ends
     bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's rules. The result
-    depends on the ranks, not on the column order. With ``order="column"``, the triples are visited
-    by middle node ``y``, then by endpoint pair ``(x, z)``, in ascending column order, each decided
-    against the marks set before it, so no edge ends bidirected and the result depends on the column
-    order.
+    depends on the ranks, not on the column order. With ``order="column"``, ``pvalues`` is not read
+    (it may be empty): the triples are visited by middle node ``y``, then by endpoint pair
+    ``(x, z)``, in ascending column order, each decided against the marks set before it, so no edge
+    ends bidirected and the result depends on the column order.
 
     The private ``_trace`` sink records every unshielded triple in the order decided:
-    ``step="collider"``, the ``triple`` ``(x, y, z)``, the pair's ``sepset`` and rank ``p``,
-    whether ``y`` was ``oriented`` as a collider, and the ``before``/``after`` endpoint matrices,
-    which are copied only when a trace is requested.
+    ``step="collider"``, the ``triple`` ``(x, y, z)``, the pair's ``sepset`` and rank ``p``
+    (``None`` with ``order="column"``), whether ``y`` was ``oriented`` as a collider, and the
+    ``before``/``after`` endpoint matrices, which are copied only when a trace is requested.
     """
+    ranked = order == "p_value"
     pdag = pdag.copy()
     triples = []
     for y in range(pdag.shape[0]):
         nbrs = np.flatnonzero(pdag[y] != NULL).tolist()
         for x, z in combinations(nbrs, 2):
             if pdag[x, z] == NULL:
-                triples.append((pvalues[(x, z)], x, y, z))
-    if order == "column":
-        groups = [[triple] for triple in triples]
-    else:
+                triples.append((pvalues[(x, z)] if ranked else None, x, y, z))
+    if ranked:
         triples.sort(key=itemgetter(0), reverse=True)
         groups = [list(tied) for _, tied in groupby(triples, key=itemgetter(0))]
+    else:
+        groups = [[triple] for triple in triples]
     for group in groups:
         decided = []
         for p, x, y, z in group:
@@ -182,6 +190,7 @@ def _discover_skeleton(
     indep_test: str = "fisherz",
     *,
     categorical: np.ndarray | None = None,
+    record_pvalues: bool = True,
     prescreen: bool = True,
     workers: int = 1,
     warn_expensive: bool = False,
@@ -195,7 +204,9 @@ def _discover_skeleton(
     separating set is the union of every conditioning set that made it independent, and its p-value
     the largest among those sets' tests; both are keyed ``(x, y)`` with ``x < y``. ``indep_test``
     selects the CI test (shared by PC and CDNOD, which pass the augmented matrix); ``categorical``
-    marks the categorical columns for a mixed-data test.
+    marks the categorical columns for a mixed-data test. With ``record_pvalues`` false, as for the
+    column collider order, which ranks nothing, no p-value is compared or kept and the returned
+    p-value dict is empty; the skeleton and the separating sets are the same.
 
     When ``prescreen`` is set and the test exposes the vectorized closed forms, the size-0 and
     size-1 passes read the correlation matrix directly (all-pairs marginal threshold, then one
@@ -230,22 +241,21 @@ def _discover_skeleton(
             max_degree = max((nb.size for nb in neighbors), default=0)
             if size > max_degree - 1:
                 break
-            remove: list[tuple[int, int]] = []
+            removals: list[Removal] = []
             if can_prescreen and size == 0:
-                for x, y, p in marginal_removals(test, np.triu(adj != NULL, 1), alpha, _trace):
-                    remove.append((x, y))
-                    sepsets[(x, y)] = ()
-                    pvalues[(x, y)] = p
+                upper = np.triu(adj != NULL, 1)
+                for x, y, p in marginal_removals(test, upper, alpha, _trace, record_pvalues):
+                    removals.append((x, y, (), p))
             elif can_prescreen and size == 1:
                 for x, y in adjacent_pairs(adj):
                     candidates = sorted(
                         (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
-                    separating, p = first_order_separating(test, x, y, candidates, alpha, _trace)
-                    if p is not None:
-                        remove.append((x, y))
-                        sepsets[(x, y)] = tuple(separating)
-                        pvalues[(x, y)] = p
+                    separating, p = first_order_separating(
+                        test, x, y, candidates, alpha, _trace, record_pvalues
+                    )
+                    if separating:
+                        removals.append((x, y, tuple(separating), p))
             else:
                 pairs = adjacent_pairs(adj)
                 if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbors, size):
@@ -258,20 +268,21 @@ def _discover_skeleton(
                         PerformanceWarning,
                     )
                 if pool is not None:
-                    removals = pool.scan(pairs, adj != NULL, size, alpha)
+                    removals = pool.scan(pairs, adj != NULL, size, alpha, record_pvalues)
                 else:
                     # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
                     # match the (1-thread) parallel skeleton workers, where it has them, whatever
                     # the host thread count.
                     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
-                        removals = scan_pairs(test, pairs, neighbors, size, alpha, _trace)
-                for x, y, separating, p in removals:
-                    remove.append((x, y))
-                    sepsets[(x, y)] = separating
-                    pvalues[(x, y)] = p
-            for x, y in remove:
+                        removals = scan_pairs(
+                            test, pairs, neighbors, size, alpha, _trace, record_pvalues
+                        )
+            for x, y, separating, p in removals:
                 adj[x, y] = NULL
                 adj[y, x] = NULL
+                sepsets[(x, y)] = separating
+                if p is not None:
+                    pvalues[(x, y)] = p
             size += 1
     finally:
         if pool is not None:

@@ -55,18 +55,19 @@ def cdnod(
         raise ValueError("c_indx contains NaN or inf")
     context = context.reshape(-1, 1)
     d = X.shape[1]
+    ranked = collider_order == "p_value"
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
         skeleton, sepsets, pvalues = _discover_skeleton(
-            X, alpha, indep_test, categorical=categorical
+            X, alpha, indep_test, categorical=categorical, record_pvalues=ranked
         )
         pdag = _orient_with_context(skeleton, sepsets, pvalues, context=None, order=collider_order)
     else:
         augmented = np.concatenate([X, context], axis=1)
         mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
         skeleton, sepsets, pvalues = _discover_skeleton(
-            augmented, alpha, indep_test, categorical=mask
+            augmented, alpha, indep_test, categorical=mask, record_pvalues=ranked
         )
         pdag = _orient_with_context(skeleton, sepsets, pvalues, context=d, order=collider_order)
     completed = _undirect_conflicts(meek(pdag))
