@@ -34,9 +34,9 @@ def blas_scope(test: CITest) -> contextlib.AbstractContextManager:
 
     One thread makes a partial-correlation test's submatrix inversions match the one-thread
     parallel skeleton workers whatever the host's thread count, and a registered test keeps it too.
-    The nonlinear tests set ``pin_blas = False``: they have no parallel workers, their kernel
-    products and Gaussian-process fits use every BLAS thread, and their p-values are reproducible
-    for a fixed thread count.
+    KCI and GPDC set ``pin_blas`` false from 1,000 rows: they have no parallel workers, their kernel
+    products and Gaussian-process fits run faster there on every BLAS thread, and their p-values
+    are reproducible for a fixed thread count.
     """
     if getattr(test, "pin_blas", True):
         return backend.one_blas_thread()

@@ -198,8 +198,6 @@ class CMIknn:
        in Genetics and Molecular Biology 9(1), Article 39.
     """
 
-    pin_blas = False  # the skeleton scans run it on every BLAS thread
-
     def __init__(
         self,
         data: np.ndarray,

@@ -23,7 +23,7 @@ from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
 from andrey.constraint.pc import pc as pc_engine
-from andrey.core import backend, ci, ci_cmiknn, ci_kernel
+from andrey.core import backend, ci, ci_cmiknn, ci_gpdc, ci_kernel
 from andrey.core.ci_cmiknn import (
     CMIknn,
     _cmi,
@@ -501,8 +501,7 @@ def _blas_threads() -> int:
 @pytest.mark.parametrize("pin_blas", [None, False])
 def test_skeleton_pins_blas_unless_the_test_opts_out(method, pin_blas, monkeypatch):
     """The skeleton scan runs a test on one BLAS thread, as Fisher-Z needs, unless the test sets
-    ``pin_blas = False``, as the nonlinear tests do."""
-    assert all(cls.pin_blas is False for cls, _ in TESTS.values())
+    ``pin_blas = False``."""
     assert getattr(ci.FisherZ, "pin_blas", True) and getattr(ci.StudentT, "pin_blas", True)
     seen = []
 
@@ -522,6 +521,20 @@ def test_skeleton_pins_blas_unless_the_test_opts_out(method, pin_blas, monkeypat
             pytest.skip("the BLAS library runs one thread")
         getattr(andrey, method)(_common_cause(seed=0, n=60, n_cond=2), indep_test="recording")
     assert seen and set(seen) == {1 if pin_blas is None else 2}
+
+
+@pytest.mark.parametrize(
+    ("cls", "rows"),
+    [(KCI, ci_kernel._KCI_BLAS_THREADS_FROM), (GPDC, ci_gpdc._GPDC_BLAS_THREADS_FROM)],
+)
+def test_kci_and_gpdc_use_every_blas_thread_from_their_cutoff(cls, rows):
+    x = np.random.default_rng(0).standard_normal((rows, 3))
+    assert (cls(x[:-1]).pin_blas, cls(x).pin_blas) == (True, False)
+
+
+def test_rcot_and_cmiknn_use_one_blas_thread():
+    x = np.random.default_rng(0).standard_normal((2000, 3))
+    assert getattr(RCoT(x), "pin_blas", True) and getattr(CMIknn(x[:50]), "pin_blas", True)
 
 
 # ---- device dispatch ---------------------------------------------------------------------------

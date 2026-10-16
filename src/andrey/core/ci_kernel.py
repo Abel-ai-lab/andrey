@@ -30,6 +30,11 @@ _RCOT_MIN_ROWS = 500
 # Each cache of RCoT's features holds about this many bytes.
 _CACHE_BYTES = 2**28
 
+# Rows from which the skeleton scans run KCI on every BLAS thread. On 8 cores of a shared node, PC
+# fits on 500 rows ran 0.42x to 1.56x the one-thread speed with 8 threads, where the
+# eigendecomposition ran up to 4x slower, and on 1,000 rows 2.2x to 2.5x faster.
+_KCI_BLAS_THREADS_FROM = 1000
+
 # Smallest kernel matrix (rows squared) at which `auto` runs a KCI query with a conditioning set on
 # a CUDA GPU. `qa/gpu_calibration_validate.py` on an A100-SXM4-80GB against 8 CPU threads found
 # 31,250 (177 rows); per query with two conditioning variables, the GPU took 0.52x the CPU's speed
@@ -166,7 +171,10 @@ class KCI:
        representations. Journal of Machine Learning Research 2, 243-264.
     """
 
-    pin_blas = False  # the skeleton scans run it on every BLAS thread
+    @property
+    def pin_blas(self) -> bool:
+        """Whether the skeleton scans run the test on one BLAS thread: on fewer than 1,000 rows."""
+        return self._n < _KCI_BLAS_THREADS_FROM
 
     def __init__(self, data: np.ndarray, *, ridge: float = 1e-3, rank: int | None = None) -> None:
         if not 0.0 < ridge < np.inf:
@@ -401,8 +409,6 @@ class RCoT:
        (2007). A kernel statistical test of independence. Advances in Neural Information
        Processing Systems 20, 585-592.
     """
-
-    pin_blas = False  # the skeleton scans run it on every BLAS thread
 
     def __init__(
         self,
