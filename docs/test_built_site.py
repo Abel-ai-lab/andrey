@@ -201,7 +201,7 @@ def test_every_header_leads_home_and_to_each_section(html):
         # Release cards carries the dot that marks the newest release until the reader opens it.
         cards = re.findall(
             r'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>Release cards'
-            r'<span class="nav-new" data-release="([^"]+)" hidden>',
+            r'<span class="nav-new" data-release="([^"]+)" data-date="\d{4}-\d{2}-\d{2}" hidden>',
             header,
         )
         if len(cards) != 1 or _resolve(html, page, cards[0][0]) != html / "docs/benchmarks.html":

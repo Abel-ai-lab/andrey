@@ -22,7 +22,7 @@ The brand uses the two parts of a causal graph as plain marks, never as drawn gr
 
 - **Node, a dot**, marks one thing to notice: the dot before a release's version on a link preview,
   above the version on a release card's cover, and on Release cards in the navbar for a release
-  the reader has not seen (`nav-new`).
+  the reader has not seen, for a week after the release (`nav-new`).
 - **Edge, a line**, marks a relation or direction: the A's amber stroke, the single amber stroke
   in each artwork, and the hairline under a heading in the documentation footer.
 - **Amber is the one accent.** A composition (a cover, a card, a link preview, a page's header)
