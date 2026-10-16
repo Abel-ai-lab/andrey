@@ -488,20 +488,23 @@ column as continuous. Tetrad's fits therefore run through `andrey_bench/adapters
 which takes causal-cmd's argument parser, parameters, and algorithm factory from the jar and
 replaces only the reader with one that applies `--numCategories`. Each fit writes the data to a CSV
 file, starts `java` once on the driver's source with causal-cmd's arguments, and reads its graph
-back, so every Tetrad time includes a Java start, the in-memory compile of the driver, and the file
-round trip:
+back:
 
 ```shell
 java -XX:ActiveProcessorCount=4 --class-path causal-cmd-1.12.0-jar-with-dependencies.jar \
-    andrey_bench/adapters/TetradDriver.java search --data-type mixed --numCategories 10 ...
+    andrey_bench/adapters/TetradDriver.java search --warmup 0 --data-type mixed ...
 ```
 
-The JVM sees only the fit's cores. Running a source file needs a `java` with the `jdk.compiler`
-module, as a JDK has; the adapter's setup checks for it. Each record's `package_version` names the
-causal-cmd, tetrad-lib, and Java releases. The adapters were written against causal-cmd 1.12.0,
-which bundles tetrad-lib 7.6.3; download it from Maven Central, check its SHA-1 against the
-published one, and point `ANDREY_BENCH_TETRAD_JAR` at it (`ANDREY_BENCH_JAVA` names `java` when it
-is not on `PATH`):
+Tetrad's time is its search inside the JVM, excluding JVM start, source compile and data loading,
+as Andrey's time excludes interpreter start and import. The driver times the search call alone and
+the record keeps it as `wall_s`; the whole call is `process_s`. With `--warmup` above 0, the
+warm-up searches run in the same JVM before the timed one. The JVM sees only the fit's cores.
+
+Running a source file needs a `java` with the `jdk.compiler` module, as a JDK has; the adapter's
+setup checks for it. Each record's `package_version` names the causal-cmd, tetrad-lib, and Java
+releases. The adapters were written against causal-cmd 1.12.0, which bundles tetrad-lib 7.6.3;
+download it from Maven Central, check its SHA-1 against the published one, and point
+`ANDREY_BENCH_TETRAD_JAR` at it (`ANDREY_BENCH_JAVA` names `java` when it is not on `PATH`):
 
 ```shell
 curl -fLO https://repo1.maven.org/maven2/io/github/cmu-phil/causal-cmd/1.12.0/causal-cmd-1.12.0-jar-with-dependencies.jar
@@ -537,6 +540,12 @@ numba and XGES inside `fit`. Account for those imports when comparing fit times.
 
 `setup_s` records setup duration and is included in `warmup_s`. At `--warmup 0`, they are equal and
 provide no fit-time bound.
+
+A package whose search runs in a process `fit` starts, such as Tetrad's JVM, times that search
+itself: its adapter declares `search_s` and sets it in `fit` to the seconds the process measured
+around the search call alone. The record keeps that time as `wall_s` and the whole `fit` call as
+`process_s`, which is null for every other adapter. Its warm-up searches run in the timed fit's
+process before its clock, so `warmup_s` holds only `setup_s`. See `contracts.SolutionAdapter`.
 
 ### Measure the dispatch thresholds
 
@@ -696,8 +705,8 @@ runner removes the directory after the fit.
 
 A record stores its data (`d`, `n`, `latents`, regime coordinates, `data_seed`, `repeat`), run
 settings (`cap_wall_s`, `cap_mem_mb`, `cores`, `device`, `dtype`, `backend`, `mode`, `machine_id`, `params`),
-and results (`status`, `wall_s`, `cpu_s`, `warmup_s`, `setup_s`, `peak_rss_mb`, `output_hash`,
-`shd`, `skeleton_f1`, `arrowhead_f1`).
+and results (`status`, `wall_s`, `process_s`, `cpu_s`, `warmup_s`, `setup_s`, `peak_rss_mb`,
+`output_hash`, `shd`, `skeleton_f1`, `arrowhead_f1`).
 
 `device_id` records `cpu` or the CUDA device index and name. The backend determines the device, so a
 pin inside `fit` outranks `ANDREY_DEVICE`; the record keeps the request separately as `device`.

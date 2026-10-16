@@ -90,6 +90,14 @@ class SolutionAdapter(Protocol):
     only ``fit`` into that environment — ``to_structure`` and scoring stay in the parent — which is
     how a package whose pins conflict with bench-env's still enters the field. Without it, fits run
     in bench-env with everything else.
+
+    Two more go together, for a package whose search runs in a process ``fit`` starts, such as a
+    JVM: ``search_s``, which ``fit`` sets to the seconds that process measured around the search
+    call alone, and ``warmup``, an ``int``. When an adapter declares ``search_s``, the worker
+    records it as ``wall_s`` and the whole timed ``fit`` call as ``process_s``, and instead of
+    calling ``fit`` once per warm-up it sets ``warmup`` to their number, so the warm-up searches run
+    in the timed fit's process before its clock. The package's time then excludes its process start
+    and data loading, as a Python package's excludes interpreter start and imports.
     """
 
     name: str  # "andrey.ges.numpy.serial" | "causal-learn.ges" | "gcastle.pc"
@@ -175,6 +183,8 @@ class RunRecord:
     # Dataset coordinate with a default: hidden nodes included in `d` but absent from the data.
     latents: int = 0
     wall_s: float | None = None
+    # The whole timed `fit` call, when the adapter reports its own search time as `wall_s`.
+    process_s: float | None = None
     cpu_s: float | None = None  # fit-scoped self+children CPU
     child_cpu_s: float | None = None  # CPU attributed to the (parallel) worker pool alone
     warmup_s: float | None = None  # Setup and warm-up fits, outside timed fit.

@@ -5,10 +5,11 @@ every column as continuous. ``TetradDriver.java``, beside this module, takes cau
 parser, parameters, and algorithm factory from the jar and replaces only the reader with one that
 applies ``--numCategories``. ``fit`` writes the data to a CSV with a header, starts ``java`` once
 on the driver's source with causal-cmd's arguments, and reads the graph back from the text file it
-writes. The timed region therefore holds the JVM start, the in-memory compile of the driver, the
-CSV write and read, and the search; the README's "Mixed data" section says so beside every Tetrad
-time. The driver also names the columns it read as categorical, and ``fit`` stops unless they are
-the lane rule's. Its setting names map to Andrey's:
+writes. The driver times the search call alone inside the JVM, after any warm-up searches in the
+same JVM, and ``fit`` reports that time as ``search_s``, which the record keeps as ``wall_s``; the
+whole call, with the JVM start, the in-memory compile of the driver, and the CSV round trip, is the
+record's ``process_s``. The driver also names the columns it read as categorical, and ``fit``
+stops unless they are the lane rule's. Its setting names map to Andrey's:
 
 =====================================  ==========================================================
 causal-cmd                             Andrey
@@ -60,8 +61,9 @@ _TESTS = {"degen_gauss": "dg-lr-test", "cond_gauss": "cg-lr-test"}
 _SCORES = {"local_score_degen_gauss": "dg-bic-score", "local_score_cond_gauss": "cg-bic-score"}
 #: An edge line of causal-cmd's text graph: ``1. x0 --> x4``.
 _EDGE = re.compile(r"^\d+\.\s+x(\d+)\s+(-->|---|<->|<--)\s+x(\d+)\s*$")
-#: The driver's first output line, naming the columns it read as categorical.
-_CATEGORICAL = "Categorical columns: "
+#: The driver's output lines naming the columns it read as categorical and timing the search.
+_CATEGORICAL = "Categorical columns:"
+_SEARCH_S = "Search seconds:"
 
 
 def _java() -> str:
@@ -111,13 +113,23 @@ def versions() -> str:
     return f"causal-cmd {found['causal-cmd']} (tetrad-lib {found['tetrad-lib']}), Java {java}"
 
 
+def _tagged(text: str, tag: str) -> str:
+    """Return the rest of the line in the driver's output header that starts with ``tag``."""
+    for line in text.split("\n\n", 1)[0].splitlines():
+        if line.startswith(tag):
+            return line.removeprefix(tag).strip()
+    raise ValueError(f"no {tag!r} line in the driver's output")
+
+
 def read_categorical(text: str) -> list[str]:
     """Return the column names the driver's output text names as read categorical."""
-    first = text.split("\n", 1)[0]
-    if not first.startswith(_CATEGORICAL):
-        raise ValueError(f"no categorical-column line in the driver's output: {first!r}")
-    names = first.removeprefix(_CATEGORICAL).strip()
+    names = _tagged(text, _CATEGORICAL)
     return names.split(";") if names else []
+
+
+def read_search_s(text: str) -> float:
+    """Return the seconds the driver's output text gives the timed search call inside the JVM."""
+    return float(_tagged(text, _SEARCH_S))
 
 
 def lane_categorical(x: np.ndarray, max_categories: int) -> list[str]:
@@ -156,12 +168,19 @@ def read_graph(text: str, d: int) -> np.ndarray:
 
 
 class _TetradCmd:
-    """One causal-cmd algorithm and test or score; ``fit`` runs the driver once."""
+    """One causal-cmd algorithm and test or score; ``fit`` runs the driver once.
+
+    ``search_s`` and ``warmup`` follow the harness's convention for a search timed in another
+    process (``contracts.SolutionAdapter``): ``fit`` sets ``search_s``, and the worker sets
+    ``warmup``, the searches the driver runs untimed before the timed one in the same JVM.
+    """
 
     package: str = "tetrad"
     backend: str = "jvm"
     mode: str = "serial"
     output_type: str = "cpdag"
+    search_s: float | None = None
+    warmup: int = 0
 
     @property
     def package_version(self) -> str:
@@ -206,6 +225,8 @@ class _TetradCmd:
                 str(_jar()),
                 str(DRIVER),
                 "search",
+                "--warmup",
+                str(self.warmup),
                 "--data-type",
                 "mixed",
                 "--numCategories",
@@ -230,12 +251,13 @@ class _TetradCmd:
             return result.read_text()
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
-        """Run the driver and read its graph back. The only timed region.
+        """Run the driver, set ``search_s`` to its search time, and read its graph back.
 
         Raises ``RuntimeError`` unless Tetrad read exactly the lane rule's categorical columns.
         """
         x = np.asarray(data, dtype=np.float64)
         text = self.run(x, params)
+        self.search_s = read_search_s(text)
         declared = read_categorical(text)
         expected = lane_categorical(x, int(params.get("max_categories", _MAX_CATEGORIES)))
         if declared != expected:

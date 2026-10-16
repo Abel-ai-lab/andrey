@@ -145,12 +145,18 @@ def test_tetrad_graph_text_reads_as_a_cpdag_adjacency() -> None:
         tetrad_cmd.read_graph("Graph Edges:\n1. x0 o-> x1\n", 2)
 
 
-def test_the_tetrad_driver_names_the_columns_it_read_as_categorical() -> None:
-    text = "Categorical columns: x0;x2\n\nGraph Nodes:\nx0;x1;x2\n\nGraph Edges:\n"
+def test_the_tetrad_driver_names_its_categorical_columns_and_times_its_search() -> None:
+    text = (
+        "Categorical columns: x0;x2\nSearch seconds: 0.125\n\n"
+        "Graph Nodes:\nx0;x1;x2\n\nGraph Edges:\n"
+    )
     assert tetrad_cmd.read_categorical(text) == ["x0", "x2"]
+    assert tetrad_cmd.read_search_s(text) == 0.125
     assert tetrad_cmd.read_categorical("Categorical columns: \n\nGraph Edges:\n") == []
-    with pytest.raises(ValueError, match="categorical-column line"):
+    with pytest.raises(ValueError, match="Categorical columns"):
         tetrad_cmd.read_categorical("Graph Edges:\n")
+    with pytest.raises(ValueError, match="Search seconds"):
+        tetrad_cmd.read_search_s("Categorical columns: x0\n\nSearch seconds: 1\n")
 
 
 @needs_tetrad
@@ -169,8 +175,13 @@ def test_tetrad_reads_exactly_the_generated_categorical_columns(categories) -> N
 def test_a_tetrad_fit_gives_a_cpdag(adapter) -> None:
     data, _, _ = datasets.generate_one(_key())
     adapter.setup()
-    structure = adapter.to_structure(adapter.fit(data, adapter.params()))
+    adjacency = adapter.fit(data, adapter.params())
+    assert adapter.search_s > 0
+    structure = adapter.to_structure(adjacency)
     assert structure.kind == "cpdag" and structure.n_nodes == 8
+    warm = pickle.loads(pickle.dumps(adapter))
+    warm.warmup = 1  # a warm-up search in the same JVM leaves the graph as it was
+    assert np.array_equal(warm.fit(data, warm.params()), adjacency)
 
 
 @needs_r()

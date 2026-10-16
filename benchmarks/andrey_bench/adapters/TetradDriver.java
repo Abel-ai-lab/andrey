@@ -65,9 +65,11 @@ import java.util.StringJoiner;
  * <p>Modes ({@code k} is the most distinct values of a categorical column; columns by index):
  *
  * <pre>
- * search ARGS                 run causal-cmd's algorithm on causal-cmd's arguments ARGS; write
- *                             OUT/PREFIX_out.txt: "Categorical columns: " and their names joined
- *                             by ";", a blank line, then the graph
+ * search [--warmup N] ARGS    run causal-cmd's algorithm on causal-cmd's arguments ARGS, after N
+ *                             untimed runs (default 0) in the same JVM; write OUT/PREFIX_out.txt:
+ *                             "Categorical columns: " and their names joined by ";", "Search
+ *                             seconds: " and the timed search call's wall time, a blank line,
+ *                             then the graph
  * columns CSV k               each column's type as causal-cmd's reader and as this reader read it
  * pc CSV k cg|dg [TABLE]      PC as causal-cmd sets it up; print every test, the separating sets,
  *                             and the graph; with TABLE ("x y z1 ... p" lines), the p-values come
@@ -130,15 +132,31 @@ public class TetradDriver {
         return (DataSet) DataConvertUtils.toDataModel(reader.read(columns, true, null));
     }
 
+    /**
+     * Runs the search {@code --warmup} times, then once more, and keeps the last run's graph and
+     * time. The clock holds the search call alone: the JVM start, the compile of this file, and
+     * the data read come before it.
+     */
     @SuppressWarnings("unchecked")
     static void search(String[] argv) throws Exception {
+        int warmup = 0;
+        if (argv.length > 1 && argv[0].equals("--warmup")) {
+            warmup = Integer.parseInt(argv[1]);
+            argv = Arrays.copyOfRange(argv, 2, argv.length);
+        }
         CmdArgs args = CmdParser.parse(argv);
         DataSet data = read(args, numCategories(argv));
-        Algorithm algorithm = AlgorithmFactory.create(
-                args.getAlgorithmClass(), args.getTestClass(), args.getScoreClass());
-        Parameters parameters = Tetrad.getParameters(args);
-        parameters.set("printStream", QUIET);
-        Graph graph = algorithm.search(data, parameters);
+        Graph graph = null;
+        double seconds = 0;
+        for (int i = 0; i <= warmup; i++) {
+            Algorithm algorithm = AlgorithmFactory.create(
+                    args.getAlgorithmClass(), args.getTestClass(), args.getScoreClass());
+            Parameters parameters = Tetrad.getParameters(args);
+            parameters.set("printStream", QUIET);
+            long start = System.nanoTime();
+            graph = algorithm.search(data, parameters);
+            seconds = (System.nanoTime() - start) / 1e9;
+        }
         StringJoiner categorical = new StringJoiner(";");
         for (Node v : data.getVariables()) {
             if (v instanceof DiscreteVariable) categorical.add(v.getName());
@@ -146,6 +164,7 @@ public class TetradDriver {
         Path out = args.getOutDirectory().resolve(args.getFilePrefix() + "_out.txt");
         try (PrintStream w = new PrintStream(Files.newOutputStream(out))) {
             w.println("Categorical columns: " + categorical);
+            w.println("Search seconds: " + seconds);
             w.println();
             w.println(graph);
         }
