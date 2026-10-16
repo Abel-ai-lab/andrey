@@ -44,9 +44,9 @@ PCMCI and PCMCI+ return the same graphs and run up to 166x faster.
 - **Up to 116x** PCMCI+ speedup over tigramite
 :::
 
-% Link the post after the card's button once the post is out (docs/DEVELOPMENT.md).
 :::{div} release-actions
 [Read the release card](benchmarks/0.5.0.md)
+[Read the post](../blog/20261016-andrey-0-5-0.md)
 :::
 ::::
 :::::
