@@ -14,7 +14,7 @@ change names its pull request.
 ### Highlights
 
 - `pcmci`, `pcmciplus`, `lpcmci`, `granger`, `varma_lingam`, and `longitudinal_lingam` are
-  supported. PCMCI runs up to 166x faster than tigramite and PCMCI+ up to 116x, each returning the
+  supported. PCMCI+ runs up to 100x faster than tigramite and PCMCI up to 20x, each returning the
   same graph as tigramite on every dataset. The 0.5.0 release card gives the numbers and each
   method's limits. ([#133])
 
