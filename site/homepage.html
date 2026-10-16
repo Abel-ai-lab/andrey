@@ -47,13 +47,9 @@
 
     {#- Each section opens on its art with its claim, then shows the evidence. #}
     <section class="section wrap act act--hero" id="accelerated" aria-labelledby="accelerated-title">
-      {#- The title stays while the ideas play one at a time (why-fast.js). #}
-      <div class="wf-run">
-        <div class="wf-pin">
-          {{ home.act_covers["accelerated"] }}
-          {{ home.why_fast_story }}
-        </div>
-      </div>
+      {{ home.act_covers["accelerated"] }}
+      {#- The ideas behind the speed, a card each, one playing at a time (why-fast.js). #}
+      {{ home.why_fast_belt }}
       <div class="run-sheet">
         <ul class="bento-grid">{{ home.family_tiles }}</ul>
       </div>

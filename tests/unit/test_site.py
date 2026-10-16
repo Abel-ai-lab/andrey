@@ -1203,21 +1203,20 @@ def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
     assert re.findall(r'<div class="err-bar"><span>([^<]+)</span>', section)
 
 
-def test_the_first_section_tells_why_it_is_fast_one_scene_at_a_time(placeholder_page):
-    # Under the first section's title, on the shared art, every scene in order with its title and
-    # narration, each played by the scroll: no tile, no opener, no dialog of their own.
+def test_the_first_section_shows_why_it_is_fast_as_a_carousel(placeholder_page):
+    # Under the first section's title, on the shared art, a card per scene in order with its title
+    # and narration, played by the carousel: no tile, no opener, no dialog of its own.
     section = placeholder_page[placeholder_page.index('id="accelerated"') :]
     section = section[: section.index('<div class="run-sheet">')]
-    pin = section[section.index('<div class="wf-pin">') :]
-    assert pin.index('id="accelerated-title"') < pin.index('<div class="wf wf-story">')
+    assert section.index('id="accelerated-title"') < section.index('<div class="wf wf-belt"')
     scenes = build._why_fast["SCENES"]
-    assert re.findall(r'data-scene="(\w+)" data-play="scroll"', pin) == [s["key"] for s in scenes]
-    titles = re.findall(r'<li class="wf-step"><div class="wf-words"><h3>([^<]+)</h3>', pin)
+    assert re.findall(r'data-scene="(\w+)" data-play="belt"', section) == [s["key"] for s in scenes]
+    titles = re.findall(r'<div class="wf-words"><h3>([^<]+)</h3>', section)
     assert titles == [html.escape(s["title"]) for s in scenes]
-    assert all(html.escape(s["text"]) in pin for s in scenes)
+    assert all(html.escape(s["text"]) in section for s in scenes)
     assert "data-wf-open" not in placeholder_page and "wf-dialog" not in placeholder_page
-    assert '<li class="tile' not in pin and "wf-plus" not in pin
-    assert "wf-note" not in pin  # no footnote under the story
+    assert '<li class="tile' not in section and "wf-plus" not in section
+    assert "wf-pin" not in placeholder_page and "wf-story" not in placeholder_page
 
 
 def test_a_list_is_a_note_in_plain_type_not_a_card(placeholder_page):
