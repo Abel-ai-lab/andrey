@@ -555,6 +555,55 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     )
 
 
+# An image keeps its address across releases, and Cloudflare and browsers cache it for hours, so a
+# deploy would show the old file. After the build, each local image a stylesheet or a page loads
+# (a CSS `url()`, an `src`, the favicon link) gets its content's hash as a query, so a changed file
+# gets a new address; then each page's stylesheet links take the hash of the rewritten stylesheet,
+# since Sphinx hashed it before. Download links keep their addresses.
+ASSET_TYPES = "svg|jpg|jpeg|png|webp|gif"
+ASSET_REFS = (
+    (".css", re.compile(rf'(url\("?)([^")?#:]+\.(?:{ASSET_TYPES}))(?="?\))')),
+    (
+        ".html",
+        re.compile(
+            rf'((?:\bsrc|<link rel="icon"[^>]*?\bhref)=")([^"?#:]+\.(?:{ASSET_TYPES}))(?=")'
+        ),
+    ),
+    (
+        ".html",
+        re.compile(r'(<link rel="stylesheet"[^>]*?\bhref=")([^"?#:]+\.css)(?:\?v=\w+)?(?=")'),
+    ),
+)
+
+
+def _version_assets(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Add ``?v=<hash>`` to each local image address in the built stylesheets and pages, and to
+    each page's stylesheet links (``ASSET_REFS``); an address whose file is not built is left as
+    it is. A stylesheet is hashed only after its own images are."""
+    if exception is not None or app.builder.name != "html":
+        return
+    import hashlib
+
+    outdir = pathlib.Path(app.outdir)
+    digests: dict[pathlib.Path, str] = {}
+
+    def versioned(match: re.Match, here: pathlib.Path) -> str:
+        base = outdir if match[2].startswith("/") else here.parent
+        target = (base / match[2].lstrip("/")).resolve()
+        if not target.is_file():
+            return match[0]
+        if target not in digests:
+            digests[target] = hashlib.sha256(target.read_bytes()).hexdigest()[:8]
+        return f"{match[1]}{match[2]}?v={digests[target]}"
+
+    for suffix, pattern in ASSET_REFS:
+        for path in outdir.rglob(f"*{suffix}"):
+            text = path.read_text(encoding="utf-8")
+            new = pattern.sub(lambda m, here=path: versioned(m, here), text)
+            if new != text:
+                path.write_text(new, encoding="utf-8")
+
+
 def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
     """Write ``llms.txt`` and ``sitemap.xml`` at the site's root from the built pages
     (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt`` lists
@@ -1089,6 +1138,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
     app.connect("build-finished", _write_discovery)
+    app.connect("build-finished", _version_assets)
     app.connect("doctree-resolved", _post_byline)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)

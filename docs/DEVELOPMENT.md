@@ -26,6 +26,11 @@ uv run --group docs sphinx-build -W -b html docs docs/_build/html
 
 Every link is relative, so one build serves any hostname.
 
+After the build, `_version_assets` in `conf.py` adds each local image's content hash to its
+address (`?v=<hash>`) in the pages and stylesheets, and gives each stylesheet link the hash of
+the rewritten stylesheet, so a deploy never shows an image Cloudflare or a browser cached from an
+earlier build. Download links keep their plain addresses.
+
 ## The homepage
 
 The homepage is a template, [`site/homepage.html`](../site/homepage.html), on pydata's layout with
