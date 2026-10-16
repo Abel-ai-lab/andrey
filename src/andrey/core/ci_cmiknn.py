@@ -170,13 +170,14 @@ class CMIknn:
             )
         arr = _checked_data(data, "CMIknn", min_rows=2)
         self._seed = resolve_seed(seed)
-        self._ranks = _rank_columns(arr, np.random.default_rng(self._seed))
         n = arr.shape[0]
         self._n = n
         self._k = min(max(1, round(k_cmi * n)), n - 1)
         self._k_perm = min(int(k_perm), n)
         self._n_permutations = int(n_permutations)
         self._dtype = np.int16 if n <= np.iinfo(np.int16).max else np.int32
+        # Ranks in the distance dtype: a difference of two ranks fits it, so distances never widen.
+        self._ranks = _rank_columns(arr, np.random.default_rng(self._seed)).astype(self._dtype)
         # The shuffles depend only on the conditioning set, so queries share them.
         entries = max(16, _CACHE_BYTES // (self._n_permutations * n * self._dtype().itemsize))
         self._permutations = lru_cache(entries)(self._draw_permutations)
