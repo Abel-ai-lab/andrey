@@ -59,5 +59,7 @@ name: Andrey, NumPy, lingam, pcalg. Respect `.markdownlint.yaml`.
 
 ## Workflow
 
-One issue -> one PR, each checked by CI. PRs target `main`. `uv` manages the environment, `ruff`
-lints and formats, and `prek` runs the commit hooks (`DEVELOPMENT.md` has the commands).
+One issue -> one PR, each checked by CI. A PR targets its release's branch, `release/<x.y.z>`; the
+release PR, from that branch to `main`, is the only PR that merges to `main`, and the tag follows
+it. `uv` manages the environment, `ruff` lints and formats, and `prek` runs the commit hooks
+(`DEVELOPMENT.md` has the commands).

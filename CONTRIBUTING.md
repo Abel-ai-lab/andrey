@@ -56,6 +56,10 @@ gitleaks, to this checkout, so they run on every commit; `prek run --all-files` 
 ## Pull requests
 
 - One change per pull request, with the tests that show it works.
+- A pull request targets the branch of the release it ships in, `release/<x.y.z>`, not `main`.
+  The release pull request, from that branch to `main`, is the only one that merges to `main`;
+  the release's tag follows it. A required check, `release-branch`, fails a pull request into
+  `main` from any other branch.
 - When the public API changes, update its docstrings and the API reference
   (`docs/docs/code/index.md`) in the same pull request.
 - Everything in `andrey.__all__` is public and documented. Names that start with `_` are internal

@@ -1,0 +1,25 @@
+name: release-flow
+
+# Only a release branch merges to main (CONTRIBUTING.md, Pull requests): a pull request into main
+# from any other branch fails this check, which the main ruleset requires. `edited` reruns it when
+# a pull request is retargeted to main.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions: {}
+
+jobs:
+  release-branch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: The pull request comes from release/<x.y.z>
+        env:
+          HEAD: ${{ github.head_ref }}
+        run: |
+          if [[ ! "$HEAD" =~ ^release/[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Only release/<x.y.z> merges to main, and this pull request comes from $HEAD. Target the release's branch instead."
+            exit 1
+          fi
