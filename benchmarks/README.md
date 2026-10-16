@@ -454,9 +454,11 @@ keys stay as they were. The Dirichlet concentration of the categorical tables is
 `datasets.MIXED_SETTINGS`. Codes and values are never rescaled.
 
 Every solution reads a column as categorical when it holds at most ten distinct whole numbers.
-Andrey infers its categorical columns with `max_categories=10`; Tetrad reads them through its own
-loader rule, and the bnlearn adapters turn such columns into factors. On `mixed_er` the rule reads
-exactly the generated categorical columns, which `tests/test_adapters_mixed.py` checks. Each
+Andrey infers its categorical columns with `max_categories=10`; Tetrad's reader marks a column of at
+most ten distinct values categorical, and the bnlearn adapters turn such columns into factors. On
+`mixed_er` the rule reads exactly the generated categorical columns, which
+`tests/test_adapters_mixed.py` checks, and every Tetrad fit stops unless Tetrad read exactly the
+rule's columns. Each
 package's names for the settings map to Andrey's:
 
 | Andrey | Tetrad (causal-cmd) | bnlearn |
@@ -481,10 +483,23 @@ data: Tetrad's conditional Gaussian parameter count leaves out each category's m
 degenerate Gaussian test statistic is twice the likelihood ratio, and its degenerate Gaussian score
 sums one regression per category of a categorical child.
 
-Tetrad runs as a black box: each fit writes the data to a CSV file, starts `java -jar` on the
-causal-cmd jar once, and reads its graph back, so every Tetrad time includes a Java start and the
-file round trip. The JVM sees only the fit's cores. The adapters were written against causal-cmd
-1.12.0, which bundles tetrad-lib 7.6.3; download it from Maven Central, check its SHA-1 against the
+causal-cmd 1.12.0 parses `--numCategories` but never stores it, so its own command line reads every
+column as continuous. Tetrad's fits therefore run through `andrey_bench/adapters/TetradDriver.java`,
+which takes causal-cmd's argument parser, parameters, and algorithm factory from the jar and
+replaces only the reader with one that applies `--numCategories`. Each fit writes the data to a CSV
+file, starts `java` once on the driver's source with causal-cmd's arguments, and reads its graph
+back, so every Tetrad time includes a Java start, the in-memory compile of the driver, and the file
+round trip:
+
+```shell
+java -XX:ActiveProcessorCount=4 --class-path causal-cmd-1.12.0-jar-with-dependencies.jar \
+    andrey_bench/adapters/TetradDriver.java search --data-type mixed --numCategories 10 ...
+```
+
+The JVM sees only the fit's cores. Running a source file needs a `java` with the `jdk.compiler`
+module, as a JDK has; the adapter's setup checks for it. Each record's `package_version` names the
+causal-cmd, tetrad-lib, and Java releases. The adapters were written against causal-cmd 1.12.0,
+which bundles tetrad-lib 7.6.3; download it from Maven Central, check its SHA-1 against the
 published one, and point `ANDREY_BENCH_TETRAD_JAR` at it (`ANDREY_BENCH_JAVA` names `java` when it
 is not on `PATH`):
 

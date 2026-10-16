@@ -2,9 +2,9 @@
 
 Every solution reads the categorical columns by one rule, at most ten distinct whole numbers, so
 the regime must give its categorical columns few codes and its continuous columns many values; the
-pairs must run one method with one setting; and the Tetrad adapter must read causal-cmd's graph
-text exactly. Tetrad's fits run where ``ANDREY_BENCH_TETRAD_JAR`` names the jar and bnlearn's where
-R is loaded.
+pairs must run one method with one setting; Tetrad must read exactly the generated categorical
+columns; and the Tetrad adapter must read causal-cmd's graph text exactly. Tetrad's fits run where
+``ANDREY_BENCH_TETRAD_JAR`` names the jar and bnlearn's where R is loaded.
 """
 
 from __future__ import annotations
@@ -31,7 +31,8 @@ from andrey_bench.datasets import DatasetKey
 
 ADAPTERS = [a for a in mixed_cpu.SOLUTIONS if a.name != "baseline.empty"]
 needs_tetrad = pytest.mark.skipif(
-    not os.environ.get(tetrad_cmd.JAR_ENV) or shutil.which("java") is None,
+    not os.environ.get(tetrad_cmd.JAR_ENV)
+    or not (os.environ.get(tetrad_cmd.JAVA_ENV) or shutil.which("java")),
     reason=f"no causal-cmd jar (${tetrad_cmd.JAR_ENV}) or no java",
 )
 
@@ -142,6 +143,25 @@ def test_tetrad_graph_text_reads_as_a_cpdag_adjacency() -> None:
         tetrad_cmd.read_graph("Graph Edges:\n1. x0 <-> x1\n", 2)
     with pytest.raises(ValueError, match="unexpected"):
         tetrad_cmd.read_graph("Graph Edges:\n1. x0 o-> x1\n", 2)
+
+
+def test_the_tetrad_driver_names_the_columns_it_read_as_categorical() -> None:
+    text = "Categorical columns: x0;x2\n\nGraph Nodes:\nx0;x1;x2\n\nGraph Edges:\n"
+    assert tetrad_cmd.read_categorical(text) == ["x0", "x2"]
+    assert tetrad_cmd.read_categorical("Categorical columns: \n\nGraph Edges:\n") == []
+    with pytest.raises(ValueError, match="categorical-column line"):
+        tetrad_cmd.read_categorical("Graph Edges:\n")
+
+
+@needs_tetrad
+@pytest.mark.parametrize("categories", [(2, 3), (3, 5)])
+def test_tetrad_reads_exactly_the_generated_categorical_columns(categories) -> None:
+    data, _, _ = datasets.generate_one(_key(categories=categories))
+    truth = sample_mixed(d=8, n=600, seed=0, categories=categories).provenance["config"]
+    adapter = tetrad_cmd.TetradPC("cond_gauss")
+    adapter.setup()
+    declared = tetrad_cmd.read_categorical(adapter.run(data, adapter.params()))
+    assert declared == [f"x{j}" for j in truth["categorical"]]
 
 
 @needs_tetrad

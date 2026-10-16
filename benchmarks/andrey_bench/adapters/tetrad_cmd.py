@@ -1,9 +1,14 @@
-"""Tetrad's PC and FGES on mixed data, run as a black box through the causal-cmd command line.
+"""Tetrad's PC and FGES on mixed data, run through the causal-cmd jar and a one-file Java driver.
 
-The released jar is the only interface: ``fit`` writes the data to a CSV with a header, runs
-``java -jar <causal-cmd jar>`` once, and reads the graph back from the text file it writes. The
-timed region therefore holds the JVM start, the CSV write and read, and the search; the README's
-"Mixed data" section says so beside every Tetrad time. Its setting names map to Andrey's:
+causal-cmd 1.12.0 parses ``--numCategories`` but never stores it, so its own command line reads
+every column as continuous. ``TetradDriver.java``, beside this module, takes causal-cmd's argument
+parser, parameters, and algorithm factory from the jar and replaces only the reader with one that
+applies ``--numCategories``. ``fit`` writes the data to a CSV with a header, starts ``java`` once
+on the driver's source with causal-cmd's arguments, and reads the graph back from the text file it
+writes. The timed region therefore holds the JVM start, the in-memory compile of the driver, the
+CSV write and read, and the search; the README's "Mixed data" section says so beside every Tetrad
+time. The driver also names the columns it read as categorical, and ``fit`` stops unless they are
+the lane rule's. Its setting names map to Andrey's:
 
 =====================================  ==========================================================
 causal-cmd                             Andrey
@@ -24,17 +29,19 @@ prior (``--structurePrior 0``), as Andrey's GES has none, and without the discre
 Each fit's JVM sees only the cores the runner gives the fit (``-XX:ActiveProcessorCount``).
 
 ``ANDREY_BENCH_TETRAD_JAR`` names the jar and ``ANDREY_BENCH_JAVA`` the ``java`` executable, by
-default the one on ``PATH``. The README's "Mixed data" section gives the jar's release, download,
-and checksum.
+default the one on ``PATH``; it needs the ``jdk.compiler`` module, which runs a source file. The
+README's "Mixed data" section gives the jar's release, download, and checksum.
 """
 
 from __future__ import annotations
 
+import functools
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+import zipfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -42,8 +49,8 @@ import numpy as np
 
 JAR_ENV = "ANDREY_BENCH_TETRAD_JAR"
 JAVA_ENV = "ANDREY_BENCH_JAVA"
-#: The release the lane was written against; a different jar is recorded through its own version.
-CAUSAL_CMD_VERSION = "1.12.0"
+#: The driver ``java`` runs from source: causal-cmd's search with the categorical columns declared.
+DRIVER = Path(__file__).with_name("TetradDriver.java")
 
 _DEFAULT_ALPHA = 0.05
 _DEFAULT_LAMBDA = 1.0
@@ -53,6 +60,8 @@ _TESTS = {"degen_gauss": "dg-lr-test", "cond_gauss": "cg-lr-test"}
 _SCORES = {"local_score_degen_gauss": "dg-bic-score", "local_score_cond_gauss": "cg-bic-score"}
 #: An edge line of causal-cmd's text graph: ``1. x0 --> x4``.
 _EDGE = re.compile(r"^\d+\.\s+x(\d+)\s+(-->|---|<->|<--)\s+x(\d+)\s*$")
+#: The driver's first output line, naming the columns it read as categorical.
+_CATEGORICAL = "Categorical columns: "
 
 
 def _java() -> str:
@@ -75,6 +84,49 @@ def _processors() -> int:
         return max(1, int(os.environ.get("OMP_NUM_THREADS", "1")))
     except ValueError:
         return 1
+
+
+@functools.cache
+def versions() -> str:
+    """Name the releases a fit runs: ``causal-cmd 1.12.0 (tetrad-lib 7.6.3), Java 21.0.6``.
+
+    causal-cmd's and tetrad-lib's come from the jar's Maven metadata and Java's from
+    ``java -version``; a part whose jar or ``java`` is missing reads ``unknown``.
+    """
+    found = {"causal-cmd": "unknown", "tetrad-lib": "unknown"}
+    jar = Path(os.environ.get(JAR_ENV, "").strip())
+    if jar.is_file():
+        with zipfile.ZipFile(jar) as archive:
+            for artifact in found:
+                name = f"META-INF/maven/io.github.cmu-phil/{artifact}/pom.properties"
+                if name in archive.namelist():
+                    text = archive.read(name).decode()
+                    found[artifact] = re.search(r"^version=(.+)$", text, re.M).group(1).strip()
+    java = "unknown"
+    executable = os.environ.get(JAVA_ENV) or shutil.which("java")
+    if executable:
+        done = subprocess.run([executable, "-version"], capture_output=True, text=True)
+        match = re.search(r'version "([^"]+)"', done.stderr)
+        java = match.group(1) if match else java
+    return f"causal-cmd {found['causal-cmd']} (tetrad-lib {found['tetrad-lib']}), Java {java}"
+
+
+def read_categorical(text: str) -> list[str]:
+    """Return the column names the driver's output text names as read categorical."""
+    first = text.split("\n", 1)[0]
+    if not first.startswith(_CATEGORICAL):
+        raise ValueError(f"no categorical-column line in the driver's output: {first!r}")
+    names = first.removeprefix(_CATEGORICAL).strip()
+    return names.split(";") if names else []
+
+
+def lane_categorical(x: np.ndarray, max_categories: int) -> list[str]:
+    """Name the columns the lane reads as categorical: at most that many distinct whole numbers."""
+    return [
+        f"x{j}"
+        for j in range(x.shape[1])
+        if np.all(x[:, j] == np.round(x[:, j])) and np.unique(x[:, j]).size <= max_categories
+    ]
 
 
 def read_graph(text: str, d: int) -> np.ndarray:
@@ -104,26 +156,35 @@ def read_graph(text: str, d: int) -> np.ndarray:
 
 
 class _TetradCmd:
-    """One causal-cmd algorithm and test or score; ``fit`` runs the jar once."""
+    """One causal-cmd algorithm and test or score; ``fit`` runs the driver once."""
 
     package: str = "tetrad"
-    package_version: str = f"causal-cmd {CAUSAL_CMD_VERSION}"
     backend: str = "jvm"
     mode: str = "serial"
     output_type: str = "cpdag"
 
+    @property
+    def package_version(self) -> str:
+        """causal-cmd's, tetrad-lib's, and Java's releases (:func:`versions`)."""
+        return versions()
+
     def setup(self) -> None:
-        """Check ``java`` and the jar before timing; the JVM itself starts inside ``fit``."""
-        subprocess.run(
-            [_java(), "-version"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
+        """Check ``java``, its compiler module, and the jar before timing.
+
+        The JVM itself starts, and compiles the driver, inside ``fit``.
+        """
+        modules = subprocess.run(
+            [_java(), "--list-modules"], check=True, capture_output=True, text=True
+        ).stdout
+        if not re.search(r"^jdk\.compiler@", modules, re.M):
+            raise RuntimeError(f"{_java()} has no jdk.compiler module to run {DRIVER.name}")
         _jar()
 
     def _arguments(self, params: Mapping[str, Any]) -> list[str]:
         raise NotImplementedError
 
-    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
-        """Write the CSV, run causal-cmd, and read its graph back. The only timed region."""
+    def run(self, data: np.ndarray, params: Mapping[str, Any]) -> str:
+        """Write the CSV, run the driver, and return the text file it writes."""
         x = np.asarray(data, dtype=np.float64)
         d = x.shape[1]
         with tempfile.TemporaryDirectory(prefix="andrey_bench_tetrad_") as tmp:
@@ -141,8 +202,10 @@ class _TetradCmd:
                 _java(),
                 f"-XX:ActiveProcessorCount={_processors()}",
                 f"-Djava.util.prefs.userRoot={work}",  # keeps Java's preferences out of $HOME
-                "-jar",
+                "--class-path",
                 str(_jar()),
+                str(DRIVER),
+                "search",
                 "--data-type",
                 "mixed",
                 "--numCategories",
@@ -157,13 +220,27 @@ class _TetradCmd:
                 "fit",
                 *self._arguments(params),
             ]
-            done = subprocess.run(command, capture_output=True, text=True)
+            # causal-cmd's logger writes causal-cmd.log into the working directory.
+            done = subprocess.run(command, capture_output=True, text=True, cwd=work)
             result = work / "fit_out.txt"
             if done.returncode != 0 or not result.is_file():
                 raise RuntimeError(
-                    f"causal-cmd exited {done.returncode}: {done.stderr.strip()[-500:]}"
+                    f"{DRIVER.name} exited {done.returncode}: {done.stderr.strip()[-500:]}"
                 )
-            return read_graph(result.read_text(), d)
+            return result.read_text()
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Run the driver and read its graph back. The only timed region.
+
+        Raises ``RuntimeError`` unless Tetrad read exactly the lane rule's categorical columns.
+        """
+        x = np.asarray(data, dtype=np.float64)
+        text = self.run(x, params)
+        declared = read_categorical(text)
+        expected = lane_categorical(x, int(params.get("max_categories", _MAX_CATEGORIES)))
+        if declared != expected:
+            raise RuntimeError(f"Tetrad read {declared} as categorical, the lane rule {expected}")
+        return read_graph(text, x.shape[1])
 
     def to_structure(self, native: np.ndarray) -> Any:
         """0/1 CPDAG adjacency -> ``GraphStructure``; untimed."""
