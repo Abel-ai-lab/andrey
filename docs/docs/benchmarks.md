@@ -181,6 +181,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.6.0: mixed and categorical data <benchmarks/0.6.0>
 0.5.0: time series <benchmarks/0.5.0>
 0.4.0: pairwise direction <benchmarks/0.4.0>
 0.3.0: score-based search <benchmarks/0.3.0>
