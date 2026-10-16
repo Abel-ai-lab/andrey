@@ -616,6 +616,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
         (r for m in methods for r in m["rows"] if r["ratio"] is not None),
         key=lambda r: r["ratio"],
     )
+    lead, shown = more_than(best["ratio"])
     peers = " and ".join(m["comparator"] for m in methods)
     legend = "".join(
         f'<span class="tc-key {cls}"><i aria-hidden="true"></i>{escape(label)}</span>'
@@ -624,7 +625,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
     return (
         '<figure class="tchart"><figcaption>'
         f'<span class="tchart-name"><strong>{escape(name)}</strong></span>'
-        f'<span class="tchart-up">up to <b>{escape(ratio_label(best))}</b></span></figcaption>'
+        f'<span class="tchart-up">{lead.lower()} <b>{shown:,}x</b></span></figcaption>'
         f'<p class="tc-legend">{legend}</p>'
         f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{escape(name)}: fit time against '
         f'the number of {unit} for Andrey and {escape(peers)}">'
@@ -1585,6 +1586,14 @@ def round_down(value: float) -> int:
     return int(value // unit * unit)
 
 
+def more_than(value: float) -> tuple[str, float]:
+    """A claim's number, the value rounded down to one significant digit (:func:`round_down`), or
+    to a tenth below 10, with "More than" when the value clears it and "At least" when it equals
+    it: 116 -> More than 100, 1.38 -> More than 1.3, 20 -> At least 20."""
+    shown = round_down(value) if value >= 10 else math.floor(value * 10) / 10
+    return ("More than" if value > shown else "At least"), shown
+
+
 def family_tiles(summaries: list[dict]) -> list[dict]:
     """A tile per registry family with a supported method that has a published comparison, in
     ``SPEC_FAMILIES`` order, so a new family gets one with no change here.
@@ -1636,18 +1645,19 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
     """Each section's claim, from the summaries and the registry: a short form for its card in the
     hero, and the sentence under its title, its number in bold. The cover's art keeps its one
     amber."""
-    fastest = max(info["number"] for info in family_tiles(summaries) if info["number"])
-    fewer = fewest_errors(summaries)
+    best = max((t for t in family_tiles(summaries) if t["number"]), key=lambda t: t["number"])
+    speed, fastest = more_than(best["best"][1]["ratio"])
+    accuracy, fewer = more_than(fewest_errors(summaries))
     count = len(list_specs())
     kinds = NUMBER_WORDS[len(graph_kinds())]
     return {
         "accelerated": (
-            f"Up to {fastest:,}x faster",
-            f"Up to <b>{fastest:,}x</b> faster than other popular packages.",
+            f"{speed} {fastest:,}x faster",
+            f"{speed} <b>{fastest:,}x</b> faster than other popular packages.",
         ),
         "accurate": (
-            f"Up to {fewer:.0f}% fewer errors",
-            f"Up to <b>{fewer:.0f}%</b> fewer errors than other popular packages.",
+            f"{accuracy} {fewer}% fewer errors",
+            f"{accuracy} <b>{fewer}%</b> fewer errors than other popular packages.",
         ),
         "agentic": (
             "Runs with no one watching",
@@ -1883,9 +1893,13 @@ def method_names(names: list[str]) -> str:
 
 
 def family_tile(info: dict) -> str:
-    """A family's tile: its name, its methods, and its best speedup in words."""
+    """A family's tile: its name, its methods, and its best speedup in words, "more than" its
+    one-digit number or "at least" where nothing is rounded off."""
+    lead = (
+        "more than" if info["number"] and info["best"][1]["ratio"] > info["number"] else "at least"
+    )
     number = (
-        f'<p class="tile-number"><span>up to</span><b>{info["number"]:,}x</b>'
+        f'<p class="tile-number"><span>{lead}</span><b>{info["number"]:,}x</b>'
         "<span>faster</span></p>"
         if info["number"]
         else ""

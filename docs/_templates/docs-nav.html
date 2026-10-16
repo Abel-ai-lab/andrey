@@ -1,10 +1,11 @@
 {#- The documentation tree, since the navbar names only the site's sections: a group per section
-    under its icon, then the reference pages, then the project's links (conf.py: _docs_sidebar).
+    under its icon, then the reference pages, each with its own icon (NAV_ICONS), then the
+    project's links with their marks (conf.py: _docs_sidebar).
     The page being read is in the accent, and a fold that holds it starts open. A page with pages of
     its own folds them under its row, its toggle at the row's end. -#}
-{%- from "nav-icons.html" import icon %}
+{%- from "nav-icons.html" import icon, logo %}
 {%- macro page(item) -%}
-<a href="{{ pathto(item.doc) }}"{% if item.doc == pagename %} aria-current="page"{% endif %}>{{ item.title }}</a>
+<a href="{{ pathto(item.doc) }}"{% if item.doc == pagename %} aria-current="page"{% endif %}>{% if item.mark %}{{ icon(item.mark) }}{% endif %}{{ item.title }}</a>
 {%- endmacro %}
 {%- macro fold(label, items, open) -%}
 <details{% if open %} open{% endif %}><summary aria-label="{{ label }}">{{ icon("chevron") }}</summary>{{ rows(items) }}</details>
@@ -35,8 +36,8 @@
   </div>
   {%- endfor %}
   <ul class="docs-nav__foot">
-    <li><a href="{{ repo_url }}">GitHub{{ icon("out") }}</a></li>
-    <li><a href="{{ pypi_url }}">PyPI{{ icon("out") }}</a></li>
-    <li><a href="{{ report_bug_url }}">{{ _("Report a bug") }}{{ icon("out") }}</a></li>
+    <li><a href="{{ repo_url }}">{{ logo("github") }}<span>GitHub</span>{{ icon("out") }}</a></li>
+    <li><a href="{{ pypi_url }}">{{ logo("pypi") }}<span>PyPI</span>{{ icon("out") }}</a></li>
+    <li><a href="{{ report_bug_url }}">{{ icon("bug") }}<span>{{ _("Report a bug") }}</span>{{ icon("out") }}</a></li>
   </ul>
 </nav>
