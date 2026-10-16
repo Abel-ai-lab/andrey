@@ -810,6 +810,41 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
     context["edit_url"] = None if generated else f"{REPO_URL}/edit/main/{source.relative_to(ROOT)}"
 
 
+# A table cell this short holds one value ("125 of 125", "1,470x", "causal-learn") or a short
+# label, which reads wrongly when it breaks across lines; such a cell keeps to one line (`nowrap`,
+# andrey.css), and a table too wide for its column scrolls inside its own frame instead.
+SHORT_CELL = 14
+
+
+def _short_cells(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Mark each table cell, a header's included, of at most ``SHORT_CELL`` characters on one line
+    ``nowrap``."""
+    for entry in doctree.findall(nodes.entry):
+        text = entry.astext()
+        if "\n" not in text and len(text) <= SHORT_CELL:
+            entry["classes"].append("nowrap")
+
+
+# The API reference's summary tables (autosummary) list a name and its description with no header
+# row; they get one, so their frame shows its label band as every other table does.
+SUMMARY_LABELS = ("Name", "Description")
+
+
+def _summary_headers(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Give each autosummary table without a header row the labels ``SUMMARY_LABELS``."""
+    for table in doctree.findall(nodes.table):
+        if "autosummary" not in table["classes"]:
+            continue
+        tgroup = next(iter(table.findall(nodes.tgroup)))
+        if any(isinstance(child, nodes.thead) for child in tgroup.children):
+            continue
+        row = nodes.row(
+            "", *(nodes.entry("", nodes.paragraph("", label)) for label in SUMMARY_LABELS)
+        )
+        tbody = next(child for child in tgroup.children if isinstance(child, nodes.tbody))
+        tgroup.insert(tgroup.index(tbody), nodes.thead("", row))
+
+
 def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
     """Put a post's cover and then its authors, date, the Andrey version it was written for, and its
     tags under its title, where a reader looks for them and where they stay on a narrow screen. A
@@ -1142,6 +1177,8 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("build-finished", _write_discovery)
     app.connect("build-finished", _version_assets)
     app.connect("doctree-resolved", _post_byline)
+    app.connect("doctree-resolved", _summary_headers)
+    app.connect("doctree-resolved", _short_cells)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)
     # Before sphinx_autodoc_typehints, which returns a signature of its own.

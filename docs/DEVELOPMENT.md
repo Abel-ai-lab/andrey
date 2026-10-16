@@ -276,4 +276,5 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Examples and demos galleries and pages | `docs/docs/examples/`, `docs/docs/demos/` |
 | Notebook sources | `examples/*.ipynb` -> staged into `docs/docs/examples/` |
 | Docs chrome over the palette tokens | `docs/_static/andrey.css` |
+| Docs tables: a framed header band over a card of rows, a fade where a wide table scrolls, short values and labels on one line (`_short_cells` in `conf.py`); the API reference's summary tables get a Name and Description header (`_summary_headers`) and stack on a phone | `docs/_static/andrey.css`, `docs/conf.py` |
 | The old demo address, redirected to the gallery | `docs/_templates/demo-redirect.html` |
