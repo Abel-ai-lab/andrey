@@ -759,18 +759,18 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
     context["edit_url"] = None if generated else f"{REPO_URL}/edit/main/{source.relative_to(ROOT)}"
 
 
-# A table cell this short holds one value ("125 of 125", "1,470x", "causal-learn"), which reads
-# wrongly when it breaks across lines; such a cell keeps to one line (`nowrap`, andrey.css), and a
-# table too wide for its column scrolls inside its own container instead.
+# A table cell this short holds one value ("125 of 125", "1,470x", "causal-learn") or a short
+# label, which reads wrongly when it breaks across lines; such a cell keeps to one line (`nowrap`,
+# andrey.css), and a table too wide for its column scrolls inside its own frame instead.
 SHORT_CELL = 14
 
 
 def _short_cells(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event arguments
-    """Mark each table body cell of at most ``SHORT_CELL`` characters on one line ``nowrap``."""
+    """Mark each table cell, a header's included, of at most ``SHORT_CELL`` characters on one line
+    ``nowrap``."""
     for entry in doctree.findall(nodes.entry):
         text = entry.astext()
-        in_body = isinstance(entry.parent.parent, nodes.tbody)
-        if in_body and "\n" not in text and len(text) <= SHORT_CELL:
+        if "\n" not in text and len(text) <= SHORT_CELL:
             entry["classes"].append("nowrap")
 
 

@@ -1269,62 +1269,151 @@ html:not(:has(.andrey-home)) .bd-header::before {
 }
 
 /* ---------- tables ---------- */
-/* The documentation's tables are quiet: no column rules and no row fills, a hairline between rows
-   and above and below the table, and a small muted header set on its bottom line. Numbers keep
-   their columns' alignment and tabular figures. A short value never breaks across lines (`nowrap`,
-   from `_short_cells` in conf.py); a table wider than the text scrolls in its own container. */
+/* A documentation table sits in a frame: a rounded `surface-2` band that holds the column labels,
+   small, medium weight, and muted, with the rows in a rounded card inside it. The labels keep their
+   case, since a label such as `n` or `(s)` names a variable or a unit. Rows are about 36px tall
+   with hairlines between them and fainter ones between cells, and tint under the pointer. Numbers
+   keep their columns' alignment and tabular figures; a short value never breaks across lines
+   (`nowrap`, from `_short_cells` in conf.py). The frame is as wide as its table, at least half the
+   column, and scrolls sideways inside itself when the table is wider; a fade at an edge that hides
+   columns shows there is more. */
+@property --table-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --table-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.bd-article .pst-scrollable-table-container {
+  --table-cell-rule: color-mix(in srgb, var(--andrey-line) 55%, transparent);
+  width: fit-content;
+  min-width: 50%;
+  max-width: 100%;
+  margin: 1.25rem 0 1.75rem;
+  padding: 0 0.3rem 0.3rem;
+  border-radius: 12px;
+  background: var(--andrey-surface-2);
+  /* The fade: each edge's width follows the scroll position, and stays 0 when nothing scrolls. */
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--andrey-ink) var(--table-fade-start),
+    var(--andrey-ink) calc(100% - var(--table-fade-end)),
+    transparent
+  );
+  animation: table-edges linear both;
+  animation-timeline: scroll(self inline);
+}
+
+@keyframes table-edges {
+  0% {
+    --table-fade-start: 0px;
+    --table-fade-end: 2.5rem;
+  }
+
+  6% {
+    --table-fade-start: 2.5rem;
+  }
+
+  94% {
+    --table-fade-end: 2.5rem;
+  }
+
+  100% {
+    --table-fade-start: 2.5rem;
+    --table-fade-end: 0px;
+  }
+}
+
+/* A table with no header row starts its card at the frame's top padding. */
+.bd-article .pst-scrollable-table-container:not(:has(thead)) {
+  padding-top: 0.3rem;
+}
+
 .bd-article table.table {
   --bs-table-bg: transparent;
   width: 100%;
-  margin: 1.25rem 0 1.75rem;
+  margin: 0;
   border: 0;
-  border-top: 1px solid var(--andrey-line);
-  border-bottom: 1px solid var(--andrey-line);
+  border-collapse: separate;
+  border-spacing: 0;
   color: var(--andrey-ink);
   font-size: 0.9375rem;
-  line-height: 1.5;
+  line-height: 1.45;
   font-variant-numeric: tabular-nums;
 }
 
 /* The theme's zebra rows and the colored rule under its header give way. */
 .bd-article table.table thead tr,
 .bd-article table.table tbody tr:nth-child(n) {
+  border: 0;
   background: transparent;
 }
 
-.bd-article table.table thead tr {
-  border-bottom: 0;
-}
-
 .bd-article table.table :is(th, td) {
-  padding: 0.7rem 0.85rem;
+  padding: 0.45rem 0.75rem;
   border: 0;
   background: transparent;
   box-shadow: none;
   vertical-align: top;
 }
 
-.bd-article table.table :is(th, td):first-child {
-  padding-left: 0;
-}
-
-.bd-article table.table :is(th, td):last-child {
-  padding-right: 0;
-}
-
 .bd-article table.table thead th {
-  padding-block: 0.55rem;
+  padding: 0.6rem 0.75rem 0.45rem;
   color: var(--andrey-muted);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.35;
+  letter-spacing: 0.01em;
   vertical-align: bottom;
   text-wrap: balance;
 }
 
-.bd-article table.table thead + tbody tr:first-child,
-.bd-article table.table tbody tr:nth-child(n) + tr {
+/* The rows: a card of `surface` with a hairline border and rounded corners. */
+.bd-article table.table tbody td {
+  border-bottom: 1px solid var(--andrey-line);
+  background: var(--andrey-surface);
+}
+
+.bd-article table.table tbody td + td {
+  border-left: 1px solid var(--table-cell-rule);
+}
+
+.bd-article table.table tbody tr:first-child td {
   border-top: 1px solid var(--andrey-line);
+}
+
+.bd-article table.table tbody td:first-child {
+  border-left: 1px solid var(--andrey-line);
+}
+
+.bd-article table.table tbody td:last-child {
+  border-right: 1px solid var(--andrey-line);
+}
+
+.bd-article table.table tbody tr:first-child td:first-child {
+  border-top-left-radius: 8px;
+}
+
+.bd-article table.table tbody tr:first-child td:last-child {
+  border-top-right-radius: 8px;
+}
+
+.bd-article table.table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 8px;
+}
+
+.bd-article table.table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 8px;
+}
+
+.bd-article table.table tbody tr:hover td {
+  background: color-mix(in srgb, var(--andrey-surface-2) 55%, var(--andrey-surface));
 }
 
 .bd-article table.table .nowrap {
