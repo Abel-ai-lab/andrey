@@ -67,8 +67,9 @@ def scan_conditioning_sets(
 
     When ``test`` exposes ``batched_call(a, b, condition_sets)`` the subsets are evaluated in
     vectorized, size-bounded chunks; otherwise each is tested with a scalar ``test(a, b, subset)``
-    call. Both paths visit the same subsets in the same order and take the same ``p > alpha``
-    decisions, so the accumulated ``separating`` and the return value are identical.
+    call, or ``test._bounded_pvalue(a, b, subset, alpha)`` where the test has one. All paths visit
+    the same subsets in the same order and take the same ``p > alpha`` decisions, so the
+    accumulated ``separating`` and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
     runs once per chunk.
@@ -76,9 +77,15 @@ def scan_conditioning_sets(
     subsets = combinations(candidates, size)
     if skip_within is not None and len(skip_within) >= size:
         subsets = (s for s in subsets if not skip_within.issuperset(s))
-    batched = getattr(test, "batched_call", None) or (
-        lambda a, b, chunk: [test(a, b, subset) for subset in chunk]
-    )
+    batched = getattr(test, "batched_call", None)
+    if batched is None:
+        # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain.
+        bounded = getattr(test, "_bounded_pvalue", None)
+        batched = (
+            (lambda a, b, chunk: [bounded(a, b, subset, alpha) for subset in chunk])
+            if bounded is not None
+            else (lambda a, b, chunk: [test(a, b, subset) for subset in chunk])
+        )
     found = False
     while True:
         chunk = list(islice(subsets, _CHUNK))

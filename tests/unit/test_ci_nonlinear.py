@@ -21,6 +21,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from threadpoolctl import threadpool_info, threadpool_limits
 
 import andrey
+from andrey.constraint.pc import pc as pc_engine
 from andrey.core import ci, ci_cmiknn, ci_kernel
 from andrey.core.ci_cmiknn import (
     CMIknn,
@@ -286,6 +287,46 @@ def test_cmiknn_draws_the_shuffles_of_each_conditioning_set_once(monkeypatch):
     pvalues = [test(*query) for query in queries]
     assert len(draws) == 2 * 20  # sets {2} and {2, 3}
     assert [CMIknn(data, n_permutations=20)(*query) for query in queries] == pvalues
+
+
+@pytest.mark.parametrize("alpha", [0.01, 0.05, 0.3])
+def test_cmiknn_bounded_pvalue_decides_as_every_shuffle(alpha):
+    """With ``alpha`` the shuffles stop once the side of ``alpha`` is certain: the p-value bounds
+    the full one on the same side, for queries on both sides."""
+    rng = np.random.default_rng(5)
+    queries = [(0, 1, ()), (0, 1, (2,)), (0, 1, (2, 3))]
+    sides, stopped = set(), 0
+    for shared in (0.0, 0.1, 0.2, 0.3, 1.0):
+        data = _common_cause(seed=int(rng.integers(100)), n=150, n_cond=2, shared=shared)
+        test = CMIknn(data, n_permutations=100)
+        for query in queries:
+            full, bounded = test(*query), test._bounded_pvalue(*query, alpha)
+            assert (bounded > alpha) == (full > alpha)
+            assert bounded <= full if full > alpha else bounded >= full
+            sides.add(full > alpha)
+            stopped += bounded != full
+    assert sides == {True, False} and stopped
+
+
+def test_pc_with_cmiknn_decides_as_with_every_shuffle(monkeypatch):
+    """PC's skeleton with CMIknn's early stop keeps the graph and every test's decision."""
+    data = _common_cause(seed=7, n=150, n_cond=3, shared=0.3)
+
+    def run(early_stop: bool):
+        def factory(x):
+            test = CMIknn(x, n_permutations=100)
+            # Without _bounded_pvalue the scan calls test(a, b, subset).
+            return test if early_stop else lambda a, b, subset=(): test(a, b, subset)
+
+        monkeypatch.setitem(ci._CI_REGISTRY, "cmiknn_run", factory)
+        trace = []
+        graph = pc_engine(data, indep_test="cmiknn_run", _trace=trace)
+        tests = [(r["x"], r["y"], r["S"], r["removed"]) for r in trace if r["step"] == "test"]
+        return graph.to_numpy(), tests
+
+    graph, tests = run(early_stop=True)
+    full_graph, full_tests = run(early_stop=False)
+    assert np.array_equal(graph, full_graph) and tests == full_tests
 
 
 # ---- the contract ------------------------------------------------------------------------------

@@ -121,10 +121,12 @@ class CMIknn:
     Each null copy maps every row to one of its ``k_perm`` nearest rows in ``z``, avoiding a row
     already taken where it can. With ``b`` of the ``B`` copies estimating at least ``I``, the
     p-value is ``(b + 1) / (B + 1)``: the observed data count as one more draw, so the p-value is
-    never zero [3]_. An empty conditioning set shuffles ``x`` over all rows, and the estimate
-    becomes the mutual information estimate of ``x`` and ``y`` [2]_. The default ``k_cmi``, a tenth
-    of the rows, is the low end of the range [1]_ recommends; a larger share smooths the estimate,
-    which costs power as the conditioning set grows.
+    never zero [3]_. In the skeleton searches of PC, FCI, GFCI, and CD-NOD, a query's shuffles stop
+    once ``p > alpha`` or ``p <= alpha`` is certain whatever the remaining shuffles give, so the
+    search decides as with every shuffle. An empty conditioning set shuffles ``x`` over all rows,
+    and the estimate becomes the mutual information estimate of ``x`` and ``y`` [2]_. The default
+    ``k_cmi``, a tenth of the rows, is the low end of the range [1]_ recommends; a larger share
+    smooths the estimate, which costs power as the conditioning set grows.
 
     The tie-breaking is drawn once, from ``seed``, when the test is built. The shuffles come from a
     generator seeded by ``seed`` and the conditioning set, so every query with the same
@@ -181,16 +183,36 @@ class CMIknn:
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the CMIknn p-value for ``x`` independent of ``y`` given ``condition_set``."""
+        return self._bounded_pvalue(x, y, condition_set, None)
+
+    def _bounded_pvalue(
+        self, x: int, y: int, condition_set: Iterable[int], alpha: float | None
+    ) -> float:
+        """The p-value, or with ``alpha`` given, a bound on it on the same side of ``alpha``.
+
+        The skeleton scans pass their ``alpha``. With ``b`` of the shuffles so far estimating at
+        least the observed value and ``r`` left, the p-value ``(b' + 1) / (B + 1)`` lies between
+        ``(b + 1) / (B + 1)`` and ``(b + r + 1) / (B + 1)``, so the shuffles stop once the first
+        exceeds ``alpha`` (that bound is returned) or the second does not (that one is). The
+        division is the full p-value's and is monotone in the numerator, so ``p > alpha`` is
+        decided as with every shuffle.
+        """
         x_int, y_int, cond = _canonical(x, y, condition_set)
         ranks, dtype, k = self._ranks, self._dtype, self._k
         dx = _distances(ranks[:, x_int], dtype)
         dz = self._cond_distances(tuple(cond))
         dyz = np.maximum(_distances(ranks[:, y_int], dtype), dz)
         observed = _cmi_given_yz(dx, dyz, dz, k)
+        total = self._n_permutations + 1
         exceed = 0
-        for perm in self._permutations(tuple(cond)):
+        for left, perm in zip(range(self._n_permutations, 0, -1), self._permutations(tuple(cond))):
+            if alpha is not None:
+                if (exceed + 1) / total > alpha:
+                    return (exceed + 1) / total
+                if (exceed + left + 1) / total <= alpha:
+                    return (exceed + left + 1) / total
             exceed += _cmi_given_yz(_distances(ranks[perm, x_int], dtype), dyz, dz, k) >= observed
-        return (exceed + 1) / (self._n_permutations + 1)
+        return (exceed + 1) / total
 
     def _cond_distances(self, cond: tuple[int, ...]) -> np.ndarray:
         """Max-norm distances between the rows in the conditioning set; zero when it is empty."""
