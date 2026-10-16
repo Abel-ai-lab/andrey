@@ -792,6 +792,7 @@ def test_the_navbar_names_only_the_page_being_read_as_current():
 
     def marks(pagename):
         page = nav.render(pagename=pagename, _=str, pathto=lambda doc: doc)
+        page = re.sub(r"<svg .*?</svg>", "", page)
         highlighted = re.findall(r'<li class="nav-item current active">\s*<a [^>]*>([^<]+)<', page)
         return highlighted, re.findall(r'aria-current="page">([^<]+)<', page)
 
