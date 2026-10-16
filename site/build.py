@@ -8,7 +8,8 @@ Every number on the homepage comes from a release's published benchmark summary 
 from the method registry. A method measured against the same package in two summaries shows the
 newer summary's rows (:func:`newest`). The speed and accuracy sections cover every comparison with
 another package whose method the registry supports; each family's tile shows its largest ratio
-rounded down to one digit, and the README claim is the one :func:`claim_sentence` words from them.
+rounded down to one digit. The README, the live demo, and the homepage's description state
+``CLAIM``, which carries no number; :func:`claim_sentence` words the first summary's headline.
 The README chart shows one card per method in ``PANEL``. The method list comes from the method
 registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks the
 page as not for release. Links are relative to the site root.
@@ -415,8 +416,12 @@ def speed_claim(summaries: list[dict]) -> tuple[str, str]:
     return lead, rest
 
 
+# The speed claim the README, the live demo, and the homepage's description state.
+CLAIM = "The fastest causal discovery package."
+
+
 def claim_sentence(summaries: list[dict]) -> str:
-    """The speed claim as one sentence: the homepage's, under its heading, and the README's."""
+    """The speed claim as one sentence, the form of a summary's ``headline``."""
     lead, rest = speed_claim(summaries)
     return f"{lead}, and {rest}." if rest else f"{lead}."
 
@@ -432,11 +437,6 @@ def fastest(summary: dict) -> tuple[dict, dict]:
             f"{ratio_text(row['ratio'])})"
         )
     return method, row
-
-
-def home_claim(summaries: list[dict]) -> str:
-    """The homepage's speed claim, the line under its heading."""
-    return claim_sentence(summaries)
 
 
 def ratio_label(row: dict) -> str:
@@ -2126,11 +2126,10 @@ def page_description(summaries: list[dict]) -> str:
     registered = {spec.name for spec in list_specs()}
     if missing := [m for m in DESCRIPTION_METHODS if m.lower() not in registered]:
         raise ValueError(f"the description names unregistered methods: {', '.join(missing)}")
-    lead, _ = speed_claim(summaries)  # the rest would take it past what search results show
     named, more = ", ".join(DESCRIPTION_METHODS), len(registered) - len(DESCRIPTION_METHODS)
     return (
-        f"Causal discovery for Python. Learn causal graphs with {named} and {more} more methods, "
-        f"{lead[0].lower() + lead[1:]} than other popular packages."
+        f"Causal discovery for Python. Learn causal graphs with {named} and {more} more methods. "
+        f"{CLAIM}"
     )
 
 

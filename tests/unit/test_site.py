@@ -480,7 +480,7 @@ def test_the_description_states_the_speed_claim_and_the_method_count(monkeypatch
     specs = [s for s in list_specs() if s.name != dropped]
     monkeypatch.setattr(build, "list_specs", lambda: specs)
     description = build.page_description(summaries)
-    assert "over 1,000x faster on PNL than other popular packages" in description
+    assert description.endswith(build.CLAIM)
     assert f"with PC, GES, FCI and {len(specs) - 3} more methods" in description
     # Search results cut a description at about 160 characters.
     assert len(description) <= 160
@@ -1665,17 +1665,15 @@ def test_no_speed_cell_is_withheld_in_the_reports_or_the_readme():
         assert "no claim" not in text and "no speed claim" not in text, page.name
 
 
-@pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
-def test_every_hand_written_copy_of_the_headline_is_the_summarys():
-    """The docs index and the notebook repeat the headline; the live demo repeats the homepage's
-    heading and the shorter claim under it. Each must match."""
-    summary = build.load_summary(build.SUMMARY)
+def test_every_hand_written_copy_of_the_claim_is_the_builds():
+    """The docs index, the notebook, and the live demo repeat the speed claim; the live demo also
+    repeats its own heading. Each must match."""
+    claim = build.CLAIM
     for page in (
         ROOT / "docs" / "docs" / "index.md",
         ROOT / "examples" / "speed_on_your_machine.ipynb",
     ):
-        assert summary["headline"] in page.read_text(encoding="utf-8"), page.name
-    claim = build.home_claim(build.release_summaries(summary))
+        assert claim in page.read_text(encoding="utf-8"), page.name
     app = (ROOT / "apps" / "live-discovery" / "app.py").read_text(encoding="utf-8")
     assert "<h1>Causal discovery, fast.</h1>" in app and claim in app
     space = (ROOT / "apps" / "live-discovery" / "README.md").read_text(encoding="utf-8")
