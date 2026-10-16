@@ -24,6 +24,7 @@ EXAMPLES = ROOT / "examples"
 SKIPPED = {"speed_on_your_machine.ipynb"}
 TIMEOUT = 600
 ADDRESS = re.compile(r"0x[0-9a-f]+")
+DECIMAL = re.compile(r"-?\d+\.\d+")
 
 
 def notebooks() -> list[Path]:
@@ -64,6 +65,21 @@ def outputs(notebook: nbformat.NotebookNode) -> list[str]:
     return lines
 
 
+def close(stored: str, fresh: str) -> bool:
+    """Whether two output lines match, a decimal number allowed one unit in its last digit.
+
+    Linux and macOS round a few floating-point results apart in the last bit, which can move a
+    printed number by one unit; every integer, name, and edge must match exactly.
+    """
+    if DECIMAL.sub("#", stored) != DECIMAL.sub("#", fresh):
+        return False
+    for a, b in zip(DECIMAL.findall(stored), DECIMAL.findall(fresh), strict=True):
+        unit = 10.0 ** -len(a.split(".")[1])
+        if abs(float(a) - float(b)) > 1.01 * unit:
+            return False
+    return True
+
+
 def main() -> int:
     """Store the outputs, or with ``--check`` compare them; return the exit status."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -77,10 +93,12 @@ def main() -> int:
             print(f"wrote {path.relative_to(ROOT)}")
             continue
         stored = outputs(nbformat.read(path, as_version=4))
-        diff = list(difflib.unified_diff(stored, outputs(fresh), "stored", "fresh", lineterm=""))
-        if diff:
-            stale.append(path.name)
-            print("\n".join(diff[:80]))
+        renewed = outputs(fresh)
+        if len(stored) == len(renewed) and all(map(close, stored, renewed)):
+            continue
+        stale.append(path.name)
+        diff = difflib.unified_diff(stored, renewed, "stored", "fresh", lineterm="")
+        print("\n".join(list(diff)[:80]))
     if stale:
         print(f"Outputs differ in {', '.join(stale)}; run scripts/execute_notebooks.py.")
     return 1 if stale else 0

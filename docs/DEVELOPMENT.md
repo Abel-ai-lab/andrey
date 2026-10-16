@@ -224,7 +224,8 @@ uv run --group docs python scripts/execute_notebooks.py
 ```
 
 The docs workflow reruns every notebook with `--check` and fails when a cell fails or an output
-differs from the stored one. The speed notebook is never run and ships without outputs.
+differs from the stored one; a decimal number may move by one in its last digit, as Linux and
+macOS round a few results apart. The speed notebook is never run and ships without outputs.
 Run them locally with `uv run --with jupyter jupyter lab`. Notebook dependencies stay out of
 `pyproject.toml`: each notebook has an Open in Colab link and a Colab-only setup cell that installs
 the pinned release from PyPI, a pin to update with every release. The rendered page's download link
