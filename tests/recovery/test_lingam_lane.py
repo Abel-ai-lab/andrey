@@ -19,6 +19,25 @@ def _linear_sem_group(seed: int, n: int, B: np.ndarray) -> np.ndarray:
     return X
 
 
+def test_adaptive_lasso_refit_is_least_squares_on_selected_parents():
+    from sklearn.linear_model import LinearRegression
+
+    from andrey.lingam.adjacency import predict_adaptive_lasso
+
+    B = np.zeros((4, 4))
+    B[2, 0] = 0.8
+    B[3, 0] = 0.5
+    B[3, 2] = -0.6
+    X = _linear_sem_group(0, 500, B) + 3.0  # an offset the refit's intercept absorbs
+    shrunk = predict_adaptive_lasso(X, [0, 1, 2], 3)
+    refit = predict_adaptive_lasso(X, [0, 1, 2], 3, refit=True)
+
+    assert np.flatnonzero(shrunk).tolist() == [0, 2]
+    assert np.flatnonzero(refit).tolist() == [0, 2]
+    ols = LinearRegression().fit(X[:, [0, 2]], X[:, 3]).coef_
+    np.testing.assert_allclose(refit[[0, 2]], ols, rtol=0, atol=1e-12)
+
+
 def test_ica_lingam_recovery():
     out = andrey.ica_lingam(datagen.generate("lingam_5v_uniform"))
     assert_recorded_output(out, "ICALiNGAM", case="lingam_5v_uniform")

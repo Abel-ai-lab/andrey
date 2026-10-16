@@ -34,13 +34,15 @@ def pc(data: npt.ArrayLike, *, alpha: float = 0.05, indep_test: str = "fisherz")
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
-        Conditional-independence test. ``"fisherz"`` is Gaussian partial correlation, for linear
-        effects. The others also detect nonlinear dependence, at a far higher cost per test, and
-        are experimental: each warns on its first use in a process. ``"kci"`` is the kernel test,
-        ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional
-        mutual information test, and ``"gpdc"`` Gaussian-process regression with a distance
-        correlation test.
+    indep_test : {"fisherz", "student_t", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test the partial
+        correlation, for linear effects: ``"fisherz"`` applies Fisher's z-transform and the normal
+        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
+        Gaussian data at any sample size. The others also detect nonlinear dependence, at a far
+        higher cost per test, and are experimental: each warns on its first use in a process.
+        ``"kci"`` is the kernel test, ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a
+        nearest-neighbor conditional mutual information test, and ``"gpdc"`` Gaussian-process
+        regression with a distance correlation test.
 
     Returns
     -------
@@ -154,13 +156,15 @@ def fci(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
-        Conditional-independence test. ``"fisherz"`` is Gaussian partial correlation, for linear
-        effects. The others also detect nonlinear dependence, at a far higher cost per test, and
-        are experimental: each warns on its first use in a process. ``"kci"`` is the kernel test,
-        ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional
-        mutual information test, and ``"gpdc"`` Gaussian-process regression with a distance
-        correlation test.
+    indep_test : {"fisherz", "student_t", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test the partial
+        correlation, for linear effects: ``"fisherz"`` applies Fisher's z-transform and the normal
+        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
+        Gaussian data at any sample size. The others also detect nonlinear dependence, at a far
+        higher cost per test, and are experimental: each warns on its first use in a process.
+        ``"kci"`` is the kernel test, ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a
+        nearest-neighbor conditional mutual information test, and ``"gpdc"`` Gaussian-process
+        regression with a distance correlation test.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -285,9 +289,11 @@ def gfci(
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
-    indep_test : {"fisherz", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
-        Conditional-independence test for the FCI phase. ``"fisherz"`` is Gaussian partial
-        correlation, for linear effects. The others also detect nonlinear dependence, at a far
+    indep_test : {"fisherz", "student_t", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
+        Conditional-independence test for the FCI phase. ``"fisherz"`` and ``"student_t"`` test the
+        partial correlation, for linear effects: ``"fisherz"`` applies Fisher's z-transform and the
+        normal distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
+        Gaussian data at any sample size. The others also detect nonlinear dependence, at a far
         higher cost per test, and are experimental: each warns on its first use in a process. See
         :func:`~andrey.pc` for each one.
     alpha : float, default=0.05
@@ -401,13 +407,15 @@ def cdnod(
         the result equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
-        Conditional-independence test. ``"fisherz"`` is Gaussian partial correlation, for linear
-        effects. The others also detect nonlinear dependence, at a far higher cost per test, and
-        are experimental: each warns on its first use in a process. ``"kci"`` is the kernel test,
-        ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional
-        mutual information test, and ``"gpdc"`` Gaussian-process regression with a distance
-        correlation test.
+    indep_test : {"fisherz", "student_t", "kci", "rcot", "cmiknn", "gpdc"}, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test the partial
+        correlation, for linear effects: ``"fisherz"`` applies Fisher's z-transform and the normal
+        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
+        Gaussian data at any sample size. The others also detect nonlinear dependence, at a far
+        higher cost per test, and are experimental: each warns on its first use in a process.
+        ``"kci"`` is the kernel test, ``"rcot"`` its random-feature approximation, ``"cmiknn"`` a
+        nearest-neighbor conditional mutual information test, and ``"gpdc"`` Gaussian-process
+        regression with a distance correlation test.
 
     Returns
     -------

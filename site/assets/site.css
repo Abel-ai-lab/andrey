@@ -619,7 +619,7 @@
 
 /* The first section opens on the hero's art, which stays on the screen into it (.run): its title
    and claim come up over the art right after the hero's cards, with the four ideas behind the
-   speed (the story, below), then its tiles rise over the art on a sheet of the page's paper,
+   speed (the carousel, below), then its tiles rise over the art on a sheet of the page's paper,
    whose top fades in over about a fifth of a screen. */
 /* Above .section's own padding, which would leave bare ground at the run's foot. */
 .andrey-home .section.act--hero {
@@ -630,136 +630,142 @@
   padding-top: clamp(2rem, 6vw, 4rem);
 }
 
-/* The story: each idea's title and narration beside its scene, on the art. Without script, or
-   with reduced motion, the ideas stand one after another. Where the section's title and an idea
-   fit the screen together, why-fast.js pins the stage (.wf-pin) under the navbar (.is-pinned)
-   and gives each idea three quarters of a screen of scroll: the current idea shows, its scene
-   played by the scroll, and a bar per idea fills as its scene plays. */
-/* The stage is as tall as its content (--pin-h, which the script measures), so the tiles follow
-   the story without a screen of bare art between them. On a short screen the script lifts the
-   title above the screen's top (--lift), and the story alone stays. */
-.andrey-home .wf-run.is-pinned {
-  height: calc(var(--pin-h, 100svh) + var(--steps, 4) * 75svh);
-}
-
-.andrey-home .wf-run.is-pinned .wf-pin {
-  position: sticky;
-  top: calc(var(--pst-header-height) - var(--lift, 0px));
-  max-height: calc(100svh - var(--pst-header-height) + var(--lift, 0px));
-  padding-top: clamp(1.5rem, 6svh, 3.5rem);
-}
-
-.andrey-home .wf-run.is-pinned .act-cover--hero {
-  padding-top: 0;
-  margin-bottom: clamp(1.25rem, 4svh, 2.5rem);
-}
-
-.andrey-home .wf-story {
+/* The ideas behind the speed: a card per idea in a row that scrolls sideways across the screen's
+   full width, each card snapping to the center with its neighbors at the edges, and under them a
+   dot per card, the current one long and filling as its scene plays (why-fast.js). Without
+   script the row scrolls by hand, every scene at its final counts, and the dots stay hidden. */
+.andrey-home .wf-belt {
+  margin-inline: calc(50% - 50vw);
   color: var(--andrey-ground-ink);
-  font-family: inherit;
 }
 
-.andrey-home .wf-steps {
-  display: grid;
-  gap: clamp(2.5rem, 6vw, 4rem);
+.andrey-home .wf-cards {
+  --card: min(64rem, calc(100vw - 2 * var(--gutter) - 2.5rem));
+  display: flex;
+  gap: clamp(0.75rem, 2vw, 1.25rem);
   margin: 0;
-  padding: 0;
+  padding: 0.75rem calc((100vw - var(--card)) / 2) 1.75rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
   list-style: none;
 }
 
-/* Each idea's words above its scene, which takes the story's full width: the title, and beside it
-   the narration, then the two lanes at a size that reads across the room. */
-.andrey-home .wf-step {
-  display: grid;
-  gap: clamp(1.25rem, 3svh, 2rem);
-}
-
-.andrey-home .wf-words {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 0.75rem clamp(2rem, 5vw, 4rem);
-  align-items: baseline;
-}
-
-.andrey-home .wf-step::marker {
-  content: none;
-}
-
-.andrey-home .section .wf-words h3 {
-  margin: 0;
-  color: var(--andrey-ground-ink);
-  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
-  font-weight: 600;
-  line-height: 1.12;
-  letter-spacing: -0.03em;
-}
-
-.andrey-home .section .wf-words p {
-  max-width: 62ch;
-  margin: 0;
-  color: var(--andrey-ground-muted);
-  font-size: 1.05rem;
-  line-height: 1.55;
-}
-
-/* Pinned, the ideas share one place, and the current one shows. */
-.andrey-home .is-pinned .wf-step {
-  grid-area: 1 / 1;
-  opacity: 0;
-  translate: 0 0.75rem;
-  pointer-events: none;
-  transition:
-    opacity 0.4s var(--ease),
-    translate 0.5s var(--ease);
-}
-
-.andrey-home .is-pinned .wf-step.is-on {
-  opacity: 1;
-  translate: 0 0;
-  pointer-events: auto;
-}
-
-.andrey-home .wf-rail {
+.andrey-home .wf-cards::-webkit-scrollbar {
   display: none;
 }
 
-.andrey-home .is-pinned .wf-rail {
-  display: grid;
-  grid-template-columns: repeat(var(--steps, 4), minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-bottom: clamp(1rem, 3svh, 2rem);
+.andrey-home .wf-cards.is-dragging {
+  scroll-snap-type: none;
+  cursor: grabbing;
+  user-select: none;
 }
 
-.andrey-home .wf-bar-step {
+.andrey-home .wf-card {
+  flex: 0 0 var(--card);
   display: grid;
-  gap: 0.55rem;
-  padding: 0.5rem 0;
+  align-content: start;
+  gap: clamp(1rem, 2.5vw, 1.5rem);
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border-radius: 22px;
+  scroll-snap-align: center;
+}
+
+/* Driven, the cards beside the current one stand back. */
+.andrey-home .is-driven .wf-card {
+  opacity: 0.55;
+  scale: 0.97;
+  transition:
+    opacity 0.5s var(--ease),
+    scale 0.5s var(--ease);
+}
+
+.andrey-home .is-driven .wf-card.is-current {
+  opacity: 1;
+  scale: 1;
+}
+
+.andrey-home .wf-card::marker {
+  content: none;
+}
+
+/* The title, and at its right a link to the idea's part of the post, then the narration. */
+.andrey-home .wf-card .wf-words {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem 1.5rem;
+}
+
+.andrey-home .section .wf-card h3 {
+  margin: 0;
+  color: var(--andrey-ink);
+  font-size: clamp(1.4rem, 2.4vw, 2rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.andrey-home .section .wf-card .wf-words p {
+  grid-column: 1 / -1;
+  max-width: 68ch;
+  margin: 0;
+  color: var(--andrey-muted);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.andrey-home .wf-more {
+  padding: 0.5rem 1.05rem;
+  border-radius: 999px;
+  background: var(--andrey-surface-2);
+  box-shadow: inset 0 0 0 1px var(--andrey-line);
+  color: var(--andrey-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.andrey-home .wf-more:hover {
+  background: var(--andrey-line);
+}
+
+.andrey-home .wf-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.15rem;
+}
+
+/* Each dot's button is larger than its mark, for the finger. */
+.andrey-home .wf-dot {
+  display: grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
   border: 0;
+  border-radius: 999px;
   background: none;
-  color: var(--andrey-ground-muted);
-  font: inherit;
-  font-size: 0.85rem;
-  text-align: left;
   cursor: pointer;
 }
 
-.andrey-home .wf-bar-step[aria-current] {
-  color: var(--andrey-ground-ink);
-}
-
-.andrey-home .wf-bar-step:focus-visible {
-  outline-color: var(--andrey-ground-ink);
-}
-
-.andrey-home .wf-bar-step i {
+.andrey-home .wf-dot i {
   position: relative;
-  height: 3px;
+  width: 0.5rem;
+  height: 0.5rem;
   overflow: hidden;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--andrey-ground-ink) 22%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--andrey-ground-ink) 40%, transparent);
+  transition: width 0.4s var(--ease);
 }
 
-.andrey-home .wf-bar-step i::after {
+.andrey-home .wf-dot[aria-selected="true"] i {
+  width: 2.25rem;
+}
+
+.andrey-home .wf-dot i::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -768,23 +774,35 @@
   scale: var(--fill, 0) 1;
 }
 
-@media (max-width: 56rem) {
-  .andrey-home .wf-words {
-    grid-template-columns: minmax(0, 1fr);
+.andrey-home .wf-dot:focus-visible {
+  outline: 2px solid var(--andrey-ground-ink);
+  outline-offset: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .andrey-home .is-driven .wf-card,
+  .andrey-home .wf-dot i {
+    transition: none;
   }
 }
 
 @media (max-width: 44rem) {
-  .andrey-home .wf-bar-step span {
-    display: none;
+  .andrey-home .wf-card .wf-words {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .andrey-home .section .wf-words p {
-    font-size: 0.98rem;
+  /* The link follows the narration. */
+  .andrey-home .wf-more {
+    order: 1;
+    justify-self: start;
+  }
+
+  .andrey-home .section .wf-card .wf-words p {
+    font-size: 0.95rem;
   }
 }
 
-/* The sheet's fade starts below the story, so the story's last line stays on the art. */
+/* The sheet's fade starts below the carousel, so its dots stay on the art. */
 .andrey-home .run-sheet {
   --sheet-fade: clamp(9rem, 24svh, 14rem);
   position: relative;
@@ -815,7 +833,6 @@
    left fade, so a soft navy halo keeps it clear of the light. */
 @media (max-width: 47.99rem), (orientation: portrait) {
   .andrey-home .act-cover--hero .act-head,
-  .andrey-home .wf-words,
   .andrey-home .hero .lede {
     text-shadow: 0 0 1.2em color-mix(in srgb, var(--andrey-ground-navy) 70%, transparent);
   }
@@ -1001,7 +1018,7 @@
   line-height: 1.45;
 }
 
-/* The one number: set large at the foot of the tile, as "up to 900x faster". */
+/* The one number: set large at the foot of the tile, as "more than 900x faster". */
 .andrey-home .tile .tile-score {
   max-width: 46ch;
 }
@@ -1076,7 +1093,7 @@
 }
 
 .andrey-home .tile-glass > *,
-.andrey-home .wf-step .wf-stage {
+.andrey-home .wf-card {
   border-radius: 14px;
   background: color-mix(in srgb, var(--andrey-surface) 90%, transparent);
   box-shadow:
@@ -1088,37 +1105,41 @@
   backdrop-filter: blur(14px) saturate(1.4);
 }
 
-.andrey-home .wf-step .wf-stage {
-  padding: 4px 22px;
+/* A card's stage is the card itself: no panel of its own. */
+.andrey-home .wf-card .wf-stage {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 
-/* A story's scene keeps one row per lane down to a phone's width, where the post's stacks, and
-   grows with the story's width up to half again its drawn size (why-fast.js reads the cap). */
-.andrey-home .wf-step .wf-scene {
+/* A card's scene keeps one row per lane down to a phone's width, where the post's stacks, and
+   grows with the card's width up to half again its drawn size (why-fast.js reads the cap). */
+.andrey-home .wf-card .wf-scene {
   --wf-scale-max: 1.6;
 }
 
 @container wf-stage (min-width: 26rem) {
-  .andrey-home .wf-step .wf-lane {
+  .andrey-home .wf-card .wf-lane {
     grid-template-columns: 7.5rem minmax(0, 1fr) 5rem;
     grid-template-areas: none;
     column-gap: 14px;
   }
 
-  .andrey-home .wf-step .wf-who,
-  .andrey-home .wf-step .wf-count,
-  .andrey-home .wf-step .wf-track {
+  .andrey-home .wf-card .wf-who,
+  .andrey-home .wf-card .wf-count,
+  .andrey-home .wf-card .wf-track {
     grid-area: auto;
   }
 }
 
 @container wf-stage (min-width: 48rem) {
-  .andrey-home .wf-step .wf-lane {
+  .andrey-home .wf-card .wf-lane {
     grid-template-columns: 11.5rem minmax(0, 1fr) 6.5rem;
     column-gap: 20px;
   }
 
-  .andrey-home .wf-step .wf-count b {
+  .andrey-home .wf-card .wf-count b {
     font-size: 2.6rem;
   }
 }
@@ -2445,15 +2466,16 @@
   height: 1.15rem;
 }
 
+/* The links on a line of their own; under them the copyright and the license, with Abel's name at
+   the right, as the documentation's footer sets them. */
 .andrey-home .site-footer nav {
   display: flex;
+  flex-basis: 100%;
   flex-wrap: wrap;
   gap: 0.5rem 1.5rem;
 }
 
-/* The copyright and the license, on a line of their own under Abel's name and the links. */
 .andrey-home .footer-legal {
-  flex-basis: 100%;
   margin: 0;
   font-size: 0.8rem;
 }

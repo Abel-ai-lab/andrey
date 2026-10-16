@@ -274,7 +274,8 @@ Andrey reads its numeric backend and its worker count from `andrey.config`, or f
 `ANDREY_BACKEND` and `ANDREY_NUM_WORKERS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
 worker, GES, GIES, and GFCI scan each pass in worker processes, and GES returns the same graph as it
-does serially.
+does serially. `granger` fits its variables on worker threads, with the same coefficients, and
+needs none of the guard below.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_NUM_WORKERS` above 1, or `-1` for every core) must put its entry

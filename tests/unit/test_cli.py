@@ -436,6 +436,7 @@ def test_seeded_run_reports_resolved_seed(capsys, csv_path):
         "tabu",
         "direct_lingam",
         "varma_lingam",
+        "granger",
         "gin",
         "rcd",
         "camuv",

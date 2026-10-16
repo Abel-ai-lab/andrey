@@ -180,13 +180,14 @@ katex_prerender = True
 # ---- HTML theme ------------------------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"
 html_title = "Andrey"
-# site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script.
+# site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script,
+# and the segmented control every choice on the site uses.
 html_static_path = ["_static", "_generated/static", "../site/brand", "../site/assets"]
 # The wordmark's A with its right stroke in amber (`site/wordmark.py`).
 html_favicon = "../site/brand/favicon.svg"
 # Served from the site root as they are: the link-preview card.
 html_extra_path = ["_generated/extra", "_extra"]
-html_css_files = ["andrey-tokens.css", "andrey.css", "graph-guides.css"]
+html_css_files = ["andrey-tokens.css", "andrey.css", "segmented.css", "graph-guides.css"]
 # The navbar's Liquid Glass, where the browser draws it (andrey.css has the frosted pill), the dot
 # on Release cards until the reader has seen the latest release, and the outline's mark on the
 # section being read.
@@ -280,6 +281,16 @@ NAV_SECTIONS = {
     "docs/demos/index": "play",
 }
 NAV_REFERENCE = ("Reference", "code")
+# The reference pages' icons in the documentation tree (_templates/nav-icons.html).
+NAV_ICONS = {
+    "docs/code/index": "braces",
+    "docs/configuration": "sliders",
+    "docs/benchmarks": "chart",
+    "docs/faq": "help",
+    "docs/changelog": "history",
+    "docs/roadmap": "map",
+    "docs/brand": "palette",
+}
 NAV_SHOWN = 5
 html_additional_pages = {"index": "homepage.html", "demo/index": "demo-redirect.html"}
 
@@ -555,6 +566,55 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     )
 
 
+# An image keeps its address across releases, and Cloudflare and browsers cache it for hours, so a
+# deploy would show the old file. After the build, each local image a stylesheet or a page loads
+# (a CSS `url()`, an `src`, the favicon link) gets its content's hash as a query, so a changed file
+# gets a new address; then each page's stylesheet links take the hash of the rewritten stylesheet,
+# since Sphinx hashed it before. Download links keep their addresses.
+ASSET_TYPES = "svg|jpg|jpeg|png|webp|gif"
+ASSET_REFS = (
+    (".css", re.compile(rf'(url\("?)([^")?#:]+\.(?:{ASSET_TYPES}))(?="?\))')),
+    (
+        ".html",
+        re.compile(
+            rf'((?:\bsrc|<link rel="icon"[^>]*?\bhref)=")([^"?#:]+\.(?:{ASSET_TYPES}))(?=")'
+        ),
+    ),
+    (
+        ".html",
+        re.compile(r'(<link rel="stylesheet"[^>]*?\bhref=")([^"?#:]+\.css)(?:\?v=\w+)?(?=")'),
+    ),
+)
+
+
+def _version_assets(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Add ``?v=<hash>`` to each local image address in the built stylesheets and pages, and to
+    each page's stylesheet links (``ASSET_REFS``); an address whose file is not built is left as
+    it is. A stylesheet is hashed only after its own images are."""
+    if exception is not None or app.builder.name != "html":
+        return
+    import hashlib
+
+    outdir = pathlib.Path(app.outdir)
+    digests: dict[pathlib.Path, str] = {}
+
+    def versioned(match: re.Match, here: pathlib.Path) -> str:
+        base = outdir if match[2].startswith("/") else here.parent
+        target = (base / match[2].lstrip("/")).resolve()
+        if not target.is_file():
+            return match[0]
+        if target not in digests:
+            digests[target] = hashlib.sha256(target.read_bytes()).hexdigest()[:8]
+        return f"{match[1]}{match[2]}?v={digests[target]}"
+
+    for suffix, pattern in ASSET_REFS:
+        for path in outdir.rglob(f"*{suffix}"):
+            text = path.read_text(encoding="utf-8")
+            new = pattern.sub(lambda m, here=path: versioned(m, here), text)
+            if new != text:
+                path.write_text(new, encoding="utf-8")
+
+
 def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
     """Write ``llms.txt`` and ``sitemap.xml`` at the site's root from the built pages
     (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt`` lists
@@ -655,8 +715,10 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
 
     Page styles load after the shared ones (priority 900), so they win a tie.
     """
-    # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release.
-    context["release_version"] = _release_post(app)[1]
+    # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release and the
+    # date of its post, which opens the dot's week.
+    release_doc, context["release_version"] = _release_post(app)
+    context["release_date"] = next(d for doc, d, _ in _dated_posts(app) if doc == release_doc)
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
@@ -737,7 +799,7 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
         for doc in top
         if doc in NAV_SECTIONS
     ]
-    rest = [row(doc) for doc in top if doc not in NAV_SECTIONS]
+    rest = [{**row(doc), "mark": NAV_ICONS.get(doc)} for doc in top if doc not in NAV_SECTIONS]
     name, icon = NAV_REFERENCE
     groups.append({"doc": None, "title": name, "icon": icon, "kids": rest, "shown": len(rest)})
     context["docs_nav"] = groups
@@ -757,6 +819,41 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
     source = included[0] if included else pathlib.Path(app.env.doc2path(pagename))
     generated = "generated" in source.parts
     context["edit_url"] = None if generated else f"{REPO_URL}/edit/main/{source.relative_to(ROOT)}"
+
+
+# A table cell this short holds one value ("125 of 125", "1,470x", "causal-learn") or a short
+# label, which reads wrongly when it breaks across lines; such a cell keeps to one line (`nowrap`,
+# andrey.css), and a table too wide for its column scrolls inside its own frame instead.
+SHORT_CELL = 14
+
+
+def _short_cells(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Mark each table cell, a header's included, of at most ``SHORT_CELL`` characters on one line
+    ``nowrap``."""
+    for entry in doctree.findall(nodes.entry):
+        text = entry.astext()
+        if "\n" not in text and len(text) <= SHORT_CELL:
+            entry["classes"].append("nowrap")
+
+
+# The API reference's summary tables (autosummary) list a name and its description with no header
+# row; they get one, so their frame shows its label band as every other table does.
+SUMMARY_LABELS = ("Name", "Description")
+
+
+def _summary_headers(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Give each autosummary table without a header row the labels ``SUMMARY_LABELS``."""
+    for table in doctree.findall(nodes.table):
+        if "autosummary" not in table["classes"]:
+            continue
+        tgroup = next(iter(table.findall(nodes.tgroup)))
+        if any(isinstance(child, nodes.thead) for child in tgroup.children):
+            continue
+        row = nodes.row(
+            "", *(nodes.entry("", nodes.paragraph("", label)) for label in SUMMARY_LABELS)
+        )
+        tbody = next(child for child in tgroup.children if isinstance(child, nodes.tbody))
+        tgroup.insert(tgroup.index(tbody), nodes.thead("", row))
 
 
 def _post_byline(app, doctree, docname) -> None:  # noqa: ANN001
@@ -1089,7 +1186,10 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
     app.connect("build-finished", _write_discovery)
+    app.connect("build-finished", _version_assets)
     app.connect("doctree-resolved", _post_byline)
+    app.connect("doctree-resolved", _summary_headers)
+    app.connect("doctree-resolved", _short_cells)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)
     # Before sphinx_autodoc_typehints, which returns a signature of its own.

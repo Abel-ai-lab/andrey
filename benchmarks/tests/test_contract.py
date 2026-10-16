@@ -46,7 +46,8 @@ def test_the_row_schema_is_what_it_says():
         "noise", "num_workers", "oom_source", "output_hash", "output_type", "package",
         "package_version", "params", "peak_rss_mb", "r2_sortability", "repeat", "run_id",
         "scheduler", "setup_s",
-        "standardize", "status", "structure_hash", "threads", "topology", "tree_peak_mem_mb",
+        "standardize", "status", "structure_hash", "tau_max", "threads", "times", "topology",
+        "tree_peak_mem_mb",
         "varsortability", "wall_s", "warmup", "warmup_s",
     )  # fmt: skip
 

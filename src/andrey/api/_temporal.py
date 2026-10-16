@@ -1,4 +1,4 @@
-"""Private adapters from fitted temporal models (VAR, VARMA, Granger) to a ``TemporalStructure``.
+"""Private adapters from fitted temporal models and PCMCI-family results to a ``TemporalStructure``.
 
 Fitted models are read by attribute name. The lag coefficients are stored as ``lag_weights`` in
 Andrey's orientation: ``W[i, j]`` weights ``i -> j``, the transpose of the coefficient matrix ``B``,
@@ -11,13 +11,18 @@ contemporaneous lag 0 (VAR and VARMA) is a ``dag``. Nothing here is re-exported 
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from andrey.api._adapt import structure_output
 from andrey.api._marks import directed_marks
-from andrey.core import GraphStructure, StructureOutput, TemporalStructure
+from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
+
+if TYPE_CHECKING:
+    from andrey.temporal.lpcmci import LPCMCIResult
+    from andrey.temporal.pcmci import PCMCIResult
+    from andrey.temporal.pcmciplus import PCMCIPlusResult
 
 
 def _lag_graphs(ar_stack: np.ndarray, *, instantaneous: bool) -> tuple[GraphStructure, ...]:
@@ -131,3 +136,91 @@ def _adapt_granger(coeff: np.ndarray, n_vars: int, maxlag: int) -> StructureOutp
         graphs, lags=list(range(1, maxlag + 1)), lag_weights=ar.transpose(0, 2, 1)
     )
     return structure_output(temporal, metadata={"algorithm": "granger"})
+
+
+def _adapt_pcmci(result: PCMCIResult) -> StructureOutput:
+    """PCMCI result -> ``StructureOutput`` over a :class:`TemporalStructure` of lags ``1..tau_max``.
+
+    ``result.graph[k, i, j]`` marks the link ``i -> j`` at lag ``k + 1`` (row = cause), so each
+    block is transposed for :func:`_lag_graphs`. PCMCI tests no lag-0 link and finds no causal
+    order, so every lag view is a ``digraph`` and the envelope carries no ``ordering``. The MCI
+    statistics and p-values are test results, not coefficients: they ride in ``metadata`` in the
+    result's ``[lag - 1, cause, effect]`` layout, with the PC1 parents as ``[variable, lag]`` pairs.
+    """
+    graph = np.asarray(result.graph, dtype=np.float64)
+    graphs = _lag_graphs(graph.transpose(0, 2, 1), instantaneous=False)
+    temporal = TemporalStructure.from_lag_graphs(graphs, lags=range(1, graph.shape[0] + 1))
+    metadata = {
+        "algorithm": "pcmci",
+        "p_values": result.p_values,
+        "statistics": result.statistics,
+        "parents": [[list(link) for link in links] for links in result.parents],
+    }
+    return structure_output(temporal, metadata=metadata)
+
+
+def _adapt_pcmciplus(result: PCMCIPlusResult) -> StructureOutput:
+    """PCMCI+ result -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
+
+    Lag 0 is a ``cpdag`` built from ``result.marks``; a conflict (an arrowhead at both ends) has no
+    mark of its own, so it becomes an undirected link and is listed in ``metadata["conflicts"]``.
+    ``result.adjacency[k, i, j]``, ``k >= 1``, marks the link ``i -> j`` at lag ``k`` (row =
+    cause), transposed for :func:`_lag_graphs`. The p-values and statistics ride in ``metadata`` in
+    the result's ``[lag, cause, effect]`` layout.
+    """
+    marks = np.array(result.marks, dtype=np.int8)
+    marks[(marks == ARROW) & (marks.T == ARROW)] = TAIL
+    lagged = np.asarray(result.adjacency[1:], dtype=np.float64).transpose(0, 2, 1)
+    graphs = (
+        GraphStructure.from_numpy(marks, kind="cpdag"),
+        *_lag_graphs(lagged, instantaneous=False),
+    )
+    temporal = TemporalStructure.from_lag_graphs(graphs, lags=range(len(graphs)))
+    metadata = {
+        "algorithm": "pcmciplus",
+        "p_values": result.p_values,
+        "statistics": result.statistics,
+        "parents": [[list(link) for link in links] for links in result.parents],
+        "conflicts": [list(pair) for pair in result.conflicts],
+        "ambiguous_triples": [list(triple) for triple in result.ambiguous_triples],
+    }
+    return structure_output(temporal, metadata=metadata)
+
+
+def _adapt_lpcmci(result: LPCMCIResult) -> StructureOutput:
+    """LPCMCI result -> ``StructureOutput`` over a :class:`TemporalStructure`, lags ``0..tau_max``.
+
+    Lag 0 is a ``pag`` built from the lag-0 marks; a conflict mark has no mark of its own, so it
+    becomes a circle, the mark that claims nothing. A lag-``k`` graph holds one mark pair per
+    unordered pair of variables and only arrowheads on the diagonal, so it cannot hold a lagged
+    link's circle or arrowhead at the earlier end: lags ``>= 1`` are ``digraph``s of the definite
+    causes ``X_i(t-k) -> X_j(t)`` alone. ``metadata["links"]`` keeps every link with all its marks,
+    and ``metadata["conflicts"]`` lists the ``[i, k, j]`` links with a conflict mark.
+    """
+    start, end = result.start_marks, result.end_marks
+    lag0 = np.array(start[0], dtype=np.int8)
+    lag0[lag0 > CIRCLE] = CIRCLE
+    causes = ((start[1:] == TAIL) & (end[1:] == ARROW)).astype(np.float64).transpose(0, 2, 1)
+    graphs = (
+        GraphStructure.from_numpy(lag0, kind="pag"),
+        *_lag_graphs(causes, instantaneous=False),
+    )
+    temporal = TemporalStructure.from_lag_graphs(graphs, lags=range(len(graphs)))
+    n_lags, n = start.shape[0], start.shape[1]
+    links = [[[result.link(i, j, k) for j in range(n)] for i in range(n)] for k in range(n_lags)]
+    conflicts = [
+        [i, k, j]
+        for k in range(n_lags)
+        for i in range(n)
+        for j in range(n)
+        if "x" in links[k][i][j] and (k > 0 or i < j)
+    ]
+    metadata = {
+        "algorithm": "lpcmci",
+        "links": links,
+        "p_values": result.p_values,
+        "statistics": result.statistics,
+        "parents": [[list(node) for node in nodes] for nodes in result.parents],
+        "conflicts": conflicts,
+    }
+    return structure_output(temporal, metadata=metadata)

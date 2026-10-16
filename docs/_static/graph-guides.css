@@ -8,24 +8,11 @@
   color: var(--andrey-ink);
 }
 .graph-explorer [hidden] { display: none !important; }
-.graph-controls { margin: 0; padding: 0 0 1rem; border: 0; }
-.graph-controls legend { font-size: .85rem; font-weight: 600; }
-.graph-controls label { position: relative; display: inline-block; margin: .3rem .1rem 0 0; }
-.graph-controls input { position: absolute; opacity: 0; }
-.graph-controls span {
-  display: block;
-  padding: .4rem .55rem;
-  border: 1px solid var(--andrey-line);
-  border-radius: var(--andrey-radius-sm);
-  font: .82rem var(--andrey-font-mono);
-  cursor: pointer;
-}
-.graph-controls input:checked + span {
-  border-color: var(--andrey-accent);
-  background: var(--andrey-surface-2);
-  color: var(--andrey-accent);
-}
-.graph-controls input:focus-visible + span, .graph-matrix td:focus-visible {
+/* The edge choices are a segmented control (segmented.css), their labels in the code font. */
+.graph-controls { min-width: 0; margin: 0; padding: 0 0 1rem; border: 0; }
+.graph-controls legend { margin-bottom: .5rem; font-size: .85rem; font-weight: 600; }
+.graph-controls .segmented span { font-family: var(--andrey-font-mono); font-weight: 500; }
+.graph-matrix td:focus-visible {
   outline: 2px solid var(--andrey-accent);
   outline-offset: 3px;
 }

@@ -187,6 +187,10 @@ def test_every_homepage_tile_leads_to_details_that_are_built(html):
     assert not problems, "\n".join(problems)
 
 
+# The section's line icon before a header link's name.
+ICON = r'<svg class="nav-icon[^"]*"[^>]*>.*?</svg>'
+
+
 def test_every_header_leads_home_and_to_each_section(html):
     cards = (DOCS / "docs" / "benchmarks").glob("*.md")
     newest = max((tuple(map(int, card.stem.split("."))) for card in cards), default=())
@@ -202,14 +206,14 @@ def test_every_header_leads_home_and_to_each_section(html):
             problems.append(f"{name}: the wordmark does not lead home")
         for label, expected in HEADER.items():
             hrefs = re.findall(
-                rf'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>{label}</a>', header
+                rf'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>{ICON}{label}</a>', header
             )
             if len(hrefs) != 1 or _resolve(html, page, hrefs[0]) != html / expected:
                 problems.append(f"{name}: the header's {label} link is wrong")
         # Release cards carries the dot that marks the newest release until the reader opens it.
         cards = re.findall(
-            r'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>Release cards'
-            r'<span class="nav-new" data-release="([^"]+)" hidden>',
+            rf'<a class="nav-link nav-internal" href="([^"]+)"[^>]*>{ICON}Release cards'
+            r'<span class="nav-new" data-release="([^"]+)" data-date="\d{4}-\d{2}-\d{2}" hidden>',
             header,
         )
         if len(cards) != 1 or _resolve(html, page, cards[0][0]) != html / "docs/benchmarks.html":
@@ -537,3 +541,25 @@ def test_the_brand_kit_offers_every_file_it_shows_and_zips_them(html):
         assert avatar.size == (1024, 1024)
     with Image.open(kit / "andrey-icon-on-light.png") as icon:
         assert icon.size == (512, 512)
+
+
+def test_every_local_image_address_carries_its_content_hash(html):
+    # A deploy changes a file's address with its content, so no cache serves the old image.
+    import hashlib
+
+    problems = []
+    for page in [html / "index.html", html / "docs" / "index.html", html / "404.html"]:
+        text = page.read_text(encoding="utf-8")
+        refs = re.findall(r'\bsrc="([^"#:]+\.(?:svg|jpg|png))(?:\?v=(\w+))?"', text)
+        assert refs, page
+        for ref, version in refs:
+            target = html / ref.lstrip("/") if ref.startswith("/") else _resolve(html, page, ref)
+            digest = hashlib.sha256(target.read_bytes()).hexdigest()[:8]
+            if version != digest:
+                problems.append(f"{page.relative_to(html)}: {ref}?v={version} (file {digest})")
+    unhashed = re.compile(r'url\("?([^")?#:]+\.(?:svg|jpg|png))(?!\?v=)"?\)')
+    for sheet in (html / "_static").glob("*.css"):
+        problems += [
+            f"{sheet.name}: url({ref}) has no hash" for ref in unhashed.findall(sheet.read_text())
+        ]
+    assert not problems, "\n".join(problems)

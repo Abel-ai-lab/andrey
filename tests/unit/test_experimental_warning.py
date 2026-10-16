@@ -63,8 +63,10 @@ def test_is_a_user_warning():
 @pytest.mark.parametrize("name", sorted(n for n, s in REGISTRY.items() if s.status == "supported"))
 def test_supported_methods_do_not_warn_experimental(name, chain):
     """Only ``ExperimentalWarning`` fails here: a numerical warning from a fit is not a status. A
-    pairwise direction test takes the pair ``x -> y``."""
+    pairwise direction test takes the pair ``x -> y``, and a panel method three time points."""
     data = chain[:200, :2] if REGISTRY[name].family == "pairwise" else chain
+    if REGISTRY[name].data.inputs[0].kind == "panel":
+        data = [chain[:300], chain[300:600], chain[600:900]]
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
         getattr(andrey, name)(data)

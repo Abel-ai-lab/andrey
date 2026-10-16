@@ -1,4 +1,4 @@
-/* "Why Andrey is fast": the scenes in the homepage's story and the launch post.
+/* "Why Andrey is fast": the scenes in the homepage's carousel and the launch post.
    Every color is an --andrey-* token generated from src/andrey/viz/theme.py, or derived from
    one, so this file names no color value. Both lanes of a scene share one grid, so a station or a pile sits at the same place in
    each. Motion runs only with no reduced-motion preference (why-fast.js). */
@@ -245,8 +245,6 @@ dialog.tile-dialog::backdrop {
   cursor: pointer;
 }
 .wf-close svg { width: 14px; height: 14px; }
-/* A scene played by the scroll: its check eases in and out as the reader scrolls past its end. */
-.wf-scene[data-play="scroll"] .wf-done { transition: opacity 0.25s var(--wf-ease), scale 0.25s var(--wf-ease); }
 
 .wf button:focus-visible {
   outline: 2px solid var(--andrey-accent);

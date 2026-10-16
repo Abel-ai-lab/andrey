@@ -51,7 +51,8 @@ uv run python -m qa.quality_gate
 The `quality-gate` workflow runs the same command. Every job that publishes to PyPI must need a job
 that calls it; `tests/unit/test_release_gates.py` fails otherwise. Pull requests do not run the
 gate. It checks PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, RCD,
-BottomUpParceLiNGAM, ANM, and PNL on the datasets whose assumptions each method needs:
+BottomUpParceLiNGAM, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and Granger
+on the datasets whose assumptions each method needs:
 
 | Dataset | Draws | Methods |
 |---|---|---|
@@ -61,6 +62,12 @@ BottomUpParceLiNGAM, ANM, and PNL on the datasets whose assumptions each method 
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
 | `pnl_pair` at `n = 1000` | 10 seeds | PNL |
+| `pcmci_paper` at `d = 10`, `n = 500, 1000` | 10 seeds each | PCMCI |
+| `pcmciplus_paper` at `(d, n) = (10, 500), (20, 1000)` | 10 seeds each | PCMCI+ |
+| `lpcmci_paper` at `(d, n) = (5, 500), (10, 1000)` | 10 seeds each | LPCMCI |
+| `varma_lingam_paper` at `d = 3, 5`, `n = 300` | 10 seeds each | VARMA-LiNGAM |
+| `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
+| `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
 | ASIA, linear-Gaussian | 10 seeds | PC, GES, XGES, HC, Tabu, BOSS, GRaSP, FCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
 | Sachs, measured | 1 | PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM |
@@ -76,6 +83,14 @@ BottomUpParceLiNGAM, ANM, and PNL on the datasets whose assumptions each method 
   edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
   with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when
   they name the true direction on most draws.
+- **Time series.** The published time-series regimes, drawn by the benchmark harness
+  (`benchmarks/andrey_bench`), which the gate imports; each method runs through its benchmark
+  adapter with the published settings. The sizes are published sizes at which the method's median
+  error is below the empty graph's: PCMCI's only at `d = 10`, and VARMA-LiNGAM's the two smallest,
+  as its fit takes seconds. `longitudinal_lingam_paper` draws `m` units at `n` time points.
+  Granger's published median error is above the empty graph's at every published size, so its
+  gate draws 5 variables, where it is below. A test keeps the Granger draws in step with the
+  benchmark driver and the regime names with the harness.
 - **ASIA.** The 8-arc network of Lauritzen and Spiegelhalter (1988), sampled as a linear SCM with
   1,000 rows per seed. Its arcs are bnlearn's (`andrey.data.load_dataset("asia")`); the gate lists
   them in its own order, which fixes each seed's weights, and a test checks the two agree.
@@ -90,7 +105,11 @@ CPDAG, the LiNGAM methods, ANM, and PNL against the DAG, and FCI by endpoint SHD
 the observed variables. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent
 projection, the edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j`
 through hidden nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden
-nodes only. On each dataset, a method passes when its median SHD over the draws is:
+nodes only. The time-series methods are scored in their summaries' units: PCMCI by the lag-resolved
+SHD, PCMCI+ by endpoint SHD over the window of lags, LPCMCI by endpoint SHD against the true PAG of
+the observed series, VARMA-LiNGAM and LongitudinalLiNGAM by the missing and extra cross-links, and
+Granger by the missing and extra lagged edges. On each dataset, a method passes when its median SHD
+over the draws is:
 
 - below the empty graph's median SHD;
 - within the method's tolerance of its baseline, in either direction.

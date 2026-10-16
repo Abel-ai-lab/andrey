@@ -49,7 +49,7 @@ def _var_process(
     ``x_t = B0 x_t + A1 x_{t-1} + e_t`` solved as
     ``x_t = (I - B0)^{-1} (A1 x_{t-1} + e_t)``.
 
-    ``B0`` is strictly lower-triangular (instantaneous causal order), ``A1`` the
+    ``B0`` is acyclic (an instantaneous causal order), ``A1`` the
     lag-1 matrix; both are chosen so the reduced-form spectral radius is < 1. A
     ``burn_in`` prefix is discarded so the returned window is stationary.
     """
@@ -64,6 +64,26 @@ def _var_process(
     X[0] = ib_inv @ e[0]
     for t in range(1, total):
         X[t] = ib_inv @ (A1a @ X[t - 1] + e[t])
+    return X[burn_in:]
+
+
+def _lagged_var(
+    seed: int, n_samples: int, lags: list[list[list[float]]], noise: str, burn_in: int
+) -> np.ndarray:
+    """Stable VAR(p) with lagged effects only: ``x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + e_t``.
+
+    ``lags`` lists ``A_1 .. A_p``, each ``A_k[i, j]`` the effect of ``x_j(t-k)`` on ``x_i(t)``;
+    there is no instantaneous mixing, so the lagged edges are exactly the nonzero entries. A
+    ``burn_in`` prefix is discarded so the returned window is stationary.
+    """
+    rng = np.random.default_rng(seed)
+    A = np.asarray(lags, dtype=np.float64)
+    p, d = A.shape[0], A.shape[1]
+    total = n_samples + burn_in
+    e = _noise(rng, (total, d), noise)
+    X = np.zeros((total, d), dtype=np.float64)
+    for t in range(total):
+        X[t] = e[t] + sum(A[k] @ X[t - k - 1] for k in range(min(p, t)))
     return X[burn_in:]
 
 
@@ -96,6 +116,31 @@ def _varma_process(
     for t in range(1, total):
         X[t] = ib_inv @ (A1a @ X[t - 1] + e[t] + M1a @ e[t - 1])
     return X[burn_in:]
+
+
+def _panel_process(
+    seed: int,
+    n_samples: int,
+    times: int,
+    B0: list[list[float]],
+    A1: list[list[float]],
+    noise: str,
+) -> list[np.ndarray]:
+    """Panel of ``n_samples`` units at ``times`` time points with instantaneous mixing:
+    ``x_t = B0 x_t + A1 x_{t-1} + e_t``, ``x_0 = B0 x_0 + e_0``, one ``(n_samples, d)`` matrix per
+    time point. ``B0`` is strictly lower-triangular, so the instantaneous causal order is
+    ``0 -> 1 -> ... -> d-1``.
+    """
+    rng = np.random.default_rng(seed)
+    B0a = np.asarray(B0, dtype=np.float64)
+    A1a = np.asarray(A1, dtype=np.float64)
+    ib_inv = np.linalg.inv(np.eye(B0a.shape[0]) - B0a)
+    x = _noise(rng, (n_samples, B0a.shape[0]), noise) @ ib_inv.T
+    panel = [x]
+    for _ in range(1, times):
+        x = (x @ A1a.T + _noise(rng, x.shape, noise)) @ ib_inv.T
+        panel.append(x)
+    return panel
 
 
 def _anm_pair(seed: int, n_samples: int, x_range: float, noise_scale: float) -> np.ndarray:
@@ -265,6 +310,19 @@ CASES: dict[str, dict] = {
             [0.1, 0.0, 0.0, 0.3],
         ],
     },
+    # Stable VAR(2) with lagged effects only - Granger. Lag 1: x0 -> x0, x0 -> x1, x2 -> x2; lag 2:
+    # x1 -> x2.
+    "var_3v_lag2": {
+        "model": "lagged_var",
+        "noise": "gaussian",
+        "seed": 20240619,
+        "n_samples": 1000,
+        "burn_in": 200,
+        "lags": [
+            [[0.5, 0.0, 0.0], [0.6, 0.0, 0.0], [0.0, 0.0, 0.3]],
+            [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, -0.5, 0.0]],
+        ],
+    },
     # Stable/invertible VARMA(1,1), non-Gaussian noise - VARMALiNGAM.
     "varma_3v": {
         "model": "varma",
@@ -286,6 +344,33 @@ CASES: dict[str, dict] = {
             [0.2, 0.0, 0.0],
             [0.0, 0.2, 0.0],
             [0.0, 0.0, 0.2],
+        ],
+    },
+    # Stable VAR(1) over six series whose last, X5, is white noise and hidden (dropped): within a
+    # step X5 -> X1, X5 -> X2, X2 -> X3; at lag 1 every observed series depends on its own past,
+    # X0 -> X1, and X3 -> X4. LPCMCI.
+    "var_6v_hidden": {
+        "model": "var",
+        "noise": "gaussian",
+        "seed": 20261015,
+        "n_samples": 1000,
+        "burn_in": 200,
+        "observed": [0, 1, 2, 3, 4],
+        "B0": [
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.7],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.6],
+            [0.0, 0.0, 0.6, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        ],
+        "A1": [
+            [0.5, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.4, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.5, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.4, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.5, 0.5, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         ],
     },
     # Nonlinear additive-noise cause->effect pair - ANM and PNL.
@@ -361,11 +446,34 @@ CASES: dict[str, dict] = {
 }
 
 
-# Multi-group case registry: a list of datasets sharing one causal order (each weight matrix is
-# strictly lower-triangular over the same order 0 -> ... -> d-1) but differing in edge support and
-# strength -- MultiGroupDirectLiNGAM's assumption. Each group has its own seed for an independent
-# noise draw.
+# Multi-group case registry: each case is a list of matrices. A ``groups`` case holds datasets
+# sharing one causal order (each weight matrix is strictly lower-triangular over the same order
+# 0 -> ... -> d-1) but differing in edge support and strength -- MultiGroupDirectLiNGAM's
+# assumption. Each group has its own seed for an independent noise draw. A ``panel`` case is one
+# process observed at several time points.
 GROUP_CASES: dict[str, dict] = {
+    # A panel: 600 units at 4 time points, non-Gaussian noise, one instantaneous DAG
+    # x0 -> x1 -> x2, x0 -> x3 and one lag-1 matrix with memory in every variable and the cross
+    # effects x1 -> x0 and x2 -> x3 - LongitudinalLiNGAM.
+    "panel_4v": {
+        "model": "panel",
+        "noise": "uniform",
+        "seed": 20261016,
+        "n_samples": 600,
+        "times": 4,
+        "B0": [
+            [0.0, 0.0, 0.0, 0.0],
+            [0.7, 0.0, 0.0, 0.0],
+            [0.0, -0.6, 0.0, 0.0],
+            [0.5, 0.0, 0.0, 0.0],
+        ],
+        "A1": [
+            [0.4, 0.5, 0.0, 0.0],
+            [0.0, 0.4, 0.0, 0.0],
+            [0.0, 0.0, 0.4, 0.0],
+            [0.0, 0.0, -0.5, 0.4],
+        ],
+    },
     "mgdl_2groups": {
         "noise": "uniform",
         "n_samples": 800,
@@ -412,11 +520,20 @@ def generate(case_id: str, *, replicate: int = 0) -> np.ndarray:
             noise=spec["noise"],
         )
     if model == "var":
-        return _var_process(
+        X = _var_process(
             seed=seed,
             n_samples=spec["n_samples"],
             B0=spec["B0"],
             A1=spec["A1"],
+            noise=spec["noise"],
+            burn_in=spec["burn_in"],
+        )
+        return np.ascontiguousarray(X[:, spec["observed"]]) if "observed" in spec else X
+    if model == "lagged_var":
+        return _lagged_var(
+            seed=seed,
+            n_samples=spec["n_samples"],
+            lags=spec["lags"],
             noise=spec["noise"],
             burn_in=spec["burn_in"],
         )
@@ -484,6 +601,15 @@ def planted_structure(case_id: str) -> tuple[set[tuple[int, int]], set[tuple[int
 def generate_groups(case_id: str) -> list[np.ndarray]:
     """Return the list of input matrices for a multi-group ``case_id`` (one per group)."""
     spec = GROUP_CASES[case_id]
+    if spec.get("model") == "panel":
+        return _panel_process(
+            seed=spec["seed"],
+            n_samples=spec["n_samples"],
+            times=spec["times"],
+            B0=spec["B0"],
+            A1=spec["A1"],
+            noise=spec["noise"],
+        )
     return [
         _linear_sem(
             seed=group["seed"],

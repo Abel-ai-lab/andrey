@@ -120,6 +120,17 @@ ANM and PNL test which of two variables causes the other.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Time series
+:link: time_series
+:link-type: doc
+:img-top: /_generated/thumbs/time_series.svg
+:img-alt: The true graph of this notebook's series, its lags merged
+
+PCMCI, PCMCI+, LPCMCI, Granger, VARMA-LiNGAM, and longitudinal LiNGAM on data over time.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Drawing a recovered structure
 :link: viz
 :link-type: doc
@@ -145,5 +156,6 @@ lingam
 rcd
 bottom_up_parce_lingam
 pairwise
+time_series
 viz
 ```

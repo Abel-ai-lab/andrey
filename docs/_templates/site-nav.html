@@ -1,23 +1,25 @@
-{#- The site's sections, as pydata's navbar-nav draws its links: the current section is marked, and
-    aria-current goes only on the link to the page being read. Release cards carries a dot that
-    nav-new.js shows until the reader has opened the latest release's cards. -#}
+{#- The site's sections, as pydata's navbar-nav draws its links, each with its line icon
+    (nav-icons.html): the current section is marked, and aria-current goes only on the link to the
+    page being read. Release cards carries a dot that nav-new.js shows for a week after the latest
+    release's post, until the reader opens the release cards. -#}
+{%- from "nav-icons.html" import icon %}
 {%- set sections = [
-  ("docs/index", "Docs", pagename.startswith("docs/")
+  ("docs/index", "Docs", "book", pagename.startswith("docs/")
     and not pagename.startswith(("docs/examples/", "docs/demos/", "docs/benchmarks/"))
     and pagename not in ("docs/faq", "docs/benchmarks")),
-  ("docs/examples/index", "Examples", pagename.startswith("docs/examples/")),
-  ("docs/demos/index", "Demos", pagename.startswith("docs/demos/")),
-  ("blog/index", "Blog", pagename == "blog" or pagename.startswith("blog/")),
-  ("docs/benchmarks", "Release cards", pagename == "docs/benchmarks"
+  ("docs/examples/index", "Examples", "notebook", pagename.startswith("docs/examples/")),
+  ("docs/demos/index", "Demos", "play", pagename.startswith("docs/demos/")),
+  ("blog/index", "Blog", "post", pagename == "blog" or pagename.startswith("blog/")),
+  ("docs/benchmarks", "Release cards", "chart", pagename == "docs/benchmarks"
     or pagename.startswith("docs/benchmarks/")),
-  ("docs/faq", "FAQ", pagename == "docs/faq"),
+  ("docs/faq", "FAQ", "help", pagename == "docs/faq"),
 ] %}
 <nav aria-label="{{ _('Site') }}">
   <ul class="bd-navbar-elements navbar-nav">
-    {%- for doc, title, current in sections %}
+    {%- for doc, title, mark, current in sections %}
     <li class="nav-item{% if current %} current active{% endif %}">
-      <a class="nav-link nav-internal" href="{{ pathto(doc) }}"{% if pagename == doc %} aria-current="page"{% endif %}>{{ title }}
-        {%- if doc == "docs/benchmarks" %}<span class="nav-new" data-release="{{ release_version }}" hidden><span class="visually-hidden">, new release</span></span>{% endif %}</a>
+      <a class="nav-link nav-internal" href="{{ pathto(doc) }}"{% if pagename == doc %} aria-current="page"{% endif %}>{{ icon(mark) }}{{ title }}
+        {%- if doc == "docs/benchmarks" %}<span class="nav-new" data-release="{{ release_version }}" data-date="{{ release_date }}" hidden><span class="visually-hidden">, new release</span></span>{% endif %}</a>
     </li>
     {%- endfor %}
   </ul>

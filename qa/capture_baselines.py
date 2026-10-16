@@ -57,11 +57,15 @@ def _run_varlingam(X: np.ndarray, algorithm: str) -> dict:
     return project_output(_adapt_var_lingam(model), algorithm)
 
 
-def _run_varmalingam(X: np.ndarray, algorithm: str) -> dict:
+def _run_varmalingam(X: np.ndarray, algorithm: str, *, prune: bool = False) -> dict:
     from andrey.temporal.varma import varma_lingam
 
-    order, psis, omegas = varma_lingam(X, order=(1, 1), prune=False)
+    order, psis, omegas = varma_lingam(X, order=(1, 1), prune=prune)
     return {"causal_order": list(order), "psis": np.asarray(psis), "omegas": np.asarray(omegas)}
+
+
+def _run_varmalingam_pruned(X: np.ndarray, algorithm: str) -> dict:
+    return _run_varmalingam(X, algorithm, prune=True)
 
 
 def _run_granger(X: np.ndarray, algorithm: str) -> dict:
@@ -101,20 +105,26 @@ ALGORITHMS = {
     "GRaSP": (_facade("grasp", lambda_value=2.0), "gauss_5v"),
     "VARLiNGAM": (_run_varlingam, "var_4v_stable"),
     "VARMALiNGAM": (_run_varmalingam, "varma_3v"),
+    "VARMALiNGAMPruned": (_run_varmalingam_pruned, "varma_3v"),
     "Granger": (_run_granger, "var_4v_stable"),
     "RCD": (_facade("rcd"), "confounded_fork_4v"),
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),
     "ANM": (_facade("anm"), "anm_pair_cubic"),
     "PNL": (_facade("pnl"), "anm_pair_cubic"),
+    "PCMCI": (_facade("pcmci", tau_max=2), "var_3v_lag2"),
+    "PCMCIplus": (_facade("pcmciplus", tau_max=2), "var_4v_stable"),
+    "LPCMCI": (_facade("lpcmci", tau_max=2), "var_6v_hidden"),
     "KCI": (_run_ci_test, "nonmonotone_4v"),
     "RCoT": (_run_ci_test, "nonmonotone_4v"),
     "CMIknn": (_run_ci_test, "nonmonotone_4v"),
     "GPDC": (_run_ci_test, "nonmonotone_4v"),
 }
 
-# Multi-group methods take a list of matrices (runner receives ``generate_groups(case)``).
+# Multi-group and panel methods take a list of matrices (runner receives
+# ``generate_groups(case)``).
 GROUP_ALGORITHMS = {
     "MultiGroupDirectLiNGAM": (_run_multi_group_direct_lingam, "mgdl_2groups"),
+    "LongitudinalLiNGAM": (_facade("longitudinal_lingam"), "panel_4v"),
 }
 
 
@@ -143,9 +153,11 @@ def capture(args: argparse.Namespace) -> None:
         if name in GROUP_ALGORITHMS:
             group_runner, case = GROUP_ALGORITHMS[name]
             groups = datagen.generate_groups(case)
+            spec = datagen.GROUP_CASES[case]
+            seeds = [g["seed"] for g in spec["groups"]] if "groups" in spec else [spec["seed"]]
             input_block = {
                 "case": case,
-                "seeds": [group["seed"] for group in datagen.GROUP_CASES[case]["groups"]],
+                "seeds": seeds,
                 "shapes": [list(X.shape) for X in groups],
                 "sha256": datagen.input_sha256(case),
             }
