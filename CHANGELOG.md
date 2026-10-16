@@ -25,7 +25,7 @@ change names its pull request.
 ### Changed
 
 - `pc` and `cdnod` orient conflicting colliders by the p-value that separated each collider's pair,
-  highest first, so their graphs no longer depend on the column order. ([#TBD])
+  highest first, so their colliders no longer depend on the column order. ([#TBD])
 - `hc` with a mixed-data score never adds a continuous -> categorical edge, which the conditional
   linear Gaussian model cannot express, and scores its candidate parent sets in batches. ([#TBD])
 

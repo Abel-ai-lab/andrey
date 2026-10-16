@@ -135,10 +135,11 @@ def pc(
     oriented from the highest rank to the lowest, and a collider is skipped when it would give an
     edge an arrowhead at both ends, so of two conflicting colliders the higher-ranked one is kept.
     When two conflicting colliders rank exactly equal, the edge they dispute stays undirected, and
-    Meek's rules do not orient it. The result therefore does not depend on the column order. This
+    Meek's rules do not orient it. The colliders therefore do not depend on the column order. This
     adapts the conflict rule of Ramsey [10]_, which ranks a collider by separating sets that
     additional tests choose; Andrey ranks it by the tests that removed the edge, so orienting runs
-    no new test.
+    no new test. Meek's rules can still depend on the column order: when two rule firings would
+    orient one edge in opposite directions, the one reached first in column order decides.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), from 20 to 400 variables with ten rows per variable: its median errors (SHD) stayed
