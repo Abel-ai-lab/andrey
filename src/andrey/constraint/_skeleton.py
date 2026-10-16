@@ -134,7 +134,7 @@ def marginal_removals(
         for x, y in zip(*np.nonzero(adjacent_upper)):
             record_tests(trace, 0, int(x), int(y), [()], [pmat[x, y]], alpha)
     xs, ys = np.nonzero(separated)
-    return [(x, y, float(pmat[x, y])) for x, y in zip(xs.tolist(), ys.tolist())]
+    return list(zip(xs.tolist(), ys.tolist(), pmat[xs, ys].tolist()))
 
 
 def first_order_separating(
@@ -158,11 +158,11 @@ def first_order_separating(
     pvals = test.first_order_pvalues(x, y, candidates)  # ty: ignore[unresolved-attribute]
     if trace is not None:
         record_tests(trace, 1, x, y, [(c,) for c in candidates], pvals, alpha)
-    separated = pvals > alpha
-    if not separated.any():
+    passing = np.asarray(candidates)[pvals > alpha]
+    if not passing.size:
         return [], None
-    passing = np.asarray(candidates)[separated]
-    return sorted(passing.tolist()), float(pvals[separated].max())
+    # Some candidate separates, so the largest p-value is a separating one.
+    return sorted(passing.tolist()), max(pvals.tolist())
 
 
 def scan_pairs(
