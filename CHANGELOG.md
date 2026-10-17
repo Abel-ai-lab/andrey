@@ -17,11 +17,23 @@ change names its pull request.
 
 ### Changed
 
+- `pc` orients conflicting colliders by the p-value that separated each collider's pair, highest
+  first, so its colliders no longer depend on the column order and its default output can change,
+  and `collider_order="column"` keeps the column-order rule. ([#TBD])
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#TBD])
 - Hill climbing and tabu search break exact score ties by a hash of each column's values, so
   reordering the columns no longer changes the graph they find. ([#TBD])
+
+### Fixed
+
+- `fci` and `gfci` no longer turn every edge with a tail at one end and a circle at the other
+  into an undirected edge; the rule that sets such tails now needs a third node. ([#TBD])
+- In `fci` and `gfci`, rule R5 searches every uncovered circle path up to a fixed bound, rule R8
+  checks both endpoint orders, and the possible-d-separation step tests every conditioning subset,
+  so they remove false edges and orient endpoints they used to miss;
+  `andrey.data.latent.marginal(..., "pag")` follows the same rules. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 
