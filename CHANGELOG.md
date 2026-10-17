@@ -14,6 +14,8 @@ change names its pull request.
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#TBD])
+- Hill climbing and tabu search break exact score ties by a hash of each column's values, so
+  reordering the columns no longer changes the graph they find. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 

@@ -8,6 +8,7 @@ score; lower is better.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Collection
 from itertools import compress
 from operator import ne
@@ -24,7 +25,8 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
 # Moves are keyed on ``delta / n_samples`` rounded to ``_KEY_DP`` places, not on the raw delta.
 # Two equal moves (add x->y vs y->x, from different cov submatrices) differ in their last bits;
-# the key makes them tie, and the lower ``(u, v, op_rank)`` wins. Schur noise scales as
+# the key makes them tie, and the lower ``(ranks[u], ranks[v], op_rank)`` wins, with ``ranks`` from
+# :func:`tie_ranks`, so the winner does not depend on the column order. Schur noise scales as
 # ~n_samples * cond(cov) * eps, like a real improvement, so the normalized residual is
 # ~cond * eps: ``_KEY_DP`` = 9 clears it for cond up to ~1e5, independent of n. A mitigation, not
 # a proof: a normalized delta within ULP of a grid line can round either way. Rounding is
@@ -47,6 +49,19 @@ ScannedMove = tuple[float, int, int, int, tuple[str, int, int]]
 
 # Out-neighbor bitset rows, ``tuple(adj_int)``, used as tabu keys.
 StructureKey = tuple[int, ...]
+
+
+def tie_ranks(x: np.ndarray) -> np.ndarray:
+    """Each column's place in the tie-break order: by a hash of its values, then by position.
+
+    The hash travels with the column, so reordering the columns reorders their ranks the same way;
+    only identical columns fall back to their positions.
+    """
+    digests = [hashlib.blake2b(col.tobytes(), digest_size=8).digest() for col in x.T]
+    order = sorted(range(len(digests)), key=digests.__getitem__)
+    ranks = np.empty(len(order), dtype=np.intp)
+    ranks[order] = np.arange(len(order))
+    return ranks
 
 
 def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
@@ -78,7 +93,8 @@ class MoveScanner:
     prevent rounding noise exceeding ``_EPS_IMPROVE`` from creating a false improvement.
 
     ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
-    legal. ``None`` forbids none.
+    legal. ``None`` forbids none. ``ranks[u]`` is column ``u``'s place in the tie-break order,
+    :func:`tie_ranks` of the data.
 
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
@@ -92,12 +108,14 @@ class MoveScanner:
         delta: DeltaBICScore | FullScoreDelta,
         d: int,
         *,
+        ranks: np.ndarray,
         forbidden: np.ndarray | None = None,
     ) -> None:
         self._delta = delta
         self._score = delta.score_obj
         self._d = d
         self._inv_n = 1.0 / self._score.n
+        self._ranks: list[int] = np.asarray(ranks).tolist()
         self._add = np.full((d, d), np.inf)
         self._rem = np.full((d, d), np.inf)
         self._parent = np.zeros((d, d), dtype=bool)  # [v, u]: the edge u -> v exists
@@ -125,9 +143,10 @@ class MoveScanner:
     ) -> ScannedMove | None:
         """The best legal move with delta below ``floor``.
 
-        Moves are keyed ``(delta / n_samples rounded to _KEY_DP places, u, v, op_rank)``, a strict
-        total order. The default ``floor`` admits improving moves only; ``floor=inf`` admits every
-        legal move. A move that leads to a structure in ``tabu`` is skipped.
+        Moves are keyed ``(delta / n_samples rounded to _KEY_DP places, ranks[u], ranks[v],
+        op_rank)``, a strict total order that moves with the columns. The default ``floor`` admits
+        improving moves only; ``floor=inf`` admits every legal move. A move that leads to a
+        structure in ``tabu`` is skipped.
         """
         if self._d < 2:
             return None
@@ -303,12 +322,14 @@ class MoveScanner:
             u, v = int(tails[i]), int(heads[i])
             if self._reverse_ok(u, v):
                 found.append((float(rev[i]), u, v, 1, "reverse"))
+        ranks = self._ranks
         best: ScannedMove | None = None
+        best_key: tuple[float, int, int, int] | None = None
         for value, u, v, rank, op in found:
             if value < floor:
-                cand = (round(value * inv_n, _KEY_DP), u, v, rank, (op, u, v))
-                if best is None or cand[:4] < best[:4]:
-                    best = cand
+                key = (round(value * inv_n, _KEY_DP), ranks[u], ranks[v], rank)
+                if best_key is None or key < best_key:
+                    best, best_key = (key[0], u, v, rank, (op, u, v)), key
         return best
 
 
@@ -355,9 +376,11 @@ def hc(
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
     score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
-    CPDAG. Under a mixed-data score the DAG stays a conditional linear Gaussian network: no move
-    gives a categorical node a continuous parent. Returns the CPDAG and the DAG's total objective
-    (lower is better), the sum of the final per-node local scores.
+    CPDAG. Exact ties between moves break by :func:`tie_ranks`, so reordering the columns of the
+    data reorders the result the same way unless two columns are identical. Under a mixed-data
+    score the DAG stays a conditional linear Gaussian network: no move gives a categorical node a
+    continuous parent. Returns the CPDAG and the DAG's total objective (lower is better), the sum of
+    the final per-node local scores.
 
     Parameters
     ----------
@@ -400,7 +423,7 @@ def hc(
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
-        scanner = MoveScanner(delta, d, forbidden=forbidden)
+        scanner = MoveScanner(delta, d, ranks=tie_ranks(X), forbidden=forbidden)
         moves = 0
         while max_iter is None or moves < max_iter:
             best = scanner.best(adj_int, parents_of)
