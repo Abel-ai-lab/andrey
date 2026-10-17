@@ -499,13 +499,15 @@ ANDREY_BENCH_DATA=outputs/discrete-cpu/data $ANDREY_BENCH_PYTHON benchmarks/disc
 
 The p-values and BDeu scores of Andrey and causal-learn follow the same definitions (Andrey's BDeu
 is `-2` times causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py`
-the two packages return the same graph. Each comparator's objective is checked against Andrey's in
+the two packages return the same graph, with Andrey's PC on the column-order collider rule that
+causal-learn's PC runs; PC's default p-value order can orient conflicting colliders differently.
+Each comparator's objective is checked against Andrey's in
 `benchmarks/tests/test_adapters_discrete_comparators.py`, where R or pgmpy is installed: the scores
-agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets,
-and each declared setting takes effect. pgmpy's search ends in a different local optimum on some
+agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets, and
+each declared setting takes effect. pgmpy's search ends in a different local optimum on some
 datasets: each package takes the first of equal moves in its own scan order, and the graphs can
-differ at equal settings. pgmpy breaks ties by the iteration order of a set of column-name pairs,
-so its columns are named by integer position, which keeps the graph the same under any
+differ at equal settings. pgmpy breaks ties by the iteration order of a set of column-name pairs, so
+its columns are named by integer position, which keeps the graph the same under any
 `PYTHONHASHSEED`. Read the error columns beside the speed-up: where the graphs differ, the
 difference is a result to report.
 
