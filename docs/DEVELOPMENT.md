@@ -9,7 +9,7 @@ meta:
 
 `andrey.abel.ai` is one Sphinx project, this folder: the homepage at `/`, the blog at `/blog/`, and
 the documentation under `/docs/`, whose sources are in [`docs/`](docs/index.md). [`conf.py`](conf.py)
-configures MyST for Markdown, autodoc for `andrey.__all__`, cached MyST-NB notebooks, ABlog, and
+configures MyST for Markdown, autodoc for `andrey.__all__`, MyST-NB notebooks, ABlog, and
 pydata-sphinx-theme. Every page shares one navbar: the wordmark to the homepage; Docs, Examples,
 Demos, Blog, Release cards, and FAQ; then search, the theme switch, and GitHub. The method API and
 the spec registry are in the root [`DEVELOPMENT.md`](../DEVELOPMENT.md); the palette, the art, and
@@ -108,17 +108,17 @@ carries; a newer release shows it again.
 The homepage takes every number from the release summaries `RELEASES` names
 (`benchmarks/published/<label>/summary.json`) or from the registry (`andrey.spec.list_specs()`),
 counting supported methods only. `comparisons()` reads every kind of summary into one layout, each
-comparison's errors in the measure its summary records (`ERRORS`). The README's claim is
-`claim_sentence()`: the largest ratio rounded down to a power of ten on its method, then whether the
-other supported methods are faster ("the other", "most other", or nothing); the build fails unless
-the first summary's headline is that claim. The README chart shows one card per `PANEL` method, at
-most six.
+comparison's errors in the measure its summary records (`ERRORS`). The README, the live demo, and
+the homepage's description state `CLAIM`, a speed claim with no number. The build fails unless the
+first summary's headline is `claim_sentence()` of its numbers: the largest ratio rounded down to a
+power of ten on its method, then whether the other supported methods are faster ("the other", "most
+other", or nothing). The README chart shows one card per `PANEL` method, at most six.
 
-The homepage's description names PC, GES, and FCI, counts the other methods, and states the claim's
-first part. Every other page's description is the `description` in its front matter; without one,
-its first paragraph cut at a word to 160 characters (an API page's docstring summary line); a page
-with neither, such as search, takes the homepage's. To preview with placeholder numbers, which
-replace the first release's summary:
+The homepage's description names PC, GES, and FCI, counts the other methods, and states `CLAIM`.
+Every other page's description is the `description` in its front matter; without one, its first
+paragraph cut at a word to 160 characters (an API page's docstring summary line); a page with
+neither, such as search, takes the homepage's. To preview with placeholder numbers, which replace
+the first release's summary:
 
 ```shell
 uv run --group docs sphinx-build -b html docs docs/_build/html \
@@ -215,8 +215,17 @@ both themes.
 
 ## Notebooks
 
-Canonical notebooks live in `examples/`. The build stages them in `docs/examples/` and executes
-them with MyST-NB's cache, so a failed cell fails the build; the speed notebook is not executed.
+Canonical notebooks live in `examples/` with their outputs. The build stages them in
+`docs/examples/` and renders the stored outputs without running any cell, so a slow build server
+cannot time out. After changing a notebook, or code a notebook calls, store fresh outputs:
+
+```shell
+uv run --group docs python scripts/execute_notebooks.py
+```
+
+The docs workflow reruns every notebook with `--check` and fails when a cell fails or an output
+differs from the stored one; a decimal number may move by one in its last digit, as Linux and
+macOS round a few results apart. The speed notebook is never run and ships without outputs.
 Run them locally with `uv run --with jupyter jupyter lab`. Notebook dependencies stay out of
 `pyproject.toml`: each notebook has an Open in Colab link and a Colab-only setup cell that installs
 the pinned release from PyPI, a pin to update with every release. The rendered page's download link
@@ -252,7 +261,7 @@ then [`test_built_site.py`](test_built_site.py), which builds the site once from
 uv run --group docs python -m pytest docs/test_built_site.py
 ```
 
-It checks a strict `-W` build including notebook execution; API coverage (every public symbol of
+It checks a strict `-W` build; API coverage (every public symbol of
 `andrey`, `andrey.metrics`, and `andrey.viz`, and every loader of `andrey.data`, documented, no
 private symbol exposed); KaTeX-ready math; one description per page, the same as its link preview's,
 at most 160 characters; the navbar's links; the favicon and the link-preview cards; the blog's front
@@ -283,6 +292,7 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Guides | `docs/docs/guides/` |
 | Examples and demos galleries and pages | `docs/docs/examples/`, `docs/docs/demos/` |
 | Notebook sources | `examples/*.ipynb` -> staged into `docs/docs/examples/` |
+| Notebook outputs | `scripts/execute_notebooks.py` |
 | Docs chrome over the palette tokens | `docs/_static/andrey.css` |
 | Docs tables: a framed header band over a card of rows, a fade where a wide table scrolls, short values and labels on one line (`_short_cells` in `conf.py`); the API reference's summary tables get a Name and Description header (`_summary_headers`) and stack on a phone | `docs/_static/andrey.css`, `docs/conf.py` |
 | The old demo address, redirected to the gallery | `docs/_templates/demo-redirect.html` |

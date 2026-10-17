@@ -1,8 +1,8 @@
 """Checks on the built website that the unit tests cannot make.
 
 Run from the repo root: ``uv run --group docs python -m pytest docs/test_built_site.py``. The first
-test that needs the site builds all of it from a clean workspace with ``-W``, which executes the
-notebooks and takes a few minutes; the checks then read the built pages. The template and source
+test that needs the site builds all of it from a clean workspace with ``-W``, which takes a few
+minutes; the checks then read the built pages. The template and source
 checks are unit tests, which the docs workflow runs first.
 """
 
@@ -451,6 +451,8 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         path = urlsplit(url).path.lstrip("/") or "index.html"
         content = (html / path).read_text()
         assert f'<meta property="og:url" content="{url}"' in content, url
+        assert content.count('rel="canonical"') == 1, url
+        assert f'<link rel="canonical" href="{url}">' in content, url
         assert 'name="robots"' not in content, url
     for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
         assert f"https://andrey.abel.ai/{required}" in urls, required

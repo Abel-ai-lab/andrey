@@ -332,11 +332,14 @@ div[class*="highlight-"].window pre {
   background: var(--andrey-surface);
 }
 
+/* The claim sits right of the method's name; on a card too narrow for both, it moves under the
+   name. */
 .tchart figcaption {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: last baseline;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0 1rem;
   margin: 0;
   padding: 0;
   color: inherit;
