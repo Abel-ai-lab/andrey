@@ -173,6 +173,17 @@ identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selec
 
 The harness does not submit jobs. One file is one job.
 
+### Column order
+
+A generated dataset lists its columns in an order drawn from its seed, with its truth permuted the
+same way, so a method's accuracy cannot depend on the column order the simulation used. The shuffle
+is part of the generator call: a shuffled dataset has its own `dataset_id` and a label ending in
+`-shuffled`, the registry records its `column_order`, and `DatasetKey(shuffle=False)` keeps the
+generated order under the `dataset_id` its records carry. The PCMCI, PCMCI+, LPCMCI, and
+longitudinal LiNGAM simulations draw an order that carries no information about the graph and take
+no shuffle step. The summaries published up to 0.6.0 were measured on the generated order and stay
+as recorded.
+
 ### Hidden confounders
 
 `latent_gauss_er` hides one node in ten, at least one, from an Erdos-Renyi linear-Gaussian graph.
@@ -779,8 +790,9 @@ its paper, drawn by `andrey_bench/lingam_models.py`:
 | `varma_lingam_paper` | VARMA-LiNGAM | Hyvarinen et al. (2010), Sect. 5.4, plus one moving-average matrix | N x T, one series |
 | `longitudinal_lingam_paper` | LongitudinalLiNGAM | Kadowaki et al. (2013), JSAI Sect. 6.1 | N x T, M units per time point |
 
-`varma_lingam_paper` draws a strictly lower-triangular same-step matrix with 0.8 N links and a
-lag-1 matrix with 2 N links, the paper's 40% of entries at N = 5 held per variable as N grows,
+`varma_lingam_paper` draws a same-step DAG with 0.8 N links (strictly lower-triangular before the
+[column shuffle](#column-order)) and a lag-1 matrix with 2 N links, the paper's 40% of entries at
+N = 5 held per variable as N grows,
 weights 0.05 to 0.5 in magnitude with a random sign, and super-Gaussian noise. The paper's model
 has no moving-average part, so the series adds one moving-average matrix drawn like the lag-1 one.
 `longitudinal_lingam_paper` draws, at every time point, a dense same-step DAG with weights 0.5 to
@@ -986,7 +998,8 @@ and guidance in [Reading a result](#reading-a-result).
 | `provenance.json` | package versions and BLAS of the bench venv, CPU, GPU, git sha. Captured |
 | | once, so a resume keeps the recorded build |
 | `run_meta.json` | flags and literals, written before the first fit |
-| `data/registry.json` | each dataset's generator call; under `$ANDREY_BENCH_DATA` when set |
+| `data/registry.json` | each dataset's generator call and column order; under |
+| | `$ANDREY_BENCH_DATA` when set |
 
 Each fit uses a temporary compute-node directory for its pickled job, result, and start marker. The
 runner removes the directory after the fit.
