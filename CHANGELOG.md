@@ -9,6 +9,11 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- Hill climbing and tabu search break exact score ties by a hash of each column's values, so
+  reordering the columns no longer changes the graph they find. ([#TBD])
+
 ## [0.6.0] - 2026-10-17
 
 ### Highlights
