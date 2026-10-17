@@ -68,7 +68,10 @@ class DeltaEngine(Protocol):
     reference arm, which the quality gate pairs against the Schur path, and BDeu.
     """
 
-    score_obj: BICScore
+    @property
+    def score_obj(self) -> LocalScore:
+        """The local score whose deltas this engine computes."""
+        ...
 
     def delta_many_with_base(
         self,

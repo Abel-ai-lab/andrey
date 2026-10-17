@@ -187,7 +187,9 @@ def sample(d: int, seed: int = 0) -> np.ndarray:
     return x
 
 
-def fit_timers(method: str, workers: int, repeats: int = 3) -> tuple[Callable[[int], float], ...]:
+def fit_timers(
+    method: str, workers: int, repeats: int = 3
+) -> tuple[Callable[[int], float], Callable[[int], float], Callable[[int], int]]:
     """Serial and pooled timing functions for a whole ``method`` fit on :func:`sample` data.
 
     The pooled arm sets the method's cutoff to 0, so every pass runs on the pool and the time
