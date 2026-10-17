@@ -6,9 +6,10 @@ libraries. Fits never calibrate automatically.
 
 GES is timed on whole fits of sparse linear-Gaussian data over ``d`` variables: serial against every
 pass pooled, pool start included. :func:`bracket` finds sizes around the crossover, extending beyond
-the probe grid when needed. The cutoff uses first-pass work, ``d * (d - 1)``: a fit that large uses
-the pool from its first pass; smaller fits use it only for larger later passes. The process's first
-pool start occurs before timing, so the value suits many fits in one process (:data:`NOTE`).
+the probe grid when needed. Each size's work is the largest estimated work of a pass in its pooled
+fit, as the gate counts it: a cutoff below it sends that pass, and every forward pass after it, to
+the pool. The process's first pool start occurs before timing, so the value suits many fits in one
+process (:data:`NOTE`).
 """
 
 from __future__ import annotations
@@ -41,24 +42,35 @@ _REFINE_STEPS = 3
 
 @dataclass(frozen=True)
 class Crossover:
-    """Where the pooled pass starts to beat the serial one, as sizes ``d`` and work ``d(d - 1)``.
+    """Where the pooled fit starts to beat the serial one, as sizes ``d`` and their pass work.
 
     ``below`` is the largest measured size where the serial fit was faster, ``above`` the smallest
-    where the pooled pass was. ``None`` marks a side the search could not reach: the pool was faster
-    down to the smallest size, or slower up to the largest. ``cutoff`` is the work to set.
+    where the pooled fit was. ``None`` marks a side the search could not reach: the pool was faster
+    down to the smallest size, or slower up to the largest. ``works`` holds each measured size's
+    largest pass work (``d * (d - 1)``, the first pass's, where it is missing). ``cutoff`` is the
+    work to set.
     """
 
     below: int | None
     above: int | None
     timings: tuple[tuple[int, float, float], ...]
+    works: tuple[tuple[int, int], ...] = ()
+
+    def work(self, d: int) -> int:
+        """The largest pass work measured at size ``d``."""
+        return dict(self.works).get(d, d * (d - 1))
 
     @property
     def cutoff(self) -> int:
-        if self.above is None:  # never faster: the largest size's first-pass work
-            return _work(_MAX_D)
+        if self.above is None:  # never faster: keep the pool off up to the largest size measured
+            from andrey.search._parallel_ges import _DEFAULT_MIN_WORK
+
+            return max(
+                self.work(self.below if self.below is not None else _MAX_D), _DEFAULT_MIN_WORK
+            )
         if self.below is None:  # faster everywhere measured: use the pool from the smallest size
-            return _work(self.above)
-        return _round2(math.sqrt(_work(self.below) * _work(self.above)))
+            return self.work(self.above)
+        return _round2(math.sqrt(self.work(self.below) * self.work(self.above)))
 
 
 def cutoff_is_default(method: str) -> bool:
@@ -86,8 +98,11 @@ def bracket(
     grid: Sequence[int] = GRID,
     *,
     refine: int = _REFINE_STEPS,
+    work: Callable[[int], int] = lambda d: d * (d - 1),
 ) -> Crossover:
     """Find the sizes around the serial/pooled crossover from timing functions of ``d``.
+
+    ``work(d)``, called after ``pooled(d)``, gives the largest pass work of the pooled fit at ``d``.
 
     Scans ``grid`` upward for the first size where the pooled pass is faster. If that is the first
     grid size, halves ``d`` until the serial pass wins again (or ``d`` reaches 4); if no grid size
@@ -136,11 +151,7 @@ def bracket(
             else:
                 below = mid
     rows = tuple((d, s, p) for d, (s, p) in sorted(timings.items()))
-    return Crossover(below, above, rows)
-
-
-def _work(d: int) -> int:
-    return d * (d - 1)
+    return Crossover(below, above, rows, tuple((d, work(d)) for d in sorted(timings)))
 
 
 def _round2(x: float) -> int:
@@ -180,12 +191,15 @@ def fit_timers(method: str, workers: int, repeats: int = 3) -> tuple[Callable[[i
     """Serial and pooled timing functions for a whole ``method`` fit on :func:`sample` data.
 
     The pooled arm sets the method's cutoff to 0, so every pass runs on the pool and the time
-    includes starting it; the process's first pool start is paid before timing.
+    includes starting it; the process's first pool start is paid before timing. The third function
+    gives the largest pass work of the last pooled fit at ``d``.
     """
     import andrey
+    from andrey.search import _parallel_ges
 
     fit = getattr(andrey, method)
     var = CUTOFFS[method]
+    works: dict[int, int] = {}
 
     def run(d: int, n_workers: int, cutoff: str | None) -> float:
         x = sample(d)
@@ -194,13 +208,16 @@ def fit_timers(method: str, workers: int, repeats: int = 3) -> tuple[Callable[[i
             if cutoff is not None:
                 os.environ[var] = cutoff
             with andrey.config(num_workers=n_workers):
-                return _time(lambda: fit(x), repeats)
+                seconds = _time(lambda: fit(x), repeats)
+            if n_workers > 1:
+                works[d] = _parallel_ges.largest_pass_work
+            return seconds
         finally:
             os.environ.pop(var, None)
             if old is not None:
                 os.environ[var] = old
 
-    return (lambda d: run(d, 1, None)), (lambda d: run(d, workers, "0"))
+    return (lambda d: run(d, 1, None)), (lambda d: run(d, workers, "0")), works.__getitem__
 
 
 def calibrate(workers: int, methods: Sequence[str] = ("ges",)) -> dict[str, Crossover]:
@@ -213,7 +230,7 @@ def calibrate(workers: int, methods: Sequence[str] = ("ges",)) -> dict[str, Cros
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", andrey.AndreyWarning)
         for m in methods:
-            serial, pooled = fit_timers(m, workers)
+            serial, pooled, work = fit_timers(m, workers)
             pooled(8)  # start the process's first pool (the forkserver) before timing
-            out[m] = bracket(serial, pooled)
+            out[m] = bracket(serial, pooled, work=work)
     return out

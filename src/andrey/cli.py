@@ -1193,17 +1193,17 @@ def calibration_report(results: dict, workers: int) -> dict:
     """The measured crossovers as JSON: per method, the bracket, the timings, and the setting."""
     from andrey.search import calibrate as cal
 
-    def side(d: int | None) -> dict | None:
-        return None if d is None else {"d": d, "work": d * (d - 1)}
+    def side(c: cal.Crossover, d: int | None) -> dict | None:
+        return None if d is None else {"d": d, "work": c.work(d)}
 
     methods = {
         m: {
             "variable": cal.CUTOFFS[m],
             "cutoff": c.cutoff,
-            "serial_faster_at": side(c.below),
-            "pool_faster_at": side(c.above),
+            "serial_faster_at": side(c, c.below),
+            "pool_faster_at": side(c, c.above),
             "timings": [
-                {"d": d, "work": d * (d - 1), "serial_s": round(s, 4), "pooled_s": round(p, 4)}
+                {"d": d, "work": c.work(d), "serial_s": round(s, 4), "pooled_s": round(p, 4)}
                 for d, s, p in c.timings
             ],
         }
