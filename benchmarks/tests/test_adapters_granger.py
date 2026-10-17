@@ -94,3 +94,19 @@ def test_lag_scores_count_every_lag_and_leave_self_loops_out_of_cross() -> None:
     assert (scores["precision"], scores["recall"]) == (1.0, 2 / 3)
     empty = granger_var.lag_scores(np.zeros_like(truth), truth)
     assert np.isnan(empty["precision"]) and empty["recall"] == 0.0 and empty["f1"] == 0.0
+
+
+def test_a_run_drawn_in_another_column_order_is_not_rescored(tmp_path) -> None:
+    """A run's settings name its column order, so its stored fits meet only the truth they had."""
+    meta = {
+        "driver": "granger_var.py",
+        "lags": granger_var.LAGS,
+        "lag_degree": granger_var.LAG_DEGREE,
+        "input": granger_var.INPUT,
+    }
+    (tmp_path / "run_meta.json").write_text(json.dumps(meta))
+    (tmp_path / granger_var.RECORDS).write_text("")
+    with pytest.raises(SystemExit, match="other process settings"):
+        granger_var.rescore(tmp_path)
+    (tmp_path / "run_meta.json").write_text(json.dumps({**meta, "shuffle": granger_var.SHUFFLE}))
+    assert granger_var.rescore(tmp_path) == []

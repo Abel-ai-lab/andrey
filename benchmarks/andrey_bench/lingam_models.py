@@ -14,7 +14,9 @@ variable, ``0.8 N`` and ``2 N``, so the graph does not grow denser with ``N``. V
 fits a moving-average part, which the paper's VAR model does not have: the series adds one
 moving-average matrix ``M1`` on the noise, drawn as ``B1`` is,
 ``x_t = B0 x_t + B1 x_{t-1} + e_t + M1 e_{t-1}``. A draw whose autoregressive or moving-average
-part is not stable is drawn again.
+part is not stable is drawn again. Its columns are then listed in an order drawn from a stream of
+their own, with the stack permuted the same way, so the column order does not follow ``B0``'s causal
+order.
 
 ``panel2013`` follows Kadowaki, Shimizu, and Washio's longitudinal LiNGAM experiments as their JSAI
 2013 paper describes them (Sect. 6.1; the MLSP 2013 paper is not openly available): ``M`` units
@@ -42,6 +44,9 @@ BURN_IN = 500
 
 #: Draws of a model before giving up on a stable one.
 MAX_DRAWS = 1000
+
+#: The last seed coordinate of the column-order stream, which no other draw uses.
+COLUMN_STREAM = zlib.crc32(b"columns")
 
 
 @dataclass(frozen=True)
@@ -102,8 +107,16 @@ def _radius(matrix: np.ndarray) -> float:
     return float(np.max(np.abs(np.linalg.eigvals(matrix))))
 
 
-def sample_varma(name: str, d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return ``(data, truth)``: ``n`` steps of ``d`` variables and the ``[B0, B1, M1]`` stack."""
+def sample_varma(
+    name: str, d: int, n: int, seed: int, *, shuffle: bool = True
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return ``(data, truth, column_order)``: ``n`` steps of ``d`` variables, the ``[B0, B1, M1]``
+    stack, and the drawn variable each column holds.
+
+    With ``shuffle``, the columns are permuted with a permutation from the seed's column-order
+    stream, and both axes of every block of the stack with them; without it, ``column_order`` is the
+    identity and ``B0`` is strictly lower-triangular.
+    """
     model = MODELS[name]
     assert isinstance(model, VarmaModel)
     rng = _rng(name, d, seed)
@@ -124,7 +137,9 @@ def sample_varma(name: str, d: int, n: int, seed: int) -> tuple[np.ndarray, np.n
     x = np.zeros((n + BURN_IN, d))
     for t in range(1, n + BURN_IN):
         x[t] = inverse @ (b1 @ x[t - 1] + noise[t] + m1 @ noise[t - 1])
-    return np.ascontiguousarray(x[BURN_IN:]), np.stack([b0, b1, m1])
+    columns = _rng(name, d, seed, COLUMN_STREAM).permutation(d) if shuffle else np.arange(d)
+    stack = np.stack([b0, b1, m1])[:, columns][:, :, columns]
+    return np.ascontiguousarray(x[BURN_IN:, columns]), np.ascontiguousarray(stack), columns
 
 
 def _standard_noise(rng: np.random.Generator, density: str, size: tuple[int, ...]) -> np.ndarray:
@@ -170,6 +185,7 @@ def sample_panel(name: str, d: int, times: int, m: int, seed: int) -> tuple[np.n
     for t in range(times):
         drive = noise[t] + (np.outer(hidden, weights) if t == 0 else x[t - 1] @ truth[t, 1].T)
         x[t] = np.linalg.solve(np.eye(d) - truth[t, 0], drive.T).T
+    # The random variable order makes the panel order-free, so it takes no column-order stream.
     order = rng.permutation(d)
     return (
         np.ascontiguousarray(x[:, :, order]),
