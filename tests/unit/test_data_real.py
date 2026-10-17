@@ -178,7 +178,7 @@ def test_n_and_seed_fix_the_simulated_rows(offline_datasets):
 
 
 def test_measured_data_take_no_n_or_seed_and_nothing_is_fetched(offline_datasets):
-    for options in ({"n": 100}, {"seed": 1}):
+    for options in ({"n": 100}, {"seed": 1}, {"discrete": True}):
         with pytest.raises(ValueError, match="measured"):
             load_dataset("sachs", **options)
     assert offline_datasets == []
@@ -215,3 +215,74 @@ probability(c|a,  b_1) { (y, y) 1.0, 0.0; }
         real.read_bif(text.replace("c|a,", "c|z,"))
     with pytest.raises(ValueError, match="exactly one"):
         real.read_bif(text.replace("probability ( a ) { table 0.5, 0.5; }", ""))
+
+
+def test_a_published_network_is_sampled_from_its_own_tables(offline_datasets):
+    """ASIA's tables fix each variable's chance of "yes": 0.5 for smoke, 0.055 for lung (0.1 for a
+    smoker, 0.01 otherwise), 0.45 for bronc. 20,000 rows put each within 0.015 of it."""
+    asia = load_dataset("asia", n=20_000, seed=0, discrete=True)
+    assert asia.data.shape == (20_000, 8)
+    assert all(asia.data[c].cat.categories.tolist() == ["yes", "no"] for c in asia.data.columns)
+    share = {c: float((asia.data[c] == "yes").mean()) for c in ("smoke", "lung", "bronc")}
+    assert share == pytest.approx({"smoke": 0.5, "lung": 0.055, "bronc": 0.45}, abs=0.015)
+    # either is lung OR tub in every row: its table is deterministic.
+    either = (asia.data["lung"] == "yes") | (asia.data["tub"] == "yes")
+    assert ((asia.data["either"] == "yes") == either).all()
+    assert "own conditional probability tables (n=20000, seed=0)" in asia.description
+
+
+def test_the_array_holds_the_category_codes_and_the_seed_fixes_them(offline_datasets):
+    frame = load_dataset("asia", n=300, seed=2, discrete=True).data
+    array = load_dataset("asia", n=300, seed=2, discrete=True, as_frame=False).data
+    assert array.dtype == np.float64
+    np.testing.assert_array_equal(array, np.column_stack([frame[c].cat.codes for c in frame]))
+    again = load_dataset("asia", n=300, seed=2, discrete=True, as_frame=False).data
+    np.testing.assert_array_equal(array, again)
+    other = load_dataset("asia", n=300, seed=3, discrete=True, as_frame=False).data
+    assert not np.array_equal(array, other)
+
+
+_TABLES = """
+network x { }
+variable a { type discrete [ 2 ] { lo, hi }; }
+variable b { type discrete [ 3 ] { r, g, b }; }
+variable c { type discrete [ 2 ] { no, yes }; }
+probability ( a ) { table 0.4, 0.6; }
+probability ( c | b, a ) {
+  (r, lo) 1.0, 0.0; (r, hi) 0.0, 1.0;
+  (g, lo) 1.0, 0.0; (g, hi) 0.0, 1.0;
+  (b, lo) 0.0, 1.0; (b, hi) 1.0, 0.0;
+}
+probability ( b ) { table 0.2, 0.3, 0.5; }
+"""
+
+
+def test_the_table_reader_numbers_rows_by_the_parents_in_their_listed_order():
+    tables = real.read_bif_tables(_TABLES)
+    assert tables.nodes == ("a", "b", "c")
+    assert tables.states == (("lo", "hi"), ("r", "g", "b"), ("no", "yes"))
+    assert tables.parents == ((), (), (1, 0))
+    # Row (b, a) = 2 * b + a: the first listed parent is the most significant digit.
+    np.testing.assert_array_equal(tables.tables[2][:, 1], [0, 1, 0, 1, 1, 0])
+    codes = tables.sample(2000, np.random.default_rng(0)).astype(int)
+    a, b, c = codes.T
+    np.testing.assert_array_equal(c, np.where(b == 2, 1 - a, a))  # c's deterministic table
+    assert set(np.unique(b)) == {0, 1, 2}
+
+
+@pytest.mark.parametrize(
+    ("change", "named"),
+    [
+        (("(b, lo) 0.0, 1.0;", ""), "misses a parent configuration"),
+        (("(b, lo) 0.0, 1.0;", "(b, lo) 0.5, 0.6;"), "must be a distribution"),
+        (("(b, lo) 0.0, 1.0;", "(b, mid) 0.0, 1.0;"), "category 'mid' of 'a'"),
+        (("(b, lo) 0.0, 1.0;", "(b, lo) 1.0;"), "malformed"),
+        (("(r, lo) 1.0, 0.0;", "table 1.0, 0.0;"), "malformed"),
+        (("type discrete [ 3 ] { r, g, b };", "type continuous;"), "not discrete"),
+        (("probability ( b ) { table 0.2, 0.3, 0.5; }", ""), "no probability block"),
+        (("c | b, a", "c | b, z"), "undeclared"),
+    ],
+)
+def test_the_table_reader_refuses_an_incomplete_table(change, named):
+    with pytest.raises(ValueError, match=named):
+        real.read_bif_tables(_TABLES.replace(*change))

@@ -1,24 +1,47 @@
-"""Conditional-independence test substrate: the partial-correlation Fisher-Z and Student-t tests.
+"""Conditional-independence test substrate: partial-correlation, chi-square, and mixed-data tests.
 
 The constraint-based discovery family (PC / FCI / CDNOD) consumes a conditional-independence test
 through the :class:`CITest` contract: an object constructed once over the data and called as
 ``test(x, y, condition_set)`` returning a p-value, where a larger p-value means more independent.
 
-:class:`PartialCorrelationTest` is the base of the two shipped tests. It precomputes the sample
-correlation matrix once, then answers each query from the conditioned partial correlation of
-columns ``x`` and ``y`` given ``condition_set``. Empty and single-element conditioning sets -- the
-bulk of a constraint-based search -- use the closed-form (first-order) partial correlation and skip
-the matrix inversion entirely; larger sets invert the correlation submatrix. numpy float64 is the
-oracle. A query is canonicalized (``x``, ``y`` ordered, the conditioning set sorted unique) so its
-p-value does not depend on argument order, and nothing is memoized: a test object holds the
-correlation matrix and the sample size, whatever it is asked. The scalar path, the batched path
-(:meth:`~PartialCorrelationTest.batched_call`), the all-pairs and first-order closed forms, and the
-many-query path (:meth:`~PartialCorrelationTest.statistic_pvalues`) return the same p-values
-exactly.
+:class:`PartialCorrelationTest` is the base of the two partial-correlation tests. It precomputes
+the sample correlation matrix once, then answers each query from the conditioned partial
+correlation of columns ``x`` and ``y`` given ``condition_set``. Empty and single-element
+conditioning sets -- the bulk of a constraint-based search -- use the closed-form (first-order)
+partial correlation and skip the matrix inversion entirely; larger sets invert the correlation
+submatrix. numpy float64 is the oracle. A query is canonicalized (``x``, ``y`` ordered, the
+conditioning set sorted unique) so its p-value does not depend on argument order, and nothing is
+memoized: a test object holds the correlation matrix and the sample size, whatever it is asked.
+The scalar path, the batched path (:meth:`~PartialCorrelationTest.batched_call`), the all-pairs
+and first-order closed forms, and the many-query path
+(:meth:`~PartialCorrelationTest.statistic_pvalues`) return the same p-values exactly.
 
-The two tests differ only in how a partial correlation ``r`` and its degrees of freedom become a
-p-value. :class:`FisherZ` applies the normal distribution to Fisher's z-transform of ``r``;
-:class:`StudentT` applies the Student-t distribution to ``t = r * sqrt(df / (1 - r**2))``.
+The two partial-correlation tests differ only in how a partial correlation ``r`` and its degrees of
+freedom become a p-value. :class:`FisherZ` applies the normal distribution to Fisher's z-transform
+of ``r``; :class:`StudentT` applies the Student-t distribution to ``t = r * sqrt(df / (1 - r**2))``.
+
+:class:`ChiSquare` implements the Pearson chi-square and G-square tests on category codes: one
+contingency table of ``x`` and ``y`` per observed configuration of the conditioning set.
+
+:class:`DGTest` and :class:`CGTest` test mixed data, continuous and categorical columns marked by a
+mask, by the likelihood ratio of the degenerate Gaussian and the conditional Gaussian models of
+:mod:`andrey.core.mixed`.
+
+References
+----------
+Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search, 2nd ed.
+MIT Press.
+
+Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing Bayesian
+network structure learning algorithm. Machine Learning 65(1), 31-78.
+https://doi.org/10.1007/s10994-006-6889-7
+
+Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed variables.
+International Journal of Data Science and Analytics 6(1), 3-18.
+https://doi.org/10.1007/s41060-017-0085-7
+
+Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed acyclic
+graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
 """
 
 from __future__ import annotations
@@ -28,9 +51,11 @@ from collections.abc import Callable, Iterable
 from typing import Protocol, Self, cast, runtime_checkable
 
 import numpy as np
-from scipy.special import ndtr, stdtr
+import numpy.typing as npt
+from scipy.special import chdtrc, ndtr, stdtr
 
-from . import stats
+from . import categorical, stats
+from .mixed import ConditionalGaussian, DegenerateGaussian
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
@@ -368,14 +393,251 @@ class StudentT(PartialCorrelationTest):
         return 2.0 * stdtr(df, -np.abs(t))
 
 
-# The indep_test registry: a name maps to a factory building a :class:`CITest` over the data.
-# Fisher-Z and Student-t are the shipped tests; the constraint facades resolve their ``indep_test``
-# argument through :func:`make_indep_test`, and :func:`register_indep_test` lets a downstream test
-# or plugin add another under the same Protocol -- the generality this registry exposes.
-SHIPPED_INDEP_TESTS: tuple[str, ...] = ("fisherz", "student_t")
-_CI_REGISTRY: dict[str, Callable[[np.ndarray], CITest]] = {
+# A joint table of at most this many cells is counted densely; a larger one counts only the cells
+# that occur, so memory stays proportional to the rows whatever the cardinalities.
+_DENSE_CELLS = 1 << 20
+
+
+class ChiSquare:
+    """Pearson chi-square or G-square test of conditional independence on category codes.
+
+    ``__init__`` re-encodes each column to the codes ``0..k-1`` (see
+    :func:`~andrey.core.categorical.encode`), so any finite values work, each distinct value of a
+    column one category. Each call counts the joint table of ``x`` and ``y`` in every configuration
+    of ``condition_set`` that occurs in the data, and compares it with the table expected under
+    independence within that configuration, ``n_sx * n_sy / n_s``. The statistic is Pearson's
+    ``sum (O - E)**2 / E`` or, with ``g_square``, ``2 * sum O * log(O / E)``, summed over the
+    configurations [1]_ [2]_.
+
+    The degrees of freedom are ``(r_x - 1) * (r_y - 1)`` summed over the configurations, where
+    ``r_x`` and ``r_y`` count the values of ``x`` and ``y`` present in that configuration, so a
+    value absent there adds no degree of freedom [2]_. With zero degrees of freedom the p-value is
+    ``1``; otherwise it is the chi-square survival function of the statistic.
+
+    Queries are canonicalized as :class:`FisherZ`'s are, and nothing is memoized.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n_samples, n_features)
+        Finite values; each distinct value of a column is one category.
+    g_square : bool, default=False
+        Use the G-square (likelihood-ratio) statistic instead of Pearson's chi-square.
+
+    References
+    ----------
+    .. [1] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd ed. MIT Press.
+    .. [2] Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing
+       Bayesian network structure learning algorithm. Machine Learning 65(1), 31-78.
+    """
+
+    def __init__(self, data: np.ndarray, *, g_square: bool = False) -> None:
+        arr = np.asarray(data)
+        if arr.ndim != 2:
+            raise ValueError(
+                f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}"
+            )
+        if arr.dtype.kind == "f" and not np.isfinite(arr).all():
+            raise ValueError("data contains NaN or Inf; cannot run a chi-square test")
+        self._n: int = arr.shape[0]
+        self._codes, self._cardinalities = categorical.encode(arr)
+        self._g_square = bool(g_square)
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
+
+        ``condition_set`` is canonicalized to sorted unique ints; ``x`` and ``y`` are ordered so the
+        p-value is independent of argument order. A larger p-value means more independence.
+        """
+        x_int, y_int, cond = _canonical(x, y, condition_set)
+        codes = self._codes
+        kx = int(self._cardinalities[x_int])
+        ky = int(self._cardinalities[y_int])
+        layer, m = categorical.configurations(codes, self._cardinalities, cond)
+        xs = layer * kx + codes[:, x_int]  # (configuration, x) cell of each row
+        ys = layer * ky + codes[:, y_int]
+        n_sx = np.bincount(xs, minlength=m * kx).reshape(m, kx)
+        n_sy = np.bincount(ys, minlength=m * ky).reshape(m, ky)
+        n_s = n_sx.sum(axis=1)
+        cells = xs * ky + codes[:, y_int]
+        if m * kx * ky <= _DENSE_CELLS:
+            table = np.bincount(cells, minlength=m * kx * ky)
+            occupied = np.flatnonzero(table)
+            observed = table[occupied]
+        else:
+            occupied, observed = np.unique(cells, return_counts=True)
+        s, rest = np.divmod(occupied, kx * ky)
+        sx, sy = np.divmod(rest, ky)
+        expected = n_sx[s, sx] * n_sy[s, sy] / n_s[s]
+        if self._g_square:
+            statistic = 2.0 * float(np.sum(observed * np.log(observed / expected)))
+        else:
+            # Each configuration's expected counts sum to its observed ones, so Pearson's sum over
+            # every cell, empty ones included, equals this sum over the occupied cells.
+            statistic = float(np.sum(observed * (observed / expected))) - float(self._n)
+        dof = int(np.sum(((n_sx > 0).sum(axis=1) - 1) * ((n_sy > 0).sum(axis=1) - 1)))
+        if dof == 0:
+            return 1.0
+        return float(chdtrc(dof, max(statistic, 0.0)))
+
+
+# A conditional covariance's eigenvalue, on the scale of unit-variance columns, at or below this
+# marks a direction the conditioning set determines.
+_RANK_TOL = 1e-10
+
+
+class DGTest:
+    """Degenerate Gaussian likelihood-ratio test of conditional independence on mixed data.
+
+    The columns are embedded as :class:`~andrey.core.mixed.DegenerateGaussian` describes: a
+    categorical variable with ``k`` categories becomes the indicators of ``k - 1`` of them, and
+    every embedded column is treated as Gaussian [1]_. The test of ``x`` and ``y`` given ``S`` is
+    the likelihood ratio of the linear model of ``x``'s columns on ``y``'s and ``S``'s against the
+    one on ``S``'s alone [2]_: ``-n * sum log(1 - rho_i**2)``, with ``rho_i`` the canonical
+    correlations of ``x``'s and ``y``'s columns after the linear regression on ``S``'s. Its degrees
+    of freedom are the product of the two variables' numbers of columns, and its p-value is the
+    chi-square survival function. A direction of ``x`` or ``y`` that ``S`` determines exactly
+    carries no information and adds no degree of freedom; with none left, the p-value is ``1``. On
+    continuous columns only, the statistic is ``-n log(1 - r**2)`` with ``r`` the partial
+    correlation.
+
+    The statistic does not depend on the columns' units, and queries are canonicalized as
+    :class:`FisherZ`'s are, so the p-value does not depend on the argument order.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n_samples, n_features)
+        Finite values; categorical columns hold their categories as numbers, each distinct value of
+        a column one category.
+    categorical : array-like of bool, shape (n_features,), optional
+        Marks the categorical columns; ``None`` marks none.
+
+    References
+    ----------
+    .. [1] Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed
+       acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
+    .. [2] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
+       variables. International Journal of Data Science and Analytics 6(1), 3-18.
+    """
+
+    def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
+        self._dg = DegenerateGaussian(data, categorical)
+        sd = np.sqrt(np.diag(self._dg.cov))
+        self._corr = self._dg.cov / np.outer(sd, sd)
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
+
+        ``condition_set`` is canonicalized to sorted unique ints; ``x`` and ``y`` are ordered so the
+        p-value is independent of argument order. A larger p-value means more independence.
+        """
+        x_int, y_int, cond = _canonical(x, y, condition_set)
+        dg = self._dg
+        cx, cy, cs = dg.columns([x_int]), dg.columns([y_int]), dg.columns(cond)
+        both = np.concatenate([cx, cy])
+        block = self._corr[np.ix_(both, both)]
+        if cs.size:
+            # Regress on the conditioning columns through their nonzero eigen-directions, so
+            # collinear conditioning columns need no inverse.
+            w, u = np.linalg.eigh(self._corr[np.ix_(cs, cs)])
+            keep = w > _RANK_TOL * w[-1]
+            cross = self._corr[np.ix_(both, cs)] @ u[:, keep]
+            block = block - (cross / w[keep]) @ cross.T
+        px = cx.size
+        wx = _whitener(block[:px, :px])
+        wy = _whitener(block[px:, px:])
+        dof = wx.shape[1] * wy.shape[1]
+        if dof == 0:
+            return 1.0
+        rho = np.linalg.svd(wx.T @ block[:px, px:] @ wy, compute_uv=False)
+        rho = np.minimum(rho, _ONE_MINUS_EPS)
+        statistic = -dg.n * float(np.sum(np.log1p(-(rho * rho))))
+        return float(chdtrc(dof, max(statistic, 0.0)))
+
+
+def _whitener(cov: np.ndarray) -> np.ndarray:
+    """Map ``cov``'s columns onto unit-variance, uncorrelated ones, dropping null directions."""
+    w, u = np.linalg.eigh(cov)
+    keep = w > _RANK_TOL
+    return u[:, keep] / np.sqrt(w[keep])
+
+
+class CGTest:
+    """Conditional Gaussian likelihood-ratio test of conditional independence on mixed data.
+
+    The variables are fit as :class:`~andrey.core.mixed.ConditionalGaussian` describes: the rows
+    split into the cells of the categorical variables' joint categories, the continuous variables
+    Gaussian within each cell, with a covariance shrunk toward that of all rows [1]_. With ``l(A)``
+    the log-likelihood of the set ``A`` and ``k(A)`` its parameter count, the test of ``x`` and
+    ``y`` given ``S`` compares the model of ``x`` given ``y`` and ``S`` with the model of ``x``
+    given ``S`` [1]_:
+
+    ``2 * (l(x, y, S) - l(y, S) - l(x, S) + l(S))``
+
+    on ``k(x, y, S) - k(y, S) - k(x, S) + k(S)`` degrees of freedom, a chi-square survival function
+    p-value. The expression is symmetric in ``x`` and ``y``. On categorical columns only, the
+    statistic is the G-square statistic of :class:`ChiSquare`, with ``(r_x - 1) * (r_y - 1)``
+    degrees of freedom for every joint category of ``S``, whether it occurs or not; on continuous
+    columns only, it is ``-n log(1 - r**2)`` with ``r`` the partial correlation, on one degree of
+    freedom.
+
+    Log-likelihoods are memoized by set, and queries are canonicalized as :class:`FisherZ`'s are.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n_samples, n_features)
+        Finite values; categorical columns hold their categories as numbers, each distinct value of
+        a column one category.
+    categorical : array-like of bool, shape (n_features,), optional
+        Marks the categorical columns; ``None`` marks none.
+
+    References
+    ----------
+    .. [1] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
+       variables. International Journal of Data Science and Analytics 6(1), 3-18.
+    """
+
+    def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
+        self._cg = ConditionalGaussian(data, categorical)
+
+    def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
+
+        ``condition_set`` is canonicalized to sorted unique ints; ``x`` and ``y`` are ordered so the
+        p-value is independent of argument order. A larger p-value means more independence.
+        """
+        x_int, y_int, cond = _canonical(x, y, condition_set)
+        cg = self._cg
+        sets = ([x_int, y_int, *cond], [y_int, *cond], [x_int, *cond], cond)
+        ll = [cg.loglik(s) for s in sets]
+        k = [cg.dof(s) for s in sets]
+        statistic = 2.0 * (ll[0] - ll[1] - ll[2] + ll[3])
+        dof = k[0] - k[1] - k[2] + k[3]
+        return float(chdtrc(dof, max(statistic, 0.0)))
+
+
+# The indep_test registry: a name maps to a factory building a :class:`CITest` over the data. The
+# constraint facades resolve their ``indep_test`` argument through :func:`make_indep_test`, and
+# :func:`register_indep_test` lets a downstream test or plugin add another under the same Protocol.
+# The discrete tests read category codes and the mixed tests a mask of the categorical columns as
+# well; the facades check both before a fit.
+SHIPPED_INDEP_TESTS: tuple[str, ...] = (
+    "fisherz",
+    "student_t",
+    "chisq",
+    "gsq",
+    "degen_gauss",
+    "cond_gauss",
+)
+DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
+MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
+_CI_REGISTRY: dict[str, Callable[..., CITest]] = {
     "fisherz": FisherZ,
     "student_t": StudentT,
+    "chisq": ChiSquare,
+    "gsq": lambda data: ChiSquare(data, g_square=True),
+    "degen_gauss": DGTest,
+    "cond_gauss": CGTest,
 }
 
 
@@ -393,10 +655,14 @@ def available_indep_tests() -> tuple[str, ...]:
     return tuple(sorted(_CI_REGISTRY))
 
 
-def make_indep_test(name: str, data: np.ndarray) -> CITest:
+def make_indep_test(
+    name: str, data: np.ndarray, *, categorical: npt.ArrayLike | None = None
+) -> CITest:
     """Construct the registered ``indep_test`` ``name`` over ``data``.
 
-    Raises :class:`NotImplementedError` when ``name`` is not registered, listing what is available.
+    ``categorical``, a boolean mask of the categorical columns, reaches the mixed tests
+    (:data:`MIXED_INDEP_TESTS`) only; another test given one raises ``ValueError``. Raises
+    :class:`NotImplementedError` when ``name`` is not registered, listing what is available.
     """
     try:
         factory = _CI_REGISTRY[name]
@@ -404,7 +670,21 @@ def make_indep_test(name: str, data: np.ndarray) -> CITest:
         raise NotImplementedError(
             f"unknown indep_test {name!r}; registered: {available_indep_tests()}"
         ) from None
+    if name in MIXED_INDEP_TESTS:
+        return factory(data, categorical)
+    if categorical is not None:
+        raise ValueError(f"indep_test {name!r} reads no column types; categorical must be None")
     return factory(data)
+
+
+def pins_blas(test: CITest) -> bool:
+    """Whether a skeleton search runs ``test`` with BLAS pinned to one thread.
+
+    A test whose p-values come from matrix algebra, the partial-correlation and the mixed-data
+    tests, then gives the same bits whatever the host's thread count; the chi-square tests call no
+    BLAS.
+    """
+    return callable(getattr(test, "to_seed", None)) or isinstance(test, (DGTest, CGTest))
 
 
 def _invert_nonsingular(stack: np.ndarray) -> np.ndarray:

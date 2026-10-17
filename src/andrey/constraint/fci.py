@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterator, Mapping
+from contextlib import nullcontext
 from itertools import combinations, islice
 
 import numpy as np
@@ -20,7 +21,7 @@ from andrey.constraint._skeleton import (
     scan_pairs,
 )
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
-from andrey.core.ci import CITest, make_indep_test
+from andrey.core.ci import CITest, make_indep_test, pins_blas
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
 _UNBOUNDED_PATH = 1000
@@ -32,18 +33,20 @@ def fci(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
+    categorical: np.ndarray | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
 
     ``data`` is an ``(n_samples, n_features)`` array; ``alpha`` is the independence-test
     significance level in ``(0, 1)``. Skeleton pruning requires a p-value above ``alpha``;
     the optional majority collider rule also counts equality as a separating vote.
+    ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
     Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
 
     _validate_collider_rule(collider_rule)
-    test = make_indep_test(indep_test, X)
+    test = make_indep_test(indep_test, X, categorical=categorical)
     support, sepsets = _fast_adjacency_search(X, test, alpha)
 
     marks = _circle_pag(support)
@@ -89,7 +92,8 @@ def _fast_adjacency_search(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    parallel = workers > 1 and callable(getattr(test, "to_seed", None))
+    seedable = callable(getattr(test, "to_seed", None))
+    parallel = workers > 1 and seedable
     pool = SkeletonWorkerPool(test, workers) if parallel else None
     try:
         size = -1
@@ -121,9 +125,10 @@ def _fast_adjacency_search(
                 if pool is not None:
                     removals = pool.scan(pairs, support.copy(), size, alpha)
                 else:
-                    # Pin BLAS to one thread: the conditioning-submatrix inversions then match the
-                    # (1-thread) parallel skeleton workers regardless of the host thread count.
-                    with backend.one_blas_thread():
+                    # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
+                    # match the (1-thread) parallel skeleton workers, where it has them, whatever
+                    # the host thread count.
+                    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
                         removals = scan_pairs(test, pairs, neighbors, size, alpha)
                 for x, y, separating in removals:
                     remove.append((x, y))

@@ -36,6 +36,9 @@ Packages:
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
+- [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](#categorical-data)
+- [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar - see
+  [Mixed data](#mixed-data)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
@@ -147,7 +150,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 |---|---|
 | GES | Andrey (numpy/serial, numpy/parallel, numba/serial), causal-learn, gCastle, pcalg |
 | XGES (GES family) | Andrey and xges, each with and without the extended search |
-| HC | Andrey, bnlearn (`hc`) |
+| HC | Andrey, bnlearn (`hc`), pgmpy (categorical data) |
 | Tabu | Andrey, bnlearn (`tabu`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
@@ -406,6 +409,184 @@ assumed cause with the mean of the estimated noise by a two-sample t-test, round
 decimals. Andrey fits smooth basis expansions by Newton's method and tests independence with HSIC.
 causal-learn's fit takes over a minute at 1000 rows and grows with the rows.
 
+### Categorical data
+
+`discrete_cpu.py` compares Andrey's PC with the chi-square and the G-square test, GES with the BDeu
+score, and hill climbing with the BDeu score and the multinomial BIC against the same method in
+causal-learn, bnlearn, and pgmpy, with the empty-graph baseline. It runs on `discrete_er`: category
+codes from a discrete network on an Erdos-Renyi graph, each node with 2 or 3 categories and each row
+of its conditional probability table drawn from a flat Dirichlet (`datasets.DISCRETE_SETTINGS`,
+recorded in each dataset's generator call). The codes are never rescaled. Every solution is serial.
+Andrey's GES runs on the numpy backend; BDeu moves are scored in one process.
+
+| method | Andrey | causal-learn | bnlearn | pgmpy |
+|---|---|---|---|---|
+| PC, chi-square | `andrey.pc.chisq` | `causal-learn.pc.chisq` | `bnlearn.pc-stable.chisq` | |
+| PC, G-square | `andrey.pc.gsq` | `causal-learn.pc.gsq` | `bnlearn.pc-stable.gsq` | |
+| GES, BDeu | `andrey.ges.bdeu` | `causal-learn.ges.bdeu` | | |
+| HC, BDeu | `andrey.hc.BDeu` | | `bnlearn.hc.BDeu` | `pgmpy.hc.BDeu` |
+| HC, BIC | `andrey.hc.BIC_categorical` | | `bnlearn.hc.BIC_categorical` | `pgmpy.hc.BIC_categorical` |
+
+A run can keep to some of these solutions, by name, with `baseline.empty`. Each pair runs one
+method with one test or score and the same settings, each set explicitly and listed in `params`.
+Where a package's default differs, the adapter overrides it:
+
+| setting | Andrey | bnlearn | pgmpy 1.1.2 |
+|---|---|---|---|
+| PC test | `chisq`, `gsq` | `x2-adf`, `mi-adf` | |
+| PC level, conditioning-set size | `alpha=0.05`, no limit | `alpha=0.05`, no limit (`max.sx`) | |
+| BDeu equivalent sample size | 1 (`sample_prior`) | `iss=1` | `equivalent_sample_size=1` (default 10) |
+| BDeu structure prior | each other variable a parent with probability `1 / (d - 1)` | `prior="vsp"`, `beta = 1 / (d - 1)` | the same, added through `structure_prior_ratio` (pgmpy has none) |
+| BIC penalty | `lambda_value=1`: `log(n)` per parameter, in deviance units | `k = log(n) / 2`, in log-likelihood units | `log(n) / 2`, fixed |
+| parent cap | none | `maxp=Inf` | `max_indegree=None` |
+| move budget | `max_iter=100000` | `max.iter=100000` | `max_iter=100000` |
+| restarts, tabu list | none | `restart=0` | `tabu_length=0` (default 100) |
+
+Andrey's scores are `-2` times the log-likelihood scale of bnlearn and pgmpy. Hill climbing stops
+at the first pass with no improving move; pgmpy's threshold is its default `epsilon=1e-4`, and
+Andrey's is `1e-9` in deviance units, both far below the gain of a real move. pgmpy is pinned to
+1.1.2, which installs on Python 3.13 with NumPy 2.5 and pandas 3 (`start.sh` installs it; the
+driver stops when another version is installed). bnlearn is the R
+library of [The R lane](#the-r-lane); its version is in `run_meta.json`.
+
+bnlearn names Pearson's chi-square test `x2` and the G-square test `mi`, the mutual information
+times `2 n`, which is the G statistic. Each has an `-adf` form that takes the empty rows and
+columns of a table out of the degrees of freedom, as Andrey's tests do, so the `-adf` forms are the
+ones paired with Andrey's: the plain `x2` and `mi` differ from Andrey's p-values on tables with an
+empty row or column. The `-adf` p-values are Andrey's to rounding, with one exception: when a table
+has fewer than 5 observations per cell on average (`n < 5 * r * c * q`, for `r` and `c` categories
+in the two variables and `q` configurations of the conditioning set), bnlearn returns `p = 1` and
+Andrey's tests have no such rule. At 2000 rows and three-category variables that starts at four
+conditioning variables, where bnlearn's PC removes the edge and Andrey's PC tests it.
+
+The defaults are 2000 rows, `d` of 10, 20, and 40, five seeds, one repeat after one warm-up fit, and
+`--cap-wall-s` of 1800. Each estimate is scored against the true DAG's CPDAG: `shd` and the
+skeleton and arrowhead columns. Andrey's PC, GES, and hill climbing return CPDAGs. bnlearn's and
+pgmpy's hill climbing return DAGs, whose comparable columns are `mec_shd` and `mec_arrowhead_f1`,
+scored through the DAG's essential graph. The summary prints each solution's median wall time and
+error per `d`, with the F1 columns in the same comparable form, then each pair's speed-up: the other
+package's median wall time over Andrey's on the datasets where both finished. A smoke run covers
+every solution on one small dataset, and a rescore recomputes the score columns from the stored
+estimates; pass the first run's flags. The bnlearn rows need the R lane and the pgmpy rows need
+pgmpy; a run that names neither needs neither:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py --out outputs/discrete-cpu --rescore
+```
+
+To run only some solutions, name them. `--resume` requires the first run's solution list, so a run
+of other solutions takes a fresh `--out`; pointing `ANDREY_BENCH_DATA` at the first run's `data/`
+gives it the same datasets, and `andrey_bench.aggregate.pool` joins the two runs' records:
+
+```shell
+ANDREY_BENCH_DATA=outputs/discrete-cpu/data $ANDREY_BENCH_PYTHON benchmarks/discrete_cpu.py \
+    --out outputs/discrete-comparators --solutions andrey.hc.BDeu andrey.hc.BIC_categorical \
+    bnlearn.pc-stable.chisq bnlearn.pc-stable.gsq bnlearn.hc.BDeu bnlearn.hc.BIC_categorical \
+    pgmpy.hc.BDeu pgmpy.hc.BIC_categorical
+```
+
+The p-values and BDeu scores of Andrey and causal-learn follow the same definitions (Andrey's BDeu
+is `-2` times causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py`
+the two packages return the same graph. Each comparator's objective is checked against Andrey's in
+`benchmarks/tests/test_adapters_discrete_comparators.py`, where R or pgmpy is installed: the scores
+agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets,
+and each declared setting takes effect. pgmpy's search ends in a different local optimum on some
+datasets: each package takes the first of equal moves in its own scan order, and the graphs can
+differ at equal settings. pgmpy breaks ties by the iteration order of a set of column-name pairs,
+so its columns are named by integer position, which keeps the graph the same under any
+`PYTHONHASHSEED`. Read the error columns beside the speed-up: where the graphs differ, the
+difference is a result to report.
+
+### Mixed data
+
+`mixed_cpu.py` compares Andrey's PC with the degenerate and the conditional Gaussian test, and GES
+and hill climbing with the two matching scores, against the same algorithm in another package:
+Tetrad's PC and FGES with the same four, bnlearn's `pc.stable` with its conditional Gaussian test,
+and bnlearn's hill climbing with its conditional linear Gaussian BIC, the comparator for both of
+Andrey's hill-climbing scores. The empty graph is the baseline. It runs on `mixed_er`: a conditional
+linear Gaussian network on an Erdos-Renyi graph from `andrey.data.sample_mixed`. Two key fields set
+the data: the categorical share of the variables (0.5 by default) and the least and most categories
+of a categorical variable (2 and 3); each changes the dataset's digest and label, and other regimes'
+keys stay as they were. The Dirichlet concentration of the categorical tables is
+`datasets.MIXED_SETTINGS`. Codes and values are never rescaled.
+
+Every solution reads a column as categorical when it holds at most ten distinct whole numbers.
+Andrey infers its categorical columns with `max_categories=10`; Tetrad's reader marks a column of at
+most ten distinct values categorical, and the bnlearn adapters turn such columns into factors. On
+`mixed_er` the rule reads exactly the generated categorical columns, which
+`tests/test_adapters_mixed.py` checks, and every Tetrad fit stops unless Tetrad read exactly the
+rule's columns. Each
+package's names for the settings map to Andrey's:
+
+| Andrey | Tetrad (causal-cmd) | bnlearn |
+|---|---|---|
+| `max_categories=10` | `--data-type mixed --numCategories 10` | integer columns of at most 10 values made `factor` |
+| `indep_test="degen_gauss"` | `--test dg-lr-test` | - |
+| `indep_test="cond_gauss"` | `--test cg-lr-test` | `pc.stable(test = "mi-cg")` |
+| `score_func="local_score_degen_gauss"` | `--score dg-bic-score` | - |
+| `score_func="local_score_cond_gauss"` | `--score cg-bic-score` | `hc(score = "bic-cg")` |
+| `max_iter=None`, from the empty graph | - | the defaults `max.iter = Inf`, `start = NULL` |
+| `alpha=0.05` | `--alpha 0.05` | `alpha = 0.05` |
+| `lambda_value=1.0` | `--penaltyDiscount 1` | the default `k = log(n) / 2` |
+
+Tetrad's PC runs order-independent (`--stableFAS`), keeps the first of two conflicting colliders
+(`--conflictRule 1`), and has no depth cap, as Andrey's PC does. FGES runs with no structure prior
+(`--structurePrior 0`), since Andrey's GES has none. Both hill climbings take the best add, remove,
+or reverse move from the empty graph until none improves the score, with no restarts, and neither
+gives a categorical node a continuous parent. bnlearn's hill climbing returns a DAG, so its
+comparable error is `mec_shd`; every other row is a CPDAG, scored by `shd`. The two packages define
+some of these tests and scores differently from Andrey, so their graphs can differ on the same
+data: Tetrad's conditional Gaussian parameter count leaves out each category's means, its
+degenerate Gaussian test statistic is twice the likelihood ratio, and its degenerate Gaussian score
+sums one regression per category of a categorical child.
+
+causal-cmd 1.12.0 parses `--numCategories` but never stores it, so its own command line reads every
+column as continuous. Tetrad's fits therefore run through `andrey_bench/adapters/TetradDriver.java`,
+which takes causal-cmd's argument parser, parameters, and algorithm factory from the jar and
+replaces only the reader with one that applies `--numCategories`. Each fit writes the data to a CSV
+file, starts `java` once on the driver's source with causal-cmd's arguments, and reads its graph
+back:
+
+```shell
+java -XX:ActiveProcessorCount=4 --class-path causal-cmd-1.12.0-jar-with-dependencies.jar \
+    andrey_bench/adapters/TetradDriver.java search --warmup 0 --data-type mixed ...
+```
+
+Tetrad's time is its search inside the JVM, excluding JVM start, source compile and data loading,
+as Andrey's time excludes interpreter start and import. The driver times the search call alone and
+the record keeps it as `wall_s`; the whole call is `process_s`. With `--warmup` above 0, the
+warm-up searches run in the same JVM before the timed one. The JVM sees only the fit's cores.
+
+Running a source file needs a `java` with the `jdk.compiler` module, as a JDK has; the adapter's
+setup checks for it. Each record's `package_version` names the causal-cmd, tetrad-lib, and Java
+releases. The adapters were written against causal-cmd 1.12.0, which bundles tetrad-lib 7.6.3;
+download it from Maven Central, check its SHA-1 against the published one, and point
+`ANDREY_BENCH_TETRAD_JAR` at it (`ANDREY_BENCH_JAVA` names `java` when it is not on `PATH`):
+
+```shell
+curl -fLO https://repo1.maven.org/maven2/io/github/cmu-phil/causal-cmd/1.12.0/causal-cmd-1.12.0-jar-with-dependencies.jar
+curl -fsL https://repo1.maven.org/maven2/io/github/cmu-phil/causal-cmd/1.12.0/causal-cmd-1.12.0-jar-with-dependencies.jar.sha1
+sha1sum causal-cmd-1.12.0-jar-with-dependencies.jar  # b0e3c3fb3b0277e0a44c54dbb82f0023c4fd9e54
+export ANDREY_BENCH_TETRAD_JAR=$PWD/causal-cmd-1.12.0-jar-with-dependencies.jar
+```
+
+The bnlearn rows need the R lane: see [The R lane](#the-r-lane). The defaults are 2000 rows, `d` of
+10, 20, and 40, five seeds, one repeat after one warm-up fit, and a wall cap of 1800 s. The summary
+prints each solution's median wall time and error per `d`, then each pair's speed-up: the
+comparator's median wall time over Andrey's on the datasets where both finished. A smoke run covers
+every solution on one small dataset, a run can keep to some solutions, and a rescore recomputes the
+score columns from the stored estimates; pass the first run's flags:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-cpu --cap-mem-mb 32000 \
+    --categorical-share 0.5 --categories 2 3
+$ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-andrey --solutions \
+    andrey.pc.degen_gauss andrey.ges.cond_gauss baseline.empty
+$ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-cpu --rescore
+```
+
 ### PCMCI on lagged series
 
 `pcmci_cpu.py` compares Andrey's PCMCI with tigramite's, with the empty lag stack as the floor.
@@ -648,6 +829,12 @@ numba and XGES inside `fit`. Account for those imports when comparing fit times.
 `setup_s` records setup duration and is included in `warmup_s`. At `--warmup 0`, they are equal and
 provide no fit-time bound.
 
+A package whose search runs in a process `fit` starts, such as Tetrad's JVM, times that search
+itself: its adapter declares `search_s` and sets it in `fit` to the seconds the process measured
+around the search call alone. The record keeps that time as `wall_s` and the whole `fit` call as
+`process_s`, which is null for every other adapter. Its warm-up searches run in the timed fit's
+process before its clock, so `warmup_s` holds only `setup_s`. See `contracts.SolutionAdapter`.
+
 ### Measure the dispatch thresholds
 
 Andrey uses hardcoded thresholds for accelerated paths:
@@ -806,10 +993,11 @@ runner removes the directory after the fit.
 
 A record stores its data (`d`, `n`, `latents`, regime coordinates, `data_seed`, `repeat`), run
 settings (`cap_wall_s`, `cap_mem_mb`, `cores`, `device`, `dtype`, `backend`, `mode`, `machine_id`, `params`),
-and results (`status`, `wall_s`, `cpu_s`, `warmup_s`, `setup_s`, `peak_rss_mb`, `output_hash`,
-`shd`, `skeleton_f1`, `arrowhead_f1`). A temporal solution's record also carries `tau_max`, and its
-scores are the lag columns of [PCMCI on lagged series](#pcmci-on-lagged-series), or the link columns
-of [PCMCI+ and LPCMCI](#pcmci-and-lpcmci-on-series-with-same-step-links) for a window.
+and results (`status`, `wall_s`, `process_s`, `cpu_s`, `warmup_s`, `setup_s`, `peak_rss_mb`,
+`output_hash`, `shd`, `skeleton_f1`, `arrowhead_f1`). A temporal solution's record also carries
+`tau_max`, and its scores are the lag columns of [PCMCI on lagged series](#pcmci-on-lagged-series),
+or the link columns of [PCMCI+ and LPCMCI](#pcmci-and-lpcmci-on-series-with-same-step-links) for a
+window.
 
 `device_id` records `cpu` or the CUDA device index and name. The backend determines the device, so a
 pin inside `fit` outranks `ANDREY_DEVICE`; the record keeps the request separately as `device`.
@@ -947,6 +1135,12 @@ Read `params` before comparing solutions because their defaults may optimize dif
   BIC.
 - `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
 - `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
+- `discrete_cpu.py` - compares PC with the chi-square and G-square tests, GES with BDeu, and hill
+  climbing with BDeu and the multinomial BIC with causal-learn, bnlearn, and pgmpy on categorical
+  data. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical tests and
+  scores.
+- `mixed_cpu.py` - compares PC, GES, and hill climbing with the degenerate and conditional Gaussian
+  tests and scores with Tetrad and bnlearn on mixed data.
 - `granger_var.py` - compares lasso Granger causality with causal-learn on vector-autoregressive
   series.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from

@@ -668,6 +668,29 @@ def _load_method_inputs(
     return positional, headers[0]
 
 
+def column_positions(
+    columns: list[str] | tuple[str, ...], labels: tuple[str, ...] | None
+) -> list[int]:
+    """Turn ``categorical=`` entries into 0-based column positions the facade reads.
+
+    An entry names a column of the data file's header, or else gives a position as digits.
+    """
+    positions = []
+    for column in columns:
+        if labels is not None and column in labels:
+            positions.append(labels.index(column))
+        elif column.isdigit():
+            positions.append(int(column))
+        else:
+            known = f"; the header names {list(labels)}" if labels is not None else ""
+            raise CliError(
+                "unknown_column",
+                f"categorical names column {column!r}, which the data file does not have{known}",
+                EXIT_USAGE,
+            )
+    return positions
+
+
 def execute_run(
     spec: MethodSpec,
     positional: list,
@@ -691,6 +714,14 @@ def execute_run(
             fkwargs = {**fkwargs, "labels": labels}
             resolved = {**resolved, "labels": list(labels)}
         labels = None
+    if fkwargs.get("categorical") is not None:
+        fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
+    if labels is not None and any(p.name == "categorical" for p in spec.params):
+        # A method that reads column types names the header's columns in its warnings and in
+        # metadata["categorical"].
+        import pandas as pd
+
+        positional = [pd.DataFrame(positional[0], columns=list(labels)), *positional[1:]]
 
     fn = getattr(andrey, spec.name)
     start = time.perf_counter()

@@ -1,7 +1,8 @@
 """causal-learn PC adapter — the reference constraint-based competitor.
 
 Calls ``pc(X, alpha=0.05, indep_test="fisherz", show_progress=False)``; those pins are also
-causal-learn's own defaults. Unlike the GES adapter this path needs no ``np.mat`` shim — it never
+causal-learn's own defaults. :class:`CausalLearnPCChisq` and :class:`CausalLearnPCGsq` run its
+chi-square and G-square tests, for categorical data. Unlike the GES adapter this path needs no ``np.mat`` shim — it never
 imports ``ScoreUtils``.
 """
 
@@ -40,6 +41,8 @@ class CausalLearnPC:
     mode: str = "serial"
     algorithm: str = "pc"
     output_type: str = "cpdag"
+    #: The CI test this solution runs; a variant with another test has its own ``name``.
+    indep_test: str = _DEFAULT_INDEP_TEST
 
     def setup(self) -> None:
         """Import causal-learn before timing; see `contracts.SetupAdapter`.
@@ -50,8 +53,8 @@ class CausalLearnPC:
         from causallearn.search.ConstraintBased.PC import pc  # noqa: F401
 
     def params(self) -> dict[str, Any]:
-        """Fisher-Z at ``alpha=0.05`` — causal-learn's own defaults."""
-        return {"alpha": _DEFAULT_ALPHA, "indep_test": _DEFAULT_INDEP_TEST}
+        """The solution's CI test at ``alpha=0.05``; Fisher-Z by default, causal-learn's own."""
+        return {"alpha": _DEFAULT_ALPHA, "indep_test": self.indep_test}
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run causal-learn PC; return a plain 0/1 CPDAG adjacency. The timed region.
@@ -74,3 +77,17 @@ class CausalLearnPC:
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+class CausalLearnPCChisq(CausalLearnPC):
+    """causal-learn's PC with its chi-square test, for categorical data."""
+
+    name: str = "causal-learn.pc.chisq"
+    indep_test: str = "chisq"
+
+
+class CausalLearnPCGsq(CausalLearnPC):
+    """causal-learn's PC with its G-square test, for categorical data."""
+
+    name: str = "causal-learn.pc.gsq"
+    indep_test: str = "gsq"

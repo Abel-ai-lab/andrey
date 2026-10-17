@@ -1079,11 +1079,12 @@ def test_a_family_number_rounds_down_to_one_digit(ratio, shown):
 
 def test_a_family_where_andrey_is_not_faster_shows_no_number():
     summaries = placeholder_summaries()
+    families = {spec.name: spec.family for spec in list_specs()}
     for summary in summaries:
         for method in summary["methods"]:
-            if method["method"] in ("PC", "FCI"):
+            if families.get(build.registry_name(method)) == "constraint":
                 for row in method["rows"]:
-                    row["ratio"] = 0.8
+                    row.update(ratio=0.8, ratio_is_lower_bound=False)
     tiles = {t["family"]: t for t in build.family_tiles(summaries)}
     assert tiles["constraint"]["number"] is None
     assert "faster</span>" not in build.family_tile(tiles["constraint"])
