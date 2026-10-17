@@ -261,21 +261,16 @@ def test_a_fingerprint_collision_does_not_undo_a_move(extended_search):
     assert edges == {(2 * j, 2 * j + 1) for j in pairs}
 
 
-@pytest.mark.parametrize(("n", "d"), [(8, 12), (12, 20)], ids=["-inf", "nan"])
-def test_no_branch_is_tried_when_the_score_is_not_finite(n, d, monkeypatch):
-    """With fewer rows than columns, parent sets fit some columns exactly and the base search's
-    total is -inf or nan. No branch can score below that, so the extended search tries none and
-    returns the base search's graph."""
+@pytest.mark.parametrize(("n", "d"), [(8, 12), (12, 20)])
+@pytest.mark.parametrize("extended_search", [True, False])
+def test_fewer_rows_than_columns_keep_parent_sets_that_can_be_scored(n, d, extended_search):
+    """With fewer rows than columns, a parent set of ``n - 1`` or more fits its child exactly. The
+    search never picks one, so every node of the graph's DAG extension has a finite score."""
     x = np.random.default_rng(0).standard_normal((n, d))
-    branches = []
-    branch = _Search.branch
-    monkeypatch.setattr(_Search, "branch", lambda self: branches.append(1) or branch(self))
-    with np.errstate(divide="ignore", invalid="ignore"):
-        xges_graph, xges_score = xges_search(x)
-        base_graph, _ = xges_search(x, extended_search=False)
-    assert not np.isfinite(xges_score)
-    assert branches == []
-    assert np.array_equal(from_structure(xges_graph), from_structure(base_graph))
+    graph, total = xges_search(x, extended_search=extended_search)
+    dag = pdag2dag(from_structure(graph))
+    assert max(int(np.count_nonzero(dag[:, v] == TAIL)) for v in range(d)) <= n - 2
+    assert np.isfinite(total)
 
 
 def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
@@ -302,12 +297,20 @@ def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
     return cases
 
 
+# The search without the column check that rejects such data before a fit.
 _FIT_EACH = """
 import json, sys
 import numpy as np
-from andrey.search.xges import xges
+from andrey.core.score import BICScore
+from andrey.search.xges import _Search
 for path, lambda_value, extended_search in json.loads(sys.argv[1]):
-    xges(np.load(path), lambda_value=lambda_value, extended_search=extended_search)
+    x = np.load(path)
+    score = BICScore.from_cov(np.cov(x, rowvar=False), len(x), lambda_value=lambda_value)
+    search = _Search(score, x.shape[1])
+    search.inserts_on_empty_graph()
+    search.base_search()
+    if extended_search:
+        search.extend(len(x))
     print(path, flush=True)
 """
 

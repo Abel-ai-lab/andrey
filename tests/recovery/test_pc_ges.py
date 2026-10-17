@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 import andrey
@@ -27,6 +28,14 @@ def test_ges_recovery():
         "GES",
         case="gauss_5v",
     )
+
+
+def test_ges_does_not_depend_on_the_data_scale():
+    """GES returns the same CPDAG after the data is rescaled so far that squared covariances
+    underflow."""
+    x = datagen.generate("gauss_5v")
+    want = andrey.ges(x).structure.to_numpy()
+    np.testing.assert_array_equal(andrey.ges(x * 1e-85).structure.to_numpy(), want)
 
 
 def test_pc_output_contract():

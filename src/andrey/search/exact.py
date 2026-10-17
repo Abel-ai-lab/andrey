@@ -4,14 +4,15 @@ The algorithm, its settings, and its references are described on :func:`andrey.e
 
 Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + len(parents) *
 log(n)``, where ``resid`` is the residual sum of squares of the centered node on its centered
-parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is singular). The
-categorical scores are :class:`~andrey.core.score.BDeuScore` and
-:class:`~andrey.core.score.CategoricalBICScore`, and the mixed-data scores
-:class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each BIC with
-``lambda_value=1``. Both searches run over the order graph, whose nodes are variable subsets: the
-shortest path from the empty set to the full set gives each variable its best parent set among the
-variables before it. The result is the optimal DAG itself, not its CPDAG, and each search breaks
-score ties deterministically.
+parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is singular). A
+parent set of more than ``n - 2`` members, or one that leaves ``resid`` at most ``ZERO_RESIDUAL``
+times the node's sum of squares, scores ``inf`` and is never chosen. The categorical scores are
+:class:`~andrey.core.score.BDeuScore` and :class:`~andrey.core.score.CategoricalBICScore`, and the
+mixed-data scores :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each
+BIC with ``lambda_value=1``. Both searches run over the order graph, whose nodes are variable
+subsets: the shortest path from the empty set to the full set gives each variable its best parent
+set among the variables before it. The result is the optimal DAG itself, not its CPDAG, and each
+search breaks score ties deterministically.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import to_structure
-from andrey.core.score import Score, make_score
+from andrey.core.score import ZERO_RESIDUAL, Score, check_columns, make_score
 
 #: The local scores :func:`exact_search` accepts.
 EXACT_SCORES: tuple[str, ...] = (
@@ -70,7 +71,8 @@ class _GramBICScore:
     Centers each column, then precomputes the Gram matrix ``S = X.T @ X`` and its diagonal once;
     :meth:`score` regresses a node on its parents through the normal equations on ``S`` to get the
     residual sum of squares, then applies the ``lambda=1`` BIC penalty. Without the centering, a
-    nonzero mean would count as shared signal and link independent variables.
+    nonzero mean would count as shared signal and link independent variables. Raises
+    ``ValueError`` for a column :func:`~andrey.core.score.check_columns` rejects.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -79,9 +81,12 @@ class _GramBICScore:
         self._diag = np.diag(self._gram)
         self._n = data.shape[0]
         self._log_n = float(np.log(self._n))
+        check_columns(self._gram / (self._n - 1), self._n)
 
     def score(self, node: int, parents: Sequence[int]) -> float:
         """Return the negative local BIC score for ``node`` given ``parents`` (lower is better)."""
+        if len(parents) > self._n - 2:
+            return float("inf")
         if not parents:
             resid = self._diag[node]
         else:
@@ -90,6 +95,8 @@ class _GramBICScore:
             gram_node_pa = self._gram[node, pa]
             beta = _solve_normal_equations(gram_pa, gram_node_pa)
             resid = self._diag[node] - gram_node_pa @ beta
+        if not resid > ZERO_RESIDUAL * self._diag[node]:
+            return float("inf")
         return float(self._n * np.log(resid / self._n) + len(parents) * self._log_n)
 
 

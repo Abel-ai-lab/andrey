@@ -19,6 +19,7 @@ import pytest
 from threadpoolctl import threadpool_limits
 
 from andrey.core import _bitset, backend
+from andrey.core import score as score_module
 from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.search import _parallel_ges as pg
@@ -28,6 +29,16 @@ from andrey.search.ges import ges
 # ``andrey.search.ges`` the *attribute* is the re-exported ``ges`` function (the package __init__
 # shadows the submodule), so flags on the module must be reached through sys.modules, not the name.
 _GES_MOD = sys.modules["andrey.search.ges"]
+
+
+@pytest.fixture
+def unchecked_columns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Let a BIC score accept the duplicate and near-duplicate columns its input check rejects.
+
+    The engine tests below run on such columns to cover the scan and its bounds where scores are
+    unavailable or rank-one updates cancel.
+    """
+    monkeypatch.setattr(score_module, "check_columns", lambda cov, n: None)
 
 
 def _gaussian_sem(seed: int, n: int, d: int, p: float) -> np.ndarray:
@@ -172,6 +183,7 @@ _COLLINEAR_GRID = [
 ]
 
 
+@pytest.mark.usefixtures("unchecked_columns")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")  # log of a zero residual
 @pytest.mark.parametrize("seed,d,n,p,k,noise", _COLLINEAR_GRID)
 def test_kept_scan_matches_full_rescan_on_collinear_columns(
@@ -186,6 +198,7 @@ def test_kept_scan_matches_full_rescan_on_collinear_columns(
 _RANDOM_COLLINEAR_SEEDS = [3, 59, 104, 128, 131, 162, 175, 250, 269]
 
 
+@pytest.mark.usefixtures("unchecked_columns")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")  # log of a zero residual
 @pytest.mark.parametrize("seed", _RANDOM_COLLINEAR_SEEDS)
 def test_kept_scan_matches_full_rescan_on_random_collinear_data(seed: int) -> None:
@@ -194,6 +207,7 @@ def test_kept_scan_matches_full_rescan_on_random_collinear_data(seed: int) -> No
     _assert_kept_matches_full(x, max_p, lambda_value, f"seed={seed}")
 
 
+@pytest.mark.usefixtures("unchecked_columns")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")  # log of a zero residual
 def test_screening_bounds_cover_batch_differences() -> None:
     """A delta scored in another batch over the same base stays within the first batch's bound.

@@ -473,7 +473,9 @@ def gfci(
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
         ``collider_rule`` is not a supported choice, if ``score_func`` and ``indep_test`` read
         different data (continuous, categorical, or mixed), or if ``data`` or ``categorical`` does
-        not suit them, as for :func:`~andrey.pc`.
+        not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a column repeats
+        another up to scale and shift given more than two rows or, with more rows than columns, is a
+        linear function of other columns.
 
     Warns
     -----
@@ -499,8 +501,11 @@ def gfci(
     **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
     and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
-    linear relations with Gaussian noise. With the mixed-data score and test, its tests run it on
-    5 variables with 3,000 rows.
+    linear relations with Gaussian noise. With fewer rows than columns the BIC score is
+    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
+    GES search never selects one, nor any parent set that leaves its child a residual variance of at
+    most ``1e-12`` times its variance. With the mixed-data score and test, its tests run it on 5
+    variables with 3,000 rows.
 
     References
     ----------

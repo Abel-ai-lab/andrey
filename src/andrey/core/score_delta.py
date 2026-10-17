@@ -27,7 +27,7 @@ from weakref import WeakKeyDictionary
 
 import numpy as np
 
-from .score import BICScore, LocalScore, Score, local_score_bic
+from .score import ZERO_RESIDUAL, BICScore, LocalScore, Score, local_score_bic
 
 # Conditioning threshold for the Schur fast path. The Schur identity loses ~log10(cond) digits;
 # at cond=1e10 the residual keeps ~6 digits in float64, well above HC's 1e-9 strict-improvement
@@ -155,6 +155,13 @@ def _delta_via_full_score(
         raise ValueError(f"unknown op: {op!r} (expected 'add' or 'remove')")
     s_old = local_score_bic(cov, n, v, list(S_old), lambda_value=lambda_value, log_n=log_n)
     s_new = local_score_bic(cov, n, v, S_new, lambda_value=lambda_value, log_n=log_n)
+    return _difference(s_new, s_old)
+
+
+def _difference(s_new: float, s_old: float) -> float:
+    """``s_new - s_old``, or ``inf`` when either family is unavailable (an ``inf`` score)."""
+    if s_new == np.inf or s_old == np.inf:
+        return np.inf
     return float(s_new - s_old)
 
 
@@ -178,8 +185,9 @@ def local_score_bic_delta(
     ``inv(cov[S_old, S_old])``. Both caches are mutated as side effects: ``inv_cov_cache`` is keyed
     by the sorted-tuple parent set, ``residual_cache`` by ``(target, sorted_S_tuple)``; new
     residuals are written back keyed to ``S_new``. Near-singular ``cov[S, S]`` (conditioning proxy
-    above ``cond_threshold``, or a ``LinAlgError``) and defensive ``R(u) <= 0`` / ``R(v_new) <= 0``
-    checks route to the two-full-score fallback.
+    above ``cond_threshold``, or a ``LinAlgError``), an add past ``n - 2`` parents, and a residual
+    ``R(u) <= 0`` or ``R(v)`` at most :data:`~andrey.core.score.ZERO_RESIDUAL` times ``cov[v, v]``
+    route to the two-full-score fallback, which is ``inf`` when either family is unavailable.
 
     Parameters
     ----------
@@ -234,6 +242,12 @@ def local_score_bic_delta(
             R_v_old = float(cov[v, v] - cs_v @ (M_old @ cs_v))
         residual_cache[key_v_old] = R_v_old
 
+    floor = ZERO_RESIDUAL * float(cov[v, v])
+    if not R_v_old > floor or (op == "add" and len(S_old_sorted) + 1 > n - 2):
+        return _delta_via_full_score(
+            cov, n, v, list(S_old_sorted), u, op, lambda_value=lambda_value, log_n=log_n
+        )
+
     if op == "add":
         if not S_old_sorted:
             R_u_old = float(cov[u, u])
@@ -273,8 +287,8 @@ def local_score_bic_delta(
                 lambda_value=lambda_value,
                 log_n=log_n,
             )
-        R_v_new = R_v_old - (e_vu * e_vu) / R_u_old
-        if R_v_new <= 0.0:
+        R_v_new = R_v_old - e_vu * (e_vu / R_u_old)
+        if R_v_new <= floor:
             return _delta_via_full_score(
                 cov,
                 n,
@@ -330,8 +344,8 @@ def local_score_bic_delta(
                 lambda_value=lambda_value,
                 log_n=log_n,
             )
-        R_v_new = R_v_old + (e_vu * e_vu) / R_u_new
-        if R_v_new <= 0.0:
+        R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
+        if R_v_new <= floor:
             return _delta_via_full_score(
                 cov,
                 n,
@@ -463,11 +477,14 @@ def score_many_with_base(
                 R_v_old = float(cov_diag[i] - cs_v @ (M_old @ cs_v))
         if R_v_old is not None:
             _bounded_put(residual_cache, key_v_old, R_v_old, _RESIDUAL_CACHE_CAP)
+    floor = ZERO_RESIDUAL * float(cov_diag[i])
+    if R_v_old is not None and not R_v_old > floor:
+        R_v_old = None  # an unavailable base: every move falls back to full scores
 
     if adds:
         add_us = sorted({u for _, u in adds if u != i and u not in S_base_sorted})
         add_scores: dict[int, float] = {}
-        if add_us and R_v_old is not None:
+        if add_us and R_v_old is not None and len(S_base_sorted) + 1 <= n - 2:
             if not S_base_sorted:
                 for u in add_us:
                     key_u_old = (u, S_base_sorted)
@@ -478,8 +495,8 @@ def score_many_with_base(
                     if R_u_old <= 0.0:
                         continue
                     e_vu = float(cov[i, u])
-                    R_v_new = R_v_old - (e_vu * e_vu) / R_u_old
-                    if R_v_new <= 0.0:
+                    R_v_new = R_v_old - e_vu * (e_vu / R_u_old)
+                    if R_v_new <= floor:
                         continue
                     add_scores[u] = float(
                         base_score + n * (_log(R_v_new) - _log(R_v_old)) + log_n * lam
@@ -496,8 +513,8 @@ def score_many_with_base(
                     R_uU = cov_diag[us_arr] - np.einsum("ij,ij->j", cs_U, beta_U)
                     safe_mask = R_uU > 0.0
                     safe_R_u = np.where(safe_mask, R_uU, 1.0)
-                    R_v_new_arr = R_v_old - (e_vU * e_vU) / safe_R_u
-                    safe_mask = safe_mask & (R_v_new_arr > 0.0)
+                    R_v_new_arr = R_v_old - e_vU * (e_vU / safe_R_u)
+                    safe_mask = safe_mask & (R_v_new_arr > floor)
                     if np.any(safe_mask):
                         deltas_arr = (
                             n * (_log(np.where(safe_mask, R_v_new_arr, 1.0)) - _log(R_v_old))
@@ -537,8 +554,8 @@ def score_many_with_base(
                         M_col = M_old[:, u_idx]
                         num = float(cs_v @ M_col) - float(cs_v[u_idx]) * M_uu
                         e_vu = float(cov[i, u]) + num / M_uu
-                        R_v_new = R_v_old + (e_vu * e_vu) / R_u_new
-                        if R_v_new <= 0.0 or not np.isfinite(R_v_new):
+                        R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
+                        if R_v_new <= floor or not np.isfinite(R_v_new):
                             continue
                         remove_scores[u] = float(
                             base_score + n * (_log(R_v_new) - log_Rv_old) - log_n * lam
@@ -577,7 +594,7 @@ def _delta_two_scores(
         S_new = [x for x in S_base_sorted if x != u]
     else:
         raise ValueError(f"unknown delta op: {op!r} (expected 'add' or 'remove')")
-    return float(score_obj.score(i, S_new) - score_obj.score(int(i), list(S_base_sorted)))
+    return _difference(score_obj.score(i, S_new), score_obj.score(int(i), list(S_base_sorted)))
 
 
 def _add_bounds(
@@ -590,6 +607,7 @@ def _add_bounds(
     R_v_old: float,
     R_uU: np.ndarray,
     e_vU: np.ndarray,
+    floor: float,
 ) -> np.ndarray:
     """Per-add bounds on how far a batched Schur add delta moves when another batch scores the add.
 
@@ -603,9 +621,9 @@ def _add_bounds(
     moves either way, which bounds the change in its log; rounding of the logs adds a few units in
     the last place.
 
-    Where the intervals leave the sign of ``R_u`` or ``R(v | S + u)`` open, another batch can take
-    the other side of an ``R > 0`` guard, and the bound is ``inf``. Where both batches certainly
-    fall back to two full scores, it is 0.
+    Where the intervals leave the sign of ``R_u`` or the position of ``R(v | S + u)`` against
+    ``floor`` open, another batch can take the other side of a guard, and the bound is ``inf``.
+    Where both batches certainly fall back to two full scores, it is 0.
 
     References
     ----------
@@ -624,20 +642,20 @@ def _add_bounds(
         rho = c * w_u2 + 2 * _EPS * np.abs(R_uU)
         eta = c * w_v * np.sqrt(w_u2) + 2 * _EPS * e_abs
         ru_lo = R_uU - rho
-        t = e_vU * e_vU / R_uU
+        t = e_vU * (e_vU / R_uU)  # the scale-free form the delta itself uses
         R_new = R_v_old - t  # this batch's value wherever its update is safe
-        t_hi = (e_abs + eta) ** 2 / ru_lo * (1 + 4 * _EPS)
+        t_hi = (e_abs + eta) * ((e_abs + eta) / ru_lo) * (1 + 4 * _EPS)
         # t can rise further than it can fall, so this covers R(v | S + u) moving either way.
         move = t_hi - t + 2 * _EPS * (R_v_old + t_hi)
         ulp = 8 * _EPS * (n * (np.abs(np.log(R_new)) + abs(math.log(R_v_old))) + penalty)
         bound = 2 * (ulp - n * np.log1p(-move / R_new))
-        # Every batch takes the update: R_u and R(v | S + u) stay positive.
-        certain = (ru_lo > 0.0) & (R_new > move)
+        # Every batch takes the update: R_u stays positive and R(v | S + u) stays above the floor.
+        certain = (ru_lo > 0.0) & (R_new - move > floor)
         if certain.all():
             return bound
         bound[~certain] = np.inf
         # No batch takes the update, so every batch scores the add by two full scores.
-        bound[(R_uU + rho <= 0.0) | ((ru_lo > 0.0) & (R_new + move <= 0.0))] = 0.0
+        bound[(R_uU + rho <= 0.0) | ((ru_lo > 0.0) & (R_new + move <= floor))] = 0.0
     return bound
 
 
@@ -663,9 +681,10 @@ def delta_many_with_base(
     * it writes back **no** chained residual and **no** derived score -- the two impurities that
       make :func:`score_many_with_base` cache-history-dependent at the ULP.
 
-    A candidate whose base is ill-conditioned (``cond >= cond_threshold`` or a singular inverse), or
-    whose rank-one update trips a ``R <= 0`` safety guard, falls back to :func:`_delta_two_scores`
-    (two memoized full scores) -- still exact. Results are returned in ``deltas`` order.
+    A candidate whose base is ill-conditioned (``cond >= cond_threshold`` or a singular inverse),
+    whose add passes ``n - 2`` parents, or whose rank-one update leaves a residual that is zero up
+    to rounding, falls back to :func:`_delta_two_scores` (two memoized full scores) -- still exact,
+    and ``inf`` when either family is unavailable. Results are returned in ``deltas`` order.
 
     The batched adds round differently for different sets of moves, so one move's delta depends on
     the batch it is scored in. ``bounds`` receives, per move, a bound on that dependence: the most
@@ -703,6 +722,7 @@ def delta_many_with_base(
 
     i = int(i)
     S_base_sorted: tuple[int, ...] = tuple(sorted(int(x) for x in base_parents))
+    floor = ZERO_RESIDUAL * float(cov_diag[i])
 
     def _get_obs_inv(S_sorted: tuple[int, ...], S_list: list[int]):
         M, ill = _get_inv_with_cond(inv_cov_cache, S_sorted, cov, S_list, cond_threshold)
@@ -734,9 +754,9 @@ def delta_many_with_base(
         else:
             cs_v = cov[S_list, i]
             R_v_old = float(cov_diag[i] - cs_v @ (M_old @ cs_v))
-            if not (R_v_old > 0.0) or not np.isfinite(R_v_old):
-                # A non-positive fresh residual means the inverse is too inaccurate to trust (cond
-                # slipped under the gate); treat the base as ill so every move falls back exactly.
+            if not (R_v_old > floor) or not np.isfinite(R_v_old):
+                # A residual that is zero up to rounding marks an unavailable base, or an inverse
+                # too inaccurate to trust (cond slipped under the gate); every move falls back.
                 R_v_old = None
 
     results: list[float] = [0.0] * len(deltas)
@@ -746,7 +766,7 @@ def delta_many_with_base(
         in_base = set(S_base_sorted)
         in_base.add(i)
         add_us = sorted({u for _, u in adds if u not in in_base})
-        if add_us and R_v_old is not None:
+        if add_us and R_v_old is not None and len(S_base_sorted) + 1 <= n - 2:
             if not S_base_sorted:
                 diag = cov_diag.tolist()
                 row = cov[i].tolist()
@@ -757,8 +777,8 @@ def delta_many_with_base(
                     if R_u_old <= 0.0:
                         continue
                     e_vu = row[u]
-                    R_v_new = R_v_old - (e_vu * e_vu) / R_u_old
-                    if R_v_new <= 0.0:
+                    R_v_new = R_v_old - e_vu * (e_vu / R_u_old)
+                    if R_v_new <= floor:
                         continue
                     add_deltas[u] = float(n * (_log(R_v_new) - log_old) + penalty)
             else:
@@ -772,8 +792,8 @@ def delta_many_with_base(
                 R_uU = cov_diag[us_arr] - np.einsum("ij,ij->j", cs_U, beta_U)
                 safe_mask = R_uU > 0.0
                 safe_R_u = np.where(safe_mask, R_uU, 1.0)
-                R_v_new_arr = R_v_old - (e_vU * e_vU) / safe_R_u
-                safe_mask = safe_mask & (R_v_new_arr > 0.0)
+                R_v_new_arr = R_v_old - e_vU * (e_vU / safe_R_u)
+                safe_mask = safe_mask & (R_v_new_arr > floor)
                 if np.any(safe_mask):
                     deltas_arr = (
                         n * (_log(np.where(safe_mask, R_v_new_arr, 1.0)) - _log(R_v_old))
@@ -788,7 +808,16 @@ def delta_many_with_base(
                     }
                 if bounds is not None:
                     bound_of = _add_bounds(
-                        n, log_n * lam, M_old, cov_diag[S_list], cs_v, cs_U, R_v_old, R_uU, e_vU
+                        n,
+                        log_n * lam,
+                        M_old,
+                        cov_diag[S_list],
+                        cs_v,
+                        cs_U,
+                        R_v_old,
+                        R_uU,
+                        e_vU,
+                        floor,
                     )
                     if len(deltas) == len(add_us) and [u for _, u in adds] == add_us:
                         bounds[:] = bound_of.tolist()  # one add per source, in source order
@@ -820,8 +849,8 @@ def delta_many_with_base(
                 M_col = M_old[:, u_idx]
                 num = float(cs_v @ M_col) - float(cs_v[u_idx]) * M_uu
                 e_vu = float(cov[i, u]) + num / M_uu
-                R_v_new = R_v_old + (e_vu * e_vu) / R_u_new
-                if R_v_new <= 0.0 or not np.isfinite(R_v_new):
+                R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
+                if R_v_new <= floor or not np.isfinite(R_v_new):
                     continue
                 remove_deltas[u] = float(n * (_log(R_v_new) - log_Rv_old) - log_n * lam)
         for idx, u in removes:
@@ -844,8 +873,9 @@ def add_deltas(
 
     The vector form of :func:`delta_many_with_base`'s ``add`` moves: ``O(|base|^2 d)`` numpy work
     instead of a Python loop over the candidates. It shares the conditioning-gated inverse cache and
-    falls back to two full scores where the Schur path is unavailable. Entries for ``i`` itself and
-    for the members of ``base`` are ``inf``.
+    falls back to two full scores where the Schur path is unavailable. Entries for ``i`` itself, for
+    the members of ``base``, and for adds to an unavailable family or past ``n - 2`` parents are
+    ``inf``.
 
     Parameters
     ----------
@@ -862,6 +892,8 @@ def add_deltas(
     i = int(i)
     S_sorted = tuple(sorted(base_parents))
     S_list = list(S_sorted)
+    if len(S_list) + 1 > score_obj.n - 2:
+        return np.full(cov.shape[0], np.inf)
     if not S_list:
         e = cov[i]
         R_u = score_obj._cov_diag
@@ -883,10 +915,12 @@ def add_deltas(
     R_v = float(e[i])  # e_ii is R(i | base)
     penalty = score_obj.log_n * score_obj.lambda_value
     with np.errstate(divide="ignore", invalid="ignore"):
-        R_v_new = R_v - e * e / R_u
+        R_v_new = R_v - e * (e / R_u)  # e * e underflows on tiny-variance data
         out = score_obj.n * (_log(R_v_new) - _log(R_v)) + penalty
-    # A finite delta implies positive R(i | base) and R(i | base + u), so only R_u is checked.
-    exact = np.flatnonzero(~((R_u > 0.0) & np.isfinite(out))).tolist()
+    # Rounding-level residuals and a nonpositive R_u go to the full scores.
+    floor = ZERO_RESIDUAL * float(score_obj._cov_diag[i])
+    schur = (R_u > 0.0) & (R_v_new > floor) & np.isfinite(out) & (R_v > floor)
+    exact = np.flatnonzero(~schur).tolist()
     out[i] = np.inf
     out[S_list] = np.inf
     for u in exact:
@@ -906,8 +940,9 @@ def remove_deltas(
 
     The removal counterpart of :func:`add_deltas`. With ``M = inv(cov[base, base])`` and
     ``b = M cov[base, i]``, dropping position ``j`` raises the residual by ``b_j^2 / M_jj``; one
-    inverse serves every removal. A near-singular base or a residual that is not positive and finite
-    triggers two full scores. Entries outside ``base`` are ``inf``.
+    inverse serves every removal. A near-singular base, a base residual that is zero up to rounding,
+    or a residual that is not positive and finite triggers two full scores. Entries outside ``base``
+    are ``inf``.
 
     Parameters
     ----------
@@ -943,8 +978,9 @@ def remove_deltas(
     with np.errstate(divide="ignore", invalid="ignore"):
         R_v_new = R_v + b * b / M_diag
         deltas = score_obj.n * (_log(R_v_new) - _log(R_v)) - penalty
-    # A finite delta implies positive R(i | base) and R(i | base - u); M_jj > 0 keeps the sign.
-    exact = ~((M_diag > 0.0) & np.isfinite(deltas))
+    # A finite delta implies positive R(i | base - u); M_jj > 0 keeps the sign.
+    floor = ZERO_RESIDUAL * float(score_obj._cov_diag[i])
+    exact = ~((M_diag > 0.0) & np.isfinite(deltas) & (R_v > floor))
     for j, u in enumerate(S_list):
         out[u] = _delta_two_scores(score_obj, i, S_sorted, u, "remove") if exact[j] else deltas[j]
     return out
