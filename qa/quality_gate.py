@@ -141,6 +141,7 @@ def regime_kwargs(regime: str, d: int, n: int, seed: int) -> dict[str, Any]:
         "seed": seed,
         "scale": "standardize",
         "density": 2.0,
+        "shuffle": True,
     }
     if regime in HIDDEN:
         kwargs["latents"] = max(1, d // HIDDEN[regime])
@@ -157,6 +158,7 @@ def pair_kwargs(regime: str, n: int, seed: int) -> dict[str, Any]:
         "seed": seed,
         "scale": "standardize",
         "density": 1.0,
+        "shuffle": True,
     }
 
 
@@ -225,7 +227,7 @@ def series_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
     out = []
     for seed in SEEDS:
         if model in lingam_models.MODELS:
-            series, stack = lingam_models.sample_varma(model, d, n, seed)
+            series, stack, _ = lingam_models.sample_varma(model, d, n, seed)
             out.append(Draw(series, CoefficientStack(stack, kind="varma")))
             continue
         series, window = temporal_models.sample(model, d, n, seed)

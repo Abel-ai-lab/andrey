@@ -51,6 +51,7 @@ def test_every_generation_coordinate_moves_the_digest_and_the_filename():
         "seed": _key(seed=1),
         "standardize": _key(standardize="raw"),
         "latents": _key(latents=1),
+        "shuffle": _key(shuffle=False),
     }
     digests = {name: key.digest for name, key in variants.items()}
     assert len(set(digests.values())) == len(variants), digests
@@ -108,9 +109,9 @@ def test_the_tiny_keys_declare_the_canonical_density():
 def test_no_hidden_nodes_leaves_the_generator_call_and_label_as_they_were():
     """Check that `latents=0` preserves dataset identity in existing stores and records."""
     assert "latents" not in datasets.generation_kwargs(_key())
-    assert _key().digest == "314b39c589d4"  # Digest is unchanged by `latents=0`.
+    assert _key().digest == "e8e12e887f9d"  # Digest is unchanged by `latents=0`.
     assert datasets.generation_kwargs(_key(latents=2))["latents"] == 2
-    assert _key().label.endswith("-standardized")
+    assert _key().label.endswith("-standardized-shuffled")
 
 
 def test_a_latent_key_drops_the_hidden_columns_and_keeps_them_in_the_truth(tmp_path):

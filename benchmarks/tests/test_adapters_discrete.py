@@ -106,7 +106,7 @@ def test_the_regime_stores_category_codes_and_the_true_dag() -> None:
     call = datasets.generation_kwargs(key)
     assert call["generator"] == "sample_discrete"
     assert {k: call[k] for k in datasets.DISCRETE_SETTINGS} == datasets.DISCRETE_SETTINGS
-    data, marks, kind = datasets.generate_one(key)
+    data, marks, kind, _ = datasets.generate_one(key)
     assert kind == "dag" and marks.shape == (6, 6)
     assert data.shape == (400, 6) and np.array_equal(data, np.round(data))
 
@@ -121,7 +121,7 @@ def test_the_regime_rejects_rescaled_codes() -> None:
 
 @pytest.mark.parametrize("adapter", ADAPTERS, ids=lambda a: a.name)
 def test_a_fit_gives_a_cpdag(adapter: SolutionAdapter) -> None:
-    data, _, _ = datasets.generate_one(_key())
+    data, _, _, _ = datasets.generate_one(_key())
     adapter.setup()
     structure = adapter.to_structure(np.asarray(adapter.fit(data, adapter.params())))
     assert structure.kind == "cpdag" and structure.n_nodes == 6

@@ -291,7 +291,7 @@ def test_the_default_ladder_hides_a_node_with_two_observed_children(regime) -> N
     hidden_per_d = {5: 1, 10: 2, 15: 3}
     for key in confounded_cpu.ladder_keys(regime, list(hidden_per_d), seeds=5, n=20):
         assert key.latents == hidden_per_d[key.d]
-        data, marks, _ = datasets.generate_one(key)
+        data, marks, _, _ = datasets.generate_one(key)
         observed = key.d - key.latents
         assert data.shape == (20, observed)
         children = ((marks == _TAIL) & (marks.T == _ARROW))[observed:, :observed].sum(axis=1)
