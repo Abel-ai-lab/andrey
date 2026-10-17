@@ -9,7 +9,7 @@ import pytest
 
 import andrey
 from andrey.constraint.pc import _orient_colliders, _undirect_conflicts
-from andrey.core import ARROW, NULL, TAIL
+from andrey.core import ARROW, TAIL
 from andrey.core.orient import meek
 
 
