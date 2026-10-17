@@ -314,6 +314,7 @@ ART = {
         "docs",
         "methods",
         "tide",
+        "abacus",
     )
 }
 CENTERED = {kind: BRAND / f"art-{kind}-center.jpg" for kind in ("tide",)}
@@ -328,6 +329,7 @@ COVERS = {
     "docs": "the pages of a vast atlas fanning open, one edge amber like a bookmark",
     "methods": "a prism fanning one beam into many rays, one amber",
     "tide": "the moon over a swelling sea, its light an amber path on the waves",
+    "abacus": "an abacus whose beads sit on smooth waves, one bead amber",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge, at the cover's height
@@ -335,7 +337,7 @@ BANNER_FADE = 0.55  # the navy fade behind the text ends at this share of the wi
 BANNER_FADE_PEAK = 0.6  # its opacity at the left edge
 # The title's size, its widest line, and its most lines: large enough to read where a link preview
 # shows the banner at a third of its size.
-BANNER_TITLE = (88, 720, 2)
+BANNER_TITLE = (88, 720, 3)
 BANNER_LINE = 40  # the release or kind under the title
 # An earlier post's thumbnail on the blog's front page: the art, THUMB_W wide, sharp at three
 # times the rows' 10 rem.
@@ -465,7 +467,7 @@ def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = 
     size, line_width, most = BANNER_TITLE
     lines = _lines(title, size, line_width, most) or [title]
     step = round(size * 1.14)
-    top = 284 if len(lines) == most else 334
+    top = 334 - 50 * (len(lines) - 1)  # each line more moves the block up half a line
     title_text = "".join(
         f'<text x="{BANNER_LEFT}" y="{top + i * step}" font-family="Inter" font-weight="600" '
         f'font-size="{size}" letter-spacing="-2" fill="#ffffff">{html.escape(text)}</text>'

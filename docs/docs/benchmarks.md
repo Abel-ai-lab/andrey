@@ -17,42 +17,72 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.5.0
+:link: benchmarks/0.6.0
 :link-type: doc
-:link-alt: The 0.5.0 release card: time series
-:class-card: release-cover release-art release-art-0-5-0
+:link-alt: The 0.6.0 release card: mixed and categorical data
+:class-card: release-cover release-art release-art-0-6-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Time series
+Mixed and categorical data
 
-0.5.0
+0.6.0
 :::
 
 ::::{div} release-tldr
 
-0.5.0 is here: PCMCI, PCMCI+, LPCMCI, lasso Granger causality, VARMA-LiNGAM, and LongitudinalLiNGAM,
-methods for data ordered in time, are now supported. Tested against tigramite on the same series,
-PCMCI+ returns the same graphs and runs more than 50x faster at every size, and more than 100x at 80
-variables and 2,000 time steps.
+0.6.0 is here: PC, GES, hill climbing, and seven more methods now take tests and scores for
+categorical columns and for tables that mix them with numbers. On categorical data, GES runs more
+than 50x faster than causal-learn at every size and returns the same graph on every dataset.
 
 :::{div} release-stats
 
-- **110 of 110** datasets with the same PCMCI+ graph as tigramite
-- **More than 50x** PCMCI+ speedup over tigramite at every size
-- **More than 20x** PCMCI speedup over tigramite at 10 variables
+- **15 of 15** datasets with the same GES graph as causal-learn
+- **More than 50x** GES speedup over causal-learn at every size
+- **More than 20x** hill climbing speedup over pgmpy at every size
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.5.0.md)
-[Read the post](../blog/20261016-andrey-0-5-0.md)
+[Read the release card](benchmarks/0.6.0.md)
+[Read the post](../blog/20261017-andrey-0-6-0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.5.0
+:link-type: doc
+:link-alt: The 0.5.0 release card: time series
+:class-card: release-tile release-art-0-5-0
+:shadow: none
+:margin: 0
+
+0.5.0
+:::
+
+:::{div} release-body
+<h3>Time series</h3>
+
+PCMCI, PCMCI+, LPCMCI, and three more methods for data ordered in time, compared with tigramite,
+causal-learn, and lingam.
+
+- **6** methods
+- PCMCI+ **more than 50x** faster than tigramite at every size
+:::
+
+:::{div} release-meta
+Released October 16, 2026
+
+- [Release card<span class="visually-hidden"> 0.5.0</span>](benchmarks/0.5.0.md)
+- [Post: Time series](../blog/20261016-andrey-0-5-0.md)
+:::
+::::
 
 ::::{div} release-row
 
