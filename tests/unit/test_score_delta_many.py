@@ -13,6 +13,8 @@ a derived score. This file pins three contracts, and the first two for its vecto
   two-full-score fallback (monkeypatch-counted), still exact;
 * **purity** -- the same query returns byte-identical deltas even after the chained
   ``score_many_with_base`` has polluted the shared residual cache in between.
+
+The batch-dependence bounds ``delta_many_with_base`` can report leave the deltas unchanged.
 """
 
 from __future__ import annotations
@@ -102,6 +104,38 @@ def test_fallback_fires_on_ill_conditioned_base(monkeypatch: pytest.MonkeyPatch)
     # The fallback is still exact: it IS two full scores.
     want = [_full_delta(score, 1, base, 0, "remove"), _full_delta(score, 1, base, 4, "remove")]
     assert got == want
+
+
+def test_bounds_leave_deltas_unchanged() -> None:
+    """Reported bounds leave each delta byte-identical; they are 0 where no batch can change it.
+
+    Adds off the empty base, adds off an ill-conditioned base, and removes do not depend on the
+    batch. Adds off a well-conditioned base get a small finite bound, and an add whose rank-one
+    update cancels gets an infinite one.
+    """
+    rng = np.random.default_rng(0)
+    cols = rng.standard_normal((400, 6))
+    x = np.hstack([cols, cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))])  # 6 ~= 0
+    delta = DeltaBICScore(BICScore(x, lambda_value=2.0))
+    queries = [
+        ((), [("add", 2), ("add", 3), ("add", 6)], "zero"),
+        ((0, 6), [("add", 2), ("add", 3)], "zero"),
+        ((2, 3), [("add", 0), ("add", 4), ("add", 5)], "small"),
+        ((2, 3), [("remove", 2), ("remove", 3)], "zero"),
+        ((0,), [("add", 6)], "inf"),
+    ]
+    for base, moves, kind in queries:
+        plain = delta.delta_many_with_base(1, base, moves)
+        bounds: list[float] = []
+        got = delta.delta_many_with_base(1, base, moves, bounds=bounds)
+        assert [g.hex() for g in got] == [p.hex() for p in plain]
+        assert len(bounds) == len(moves)
+        if kind == "zero":
+            assert bounds == [0.0] * len(moves), base
+        elif kind == "small":
+            assert all(0.0 < b < 1e-9 * 400 for b in bounds), bounds
+        else:
+            assert bounds == [np.inf], bounds
 
 
 def test_purity_survives_chained_cache_pollution() -> None:

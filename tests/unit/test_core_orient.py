@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from andrey.core.orient import (
+    _cpdag_of_pdag,
     dag2cpdag,
     from_structure,
     meek,
@@ -183,6 +184,59 @@ def test_pdag2dag_keeps_directed_edges():
     out = pdag2dag(pdag)
     assert out[0, 1] == TAIL and out[1, 0] == ARROW  # 0 -> 1 kept
     assert out[1, 2] != NULL and out[2, 1] != NULL  # 1 -- 2 now directed some way
+
+
+def _perturbed_cpdag(rng: np.random.Generator, d: int, p: float | None = None) -> np.ndarray:
+    """A random DAG's CPDAG with some undirected edges directed and some directed edges undirected.
+
+    ``p`` is the DAG's edge density, drawn from ``[0.1, 0.7]`` when not given. Some of these PDAGs
+    have no consistent extension.
+    """
+    p = float(rng.uniform(0.1, 0.7)) if p is None else p
+    pdag = dag2cpdag(random_dag(rng, d, p))
+    for a, b in np.argwhere((pdag == TAIL) & (pdag.T == TAIL)):
+        if a < b and rng.random() < 0.3:
+            pdag[a, b], pdag[b, a] = (TAIL, ARROW) if rng.random() < 0.5 else (ARROW, TAIL)
+    for a, b in np.argwhere((pdag == TAIL) & (pdag.T == ARROW)):
+        if rng.random() < 0.15:
+            pdag[a, b], pdag[b, a] = TAIL, TAIL
+    return pdag
+
+
+def test_cpdag_of_pdag_matches_extension_then_cpdag():
+    # The bitmask rebuild GES runs after each move returns dag2cpdag(pdag2dag(pdag)), and raises
+    # pdag2dag's error when the PDAG has no consistent extension.
+    rng = np.random.default_rng(7)
+    raised = 0
+    for _ in range(600):
+        d = int(rng.integers(1, 30))
+        for pdag in (random_dag(rng, d), _perturbed_cpdag(rng, d)):
+            try:
+                expected = dag2cpdag(pdag2dag(pdag))
+            except ValueError:
+                raised += 1
+                with pytest.raises(ValueError, match="no consistent"):
+                    _cpdag_of_pdag(pdag)
+                continue
+            assert np.array_equal(_cpdag_of_pdag(pdag), expected)
+    assert 0 < raised < 600
+
+
+@pytest.mark.parametrize("d", [63, 64, 65, 128, 129])
+def test_cpdag_of_pdag_across_word_boundary(d):
+    # Node masks past 64 nodes span more than one 64-bit word; the rebuild still matches the
+    # reference on sparse DAGs, their CPDAGs, and perturbed CPDAGs.
+    rng = np.random.default_rng(d)
+    for _ in range(4):
+        p = float(rng.uniform(1.0, 4.0)) / d
+        for pdag in (random_dag(rng, d, p), _perturbed_cpdag(rng, d, p)):
+            try:
+                expected = dag2cpdag(pdag2dag(pdag))
+            except ValueError:
+                with pytest.raises(ValueError, match="no consistent"):
+                    _cpdag_of_pdag(pdag)
+                continue
+            assert np.array_equal(_cpdag_of_pdag(pdag), expected)
 
 
 # ---- collider orientation ------------------------------------------------------------------------
