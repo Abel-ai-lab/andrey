@@ -404,7 +404,7 @@ def _check_singular(
         raise ValueError(f"continuous columns {continuous} are collinear; cannot fit them")
 
 
-def _nbytes(value: object) -> int:
+def _nbytes(value: np.ndarray | tuple[Any, ...]) -> int:
     if isinstance(value, np.ndarray):
         return value.nbytes
     return sum(a.nbytes for a in value if isinstance(a, np.ndarray))
