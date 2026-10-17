@@ -122,6 +122,7 @@ def assemble_record(
         latents=key.latents,
         tau_max=params.get("tau_max"),
         times=key.times,
+        shuffle=key.shuffle,
         wall_s=measures.get("wall_s"),
         process_s=measures.get("process_s"),
         cpu_s=measures.get("cpu_s"),
