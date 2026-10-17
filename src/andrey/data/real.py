@@ -565,7 +565,8 @@ def load_dataset(
             functional=functional.linear(),
             noise=noise.gaussian(),
         )
-        values = scm.sample(n=n, seed=seed, scale="standardize").data
+        # The columns keep the network's own variable order, which the names and graph follow.
+        values = scm.sample(n=n, seed=seed, scale="standardize", shuffle=False).data
         description = description.replace(
             "{simulation}",
             "The network's own probability tables are not used: the rows come from a "

@@ -60,6 +60,27 @@ def test_reproducible_with_latents():
     assert a.graph == b.graph
 
 
+def test_per_node_parameters_follow_the_latent_reindexing():
+    """Hiding latents re-indexes the edges and the noise scales with the nodes."""
+
+    def sample(latents):
+        return data.SCM(
+            graph=data.graphs.erdos_renyi(20, 3.0),
+            functional=data.functional.linear(),
+            noise=data.noise.gaussian(heteroscedastic=True),
+            latents=latents,
+        ).sample(n=50, seed=2, shuffle=False)
+
+    full, hidden = sample(0), sample(3)
+    observed = [
+        next(i for i in range(20) if np.array_equal(full.data[:, i], column))
+        for column in hidden.data.T
+    ]
+    order = np.array(observed + sorted(set(range(20)) - set(observed)))
+    assert np.array_equal(hidden.params.edges, np.argsort(order)[full.params.edges])
+    assert np.array_equal(hidden.params.noise_scales, full.params.noise_scales[order])
+
+
 def test_too_few_confounders_raises():
     """A tiny/sparse graph without enough >=2-child nodes raises rather than silently
     degenerating."""

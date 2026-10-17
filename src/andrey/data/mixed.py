@@ -21,7 +21,16 @@ import andrey
 
 from .dataset import CausalDataset, QAReport, SCMParams
 from .discrete import _parents_of
-from .scm import _GRAPH, _NOISE, _SEED_SCHEME, _WEIGHTS, _component_rng, named_graph
+from .graphs import dag_truth
+from .scm import (
+    _GRAPH,
+    _NOISE,
+    _SEED_SCHEME,
+    _WEIGHTS,
+    _column_order,
+    _component_rng,
+    named_graph,
+)
 
 __all__ = ["sample_mixed"]
 
@@ -39,6 +48,7 @@ def sample_mixed(
     categorical_share: float = 0.5,
     categories: tuple[int, int] = (2, 3),
     concentration: float = 1.0,
+    shuffle: bool = True,
 ) -> CausalDataset:
     """Sample a conditional linear Gaussian network of categorical and continuous variables.
 
@@ -63,6 +73,11 @@ def sample_mixed(
     concentration : float, default=1.0
         Concentration of the symmetric Dirichlet each table row is drawn from, as for
         :func:`~andrey.data.sample_discrete`.
+    shuffle : bool, default=True
+        Shuffle the columns with a permutation from the seed's own column stream, and relabel the
+        true graph, the categorical columns, and the parameters to match, as for
+        :func:`~andrey.data.sample_scm`. ``provenance["column_order"][j]`` is the index column
+        ``j`` has with ``shuffle=False``.
 
     Returns
     -------
@@ -111,7 +126,7 @@ def sample_mixed(
         raise ValueError(f"concentration must be finite and positive, got {concentration}")
     spec = named_graph(graph, d, density)
     root = np.random.SeedSequence(seed)
-    truth, draw = spec.materialize(_component_rng(root, _GRAPH))
+    _, draw = spec.materialize(_component_rng(root, _GRAPH))
     is_categorical = np.zeros(draw.d, dtype=bool)
     is_categorical[draw.topo_order[: round(categorical_share * draw.d)]] = True
 
@@ -156,8 +171,11 @@ def sample_mixed(
                 column += weights[k] * values[:, p]
         values[:, c] = column
 
+    order = _column_order(root, draw.d, shuffle)  # the drawn node of each column
+    edges = np.argsort(order)[np.stack([draw.parents, draw.children], axis=1)]
+    is_categorical, cards = is_categorical[order], cards[order]
     params = SCMParams(
-        edges=np.stack([draw.parents, draw.children], axis=1),
+        edges=edges,
         weights=weights,
         noise_scales=np.where(is_categorical, np.nan, 1.0),
         functional="conditional_linear_gaussian",
@@ -168,6 +186,7 @@ def sample_mixed(
         "root_entropy": str(root.entropy),
         "spawn_key": list(root.spawn_key),
         "seed_scheme": _SEED_SCHEME,
+        "column_order": order.tolist(),
         "config": {
             "graph": {
                 "model": spec.name,
@@ -180,9 +199,14 @@ def sample_mixed(
             "categories": cards[columns].tolist(),
             "concentration": float(concentration),
             "n": int(n),
+            "shuffle": bool(shuffle),
         },
         "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
     }
     return CausalDataset(
-        data=values, graph=truth, report=QAReport(scale="raw"), provenance=provenance, params=params
+        data=np.take(values, order, axis=1),
+        graph=dag_truth(edges[:, 0], edges[:, 1], draw.d),
+        report=QAReport(scale="raw"),
+        provenance=provenance,
+        params=params,
     )
