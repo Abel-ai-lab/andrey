@@ -73,7 +73,7 @@ def _oracle_fci(monkeypatch, n_obs, edges, possible_dsep):
         remove_by_possible_dsep(marks, *args, **kwargs)
         removed.append((before - np.count_nonzero(marks)) // 2)
 
-    monkeypatch.setattr(fci_module, "make_indep_test", lambda name, X: test)
+    monkeypatch.setattr(fci_module, "make_indep_test", lambda name, X, categorical=None: test)
     monkeypatch.setattr(fci_module, "_remove_by_possible_dsep", counted)
     pag = fci_module.fci(np.zeros((10, n_obs)), alpha=0.5, possible_dsep=possible_dsep)
     return np.asarray(pag.to_numpy(), dtype=np.int8), removed[0]
@@ -118,14 +118,14 @@ def test_order_free_pag_ignores_node_labels_under_exact_tests(monkeypatch, name)
 RECORDED = {
     "fci": (
         {"d": 15, "n": 750, "density": 4.0, "seed": 3},
-        ["00001000200002", "00030000000000", "00000020002000", "03000003000000"]
-        + ["20000000000002", "00000002202020", "00200000010020", "00030300000000"]
-        + ["20000200000000", "00000020000022", "00200100000002", "00000000000000"]
-        + ["00000120020000", "20001000022000"],
+        ["00000000201200", "00000000020200", "00000002000021", "00003000003000"]
+        + ["00030030000000", "00000000000000", "00003000000000", "00200000220001"]
+        + ["20000002000100", "02000002001000", "20020000020020", "22000000200000"]
+        + ["00200000002000", "00200002000000"],
     ),
     "gfci": (
-        {"d": 8, "n": 400, "density": 4.0, "seed": 2},
-        ["0000220", "0012021", "0202100", "0210002", "2020002", "2200000", "0201200"],
+        {"d": 8, "n": 400, "density": 4.0, "seed": 7},
+        ["0231002", "2030200", "2201222", "2020020"] + ["0230020", "0022200", "3030000"],
     ),
 }
 
