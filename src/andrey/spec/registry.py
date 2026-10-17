@@ -37,7 +37,7 @@ _INDEP_TEST = ParamSpec(
     "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
     "distribution, exact for Gaussian data at any sample size. For categorical data coded by whole "
     "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
-    "columns named by categorical (experimental): degen_gauss = degenerate Gaussian and "
+    "columns named by categorical: degen_gauss = degenerate Gaussian and "
     "cond_gauss = conditional Gaussian likelihood ratio.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
@@ -256,7 +256,7 @@ _add(
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
                 "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
-                "Gaussian BIC, for mixed data (experimental).",
+                "Gaussian BIC, for mixed data.",
                 choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
