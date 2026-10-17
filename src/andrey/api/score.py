@@ -502,7 +502,10 @@ def hc(
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set. Under a mixed-data score, no move gives a categorical column
-    a continuous parent, so the DAG found is a conditional linear Gaussian network.
+    a continuous parent, so the DAG found is a conditional linear Gaussian network. Exact score ties
+    between moves, such as adding ``x -> y`` or ``y -> x`` under a score-equivalent score, break by
+    a hash of each column's values, so reordering the columns does not change the graph found
+    unless two columns are identical.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
     to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
