@@ -22,6 +22,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from andrey.core import score as score_module
 from andrey.core import score_delta
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
@@ -111,13 +112,15 @@ def test_fallback_fires_on_ill_conditioned_base(monkeypatch: pytest.MonkeyPatch)
     assert got == want
 
 
-def test_bounds_leave_deltas_unchanged() -> None:
+def test_bounds_leave_deltas_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
     """Reported bounds leave each delta byte-identical; they are 0 where no batch can change it.
 
     Adds off the empty base, adds off an ill-conditioned base, and removes do not depend on the
     batch. Adds off a well-conditioned base get a small finite bound, and an add whose rank-one
     update cancels gets an infinite one.
     """
+    # BICScore's input check rejects the near-duplicate column; the bounds still cover it.
+    monkeypatch.setattr(score_module, "check_columns", lambda cov, n: None)
     rng = np.random.default_rng(0)
     cols = rng.standard_normal((400, 6))
     x = np.hstack([cols, cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))])  # 6 ~= 0
