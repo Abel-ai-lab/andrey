@@ -1,8 +1,8 @@
 """Checks on the built website that the unit tests cannot make.
 
 Run from the repo root: ``uv run --group docs python -m pytest docs/test_built_site.py``. The first
-test that needs the site builds all of it from a clean workspace with ``-W``, which executes the
-notebooks and takes a few minutes; the checks then read the built pages. The template and source
+test that needs the site builds all of it from a clean workspace with ``-W``, which takes a few
+minutes; the checks then read the built pages. The template and source
 checks are unit tests, which the docs workflow runs first.
 """
 

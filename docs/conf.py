@@ -132,13 +132,16 @@ intersphinx_mapping = {
 
 # ---- notebooks -------------------------------------------------------------------------------
 EXAMPLES = HERE / "docs" / "examples"
+# The example notebooks carry their outputs, so a slow builder runs none of them:
+# `scripts/execute_notebooks.py` stores the outputs, and the docs workflow checks they match a fresh
+# run. speed_on_your_machine.ipynb ships without outputs: its timings belong to the reader's
+# machine. The getting-started guide, a MyST notebook, runs at build time.
 nb_execution_mode = "cache"
-nb_execution_timeout = 180
+nb_execution_timeout = 600
 nb_execution_raise_on_error = True
 nb_execution_in_temp = True
 nb_execution_cache_path = str(HERE / "_build" / ".jupyter_cache")
-# Timings belong to the reader's machine, not the docs builder; the page ships without outputs.
-nb_execution_excludepatterns = ["docs/examples/speed_on_your_machine.ipynb"]
+nb_execution_excludepatterns = ["docs/examples/*.ipynb"]
 # Warnings print local paths.
 nb_output_stderr = "remove"
 
