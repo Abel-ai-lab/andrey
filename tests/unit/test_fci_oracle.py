@@ -30,7 +30,7 @@ def _oracle_fci(monkeypatch, n_obs, edges, selection=()):
     def test(x, y, condition_set=()):
         return float(nx.is_d_separator(dag, {x}, {y}, set(condition_set) | conditioned))
 
-    monkeypatch.setattr(fci_module, "make_indep_test", lambda name, X: test)
+    monkeypatch.setattr(fci_module, "make_indep_test", lambda name, X, categorical=None: test)
     pag = fci_module.fci(np.zeros((10, n_obs)), alpha=0.5)
     return np.asarray(pag.to_numpy(), dtype=np.int8)
 
