@@ -108,17 +108,17 @@ carries; a newer release shows it again.
 The homepage takes every number from the release summaries `RELEASES` names
 (`benchmarks/published/<label>/summary.json`) or from the registry (`andrey.spec.list_specs()`),
 counting supported methods only. `comparisons()` reads every kind of summary into one layout, each
-comparison's errors in the measure its summary records (`ERRORS`). The README's claim is
-`claim_sentence()`: the largest ratio rounded down to a power of ten on its method, then whether the
-other supported methods are faster ("the other", "most other", or nothing); the build fails unless
-the first summary's headline is that claim. The README chart shows one card per `PANEL` method, at
-most six.
+comparison's errors in the measure its summary records (`ERRORS`). The README, the live demo, and
+the homepage's description state `CLAIM`, a speed claim with no number. The build fails unless the
+first summary's headline is `claim_sentence()` of its numbers: the largest ratio rounded down to a
+power of ten on its method, then whether the other supported methods are faster ("the other", "most
+other", or nothing). The README chart shows one card per `PANEL` method, at most six.
 
-The homepage's description names PC, GES, and FCI, counts the other methods, and states the claim's
-first part. Every other page's description is the `description` in its front matter; without one,
-its first paragraph cut at a word to 160 characters (an API page's docstring summary line); a page
-with neither, such as search, takes the homepage's. To preview with placeholder numbers, which
-replace the first release's summary:
+The homepage's description names PC, GES, and FCI, counts the other methods, and states `CLAIM`.
+Every other page's description is the `description` in its front matter; without one, its first
+paragraph cut at a word to 160 characters (an API page's docstring summary line); a page with
+neither, such as search, takes the homepage's. To preview with placeholder numbers, which replace
+the first release's summary:
 
 ```shell
 uv run --group docs sphinx-build -b html docs docs/_build/html \
