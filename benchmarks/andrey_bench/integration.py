@@ -123,6 +123,7 @@ def assemble_record(
         tau_max=params.get("tau_max"),
         times=key.times,
         wall_s=measures.get("wall_s"),
+        process_s=measures.get("process_s"),
         cpu_s=measures.get("cpu_s"),
         child_cpu_s=measures.get("child_cpu_s"),
         warmup_s=measures.get("warmup_s"),

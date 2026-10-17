@@ -9,6 +9,24 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- Categorical and mixed data: `pc`, `fci`, `gfci`, and `cdnod` take the chi-square, G-square,
+  degenerate Gaussian, and conditional Gaussian tests (`indep_test="chisq"`, `"gsq"`,
+  `"degen_gauss"`, `"cond_gauss"`), and `ges`, `gfci`, `hc`, `tabu`, `boss`, `grasp`, and
+  `exact_search` take the matching scores. ([#167])
+- `andrey.data.sample_discrete` and `sample_mixed` sample a discrete or a conditional linear
+  Gaussian network with its true graph. ([#167])
+- The categorical scores include the multinomial BIC beside BDeu on the BIC's `-2` log scale, read
+  text, string, and `category` columns as categories, and `load_dataset(..., discrete=True)` samples
+  ASIA, ALARM, HEPAR2, and ANDES from their own conditional probability tables (with Rui Zhu,
+  [#94]). ([#167])
+
+### Changed
+
+- `hc` with a mixed-data score never adds a continuous -> categorical edge, which the conditional
+  linear Gaussian model cannot express, and scores its candidate parent sets in batches. ([#167])
+
 ## [0.5.0] - 2026-10-16
 
 ### Highlights
@@ -183,3 +201,5 @@ First alpha release.
 [#127]: https://github.com/Abel-ai-lab/andrey/pull/127
 [#133]: https://github.com/Abel-ai-lab/andrey/pull/133
 [#95]: https://github.com/Abel-ai-lab/andrey/pull/95
+[#94]: https://github.com/Abel-ai-lab/andrey/pull/94
+[#167]: https://github.com/Abel-ai-lab/andrey/pull/167

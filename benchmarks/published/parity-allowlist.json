@@ -1,5 +1,5 @@
 {
-  "about": "Published rows where the reference package has fewer errors than Andrey, each with its cause. qa/reference_parity.py accepts an entry only when its cause is correct-by-paper or reference-defect, it gives a reason and a citation, and it pins the row's current error values.",
+  "about": "Published rows where the reference package has fewer errors than Andrey, each with its cause. qa/reference_parity.py accepts an entry only when its cause is correct-by-paper, reference-defect, or tie-break, it gives a reason and a citation, and it pins the row's current error values; a tie-break entry's evidence gives the row's error values with the columns in reversed order, where the row passes.",
   "entries": [
     {
       "summary": "alpha-2026-09",
@@ -66,6 +66,109 @@
       "cause": "reference-defect",
       "reason": "The one series where tigramite has fewer errors differs only in the order of candidate separating sets. tigramite orders candidates using a memory updated while a group of links is tested, so its order follows the variable indices; Andrey orders by the memory as it stood when the group started, which does not depend on column order. Over 20 random column orders of that series, Andrey returns the same graph every time; tigramite matches Andrey's error count in 18 orders and has one fewer error in 2, so its advantage on this row comes from the column order of the stored data.",
       "citation": "Gerhardus and Runge (2020), High-recall causal discovery for autocorrelated time series with latent confounders, NeurIPS; Supplement S5 (Algorithm S2 line 7; order-independent separating sets)."
+    },
+    {
+      "summary": "data-types-2026-10",
+      "method": "GES on mixed data, degenerate Gaussian score",
+      "comparator": "Tetrad",
+      "row": {"mean_degree": 2.0, "d": 10, "n": 2000},
+      "andrey_errors": 2,
+      "comparator_errors": 1,
+      "cause": "correct-by-paper",
+      "reason": "Andrey runs GES as Chickering defines it: each forward step takes the Insert with the largest score gain, then the backward phase deletes, and the result is a local optimum of those operators, which a check over every single-edge addition and removal in the equivalence class confirms. Two series differ. On one, Tetrad's FGES, which first scores only pairs whose marginal edge improves the score and then repeats its forward and backward passes, reaches a different local optimum that scores better under Andrey's degenerate Gaussian score; Tetrad's later release, whose score orders parent sets as Andrey's does, also reaches a better one. On the other, Andrey's graph has the better score under both packages' scores, so Tetrad's fewer errors there come from a lower-scoring graph, and Tetrad's later release returns Andrey's graph. The benchmarked Tetrad release's degenerate Gaussian score also differs from the paper's: it scores each indicator column of a categorical child on the parents alone, without the chain rule over the child's indicators.",
+      "citation": "Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3, 507-554. Ramsey, J., Glymour, M., Sanchez-Romero, R., and Glymour, C. (2017). A million variables and more: the fast greedy equivalence search algorithm. IJDSA 3(2), 121-129. Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed acyclic graphs with mixed data-types. PMLR 104, 4-21. Tetrad 7.6.3 (GPL), tetrad-lib edu/cmu/tetrad/search/score/DegenerateGaussianScore.java, localScore; Tetrad 7.6.10, the same file, and edu/cmu/tetrad/search/Fges.java, search."
+    },
+    {
+      "summary": "data-types-2026-10",
+      "method": "Hill climbing on discrete data, BDeu score",
+      "comparator": "pgmpy",
+      "row": {"mean_degree": 2.0, "d": 10, "n": 2000},
+      "andrey_errors": 4,
+      "comparator_errors": 0,
+      "cause": "tie-break",
+      "reason": "Both packages run hill climbing on the same BDeu score: every pgmpy move changes the score by Andrey's change times -1/2, so they rank the moves alike. On every series of the row, the two searches first differ at a tie between adding x -> y and adding y -> x, which score equivalence makes exact: Andrey takes the addition with the lower column pair, pgmpy the first maximal move in its own move order. From there each search ends at a different local optimum of the same score, where no single addition, removal, or reversal improves it, and bnlearn's hill climbing returns Andrey's graph on every series. Hill climbing takes the best move and leaves ties open, so neither optimum is wrong by the method; on the four series where pgmpy has fewer errors, pgmpy's optimum scores better on all four. With the columns in reversed order, which reverses Andrey's tie-break, pgmpy has fewer errors on one series and Andrey on one, and Andrey returns pgmpy's graph on three of the five.",
+      "citation": "Chickering, D. M., Geiger, D., and Heckerman, D. (1995). Learning Bayesian networks: search methods and experimental results. AISTATS, 112-128. Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks: the combination of knowledge and statistical data. Machine Learning 20(3), 197-243 (score equivalence). pgmpy 1.1.2 (MIT): pgmpy/estimators/HillClimbSearch.py, _legal_operations enumerates the candidate additions from a set of ordered variable pairs, and estimate takes max(..., key=lambda t: t[1]), the first maximal move in that order.",
+      "evidence": {
+        "column_order": "reversed",
+        "andrey_errors": 1,
+        "comparator_errors": 1,
+        "series": [
+          {"seed": 0, "andrey": 6, "comparator": 3, "andrey_reversed": 3, "andrey_reversed_is_comparator": true},
+          {"seed": 1, "andrey": 5, "comparator": 5, "andrey_reversed": 4, "andrey_reversed_is_comparator": false},
+          {"seed": 2, "andrey": 12, "comparator": 0, "andrey_reversed": 6, "andrey_reversed_is_comparator": false},
+          {"seed": 3, "andrey": 4, "comparator": 1, "andrey_reversed": 1, "andrey_reversed_is_comparator": true},
+          {"seed": 4, "andrey": 3, "comparator": 0, "andrey_reversed": 0, "andrey_reversed_is_comparator": true}
+        ]
+      }
+    },
+    {
+      "summary": "data-types-2026-10",
+      "method": "Hill climbing on discrete data, BDeu score",
+      "comparator": "pgmpy",
+      "row": {"mean_degree": 2.0, "d": 20, "n": 2000},
+      "andrey_errors": 3,
+      "comparator_errors": 2,
+      "cause": "tie-break",
+      "reason": "Both packages run hill climbing on the same BDeu score: every pgmpy move changes the score by Andrey's change times -1/2, so they rank the moves alike. On every series of the row, the two searches first differ at a tie between adding x -> y and adding y -> x, which score equivalence makes exact: Andrey takes the addition with the lower column pair, pgmpy the first maximal move in its own move order. From there each search ends at a different local optimum of the same score, where no single addition, removal, or reversal improves it, and bnlearn's hill climbing returns Andrey's graph on every series. Hill climbing takes the best move and leaves ties open, so neither optimum is wrong by the method; on the three series where pgmpy has fewer errors, pgmpy's optimum scores better on two. With the columns in reversed order, which reverses Andrey's tie-break, pgmpy has fewer errors on one series and Andrey on one, and Andrey returns pgmpy's graph on two of the five.",
+      "citation": "Chickering, D. M., Geiger, D., and Heckerman, D. (1995). Learning Bayesian networks: search methods and experimental results. AISTATS, 112-128. Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks: the combination of knowledge and statistical data. Machine Learning 20(3), 197-243 (score equivalence). pgmpy 1.1.2 (MIT): pgmpy/estimators/HillClimbSearch.py, _legal_operations enumerates the candidate additions from a set of ordered variable pairs, and estimate takes max(..., key=lambda t: t[1]), the first maximal move in that order.",
+      "evidence": {
+        "column_order": "reversed",
+        "andrey_errors": 1,
+        "comparator_errors": 1,
+        "series": [
+          {"seed": 0, "andrey": 12, "comparator": 4, "andrey_reversed": 4, "andrey_reversed_is_comparator": true},
+          {"seed": 1, "andrey": 9, "comparator": 15, "andrey_reversed": 11, "andrey_reversed_is_comparator": false},
+          {"seed": 2, "andrey": 8, "comparator": 4, "andrey_reversed": 4, "andrey_reversed_is_comparator": false},
+          {"seed": 3, "andrey": 5, "comparator": 9, "andrey_reversed": 9, "andrey_reversed_is_comparator": true},
+          {"seed": 4, "andrey": 7, "comparator": 4, "andrey_reversed": 7, "andrey_reversed_is_comparator": false}
+        ]
+      }
+    },
+    {
+      "summary": "data-types-2026-10",
+      "method": "Hill climbing on discrete data, BDeu score",
+      "comparator": "pgmpy",
+      "row": {"mean_degree": 2.0, "d": 40, "n": 2000},
+      "andrey_errors": 2,
+      "comparator_errors": 1,
+      "cause": "tie-break",
+      "reason": "Both packages run hill climbing on the same BDeu score: every pgmpy move changes the score by Andrey's change times -1/2, so they rank the moves alike. On every series of the row, the two searches first differ at a tie between adding x -> y and adding y -> x, which score equivalence makes exact: Andrey takes the addition with the lower column pair, pgmpy the first maximal move in its own move order. From there each search ends at a different local optimum of the same score, where no single addition, removal, or reversal improves it, and bnlearn's hill climbing returns Andrey's graph on every series. Hill climbing takes the best move and leaves ties open, so neither optimum is wrong by the method; on the two series where pgmpy has fewer errors, pgmpy's optimum scores better on both. With the columns in reversed order, which reverses Andrey's tie-break, pgmpy has fewer errors on two series and Andrey on three, and Andrey returns pgmpy's graph on none of the five.",
+      "citation": "Chickering, D. M., Geiger, D., and Heckerman, D. (1995). Learning Bayesian networks: search methods and experimental results. AISTATS, 112-128. Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks: the combination of knowledge and statistical data. Machine Learning 20(3), 197-243 (score equivalence). pgmpy 1.1.2 (MIT): pgmpy/estimators/HillClimbSearch.py, _legal_operations enumerates the candidate additions from a set of ordered variable pairs, and estimate takes max(..., key=lambda t: t[1]), the first maximal move in that order.",
+      "evidence": {
+        "column_order": "reversed",
+        "andrey_errors": 2,
+        "comparator_errors": 3,
+        "series": [
+          {"seed": 0, "andrey": 18, "comparator": 20, "andrey_reversed": 13, "andrey_reversed_is_comparator": false},
+          {"seed": 1, "andrey": 21, "comparator": 12, "andrey_reversed": 9, "andrey_reversed_is_comparator": false},
+          {"seed": 2, "andrey": 18, "comparator": 18, "andrey_reversed": 24, "andrey_reversed_is_comparator": false},
+          {"seed": 3, "andrey": 17, "comparator": 14, "andrey_reversed": 11, "andrey_reversed_is_comparator": false},
+          {"seed": 4, "andrey": 13, "comparator": 13, "andrey_reversed": 14, "andrey_reversed_is_comparator": false}
+        ]
+      }
+    },
+    {
+      "summary": "data-types-2026-10",
+      "method": "Hill climbing on discrete data, BIC score",
+      "comparator": "pgmpy",
+      "row": {"mean_degree": 2.0, "d": 20, "n": 2000},
+      "andrey_errors": 4,
+      "comparator_errors": 1,
+      "cause": "tie-break",
+      "reason": "Both packages run hill climbing on the same multinomial BIC score: every pgmpy move changes the score by Andrey's change times -1/2, so they rank the moves alike. On every series of the row, the two searches first differ at a tie between adding x -> y and adding y -> x, which score equivalence makes exact: Andrey takes the addition with the lower column pair, pgmpy the first maximal move in its own move order. From there each search ends at a different local optimum of the same score, where no single addition, removal, or reversal improves it, and bnlearn's hill climbing returns Andrey's graph on every series. Hill climbing takes the best move and leaves ties open, so neither optimum is wrong by the method; on the four series where pgmpy has fewer errors, pgmpy's optimum scores better on all four. With the columns in reversed order, which reverses Andrey's tie-break, pgmpy has fewer errors on one series and Andrey on two, and Andrey returns pgmpy's graph on two of the five.",
+      "citation": "Chickering, D. M., Geiger, D., and Heckerman, D. (1995). Learning Bayesian networks: search methods and experimental results. AISTATS, 112-128. Heckerman, D., Geiger, D., and Chickering, D. M. (1995). Learning Bayesian networks: the combination of knowledge and statistical data. Machine Learning 20(3), 197-243 (score equivalence). pgmpy 1.1.2 (MIT): pgmpy/estimators/HillClimbSearch.py, _legal_operations enumerates the candidate additions from a set of ordered variable pairs, and estimate takes max(..., key=lambda t: t[1]), the first maximal move in that order.",
+      "evidence": {
+        "column_order": "reversed",
+        "andrey_errors": 1,
+        "comparator_errors": 2,
+        "series": [
+          {"seed": 0, "andrey": 9, "comparator": 7, "andrey_reversed": 4, "andrey_reversed_is_comparator": false},
+          {"seed": 1, "andrey": 11, "comparator": 16, "andrey_reversed": 11, "andrey_reversed_is_comparator": false},
+          {"seed": 2, "andrey": 5, "comparator": 4, "andrey_reversed": 4, "andrey_reversed_is_comparator": true},
+          {"seed": 3, "andrey": 5, "comparator": 4, "andrey_reversed": 7, "andrey_reversed_is_comparator": false},
+          {"seed": 4, "andrey": 8, "comparator": 7, "andrey_reversed": 7, "andrey_reversed_is_comparator": true}
+        ]
+      }
     }
   ]
 }

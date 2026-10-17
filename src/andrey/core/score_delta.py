@@ -13,6 +13,8 @@ The delta is ``n * (log R_new - log R_old) +/- log_n * lambda`` (``+`` for an ad
 within ``1e-9`` of the exact difference. :func:`local_score_bic_delta` scores one move,
 :func:`score_many_with_base` many, :func:`add_deltas` and :func:`remove_deltas` every add or every
 removal against one base at once, and :class:`DeltaBICScore` keeps the caches a search reuses.
+:class:`FullScoreDelta` differences two full local scores of any :class:`~andrey.core.score.Score`,
+for a score with no rank-one update, such as BDeu.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from weakref import WeakKeyDictionary
 
 import numpy as np
 
-from .score import BICScore, local_score_bic
+from .score import BICScore, LocalScore, Score, local_score_bic
 
 # Conditioning threshold for the Schur fast path. The Schur identity loses ~log10(cond) digits;
 # at cond=1e10 the residual keeps ~6 digits in float64, well above HC's 1e-9 strict-improvement
@@ -557,7 +559,7 @@ def score_many_with_base(
 
 
 def _delta_two_scores(
-    score_obj: BICScore, i: int, S_base_sorted: tuple[int, ...], u: int, op: str
+    score_obj: Score, i: int, S_base_sorted: tuple[int, ...], u: int, op: str
 ) -> float:
     """Raw delta ``score(i, base +/- u) - score(i, base)`` from two memoized full scores.
 
@@ -917,3 +919,50 @@ class DeltaBICScore:
         return delta_many_with_base(
             self.score_obj, i, base_parents, deltas, cond_threshold=self.cond_threshold
         )
+
+
+class FullScoreDelta:
+    """Move deltas from two full local scores, with the surface of :class:`DeltaBICScore`.
+
+    Every delta is ``score(v, S +/- u) - score(v, S)`` from two memoized full scores; the batched
+    methods score all of a call's parent sets in one ``score_many`` call.
+    GES's reference arm uses it on BIC, and GES and hill climbing use it on scores with no Schur
+    update, such as :class:`~andrey.core.score.BDeuScore` and the mixed-data scores.
+
+    Parameters
+    ----------
+    score : BICScore, BDeuScore, DGScore, or CGScore
+        The local score; HC also reads its sample count, ``score.n``.
+    """
+
+    def __init__(self, score: LocalScore) -> None:
+        self.score_obj = score
+
+    def delta(self, v: int, S_old_sorted: tuple[int, ...], u: int, op: str) -> float:
+        """Return ``score(v, S_new) - score(v, S_old)`` for a single ``add``/``remove`` of ``u``."""
+        return _delta_two_scores(self.score_obj, int(v), tuple(S_old_sorted), u, op)
+
+    def delta_many_with_base(
+        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+    ) -> list[float]:
+        """Return RAW deltas ``[score(i, base +/- u_k) - score(i, base)]`` for single moves."""
+        base = sorted(int(p) for p in base_parents)
+        scores = self.score_obj.score_many(int(i), [base, *_moved(base, deltas)])
+        return [float(s - scores[0]) for s in scores[1:]]
+
+    def score_many_with_base(
+        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+    ) -> list[float]:
+        """Return absolute scores ``[score(i, base +/- u_k)]`` for single moves."""
+        base = [int(p) for p in base_parents]
+        return self.score_obj.score_many(int(i), _moved(base, deltas))
+
+
+def _moved(base: list[int], deltas: Sequence[tuple[str, int]]) -> list[list[int]]:
+    """The parent sets ``base`` plus or minus ``u`` for each ``(op, u)`` in ``deltas``."""
+    sets = []
+    for op, u in deltas:
+        if op not in ("add", "remove"):
+            raise ValueError(f"unknown delta op: {op!r} (expected 'add' or 'remove')")
+        sets.append([*base, int(u)] if op == "add" else [p for p in base if p != u])
+    return sets

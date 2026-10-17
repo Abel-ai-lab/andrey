@@ -275,6 +275,24 @@ class SCM:
         )
 
 
+_GRAPH_BUILDERS = {
+    "erdos_renyi": erdos_renyi,
+    "scale_free": scale_free,
+    "small_world": small_world,
+    "hub": hub,
+}
+
+
+def named_graph(graph: str, d: int, density: float) -> GraphSpec:
+    """Return the graph spec ``graph`` names, on ``d`` nodes at mean total degree ``density``.
+
+    Raises ``ValueError`` for an unknown name, listing the known ones.
+    """
+    if graph not in _GRAPH_BUILDERS:
+        raise ValueError(f"unknown graph {graph!r}; supported: {sorted(_GRAPH_BUILDERS)}")
+    return _GRAPH_BUILDERS[graph](d, **params_for_density(graph, d, density))
+
+
 def sample_scm(
     *,
     graph: str = "erdos_renyi",
@@ -308,12 +326,6 @@ def sample_scm(
     -------
     CausalDataset
     """
-    graph_specs = {
-        "erdos_renyi": lambda: erdos_renyi(d, **params_for_density("erdos_renyi", d, density)),
-        "scale_free": lambda: scale_free(d, **params_for_density("scale_free", d, density)),
-        "small_world": lambda: small_world(d, **params_for_density("small_world", d, density)),
-        "hub": lambda: hub(d, **params_for_density("hub", d, density)),
-    }
     functional_specs = {
         "linear": linear,
         "additive_noise": additive_noise,
@@ -328,8 +340,7 @@ def sample_scm(
         "exponential": exponential,
         "gumbel": gumbel,
     }
-    if graph not in graph_specs:
-        raise ValueError(f"unknown graph {graph!r}; supported: {sorted(graph_specs)}")
+    graph_spec = named_graph(graph, d, density)
     if functional not in functional_specs:
         raise ValueError(
             f"unknown functional {functional!r}; supported: {sorted(functional_specs)}"
@@ -337,7 +348,7 @@ def sample_scm(
     if noise not in noise_specs:
         raise ValueError(f"unknown noise {noise!r}; supported: {sorted(noise_specs)}")
     scm = SCM(
-        graph=graph_specs[graph](),
+        graph=graph_spec,
         functional=functional_specs[functional](),
         noise=noise_specs[noise](),
         latents=latents,

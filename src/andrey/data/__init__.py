@@ -13,13 +13,20 @@ true graph:
 >>> ds = scm.sample(n=500, seed=0)
 >>> ds.data.shape, ds.graph.kind
 ((500, 10), 'dag')
+
+:func:`sample_discrete` samples category codes from a discrete Bayesian network with random
+conditional probability tables, the data for the discrete tests and scores. :func:`sample_mixed`
+samples categorical and continuous variables from a conditional linear Gaussian network, the data
+for the mixed-data tests and scores.
 """
 
 from __future__ import annotations
 
 from . import benchmarks, functional, graphs, latent, noise, qa, sortability, storage, temporal
 from .dataset import CausalDataset, QAReport, SCMParams
+from .discrete import sample_discrete
 from .generate import Ensemble, generate
+from .mixed import sample_mixed
 from .qa import FaithfulnessScreen
 from .real import RealDataset, list_datasets, load_dataset
 from .scm import SCM, sample_scm
@@ -27,6 +34,8 @@ from .scm import SCM, sample_scm
 __all__ = [
     "SCM",
     "sample_scm",
+    "sample_discrete",
+    "sample_mixed",
     "Ensemble",
     "generate",
     "CausalDataset",

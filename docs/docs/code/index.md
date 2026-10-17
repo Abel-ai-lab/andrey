@@ -8,7 +8,7 @@ meta:
 # API reference
 
 The public API of Andrey - everything exported by `andrey`, `andrey.metrics`, and `andrey.viz`,
-and the dataset loaders of `andrey.data` - generated from the source docstrings.
+and the dataset loaders and simulators of `andrey.data` - generated from the source docstrings.
 `andrey.__version__` gives the installed version.
 
 ## Structure-learning methods
@@ -19,9 +19,19 @@ exceptions: `cdnod` also takes a domain index, `longitudinal_lingam` takes a lis
 method is either supported or experimental; `andrey list` prints the status.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
-least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column
-names. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
-column. A single column gives a one-node graph.
+least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column names.
+The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
+`"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
+whole numbers in a column of numbers, each distinct value of a column one category. The mixed-data
+settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
+`"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
+[Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
+needs whole numbers. Other data raises a `ValueError` that names the argument and, for a bad cell,
+its row and column. A single column gives a one-node graph.
+
+`pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
+`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`
+and `"cond_gauss"` for mixed data.
 
 ### Supported methods
 
@@ -141,6 +151,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
+| {py:class}`~andrey.DataTypeWarning` | A mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -175,6 +186,7 @@ name.
    PerformanceWarning
    BackendFallbackWarning
    SearchLimitWarning
+   DataTypeWarning
 ```
 
 ## Datasets
@@ -189,8 +201,9 @@ name.
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
 
-A published network's data come from a linear-Gaussian model on its graph, standardized, since its
-own tables are discrete; `n` (default 1000) and `seed` (default 0) set the rows. The first load
+A published network's data come from a linear-Gaussian model on its graph, standardized, or, with
+`discrete=True`, from its own conditional probability tables, each column a pandas `category` of
+the network's category names; `n` (default 1000) and `seed` (default 0) set the rows. The first load
 downloads the file, checks its SHA-256, and caches it; later loads need no network. The
 cache directory is the `data_home` argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey`
 (`~/.cache/andrey` when `XDG_CACHE_HOME` is unset). Without network access, the error names the
@@ -207,6 +220,23 @@ Sachs data end to end.
    load_dataset
    list_datasets
    RealDataset
+```
+
+### Simulators
+
+`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
+scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
+for the mixed-data tests and scores. Each returns the data with the true graph.
+
+```{eval-rst}
+.. currentmodule:: andrey.data
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   sample_discrete
+   sample_mixed
 ```
 
 ## Metrics

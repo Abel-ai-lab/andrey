@@ -275,6 +275,36 @@ EDGE_MEANINGS = {
 }
 
 
+def _data_types_section() -> str:
+    """The agent guide's paragraph on column types, from the registry's mixed-data settings."""
+    from andrey.api._adapt import MAX_CATEGORIES
+    from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
+    from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES
+
+    def code(names: tuple[str, ...]) -> str:
+        return " or ".join(f"`{n}`" for n in names)
+
+    typed = [
+        name for name, spec in REGISTRY.items() if any(p.name == "categorical" for p in spec.params)
+    ]
+    return (
+        "The default tests and scores read every column as continuous. For categorical columns "
+        f"coded by whole numbers, choose `indep_test` {code(DISCRETE_INDEP_TESTS)} or `score_func` "
+        f"{code(DISCRETE_SCORES)}. For mixed data, choose `indep_test` {code(MIXED_INDEP_TESTS)} "
+        f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "
+        "and name the categorical columns with `categorical=[col,...]` (header names or 0-based "
+        "positions), or `categorical=[]` for none. Without `categorical`, the setting infers them: "
+        "a DataFrame's `category`, `bool`, and text columns, and every column of at most "
+        f"`max_categories` (default {MAX_CATEGORIES}) distinct whole numbers. `andrey run` reads "
+        "numbers only, so its data file codes each category as a whole number. The result's "
+        "`metadata.categorical` lists the categorical columns read, and `run.warnings` holds a "
+        "`DataTypeWarning` that names the inferred columns, or says that none was found and the "
+        "setting ran as its linear-Gaussian form. Under a continuous setting, a `DataTypeWarning` "
+        "names whole-number columns that may be category codes: check them before reading the "
+        "graph."
+    )
+
+
 def render_skill() -> str:
     """The ``SKILL.md`` agent skill: how to select, call, and read Andrey from an agent."""
     out: list[str] = []
@@ -338,6 +368,10 @@ def render_skill() -> str:
         "A CPDAG's undirected edges are directions the data cannot settle, not missing work; "
         "report them as such."
     )
+    a("")
+    a("## Data types")
+    a("")
+    a(_data_types_section())
     a("")
     a("## Choosing a method")
     a("")

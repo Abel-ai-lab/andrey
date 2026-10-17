@@ -168,7 +168,8 @@ def meek(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
 
     The completion is defined for a collider-consistent PDAG (as produced by
     :func:`orient_colliders`); on an inconsistent PDAG the fixed point can depend on rule-firing
-    order.
+    order. R1 visits the directed edges ``i -> j`` by ``i``, then ``j``, so when two of them demand
+    opposite directions for one undirected edge, the edge with the lower tail index decides.
 
     The private ``_trace`` sink records each firing's rule, participating nodes, and full
     before/after endpoint matrices. Matrices are copied only when a trace is requested.

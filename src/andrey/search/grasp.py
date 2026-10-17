@@ -1,8 +1,8 @@
-"""GRaSP: greedy relaxation of the sparsest permutation over a linear-Gaussian BIC score.
+"""GRaSP: greedy relaxation of the sparsest permutation over a linear-Gaussian or mixed-data BIC.
 
 A depth-bounded search of tucks (:func:`_dfs`) relaxes a variable order; each variable's parents
-come from its persistent grow-shrink tree (:class:`_GST`). Scores are negated
-:class:`~andrey.core.score.BICScore` local scores, so the search maximizes. The algorithm and its
+come from its persistent grow-shrink tree (:class:`_GST`). Scores are negated local scores, so the
+search maximizes. The algorithm and its
 reference are described on :func:`andrey.grasp`.
 """
 
@@ -15,8 +15,9 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore
+from andrey.core.score import BICScore, LocalScore, make_score
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.search.boss import PERMUTATION_SCORES
 
 # The depth-first search of covered tucks descends at most this many score-preserving moves before
 # backtracking.
@@ -158,7 +159,13 @@ class _GST:
 
     __slots__ = ("vertex", "score", "delta", "n_features", "empty_score", "root")
 
-    def __init__(self, vertex: int, score: BICScore, delta: DeltaBICScore, n_features: int) -> None:
+    def __init__(
+        self,
+        vertex: int,
+        score: LocalScore,
+        delta: DeltaBICScore | FullScoreDelta,
+        n_features: int,
+    ) -> None:
         self.vertex = vertex
         self.score = score
         self.delta = delta
@@ -371,9 +378,14 @@ def _dfs(
 
 
 def grasp(
-    data: np.ndarray, *, lambda_value: float = 1.0, random_state: int = 0
+    data: np.ndarray,
+    *,
+    lambda_value: float = 1.0,
+    random_state: int = 0,
+    score_func: str = "local_score_BIC_from_cov",
+    categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Learn a CPDAG from ``data`` by GRaSP over the linear-Gaussian BIC score.
+    """Learn a CPDAG from ``data`` by GRaSP over a linear-Gaussian or mixed-data BIC score.
 
     Runs the greedy relaxation of the sparsest permutation: seeds a permutation, grow-shrinks each
     variable's parents from its predecessors, then relaxes the order through depth-bounded covered
@@ -388,12 +400,16 @@ def grasp(
         Weight on the BIC complexity term of the deviance the search minimizes.
     random_state : int
         Seed for the private RNG that fixes the initial permutation and DFS shuffles.
+    score_func : str
+        Local score, one of :data:`~andrey.search.boss.PERMUTATION_SCORES`.
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score.
 
     Returns
     -------
     tuple[GraphStructure, float]
-        The learned CPDAG, and the total BIC score of the settled DAG (sum of local
-        ``local_score_BIC_from_cov`` values; lower is better).
+        The learned CPDAG, and the total score of the settled DAG (the sum of its local scores;
+        lower is better).
     """
     X = np.asarray(data, dtype=np.float64)
     n_features = X.shape[1]
@@ -401,8 +417,12 @@ def grasp(
         empty = np.zeros((n_features, n_features), dtype=np.int8)
         return to_structure(empty, kind="cpdag"), 0.0
 
-    score = BICScore(X, lambda_value=lambda_value)
-    delta = DeltaBICScore(score)
+    if score_func not in PERMUTATION_SCORES:
+        raise NotImplementedError(
+            f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
+        )
+    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
     gsts = [_GST(v, score, delta, n_features) for v in range(n_features)]
 

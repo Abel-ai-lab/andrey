@@ -83,6 +83,8 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
         "latent_anm_er": "ac7e8fa030c0",
         "anm_pair": "a200dd78d80c",
         "pnl_pair": "d015f7add4b2",
+        "discrete_er": "1cff12e9af03",
+        "mixed_er": "cb7595f71def",
     }
 
 

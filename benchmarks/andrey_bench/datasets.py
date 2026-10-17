@@ -1,7 +1,10 @@
 """Generate and store benchmark datasets with ``andrey.data.sample_scm``.
 
 Each ``(topology, functional, noise, density, d, n, seed, standardize, latents)`` dataset is stored
-once as a ``.npz`` containing ``float64`` samples and the true graph's int8 endpoint marks.
+once as a ``.npz`` containing ``float64`` samples and the true graph's int8 endpoint marks. The
+``categorical`` functional samples a discrete network with ``andrey.data.sample_discrete`` instead;
+its samples are category codes. The ``conditional_gaussian`` functional samples a mixed network with
+``andrey.data.sample_mixed``: category codes in its categorical columns, values in the rest.
 :class:`DatasetKey` supplies the ``dataset_id``; :func:`load` casts to ``float32`` for those fits
 outside timing, without storing another copy.
 
@@ -97,6 +100,13 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # PNL is identifiable. The inner transform is linear and the outer one nonlinear and invertible.
     # At ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "pnl_pair": ("er", "pnl", "laplace", "standardized"),
+    # Categorical data from a discrete network, Dirichlet tables on an ER DAG: the chi-square and
+    # G-square tests and the BDeu score. Codes are categories, so they are never rescaled.
+    "discrete_er": ("er", "categorical", "dirichlet", "raw"),
+    # Mixed data from a conditional linear Gaussian network on an ER DAG: the degenerate and
+    # conditional Gaussian tests and scores. The key's `categorical_share` and `categories` set the
+    # categorical columns; codes and values are never rescaled.
+    "mixed_er": ("er", "conditional_gaussian", "gaussian", "raw"),
     # A lagged linear-Gaussian series for PCMCI: andrey.data's VAR(1) on an empty instantaneous
     # graph (the key sets density LAG_ONLY_DENSITY), so every true link has lag 1. Temporal
     # generation takes raw scale only.
@@ -114,6 +124,19 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     "varma_lingam_paper": ("random", "varma2010", "nongaussian", "raw"),
     "longitudinal_lingam_paper": ("random", "panel2013", "nongaussian", "raw"),
 }
+
+#: The functional label of :data:`REGIMES` that ``andrey.data.sample_discrete`` generates, with the
+#: arguments it takes beyond the key's coordinates: categories per node and the Dirichlet
+#: concentration of each table row. They are recorded in the generator call, so the digest follows
+#: them.
+DISCRETE_FUNCTIONAL = "categorical"
+DISCRETE_SETTINGS: dict[str, object] = {"categories": [2, 3], "concentration": 1.0}
+
+#: The functional label ``andrey.data.sample_mixed`` generates, and the argument it takes beyond the
+#: key's coordinates: the Dirichlet concentration of each categorical table row. The categorical
+#: share and the categories per categorical column travel on the key.
+MIXED_FUNCTIONAL = "conditional_gaussian"
+MIXED_SETTINGS: dict[str, object] = {"concentration": 1.0}
 
 #: Temporal regimes and the density their keys set. At density 0 the instantaneous graph has no
 #: edges, so the truth is lag-only: lag 1 holds every link.
@@ -225,6 +248,9 @@ class DatasetKey:
 
     ``times`` is a panel's number of time points, with ``n`` units at each. At ``0``, its default, it
     affects neither the label nor the generator call either.
+
+    ``categorical_share`` and ``categories`` reach the generator only for the mixed functional,
+    :data:`MIXED_FUNCTIONAL`, where they join the label too. Every other key keeps its identity.
     """
 
     topology: str
@@ -236,6 +262,8 @@ class DatasetKey:
     seed: int
     standardize: str
     latents: int = 0
+    categorical_share: float = 0.5
+    categories: tuple[int, int] = (2, 3)
     times: int = 0
 
     @property
@@ -246,10 +274,15 @@ class DatasetKey:
         density would merge a dense key into the sparse key's file.
         """
         hidden = f"-L{self.latents}" if self.latents else ""
+        mixed = (
+            f"-cat{self.categorical_share:g}-k{self.categories[0]}to{self.categories[1]}"
+            if self.functional == MIXED_FUNCTIONAL
+            else ""
+        )
         panel = f"-T{self.times}" if self.times else ""
         return (
             f"{self.topology}-{self.functional}-{self.noise}-deg{self.density:g}"
-            f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}{panel}"
+            f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}{mixed}{panel}"
         )
 
     @property
@@ -271,8 +304,10 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
     """Return the ``andrey.data.sample_scm`` arguments for ``key``, including ``key.density``.
 
     The registry stores this call for reproduction. Unmapped labels raise ``KeyError`` or
-    ``ValueError``. A paper model's call is :func:`andrey_bench.temporal_models.sample`'s, with the
-    model's whole setup, so a change to the setup is a new dataset.
+    ``ValueError``. A categorical key returns the ``andrey.data.sample_discrete`` arguments, with
+    ``"generator"`` naming it, and a mixed key the ``andrey.data.sample_mixed`` arguments. A paper
+    model's call is :func:`andrey_bench.temporal_models.sample`'s, with the model's whole setup, so a
+    change to the setup is a new dataset.
     """
     if key.functional in temporal_models.MODELS:
         call: dict[str, object] = {
@@ -303,6 +338,34 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
         if panel:
             call["times"] = key.times
         return call
+    if key.functional == MIXED_FUNCTIONAL:
+        if key.standardize != "raw" or key.latents:
+            raise ValueError(
+                f"{key.label}: mixed data are raw codes and values with no hidden nodes"
+            )
+        return {
+            "generator": "sample_mixed",
+            "graph": TOPOLOGY_TO_GRAPH[key.topology],
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+            "density": key.density,
+            "categorical_share": key.categorical_share,
+            "categories": list(key.categories),
+            **MIXED_SETTINGS,
+        }
+    if key.functional == DISCRETE_FUNCTIONAL:
+        if key.standardize != "raw" or key.latents:
+            raise ValueError(f"{key.label}: categorical data are raw codes with no hidden nodes")
+        return {
+            "generator": "sample_discrete",
+            "graph": TOPOLOGY_TO_GRAPH[key.topology],
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+            "density": key.density,
+            **DISCRETE_SETTINGS,
+        }
     try:
         graph = TOPOLOGY_TO_GRAPH[key.topology]
         functional = FUNCTIONAL_TO_ANDREY[key.functional]
@@ -378,7 +441,14 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
     if key.functional == "panel2013":
         panel, stack = lingam_models.sample_panel(key.functional, key.d, key.times, key.n, key.seed)
         return panel, stack, COEFFICIENT_KINDS[key.functional]
-    ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
+    generator = kwargs.pop("generator", None)
+    if generator == "sample_discrete":
+        ds = data.sample_discrete(**kwargs)  # type: ignore[arg-type]
+    elif generator == "sample_mixed":
+        kwargs["categories"] = tuple(kwargs["categories"])  # type: ignore[arg-type]
+        ds = data.sample_mixed(**kwargs)  # type: ignore[arg-type]
+    else:
+        ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
     data_arr = np.ascontiguousarray(ds.data, dtype=CANONICAL_DTYPE)
     graph = ds.graph
     if isinstance(graph, TemporalStructure):
@@ -577,6 +647,10 @@ __all__ = [
     "load",
     "TOPOLOGY_TO_GRAPH",
     "FUNCTIONAL_TO_ANDREY",
+    "DISCRETE_FUNCTIONAL",
+    "DISCRETE_SETTINGS",
+    "MIXED_FUNCTIONAL",
+    "MIXED_SETTINGS",
     "NOISES",
     "STANDARDIZE_TO_SCALE",
 ]

@@ -7,6 +7,7 @@ Direct Python calls (not the CLI, which validates inputs of its own) must not le
 from __future__ import annotations
 
 import warnings
+from functools import partial
 
 import numpy as np
 import pytest
@@ -378,7 +379,7 @@ def test_hc_sets_no_move_limit_by_default():
         ({"tabu_length": 3, "max_tabu": 4}, "max_tabu", ValueError),
         ({"max_tabu": True}, "max_tabu", TypeError),
         ({"lambda_value": -1.0}, "lambda_value", ValueError),
-        ({"score_func": "local_score_BDeu"}, "score_func", NotImplementedError),
+        ({"score_func": "local_score_cond_gauss"}, "local_score_cond_gauss", NotImplementedError),
     ],
 )
 def test_tabu_rejects_a_bad_setting(settings, named, error):
@@ -406,6 +407,135 @@ def test_cdnod_rejects_nan_in_c_indx():
         andrey.cdnod(_data(), c_indx=np.r_[np.nan, np.zeros(59)])
 
 
+# Every categorical setting of each facade that takes one, called on one data matrix.
+CATEGORICAL = {
+    ("pc", "indep_test", "chisq"): lambda x: andrey.pc(x, indep_test="chisq"),
+    ("pc", "indep_test", "gsq"): lambda x: andrey.pc(x, indep_test="gsq"),
+    ("fci", "indep_test", "chisq"): lambda x: andrey.fci(x, indep_test="chisq"),
+    ("fci", "indep_test", "gsq"): lambda x: andrey.fci(x, indep_test="gsq"),
+    ("cdnod", "indep_test", "gsq"): lambda x: andrey.cdnod(
+        x, np.arange(len(x)) % 2, indep_test="gsq"
+    ),
+    ("gfci", "indep_test", "chisq"): lambda x: andrey.gfci(
+        x, indep_test="chisq", score_func="local_score_BDeu"
+    ),
+    ("ges", "score_func", "local_score_BDeu"): lambda x: andrey.ges(
+        x, score_func="local_score_BDeu"
+    ),
+    ("hc", "score_func", "local_score_BDeu"): lambda x: andrey.hc(x, score_func="local_score_BDeu"),
+    ("gfci", "indep_test", "gsq"): lambda x: andrey.gfci(
+        x, indep_test="gsq", score_func="local_score_BIC_categorical"
+    ),
+    ("ges", "score_func", "local_score_BIC_categorical"): lambda x: andrey.ges(
+        x, score_func="local_score_BIC_categorical"
+    ),
+    ("hc", "score_func", "local_score_BIC_categorical"): lambda x: andrey.hc(
+        x, score_func="local_score_BIC_categorical"
+    ),
+    ("tabu", "score_func", "local_score_BDeu"): lambda x: andrey.tabu(
+        x, score_func="local_score_BDeu"
+    ),
+    ("tabu", "score_func", "local_score_BIC_categorical"): lambda x: andrey.tabu(
+        x, score_func="local_score_BIC_categorical"
+    ),
+    ("exact_search", "score_func", "local_score_BDeu"): lambda x: andrey.exact_search(
+        x, score_func="local_score_BDeu"
+    ),
+    ("exact_search", "score_func", "local_score_BIC_categorical"): lambda x: andrey.exact_search(
+        x, score_func="local_score_BIC_categorical"
+    ),
+}
+
+
+def _categories(n=200, d=3):
+    return np.random.default_rng(0).integers(0, 3, (n, d)).astype(np.float64)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
+def test_a_categorical_setting_rejects_a_fractional_value(setting):
+    _, option, value = setting
+    with pytest.raises(ValueError, match=rf"{option}='{value}' reads data .* 0\.5 at row 7, col"):
+        CATEGORICAL[setting](_with(_categories(), (7, 2), 0.5))
+    assert CATEGORICAL[setting](_categories()).structure.n_nodes == 3
+
+
+# Columns that hold categories as something other than whole numbers, built from whole codes.
+_LEVELS = np.array(["low", "mid", "high"])
+CATEGORY_COLUMNS = {
+    "text": lambda pd, codes: _LEVELS[codes],
+    "category of text": lambda pd, codes: pd.Categorical(_LEVELS[codes]),
+    "string": lambda pd, codes: pd.array(_LEVELS[codes], dtype="string"),
+    "bool": lambda pd, codes: codes > 0,
+}
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("kind", list(CATEGORY_COLUMNS))
+@pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
+def test_a_categorical_setting_reads_a_column_of_categories_like_its_codes(setting, kind):
+    """Each distinct value is one category, so a column of text, a pandas ``category`` or
+    ``string`` column, or a boolean column gives the graph its codes give."""
+    pd = pytest.importorskip("pandas")
+    codes = _categories(n=400)
+    codes[:, 1] = np.where(np.random.default_rng(1).random(400) < 0.8, codes[:, 0], codes[:, 1])
+    if kind == "bool":
+        codes[:, 0] = codes[:, 0] > 0
+    frame = pd.DataFrame(codes, columns=["a", "b", "c"])
+    typed = frame.assign(a=CATEGORY_COLUMNS[kind](pd, codes[:, 0].astype(int)))
+    fit = CATEGORICAL[setting]
+    assert np.array_equal(fit(typed).structure.to_numpy(), fit(frame).structure.to_numpy())
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
+def test_a_categorical_setting_names_a_missing_category(setting):
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_categories(), columns=["a", "b", "c"])
+    frame["b"] = np.where(frame["b"] > 0, "yes", None)
+    with pytest.raises(ValueError, match=r"column 'b' has a missing value at row \d+"):
+        CATEGORICAL[setting](frame)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("score_func", "indep_test"), [("local_score_BDeu", "fisherz"), ("local_score_BIC", "chisq")]
+)
+def test_gfci_rejects_a_score_and_test_that_read_the_data_differently(score_func, indep_test):
+    with pytest.raises(ValueError, match="score and test must read the data alike"):
+        andrey.gfci(_categories(), score_func=score_func, indep_test=indep_test)
+
+
+@pytest.mark.parametrize("code", [2.0**53, -(2.0**60)])
+def test_a_categorical_setting_rejects_codes_too_large_to_stay_distinct(code):
+    with pytest.raises(ValueError, match=r"2\*\*53 or more"):
+        andrey.pc(_with(_categories(), (5, 0), code), indep_test="chisq")
+
+
+def test_a_categorical_error_names_the_dataframe_column():
+    pd = pytest.importorskip("pandas")
+    frame = pd.DataFrame(_with(_categories(), (4, 1), 2.25), columns=["a", "b", "c"])
+    with pytest.raises(ValueError, match=r"2\.25 at row 4, column 'b'"):
+        andrey.pc(frame, indep_test="chisq")
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    "fit", [andrey.ges, andrey.hc, andrey.tabu, partial(andrey.gfci, indep_test="chisq")]
+)
+def test_bdeu_still_checks_lambda_value(fit):
+    """BDeu has no penalty weight, but a setting outside its range is an error under any score."""
+    with pytest.raises(ValueError, match="lambda_value"):
+        fit(_categories(), score_func="local_score_BDeu", lambda_value=-1.0)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
+    c_indx = np.r_[0.5, np.zeros(99), np.ones(100)]
+    with pytest.raises(ValueError, match=r"c_indx .* 0\.5 at row 0"):
+        andrey.cdnod(_categories(), c_indx, indep_test="chisq")
+
+
 @pytest.mark.parametrize(
     ("setting", "value", "error"),
     [
@@ -419,3 +549,192 @@ def test_cdnod_rejects_nan_in_c_indx():
 def test_xges_rejects_a_bad_setting(setting, value, error):
     with pytest.raises(error, match=setting):
         andrey.xges(_data(), **{setting: value})
+
+
+# Every mixed-data setting of each facade that takes one, called on one data matrix.
+MIXED = {
+    ("pc", "degen_gauss"): lambda x, **kw: andrey.pc(x, indep_test="degen_gauss", **kw),
+    ("fci", "cond_gauss"): lambda x, **kw: andrey.fci(x, indep_test="cond_gauss", **kw),
+    ("gfci", "degen_gauss"): lambda x, **kw: andrey.gfci(
+        x, score_func="local_score_degen_gauss", indep_test="degen_gauss", **kw
+    ),
+    ("ges", "local_score_cond_gauss"): lambda x, **kw: andrey.ges(
+        x, score_func="local_score_cond_gauss", **kw
+    ),
+    ("hc", "local_score_degen_gauss"): lambda x, **kw: andrey.hc(
+        x, score_func="local_score_degen_gauss", **kw
+    ),
+    ("boss", "local_score_cond_gauss"): lambda x, **kw: andrey.boss(
+        x, score_func="local_score_cond_gauss", **kw
+    ),
+    ("grasp", "local_score_degen_gauss"): lambda x, **kw: andrey.grasp(
+        x, score_func="local_score_degen_gauss", **kw
+    ),
+    ("exact_search", "local_score_cond_gauss"): lambda x, **kw: andrey.exact_search(
+        x, score_func="local_score_cond_gauss", **kw
+    ),
+}
+
+
+def _mixed_data(n=200):
+    """Columns: 3 categories, continuous, 2 categories."""
+    rng = np.random.default_rng(0)
+    return np.column_stack(
+        [rng.integers(0, 3, n), rng.standard_normal(n), rng.integers(0, 2, n)]
+    ).astype(np.float64)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_infers_whole_number_columns_and_says_so(setting):
+    """Columns 0 and 2 hold three and two whole numbers; column 1 is continuous."""
+    with pytest.warns(andrey.DataTypeWarning, match=r"columns 0 \(3 values\), 2 \(2 values\)"):
+        out = MIXED[setting](_mixed_data())
+    assert out.metadata["categorical"] == [0, 2]
+    named = MIXED[setting](_mixed_data(), categorical=[0, 2])
+    assert np.array_equal(named.structure.to_numpy(), out.structure.to_numpy())
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_without_categorical_columns_warns_and_runs(setting):
+    with pytest.warns(andrey.DataTypeWarning, match="with categorical=\\[\\], so it runs as the"):
+        out = MIXED[setting](_mixed_data(), categorical=[])
+    assert out.metadata["categorical"] == []
+    continuous = np.random.default_rng(1).standard_normal((200, 3))
+    with pytest.warns(andrey.DataTypeWarning, match="found no categorical column"):
+        MIXED[setting](continuous)
+
+
+@pytest.mark.parametrize(
+    ("max_categories", "inferred"), [(2, [2]), (3, [0, 2]), (10, [0, 2])], ids=str
+)
+def test_max_categories_bounds_the_inferred_columns(max_categories, inferred):
+    with pytest.warns(andrey.DataTypeWarning):
+        out = andrey.pc(_mixed_data(), indep_test="cond_gauss", max_categories=max_categories)
+    assert out.metadata["categorical"] == inferred
+
+
+@pytest.mark.parametrize(("value", "error"), [(1, ValueError), (2.5, TypeError), (True, TypeError)])
+def test_max_categories_is_an_int_of_at_least_two(value, error):
+    with pytest.raises(error, match="max_categories"):
+        andrey.pc(_mixed_data(), max_categories=value)
+
+
+def test_inference_reads_every_row():
+    """A column that is a code over the first rows and continuous after them is not categorical."""
+    x = _mixed_data()
+    x[150:, 0] += 0.5
+    with pytest.warns(andrey.DataTypeWarning) as caught:
+        out = andrey.pc(x, indep_test="degen_gauss")
+    assert out.metadata["categorical"] == [2]
+    assert "column 0" not in str(caught[0].message) and "0 (" not in str(caught[0].message)
+
+
+def test_a_dataframe_types_mark_columns_and_the_warning_names_why():
+    pd = pytest.importorskip("pandas")
+    x = _mixed_data()
+    frame = pd.DataFrame(
+        {
+            "group": pd.Categorical(x[:, 0].astype(int)),
+            "u": x[:, 1],
+            "flag": x[:, 2].astype(bool),
+            "label": np.array(["p", "q"])[x[:, 2].astype(int)],
+        }
+    )
+    with pytest.warns(andrey.DataTypeWarning) as caught:
+        out = andrey.ges(frame, score_func="local_score_cond_gauss")
+    message = str(caught[0].message)
+    assert "'group' (category)" in message and "'flag' (bool)" in message
+    assert "'label' (text)" in message
+    assert out.metadata["categorical"] == ["group", "flag", "label"]
+
+
+@pytest.mark.parametrize(
+    "fit",
+    [lambda x: andrey.pc(x), lambda x: andrey.ges(x), lambda x: andrey.boss(x)],
+    ids=["pc", "ges", "boss"],
+)
+def test_a_continuous_setting_hints_at_columns_that_look_like_codes(fit):
+    with pytest.warns(andrey.DataTypeWarning, match="columns 0, 2 hold at most 10 distinct whole"):
+        out = fit(_mixed_data())
+    assert "categorical" not in out.metadata
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
+def test_a_mixed_setting_rejects_a_fractional_category(setting):
+    with pytest.raises(ValueError, match=r"reads data .* 0\.5 at row 7, column 2"):
+        MIXED[setting](_with(_mixed_data(), (7, 2), 0.5), categorical=[0, 2])
+
+
+@pytest.mark.parametrize(
+    ("data", "categorical", "error", "message"),
+    [
+        ("frame", ["a", "zz"], ValueError, "names column 'zz', which data does not have"),
+        ("array", ["a"], ValueError, "data has no column names"),
+        ("array", [3], ValueError, "lists column 3, but data has 3 columns"),
+        ("array", "a", TypeError, "list of column names or positions"),
+        ("array", [1.5], TypeError, "names or 0-based positions, got float"),
+        ("array", [True], TypeError, "names or 0-based positions, got bool"),
+    ],
+)
+def test_categorical_lists_columns_the_data_has(data, categorical, error, message):
+    pd = pytest.importorskip("pandas")
+    x = _mixed_data()
+    x = pd.DataFrame(x, columns=["a", "b", "c"]) if data == "frame" else x
+    with pytest.raises(error, match=message):
+        andrey.pc(x, indep_test="degen_gauss", categorical=categorical)
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    "fit",
+    [
+        lambda x: andrey.pc(x, categorical=[0]),
+        lambda x: andrey.pc(x, indep_test="chisq", categorical=[0]),
+        lambda x: andrey.ges(x, categorical=[0]),
+        lambda x: andrey.boss(x, categorical=[0]),
+        lambda x: andrey.exact_search(x, categorical=[0]),
+    ],
+)
+def test_a_setting_that_reads_no_column_types_rejects_categorical(fit):
+    with pytest.raises(ValueError, match="leave categorical as None"):
+        fit(np.round(_mixed_data()))
+
+
+def test_a_column_that_does_not_hold_numbers_must_be_categorical():
+    pd = pytest.importorskip("pandas")
+    x = _mixed_data()
+    frame = pd.DataFrame({"a": np.array(["p", "q", "r"])[x[:, 0].astype(int)], "b": x[:, 1]})
+    frame["c"] = x[:, 2]
+    with pytest.raises(ValueError, match="column 'a' does not hold numbers; list it"):
+        andrey.pc(frame, indep_test="degen_gauss", categorical=["c"])
+    assert andrey.pc(frame, indep_test="degen_gauss").structure.n_nodes == 3  # an object column
+    frame.loc[5, "a"] = None
+    with pytest.raises(ValueError, match="column 'a' has a missing value at row 5"):
+        andrey.pc(frame, indep_test="degen_gauss")
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("score_func", "indep_test"),
+    [
+        ("local_score_degen_gauss", "fisherz"),
+        ("local_score_BIC", "cond_gauss"),
+        ("local_score_BDeu", "degen_gauss"),
+    ],
+)
+def test_gfci_rejects_a_mixed_score_or_test_without_its_pair(score_func, indep_test):
+    with pytest.raises(ValueError, match="score and test must read the data alike"):
+        andrey.gfci(_mixed_data(), score_func=score_func, indep_test=indep_test, categorical=[0])
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+def test_cdnod_with_a_mixed_test_takes_continuous_data_and_rejects_a_fractional_index():
+    """The index is the categorical variable, so the data may have no categorical column."""
+    x = _mixed_data()[:, [1]]
+    c_indx = np.repeat([0.0, 1.0], 100)
+    assert andrey.cdnod(x, c_indx, indep_test="degen_gauss").structure.n_nodes == 1
+    with pytest.raises(ValueError, match=r"c_indx .* 0\.5 at row 0"):
+        andrey.cdnod(x, np.r_[0.5, c_indx[1:]], indep_test="cond_gauss")
