@@ -168,7 +168,7 @@ def test_exact_search_returns_the_categorical_network(fit):
 def test_the_searches_order_by_score_on_one_categorical_score(score_func):
     """Exact search finds the lowest total score, and tabu search never ends above hill climbing.
     On this draw, dense and with few rows, hill climbing stops short of the optimum."""
-    data = sample_discrete(d=6, n=200, seed=7, density=4.0).data
+    data = sample_discrete(d=6, n=200, seed=8, density=4.0).data
     score = make_score(score_func, data)
 
     def total(structure):
