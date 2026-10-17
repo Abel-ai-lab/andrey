@@ -481,9 +481,11 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
     """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
-    image), and its structured data (``discovery.head_tags``): the organization, the website, the
-    software at the release the page belongs to, the page or post, and its breadcrumbs. The pages
-    in ``UNINDEXED`` are ``noindex``. The description and ``og:description`` are one value."""
+    image), its canonical address, and its structured data (``discovery.head_tags``): the
+    organization, the website, the software at the release the page belongs to, the page or post,
+    and its breadcrumbs. The pages in ``UNINDEXED`` are ``noindex`` and name no canonical address.
+    The description and ``og:description`` are one value, as are ``og:url`` and the canonical
+    address."""
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
@@ -513,6 +515,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         f'content="{html.escape(value, quote=True)}">\n'
         for key, value in tags.items()
     )
+    if pagename not in UNINDEXED:
+        preview += f'<link rel="canonical" href="{html.escape(url, quote=True)}">\n'
     page = {"title": title, "description": description, "url": url, "image": image}
     if pagename in UNINDEXED:
         page["indexable"] = False

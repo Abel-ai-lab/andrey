@@ -214,11 +214,11 @@ def test_charts_cover_only_comparisons_with_a_published_ratio():
     # them once, hidden from assistive technology, so the loop is seamless.
     assert chart.count('<figure class="tchart">') == 3  # PC, FCI, DirectLiNGAM
     assert chart.count('<figure class="tchart" aria-hidden="true">') == 3
-    ups = re.findall(r"(more than|at least) <b>([^<]+)</b>", chart)
+    ups = re.findall(r'class="tchart-up"><b>([^<]+)</b>', chart)
     # Each title rounds its largest ratio (941.05x, 8.9x, 3.59x) down, to one digit or below 10 to
-    # a tenth, and says "at least" where nothing is rounded off. FCI's largest is at d = 400, where
-    # both graphs are worse than the empty graph: a speed ratio does not depend on accuracy.
-    assert ups == [("more than", "900x"), ("at least", "8.9x"), ("more than", "3.5x")] * 2
+    # a tenth, and marks it "+". FCI's largest is at d = 400, where both graphs are worse than the
+    # empty graph: a speed ratio does not depend on accuracy.
+    assert ups == ["900x+", "8.9x+", "3.5x+"] * 2
     # Sizes without a ratio are plotted hollow: DirectLiNGAM 200 (Andrey only; lingam passed its
     # time cap).
     assert chart.count("is-open") == 1 * 2
@@ -315,15 +315,15 @@ def test_unpublished_summary_needs_the_placeholder_flag():
 def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_page):
     summaries = placeholder_summaries()
     page = placeholder_page
-    # Each chart's largest speedup, as "up to"; every size is on the release cards.
+    # Each chart's largest speedup, as "NNNx+"; every size is on the release cards.
     for _, methods in build.time_groups(summaries):
         if all(build.faster(m) for m in methods):
             claimed = [r for m in methods for r in m["rows"] if r["ratio"] is not None]
             best = max(claimed, key=lambda r: r["ratio"])
             family = methods[0]["family"]
             dialog = page[page.index(f'id="speed-{family}"') :]
-            lead, shown = build.more_than(best["ratio"])
-            up = f"{lead.lower()} <b>{shown:,}x</b>"
+            _, shown = build.more_than(best["ratio"])
+            up = f"<b>{shown:,}x+</b>"
             assert up in dialog[: dialog.index("</dialog>")]
     assert not re.search(r"/scratch/|/home/|\bsc\d{3}\b|\bsol\b", page, re.IGNORECASE)
     # A summary's notes on its runs stay on the release cards.
@@ -480,7 +480,7 @@ def test_the_description_states_the_speed_claim_and_the_method_count(monkeypatch
     specs = [s for s in list_specs() if s.name != dropped]
     monkeypatch.setattr(build, "list_specs", lambda: specs)
     description = build.page_description(summaries)
-    assert "over 1,000x faster on PNL than other popular packages" in description
+    assert description.endswith(build.CLAIM)
     assert f"with PC, GES, FCI and {len(specs) - 3} more methods" in description
     # Search results cut a description at about 160 characters.
     assert len(description) <= 160
@@ -686,7 +686,7 @@ def test_a_lower_bound_prints_as_one():
     _lower_bound(summaries, "FCI", 20.0)
     slide = next(s for s in build.speedup_slides(summaries) if s[0] == "FCI")
     assert slide[2][0] == ("Andrey", 20.0, "\u226520x")
-    assert "at least <b>20x</b>" in build.speed_chart(summaries)
+    assert "<b>20x+</b>" in build.speed_chart(summaries)
     # A bound divides into no other package's bar: PC is compared with two packages.
     _lower_bound(summaries, "PC", 1000.0)
     with pytest.raises(ValueError, match="lower bound"):
@@ -1666,17 +1666,15 @@ def test_no_speed_cell_is_withheld_in_the_reports_or_the_readme():
         assert "no claim" not in text and "no speed claim" not in text, page.name
 
 
-@pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
-def test_every_hand_written_copy_of_the_headline_is_the_summarys():
-    """The docs index and the notebook repeat the headline; the live demo repeats the homepage's
-    heading and the shorter claim under it. Each must match."""
-    summary = build.load_summary(build.SUMMARY)
+def test_every_hand_written_copy_of_the_claim_is_the_builds():
+    """The docs index, the notebook, and the live demo repeat the speed claim; the live demo also
+    repeats its own heading. Each must match."""
+    claim = build.CLAIM
     for page in (
         ROOT / "docs" / "docs" / "index.md",
         ROOT / "examples" / "speed_on_your_machine.ipynb",
     ):
-        assert summary["headline"] in page.read_text(encoding="utf-8"), page.name
-    claim = build.home_claim(build.release_summaries(summary))
+        assert claim in page.read_text(encoding="utf-8"), page.name
     app = (ROOT / "apps" / "live-discovery" / "app.py").read_text(encoding="utf-8")
     assert "<h1>Causal discovery, fast.</h1>" in app and claim in app
     space = (ROOT / "apps" / "live-discovery" / "README.md").read_text(encoding="utf-8")

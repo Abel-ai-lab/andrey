@@ -44,7 +44,7 @@ def test_readme_blocks_match_summary_and_registry(monkeypatch, offline_datasets)
     # The claims sit above the fold, before any table or code, and are the homepage's.
     assert readme.index(end) < readme.index("```")
     summaries = build.release_summaries(summary)
-    assert f"- **Fast**: {build.claim_sentence(summaries)}" in pitch
+    assert f"- **Fast**: {build.CLAIM}" in pitch
     lead, fewer = build.more_than(build.fewest_errors(summaries))
     claim = f"- **Accurate**: {lead.lower()} {fewer}% fewer errors than other popular packages."
     assert claim in pitch
