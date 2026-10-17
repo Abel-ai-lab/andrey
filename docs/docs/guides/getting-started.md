@@ -266,6 +266,60 @@ kind of result; `cdnod` also takes a domain index, and `multi_group_direct_linga
 `longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
 {doc}`graph-types` explains which graph each one returns.
 
+## Data types
+
+Each test and score reads the columns as one kind of data:
+
+| Data | `indep_test` | `score_func` |
+|---|---|---|
+| Continuous | `fisherz` (the default), `student_t` | `local_score_BIC` (the default) |
+| Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
+| Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
+
+`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, and `exact_search` take
+every score, `tabu` the continuous and categorical ones, and `boss` and `grasp` the continuous and
+mixed ones. `gfci` takes a score and a test
+that read the same kind of data, such as
+`andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
+
+**Categorical data.** Each distinct value of a column is one category. A column may hold whole
+numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
+
+**Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
+`andrey.pc(data, indep_test="cond_gauss")` or
+`andrey.ges(data, score_func="local_score_cond_gauss")`. The degenerate Gaussian (`degen_gauss`)
+turns each categorical column into indicator columns and treats every column as Gaussian, so it
+suits effects that are linear and add up across categories. The conditional Gaussian
+(`cond_gauss`) gives each combination of categories its own Gaussian, so a category can change a
+variable's spread as well as its mean; it needs several rows for each combination of categories it
+conditions on. Both are experimental. With either score, `hc` gives no categorical column a
+continuous parent.
+
+**Marking the categorical columns.** Name them with `categorical`, by column name or 0-based
+position: `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without
+`categorical`, a mixed-data setting infers them: a DataFrame's `category`, `bool`, and text columns,
+and every column whose values, over all its rows, are at most `max_categories` distinct whole
+numbers (10 by default). pandas does not mark a column as categorical by itself, so this follows
+the rule Tetrad applies when it loads mixed data. A `DataTypeWarning` names the inferred columns and
+why; check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]`
+for none. The result's `metadata["categorical"]` lists the categorical columns it read.
+
+**No categorical column.** A mixed-data setting that finds no categorical column, or gets
+`categorical=[]`, warns and runs as its linear-Gaussian form: both tests become the likelihood-ratio
+form of the partial-correlation test, close to `fisherz`, and the degenerate Gaussian score becomes
+the BIC.
+
+**Integer-coded columns.** The default test and score read a column of codes such as 0, 1, 2 as
+numbers, which assumes the categories are ordered and evenly spaced. When columns of at most
+`max_categories` distinct whole numbers reach them, a one-time `DataTypeWarning` names those
+columns; if they are categories, choose a mixed-data setting.
+
+From the command line, the same settings are `key=value` arguments, such as
+`andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
+`max_categories=5`. The data file holds numbers only, so code each category as a whole number. The
+JSON result lists the categorical columns under `metadata.categorical` and the warnings under
+`run.warnings`.
+
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the

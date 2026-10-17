@@ -247,13 +247,33 @@ def test_parity_allowlist_exempts_only_a_cited_cause_with_the_row_numbers():
     row = {"d": 50, "andrey_shd": 5.0, "comparator_shd": 4.0}
     assert _failures(row, allowlist=(_entry(),)) == []
     for bad in (
-        _entry(cause="tie-break"),
+        _entry(cause="column-order"),
         _entry(citation=""),
         _entry(reason=" "),
         _entry(andrey_errors=6.0),
     ):
         assert len(_failures(row, allowlist=(bad,))) == 1, bad
     assert len(_failures(row, allowlist=(_entry(), _entry()))) == 1
+
+
+def test_parity_allowlist_exempts_a_tie_break_only_when_the_reversed_order_passes():
+    # Series counts: the reference has fewer errors on 4 series, Andrey on 0.
+    row = {"d": 50, "andrey_fewer_errors": 0, "comparator_fewer_errors": 4}
+    reversed_order = {"column_order": "reversed", "andrey_errors": 1, "comparator_errors": 1}
+
+    def tie_break(evidence):
+        return _entry(cause="tie-break", andrey_errors=4, comparator_errors=0, evidence=evidence)
+
+    assert _failures(row, allowlist=(tie_break(reversed_order),)) == []
+    for evidence in (
+        None,
+        "pgmpy wins on ties",
+        {**reversed_order, "column_order": "random"},
+        {"column_order": "reversed", "andrey_errors": 1},
+        {**reversed_order, "andrey_errors": 2},
+    ):
+        failures = _failures(row, allowlist=(tie_break(evidence),))
+        assert len(failures) == 1 and "allowlist entry rejected" in failures[0], evidence
 
 
 def test_parity_fails_an_allowlist_entry_without_a_failing_row():

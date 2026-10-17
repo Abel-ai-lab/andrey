@@ -1,7 +1,7 @@
 """Tabu search over DAGs, the engine behind :func:`andrey.tabu`.
 
 ``_search`` uses :class:`andrey.search.hc.MoveScanner`, sharing hill climbing's tie rules. Output is
-the best DAG's CPDAG and total BIC; lower is better.
+the best DAG's CPDAG and total score; lower is better.
 """
 
 from __future__ import annotations
@@ -13,17 +13,24 @@ import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore
+from andrey.core.score import BICScore, LocalScore, make_score
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE
 from andrey.search.hc import MoveScanner, StructureKey, _apply_move
 
 __all__ = ["tabu"]
 
+#: The local scores :func:`tabu` accepts.
+TABU_SCORES: tuple[str, ...] = (
+    "local_score_BIC_from_cov",
+    "local_score_BDeu",
+    "local_score_BIC_categorical",
+)
+
 
 def _search(
-    score: BICScore, d: int, tabu_length: int, max_tabu: int, max_iter: int | None
+    score: LocalScore, d: int, tabu_length: int, max_tabu: int, max_iter: int | None
 ) -> tuple[StructureKey, int]:
     """Run tabu search from the empty graph; return the best DAG's structure key and moves taken.
 
@@ -42,7 +49,8 @@ def _search(
     recent: deque[StructureKey] = deque(maxlen=tabu_length)
     losses = 0
     moves = 0
-    scanner = MoveScanner(DeltaBICScore(score), d)
+    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    scanner = MoveScanner(delta, d)
     while max_iter is None or moves < max_iter:
         recent.append(tuple(adj_int))
         tabu = frozenset(recent)
@@ -75,16 +83,19 @@ def tabu(
     max_tabu: int | None = None,
     max_iter: int | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by tabu search over the linear-Gaussian BIC score.
+    """Discover a CPDAG by tabu search over the linear-Gaussian BIC or a categorical score.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score; ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC) is supported.
+        Local score, one of :data:`TABU_SCORES`: ``"local_score_BIC_from_cov"`` (linear-Gaussian
+        BIC), ``"local_score_BDeu"`` (:class:`~andrey.core.score.BDeuScore` with its default
+        priors), or ``"local_score_BIC_categorical"``
+        (:class:`~andrey.core.score.CategoricalBICScore`), both on category codes.
     lambda_value : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     tabu_length : int
         Number of recently visited DAGs a move may not return to.
     max_tabu : int or None
@@ -97,11 +108,11 @@ def tabu(
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) of the best DAG visited and that DAG's total BIC score.
+        The CPDAG (``kind="cpdag"``) of the best DAG visited and that DAG's total score.
     """
-    if score_func != "local_score_BIC_from_cov":
+    if score_func not in TABU_SCORES:
         raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use 'local_score_BIC_from_cov'"
+            f"unsupported score_func {score_func!r}; use one of {TABU_SCORES}"
         )
     if max_tabu is None:
         max_tabu = tabu_length
@@ -109,7 +120,7 @@ def tabu(
         raise ValueError(f"max_tabu must lie in [1, tabu_length={tabu_length}], got {max_tabu}")
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
-    score = BICScore(X, lambda_value=lambda_value)
+    score = make_score(score_func, X, lambda_value=lambda_value)
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():

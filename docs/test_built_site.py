@@ -22,6 +22,8 @@ from urllib.parse import urlsplit
 import pytest
 
 import andrey
+import andrey.data.discrete
+import andrey.data.mixed
 import andrey.data.real
 import andrey.metrics
 import andrey.viz
@@ -46,6 +48,8 @@ MATH_UNICODE = set(
 PUBLIC_MODULES = (
     (andrey, ""),
     (andrey.data.real, "data."),
+    (andrey.data.discrete, "data."),
+    (andrey.data.mixed, "data."),
     (andrey.metrics, "metrics."),
     (andrey.viz, "viz."),
     (andrey.viz.mpl, "viz.mpl."),
@@ -451,6 +455,8 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         path = urlsplit(url).path.lstrip("/") or "index.html"
         content = (html / path).read_text()
         assert f'<meta property="og:url" content="{url}"' in content, url
+        assert content.count('rel="canonical"') == 1, url
+        assert f'<link rel="canonical" href="{url}">' in content, url
         assert 'name="robots"' not in content, url
     for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
         assert f"https://andrey.abel.ai/{required}" in urls, required

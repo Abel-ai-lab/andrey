@@ -8,7 +8,8 @@ Every number on the homepage comes from a release's published benchmark summary 
 from the method registry. A method measured against the same package in two summaries shows the
 newer summary's rows (:func:`newest`). The speed and accuracy sections cover every comparison with
 another package whose method the registry supports; each family's tile shows its largest ratio
-rounded down to one digit, and the README claim is the one :func:`claim_sentence` words from them.
+rounded down to one digit. The README, the live demo, and the homepage's description state
+``CLAIM``, which carries no number; :func:`claim_sentence` words the first summary's headline.
 The README chart shows one card per method in ``PANEL``. The method list comes from the method
 registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks the
 page as not for release. Links are relative to the site root.
@@ -56,6 +57,7 @@ RELEASES = (
     "pairwise-2026-10",
     "direct-lingam-2026-10",
     "time-series-2026-10",
+    "data-types-2026-10",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -100,6 +102,8 @@ REGIMES = {
     "varma_lingam_paper": "linear non-Gaussian time series with a moving average",
     "longitudinal_lingam_paper": "linear non-Gaussian longitudinal data",
     "var2_lagged": "lagged linear-Gaussian time series",
+    "mixed_er": "mixed continuous and categorical data from Erdos-Renyi graphs",
+    "discrete_er": "categorical data from Erdos-Renyi graphs",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
@@ -415,8 +419,12 @@ def speed_claim(summaries: list[dict]) -> tuple[str, str]:
     return lead, rest
 
 
+# The speed claim the README, the live demo, and the homepage's description state.
+CLAIM = "The fastest causal discovery package."
+
+
 def claim_sentence(summaries: list[dict]) -> str:
-    """The speed claim as one sentence: the homepage's, under its heading, and the README's."""
+    """The speed claim as one sentence, the form of a summary's ``headline``."""
     lead, rest = speed_claim(summaries)
     return f"{lead}, and {rest}." if rest else f"{lead}."
 
@@ -432,11 +440,6 @@ def fastest(summary: dict) -> tuple[dict, dict]:
             f"{ratio_text(row['ratio'])})"
         )
     return method, row
-
-
-def home_claim(summaries: list[dict]) -> str:
-    """The homepage's speed claim, the line under its heading."""
-    return claim_sentence(summaries)
 
 
 def ratio_label(row: dict) -> str:
@@ -560,21 +563,20 @@ def log_scale(lo: float, hi: float, a: float, b: float):
     return lambda v: a + (b - a) * math.log10(v / lo) / span
 
 
-# The sizes a time chart labels on its axis, those inside the charts' range.
-SIZE_TICKS = (5, 10, 20, 50, 100, 200, 400, 800, 1600, 3200)
-
-
-def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: list[int]) -> str:
+def time_chart(name: str, methods: list[dict], xr: tuple[float, float]) -> str:
     """Fit time (x) against problem size (y) for Andrey and each package, both on log scales.
 
     Up and to the left is better: larger problems in less time. The size is in the comparisons'
-    ``unit``, variables or rows. A hollow point is a size with no paired ratio; a package past its
-    time cap has no point at that size.
+    ``unit``, variables or rows, and its axis spans and labels the sizes the chart measures. A
+    hollow point is a size with no paired ratio; a package past its time cap has no point at that
+    size.
     """
     unit = methods[0]["unit"]
+    sizes = sorted({r["d"] for m in methods for r in m["rows"]})
     w, h, left, right, top, bottom = 320, 232, 44, 306, 22, 196
     x = log_scale(xr[0], xr[1], left, right)
-    y = log_scale(sizes[0], sizes[-1], bottom, top)
+    lo, hi = (sizes[0], sizes[-1]) if len(sizes) > 1 else (sizes[0] / 2, sizes[0] * 2)
+    y = log_scale(lo, hi, bottom, top)
     grid = []
     for k in range(round(math.log10(xr[0])), round(math.log10(xr[1])) + 1):
         v = 10.0**k
@@ -582,7 +584,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
             f'<line x1="{x(v):.1f}" x2="{x(v):.1f}" y1="{top}" y2="{bottom}" class="tc-grid"/>'
             f'<text x="{x(v):.1f}" y="{bottom + 14}" text-anchor="middle">{seconds_axis(v)}</text>'
         )
-    for d in (v for v in SIZE_TICKS if sizes[0] <= v <= sizes[-1]):
+    for d in sizes:
         grid.append(
             f'<line x1="{left}" x2="{right}" y1="{y(d):.1f}" y2="{y(d):.1f}" class="tc-grid"/>'
             f'<text x="{left - 6}" y="{y(d) + 3:.1f}" text-anchor="end">{d:,}</text>'
@@ -616,7 +618,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
         (r for m in methods for r in m["rows"] if r["ratio"] is not None),
         key=lambda r: r["ratio"],
     )
-    lead, shown = more_than(best["ratio"])
+    _, shown = more_than(best["ratio"])
     peers = " and ".join(m["comparator"] for m in methods)
     legend = "".join(
         f'<span class="tc-key {cls}"><i aria-hidden="true"></i>{escape(label)}</span>'
@@ -625,7 +627,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
     return (
         '<figure class="tchart"><figcaption>'
         f'<span class="tchart-name"><strong>{escape(name)}</strong></span>'
-        f'<span class="tchart-up">{lead.lower()} <b>{shown:,}x</b></span></figcaption>'
+        f'<span class="tchart-up"><b>{shown:,}x+</b></span></figcaption>'
         f'<p class="tc-legend">{legend}</p>'
         f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{escape(name)}: fit time against '
         f'the number of {unit} for Andrey and {escape(peers)}">'
@@ -643,8 +645,8 @@ def seconds_axis(v: float) -> str:
 
 def speed_figures(summaries: list[dict]) -> list[tuple[str, str]]:
     """A chart per method (or per run where a method's comparisons differ), each with its largest
-    speedup, as (registry family, chart). The charts share axes so they compare at a glance: one
-    time axis, and one size axis per unit."""
+    speedup, as (registry family, chart). The charts share one time axis, so they compare at a
+    glance; each size axis spans its own chart's sizes."""
     # A speedup chart: a comparison where Andrey is not faster stays in the release cards' tables.
     groups = [(n, ms) for n, ms in time_groups(summaries) if all(faster(m) for m in ms)]
     times = [
@@ -656,14 +658,7 @@ def speed_figures(summaries: list[dict]) -> list[tuple[str, str]]:
         if t is not None
     ]
     xr = (10 ** math.floor(math.log10(min(times))), 10 ** math.ceil(math.log10(max(times))))
-    sizes: dict[str, set[int]] = {}
-    for _, methods in groups:
-        for m in methods:
-            sizes.setdefault(m["unit"], set()).update(r["d"] for r in m["rows"])
-    return [
-        (methods[0]["family"], time_chart(name, methods, xr, sorted(sizes[methods[0]["unit"]])))
-        for name, methods in groups
-    ]
+    return [(methods[0]["family"], time_chart(name, methods, xr)) for name, methods in groups]
 
 
 def speed_chart(summaries: list[dict]) -> str:
@@ -1660,7 +1655,7 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
             f"{accuracy} <b>{fewer}%</b> fewer errors than other popular packages.",
         ),
         "agentic": (
-            "Runs with no one watching",
+            "Built for agents",
             "A command line that never prompts and answers in JSON, so an agent can run it alone.",
         ),
         "all-in-one": (
@@ -2134,11 +2129,10 @@ def page_description(summaries: list[dict]) -> str:
     registered = {spec.name for spec in list_specs()}
     if missing := [m for m in DESCRIPTION_METHODS if m.lower() not in registered]:
         raise ValueError(f"the description names unregistered methods: {', '.join(missing)}")
-    lead, _ = speed_claim(summaries)  # the rest would take it past what search results show
     named, more = ", ".join(DESCRIPTION_METHODS), len(registered) - len(DESCRIPTION_METHODS)
     return (
-        f"Causal discovery for Python. Learn causal graphs with {named} and {more} more methods, "
-        f"{lead[0].lower() + lead[1:]} than other popular packages."
+        f"Causal discovery for Python. Learn causal graphs with {named} and {more} more methods. "
+        f"{CLAIM}"
     )
 
 

@@ -1,0 +1,16 @@
+PC  cpdag  |  4 nodes  |  3 edges (3 directed)
+
+  plan -> hours
+  region -> hours
+  hours -> bill
+
+  categorical: ['plan', 'region']
+
+GES  cpdag  |  4 nodes  |  3 edges (3 directed)
+
+  plan -> hours
+  region -> hours
+  hours -> bill
+
+  score: 2.943e+04
+  categorical: ['plan', 'region']

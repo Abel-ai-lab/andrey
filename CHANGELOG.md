@@ -9,6 +9,34 @@ change names its pull request.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-17
+
+### Highlights
+
+- Categorical and mixed data: PC, GES, hill climbing, and seven more methods take tests and scores
+  for categorical columns and for tables that mix them with numbers. On categorical data, GES runs
+  more than 50x faster than causal-learn at every size and returns the same graph on every
+  dataset, and hill climbing runs more than 20x faster than pgmpy at every size. The 0.6.0 release
+  card gives the numbers and each method's limits. ([#167])
+
+### Added
+
+- Categorical and mixed data: `pc`, `fci`, `gfci`, and `cdnod` take the chi-square, G-square,
+  degenerate Gaussian, and conditional Gaussian tests (`indep_test="chisq"`, `"gsq"`,
+  `"degen_gauss"`, `"cond_gauss"`), and `ges`, `gfci`, `hc`, `tabu`, `boss`, `grasp`, and
+  `exact_search` take the matching scores. ([#167])
+- `andrey.data.sample_discrete` and `sample_mixed` sample a discrete or a conditional linear
+  Gaussian network with its true graph. ([#167])
+- The categorical scores include the multinomial BIC beside BDeu on the BIC's `-2` log scale, read
+  text, string, and `category` columns as categories, and `load_dataset(..., discrete=True)` samples
+  ASIA, ALARM, HEPAR2, and ANDES from their own conditional probability tables (with Rui Zhu,
+  [#94]). ([#167])
+
+### Changed
+
+- `hc` with a mixed-data score never adds a continuous -> categorical edge, which the conditional
+  linear Gaussian model cannot express, and scores its candidate parent sets in batches. ([#167])
+
 ## [0.5.0] - 2026-10-16
 
 ### Highlights
@@ -162,7 +190,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...v0.4.0
@@ -183,3 +212,5 @@ First alpha release.
 [#127]: https://github.com/Abel-ai-lab/andrey/pull/127
 [#133]: https://github.com/Abel-ai-lab/andrey/pull/133
 [#95]: https://github.com/Abel-ai-lab/andrey/pull/95
+[#94]: https://github.com/Abel-ai-lab/andrey/pull/94
+[#167]: https://github.com/Abel-ai-lab/andrey/pull/167

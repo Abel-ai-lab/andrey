@@ -1,7 +1,8 @@
 """Andrey PC solution adapter — the home team's constraint-based entry.
 
 Calls the public facade ``andrey.pc(X, alpha=0.05, indep_test="fisherz")``. Both values are
-Andrey's own defaults; ``fisherz`` is the only CI test Andrey supports.
+Andrey's own defaults. :class:`AndreyPCChisq` and :class:`AndreyPCGsq` run the chi-square and
+G-square tests, for categorical data.
 
 PC has no accelerated backend axis — its CI test is pure-numpy partial correlation and its Meek
 orientation is pure Python — so the single ``numpy``/``serial`` variant is the whole lane entry.
@@ -45,6 +46,8 @@ class AndreyPC:
     mode: str = "serial"
     algorithm: str = "pc"
     output_type: str = "cpdag"
+    #: The CI test this solution runs; a variant with another test has its own ``name``.
+    indep_test: str = _DEFAULT_INDEP_TEST
 
     def setup(self) -> None:
         """Import Andrey and its PC implementation before timing.
@@ -57,8 +60,8 @@ class AndreyPC:
         from andrey.constraint.pc import pc  # noqa: F401
 
     def params(self) -> dict[str, Any]:
-        """Fisher-Z at ``alpha=0.05`` — Andrey's own defaults."""
-        return {"alpha": _DEFAULT_ALPHA, "indep_test": _DEFAULT_INDEP_TEST}
+        """The solution's CI test at ``alpha=0.05``; Fisher-Z by default, Andrey's own defaults."""
+        return {"alpha": _DEFAULT_ALPHA, "indep_test": self.indep_test}
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run Andrey PC; return the CPDAG's endpoint-mark array. The only timed region.
@@ -84,3 +87,17 @@ class AndreyPC:
         from andrey import GraphStructure
 
         return GraphStructure.from_numpy(native, kind=self.output_type)
+
+
+class AndreyPCChisq(AndreyPC):
+    """Andrey's PC with Pearson's chi-square test, for categorical data."""
+
+    name: str = "andrey.pc.chisq"
+    indep_test: str = "chisq"
+
+
+class AndreyPCGsq(AndreyPC):
+    """Andrey's PC with the G-square test, for categorical data."""
+
+    name: str = "andrey.pc.gsq"
+    indep_test: str = "gsq"

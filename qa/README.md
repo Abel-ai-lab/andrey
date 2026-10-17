@@ -126,11 +126,18 @@ fails at any margin:
 A row where either side has no result is skipped. A released summary never changes, so a method
 re-measured against the same reference in a later summary is judged by the later rows only.
 
-`benchmarks/published/parity-allowlist.json` exempts a failing row only when it names the cause:
-`correct-by-paper` (Andrey follows the method's paper and the reference does not) or
-`reference-defect`, with a reason and a citation. Each entry pins the row's two error values (its
-two series counts, where the row has them), so a re-run that changes the row voids it, and an
-entry that matches no failing row fails the check.
+`benchmarks/published/parity-allowlist.json` exempts a failing row only when it names the cause,
+with a reason and a citation:
+
+- `correct-by-paper`: Andrey follows the method's paper and the reference does not.
+- `reference-defect`: the reference has a defect.
+- `tie-break`: the two packages end at different local optima after an exact score tie that Andrey
+  breaks by column order. Its `evidence` holds the row's two error values with the columns in
+  reversed order (`"column_order": "reversed"`, `andrey_errors`, `comparator_errors`), where the
+  row must pass.
+
+Each entry pins the row's two error values (its two series counts, where the row has them), so a
+re-run that changes the row voids it, and an entry that matches no failing row fails the check.
 
 ```shell
 uv run python -m qa.reference_parity  # exit 1 if any row fails

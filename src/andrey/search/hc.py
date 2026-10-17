@@ -1,8 +1,9 @@
 """Hill climbing over DAGs, the engine behind :func:`andrey.hc`.
 
-Candidate moves use Schur-complement deltas from :mod:`andrey.core.score_delta`;
-:class:`MoveScanner` caches them between passes, recomputing only changed targets. Output is the
-DAG's CPDAG and total BIC; lower is better.
+Under BIC, candidate moves use Schur-complement deltas from :mod:`andrey.core.score_delta`; under
+the categorical and mixed-data scores, the difference of two full local scores. :class:`MoveScanner`
+caches them between passes, recomputing only changed targets. Output is the DAG's CPDAG and total
+score; lower is better.
 """
 
 from __future__ import annotations
@@ -14,9 +15,10 @@ from operator import ne
 import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore, add_deltas, remove_deltas
+from andrey.core.score import MIXED_SCORES, BICScore, make_score
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
@@ -28,6 +30,15 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 # a proof: a normalized delta within ULP of a grid line can round either way. Rounding is
 # monotone, so non-tied order holds; the reported score is recomputed from the final structure.
 __all__ = ["hc"]
+
+#: The local scores :func:`hc` accepts.
+HC_SCORES: tuple[str, ...] = (
+    "local_score_BIC_from_cov",
+    "local_score_BDeu",
+    "local_score_BIC_categorical",
+    "local_score_degen_gauss",
+    "local_score_cond_gauss",
+)
 
 
 # (delta, u, v, op_rank, (op, u, v)). op_rank: remove 0 < reverse 1; add is 0 and never shares
@@ -62,9 +73,12 @@ class MoveScanner:
     ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
     ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
     ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
-    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score. Its delta is set
-    to zero to prevent Schur rounding noise exceeding ``_EPS_IMPROVE`` from creating a false
-    improvement.
+    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, the
+    categorical scores, and the mixed-data scores, all score-equivalent. Its delta is set to zero to
+    prevent rounding noise exceeding ``_EPS_IMPROVE`` from creating a false improvement.
+
+    ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
+    legal. ``None`` forbids none.
 
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
@@ -73,9 +87,15 @@ class MoveScanner:
     cycles.
     """
 
-    def __init__(self, delta: DeltaBICScore, d: int) -> None:
+    def __init__(
+        self,
+        delta: DeltaBICScore | FullScoreDelta,
+        d: int,
+        *,
+        forbidden: np.ndarray | None = None,
+    ) -> None:
+        self._delta = delta
         self._score = delta.score_obj
-        self._cond = delta.cond_threshold
         self._d = d
         self._inv_n = 1.0 / self._score.n
         self._add = np.full((d, d), np.inf)
@@ -92,6 +112,8 @@ class MoveScanner:
         self._ids: dict[tuple[int, ...], int] = {}
         self._set_of = np.zeros(d, dtype=np.intp)
         self._set_with = np.zeros(d, dtype=np.intp)
+        # [v, u]: the edge u -> v is never added, nor made by a reverse.
+        self._forbidden = np.zeros((d, d), dtype=bool) if forbidden is None else forbidden
 
     def best(
         self,
@@ -115,7 +137,7 @@ class MoveScanner:
         with np.errstate(invalid="ignore"):  # a degenerate row's deltas may be infinite
             rev = self._add[tails, heads] + self._rem[heads, tails]
         rev[self._set_of[heads] == self._set_with[tails]] = 0.0
-        rev[np.isnan(rev) | self._cyclic] = np.inf
+        rev[np.isnan(rev) | self._cyclic | self._forbidden[tails, heads]] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:
             while True:
@@ -149,8 +171,7 @@ class MoveScanner:
             lost += [(u, v) for v in _bits(old[u] & ~adj_int[u])]
         for v in range(d) if first else {v for _, v in gained + lost}:
             pa = parents_of[v]
-            self._add[v] = add_deltas(self._score, v, pa, cond_threshold=self._cond)
-            self._rem[v] = remove_deltas(self._score, v, pa, cond_threshold=self._cond)
+            self._add[v], self._rem[v] = self._deltas(v, pa)
             ids = self._ids
             self._set_of[v] = ids.setdefault(tuple(pa), len(ids))
             self._set_with[v] = ids.setdefault(tuple(sorted([*pa, v])), len(ids))
@@ -180,9 +201,33 @@ class MoveScanner:
         for v in rows:
             row = np.where(self._parent[v], self._rem[v], self._add[v])
             row[self._parent[:, v] | reach[v] | np.isnan(row)] = np.inf
+            row[self._forbidden[v] & ~self._parent[v]] = np.inf  # forbidden adds; removes stay
             self._single[v] = row
             self._low[v] = row.min()
         self._adj = list(adj_int)
+
+    def _deltas(self, v: int, pa: list[int]) -> tuple[np.ndarray, np.ndarray]:
+        """Every add delta and every remove delta at target ``v`` with parents ``pa``.
+
+        BIC takes the vectorized Schur updates. A score without one, such as BDeu, differences two
+        full local scores per candidate, all scored in one :meth:`score_many` call. Entries that are
+        not a legal add or remove, or are a forbidden add, are ``inf``.
+        """
+        delta = self._delta
+        if isinstance(delta, DeltaBICScore):
+            cond = delta.cond_threshold
+            return (
+                add_deltas(delta.score_obj, v, pa, cond_threshold=cond),
+                remove_deltas(delta.score_obj, v, pa, cond_threshold=cond),
+            )
+        adds = [u for u in range(self._d) if u != v and u not in pa and not self._forbidden[v, u]]
+        sets = [pa, *(sorted([*pa, u]) for u in adds), *([p for p in pa if p != u] for u in pa)]
+        scores = np.array(self._score.score_many(v, sets))
+        add = np.full(self._d, np.inf)
+        rem = np.full(self._d, np.inf)
+        add[adds] = scores[1 : 1 + len(adds)] - scores[0]
+        rem[pa] = scores[1 + len(adds) :] - scores[0]
+        return add, rem
 
     def _unreach(self, tails: list[int]) -> list[int]:
         """Recompute ``reach`` after edges out of ``tails`` went; return the nodes it changed for.
@@ -304,47 +349,58 @@ def hc(
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
     max_iter: int | None = None,
+    categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Hill-Climbing over the linear-Gaussian BIC score.
+    """Discover a CPDAG by Hill-Climbing over a BIC, categorical, or mixed-data score.
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
-    BIC or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
-    CPDAG. Returns the CPDAG and the DAG's total BIC objective (lower is better), the sum of the
-    final per-node local scores.
+    score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
+    CPDAG. Under a mixed-data score the DAG stays a conditional linear Gaussian network: no move
+    gives a categorical node a continuous parent. Returns the CPDAG and the DAG's total objective
+    (lower is better), the sum of the final per-node local scores.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score; ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC) is supported.
+        Local score: ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC), ``"local_score_BDeu"``
+        (BDeu on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors),
+        ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
+        :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
+        ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
+        ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
     lambda_value : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     max_iter : int or None
         Maximum moves; ``None`` sets no limit. Taking ``max_iter`` moves warns with
         ``SearchLimitWarning``.
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score; the other scores ignore it.
 
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and the total BIC score of the discovered DAG.
+        The CPDAG (``kind="cpdag"``) and the total score of the discovered DAG.
     """
-    if score_func != "local_score_BIC_from_cov":
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use 'local_score_BIC_from_cov'"
-        )
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
 
-    score = BICScore(X, lambda_value=lambda_value)
-    delta = DeltaBICScore(score)
+    if score_func not in HC_SCORES:
+        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
+    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    forbidden = None
+    if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
+        mask = column_mask(categorical, d)
+        forbidden = mask[:, None] & ~mask[None, :]
 
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
-        scanner = MoveScanner(delta, d)
+        scanner = MoveScanner(delta, d, forbidden=forbidden)
         moves = 0
         while max_iter is None or moves < max_iter:
             best = scanner.best(adj_int, parents_of)

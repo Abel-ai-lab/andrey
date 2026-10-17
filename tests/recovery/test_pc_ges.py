@@ -46,7 +46,7 @@ def test_pc_rejects_non_fisherz():
 
 def test_ges_rejects_unknown_score():
     with pytest.raises(NotImplementedError):
-        andrey.ges(datagen.generate("gauss_5v"), score_func="local_score_BDeu")
+        andrey.ges(datagen.generate("gauss_5v"), score_func="local_score_CV_general")
 
 
 def test_pc_rejects_bad_alpha():

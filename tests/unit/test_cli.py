@@ -978,3 +978,33 @@ def test_documented_schema_version_matches_code(path):
 
     text = (Path(__file__).parents[2] / path).read_text()
     assert set(re.findall(r'`schema_version`?:? \(?`?"(\d+)"', text)) == {SCHEMA_VERSION}
+
+
+def test_categorical_names_header_columns_or_positions(capsys, tmp_path):
+    rng = np.random.default_rng(3)
+    g = rng.integers(0, 3, 600)
+    u = rng.standard_normal(600)
+    v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(600)
+    path = tmp_path / "mixed.csv"
+    path.write_text("g,u,v\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(g, u, v)))
+    base = ["run", "pc", "--data", str(path), "indep_test=degen_gauss"]
+    code, by_name, _ = _run([*base, "categorical=[g]"], capsys)
+    assert code == 0 and json.loads(by_name)["run"]["params"]["categorical"] == ["g"]
+    code, by_position, _ = _run([*base, "categorical=[0]"], capsys)
+    assert json.loads(by_position)["structure"] == json.loads(by_name)["structure"]
+    code, _out, err = _run([*base, "categorical=[h]"], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "unknown_column"
+
+
+def test_a_mixed_run_reports_inferred_columns_and_its_warning(capsys, tmp_path):
+    rng = np.random.default_rng(4)
+    g = rng.integers(0, 3, 400)
+    u = rng.standard_normal(400)
+    v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(400)
+    path = tmp_path / "mixed.csv"
+    path.write_text("g,u,v\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(g, u, v)))
+    code, out, _ = _run(["run", "pc", "--data", str(path), "indep_test=cond_gauss"], capsys)
+    env = json.loads(out)
+    assert code == 0 and env["metadata"]["categorical"] == ["g"]
+    [warning] = [w for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
+    assert "'g' (3 values)" in warning["message"]
