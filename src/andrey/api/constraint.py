@@ -37,6 +37,7 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    collider_order: str = "p_value",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
@@ -62,6 +63,12 @@ def pc(
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
         mixed data, continuous and categorical columns, by a likelihood ratio. See Notes.
+    collider_order : {"p_value", "column"}, default="p_value"
+        The order in which colliders are oriented, which decides between two colliders that would
+        orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
+        endpoints were separated with the largest p-value, so the colliders do not depend on the
+        column order. ``"column"`` orients them in column order and keeps the first of two that
+        conflict. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -94,7 +101,7 @@ def pc(
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test.
+        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``.
 
     Warns
     -----
@@ -131,13 +138,27 @@ def pc(
     **How it works.** Edge removal is order-independent (PC-stable) [3]_. At each conditioning-set
     size, every test uses the adjacencies from the start of that size. Edges found independent are
     removed together. A removed pair's separating set combines all conditioning sets that separated
-    it. If two colliders conflict, the one found first in column order is kept.
+    it. Two colliders conflict when they would orient one edge in opposite directions, so the order
+    in which they are oriented can change the result [3]_. A collider is skipped when it would give
+    an edge an arrowhead at both ends, so of two conflicting colliders the one oriented first is
+    kept. With the default ``collider_order="p_value"``, each collider ``x -> y <- z`` ranks by the
+    largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders are
+    oriented from the highest rank to the lowest. When two conflicting colliders rank exactly
+    equal, the edge they dispute stays undirected, and Meek's rules do not orient it. The colliders
+    therefore do not depend on the column order. This adapts the conflict rule of Ramsey [10]_,
+    which ranks a collider by separating sets that additional tests choose; Andrey ranks it by the
+    tests that removed the edge, so orienting runs no new test. With ``collider_order="column"``,
+    colliders are oriented by middle node, then by endpoint pair, in column order, so the result
+    can depend on the column order. Meek's rules can still depend on the column order: when two
+    rule firings would orient one edge in opposite directions, the one reached first in column
+    order decides.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 400 variables with ten rows per variable: its median errors (SHD) stayed
-    below the empty graph's at every size, 357 against 400 at 400 variables. The median fit took
-    0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network with
-    1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
+    **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
+    default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
+    (mean degree 2), from 20 to 400 variables with ten rows per variable, its median errors (SHD)
+    stayed below the empty graph's at every size, 357 against 400 at 400 variables. The median fit
+    took 0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network
+    with 1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
     practical to roughly 1,000 variables on sparse data with ten rows per variable; runtime grows
     combinatorially with the largest neighborhood, so sparser graphs can stay feasible beyond that.
     On simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the
@@ -194,6 +215,8 @@ def pc(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [9] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
        Statistical Association 84(405), 165-175.
+    .. [10] Ramsey, J. (2016). Improving accuracy and scalability of the PC algorithm by maximizing
+       P-value. arXiv:1610.00378, Section 5.
 
     Examples
     --------
@@ -232,7 +255,9 @@ def pc(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    cpdag = _pc(X, alpha=alpha, indep_test=indep_test, categorical=mask)
+    cpdag = _pc(
+        X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+    )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
     )

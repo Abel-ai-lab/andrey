@@ -530,16 +530,17 @@ package's names for the settings map to Andrey's:
 | `alpha=0.05` | `--alpha 0.05` | `alpha = 0.05` |
 | `lambda_value=1.0` | `--penaltyDiscount 1` | the default `k = log(n) / 2` |
 
-Tetrad's PC runs order-independent (`--stableFAS`), keeps the first of two conflicting colliders
-(`--conflictRule 1`), and has no depth cap, as Andrey's PC does. FGES runs with no structure prior
-(`--structurePrior 0`), since Andrey's GES has none. Both hill climbings take the best add, remove,
-or reverse move from the empty graph until none improves the score, with no restarts, and neither
-gives a categorical node a continuous parent. bnlearn's hill climbing returns a DAG, so its
-comparable error is `mec_shd`; every other row is a CPDAG, scored by `shd`. The two packages define
-some of these tests and scores differently from Andrey, so their graphs can differ on the same
-data: Tetrad's conditional Gaussian parameter count leaves out each category's means, its
-degenerate Gaussian test statistic is twice the likelihood ratio, and its degenerate Gaussian score
-sums one regression per category of a categorical child.
+Tetrad's PC runs order-independent (`--stableFAS`) and has no depth cap, as Andrey's PC does. It
+keeps Tetrad's default collider conflict rule (`--conflictRule 1`), under which a later collider
+replaces an earlier one; Andrey's PC keeps the collider whose pair was separated with the larger
+p-value. FGES runs with no structure prior (`--structurePrior 0`), since Andrey's GES has none. Both
+hill climbings take the best add, remove, or reverse move from the empty graph until none improves
+the score, with no restarts, and neither gives a categorical node a continuous parent. bnlearn's
+hill climbing returns a DAG, so its comparable error is `mec_shd`; every other row is a CPDAG,
+scored by `shd`. The two packages define some of these tests and scores differently from Andrey, so
+their graphs can differ on the same data: Tetrad's conditional Gaussian parameter count leaves out
+each category's means, its degenerate Gaussian test statistic is twice the likelihood ratio, and its
+degenerate Gaussian score sums one regression per category of a categorical child.
 
 causal-cmd 1.12.0 parses `--numCategories` but never stores it, so its own command line reads every
 column as continuous. Tetrad's fits therefore run through `andrey_bench/adapters/TetradDriver.java`,

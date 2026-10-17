@@ -8,6 +8,7 @@ and JSON schema render.
 
 from __future__ import annotations
 
+from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
 from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
@@ -70,6 +71,16 @@ _COLLIDER_RULE = ParamSpec(
     "neighbors, and z is a collider when fewer than half of the separating subsets contain it "
     "(exactly half: unoriented). Majority costs up to 2**degree tests per triple.",
 )
+_COLLIDER_ORDER = ParamSpec(
+    name="collider_order",
+    type="str",
+    default="p_value",
+    choices=COLLIDER_ORDERS,
+    doc="The order in which colliders are oriented, which decides between two that would orient "
+    "one edge in opposite directions: p_value = the collider whose endpoints were separated with "
+    "the largest p-value first, independent of the column order; column = in column order, the "
+    "first of two conflicting colliders kept.",
+)
 _LAMBDA_VALUE = ParamSpec(
     name="lambda_value",
     type="float",
@@ -122,7 +133,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
         references=(
             "Spirtes & Glymour 1991",
             "Spirtes, Glymour & Scheines 2000",
