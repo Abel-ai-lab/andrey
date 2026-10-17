@@ -9,6 +9,24 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#TBD])
+- `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
+  measure values calibrated before this change again with `andrey calibrate`. ([#TBD])
+
+### Fixed
+
+- `ges`, `gies`, `gfci`, `xges`, `hc`, `tabu`, `boss`, and `grasp` return the same graph however
+  small the data's scale, where squared covariances used to underflow and change the result.
+  ([#TBD])
+- These searches and `exact_search` raise a `ValueError` naming the columns when a column repeats
+  another up to scale and shift given more than two rows or, with more rows than columns, is a
+  linear function of other columns, instead of returning a graph from scores of a zero residual
+  variance, which were infinite or finite but meaningless. ([#TBD])
+- With no more rows than columns, these searches no longer pick a parent set of `n_samples - 1` or
+  more variables, which fits its child exactly. ([#TBD])
+
 ## [0.6.0] - 2026-10-17
 
 ### Highlights
