@@ -69,6 +69,17 @@ def paired_ratios(
     return sorted(out)
 
 
+def same_graph(a: pd.DataFrame, b: pd.DataFrame) -> tuple[int, int]:
+    """Count the datasets both solutions finished in one run, and those with the same graph.
+
+    Returns ``(same, both)``. Graphs are compared by ``structure_hash``; a dataset's first finished
+    row stands for its solution there, since a repeat refits the same data.
+    """
+    a, b = (df[df.status == "ok"].groupby("dataset_id").structure_hash.first() for df in (a, b))
+    both = a.index.intersection(b.index)
+    return int((a[both] == b[both]).sum()), len(both)
+
+
 def duration_skew(a: pd.DataFrame, b: pd.DataFrame) -> float:
     """How many times longer one method's fit runs than the other's, over the paired rows."""
     a, b = shared_cells(a, b)
