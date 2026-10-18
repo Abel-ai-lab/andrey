@@ -965,8 +965,10 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     -----
     CALM first estimates the moral graph with IAMB [2]_: for each variable it adds, one at a time,
     the variable most dependent on it given those already added (Fisher-Z at level ``alpha``),
-    then drops any member the others make independent of it. A pair is a candidate edge, in
-    either direction, when each is in the other's set.
+    then drops any member the others make independent of it. The most dependent variable has the
+    largest absolute partial correlation; equal ones are chosen by each column's rank, as in
+    :func:`~andrey.hc`, so reordering the columns does not change the choice. A pair is a
+    candidate edge, in either direction, when each is in the other's set.
 
     Each candidate edge ``i -> j`` has a weight and a gate. During the fit a gate is a
     Gumbel-Softmax sample [3]_, ``sigmoid((logit + noise) / tau)``, so ``lambda1`` times the sum
