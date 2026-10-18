@@ -38,7 +38,7 @@ only its navbar. `conf.py` fills it with `homepage_context` from [`site/build.py
 the hero's art, the sections' claims and tiles, the charts, and the comparison table with its
 sources. `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme's styles and the
 page's never meet. `site/assets/figures.css` and `figures.js` draw the timing comparison and the
-speed charts, which the posts, the release cards, and the benchmark explorer share.
+speed charts, which the posts and the release cards share.
 
 The hero is one screen: the headline, "Causal discovery accelerated, accurate, agentic.", the
 install line, and a card per section. A pill above the headline copies the prompt that installs the
@@ -196,18 +196,16 @@ On a phone the outline moves into the menu
 [`docs/demos/index.md`](docs/demos/index.md) of demos that run in the browser, plus a live demo
 whose card appears once `DEMO_URL` in `site/build.py` names a public Space. Each demo is a page with
 a title, a paragraph, and the demo in a frame, generated into `_static/examples/` at build time: the
-comparison on one dataset from [`apps/compare.py`](../apps/compare.py), and Meek's rules, the
-d-separation explorer, and the benchmark explorer from
-[`apps/build_assets.py`](../apps/build_assets.py). The comparison reads causal-learn's graphs from
-`apps/compare-causal-learn.json`, recorded once (see [`apps/README.md`](../apps/README.md)); the
-build refuses a recording made on different data.
+comparison on one dataset from [`apps/compare.py`](../apps/compare.py), and the PC replay, Meek's
+rules, and the d-separation explorer from [`apps/build_assets.py`](../apps/build_assets.py). The
+comparison reads causal-learn's graphs from `apps/compare-causal-learn.json`, recorded once (see
+[`apps/README.md`](../apps/README.md)); the build refuses a recording made on different data.
 
-Every choice on the site is one segmented control, `site/assets/segmented.css`: a track whose
-chosen option fills with the accent. The documentation pages load it with the shared stylesheets,
-and the demos and the benchmark explorer, which are standalone pages, inline the same file. It
-styles the release cards' and posts' figure tabs (`race-sizes`), the comparison's method switch,
-the PC replay's examples, the d-separation explorer's conditioning set, and the graph guide's
-edges.
+Every choice on the site is one segmented control, `site/assets/segmented.css`: a track whose chosen
+option fills with the accent. The documentation pages load it with the shared stylesheets, and the
+demos, which are standalone pages, inline the same file. It styles the release cards' and posts'
+figure tabs (`race-sizes`), the comparison's method switch, the PC replay's examples, the
+d-separation explorer's conditioning set, and the graph guide's edges.
 
 Thumbnails come from each page's own output: a demo draws its own; a notebook's is its first figure,
 or its dataset's true graph (`NOTEBOOK_DATA` in `conf.py`). They are drawn in the light palette in
@@ -296,3 +294,4 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Docs chrome over the palette tokens | `docs/_static/andrey.css` |
 | Docs tables: a framed header band over a card of rows, a fade where a wide table scrolls, short values and labels on one line (`_short_cells` in `conf.py`); the API reference's summary tables get a Name and Description header (`_summary_headers`) and stack on a phone | `docs/_static/andrey.css`, `docs/conf.py` |
 | The old demo address, redirected to the gallery | `docs/_templates/demo-redirect.html` |
+| The retired benchmark explorer's address, redirected to the release cards | `docs/_templates/benchmark-explorer-redirect.html` |

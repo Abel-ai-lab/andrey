@@ -295,7 +295,11 @@ NAV_ICONS = {
     "docs/brand": "palette",
 }
 NAV_SHOWN = 5
-html_additional_pages = {"index": "homepage.html", "demo/index": "demo-redirect.html"}
+html_additional_pages = {
+    "index": "homepage.html",
+    "demo/index": "demo-redirect.html",
+    "docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html",
+}
 
 # ---- blog (ABlog) ----------------------------------------------------------------------------
 # A post is a page under blog/ whose front matter sets `blogpost: true`, with its `date`. ABlog
@@ -1067,8 +1071,8 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
 
 
 # ---- the examples and demos galleries ------------------------------------------------------------
-# Each demo's page (docs/demos/), and, from the summary, the generated file that page shows at full
-# width and the gallery card's thumbnail.
+# Each demo's page (docs/demos/), the generated file that page shows at full width, and the gallery
+# card's thumbnail.
 INTERACTIVE = {
     "docs/demos/compare": (
         "compare.html",
@@ -1089,11 +1093,6 @@ INTERACTIVE = {
         "d-separation.html",
         lambda summary: build_assets.dsep_document(heading=False),
         lambda summary: build_assets.dsep_thumbnail(),
-    ),
-    "docs/demos/benchmark-explorer": (
-        "benchmarks.html",
-        lambda summary: build_assets.benchmarks_page(summary, links="../../docs/", heading=False),
-        build_assets.benchmarks_thumbnail,
     ),
 }
 THUMBS = GENERATED / "thumbs"

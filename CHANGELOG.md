@@ -29,6 +29,10 @@ change names its pull request.
 - `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
   measure values calibrated before this change again with `andrey calibrate`. ([#169])
 
+### Removed
+
+- The benchmark explorer page is retired, and its address redirects to the release cards. ([#175])
+
 ### Fixed
 
 - `fci` and `gfci` no longer turn every edge with a tail at one end and a circle at the other
@@ -254,3 +258,4 @@ First alpha release.
 [#167]: https://github.com/Abel-ai-lab/andrey/pull/167
 [#168]: https://github.com/Abel-ai-lab/andrey/pull/168
 [#169]: https://github.com/Abel-ai-lab/andrey/pull/169
+[#175]: https://github.com/Abel-ai-lab/andrey/pull/175
