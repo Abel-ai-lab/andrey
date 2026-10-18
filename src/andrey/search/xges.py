@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import heapq
 from collections import OrderedDict, defaultdict, deque
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from itertools import chain, count
 
 import numpy as np
@@ -42,7 +42,7 @@ from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import add_deltas
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE, stable_key
+from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 from andrey.search.ges import _reachable, _recompute_objective, _reform_cpdag
 from andrey.search.hc import tie_ranks
 
@@ -61,16 +61,17 @@ PathMap = defaultdict[tuple[int, int], set[tuple[int, int]]]
 
 
 def _move_key(
-    delta: float, n: int, x: int, y: int, subset: Iterable[int], ranks: list[int]
+    delta: float, n: int, x: int, y: int, subset: Collection[int], ranks: list[int]
 ) -> tuple:
     """The order of a move of edge ``x``-``y`` with ``subset`` (``T`` or ``C``); lower goes first.
 
-    ``(stable_key(delta, n), ranks[x], ranks[y], sorted ranks of subset)`` for ``n`` samples and
-    ``ranks`` from :func:`~andrey.search.hc.tie_ranks`: moves whose score changes per sample agree
-    to :data:`~andrey.search._parallel._KEY_DP` decimals are ordered by ranks that follow the
-    columns.
+    ``(round(delta / n, _KEY_DP), ranks[x], ranks[y], sorted ranks of subset)`` for ``n``
+    samples and ``ranks`` from :func:`~andrey.search.hc.tie_ranks`: moves whose score changes per
+    sample agree to :data:`~andrey.search._parallel._KEY_DP` decimals are ordered by ranks that
+    follow the columns.
     """
-    return (stable_key(delta, n), ranks[x], ranks[y], tuple(sorted(ranks[v] for v in subset)))
+    ordered = tuple(sorted([ranks[v] for v in subset])) if subset else ()
+    return (round(delta / n, _KEY_DP), ranks[x], ranks[y], ordered)
 
 
 def _is_directed(state: int) -> bool:
@@ -503,6 +504,7 @@ class _Search:
     def __init__(self, score: BICScore, d: int, ranks: list[int]) -> None:
         self.add_deltas = _AddDeltas(score, d)
         self.d = d
+        self.n_samples = score.n
         self.ranks = ranks
         self.g = _Graph(d)
         self.paths: PathMap = defaultdict(set)
@@ -515,7 +517,8 @@ class _Search:
     def branch(self) -> _Search:
         """A copy of the graph and path records, with empty queues and the same score cache."""
         out = _Search.__new__(_Search)
-        out.add_deltas, out.d, out.seq, out.ranks = self.add_deltas, self.d, self.seq, self.ranks
+        out.add_deltas, out.d, out.seq = self.add_deltas, self.d, self.seq
+        out.n_samples, out.ranks = self.n_samples, self.ranks
         out.g = self.g.copy()
         out.paths = defaultdict(set, {k: set(v) for k, v in self.paths.items()})
         out.fingerprint = self.fingerprint
@@ -524,9 +527,9 @@ class _Search:
 
     # -- finding operators ----------------------------------------------------------------------
 
-    def key(self, delta: float, x: int, y: int, subset: Iterable[int]) -> tuple:
+    def key(self, delta: float, x: int, y: int, subset: frozenset[int]) -> tuple:
         """:func:`_move_key` of a move."""
-        return _move_key(delta, self.add_deltas.score.n, x, y, subset, self.ranks)
+        return _move_key(delta, self.n_samples, x, y, subset, self.ranks)
 
     def subsets(
         self, t0: list[int], na: set[int], E: frozenset[int]
