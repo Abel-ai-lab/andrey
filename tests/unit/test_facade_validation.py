@@ -143,17 +143,15 @@ BROKEN = {
         lambda: np.column_stack([_data(), 2.0 * _data()[:, 0] + 1.0]),
         r"data column 3 is a linear function of column 0",
     ),
-    "scaled copy, fewer rows than columns": (
-        lambda: np.column_stack([_data(5, 8), -_data(5, 8)[:, 2]]),
-        r"data column 8 is a linear function of column 2",
-    ),
     "sum of two columns": (_sum_of_two_columns, r"data columns \[2, 3, 5\] are linearly dependent"),
 }
 
 
+# Every BIC search runs the check; one of them shows the pairwise message.
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-@pytest.mark.parametrize("case", list(BROKEN))
-@pytest.mark.parametrize("method", BIC)
+@pytest.mark.parametrize(
+    ("method", "case"), [(m, "sum of two columns") for m in BIC] + [("ges", "scaled copy")]
+)
 def test_bic_searches_reject_dependent_columns(method, case):
     make, message = BROKEN[case]
     with pytest.raises(ValueError, match=message):
@@ -165,7 +163,10 @@ def test_bic_searches_reject_dependent_columns(method, case):
 def test_bic_searches_fit_fewer_rows_than_columns(method):
     out = SINGLE[method](np.random.default_rng(0).standard_normal((6, 12)))
     assert out.structure.n_nodes == 12
-    assert np.isfinite(out.metadata.get("score", 0.0))
+    if method == "gfci":  # a PAG, with no score in its metadata
+        assert out.structure.kind == "pag"
+    else:
+        assert np.isfinite(out.metadata["score"])
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")

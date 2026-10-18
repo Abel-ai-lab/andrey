@@ -75,11 +75,10 @@ def test_the_orientation_follows_the_nodes_not_their_order(ranks, order):
     np.testing.assert_array_equal(relabeled, relabel(orient(CHAIN, CHAIN_SEPSETS, pvalues), order))
 
 
-@pytest.mark.parametrize("ranks", [(0.9, 0.3), (0.3, 0.9), (0.5, 0.5)])
-def test_column_order_keeps_the_collider_visited_first(ranks):
-    # The collider at node 1 comes first in column order, whatever the ranks; the one at 2 is
-    # skipped, and no edge is left disputed.
-    pvalues = dict(zip(CHAIN_SEPSETS, ranks))
+def test_column_order_keeps_the_collider_visited_first():
+    # The collider at node 1 comes first in column order, though these ranks pick the one at 2
+    # under "p_value"; the one at 2 is skipped, and no edge is left disputed.
+    pvalues = dict(zip(CHAIN_SEPSETS, (0.3, 0.9)))
     pdag = _orient_colliders(CHAIN, CHAIN_SEPSETS, pvalues, order="column")
     out = _undirect_conflicts(meek(pdag))
     np.testing.assert_array_equal(out, marks(4, directed=[(0, 1), (2, 1)], undirected=[(2, 3)]))

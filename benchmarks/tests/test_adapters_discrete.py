@@ -174,7 +174,8 @@ def test_bdeu_is_minus_twice_causal_learns_score() -> None:
 @pytest.mark.parametrize("method", list(discrete_cpu.PAIRS))
 def test_both_packages_return_the_same_graph(method: str, seed: int) -> None:
     """causal-learn's PC orients conflicting colliders in column order, so Andrey's PC runs that
-    rule here; its default p-value order can orient them differently."""
+    rule here; its default p-value order can orient them differently. The campaign runs the
+    default, which this check does not cover."""
     data = sample_discrete(d=8, n=2000, seed=seed).data
     hashes = []
     for adapter in discrete_cpu.PAIRS[method]:

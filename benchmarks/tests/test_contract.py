@@ -29,7 +29,7 @@ _CANONICAL = DatasetKey(
 
 
 def test_the_canonical_dataset_keeps_its_identity():
-    """Pin the dataset digest and filename used by existing records."""
+    """Pin the canonical slice's digest and filename, its columns shuffled by default."""
     assert _CANONICAL.digest == "297729421a36"
     assert _CANONICAL.filename == "ds_297729421a36.npz"
 

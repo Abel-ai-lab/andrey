@@ -17,12 +17,16 @@ import pytest
 from andrey.core.structure import ARROW, CIRCLE, TAIL
 
 fci_module = importlib.import_module("andrey.constraint.fci")
+remove_by_possible_dsep = fci_module._remove_by_possible_dsep
 
 _, T, A, C = 0, TAIL, ARROW, CIRCLE
 
 
-def _oracle_fci(monkeypatch, n_obs, edges, selection=()):
-    """Run ``fci`` with a d-separation test on the DAG ``edges`` given ``selection``."""
+def _oracle_fci(monkeypatch, n_obs, edges, selection=(), removed=None, **params):
+    """Run ``fci`` with a d-separation test on the DAG ``edges`` given ``selection``.
+
+    ``removed``, when given, receives the number of edges the possible-d-separation step removes.
+    """
     dag = nx.DiGraph(edges)
     dag.add_nodes_from(range(n_obs))
     conditioned = set(selection)
@@ -30,8 +34,15 @@ def _oracle_fci(monkeypatch, n_obs, edges, selection=()):
     def test(x, y, condition_set=()):
         return float(nx.is_d_separator(dag, {x}, {y}, set(condition_set) | conditioned))
 
+    def counted(marks, *args, **kwargs):
+        before = np.count_nonzero(marks)
+        remove_by_possible_dsep(marks, *args, **kwargs)
+        removed.append((before - np.count_nonzero(marks)) // 2)
+
     monkeypatch.setattr(fci_module, "make_indep_test", lambda name, X, categorical=None: test)
-    pag = fci_module.fci(np.zeros((10, n_obs)), alpha=0.5)
+    if removed is not None:
+        monkeypatch.setattr(fci_module, "_remove_by_possible_dsep", counted)
+    pag = fci_module.fci(np.zeros((10, n_obs)), alpha=0.5, **params)
     return np.asarray(pag.to_numpy(), dtype=np.int8)
 
 
@@ -123,6 +134,34 @@ def test_r8_graphs_do_not_depend_on_labels(monkeypatch, name):
     for _ in range(12):
         order = rng.permutation(7)
         pag = _oracle_fci(monkeypatch, 7, _relabel(7, edges, order))
+        back = np.empty_like(pag)
+        back[np.ix_(order, order)] = pag
+        np.testing.assert_array_equal(back, reference)
+
+
+# Six observed nodes 0-5 with hidden common causes from node 6 up. On each, the
+# possible-d-separation step removes an edge, and the default and order-free sets differ.
+ORACLE_GRAPHS = {
+    "one extra edge": [(6, 2), (6, 5), (7, 1), (7, 0), (4, 5), (4, 1), (5, 0), (1, 2), (3, 0)]
+    + [(8, 1), (8, 3)],
+    "four hidden common causes": [(6, 0), (6, 1), (7, 3), (7, 4), (2, 1), (2, 3), (1, 4), (3, 0)]
+    + [(8, 3), (8, 5), (9, 4), (9, 5)],
+    "a fourth parent": [(6, 0), (6, 3), (7, 1), (7, 2), (5, 3), (5, 1), (3, 2), (1, 0), (4, 0)]
+    + [(4, 2), (8, 4), (8, 3)],
+}
+
+
+@pytest.mark.parametrize("name", sorted(ORACLE_GRAPHS))
+def test_order_free_pag_ignores_node_labels_under_exact_tests(monkeypatch, name):
+    """With exact tests, every labeling gives the same order-free PAG once mapped back."""
+    edges = ORACLE_GRAPHS[name]
+    removed = []
+    reference = _oracle_fci(monkeypatch, 6, edges, removed=removed, possible_dsep="order_free")
+    assert removed[0] > 0
+    rng = np.random.default_rng(0)
+    for _ in range(24):
+        order = rng.permutation(6)
+        pag = _oracle_fci(monkeypatch, 6, _relabel(6, edges, order), possible_dsep="order_free")
         back = np.empty_like(pag)
         back[np.ix_(order, order)] = pag
         np.testing.assert_array_equal(back, reference)

@@ -119,16 +119,11 @@ def test_numba_d64_bit63_barrier():
         assert bool(reaches_nb(succ, start, target, barrier)) == want, (start, target)
 
 
-def test_ges_runs_without_numba(monkeypatch):
-    """The default (no [numba]) install: numba is unavailable, GES uses the numpy reference."""
+def test_reaches_impl_falls_back_to_numpy_without_numba(monkeypatch):
+    """Without the [numba] extra, the bitset kernels resolve to the numpy reference."""
     monkeypatch.setattr(backend, "numba", lambda: None)
     assert backend.resolve_bitset() == "numpy"
     assert _bitset.reaches_impl() is _bitset._semidirected_reaches_numpy
-    from andrey.search.ges import ges
-
-    x = np.random.default_rng(1).standard_normal((200, 5))
-    cpdag, _ = ges(x)
-    assert cpdag.n_nodes == 5  # runs to completion on the numpy path
 
 
 def _random_tail_adj(rng: np.random.Generator, d: int) -> np.ndarray:

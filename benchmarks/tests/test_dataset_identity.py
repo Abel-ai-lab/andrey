@@ -107,9 +107,9 @@ def test_the_tiny_keys_declare_the_canonical_density():
 
 
 def test_no_hidden_nodes_leaves_the_generator_call_and_label_as_they_were():
-    """Check that `latents=0` preserves dataset identity in existing stores and records."""
+    """`latents=0` stays out of the generator call; pin the base key's digest and label."""
     assert "latents" not in datasets.generation_kwargs(_key())
-    assert _key().digest == "e8e12e887f9d"  # Digest is unchanged by `latents=0`.
+    assert _key().digest == "e8e12e887f9d"
     assert datasets.generation_kwargs(_key(latents=2))["latents"] == 2
     assert _key().label.endswith("-standardized-shuffled")
 

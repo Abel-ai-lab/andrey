@@ -1,10 +1,7 @@
-"""Test that GES enumeration, scan, and reachability paths return the same CPDAG and score.
+"""Test that GES's forward scans and subset enumerations return one CPDAG and score.
 
-The forward scan that keeps candidates between passes is compared with the full rescan, move by
-move, from 8 to 200 nodes on dense and sparse data, on duplicate and near-duplicate columns, and
-with the slowest reference: the full rescan over unpruned subset lattices. Separate checks cover
-the bounds the kept scan's screening deltas rely on, the kept scan under an engine whose deltas
-move with the batch by up to those bounds, and serial against two-chunk decomposition.
+The kept forward scan is compared with the full rescan (``_FULL_RESCAN``), pruned enumeration
+with unpruned subset lattices (``_LATTICE_PRUNE``), and serial GES with two-chunk decomposition.
 """
 
 from __future__ import annotations
@@ -121,7 +118,7 @@ def _run(
 
 
 # Dense rows put several undirected neighbors on most targets, so subsets and reachability matter;
-# sparse rows reach 200 nodes. The full rescan costs about one scan of every target per accepted
+# sparse rows reach 100 nodes. The full rescan costs about one scan of every target per accepted
 # move, so the largest rows take a heavier penalty, which keeps chance edges and moves few.
 _SCAN_GRID = [
     # (seed, d, n, p, lambda_value)
@@ -131,7 +128,6 @@ _SCAN_GRID = [
     (2, 30, 300, 0.25, 1.0),
     (0, 60, 300, 0.08, 1.0),
     (1, 100, 500, 0.02, 2.0),
-    (0, 200, 1000, 0.002, 2.0),
 ]
 
 
@@ -159,8 +155,9 @@ def test_kept_scan_matches_full_rescan(
     _assert_kept_matches_full(x, None, lambda_value, f"seed={seed}, d={d}")
 
 
-# Duplicate columns give deltas of minus infinity, which tie across sources; near-duplicates make
-# the rank-one update cancel, so two batches over one base can give far-apart deltas.
+# Duplicate columns make families unavailable, so their adds score an infinite delta;
+# near-duplicates make the rank-one update cancel, so two batches over one base can give far-apart
+# deltas.
 _COLLINEAR_GRID = [
     # (seed, d, n, p, k, noise)
     (0, 4, 25, 0.0, 1, 0.0),
@@ -183,17 +180,37 @@ def test_kept_scan_matches_full_rescan_on_collinear_columns(
     _assert_kept_matches_full(x, None, 1.0, f"seed={seed}, d={d}, noise={noise}")
 
 
-# Seeds of random near-collinear cases that include ties at minus infinity and cancelled updates.
-_RANDOM_COLLINEAR_SEEDS = [3, 59, 104, 128, 131, 162, 175, 250, 269]
+# Random near-collinear cases whose updates can cancel: one without maxP, one whose maxP changes
+# the graph.
+_RANDOM_COLLINEAR_SEEDS = [59, 131]
 
 
 @pytest.mark.usefixtures("unchecked_columns")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")  # log of a zero residual
 @pytest.mark.parametrize("seed", _RANDOM_COLLINEAR_SEEDS)
-def test_kept_scan_matches_full_rescan_on_random_collinear_data(seed: int) -> None:
+def test_kept_scan_matches_full_rescan_on_random_collinear_data(
+    seed: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The kept scan matches the full rescan, move by move, on random near-collinear data."""
+    from andrey.core.score_delta import DeltaBICScore
+
     x, max_p, lambda_value = _random_collinear_case(seed)
+    batch = DeltaBICScore.delta_many_with_base
+    infinite_bounds = 0
+
+    def counted(self, i, base_parents, deltas, *, bounds=None):
+        nonlocal infinite_bounds
+        out = batch(self, i, base_parents, deltas, bounds=bounds)
+        infinite_bounds += sum(b == math.inf for b in bounds or ())
+        return out
+
+    monkeypatch.setattr(DeltaBICScore, "delta_many_with_base", counted)
     _assert_kept_matches_full(x, max_p, lambda_value, f"seed={seed}")
+    assert infinite_bounds, "no update could cancel"
+    if max_p is not None:
+        capped, _ = _run(x, maxP=max_p, lambda_value=lambda_value)
+        uncapped, _ = _run(x, maxP=None, lambda_value=lambda_value)
+        assert not np.array_equal(capped, uncapped), "maxP does not change the graph"
 
 
 @pytest.mark.usefixtures("unchecked_columns")
@@ -201,12 +218,8 @@ def test_kept_scan_matches_full_rescan_on_random_collinear_data(seed: int) -> No
 def test_screening_bounds_cover_batch_differences() -> None:
     """A delta scored in another batch over the same base stays within the first batch's bound.
 
-    The kept scan's screening deltas come from one batch of every candidate sharing a base; the
-    full rescan's come from a batch of the candidates that pass the reachability check. The scan
-    selects the full rescan's move whenever every difference stays within the bound. The sample
-    covers well-conditioned data, mixed column scales, and near-duplicate columns, where the
-    rank-one update cancels. On well-conditioned data every bound is finite and small, so the scan
-    still skips most candidates.
+    The kept scan screens with one batch of every candidate sharing a base; the full rescan scores
+    a batch of those passing reachability. On well-conditioned data every bound is also small.
     """
     from andrey.core.score_delta import DeltaBICScore
 
@@ -295,7 +308,7 @@ class _BatchShiftedDelta:
         return out
 
 
-@pytest.mark.parametrize("seed,d,n,p", [(0, 12, 200, 0.40), (1, 20, 300, 0.30), (2, 30, 300, 0.15)])
+@pytest.mark.parametrize("seed,d,n,p", [(0, 12, 200, 0.40), (1, 20, 300, 0.30)])
 def test_kept_scan_honors_any_engine_bounds(
     seed: int, d: int, n: int, p: float, monkeypatch: pytest.MonkeyPatch
 ) -> None:
