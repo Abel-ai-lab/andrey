@@ -5,7 +5,9 @@ Loads each dataset with ``andrey.data.load_dataset`` and fits every package's ad
 rows with matched settings: Fisher-z at ``alpha = 0.05`` for PC and FCI; Andrey's
 ``lambda_value = 1.0`` (causal-learn's 0.5, the same BIC penalty on its scale) for GES, BOSS,
 and GRaSP, with at most ``d/2`` parents for GES and search seed 0; GRaSP depth 3. The published
-networks' simulated data are Gaussian, so the LiNGAM methods run on measured data only.
+networks' simulated data are Gaussian, so the LiNGAM methods run on measured data only. A network's
+columns come in the order ``load_dataset`` draws from the seed, and each record says so with
+``shuffle``; Sachs keeps its file's order.
 
 Each fit runs isolated after one warm-up, with one numeric thread, under a per-repeat wall cap;
 a fit past the cap is recorded as ``timeout``. Every estimate is scored against the dataset's
@@ -118,6 +120,7 @@ def main() -> None:
                                 "dataset": name,
                                 "n": int(x.shape[0]),
                                 "seed": seed,
+                                "shuffle": not measured,
                                 "method": method,
                                 "solution": adapter.name,
                                 "repeat": repeat,
