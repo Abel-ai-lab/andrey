@@ -13,27 +13,27 @@ change names its pull request.
 
 - `fci` and `gfci` take `possible_dsep`: `"fast"`, the default, builds each possible-d-separation
   set as before, in the order the search visits nodes, and `"order_free"` builds sets that do not
-  depend on that order, at the cost of more tests on some graphs. ([#TBD])
+  depend on that order, at the cost of more tests on some graphs. ([#168])
 
 ### Changed
 
 - `pc` orients conflicting colliders by the p-value that separated each collider's pair, highest
   first, so its colliders no longer depend on the column order and its default output can change,
-  and `collider_order="column"` keeps the column-order rule. ([#TBD])
+  and `collider_order="column"` keeps the column-order rule. ([#168])
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
-  (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#TBD])
+  (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
 - Hill climbing and tabu search break exact score ties by a hash of each column's values, so
-  reordering the columns no longer changes the graph they find. ([#TBD])
+  reordering the columns no longer changes the graph they find. ([#168])
 
 ### Fixed
 
 - `fci` and `gfci` no longer turn every edge with a tail at one end and a circle at the other
-  into an undirected edge; the rule that sets such tails now needs a third node. ([#TBD])
+  into an undirected edge; the rule that sets such tails now needs a third node. ([#168])
 - In `fci` and `gfci`, rule R5 searches every uncovered circle path up to a fixed bound, rule R8
   checks both endpoint orders, and the possible-d-separation step tests every conditioning subset,
   so they remove false edges and orient endpoints they used to miss;
-  `andrey.data.latent.marginal(..., "pag")` follows the same rules. ([#TBD])
+  `andrey.data.latent.marginal(..., "pag")` follows the same rules. ([#168])
 
 ## [0.6.0] - 2026-10-17
 
@@ -240,3 +240,4 @@ First alpha release.
 [#95]: https://github.com/Abel-ai-lab/andrey/pull/95
 [#94]: https://github.com/Abel-ai-lab/andrey/pull/94
 [#167]: https://github.com/Abel-ai-lab/andrey/pull/167
+[#168]: https://github.com/Abel-ai-lab/andrey/pull/168
