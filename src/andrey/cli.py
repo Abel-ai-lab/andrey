@@ -641,9 +641,10 @@ def _resolve_params(spec: MethodSpec, config: dict, tokens: Sequence[str]) -> tu
 def _load_method_inputs(
     spec: MethodSpec, provided: dict[str, list[str] | None]
 ) -> tuple[list, tuple[str, ...] | None]:
-    """Load a method's array inputs from their `--flag` value(s); error on missing / extra.
+    """Load a method's array inputs from their `--flag` value(s).
 
-    Also returns the first input's header, whose column names name the nodes.
+    Errors on a missing required input or an unexpected input flag. Also returns the first input's
+    header, whose column names name the nodes.
     """
     used = {i.name for i in spec.data.inputs}
     extra = [name for name, val in provided.items() if val and name not in used]
