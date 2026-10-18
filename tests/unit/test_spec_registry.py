@@ -395,7 +395,7 @@ def _notebook_code(path: pathlib.Path) -> str:
 
 def test_every_method_has_a_status():
     assert {spec.status for spec in REGISTRY.values()} <= set(typing.get_args(Status))
-    assert SUPPORTED and EXPERIMENTAL
+    assert SUPPORTED
 
 
 def test_supported_means_published():

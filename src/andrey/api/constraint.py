@@ -22,7 +22,6 @@ from andrey.api._adapt import (
     open_unit_interval,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -550,9 +549,6 @@ def gfci(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When the mixed-data score and test infers the categorical columns, or finds none and so runs
         as the linear-Gaussian form, or when a continuous setting meets columns that look like
@@ -620,7 +616,6 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    warn_experimental("gfci")
     from andrey.search.gfci import gfci as _gfci
 
     # Both phases read the same data, so the score and the test must agree on its type.
@@ -741,9 +736,6 @@ def cdnod(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When a mixed-data test infers the categorical columns, or finds none and so runs as the
         linear-Gaussian form, or when a continuous setting meets columns that look like category
@@ -824,7 +816,6 @@ def cdnod(
     >>> cdnod(np.column_stack([x, y]), domain_index).structure.oriented_edges()
     [(0, 1, 'directed')]
     """
-    warn_experimental("cdnod")
     from andrey.constraint.cdnod import cdnod as _cdnod
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.

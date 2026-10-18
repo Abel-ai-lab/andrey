@@ -69,7 +69,6 @@ RECORDED = {
 }
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("method", sorted(RECORDED))
 def test_default_keeps_the_recorded_pag(method):
     draw, rows = RECORDED[method]
@@ -81,7 +80,6 @@ def test_default_keeps_the_recorded_pag(method):
     assert np.count_nonzero(order_free) < np.count_nonzero(recorded)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(("method", "value"), [("fci", "order-free"), ("gfci", "FAST")])
 def test_unknown_possible_dsep_raises(method, value):
     with pytest.raises(ValueError, match="possible_dsep must be 'fast' or 'order_free'"):

@@ -26,7 +26,6 @@ from andrey.api._adapt import (
     json_safe,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
 from andrey.core import backend
 from andrey.core.seeding import resolve_seed
 
@@ -302,12 +301,6 @@ def gies(
         up to scale and shift given more than two rows or, with more rows than columns, is a linear
         function of other columns.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     See Also
     --------
     andrey.ges : Searches the same way on observational data, without the turning phase.
@@ -353,7 +346,6 @@ def gies(
     >>> gies(pd.DataFrame({"x": x, "y": y}), intervened).structure.oriented_edges()
     [('x', 'y', 'directed')]
     """
-    warn_experimental("gies")
     from andrey.search.gies import gies as _gies
     from andrey.search.gies import intervention_mask
 
@@ -818,9 +810,6 @@ def exact_search(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When a mixed-data score infers the categorical columns, or finds none and so runs as the
         linear-Gaussian form, or when a continuous setting meets columns that look like category
@@ -882,7 +871,6 @@ def exact_search(
     >>> exact_search(np.column_stack([x, y, z])).structure.kind
     'dag'
     """
-    warn_experimental("exact_search")
     from andrey.search.exact import EXACT_SCORES
     from andrey.search.exact import exact_search as _exact
 
@@ -955,12 +943,6 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         If the fit's loss or weights stop being finite, for example when the data's scale
         overflows its covariance; ``standardize=True`` rescales the columns.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     CALM first estimates the moral graph with IAMB [2]_: for each variable it adds, one at a time,
@@ -1030,7 +1012,6 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     >>> out.structure.kind  # doctest: +SKIP
     'dag'
     """
-    warn_experimental("calm")
     if backend.torch() is None:
         raise ImportError("andrey.calm needs torch for its continuous optimizer; install '[torch]'")
     from andrey.search.calm import calm as _calm

@@ -198,7 +198,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="score_func",
@@ -255,7 +255,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -341,7 +341,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(_LAMBDA_VALUE,),
         references=("Hauser & Buhlmann 2012",),
     )
@@ -504,7 +504,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="search_method",
@@ -545,7 +545,7 @@ _add(
         ),
         determinism="stochastic",
         accel="torch",
-        status="experimental",
+        status="supported",
         seeded=True,
         passthrough=True,
         params=(
@@ -721,7 +721,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(_RANDOM_STATE,),
         references=("Shimizu 2012",),
     )
@@ -1162,7 +1162,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="alpha",

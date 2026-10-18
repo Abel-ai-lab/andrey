@@ -60,8 +60,7 @@ class AndreyGIES:
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run GIES and return endpoint marks of the essential graph. The only timed region.
 
-        Calls the search directly, so the facade's experimental warning and input checks stay
-        outside the timing.
+        Calls the search directly, so the facade's input checks stay outside the timing.
         """
         import andrey
         from andrey.search.gies import gies

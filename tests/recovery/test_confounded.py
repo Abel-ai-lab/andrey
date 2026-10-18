@@ -19,8 +19,6 @@ import andrey
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 
 @pytest.fixture(autouse=True)
 def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:

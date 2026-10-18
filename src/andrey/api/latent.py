@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
-from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -63,12 +62,6 @@ def gin(
         If ``alpha`` is not in ``(0, 1)``, or if ``labels`` does not give one name per column of
         ``data``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     A group of observed variables forms a cluster when the linear combination of the group that is
@@ -118,7 +111,6 @@ def gin(
     >>> out.metadata["clusters"], out.structure.labels
     ([[0, 1, 2]], ('X1', 'X2', 'X3', 'L1'))
     """
-    warn_experimental("gin")
     from andrey.latent.gin import gin_structure
 
     X = data_matrix(data)
