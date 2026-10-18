@@ -97,6 +97,10 @@ change names its pull request.
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
   dropping the edge. ([#187])
+- `exact_search` returns the same DAG of the equivalence class it finds on every CPU, with either
+  `search_method`, and under any column order, because it orients the edges the class leaves
+  reversible by a rank computed from each column's own data, so the DAG can differ from before but
+  its class does not. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 
