@@ -24,6 +24,7 @@ from andrey.latent.gin import _independence_pvalue, gin
 from andrey.search._parallel import _KEY_DP
 from andrey.search.calm import moral_graph
 from andrey.search.ges import ges
+from andrey.search.gies import gies
 from andrey.search.xges import xges
 from andrey.temporal.pcmci import design_test
 
@@ -289,3 +290,24 @@ def test_pc_collider_ties() -> None:
         found = _mapped(lambda data: pc(data).to_numpy(), x, np.array(order))
         np.testing.assert_array_equal(found, want)
     assert want[1, 2] == want[2, 1] == TAIL
+
+
+def test_gies_ties(monkeypatch) -> None:
+    """GIES meets the tie GES meets, with column 2 set by an intervention in some rows."""
+    x = _swap_symmetric(0)
+    mask = np.zeros(x.shape, dtype=bool)
+    mask[np.arange(len(x)) % 5 == 0, 2] = True  # the rows of both halves alike
+
+    def fit(data: np.ndarray, columns: np.ndarray) -> np.ndarray:
+        return gies(data, mask[:, columns])[0].to_numpy()
+
+    orders = [np.array(order) for order in permutations(range(3))]
+    want = fit(x, np.arange(3))
+    for order in orders:
+        back = np.argsort(order)
+        np.testing.assert_array_equal(fit(x[:, order], order)[np.ix_(back, back)], want)
+    monkeypatch.setattr(importlib.import_module("andrey.search.gies"), "tie_ranks", _by_position)
+    by_position = fit(x, np.arange(3))
+    assert any(
+        (fit(x[:, o], o)[np.ix_(np.argsort(o), np.argsort(o))] != by_position).any() for o in orders
+    )

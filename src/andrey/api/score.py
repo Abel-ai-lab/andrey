@@ -322,7 +322,8 @@ def gies(
     round of removing and turning changes nothing. No variable's parent count is capped. Each step
     moves to the best neighboring equivalence class, and the classes are those of the
     interventional setting: two graphs are equivalent when they agree on the data from every
-    observed combination of intervened variables.
+    observed combination of intervened variables. Steps whose score changes are equal after
+    rounding are chosen by each column's rank, as in :func:`~andrey.hc`.
 
     **Limitations.** Measured on simulated linear-Gaussian data that mixes observation with
     interventions, from sparse random graphs (mean degree 2), from 10 to 200 variables with ten

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import heapq
 import math
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Protocol
 
 import numpy as np
@@ -52,7 +52,7 @@ BackwardResult = tuple[tuple, int, int, tuple[int, ...]] | None  # (key, x, y, H
 
 
 def move_key(
-    delta: float, n: int, x: int, y: int, subset: Sequence[int], ranks: Sequence[int]
+    delta: float, n: int, x: int, y: int, subset: Iterable[int], ranks: Sequence[int]
 ) -> tuple:
     """The reduce key of the move of edge ``x``-``y`` with ``subset`` (``T`` or ``H``); lower wins.
 

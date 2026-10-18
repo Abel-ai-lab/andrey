@@ -146,7 +146,7 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
 def test_gies_step_that_does_not_lower_the_score_fails():
     X, mask = _interventional_sem([[1], [6]], n=600, seed=0)
     score = gies_search.InterventionalBICScore(X, mask)
-    search = gies_search._Search(score, X.shape[1])
+    search = gies_search._Search(score, X.shape[1], range(X.shape[1]))
     with pytest.raises(RuntimeError):
         search.apply(search.adj.copy())
 
