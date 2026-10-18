@@ -124,3 +124,56 @@ def test_continuous_orders_are_unchanged(d: int, noise: str, seed: int) -> None:
 def test_continuous_shared_orders_are_unchanged(seed: int) -> None:
     groups = [sample_scm(noise="uniform", d=7, n=300 + 100 * g, seed=seed).data for g in range(2)]
     assert _shared(groups) == _SHARED_ORDERS[seed]
+
+
+def _chain_with_copy(copy: str) -> np.ndarray:
+    """Ranks / n of a nonlinear chain x0 -> x1 -> x2 and a fourth column copying x1.
+
+    ``copy`` is ``"exact"`` (the same values), ``"near"`` (x1 plus noise of size 1e-12), or
+    ``"reversed"`` (1 + 1 / n - x1, the ranks of -x1).
+    """
+    n = 300
+    rng = np.random.default_rng(5)
+    x = rng.uniform(-1, 1, (n, 3))
+    x[:, 1] += 2 * np.tanh(2 * x[:, 0])
+    x[:, 2] += x[:, 1] ** 3
+    ranked = (np.argsort(np.argsort(x, axis=0), axis=0) + 1.0) / n
+    twin = {
+        "exact": ranked[:, 1].copy(),
+        "near": ranked[:, 1] + 1e-12 * rng.uniform(-1, 1, n),
+        "reversed": 1 + 1 / n - ranked[:, 1],
+    }[copy]
+    return np.column_stack([ranked, twin])
+
+
+def test_copies_give_one_order_up_to_the_pair() -> None:
+    """Exact, 1e-12-near, and reversed copies of x1 give one order, the copies next to each other.
+
+    Which of two copies comes first can differ: identical columns fall back to column position.
+    """
+    orders = [pwling.find_causal_order(_chain_with_copy(c)) for c in ("exact", "near", "reversed")]
+    for order in orders:
+        pos = sorted([order.index(1), order.index(3)])
+        assert pos[1] == pos[0] + 1, order
+    assert len({tuple(3 if k == 1 else k for k in order) for order in orders}) == 1, orders
+
+
+@pytest.mark.parametrize("copy", ["near", "reversed"])
+def test_copy_order_follows_columns(copy: str) -> None:
+    _assert_order_follows_columns(_direct, [_chain_with_copy(copy)])
+
+
+def test_copy_pair_scores_nan_in_both_implementations() -> None:
+    """Both copies score NaN; the other candidates keep finite scores."""
+    X = _chain_with_copy("near")
+    for scores in (pwling.score_candidates, pwling.score_candidates_serial):
+        s = scores(X, [0, 1, 2, 3])
+        assert np.isnan(s[[1, 3]]).all() and np.isfinite(s[[0, 2]]).all(), scores
+
+
+def test_residual_of_a_copy_is_exact_zeros() -> None:
+    """A rounding-sized residual becomes exact zeros; a constant regressor leaves its input."""
+    X = _chain_with_copy("near")
+    assert not pwling.compute_residual(X[:, 3], X[:, 1]).any()
+    assert not pwling.compute_residual(2 * X[:, 1], X[:, 1]).any()
+    np.testing.assert_array_equal(pwling.compute_residual(X[:, 0], np.full(300, 0.5)), X[:, 0])

@@ -19,15 +19,30 @@ from andrey.search.hc import tie_ranks
 # differences, and rounding moves it by at most the norm of their rounding errors. Mathematically
 # tied candidates measure < 1e-12 apart in this norm and distinct ones > 5e-10 apart.
 _TIE_TOL = 1e-10
+# Two columns are degenerate when the residual of one on the other keeps at most this fraction of
+# its variance (1 - corr^2), so that its standardized entropy is undefined (0 / 0) or rounding
+# noise, and which of the two a CPU's rounding gives differs by kernel. Copies, exact or perturbed
+# by 1e-12, measure < 1e-15; distinct columns of rank-transformed near-copies measure > 1e-7.
+_DEGENERATE_TOL = 1e-12
 
 
 def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Least-squares residual of ``a`` regressed on ``b``: ``a - (cov(a, b) / var(b)) * b``.
 
     Covariance and variance share ``ddof=0``, so the residual is uncorrelated with ``b`` in the
-    sample, as the order search assumes.
+    sample, as the order search assumes. A constant ``b`` explains nothing and leaves ``a`` as it
+    is. A residual whose variance is at most ``_DEGENERATE_TOL`` times that of ``a`` (``a`` copies
+    ``b`` up to scale) is returned as exact zeros, which :func:`score_candidates` marks degenerate.
     """
-    return a - (np.cov(a, b, ddof=0)[0, 1] / np.var(b)) * b
+    if _constant(b):
+        return a.copy()
+    r = a - (np.cov(a, b, ddof=0)[0, 1] / np.var(b)) * b
+    return np.zeros_like(r) if np.var(r) <= _DEGENERATE_TOL * np.var(a) else r
+
+
+def _constant(x: np.ndarray) -> np.ndarray:
+    """Whether each column (or the 1-D array) holds a single value, by comparison only."""
+    return np.max(x, axis=0) == np.min(x, axis=0)
 
 
 def compute_entropy(u: np.ndarray) -> float:
@@ -43,37 +58,52 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     Entropy is batched over a stack of residuals; :func:`pick` chooses the best, MultiGroup sums
     across groups first. Order-exactness needs the float64 entropy path -- on a float32 device
     (atol 1e-3) a near-tie could flip the pick, so pin ``ANDREY_DEVICE=numpy`` for exact order.
+
+    A degenerate candidate scores NaN, which :func:`pick` ranks highest: a constant column (such as
+    one :func:`compute_residual` zeroed), or one of a pair with ``1 - corr^2 <= _DEGENERATE_TOL``.
+    Other candidates are scored against the non-constant columns only.
     """
     cols = np.asarray(U)
     if len(cols) < 2:
         return np.zeros(len(cols), dtype=np.float64)  # a lone candidate has no pair to score
     sub = X[:, cols]
-    x_std = (sub - sub.mean(axis=0)) / sub.std(axis=0)  # (n, m) standardized candidate columns
-    ent = stats.entropy(x_std)  # (m,) batched candidate entropy
-    cov = np.cov(x_std, rowvar=False, ddof=0)  # (m, m), same ddof as var: least-squares slopes
-    var = np.var(x_std, axis=0)  # (m,), ddof=0
     m = len(cols)
-    scores = np.empty(m, dtype=np.float64)
-    for a in range(m):
-        others = np.arange(m) != a
+    scores = np.full(m, np.nan)
+    live = np.flatnonzero(~_constant(sub))
+    if len(live) < 2:
+        scores[live] = 0.0  # a lone live candidate has no pair to score
+        return scores
+    sub = sub[:, live]
+    x_std = (sub - sub.mean(axis=0)) / sub.std(axis=0)  # (n, k) standardized live columns
+    ent = stats.entropy(x_std)  # (k,) batched candidate entropy
+    cov = np.cov(x_std, rowvar=False, ddof=0)  # (k, k), same ddof as var: least-squares slopes
+    var = np.var(x_std, axis=0)  # (k,), ddof=0
+    unexplained = 1.0 - cov * cov.T / np.outer(var, var)  # symmetric 1 - corr^2
+    np.fill_diagonal(unexplained, np.inf)
+    degenerate = (unexplained <= _DEGENERATE_TOL).any(axis=0)
+    k = len(live)
+    for a in np.flatnonzero(~degenerate):
+        others = np.arange(k) != a
         xi = x_std[:, a][:, None]  # (n, 1)
-        xj = x_std[:, others]  # (n, m-1)
+        xj = x_std[:, others]  # (n, k-1)
         r_ij = xi - (cov[a, others] / var[others])[None, :] * xj  # residual of i on each j
         r_ji = xj - (cov[others, a] / var[a])[None, :] * xi  # residual of each j on i
         r_ij /= np.std(r_ij, axis=0)
         r_ji /= np.std(r_ji, axis=0)
         diff = (ent[others] + stats.entropy(r_ij)) - (ent[a] + stats.entropy(r_ji))
-        scores[a] = -np.sum(np.minimum(0.0, diff) ** 2)
+        scores[live[a]] = -np.sum(np.minimum(0.0, diff) ** 2)
     return scores
 
 
 def score_candidates_serial(X: np.ndarray, U: list[int]) -> np.ndarray:
     """Readable per-pair reference implementation of :func:`score_candidates`."""
-    cols = list(U)
+    cols = [k for k in U if not _constant(X[:, k])]
     x_std = {k: (X[:, k] - X[:, k].mean()) / X[:, k].std() for k in cols}
     ent = {k: compute_entropy(x_std[k]) for k in cols}
-    scores = np.empty(len(cols), dtype=np.float64)
-    for a, i in enumerate(cols):
+    scores = np.full(len(U), np.nan)
+    for a, i in enumerate(U):
+        if i not in x_std:
+            continue
         xi, e_xi = x_std[i], ent[i]
         acc = 0.0
         for j in cols:
@@ -82,6 +112,9 @@ def score_candidates_serial(X: np.ndarray, U: list[int]) -> np.ndarray:
             xj, e_xj = x_std[j], ent[j]
             r_ij = compute_residual(xi, xj)
             r_ji = compute_residual(xj, xi)
+            if not (r_ij.any() and r_ji.any()):  # a degenerate pair
+                acc = np.nan
+                break
             diff = (e_xj + compute_entropy(r_ij / np.std(r_ij))) - (
                 e_xi + compute_entropy(r_ji / np.std(r_ji))
             )
@@ -95,8 +128,8 @@ def pick(scores: np.ndarray, candidates: list[int], ranks: np.ndarray) -> int:
 
     ``scores`` are aligned with ``candidates`` and ``<= 0`` or NaN; two tie when their
     ``sqrt(-score)`` values both lie within ``_TIE_TOL`` of the best one. A NaN score, from a
-    candidate whose pairwise residuals vanish (a column that copies another), ranks highest, as
-    under ``np.argmax``; all NaN candidates then tie. ``ranks`` is indexed by column, as
+    degenerate candidate (:func:`score_candidates`), ranks highest, as under ``np.argmax``; all NaN
+    candidates then tie. ``ranks`` is indexed by column, as
     :func:`~andrey.search.hc.tie_ranks` returns for the input data.
     """
     norm = np.sqrt(-np.asarray(scores, dtype=np.float64))
