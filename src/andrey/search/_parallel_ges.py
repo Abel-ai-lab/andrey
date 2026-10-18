@@ -96,10 +96,9 @@ NeighborState = tuple[list[set[int]], list[np.ndarray], list[set[int]]]
 def neighborhood_state(adj: np.ndarray, n: int) -> NeighborState:
     """The per-node adjacency sets, directed parents, and undirected neighbors for a graph state.
 
-    Computed once per graph state (as the serial passes do) and shared read-only across all chunks;
-    a chunk owning targets ``[y0, y1)`` iterates only its ``y`` slice but reads every node's arrays.
-    Node ``v``'s entries equal ``ops.adjacent``, ``ops.parents``, and ``ops.undirected_neighbors``
-    of ``v``; ``n`` is the node count of ``adj``.
+    Computed once per graph state and shared read-only across chunks. Each chunk reads all node
+    arrays but iterates only its targets ``[y0, y1)``. Node ``v``'s entries equal ``ops.adjacent``,
+    ``ops.parents``, and ``ops.undirected_neighbors`` of ``v``; ``n`` is the node count of ``adj``.
     """
     adj_sets = [set(row.tolist()) for row in _rows(adj != ops.NULL)]
     par_of = _rows(adj == ops.ARROW)
@@ -124,7 +123,6 @@ def _insert_candidates(
     """
     adj_sets, _par_of, nbr = state
     nbrs_y = nbr[y]
-    # Insert requires a non-adjacent pair.
     sources = np.flatnonzero((adj[:, y] == ops.NULL) & (adj[y] == ops.NULL))
     for x in sources.tolist():
         if x == y:
@@ -151,8 +149,8 @@ def forward_chunk_best(
     per target by ``base = sorted(NA u T u Pa)``, and scores each group with one batched
     ``delta_many_with_base`` call over its ``("add", x)`` moves -- so one shared ``inv(cov[base,
     base])`` amortizes across all sources sharing a base. A candidate is improving iff its raw delta
-    is below ``-_EPS_IMPROVE``; the argmin is over the quantized key, so visitation order and add
-    batching cannot change the result. Grouping is per target, and a target lives wholly in one
+    is below ``-_EPS_IMPROVE``; the argmin is over the quantized key, so the visitation order
+    cannot change the result. Grouping is per target, and a target lives wholly in one
     chunk, so the batch shape (hence each delta) is identical however the targets are partitioned.
     """
     par_of = state[1]
@@ -342,8 +340,9 @@ class _ForwardScan:
             key = (stable_key(delta, self.n), x, y, t_index)
             if best is None or key < best[0]:
                 best = (key, x, y, T)
-                # Only a delta within one quantization step of this key can still win; at a key
-                # of minus infinity, only a delta of minus infinity can tie.
+                # A delta that can still win rounds to this key or below, so it lies within half a
+                # quantization step of it; the limit allows two steps as slack against rounding.
+                # At a key of minus infinity, only a delta of minus infinity can tie.
                 limit = min(-_EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-_KEY_DP))
         return best
 

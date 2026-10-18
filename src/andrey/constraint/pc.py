@@ -28,7 +28,6 @@ from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
 
 _EXPENSIVE_PASS_TESTS = 10_000_000
-#: The orders in which :func:`_orient_colliders` orients the colliders.
 COLLIDER_ORDERS = ("p_value", "column")
 
 

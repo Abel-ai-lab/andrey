@@ -121,12 +121,9 @@ def boss(
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
 
-    **Choosing lambda_value.** As for :func:`~andrey.ges`, a larger value gives a sparser graph, and
-    ``1.0`` is the standard BIC.
-
     **Choosing seed.** The search visits variables in a random order and stops when no move improves
-    the order. Different seeds can therefore reach different graphs. When the result matters,
-    compare a few seeds.
+    the order. Different seeds can therefore reach different graphs; comparing a few shows whether
+    a result depends on the seed.
 
     **How it works.** BOSS searches variable orders for the best DAG with the lowest total score
     [1]_. Each variable uses a grow-shrink tree to cache its best parent set for any set of
@@ -297,11 +294,9 @@ def grasp(
     the better score on a given dataset. On the published benchmarks, GRaSP took far longer than
     :func:`~andrey.boss` at 400 variables.
 
-    **Choosing lambda_value.** As for :func:`~andrey.ges`, a larger value gives a sparser graph, and
-    ``1.0`` is the standard BIC.
-
     **Choosing seed.** Both the starting order and the order of visiting variables are random, so
-    different seeds can reach different graphs. When the result matters, compare a few seeds.
+    different seeds can reach different graphs; comparing a few shows whether a result depends on
+    the seed.
 
     **How it works.** GRaSP searches variable orders for the best DAG with the lowest total score
     [1]_. Each variable uses a grow-shrink tree [2]_ to cache its best parent set for any set of

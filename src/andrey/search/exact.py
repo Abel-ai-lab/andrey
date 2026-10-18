@@ -9,9 +9,10 @@ parent set of more than ``n - 2`` members, or one that leaves ``resid`` at most 
 times the node's sum of squares, scores ``inf`` and is never chosen. The categorical scores are
 :class:`~andrey.core.score.BDeuScore` and :class:`~andrey.core.score.CategoricalBICScore`, and the
 mixed-data scores :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each
-BIC with ``lambda_value=1``. Both searches run over the order graph, whose nodes are variable
-subsets: the shortest path from the empty set to the full set gives each variable its best parent
-set among the variables before it. The result is the optimal DAG itself, not its CPDAG, and each
+BIC with ``lambda_value=1``. Both searches, A* (``"astar"``) and the subset-lattice dynamic
+program (``"dp"``), run over the order graph, whose nodes are variable subsets: the shortest
+path from the empty set to the full set gives each variable its best parent set among the
+variables before it. The result is the optimal DAG itself, not its CPDAG, and each
 search breaks score ties deterministically.
 """
 

@@ -124,7 +124,7 @@ def pc(
     assumes continuous data, where each variable depends linearly on its causes with roughly
     Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, and for mixed data
     ``"degen_gauss"`` or ``"cond_gauss"``. It is fastest on sparse graphs, where every variable has
-    few neighbors [5]_. An undirected edge (``--``) is one the data cannot orient.
+    few neighbors [5]_.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -132,8 +132,8 @@ def pc(
     **Choosing alpha.** A test removes an edge when it cannot reject independence at ``alpha``. A
     larger ``alpha`` therefore keeps more edges, true and false. On the Sachs data in the
     getting-started guide, raising ``alpha`` from 0.05 to 0.2 found more known links, but a smaller
-    share of the links found were known. No value is right in general. Choose it by weighing the
-    cost of a missed edge against a false one, and report how the graph changes with it.
+    share of the links found were known. No value is right in general: it trades missed edges
+    against false ones, so a result is best reported with how the graph changes with ``alpha``.
 
     **How it works.** Edge removal is order-independent (PC-stable) [3]_. At each conditioning-set
     size, every test uses the adjacencies from the start of that size. Edges found independent are
@@ -363,17 +363,7 @@ def fci(
     **When not to.** When every common cause is measured, :func:`~andrey.pc` orients more of the
     graph with fewer tests. FCI's possible-d-separation step runs tests PC does not.
 
-    **Choosing alpha.** As for :func:`~andrey.pc`, a larger ``alpha`` keeps more edges, true and
-    false.
-
-    **Choosing collider_rule.** ``"sepsets"`` uses the separating set recorded when the edge was
-    removed. ``"majority"`` tests the pair again given every subset of either endpoint's neighbors
-    and follows the majority [4]_, at the cost of the extra tests described under the parameter.
-
-    **Choosing possible_dsep.** ``"fast"`` builds each possible-d-separation set in the order the
-    search visits nodes, so the set, and with it the PAG, can change with the column order.
-    ``"order_free"`` builds sets that do not depend on that order, at the cost of more tests on
-    some graphs. The possible-d-separation paragraph below describes both.
+    **Choosing alpha.** A larger ``alpha`` keeps more edges, true and false.
 
     **How it works.** FCI runs in three steps. First, it removes edges by conditional-independence
     tests, as PC does, and orients colliders from the separating sets. Next, it tests each remaining
@@ -384,7 +374,7 @@ def fci(
 
     The result can depend on the column order, for example, through the order in which the
     possible-d-separation step visits pairs and conditioning sets, and with
-    ``possible_dsep="fast"`` through the sets themselves. Keep a fixed column order for reproducible
+    ``possible_dsep="fast"`` through the sets themselves. A fixed column order gives reproducible
     results.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,

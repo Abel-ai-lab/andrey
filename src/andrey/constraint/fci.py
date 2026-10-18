@@ -25,7 +25,6 @@ from andrey.core.ci import CITest, make_indep_test, pins_blas
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
 _UNBOUNDED_PATH = 1000
-# Bound the R5 search for one circle pair by this many partial paths.
 _R5_PARTIAL_PATHS = 10_000
 
 

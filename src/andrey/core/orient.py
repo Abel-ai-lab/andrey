@@ -441,8 +441,7 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
     # topological order. Chickering labels the edges into y from the parent x latest in that order:
     # every edge into y is compelled when some compelled w -> x has w outside Pa(y); otherwise each
     # such w -> y is compelled, and the rest follow x -> y, compelled iff some other parent of y is
-    # not a parent of x. The extension keeps every edge, so the CPDAG has the PDAG's directed and
-    # undirected edges as its skeleton; the edges left reversible are undirected.
+    # not a parent of x.
     order = removed[::-1]
     pos = [0] * n
     for rank, v in enumerate(order):

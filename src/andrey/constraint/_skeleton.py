@@ -47,7 +47,7 @@ def scan_conditioning_sets(
     the pair. With ``largest`` given, the largest p-value among the separating subsets is appended
     to it when one separated the pair; without it, no p-value is compared. There is no early exit:
     the whole subset space is scanned so ``separating`` accumulates the union over every separating
-    set, exactly as the scalar loop it replaces did.
+    set.
 
     With ``skip_within`` given, subsets lying entirely inside it are not tested: the caller passes
     the candidates the pair's other endpoint already scanned at this size, so each shared subset is
@@ -69,7 +69,7 @@ def scan_conditioning_sets(
         lambda a, b, chunk: [test(a, b, subset) for subset in chunk]
     )
     found = False
-    top = 0.0  # below every separating p-value, which exceeds alpha
+    top = 0.0
     while True:
         chunk = list(islice(subsets, _CHUNK))
         if not chunk:
@@ -141,7 +141,7 @@ def marginal_removals(
     ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized read
     of the correlation matrix flags every pair with marginal ``p > alpha``; the return is those in
     row-major order (matching the serial loop's visitation), each with its p-value, or ``None``
-    when ``record_pvalues`` is false. Each carries an empty separating set. With ``trace`` given,
+    when ``record_pvalues`` is false; each pair's separating set is empty. With ``trace`` given,
     every adjacent pair's test is recorded.
     """
     pmat = test.marginal_pvalues()  # ty: ignore[unresolved-attribute]  # gated by prescreen_capable
@@ -166,12 +166,12 @@ def first_order_separating(
 ) -> tuple[list[int], float | None]:
     """(size 1) The candidates whose first-order test separates ``(x, y)``, and their largest p.
 
-    ``candidates`` is the pair's start-of-size snapshot conditioners (PC: either endpoint's
-    neighbors minus the partner; FCI: the lower endpoint's). Vectorized over the candidates in one
-    shot; no cache writes. Returns the separating conditioners sorted ascending (the separating-set
-    key order) and the largest p-value among their tests, ``([], None)`` when none separate; the
-    p-value is ``None`` when ``record_pvalues`` is false. With ``trace`` given, every candidate's
-    test is recorded.
+    ``candidates`` is the pair's start-of-size snapshot conditioners: either endpoint's neighbors
+    minus the pair, in PC and FCI alike. Vectorized over the candidates in one shot; no cache
+    writes. Returns the separating conditioners sorted ascending (the separating-set key order) and
+    the largest p-value among their tests, ``([], None)`` when none separate; the p-value is
+    ``None`` when ``record_pvalues`` is false. With ``trace`` given, every candidate's test is
+    recorded.
     """
     if not candidates:
         return [], None

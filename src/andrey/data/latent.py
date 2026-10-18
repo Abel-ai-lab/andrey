@@ -92,7 +92,7 @@ def with_latents(
     new_label = np.empty(d, dtype=np.int64)
     new_label[order] = np.arange(d)  # old label -> new index
     node_types = np.full(d, OBSERVED, dtype=np.int8)
-    node_types[n_obs:] = LATENT  # latents occupy the last indices
+    node_types[n_obs:] = LATENT
     return data[:, order[:n_obs]], new_label[edges], node_types
 
 
