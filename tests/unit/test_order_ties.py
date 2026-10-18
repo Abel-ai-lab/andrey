@@ -14,6 +14,8 @@ from itertools import permutations
 import numpy as np
 
 import andrey
+from andrey.constraint.pc import pc
+from andrey.core import TAIL
 from andrey.core.ci import FisherZ
 from andrey.core.independence import gamma_gram
 from andrey.core.score import BICScore
@@ -262,3 +264,28 @@ def test_gin_ties(monkeypatch) -> None:
     monkeypatch.setattr(importlib.import_module("andrey.latent.gin"), "tie_ranks", _by_position)
     by_position = causal_order(orders[0])
     assert any(causal_order(columns) != by_position for columns in orders)
+
+
+def test_pc_collider_ties() -> None:
+    """Colliders at 1 and at 2 dispute the edge 1 - 2, and their ranks agree to the last bits.
+
+    The data follow ``0 -> 1 <- L -> 2 <- 3`` with ``L`` hidden, and every row is followed by a
+    copy with the columns reversed. The two ranks are p-values computed from different rows, which
+    can differ in their last bits by how the data lie in memory, so both colliders are oriented
+    together and the disputed edge stays undirected under every column order.
+    """
+    rng = np.random.default_rng(0)
+    e = rng.standard_normal((300, 5))
+    z = np.column_stack(
+        [e[:, 0], e[:, 0] + e[:, 4] + 0.5 * e[:, 1], e[:, 4] + e[:, 3] + 0.5 * e[:, 2], e[:, 3]]
+    )
+    x = np.empty((600, 4))
+    x[0::2], x[1::2] = z, z[:, ::-1]
+    trace: list[dict] = []
+    want = pc(x, _trace=trace).to_numpy()
+    ranks = [step["p"] for step in trace if step["step"] == "collider"]
+    assert len(ranks) == 2 and round(ranks[0], _KEY_DP) == round(ranks[1], _KEY_DP)
+    for order in permutations(range(4)):
+        found = _mapped(lambda data: pc(data).to_numpy(), x, np.array(order))
+        np.testing.assert_array_equal(found, want)
+    assert want[1, 2] == want[2, 1] == TAIL
