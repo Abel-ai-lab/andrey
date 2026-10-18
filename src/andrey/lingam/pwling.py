@@ -31,18 +31,16 @@ def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
     Covariance and variance share ``ddof=0``, so the residual is uncorrelated with ``b`` in the
     sample, as the order search assumes. A constant ``b`` explains nothing and leaves ``a`` as it
-    is. A residual whose variance is at most ``_DEGENERATE_TOL`` times that of ``a`` (``a`` copies
-    ``b`` up to scale) is returned as exact zeros, which :func:`score_candidates` marks degenerate.
+    is. When ``b`` leaves at most ``_DEGENERATE_TOL`` of the variance of ``a`` unexplained
+    (``1 - corr^2``, as for a copy up to scale), the residual is exact zeros, which
+    :func:`score_candidates` marks degenerate.
     """
-    if _constant(b):
+    c = np.cov(a, b, ddof=0)
+    if c[1, 1] == 0.0:
         return a.copy()
-    r = a - (np.cov(a, b, ddof=0)[0, 1] / np.var(b)) * b
-    return np.zeros_like(r) if np.var(r) <= _DEGENERATE_TOL * np.var(a) else r
-
-
-def _constant(x: np.ndarray) -> np.ndarray:
-    """Whether each column (or the 1-D array) holds a single value, by comparison only."""
-    return np.max(x, axis=0) == np.min(x, axis=0)
+    if c[0, 1] ** 2 >= (1.0 - _DEGENERATE_TOL) * c[0, 0] * c[1, 1]:
+        return np.zeros_like(a)
+    return a - (c[0, 1] / np.var(b)) * b
 
 
 def compute_entropy(u: np.ndarray) -> float:
@@ -59,22 +57,23 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     across groups first. Order-exactness needs the float64 entropy path -- on a float32 device
     (atol 1e-3) a near-tie could flip the pick, so pin ``ANDREY_DEVICE=numpy`` for exact order.
 
-    A degenerate candidate scores NaN, which :func:`pick` ranks highest: a constant column (such as
-    one :func:`compute_residual` zeroed), or one of a pair with ``1 - corr^2 <= _DEGENERATE_TOL``.
+    A degenerate candidate scores NaN, which :func:`pick` ranks highest: a constant column (one
+    :func:`compute_residual` zeroed), or one of a pair with ``1 - corr^2 <= _DEGENERATE_TOL``.
     Other candidates are scored against the non-constant columns only.
     """
     cols = np.asarray(U)
     if len(cols) < 2:
         return np.zeros(len(cols), dtype=np.float64)  # a lone candidate has no pair to score
     sub = X[:, cols]
-    m = len(cols)
-    scores = np.full(m, np.nan)
-    live = np.flatnonzero(~_constant(sub))
+    mean, std = sub.mean(axis=0), sub.std(axis=0)
+    scores = np.full(len(cols), np.nan)
+    live = np.flatnonzero(std > 0.0)
     if len(live) < 2:
         scores[live] = 0.0  # a lone live candidate has no pair to score
         return scores
-    sub = sub[:, live]
-    x_std = (sub - sub.mean(axis=0)) / sub.std(axis=0)  # (n, k) standardized live columns
+    if len(live) < len(cols):
+        sub, mean, std = sub[:, live], mean[live], std[live]
+    x_std = (sub - mean) / std  # (n, k) standardized live columns
     ent = stats.entropy(x_std)  # (k,) batched candidate entropy
     cov = np.cov(x_std, rowvar=False, ddof=0)  # (k, k), same ddof as var: least-squares slopes
     var = np.var(x_std, axis=0)  # (k,), ddof=0
@@ -97,7 +96,7 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
 
 def score_candidates_serial(X: np.ndarray, U: list[int]) -> np.ndarray:
     """Readable per-pair reference implementation of :func:`score_candidates`."""
-    cols = [k for k in U if not _constant(X[:, k])]
+    cols = [k for k in U if X[:, k].std() > 0.0]
     x_std = {k: (X[:, k] - X[:, k].mean()) / X[:, k].std() for k in cols}
     ent = {k: compute_entropy(x_std[k]) for k in cols}
     scores = np.full(len(U), np.nan)
