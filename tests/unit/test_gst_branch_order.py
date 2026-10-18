@@ -10,6 +10,7 @@ graph.
 
 from __future__ import annotations
 
+from functools import partial
 from types import SimpleNamespace
 
 import numpy as np
@@ -161,7 +162,13 @@ def _graph(search, x: np.ndarray, order: np.ndarray, **kwargs) -> np.ndarray:
     return search(x[:, order], **kwargs)[0].to_numpy()[np.ix_(back, back)]
 
 
-@pytest.mark.parametrize("search", [boss, grasp])
+_SEARCHES = {
+    "boss": boss,
+    **{f"grasp-depth{depth}": partial(grasp, depth=depth) for depth in (1, 2, 3)},
+}
+
+
+@pytest.mark.parametrize("search", list(_SEARCHES))
 @pytest.mark.parametrize("case", list(_ORDER_CASES))
 def test_reordering_the_columns_relabels_the_graph(search, case, monkeypatch) -> None:
     """Every column order gives the graph of the stored order, mapped back.
@@ -169,6 +176,7 @@ def test_reordering_the_columns_relabels_the_graph(search, case, monkeypatch) ->
     Ranking the columns by position instead changes the graph under at least one of the orders, so
     the orders reach choices that go by variable index.
     """
+    search = _SEARCHES[search]
     x, kwargs = _ORDER_CASES[case]()
     d = x.shape[1]
     rng = np.random.default_rng(0)
