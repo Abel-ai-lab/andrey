@@ -310,7 +310,7 @@ def dag2cpdag(dag: np.ndarray) -> np.ndarray:
     adj = _validate_adjacency(dag)
     n = adj.shape[0]
     parent = adj == ARROW  # parent[a, b] -> b is a parent of a  (b -> a)
-    if (parent & parent.T).any():
+    if (parent & parent.T).any() or ((adj == TAIL) & (adj.T == TAIL)).any():
         raise ValueError("dag2cpdag requires a DAG (no undirected or bidirected edges)")
     m = int(np.count_nonzero(parent))
     out = np.zeros((n, n), dtype=np.int8)

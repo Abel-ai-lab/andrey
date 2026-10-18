@@ -39,7 +39,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer >= -1 (-1 = all usable cores)",
         default="1",
         effect=(
-            "Worker processes for GES, GIES, and GFCI (its GES phase); `0` or `1` runs serially. "
+            "Worker processes for GES and GFCI (its GES phase); `0` or `1` runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",

@@ -74,7 +74,9 @@ def score_result(
 
     A truth with hidden nodes is scored as its observed PAG for every estimate kind. The truth DAG
     includes nodes absent from the data. ``andrey.metrics.score`` would treat that DAG as a latent
-    clustering.
+    clustering. An estimate with latent nodes of its own, such as GIN's, is that clustering, so it
+    is scored against the truth's latents instead: ``andrey.metrics.score`` returns the clustering's
+    adjusted Rand index and both latent counts (:func:`measurement_scores` adds the rest).
 
     A temporal truth or estimate is scored by :func:`temporal_score_columns`, which raises
     ``TypeError`` unless both are temporal, and a window graph by :func:`window_scores`, which
@@ -86,6 +88,8 @@ def score_result(
         return window_scores(estimate, truth)
     if isinstance(truth, TemporalStructure) or isinstance(estimate, TemporalStructure):
         return temporal_score_columns(estimate, truth)
+    if _has_hidden(estimate):
+        return dict(M.score(estimate, truth))
     if truth.kind == "dag" and (estimate.kind == "pag" or _has_hidden(truth)):
         truth = _pag_of(truth)
     return dict(M.score(estimate, truth))
@@ -388,11 +392,9 @@ CONFOUNDED_MARKS = {"bidirected": _ARROW, "circle": _CIRCLE}
 #: What counts as a true confounded pair. ``pag``: the observed pairs joined by ``<->`` in the
 #: observed PAG. A PAG keeps ``<->`` only where conditional independences fix both arrowheads, so a
 #: sparse graph has few. ``hidden_cause``: the observed pairs reached from one hidden node by
-#: directed paths that pass through hidden nodes only, the target of RCD and BottomUpParceLiNGAM.
-#: ``unobserved_path``: CAM-UV's target, the pairs joined by an unobserved causal or backdoor path
-#: (:func:`unobserved_path_pairs`). Each method marks its pairs whether or not one node is the
-#: other's parent.
-CONFOUNDED_TARGETS = ("pag", "hidden_cause", "unobserved_path")
+#: directed paths that pass through hidden nodes only, the target of RCD and BottomUpParceLiNGAM,
+#: which mark a pair whether or not one node is the other's parent.
+CONFOUNDED_TARGETS = ("pag", "hidden_cause")
 
 #: The columns :func:`confounded_pair_scores` returns, in order: the number of estimated pairs, then
 #: per target the number of true pairs, precision, recall, and F1.
@@ -451,50 +453,6 @@ def projected_directed(truth: GraphStructure) -> set[tuple[int, int]]:
     return edges
 
 
-def unobserved_path_pairs(truth: GraphStructure) -> set[tuple[int, int]]:
-    """Return the observed pairs ``i < j`` of a DAG `truth` joined by an unobserved path.
-
-    CAM-UV's definitions (Maeda and Shimizu, 2021): an unobserved causal path from ``i`` to ``j`` is
-    a directed path that enters ``j`` from a hidden parent; an unobserved backdoor path enters both
-    ``i`` and ``j`` from hidden parents that share an ancestor (either may be that ancestor). Nodes
-    inside either path may be observed.
-    """
-    directed = _directed_adjacency(truth).astype(bool)
-    hidden = np.asarray(truth.node_types) == LATENT
-    reach = directed | np.eye(len(hidden), dtype=bool)  # reach[a, b]: a is b or an ancestor of b
-    for k in range(len(hidden)):
-        reach |= reach[:, [k]] & reach[[k], :]
-    hidden_parents = [np.flatnonzero(directed[:, v] & hidden) for v in range(len(hidden))]
-    observed = np.flatnonzero(~hidden)
-    pairs: set[tuple[int, int]] = set()
-    for i, j in combinations(map(int, observed), 2):
-        causal = any(reach[i, h] for h in hidden_parents[j]) or any(
-            reach[j, h] for h in hidden_parents[i]
-        )
-        backdoor = any(
-            (reach[:, a] & reach[:, b]).any() for a in hidden_parents[i] for b in hidden_parents[j]
-        )
-        if causal or backdoor:
-            pairs.add((i, j))
-    return pairs
-
-
-def direct_edges(truth: GraphStructure) -> set[tuple[int, int]]:
-    """Return the edges ``(i, j)`` of a DAG `truth` that CAM-UV can identify as direct.
-
-    These join two observed nodes with no unobserved path between them (:func:`unobserved_path_pairs`):
-    CAM-UV marks a pair with such a path as unresolved even when one node is the other's parent.
-    """
-    hidden = np.asarray(truth.node_types) == LATENT
-    directed = _directed_adjacency(truth).astype(bool) & ~hidden[:, None] & ~hidden[None, :]
-    unresolved = unobserved_path_pairs(truth)
-    return {
-        (int(i), int(j))
-        for i, j in zip(*np.nonzero(directed), strict=True)
-        if (min(i, j), max(i, j)) not in unresolved
-    }
-
-
 def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, int]]:
     """Return the true confounded pairs ``i < j`` of a DAG `truth` with hidden nodes.
 
@@ -505,8 +463,6 @@ def true_confounded_pairs(truth: GraphStructure, target: str) -> set[tuple[int, 
         return _marked_pairs(np.asarray(_pag_of(truth).to_numpy()), _ARROW)
     if target == "hidden_cause":
         return _hidden_cause_pairs(truth)
-    if target == "unobserved_path":
-        return unobserved_path_pairs(truth)
     raise ValueError(f"unknown target {target!r}; known: {list(CONFOUNDED_TARGETS)}")
 
 
@@ -535,10 +491,8 @@ def confounded_pair_scores(
 
 #: What counts as a true directed edge. ``projection``: the latent projection's edges
 #: (:func:`projected_directed`) whose endpoints share no hidden cause, what RCD and
-#: BottomUpParceLiNGAM estimate; a pair with a hidden cause is marked, not oriented. ``direct``: the edges
-#: between two observed nodes with no unobserved path between them (:func:`direct_edges`), what
-#: CAM-UV estimates; it marks a pair with such a path as unresolved instead.
-DIRECTED_TARGETS = ("projection", "direct")
+#: BottomUpParceLiNGAM estimate; a pair with a hidden cause is marked, not oriented.
+DIRECTED_TARGETS = ("projection",)
 
 #: The columns :func:`directed_edge_scores` returns, in order.
 DIRECTED_COLUMNS = (
@@ -564,15 +518,69 @@ def directed_edge_scores(estimate: GraphStructure, truth: GraphStructure) -> dic
     scores: dict[str, float] = {"directed_n_est": len(claimed)}
     confounded = _hidden_cause_pairs(truth)
     projection = {e for e in projected_directed(truth) if tuple(sorted(e)) not in confounded}
-    for target, true in (("projection", projection), ("direct", direct_edges(truth))):
-        hits = len(claimed & true)
-        both = len(claimed) + len(true)
-        scores[f"directed_{target}_n_true"] = len(true)
-        scores[f"directed_{target}_precision"] = hits / len(claimed) if claimed else np.nan
-        scores[f"directed_{target}_recall"] = hits / len(true) if true else np.nan
-        scores[f"directed_{target}_f1"] = 2 * hits / both if both else np.nan
-        scores[f"directed_{target}_errors"] = len(claimed ^ true)
+    hits = len(claimed & projection)
+    both = len(claimed) + len(projection)
+    scores["directed_projection_n_true"] = len(projection)
+    scores["directed_projection_precision"] = hits / len(claimed) if claimed else np.nan
+    scores["directed_projection_recall"] = hits / len(projection) if projection else np.nan
+    scores["directed_projection_f1"] = 2 * hits / both if both else np.nan
+    scores["directed_projection_errors"] = len(claimed ^ projection)
     return scores
+
+
+#: The columns :func:`measurement_scores` returns, in order.
+MEASUREMENT_COLUMNS = (
+    "measurement_cluster_ari",
+    "measurement_n_latents",
+    "measurement_clusters_found",
+    "measurement_order_accuracy",
+)
+
+
+def _latent_clusters(graph: GraphStructure) -> dict[int, frozenset[int]]:
+    """Map each latent node of `graph` to the observed nodes it points into."""
+    if graph.node_types is None:
+        return {}
+    latent = np.asarray(graph.node_types) == LATENT
+    directed = _directed_adjacency(graph).astype(bool)
+    return {
+        int(node): frozenset(int(c) for c in np.flatnonzero(directed[node] & ~latent))
+        for node in np.flatnonzero(latent)
+    }
+
+
+def measurement_scores(estimate: GraphStructure, truth: GraphStructure) -> dict[str, float]:
+    """Score the latent clusters and the latent order of `estimate` against a measurement model.
+
+    `truth` is a DAG whose latents each point into their own observed indicators and into the
+    latents after them. A latent's cluster is the observed nodes it points into; an estimate with
+    no latents, such as the empty graph, has none. Returns the adjusted Rand index of the two
+    clusterings of the observed nodes (an unclustered node is a cluster of its own), the number of
+    estimated latents, the share of true clusters the estimate has exactly, and, over the pairs of
+    true latents whose clusters it has exactly, the share it orders as the truth does: its latent
+    of the earlier one points into its latent of the later one. A ratio with no pair is ``NaN``.
+    """
+    from andrey.metrics import latent_cluster_ari
+
+    true = _latent_clusters(truth)
+    estimated = _latent_clusters(estimate)
+    found = {members: node for node, members in estimated.items()}
+    matched = {node: found[members] for node, members in true.items() if members in found}
+    true_directed = _directed_adjacency(truth).astype(bool)
+    est_directed = _directed_adjacency(estimate).astype(bool)
+    pairs = correct = 0
+    for a, b in combinations(sorted(matched), 2):
+        if not (true_directed[a, b] or true_directed[b, a]):
+            continue
+        first, second = (a, b) if true_directed[a, b] else (b, a)
+        pairs += 1
+        correct += bool(est_directed[matched[first], matched[second]])
+    return {
+        "measurement_cluster_ari": float(latent_cluster_ari(estimate, truth)),
+        "measurement_n_latents": len(estimated),
+        "measurement_clusters_found": len(matched) / len(true) if true else np.nan,
+        "measurement_order_accuracy": correct / pairs if pairs else np.nan,
+    }
 
 
 def sortability(data: np.ndarray, truth: GraphStructure | TemporalStructure) -> dict[str, float]:

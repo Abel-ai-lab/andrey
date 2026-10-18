@@ -17,6 +17,7 @@ from andrey.api._adapt import (
     categorical_metadata,
     checked_data,
     column_labels,
+    copies_named,
     json_safe,
     structure_output,
 )
@@ -95,7 +96,8 @@ def boss(
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
         suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
         another up to scale and shift given more than two rows or, with more rows than columns, is a
-        linear function of other columns.
+        linear function of other columns. One message names every group of copies and says to keep
+        one column per group.
 
     Warns
     -----
@@ -191,13 +193,14 @@ def boss(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
-    cpdag, score = _boss(
-        X,
-        lambda_value=lambda_value,
-        random_state=resolve_seed(seed),
-        score_func=score_func,
-        categorical=mask,
-    )
+    with copies_named(labels):
+        cpdag, score = _boss(
+            X,
+            lambda_value=lambda_value,
+            random_state=resolve_seed(seed),
+            score_func=score_func,
+            categorical=mask,
+        )
     metadata = {"algorithm": "BOSS", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -271,7 +274,8 @@ def grasp(
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
         suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
         another up to scale and shift given more than two rows or, with more rows than columns, is a
-        linear function of other columns.
+        linear function of other columns. One message names every group of copies and says to keep
+        one column per group.
 
     Warns
     -----
@@ -375,12 +379,13 @@ def grasp(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
-    cpdag, score = _grasp(
-        X,
-        lambda_value=lambda_value,
-        random_state=resolve_seed(seed),
-        score_func=score_func,
-        categorical=mask,
-    )
+    with copies_named(labels):
+        cpdag, score = _grasp(
+            X,
+            lambda_value=lambda_value,
+            random_state=resolve_seed(seed),
+            score_func=score_func,
+            categorical=mask,
+        )
     metadata = {"algorithm": "GRaSP", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)

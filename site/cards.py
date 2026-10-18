@@ -274,6 +274,7 @@ ART = {
         "methods",
         "tide",
         "abacus",
+        "punch-cards",
     )
 }
 CENTERED = {kind: BRAND / f"art-{kind}-center.jpg" for kind in ("tide",)}
@@ -289,6 +290,7 @@ COVERS = {
     "methods": "a prism fanning one beam into many rays, one amber",
     "tide": "the moon over a swelling sea, its light an amber path on the waves",
     "abacus": "an abacus seen at an angle, one bead amber",
+    "punch-cards": "a shuffled fan of punch cards, one card amber",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge, at the cover's height
@@ -298,6 +300,10 @@ BANNER_FADE_PEAK = 0.6  # its opacity at the left edge
 # shows the banner at a third of its size.
 BANNER_TITLE = (88, 720, 2)
 BANNER_LINE = 40  # the release or kind under the title
+# The arts whose banner sets the title low, the line's baseline at BANNER_BOTTOM, to leave the art
+# its height; the others center it under the wordmark.
+BANNER_LOW = {"punch-cards"}
+BANNER_BOTTOM = 552
 # An earlier post's thumbnail on the blog's front page: the art, THUMB_W wide, sharp at three
 # times the rows' 10 rem.
 THUMB_W = 480
@@ -421,12 +427,16 @@ def _jpeg_href(image: Image.Image) -> str:
 def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = H) -> str:
     """The banner as SVG, ``width`` x ``height``: ``kind``'s art filling the height, its right edge
     aligned with the banner's. The wordmark, ``title``, and ``line`` sit over the left side, with
-    an amber dot before ``line``. Text sizes follow the height."""
+    an amber dot before ``line``, the title low for an art in ``BANNER_LOW``. Text sizes follow
+    the height."""
     k = height / COVER_H
     size, line_width, most = BANNER_TITLE
     lines = _lines(title, size, line_width, most) or [title]
     step = round(size * 1.14)
-    top = 284 if len(lines) == most else 334
+    if kind in BANNER_LOW:
+        top = BANNER_BOTTOM - 95 - (len(lines) - 1) * step
+    else:
+        top = 284 if len(lines) == most else 334
     title_text = "".join(
         f'<text x="{BANNER_LEFT}" y="{top + i * step}" font-family="Inter" font-weight="600" '
         f'font-size="{size}" letter-spacing="-2" fill="#ffffff">{html.escape(text)}</text>'

@@ -54,8 +54,8 @@ class _InvCache(OrderedDict):
     """LRU cache of ``inv(cov[S, S])`` that also tracks the total bytes of its stored matrices.
 
     Used wherever the batched Schur surface amortizes inversions (:func:`score_many_with_base`,
-    :func:`delta_many_with_base`). The ``_ILL`` sentinel is a string of negligible size and is not
-    counted; only real ndarray inverses contribute to :attr:`nbytes`.
+    :func:`delta_many_with_base`). An entry is ``(inverse, conditioning proxy)``, or the ``_ILL``
+    sentinel for a singular set; only the inverses count toward :attr:`nbytes`.
     """
 
     def __init__(self) -> None:
@@ -75,8 +75,8 @@ def _evict_inv(cache: OrderedDict) -> None:
 def _evict_one_inv(cache: OrderedDict) -> None:
     """Pop the least-recently-used inv-cache entry, keeping :attr:`_InvCache.nbytes` in sync."""
     _key, evicted = cache.popitem(last=False)
-    if isinstance(cache, _InvCache) and isinstance(evicted, np.ndarray):
-        cache.nbytes -= evicted.nbytes
+    if isinstance(cache, _InvCache) and isinstance(evicted, tuple):
+        cache.nbytes -= evicted[0].nbytes
 
 
 def _get_inv_with_cond(
@@ -90,12 +90,13 @@ def _get_inv_with_cond(
 
     Returns ``(M, ill)``. When ``ill`` is ``True`` the caller must fall back to the full-score path;
     ``M`` is then ``None``. The conditioning proxy ``||cov[S,S]||_inf * ||inv(cov[S,S])||_inf`` uses
-    true infinity-norm row sums (an upper bound on the condition number). Ill-conditioned or exactly
-    singular sets cache a ``"__ill__"`` sentinel at ``S_sorted`` so repeated candidate moves on the
+    true infinity-norm row sums (an upper bound on the condition number). The inverse is cached at
+    ``S_sorted`` with its proxy, so a later call with a different ``cond_threshold`` applies its own
+    gate; an exactly singular set caches a ``"__ill__"`` sentinel. Repeated candidate moves on the
     same set skip re-inversion.
     """
-    M = inv_cov_cache.get(S_sorted)
-    if M is None:
+    entry = inv_cov_cache.get(S_sorted)
+    if entry is None:
         XX = cov[S_list][:, S_list]
         try:
             M_candidate = np.linalg.inv(XX)
@@ -104,14 +105,14 @@ def _get_inv_with_cond(
             return None, True
         XX_norm = float(np.abs(XX).sum(axis=1).max())
         M_norm = float(np.abs(M_candidate).sum(axis=1).max())
-        if XX_norm * M_norm > cond_threshold:
-            inv_cov_cache[S_sorted] = _ILL
-            return None, True
-        inv_cov_cache[S_sorted] = M_candidate
+        entry = (M_candidate, XX_norm * M_norm)
+        inv_cov_cache[S_sorted] = entry
         if isinstance(inv_cov_cache, _InvCache):
             inv_cov_cache.nbytes += M_candidate.nbytes
-        return M_candidate, False
-    if isinstance(M, str) and M == _ILL:
+    elif isinstance(entry, str):
+        return None, True
+    M, proxy = entry
+    if proxy > cond_threshold:
         return None, True
     return M, False
 

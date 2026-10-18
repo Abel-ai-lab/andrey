@@ -25,6 +25,10 @@ as a coefficient stack (:mod:`andrey_bench.coefficients`), with the kind ``"temp
 or ``"panel_coefficients"``. A panel key's ``times`` is its number of time points, and its ``n``
 the number of units observed at each; a panel dataset's data has shape ``(times, n, d)``.
 
+The data of CD-NOD, MultiGroupDirectLiNGAM, and GIN are drawn by :mod:`andrey_bench.regime_models`
+instead (functional ``domain_shift``, ``multi_group``, or ``measurement``); that module gives each
+layout, truth, and column order.
+
 A key's ``shuffle`` lists the columns in an order drawn from the seed, with the truth permuted the
 same way, so the column order does not follow the graph's construction (:class:`DatasetKey`).
 """
@@ -46,7 +50,7 @@ import numpy as np
 import andrey.data as data
 from andrey import TemporalStructure
 from andrey.core import LATENT, OBSERVED
-from andrey_bench import lingam_models, temporal_models
+from andrey_bench import lingam_models, regime_models, temporal_models
 from andrey_bench.contracts import lag_marks
 
 # Canonical on-disk dtype. An f32 fit down-casts at load.
@@ -94,8 +98,6 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # Linear with uniform noise and hidden confounders, where RCD and BottomUpParceLiNGAM are
     # identifiable.
     "latent_lingam_er": ("er", "linear", "uniform", "standardized"),
-    # Nonlinear additive noise with hidden confounders, where CAM-UV is identifiable.
-    "latent_anm_er": ("er", "anm", "gaussian", "standardized"),
     # Cause-effect pairs: nonlinear additive noise on two nodes, where ANM is identifiable. At
     # ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "anm_pair": ("er", "anm", "gaussian", "standardized"),
@@ -110,6 +112,15 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # conditional Gaussian tests and scores. The key's `categorical_share` and `categories` set the
     # categorical columns; codes and values are never rescaled.
     "mixed_er": ("er", "conditional_gaussian", "gaussian", "raw"),
+    # Linear-Gaussian rows pooled from several domains, where some means move with the domain:
+    # CD-NOD's data (andrey_bench.regime_models; the key's density is the graph's mean degree).
+    "domain_shift_er": ("er", "domain_shift", "gaussian", "ancestral"),
+    # Several groups over one linear non-Gaussian DAG, each with its own weights:
+    # MultiGroupDirectLiNGAM's data; the key's d is the variables in each group.
+    "multi_group_er": ("er", "multi_group", "uniform", "ancestral"),
+    # Latents that each cause every later one, each measured by observed indicators of its own:
+    # GIN's data; the key's d counts latents and indicators, its density is indicators per latent.
+    "latent_measurement": ("complete", "measurement", "uniform", "ancestral"),
     # A lagged linear-Gaussian series for PCMCI: andrey.data's VAR(1) on an empty instantaneous
     # graph (the key sets density LAG_ONLY_DENSITY), so every true link has lag 1. Temporal
     # generation takes raw scale only.
@@ -164,8 +175,10 @@ COEFFICIENT_KINDS = {"varma2010": "temporal_coefficients", "panel2013": "panel_c
 
 #: Functionals whose column order carries no information about the graph, so their keys take no
 #: shuffle step: the PCMCI-family models draw each variable independently and link uniformly drawn
-#: pairs, and the longitudinal LiNGAM panel lists its variables in a random order.
-ORDER_FREE = frozenset({*temporal_models.MODELS, "panel2013"})
+#: pairs, the longitudinal LiNGAM panel lists its variables in a random order, and the GIN
+#: measurement model lists its indicators in a random order. A model that draws its graph with
+#: ``andrey.data.graphs``, as the other :mod:`~andrey_bench.regime_models` models do, takes the step.
+ORDER_FREE = frozenset({*temporal_models.MODELS, "panel2013", "measurement"})
 
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
 #: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
@@ -176,7 +189,7 @@ ORDER_FREE = frozenset({*temporal_models.MODELS, "panel2013"})
 #: child, so at least one hidden node has two observed children at every ``d``. A seed fails to
 #: generate when fewer nodes have two or more children than nodes to hide. That is about 3% of seeds
 #: at ``d = 10`` and ``d = 15``; seeds 0 to 28 all generate on that ladder.
-LATENT_REGIMES: dict[str, int] = {"latent_gauss_er": 10, "latent_lingam_er": 5, "latent_anm_er": 5}
+LATENT_REGIMES: dict[str, int] = {"latent_gauss_er": 10, "latent_lingam_er": 5}
 
 DEFAULT_REGIME = "linear_gauss_er"
 
@@ -217,6 +230,8 @@ def latents_for(regime: str, d: int) -> int:
     if regime not in REGIMES:
         raise KeyError(f"unknown regime {regime!r}; known: {sorted(REGIMES)}")
     functional = REGIMES[regime][1]
+    if functional in regime_models.MODELS:
+        return regime_models.latents_for(functional, d)
     if functional in temporal_models.MODELS:
         return temporal_models.hidden_count(functional, d)
     per = LATENT_REGIMES.get(regime)
@@ -321,8 +336,9 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
 
     The registry stores this call for reproduction. Unmapped labels raise ``KeyError`` or
     ``ValueError``. A categorical key returns the ``andrey.data.sample_discrete`` arguments, with
-    ``"generator"`` naming it, and a mixed key the ``andrey.data.sample_mixed`` arguments. A paper
-    model's call is :func:`andrey_bench.temporal_models.sample`'s, with the model's whole setup, so a
+    ``"generator"`` naming it, and a mixed key the ``andrey.data.sample_mixed`` arguments. The call
+    of a paper model (:mod:`~andrey_bench.temporal_models`, :mod:`~andrey_bench.lingam_models`) or of
+    a :mod:`~andrey_bench.regime_models` model is its sampler's, with the model's whole setup, so a
     change to the setup is a new dataset.
 
     A shuffled key's call holds ``shuffle=True``. An unshuffled key's call leaves ``shuffle`` out,
@@ -393,6 +409,23 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
             **DISCRETE_SETTINGS,
             **shuffle,
         }
+    if key.functional in regime_models.MODELS:
+        if key.latents != regime_models.latents_for(key.functional, key.d):
+            raise ValueError(f"{key.label}: latents must be the model's latent count")
+        spec = regime_models.MODELS[key.functional]
+        if isinstance(spec, regime_models.Measurement) and key.density != spec.indicators:
+            raise ValueError(f"{key.label}: density must be the model's indicators per latent")
+        return {
+            "generator": "andrey_bench.regime_models.sample",
+            "model": key.functional,
+            "setup": regime_models.model_params(key.functional),
+            "d": key.d,
+            "n": key.n,
+            "seed": key.seed,
+            "density": key.density,
+            "noise": key.noise,
+            **({} if key.functional in ORDER_FREE else shuffle),
+        }
     try:
         graph = TOPOLOGY_TO_GRAPH[key.topology]
         functional = FUNCTIONAL_TO_ANDREY[key.functional]
@@ -421,8 +454,16 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
     """Return ``{model, num_nodes, density, params}`` in the ``andrey.data`` provenance format.
 
     ``params_for_density`` maps the key's density to builder parameters. Keys match the sample's
-    ``config.graph`` block. A paper model records its cross-links per variable.
+    ``config.graph`` block. A :mod:`~andrey_bench.regime_models` model records its setup, and a
+    paper model its cross-links per variable.
     """
+    if key.functional in regime_models.MODELS:
+        return {
+            "model": key.functional,
+            "num_nodes": key.d,
+            "density": key.density,
+            "params": regime_models.model_params(key.functional),
+        }
     if key.functional in temporal_models.MODELS:
         return {
             "model": key.functional,
@@ -454,12 +495,25 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
     nodes. :func:`latent_node_types` rebuilds their types from the key. A temporal truth is
     returned as :func:`lag_only_marks` with the kind ``"temporal"``. A paper model's series and
     truth come from :mod:`andrey_bench.temporal_models` or :mod:`andrey_bench.lingam_models`, as
-    the module docstring says.
+    the module docstring says, and a :mod:`~andrey_bench.regime_models` dataset's data and truth come
+    from that module.
 
     ``column_order[j]`` is the observed column that column ``j`` holds with ``shuffle`` off: the
     identity for an unshuffled key, and ``None`` for an :data:`ORDER_FREE` functional.
     """
     kwargs = generation_kwargs(key)
+    if key.functional in regime_models.MODELS:
+        data_arr, marks, kind, columns = regime_models.sample(
+            key.functional,
+            d=key.d,
+            n=key.n,
+            seed=key.seed,
+            density=key.density,
+            noise=key.noise,
+            shuffle=key.shuffle,  # an unshuffled key's call leaves it out
+        )
+        data_arr = np.ascontiguousarray(data_arr, dtype=CANONICAL_DTYPE)
+        return data_arr, marks, kind, None if columns is None else columns.tolist()
     if key.functional in temporal_models.MODELS:
         series, window = temporal_models.sample(key.functional, key.d, key.n, key.seed)
         series = np.ascontiguousarray(series, dtype=CANONICAL_DTYPE)
