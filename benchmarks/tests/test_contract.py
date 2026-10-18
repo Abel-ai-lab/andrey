@@ -30,8 +30,8 @@ _CANONICAL = DatasetKey(
 
 def test_the_canonical_dataset_keeps_its_identity():
     """Pin the dataset digest and filename used by existing records."""
-    assert _CANONICAL.digest == "d73a6b2a3227"
-    assert _CANONICAL.filename == "ds_d73a6b2a3227.npz"
+    assert _CANONICAL.digest == "297729421a36"
+    assert _CANONICAL.filename == "ds_297729421a36.npz"
 
 
 def test_the_row_schema_is_what_it_says():
@@ -46,7 +46,7 @@ def test_the_row_schema_is_what_it_says():
         "noise", "num_workers", "oom_source", "output_hash", "output_type", "package",
         "package_version", "params", "peak_rss_mb", "process_s", "r2_sortability", "repeat",
         "run_id",
-        "scheduler", "setup_s",
+        "scheduler", "setup_s", "shuffle",
         "standardize", "status", "structure_hash", "tau_max", "threads", "times", "topology",
         "tree_peak_mem_mb",
         "varsortability", "wall_s", "warmup", "warmup_s",

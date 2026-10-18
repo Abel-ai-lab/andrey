@@ -126,6 +126,24 @@ def build_truth(
     )
 
 
+def relabel_truth(truth: TemporalStructure, order: np.ndarray) -> TemporalStructure:
+    """Return ``truth`` with node ``order[j]`` as node ``j`` in every lag graph and weight block."""
+    index = np.ix_(order, order)
+    graphs = [
+        GraphStructure.from_numpy(
+            truth.lag(lag).to_numpy()[index], kind=truth.lag(lag).kind, allow_self_loops=True
+        )
+        for lag in truth.lags
+    ]
+    ma = truth.lag_weights_ma
+    return TemporalStructure.from_lag_graphs(
+        graphs,
+        lags=truth.lags,
+        lag_weights=truth.lag_weights[:, order][:, :, order],  # ty: ignore[not-subscriptable]  # build_truth always stores lag weights
+        lag_weights_ma=None if ma is None else ma[:, order][:, :, order],
+    )
+
+
 def _lag_digraph(a_k: np.ndarray, d: int) -> GraphStructure:
     """Build the digraph of a lag matrix's support (``a_k[i, j] != 0`` is the edge ``j -> i``)."""
     adj = a_k.T != 0  # adj[cause, effect]

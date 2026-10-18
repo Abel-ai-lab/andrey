@@ -50,6 +50,10 @@ LAG_DEGREE = 2.0
 #: What both packages are given: each variable z-scored.
 INPUT = "standardized"
 
+#: Columns in an order drawn from the seed, the truth permuted with them. ``run_meta.json`` records
+#: it, so a run drawn in another column order is neither resumed nor rescored.
+SHUFFLE = True
+
 #: Smallest run that touches every solution: one small series.
 SMOKE = {"ladder": [5], "seeds": 1, "n": 300, "cap_wall_s": 300.0}
 
@@ -68,7 +72,7 @@ def sample(d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
         functional=var(n_lags=LAGS, lag_density=min(1.0, LAG_DEGREE / (d - 1))),
         noise=gaussian(),
     )
-    ds = scm.sample(n=n, seed=seed)
+    ds = scm.sample(n=n, seed=seed, shuffle=SHUFFLE)
     weights = np.asarray(ds.graph.lag_weights)  # (1 + LAGS, d, d), [cause, effect], lag 0 first
     if weights[0].any():
         raise AssertionError("the process has instantaneous effects")
@@ -138,12 +142,8 @@ def _read(out: Path) -> list[dict]:
 def rescore(out: Path) -> list[dict]:
     """Recompute every record's scores from its stored coefficients and rewrite the records."""
     meta = json.loads((out / "run_meta.json").read_text())
-    if (meta["driver"], meta["lags"], meta["lag_degree"], meta.get("input")) != (
-        Path(__file__).name,
-        LAGS,
-        LAG_DEGREE,
-        INPUT,
-    ):
+    drawn = tuple(meta.get(k) for k in ("driver", "lags", "lag_degree", "input", "shuffle"))
+    if drawn != (Path(__file__).name, LAGS, LAG_DEGREE, INPUT, SHUFFLE):
         raise SystemExit(
             f"--rescore: {out} was drawn with other process settings than this script's"
         )
@@ -227,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         "lags": LAGS,
         "lag_degree": LAG_DEGREE,
         "input": INPUT,
+        "shuffle": SHUFFLE,
         "ladder": args.ladder,
         "seeds": args.seeds,
         "n": args.n,

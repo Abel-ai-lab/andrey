@@ -166,6 +166,15 @@ def test_a_published_network_is_its_graph_with_data_simulated_on_it(offline_data
     assert "Lauritzen" in asia.description
 
 
+def test_each_simulated_column_is_the_variable_it_is_named_for(offline_datasets):
+    """The two ends of every arc are correlated; two variables with no path or common cause are
+    not."""
+    corr = load_dataset("asia").data.corr().abs()
+    assert all(corr.loc[s, t] > 0.3 for s, t in ASIA_ARCS)
+    unrelated = [(a, b) for a in ("asia", "tub") for b in ("smoke", "lung", "bronc")]
+    assert all(corr.loc[s, t] < 0.15 for s, t in unrelated)
+
+
 def test_n_and_seed_fix_the_simulated_rows(offline_datasets):
     first = load_dataset("asia", n=200, seed=3, as_frame=False).data
     np.testing.assert_array_equal(first, load_dataset("asia", n=200, seed=3, as_frame=False).data)

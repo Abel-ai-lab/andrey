@@ -17,8 +17,16 @@ import numpy as np
 import andrey
 
 from .dataset import CausalDataset, QAReport, SCMParams
-from .graphs import DAGDraw
-from .scm import _GRAPH, _NOISE, _SEED_SCHEME, _WEIGHTS, _component_rng, named_graph
+from .graphs import DAGDraw, dag_truth
+from .scm import (
+    _GRAPH,
+    _NOISE,
+    _SEED_SCHEME,
+    _WEIGHTS,
+    _column_order,
+    _component_rng,
+    named_graph,
+)
 
 __all__ = ["sample_discrete"]
 
@@ -32,6 +40,7 @@ def sample_discrete(
     density: float = 2.0,
     categories: tuple[int, int] = (2, 3),
     concentration: float = 1.0,
+    shuffle: bool = True,
 ) -> CausalDataset:
     """Sample a discrete Bayesian network with random conditional probability tables.
 
@@ -54,12 +63,16 @@ def sample_discrete(
         Concentration of the symmetric Dirichlet each table row is drawn from. ``1.0`` draws rows
         uniformly over the probability simplex; a smaller value draws peakier rows, so the
         variables depend on their parents more strongly.
+    shuffle : bool, default=True
+        Shuffle the columns with a permutation from the seed's own column stream, and relabel the
+        true graph and the categories to match, as for :func:`~andrey.data.sample_scm`.
+        ``provenance["column_order"][j]`` is the index column ``j`` has with ``shuffle=False``.
 
     Returns
     -------
     CausalDataset
         ``data`` holds the category codes, shape ``(n, d)``; ``graph`` is the true DAG;
-        ``provenance["config"]["categories"]`` lists each node's number of categories.
+        ``provenance["config"]["categories"]`` lists each column's number of categories.
         ``params.weights`` and ``params.noise_scales`` are empty: the tables are the parameters.
 
     Raises
@@ -87,7 +100,7 @@ def sample_discrete(
         raise ValueError(f"concentration must be finite and positive, got {concentration}")
     spec = named_graph(graph, d, density)
     root = np.random.SeedSequence(seed)
-    truth, draw = spec.materialize(_component_rng(root, _GRAPH))
+    _, draw = spec.materialize(_component_rng(root, _GRAPH))
     table_rng = _component_rng(root, _WEIGHTS)
     cards = table_rng.integers(low, high + 1, size=draw.d)
     parents = _parents_of(draw)
@@ -101,8 +114,10 @@ def sample_discrete(
     values = _forward_sample(
         draw.topo_order.tolist(), parents, cards, tables, n, _component_rng(root, _NOISE)
     )
+    order = _column_order(root, draw.d, shuffle)  # the drawn node of each column
+    edges = np.argsort(order)[np.stack([draw.parents, draw.children], axis=1)]
     params = SCMParams(
-        edges=np.stack([draw.parents, draw.children], axis=1),
+        edges=edges,
         weights=np.empty(0),
         noise_scales=np.empty(0),
         functional="categorical",
@@ -112,6 +127,7 @@ def sample_discrete(
         "root_entropy": str(root.entropy),
         "spawn_key": list(root.spawn_key),
         "seed_scheme": _SEED_SCHEME,
+        "column_order": order.tolist(),
         "config": {
             "graph": {
                 "model": spec.name,
@@ -120,14 +136,19 @@ def sample_discrete(
                 "params": spec.params,
             },
             "functional": "categorical",
-            "categories": cards.tolist(),
+            "categories": cards[order].tolist(),
             "concentration": float(concentration),
             "n": int(n),
+            "shuffle": bool(shuffle),
         },
         "versions": {"andrey": andrey.__version__, "numpy": np.__version__},
     }
     return CausalDataset(
-        data=values, graph=truth, report=QAReport(scale="raw"), provenance=provenance, params=params
+        data=np.take(values, order, axis=1),
+        graph=dag_truth(edges[:, 0], edges[:, 1], draw.d),
+        report=QAReport(scale="raw"),
+        provenance=provenance,
+        params=params,
     )
 
 

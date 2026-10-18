@@ -4,7 +4,7 @@
 inside the first's candidates, so a shared subset is tested once. A dense random graph, where the
 two neighborhoods overlap heavily, is compared against the unfiltered scan and the query count is
 checked against the closed form. ``_iter_dsep_choices`` yields subsets one at a time; it is compared
-exhaustively against the eager list-building form, aliasing included.
+against every subset of the possible-d-sep set, filtered by the endpoint adjacencies.
 """
 
 from __future__ import annotations
@@ -33,15 +33,16 @@ def _unfiltered_scan_pairs(test, pairs, neighbors, size, alpha):
     removals = []
     for x, y in pairs:
         separating: set[int] = set()
-        found = False
+        largest: list[float] = []
         for a, b in ((x, y), (y, x)):
             candidates = neighbors[a][neighbors[a] != b]
             if candidates.size < size:
                 continue
-            if scan_conditioning_sets(test, a, b, candidates.tolist(), size, alpha, separating):
-                found = True
-        if found:
-            removals.append((x, y, tuple(sorted(separating))))
+            scan_conditioning_sets(
+                test, a, b, candidates.tolist(), size, alpha, separating, largest=largest
+            )
+        if largest:
+            removals.append((x, y, tuple(sorted(separating)), max(largest)))
     return removals
 
 
@@ -117,38 +118,36 @@ def test_skip_within_below_size_is_a_no_op():
 # ---- lazy possible-d-sep subsets ----------------------------------------------------------------
 
 
-def _eager_dsep_choices(dsep, adj_a, adj_b):
-    """The eager list-building generator, aliasing included."""
-    raw: list[tuple[int, ...]] = []
-    for size in range(len(dsep) + 1):
-        raw.extend(combinations(range(len(dsep)), size))
-    m = len(raw)
-    out = []
-    for j in range(1, m + 1):
-        positions = raw[j] if j < m and len(raw[j]) == len(raw[j - 1]) else raw[j - 1]
-        if len(positions) < 2:
-            continue
-        values = [dsep[i] for i in positions]
-        if all(v in adj_a for v in values):
-            continue
-        if all(v in adj_b for v in values):
-            continue
-        out.append(tuple(values))
-    return out
+def _every_dsep_choice(dsep, adj_a, adj_b):
+    """Every non-empty subset by size, minus those inside either endpoint's adjacency."""
+    return [
+        values
+        for size in range(1, len(dsep) + 1)
+        for values in combinations(dsep, size)
+        if not (set(values) <= adj_a or set(values) <= adj_b)
+    ]
 
 
 @pytest.mark.parametrize("seed", range(24))
-def test_lazy_dsep_choices_match_eager(seed):
+def test_lazy_dsep_choices_match_every_subset(seed):
     rng = np.random.default_rng(seed)
     length = int(rng.integers(2, 11))
     dsep = rng.permutation(30)[:length].tolist()
     adj_a = set(rng.choice(30, size=int(rng.integers(0, 12)), replace=False).tolist())
     adj_b = set(rng.choice(30, size=int(rng.integers(0, 12)), replace=False).tolist())
-    assert list(_iter_dsep_choices(dsep, adj_a, adj_b)) == _eager_dsep_choices(dsep, adj_a, adj_b)
+    assert list(_iter_dsep_choices(dsep, adj_a, adj_b)) == _every_dsep_choice(dsep, adj_a, adj_b)
 
 
-def test_lazy_dsep_choices_aliasing():
-    # The first combination of every size is skipped and the last emitted twice; a size with a
-    # single combination (the full set) is emitted once.
-    assert list(_iter_dsep_choices([4, 7], set(), set())) == [(4, 7)]
-    assert list(_iter_dsep_choices([4, 7, 9], set(), set())) == [(4, 9), (7, 9), (7, 9), (4, 7, 9)]
+def test_lazy_dsep_choices_enumeration():
+    # Every subset once, by size; subsets inside an endpoint's adjacency are left out.
+    assert list(_iter_dsep_choices([4, 7], set(), set())) == [(4,), (7,), (4, 7)]
+    assert list(_iter_dsep_choices([4, 7, 9], set(), set())) == [
+        (4,),
+        (7,),
+        (9,),
+        (4, 7),
+        (4, 9),
+        (7, 9),
+        (4, 7, 9),
+    ]
+    assert list(_iter_dsep_choices([4, 7, 9], {4, 7}, {9})) == [(4, 9), (7, 9), (4, 7, 9)]

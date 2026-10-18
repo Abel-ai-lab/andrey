@@ -51,7 +51,7 @@ def test_materialize_writes_npz_and_registry_reloads_identically(tmp_path):
         assert entry["graph_shape"] == [key.d, key.d]
 
         # Reloading gives IDENTICAL bytes to a fresh deterministic generation from andrey.data.
-        regen_data, regen_marks, _ = datasets.generate_one(key)
+        regen_data, regen_marks, _, _ = datasets.generate_one(key)
         assert np.array_equal(data_arr, regen_data)
         assert np.array_equal(graph_arr, regen_marks)
 

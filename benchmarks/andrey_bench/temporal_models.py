@@ -183,6 +183,9 @@ def sample(name: str, d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray
     links = np.transpose(stack != 0, (0, 2, 1))
     marks = np.where(links, TAIL, 0).astype(np.int8)
     marks[0][links[0].T] = ARROW  # a same-step link's effect end
+    # Order-free: each variable's draws are independent and the links join uniformly drawn pairs,
+    # oriented at lag 0 by a random rank, so the column order carries no information about the
+    # graph, and the model takes no column-order stream.
     hidden = hidden_count(name, d)
     order = np.arange(d)
     if hidden:
