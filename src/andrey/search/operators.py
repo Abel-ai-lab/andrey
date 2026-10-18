@@ -199,9 +199,9 @@ def clique_residuals(adj: np.ndarray, h0: Sequence[int]) -> Iterable[tuple[int, 
 def tail_successor_lists(adj: np.ndarray) -> list[list[int]]:
     """Per-node lists of semi-directed successors (each ``c`` with ``adj[node, c] == TAIL``).
 
-    The width-unlimited analog of :func:`andrey.core._bitset.tail_successor_masks`, built in one
-    pass over the matrix. :func:`blocks_semi_directed_paths` consumes these so its traversal is
-    pure-Python list iteration, free of a per-call ``np.nonzero`` scan.
+    Each list contains the nodes reachable in one step along an outgoing directed edge or an
+    undirected edge. The lists are built once from ``adj`` so :func:`blocks_semi_directed_paths`
+    can reuse them across path checks without rescanning the matrix with ``np.nonzero``.
     """
     tail = adj == TAIL
     return [np.nonzero(tail[node])[0].tolist() for node in range(adj.shape[0])]

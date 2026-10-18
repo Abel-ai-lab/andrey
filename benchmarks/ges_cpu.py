@@ -1,24 +1,23 @@
 #!/usr/bin/env python
-"""A benchmark: a GES comparison over a ladder of graph sizes, on CPU.
+"""A comparison of GES speed and accuracy across graph sizes on CPU.
 
-The campaign's headline question — which GES implementation is fastest, and at what size does each
-one stop finishing. Six solutions on identical data: three Andrey backends, two packages, and the
-empty graph as the correctness floor.
+Five solutions run on identical data: serial and parallel Andrey GES, causal-learn, gCastle, and
+an empty-graph baseline. The comparison measures fit time, graph accuracy, and the largest graph
+each solution finishes within the resource limits.
 
-A copy of ``benchmark.py`` with different literals, which is how a benchmark is written. Run it under
-a memory cap: without one the ceiling a solution reaches is a fact about the node it landed on.
+``--cap-mem-mb`` sets a memory cap so the largest completed graph is measured under a declared
+limit rather than whatever memory happens to be available on the host.
 
-``--ges-min-work`` declares the parallel work gate the campaign runs under. It matters because
-``andrey.ges.numpy.parallel`` fans a pass out only when its estimated candidate work exceeds that
-gate; below it the pass runs the identical in-process scan as ``andrey.ges.numpy.serial``, and the
-two solutions publish one code path under two names. The shipped default is a fixed constant in
-``src/andrey/search/_parallel_ges.py``. Declare the campaign's gate and report it beside the table;
+``--ges-min-work`` sets a threshold on the estimated number of candidate evaluations.
+``andrey.ges.numpy.parallel`` uses worker processes only above that threshold; otherwise it
+evaluates candidates in the calling process, like ``andrey.ges.numpy.serial``. Without the flag
+the fits run under the default in ``src/andrey/search/_parallel_ges.py``, since the runner drops
+an inherited ``ANDREY_GES_PARALLEL_MIN_WORK``. ``0`` sends every pass to the workers. The chosen
+threshold belongs beside the timing results because it determines which passes run in parallel.
 ``andrey calibrate`` measures a suitable value for the target host.
 
-Size ``--cap-wall-s`` for the slowest *start*, not the slowest fit. The cap covers warm-up and fit
-together, and at small ``d`` the warm-up is import and compilation rather than search — a smoke at
-d=20 on a loaded node put 0.3 s of Andrey GES behind 61 s of warm-up and 8.9 s of causal-learn behind
-236 s. A cap sized for the fit censors the numba backend before it is ever measured.
+``--cap-wall-s`` covers imports, warm-up, and the timed fit. Startup can dominate at small graph
+sizes, so a cap based only on expected fit time can terminate a solution before timing begins.
 
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/ges_cpu.py \\
         --out outputs/ges-cpu --ladder 20 50 100 200 --cap-mem-mb 32000
@@ -42,9 +41,8 @@ from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores
 
-#: The solutions. ``andrey_ges_adapters()`` expands to numpy·serial, numpy·parallel and
-#: numba·serial — three builds of one algorithm, so a difference between them is a backend
-#: difference and nothing else. Every solution runs on every dataset.
+#: ``andrey_ges_adapters()`` supplies serial and parallel GES with the same ``numpy`` backend and
+#: score settings. Every solution runs on every dataset.
 SOLUTIONS = [*andrey_ges_adapters(), CausalLearnGES(), GCastleGES(), BaselineEmpty()]
 
 #: The solutions the work gate reaches: parallel-mode Andrey only. A serial fit is pinned to one
@@ -72,8 +70,7 @@ SLICE = {
     "density": datasets.CANONICAL_DENSITY,
 }
 
-#: Untimed fits before each timed one. The numba backend compiles on its first call, and without a
-#: warm-up that compilation is published as its speed.
+#: Untimed fits before each timed fit, excluding first-call setup from the reported fit time.
 WARMUP = 1
 
 

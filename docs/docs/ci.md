@@ -12,7 +12,7 @@ meta:
 Every pull request runs the full test suite on Linux, on Python 3.11 and 3.14, with and without
 the optional extras. It also builds and installs the wheel, builds this website, and reruns every
 notebook, which must reproduce the outputs the website shows. NumPy in float64 is the reference:
-the Numba and PyTorch paths must match its results and repeat exactly.
+the PyTorch paths must match its results and repeat exactly.
 
 Before each release, a quality gate fits the nine supported methods to data with known graphs,
 seven of them to the Sachs data too, and the release is published only when every method passes.

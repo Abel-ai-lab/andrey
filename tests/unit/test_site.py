@@ -48,6 +48,7 @@ LAYOUT = (
 def render_homepage(summary, *, placeholder=False):
     """The homepage template filled from ``summary``, as the site build fills it."""
     jinja2 = pytest.importorskip("jinja2")
+    pytest.importorskip("PIL")  # the sweep traces the art; Pillow is the viz extra's, not dev's
     loader = jinja2.ChoiceLoader(
         [
             jinja2.DictLoader(
@@ -306,6 +307,7 @@ def test_unpublished_summary_needs_the_placeholder_flag():
     with pytest.raises(ValueError, match="andrey_placeholder=1"):
         build.load_summary(PLACEHOLDER)
     summary = build.load_summary(PLACEHOLDER, placeholder=True)
+    pytest.importorskip("PIL")  # the context traces the art's sweep
     marked = build.homepage_context(summary, placeholder=True)
     assert 'content="noindex"' in marked["robots"] and "Not for release" in marked["banner"]
     unmarked = build.homepage_context(summary)
@@ -469,7 +471,9 @@ def test_the_lede_names_every_registry_family_in_one_sentence(placeholder_page):
 
 def test_the_page_title_is_the_one_line_description(placeholder_page):
     # The description pyproject.toml and the README give, as the browser tab shows it.
-    assert "<title>Andrey, a very fast causal discovery package</title>" in placeholder_page
+    assert (
+        "<title>Andrey: accelerated, accurate, agentic causal discovery</title>" in placeholder_page
+    )
 
 
 # The registry as it is, and without one method the description does not name: the count of "more"
@@ -1371,7 +1375,7 @@ def test_the_card_shows_its_title_with_the_accent_word_and_no_version(cards):
     assert andrey.__version__ not in svg
     assert " ".join(word for word, _ in _title_words(svg)) == cards.TAGLINE
     amber = [word for word, fill in _title_words(svg) if fill == cards.grain.AMBER]
-    assert amber == [cards.ACCENT]
+    assert amber == list(cards.ACCENT)
     plain = cards.card_svg(cards.TAGLINE)
     assert {fill for _, fill in _title_words(plain)} == {"#ffffff"}
 
@@ -1471,7 +1475,8 @@ def test_the_sweep_follows_the_streak_in_the_art():
     # The traced path lies on the art's amber pixels from its foot to its tip, so the light runs
     # up the streak, the trail's dots, or the arm, and nowhere else.
     import numpy as np
-    from PIL import Image
+
+    Image = pytest.importorskip("PIL.Image")
 
     assert set(build.SWEPT) == {art for _, _, art, _ in build.ACTS} | {
         build.EXAMPLE_ART,
@@ -1566,9 +1571,9 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     assert 'src=".github/readme/banner.svg"' in header
     # The banner links the website's homepage.
     assert '<a href="https://andrey.abel.ai/"><img' in header
-    assert 'alt="Andrey, a very fast causal discovery package"' in header
+    assert 'alt="Andrey: accelerated, accurate, agentic causal discovery"' in header
     assert "<picture" not in header and "<h1" not in readme
-    assert cards.TAGLINE == "A very fast causal discovery package"
+    assert cards.TAGLINE == "Accelerated, accurate, agentic causal discovery"
 
 
 @pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "hourglass", "ground"])
@@ -1685,7 +1690,9 @@ def test_every_hand_written_copy_of_the_claim_is_the_builds():
 def test_the_citation_title_is_the_tagline():
     # The package's own line, as on the README banner; the homepage's headline is campaign wording.
     cff = (ROOT / "CITATION.cff").read_text()
-    assert 'title: "Andrey: A very fast causal discovery package"' in cff
+    assert 'title: "Andrey: Accelerated, accurate, agentic causal discovery"' in cff
     for page in (ROOT / "README.md", ROOT / "docs" / "docs" / "faq.md"):
         text = page.read_text()
-        assert "title = {Andrey: A very fast causal discovery package}," in text, page.name
+        assert "title = {Andrey: Accelerated, accurate, agentic causal discovery}," in text, (
+            page.name
+        )

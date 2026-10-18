@@ -55,11 +55,9 @@ SCENES = (
     dict(
         key="hardware",
         title="Use the hardware you have",
-        text="With the optional extras, Numba JIT-compiles GES's path checks, and a CUDA GPU "
-        "computes large entropy tables many cells at a time, once they are large enough to repay "
-        "the transfer.",
-        line="with the optional extras, Numba compiles GES's path checks and a GPU computes large "
-        "tables.",
+        text="With the optional PyTorch extra, a CUDA GPU computes large entropy tables many cells "
+        "at a time, once they are large enough to repay the transfer.",
+        line="with the optional PyTorch extra, a GPU computes large entropy tables.",
         andrey="a GPU, many cells per step",
         others="one core, one cell per step",
         unit=("step", "steps"),

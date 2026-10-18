@@ -9,6 +9,13 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- The `numba` extra and backend are removed, because no method ran Numba code anymore:
+  `andrey.config(backend="numba")` and `ANDREY_BACKEND=numba` raise a `ValueError`,
+  `andrey.describe()` has no `numba` field, and `numpy` or the default `auto` runs the same code as
+  before. ([#178])
+
 ### Added
 
 - `fci` and `gfci` take `possible_dsep`: `"fast"`, the default, builds each possible-d-separation
@@ -260,4 +267,5 @@ First alpha release.
 [#168]: https://github.com/Abel-ai-lab/andrey/pull/168
 [#169]: https://github.com/Abel-ai-lab/andrey/pull/169
 [#175]: https://github.com/Abel-ai-lab/andrey/pull/175
+[#178]: https://github.com/Abel-ai-lab/andrey/pull/178
 [#179]: https://github.com/Abel-ai-lab/andrey/pull/179

@@ -1,7 +1,7 @@
 <!-- One image on its own dark ground reads on both GitHub themes; PyPI keeps a plain <img>. The
 banner links the website's homepage. -->
 <p align="center">
-  <a href="https://andrey.abel.ai/"><img alt="Andrey, a very fast causal discovery package"
+  <a href="https://andrey.abel.ai/"><img alt="Andrey: accelerated, accurate, agentic causal discovery"
     src=".github/readme/banner.svg" width="830"></a>
 </p>
 
@@ -33,7 +33,8 @@ uv add andrey-core
 ```
 
 - **With pip**: `pip install andrey-core`
-- **Optional extras**: `andrey-core[numba]` for compiled CPU code, `andrey-core[torch]` for GPUs
+- **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
+  layouts
 - **Development version**: `uv add git+https://github.com/Abel-ai-lab/andrey`
 - **[Installation guide](https://andrey.abel.ai/docs/guides/getting-started.html#install)**: the
   extras, a PyTorch build for your GPU, and building Andrey from source
@@ -68,8 +69,8 @@ Four ideas make it fast; each is animated in
   local scores.
 - **Skip what can't matter**: tests with a closed form settle most edges before any matrix is
   inverted.
-- **Use the hardware you have**: with the optional extras, Numba compiles GES's path checks and a
-  GPU computes large tables.
+- **Use the hardware you have**: with the optional PyTorch extra, a GPU computes large entropy
+  tables.
 
 <!-- WHY_FAST:END -->
 
@@ -172,7 +173,7 @@ If you use Andrey in your work, please cite it, or use the
 ```bibtex
 @software{andrey,
   author = {{Abel AI Lab}},
-  title = {Andrey: A very fast causal discovery package},
+  title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
   version = {0.6.0},
   url = {https://andrey.abel.ai},
