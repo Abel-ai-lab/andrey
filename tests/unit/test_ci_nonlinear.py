@@ -11,6 +11,8 @@ rejection rates over many draws are a measurement, made by ``qa/ci_calibration.p
 from __future__ import annotations
 
 import math
+import subprocess
+import sys
 import warnings
 from functools import partial
 
@@ -276,6 +278,22 @@ def test_make_indep_test_passes_settings_to_the_test():
         ci.make_indep_test("fisherz", data, k_cmi=5)
 
 
+def test_building_a_test_imports_only_its_own_module():
+    """KCI, RCoT, and CMIknn build without loading scikit-learn, which only GPDC uses."""
+    code = (
+        "import sys, numpy as np\n"
+        "from andrey.core.ci import make_indep_test\n"
+        "data = np.random.default_rng(0).standard_normal((60, 3))\n"
+        "for name in ('kci', 'rcot', 'cmiknn'): make_indep_test(name, data)\n"
+        "print('sklearn' in sys.modules)\n"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-W", "ignore", "-c", code], capture_output=True, text=True, timeout=300
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "False"
+
+
 def test_cmiknn_local_shuffle_stays_near_in_z():
     """Each row takes ``x`` from a row no farther in ``z`` than its ``k_perm``-th nearest, rows
     repeat rarely, and the dependence of ``x`` on ``z`` stays."""
@@ -320,6 +338,20 @@ def test_gpdc_fits_each_variable_and_conditioning_set_once(monkeypatch):
     pvalues = [test(*query) for query in queries]
     assert len(fits) == 5  # (0, {2}), (1, {2}), (3, {2}), (0, {2, 3}), (1, {2, 3})
     assert [_build("gpdc", data)(*query) for query in queries] == pvalues
+
+
+def test_kci_decomposes_each_conditioning_set_once(monkeypatch):
+    """Queries with the same conditioning set share its eigendecomposition, and the p-values equal
+    those of a test that computes every query afresh."""
+    calls = []
+    eigh = np.linalg.eigh
+    monkeypatch.setattr(np.linalg, "eigh", lambda a: calls.append(1) or eigh(a))
+    data = _common_cause(seed=3, n=120, n_cond=2)
+    queries = [(0, 1, (2,)), (0, 3, (2,)), (1, 3, (2,)), (3, 0, (2,)), (0, 1, (2, 3))]
+    test = KCI(data)
+    pvalues = [test(*query) for query in queries]
+    assert len(calls) == 2  # sets {2}, {2, 3}
+    assert [KCI(data)(*query) for query in queries] == pvalues
 
 
 def test_rcot_draws_the_features_of_each_column_set_once(monkeypatch):

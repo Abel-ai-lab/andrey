@@ -51,6 +51,7 @@ graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21
 
 from __future__ import annotations
 
+import importlib
 import math
 from collections.abc import Callable, Iterable
 from functools import partial
@@ -659,16 +660,21 @@ class CGTest:
         return float(chdtrc(dof, max(statistic, 0.0)))
 
 
-NONLINEAR_INDEP_TESTS: tuple[str, ...] = ("kci", "rcot", "cmiknn", "gpdc")
+# The module and class of each nonlinear test. Building one imports only its own module: GPDC's
+# loads scikit-learn, which takes a second or more.
+_NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
+    "kci": ("ci_kernel", "KCI"),
+    "rcot": ("ci_kernel", "RCoT"),
+    "cmiknn": ("ci_cmiknn", "CMIknn"),
+    "gpdc": ("ci_gpdc", "GPDC"),
+}
+NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(_NONLINEAR_CLASSES)
 
 
 def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
     """Build the experimental nonlinear test ``name`` with ``options``, warning once per process."""
-    from .ci_cmiknn import CMIknn
-    from .ci_gpdc import GPDC
-    from .ci_kernel import KCI, RCoT
-
-    test = {"kci": KCI, "rcot": RCoT, "cmiknn": CMIknn, "gpdc": GPDC}[name]
+    module, cls = _NONLINEAR_CLASSES[name]
+    test = getattr(importlib.import_module(f"{__package__}.{module}"), cls)
     warn_once(
         f"indep_test={name!r} is experimental: it has no published benchmark, and its settings "
         "may change without deprecation.",

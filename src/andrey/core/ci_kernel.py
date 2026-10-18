@@ -27,7 +27,7 @@ __all__ = ["KCI", "RCoT"]
 # rows were measured to reject true independences more often than alpha.
 _RCOT_MIN_ROWS = 500
 
-# Each cache of RCoT's features holds about this many bytes.
+# Each cache of RCoT's features or KCI's matrices holds about this many bytes.
 _CACHE_BYTES = 2**28
 
 # Rows from which the skeleton scans run KCI on every BLAS thread. The gain depends on the cores a
@@ -157,12 +157,14 @@ class KCI:
     matches the CPU's to rounding.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
-    variables. Each query with a conditioning set costs an eigendecomposition and four products of
-    ``n x n`` matrices, so time grows as the cube of the number of rows and memory as its square:
-    thousands of rows are practical, tens of thousands are not. The kernel widths follow the row
-    count and the size of the conditioning set, not the data. On simulated draws with up to three
-    conditioning variables and 500 rows, it rejected a true independence at rates between
-    ``alpha`` and twice ``alpha``; a test that rejects too often makes PC and FCI keep edges.
+    variables. Each query with a conditioning set costs two products of ``n x n`` matrices, plus
+    an eigendecomposition for a conditioning set not seen before and two more products for a new
+    ``y`` with it; the test keeps up to 256 MB of each kind of matrix, at least one. So time grows
+    as the cube of the number of rows and memory as its square: thousands of rows are practical,
+    tens of thousands are not. The kernel widths follow the row count and the size of the
+    conditioning set, not the data. On simulated draws with up to three conditioning variables and
+    500 rows, it rejected a true independence at rates between ``alpha`` and twice ``alpha``; a
+    test that rejects too often makes PC and FCI keep edges.
 
     References
     ----------
@@ -187,6 +189,10 @@ class KCI:
         self._n = arr.shape[0]
         self._ridge = float(ridge)
         self._rank = None if rank is None else int(rank)
+        # R and R Ky R do not depend on x, so queries with the same conditioning set share them.
+        entries = max(1, _CACHE_BYTES // (8 * self._n * self._n))
+        self._resid = lru_cache(entries)(self._residual_maker)
+        self._resid_y = lru_cache(entries)(self._residualized_kernel)
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the KCI p-value for ``x`` independent of ``y`` given ``condition_set``."""
@@ -197,7 +203,7 @@ class KCI:
         if not cond:
             return hsic_test(data[:, x_int], data[:, y_int])
 
-        width = (1.2 if n < 200 else 0.7 if n < 1200 else 0.4) * np.sqrt(len(cond))
+        width = self._width(len(cond))
         z = data[:, cond]
         if self._rank is not None:
             return self._low_rank_pvalue(data[:, x_int], data[:, y_int], z, width, self._rank)
@@ -207,13 +213,27 @@ class KCI:
             return _gamma_pvalue(
                 *_kci_moments_torch(xs, data[:, [y_int]], z, width, self._ridge, dev)
             )
+        resid = self._resid(tuple(cond))
         kxs = _centered_gaussian_kernel(xs, width)
-        ky = _centered_gaussian_kernel(data[:, [y_int]], width)
-        ks = _centered_gaussian_kernel(z, width)
+        return _gamma_pvalue(*_kci_moments(resid @ kxs @ resid, self._resid_y(y_int, tuple(cond))))
+
+    def _width(self, size: int) -> float:
+        """The Gaussian kernels' width with ``size`` conditioning variables."""
+        n = self._n
+        return (1.2 if n < 200 else 0.7 if n < 1200 else 0.4) * np.sqrt(size)
+
+    def _residual_maker(self, cond: tuple[int, ...]) -> np.ndarray:
+        """``R = ridge (Ks + ridge I)^-1`` of the conditioning set ``cond``."""
+        ks = _centered_gaussian_kernel(self._data[:, list(cond)], self._width(len(cond)))
         eigval, eigvec = np.linalg.eigh(ks)
         shrink = self._ridge / (np.clip(eigval, 0.0, None) + self._ridge)
-        resid = (eigvec * shrink) @ eigvec.T  # R = ridge (Ks + ridge I)^-1
-        return _gamma_pvalue(*_kci_moments(resid @ kxs @ resid, resid @ ky @ resid))
+        return (eigvec * shrink) @ eigvec.T
+
+    def _residualized_kernel(self, y: int, cond: tuple[int, ...]) -> np.ndarray:
+        """``B = R Ky R``: the kernel of column ``y`` with what ``cond`` explains removed."""
+        resid = self._resid(cond)
+        ky = _centered_gaussian_kernel(self._data[:, [y]], self._width(len(cond)))
+        return resid @ ky @ resid
 
     def _low_rank_pvalue(
         self, x: np.ndarray, y: np.ndarray, z: np.ndarray, width: float, rank: int
