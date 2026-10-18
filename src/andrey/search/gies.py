@@ -5,9 +5,10 @@ The search state is the interventional essential graph: a chain graph whose arro
 that every DAG of the interventional Markov equivalence class orients alike. Each variable's local
 score uses only the rows where it was not intervened on. The forward, backward, and turning phases
 repeat until none of them improves the score. A step orients the chain components it touches along
-a LexBFS ordering, adds, removes, or turns one edge, and rebuilds the essential graph by turning
-every arrow that is not strongly protected into an undirected edge. The algorithm, its settings,
-and its reference are described on :func:`andrey.gies`.
+a lexicographic breadth-first search (LexBFS) ordering, adds, removes, or turns one edge, and
+rebuilds the essential graph by turning every arrow that is not strongly protected into an
+undirected edge. The algorithm, its settings, and its reference are described on
+:func:`andrey.gies`.
 
 References
 ----------
@@ -265,7 +266,7 @@ def _orient_component(adj: np.ndarray, first: Sequence[int]) -> None:
 
 # The scan the forward and backward phases use. ``True`` enumerates every target at every step and
 # checks every insertion's path condition before choosing; ``False`` keeps each target's candidates
-# until a step touches it and checks the path condition in key order. Tests flip it to compare.
+# until a step touches it and checks the path condition in key order.
 _FULL_RESCAN = False
 
 
@@ -582,8 +583,9 @@ def gies(
 
     Starts from the empty graph and repeats the forward (insert), backward (delete), and turning
     phases, each until it finds no improving step, until a round of backward and turning phases
-    changes nothing. Every step takes the move with the lowest score change, ties broken by the
-    vertices and the move's position in the enumeration.
+    changes nothing. Every step takes the move with the lowest score change divided by the
+    variable count and rounded to nine decimal places, ties broken by the vertices and the move's
+    position in the enumeration.
 
     Parameters
     ----------

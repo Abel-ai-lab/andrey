@@ -32,10 +32,10 @@ from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
 class GINResult:
     """Recovered latent structure of a linear non-Gaussian latent-variable model.
 
-    ``clusters`` groups the observed-variable indices by shared latent parent (an unordered
-    partition). ``causal_order`` lists the clusters whose latents were ordered, from the earliest
-    latent to the latest, and ``unordered`` the rest, by smallest member: every latent in
-    ``causal_order`` comes before every unordered one.
+    ``clusters`` groups the observed-variable indices by shared latent parent, in disjoint groups
+    that can leave variables out. ``causal_order`` lists the clusters whose latents were ordered,
+    from the earliest latent to the latest, and ``unordered`` the rest, by smallest member: every
+    latent in ``causal_order`` comes before every unordered one.
     """
 
     clusters: list[list[int]]
@@ -47,8 +47,8 @@ def _fisher_combine(pvals: list[float]) -> float:
     """Pool p-values by Fisher's method, returning the combined right-tail p-value.
 
     The statistic ``-2 sum(log p)`` over ``c`` p-values is chi-square with ``2c`` degrees of
-    freedom under independence. A p-value of zero is raised to the smallest positive float so its
-    logarithm stays finite.
+    freedom under independence. A p-value below the smallest positive normal float64 is raised to
+    it, so its logarithm stays finite.
     """
     clipped = np.clip(np.asarray(pvals, dtype=np.float64), np.finfo(np.float64).tiny, None)
     statistic = -2.0 * float(np.sum(np.log(clipped)))
@@ -176,9 +176,10 @@ def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     """Fit GIN to observed data ``(n_samples, n_variables)``; return clusters and their order.
 
     ``alpha`` is the significance level of the pooled independence test that finds the clusters and
-    then the root at each ordering step. Returns a :class:`GINResult` whose ``clusters`` partition
-    the observed variables by latent parent, whose ``causal_order`` lists the ordered clusters
-    from the earliest latent, and whose ``unordered`` lists the clusters left when no root passed.
+    then the root at each ordering step. Returns a :class:`GINResult` whose ``clusters`` group
+    observed variables by latent parent, disjointly, whose ``causal_order`` lists the ordered
+    clusters from the earliest latent, and whose ``unordered`` lists the clusters left when no root
+    passed.
     """
     data = np.asarray(data, dtype=np.float64)
     cov = np.cov(data, rowvar=False)

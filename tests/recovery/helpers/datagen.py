@@ -490,7 +490,7 @@ CASES: dict[str, dict] = {
     "measurement_chain_9v": {
         "model": "measurement",
         "seed": 20261015,
-        "n_samples": 1000,
+        "n_samples": 400,
         "noise_scale": 0.3,
         "latent_weights": [[], [0.9], [0.0, 0.9]],
         "loadings": [[1.0, 0.9, 1.1], [0.8, 1.2, 0.9], [1.0, 1.1, 0.9]],

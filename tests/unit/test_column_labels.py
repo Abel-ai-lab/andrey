@@ -50,12 +50,16 @@ TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
 ]
 
+#: Settings that shorten a slow fit; the labels come from the same facade path.
+SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
+
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
 def test_dataframe_columns_become_labels(spec):
     if spec.name == "calm":
         pytest.importorskip("torch")
-    out = getattr(andrey, spec.name)(*inputs(spec, [frame(0), frame(1), frame(2)]))
+    frames = [frame(0), frame(1), frame(2)]
+    out = getattr(andrey, spec.name)(*inputs(spec, frames), **SHORT.get(spec.name, {}))
     for result in out if isinstance(out, list) else [out]:
         for graph in graphs(result.structure):
             # GIN appends its latents after the observed columns; a pairwise test takes two.
