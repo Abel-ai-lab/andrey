@@ -267,22 +267,27 @@ def test_errors_compare_as_a_share_rounded_against_andrey():
     ]
 
 
-def test_methods_list_every_registered_method():
+def test_methods_list_every_registered_method(monkeypatch):
+    # GFCI is experimental here, so it carries the status label and no seal.
+    specs = [
+        s.model_copy(update={"status": "experimental"}) if s.name == "gfci" else s
+        for s in list_specs()
+    ]
+    monkeypatch.setattr(build, "list_specs", lambda: specs)
     summaries = placeholder_summaries()
     title, html = build.methods(summaries)
-    specs = list_specs()
     assert title.startswith(f"{len(specs)} methods in ")
     assert html.count('class="method"') == len(specs)
     for spec in specs:
         assert f"docs/code/generated/andrey.{spec.name}.html" in html
     # Each supported method a release's summary compares with another package has the seal, and a
     # tooltip that describes it.
+    status = {s.name: s.status for s in specs}
     measured = {build.registry_name(m) for s in summaries for m in s["methods"]}
     sealed = sorted(re.findall(r'aria-describedby="bench-(\w+)"', html))
-    assert sealed == sorted(n for n in measured if get_spec(n).status == "supported")
+    assert sealed == sorted(n for n in measured if status[n] == "supported")
     assert html.count('role="tooltip"') == len(sealed) and "Benchmarked</a>" not in html
-    experimental = [s for s in specs if s.status == "experimental"]
-    assert html.count('class="method-status"') == len(experimental)
+    assert html.count('class="method-status"') == 1
     assert "Experimental Score-then-FCI hybrid" in re.sub(r"<[^>]+>", "", html)  # read as text
 
 

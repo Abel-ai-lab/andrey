@@ -9,7 +9,7 @@ import warnings
 import numpy as np
 import pytest
 
-from andrey.cli import graph_view, main
+from andrey.cli import graph_view, main, render_method_help
 from andrey.spec import REGISTRY, SCHEMA_VERSION
 
 
@@ -338,8 +338,8 @@ def test_per_method_help(capsys):
     assert "andrey run pc" in out and "alpha=" in out and "andrey run pc --help --json" in out
     assert "--config" in out  # run-level flags are listed in per-method help
     assert "Experimental" not in out
-    _, out, _ = _run(["run", "gfci", "--help"], capsys)
-    assert "Experimental: no published benchmark" in out
+    experimental = REGISTRY["pc"].model_copy(update={"status": "experimental"})
+    assert "Experimental: no published benchmark" in render_method_help(experimental)
 
 
 # --- edge orientation + mark constants ------------------------------------------------------------
@@ -492,11 +492,11 @@ def test_fit_warnings_go_in_the_envelope_not_stderr(capsys, csv_path, filter_act
     """An error filter (``PYTHONWARNINGS=error``) does not turn a fit's warning into a failure."""
     with warnings.catch_warnings():
         warnings.simplefilter(filter_action)
-        code, out, err = _run(["run", "gfci", "--data", str(csv_path)], capsys)
+        code, out, err = _run(["run", "hc", "--data", str(csv_path), "max_iter=1"], capsys)
     assert code == 0 and err == ""
     [warning] = json.loads(out)["run"]["warnings"]
-    assert warning["category"] == "ExperimentalWarning"
-    assert warning["message"].startswith("andrey.gfci is experimental")
+    assert warning["category"] == "SearchLimitWarning"
+    assert warning["message"].startswith("hc stopped at its limit of max_iter=1 moves")
 
 
 def test_supported_run_has_no_warnings(capsys, csv_path):
@@ -509,9 +509,9 @@ def test_supported_run_has_no_warnings(capsys, csv_path):
 
 def test_human_summary_ends_with_the_fit_warnings(capsys, monkeypatch, csv_path):
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
-    _, out, err = _run(["run", "gfci", "--data", str(csv_path)], capsys)
+    _, out, err = _run(["run", "hc", "--data", str(csv_path), "max_iter=1"], capsys)
     assert err == ""
-    assert out.rstrip().splitlines()[-1].startswith("  ExperimentalWarning: andrey.gfci is")
+    assert out.rstrip().splitlines()[-1].startswith("  SearchLimitWarning: hc stopped at its")
 
 
 def test_run_prints_human_summary_on_tty(capsys, monkeypatch, csv_path):
