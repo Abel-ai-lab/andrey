@@ -25,7 +25,7 @@ change names its pull request.
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
 - Hill climbing and tabu search break exact score ties by the signs of each column's changes from
   row to row, or by which rows share a category, instead of by column position, so reordering the
-  columns no longer changes the graph they find. ([#168])
+  columns no longer changes the graph they find, on any machine. ([#168], [#179])
 - `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#169])
 - `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
   measure values calibrated before this change again with `andrey calibrate`. ([#169])
@@ -260,3 +260,4 @@ First alpha release.
 [#168]: https://github.com/Abel-ai-lab/andrey/pull/168
 [#169]: https://github.com/Abel-ai-lab/andrey/pull/169
 [#175]: https://github.com/Abel-ai-lab/andrey/pull/175
+[#179]: https://github.com/Abel-ai-lab/andrey/pull/179
