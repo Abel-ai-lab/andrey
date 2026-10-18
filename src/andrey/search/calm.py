@@ -296,10 +296,15 @@ def calm(
     grows from ``rho_init`` by ``rho_mult`` until the acyclicity residual clears ``h_tol`` or
     ``rho`` exceeds ``rho_max``. A gate is kept when its probability clears ``gate_threshold`` and
     its weight magnitude clears ``w_threshold``. Set ``standardize`` to z-score the columns first;
-    ``seed`` makes the run reproducible. Returns a :class:`CalmResult`.
+    ``seed`` makes the run reproducible. The fit runs on the columns in order of their
+    :func:`~andrey.search.hc.tie_ranks`, so each column keeps its initial weights and gate noise
+    when the columns are reordered. Returns a :class:`CalmResult`.
     """
     samples = np.asarray(data, dtype=np.float64)
     n, d = samples.shape
+    order = np.argsort(tie_ranks(samples))  # the fit's column k is the data's column order[k]
+    back = np.argsort(order)
+    samples = samples[:, order]
     centered = samples - samples.mean(axis=0, keepdims=True)
     if standardize:
         scale = centered.std(axis=0, keepdims=True)
@@ -331,12 +336,13 @@ def calm(
     support = ((gate_prob >= gate_threshold) & (np.abs(weight) >= w_threshold)).astype(np.int8)
     support = _break_cycles(weight, support)
     weighted = weight * support
+    resid_var = _residual_variances(weighted, cov)
+    support, weighted, mask = (m[np.ix_(back, back)] for m in (support, weighted, mask))
 
     marks = _endpoint_marks(support)
     dag = to_structure(marks, kind="dag", labels=labels)
     cpdag = to_structure(dag2cpdag(marks), kind="cpdag", labels=labels)
 
-    resid_var = _residual_variances(weighted, cov)
     objective = 0.5 * float(np.sum(np.log(np.clip(resid_var, 1e-12, None))))
     objective += lambda1 * float(support.sum())
     poly = np.linalg.matrix_power(np.eye(d) + support.astype(float) / d, d)

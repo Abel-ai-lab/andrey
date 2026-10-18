@@ -12,6 +12,7 @@ import importlib
 from itertools import permutations
 
 import numpy as np
+import pytest
 
 import andrey
 from andrey.constraint.pc import pc
@@ -354,3 +355,19 @@ def test_bottom_up_parce_lingam_weights() -> None:
             np.array(order),
         )
         np.testing.assert_array_equal(found, want)
+
+
+def test_calm_fit_order() -> None:
+    """CALM's initial weights and gate noise follow the columns, so its graph follows them too."""
+    pytest.importorskip("torch")
+    z = np.random.default_rng(0).standard_normal((200, 4))
+    z[:, 1] += z[:, 0]
+    z[:, 2] += 0.8 * z[:, 1]
+    z[:, 3] += z[:, 0] - z[:, 2]
+
+    def fit(data: np.ndarray) -> np.ndarray:
+        return andrey.calm(data, seed=0, max_outer=4, subproblem_iter=300).structure.to_numpy()
+
+    want = fit(z)
+    for order in ([3, 2, 1, 0], [1, 3, 0, 2], [2, 0, 3, 1]):
+        np.testing.assert_array_equal(_mapped(fit, z, np.array(order)), want)

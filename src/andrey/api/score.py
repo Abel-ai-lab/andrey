@@ -925,6 +925,8 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         Seed for the optimizer's torch random number generator. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so every call is seeded
         and repeated calls return the same graph on one machine with the same torch version.
+        The draws go to the columns in order of each column's rank, as in :func:`~andrey.hc`, so
+        reordering the columns reorders the graph's nodes and changes nothing else.
         ``metadata["seed"]`` records the seed used.
     **params : Any
         Optimizer settings passed to the solver; a name not listed here raises ``TypeError``.
