@@ -193,6 +193,16 @@ def test_copy_takes_its_twin_as_only_parent(copy: str) -> None:
     np.testing.assert_allclose(abs(B[second, first]), 1.0, atol=1e-9)
 
 
+def test_rounding_sized_perturbation_keeps_the_edges() -> None:
+    """An exact copy and a 1e-12-near copy give the same edges, up to which copy comes first."""
+    swap = [0, 3, 2, 1]
+    edges = []
+    for copy in ("exact", "near"):
+        order, B = direct.direct_lingam(_chain_with_copy(copy))
+        edges.append(B != 0 if order.index(1) < order.index(3) else (B != 0)[np.ix_(swap, swap)])
+    np.testing.assert_array_equal(edges[0], edges[1])
+
+
 @pytest.mark.parametrize("copy", ["near", "reversed"])
 def test_copy_adjacency_follows_columns(copy: str) -> None:
     """Reordering the columns reorders the weighted adjacency and changes nothing else."""
