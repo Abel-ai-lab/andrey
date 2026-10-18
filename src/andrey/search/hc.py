@@ -9,6 +9,7 @@ score; lower is better.
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 from collections.abc import Collection
 from itertools import compress
 from operator import ne
@@ -18,19 +19,24 @@ import numpy as np
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import MIXED_SCORES, BICScore, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
-# Moves are keyed on ``delta / n_samples`` rounded to ``_KEY_DP`` places, not on the raw delta.
-# Two equal moves (add x->y vs y->x, from different cov submatrices) differ in their last bits;
-# the key makes them tie, and the lower ``(ranks[u], ranks[v], op_rank)`` wins, with ``ranks`` from
-# :func:`tie_ranks`, so the winner does not depend on the column order. Schur noise scales as
-# ~n_samples * cond(cov) * eps, like a real improvement, so the normalized residual is
-# ~cond * eps: ``_KEY_DP`` = 9 clears it for cond up to ~1e5, independent of n. A mitigation, not
-# a proof: a normalized delta within ULP of a grid line can round either way. Rounding is
-# monotone, so non-tied order holds; the reported score is recomputed from the final structure.
+# Moves are compared by ``delta / n_samples`` rounded to ``_KEY_DP`` decimal places; ``delta`` is
+# the change in score, with lower values preferred. Under a score-equivalent score, adding
+# ``x -> y`` or ``y -> x`` from the empty graph ties mathematically, but computing their score
+# changes can introduce different rounding errors. If the rounded values tie, the lower
+# ``(ranks[u], ranks[v], op_rank)`` wins, with ``ranks`` from :func:`tie_ranks`.
+# Schur updates compute BIC score changes from covariance submatrices. Their rounding error scales
+# as ~n_samples * cond(cov) * eps, where cond(cov) is the covariance condition number and eps is
+# machine precision. Dividing by n_samples leaves ~cond(cov) * eps; ``_KEY_DP`` = 9 usually absorbs
+# this error for condition numbers up to ~1e5, independent of sample count. Rounding mitigates
+# numerical differences but can still split a tie within one grid step: a value near a rounding
+# boundary can round either way.
+# Rounding preserves the order of values that remain distinct; the reported score is recomputed
+# from the final structure.
 __all__ = ["hc"]
 
 #: The local scores :func:`hc` accepts.
@@ -51,13 +57,55 @@ ScannedMove = tuple[float, int, int, int, tuple[str, int, int]]
 StructureKey = tuple[int, ...]
 
 
-def tie_ranks(x: np.ndarray) -> np.ndarray:
-    """Each column's place in the tie-break order: by a hash of its values, then by position.
+def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarray:
+    """Each column's rank for choosing between moves with equal rounded score changes.
 
-    The hash travels with the column, so reordering the columns reorders their ranks the same way;
-    only identical columns fall back to their positions.
+    A continuous column's pattern records whether each value rises, falls, or stays equal to the
+    preceding row's value, using comparisons rather than subtraction. A categorical column's
+    pattern assigns codes in order of first appearance, so changing category labels preserves the
+    pattern. Columns are ordered by a hash of their pattern, then by a hash of their values if
+    pattern hashes match. For example, a column and a strictly increasing function of it share a
+    pattern. If both hashes match, as for identical columns, column position decides. Otherwise,
+    each rank moves with its column when the columns are reordered. The rank is arbitrary with
+    respect to causal structure.
+
+    Distinct pattern hashes give the same ranks across machines when the patterns are unchanged.
+    Last-bit differences in data, such as those from different CPUs' BLAS calculations, preserve
+    continuous patterns unless they change a comparison between consecutive rows. If pattern
+    hashes match, the fallback to raw values can make ranks sensitive to these differences or to
+    category recoding.
+
+    Parameters
+    ----------
+    x : ndarray, shape (n_samples, n_features)
+        Data matrix; rows are observations, columns are variables.
+    categorical : ndarray of bool, shape (n_features,), optional
+        Marks columns that use first-appearance category codes. ``None`` treats all columns as
+        continuous.
+
+    Returns
+    -------
+    ndarray of int, shape (n_features,)
+        Each column's position in the tie-break order, from zero to ``n_features - 1``. Lower ranks
+        take precedence when moves have equal rounded score changes.
     """
-    digests = [hashlib.blake2b(col.tobytes(), digest_size=8).digest() for col in x.T]
+    mask = np.zeros(x.shape[1], dtype=bool) if categorical is None else categorical
+    patterns = []
+    for col, is_categorical in zip(x.T, mask.tolist(), strict=True):
+        if is_categorical:
+            _, first, codes = np.unique(col, return_index=True, return_inverse=True)
+            seen = np.empty(first.size, dtype=np.int64)
+            seen[np.argsort(first)] = np.arange(first.size)
+            pattern = seen[codes]
+        else:
+            col = np.ascontiguousarray(col)
+            pattern = (col[1:] > col[:-1]).astype(np.int8) - (col[1:] < col[:-1])
+        patterns.append(hashlib.blake2b(pattern.tobytes(), digest_size=8).digest())
+    shared = {key for key, count in Counter(patterns).items() if count > 1}
+    digests = [
+        (key, hashlib.blake2b(col.tobytes(), digest_size=8).digest() if key in shared else b"")
+        for key, col in zip(patterns, x.T, strict=True)
+    ]
     order = sorted(range(len(digests)), key=digests.__getitem__)
     ranks = np.empty(len(order), dtype=np.intp)
     ranks[order] = np.arange(len(order))
@@ -374,15 +422,16 @@ def hc(
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Hill-Climbing over a BIC, categorical, or mixed-data score.
+    """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
     score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
-    CPDAG. Exact ties between moves break by :func:`tie_ranks`, so reordering the columns of the
-    data reorders the result the same way unless two columns are identical. Under a mixed-data
-    score the DAG stays a conditional linear Gaussian network: no move gives a categorical node a
-    continuous parent. Returns the CPDAG and the DAG's total objective (lower is better), the sum of
-    the final per-node local scores.
+    CPDAG. Moves with equal rounded score changes are chosen by :func:`tie_ranks`, whose ranks
+    follow the columns when reordered, subject to its hash and rounding limits. These choices can
+    affect later moves and the final CPDAG; the ranks do not indicate causal direction. Under a
+    mixed-data score the DAG stays a conditional linear Gaussian network: no move gives a
+    categorical node a continuous parent. Returns the CPDAG and the DAG's total objective (lower
+    is better), the sum of the final per-node local scores.
 
     Parameters
     ----------
@@ -416,6 +465,7 @@ def hc(
     score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     forbidden = None
+    mask = np.full(d, score_func in DISCRETE_SCORES)
     if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
         mask = column_mask(categorical, d)
         forbidden = mask[:, None] & ~mask[None, :]
@@ -425,7 +475,7 @@ def hc(
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
-        scanner = MoveScanner(delta, d, ranks=tie_ranks(X), forbidden=forbidden)
+        scanner = MoveScanner(delta, d, ranks=tie_ranks(X, mask), forbidden=forbidden)
         moves = 0
         while max_iter is None or moves < max_iter:
             best = scanner.best(adj_int, parents_of)
