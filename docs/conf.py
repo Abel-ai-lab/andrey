@@ -135,7 +135,9 @@ EXAMPLES = HERE / "docs" / "examples"
 # The example notebooks carry their outputs, so a slow builder runs none of them:
 # `scripts/execute_notebooks.py` stores the outputs, and the docs workflow checks they match a fresh
 # run. speed_on_your_machine.ipynb ships without outputs: its timings belong to the reader's
-# machine. The getting-started guide, a MyST notebook, runs at build time.
+# machine. calm.ipynb needs torch, which the docs workflow does not install, so its stored outputs
+# come from a local run and the workflow does not rerun it. The getting-started guide, a MyST
+# notebook, runs at build time.
 nb_execution_mode = "cache"
 nb_execution_timeout = 600
 nb_execution_raise_on_error = True

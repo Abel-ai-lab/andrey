@@ -78,6 +78,17 @@ GIES also learns from interventions.
 {bdg-secondary-line}`Notebook · Colab`
 :::
 
+:::{grid-item-card} Continuous optimization: CALM
+:link: calm
+:link-type: doc
+:img-top: /_generated/thumbs/calm.svg
+:img-alt: The true graph of this notebook's data
+
+CALM learns a weighted DAG by gradient descent on a penalized likelihood; it runs on torch.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
 :::{grid-item-card} Linear non-Gaussian models
 :link: lingam
 :link-type: doc
@@ -155,6 +166,7 @@ ges_quickstart
 constraint_based
 permutation_based
 score_search
+calm
 lingam
 rcd
 bottom_up_parce_lingam

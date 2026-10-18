@@ -1,9 +1,9 @@
 """Run the example notebooks and store their outputs, which the site renders without running them.
 
 ``uv run --group docs python scripts/execute_notebooks.py`` runs every notebook in ``examples/`` but
-``speed_on_your_machine.ipynb``, whose timings belong to the reader's machine, and writes its
-outputs into the file. With ``--check`` it writes nothing and exits 1 when a notebook fails or an
-output differs from the stored one.
+``speed_on_your_machine.ipynb``, whose timings belong to the reader's machine, and ``calm.ipynb``,
+which needs torch, and writes each one's outputs into the file. With ``--check`` it writes nothing
+and exits 1 when a notebook fails or an output differs from the stored one.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from nbclient import NotebookClient
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "examples"
-SKIPPED = {"speed_on_your_machine.ipynb"}
+SKIPPED = {"calm.ipynb", "speed_on_your_machine.ipynb"}
 TIMEOUT = 600
 ADDRESS = re.compile(r"0x[0-9a-f]+")
 DECIMAL = re.compile(r"-?\d+\.\d+")

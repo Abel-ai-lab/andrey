@@ -222,12 +222,15 @@ uv run --group docs python scripts/execute_notebooks.py
 ```
 
 The docs workflow reruns every notebook with `--check` and fails when a cell fails or an output
-differs from the stored one; a decimal number may move by one in its last digit, as Linux and
-macOS round a few results apart. The speed notebook is never run and ships without outputs.
-Run them locally with `uv run --with jupyter jupyter lab`. Notebook dependencies stay out of
-`pyproject.toml`: each notebook has an Open in Colab link and a Colab-only setup cell that installs
-the pinned release from PyPI, a pin to update with every release. The rendered page's download link
-points at the canonical notebook.
+differs from the stored one; a decimal number may move by one in its last digit, as Linux and macOS
+round a few results apart. The speed notebook is never run and ships without outputs. The CALM
+notebook needs torch, which the workflow does not install, so the workflow never runs it either; its
+stored outputs come from a local run with the `torch` extra, for example in
+`uv run --extra torch --with jupyter jupyter lab`. Run the notebooks locally with
+`uv run --with jupyter jupyter lab`. Notebook dependencies stay out of `pyproject.toml`: each
+notebook has an Open in Colab link and a Colab-only setup cell that installs the pinned release
+from PyPI, a pin to update with every release. The rendered page's download link points at the
+canonical notebook.
 
 ## Preview locally
 
