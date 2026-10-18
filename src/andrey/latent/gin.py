@@ -10,7 +10,8 @@ pooled by Fisher's method. Clusters grow by size and merge when they overlap. Th
 ordered one root at a time (Xie et al. 2020, Proposition 4 and Algorithm 2): a cluster is a root
 when its ``e``, built with each other remaining cluster in turn and given the clusters already
 ordered, passes the pooled test at ``alpha`` for every one of them. When several candidates pass,
-the one whose lowest pooled p-value is highest is taken. When none passes, the ordering stops and
+the one whose lowest pooled p-value is highest is taken, equal ones by the columns'
+:func:`~andrey.search.hc.tie_ranks`. When none passes, the ordering stops and
 the remaining clusters stay unordered: the paper adds a latent to the order only when the
 condition holds.
 """
@@ -26,6 +27,8 @@ from scipy.special import gammaincc
 from andrey.core.independence import hsic_gamma_test
 from andrey.core.output import StructureOutput
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
+from andrey.search._parallel import _KEY_DP
+from andrey.search.hc import tie_ranks
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +128,7 @@ def _find_root(
     clusters: list[list[int]],
     ordered: list[list[int]],
     alpha: float,
+    ranks: list[int],
 ) -> list[int] | None:
     """Return the root among ``clusters`` given the ``ordered`` ones, or ``None`` if none passes.
 
@@ -132,11 +136,13 @@ def _find_root(
     each and of every ordered cluster, against the candidate's other members and the second member
     of every ordered cluster. A candidate passes when that pooled p-value is at least ``alpha`` for
     every other cluster; of the passing candidates, the one with the highest lowest p-value is the
-    root. A single remaining cluster is the root.
+    root. Lowest p-values equal to ``_KEY_DP`` decimals go to the cluster whose members' sorted
+    ``ranks``, from :func:`~andrey.search.hc.tie_ranks`, come first. A single remaining cluster is
+    the root.
     """
     if len(clusters) == 1:
         return clusters[0]
-    best, best_pvalue = None, -1.0
+    best, best_key = None, None
     for candidate in clusters:
         lowest = min(
             _independence_pvalue(
@@ -148,13 +154,14 @@ def _find_root(
             for other in clusters
             if other is not candidate
         )
-        if lowest >= alpha and lowest > best_pvalue:
-            best, best_pvalue = candidate, lowest
+        key = (-round(lowest, _KEY_DP), sorted(ranks[v] for v in candidate))
+        if lowest >= alpha and (best_key is None or key < best_key):
+            best, best_key = candidate, key
     return best
 
 
 def _order_clusters(
-    data: np.ndarray, cov: np.ndarray, clusters: list[list[int]], alpha: float
+    data: np.ndarray, cov: np.ndarray, clusters: list[list[int]], alpha: float, ranks: list[int]
 ) -> tuple[list[list[int]], list[list[int]]]:
     """Order clusters from the earliest latent by peeling roots; return ``(ordered, unordered)``.
 
@@ -164,7 +171,7 @@ def _order_clusters(
     pending = [list(cluster) for cluster in clusters]
     ordered: list[list[int]] = []
     while pending:
-        root = _find_root(data, cov, pending, ordered, alpha)
+        root = _find_root(data, cov, pending, ordered, alpha, ranks)
         if root is None:
             break
         ordered.append(root)
@@ -183,7 +190,7 @@ def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     data = np.asarray(data, dtype=np.float64)
     cov = np.cov(data, rowvar=False)
     clusters = _find_clusters(data, cov, alpha)
-    ordered, unordered = _order_clusters(data, cov, clusters, alpha)
+    ordered, unordered = _order_clusters(data, cov, clusters, alpha, tie_ranks(data).tolist())
     return GINResult(clusters=clusters, causal_order=ordered, unordered=unordered)
 
 

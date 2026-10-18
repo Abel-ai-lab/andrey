@@ -18,6 +18,7 @@ from andrey.core.ci import FisherZ
 from andrey.core.independence import gamma_gram
 from andrey.core.score import BICScore
 from andrey.irregular.bottom_up_parce import _fisher_hsic_test, _residual
+from andrey.latent.gin import _independence_pvalue, gin
 from andrey.search._parallel import _KEY_DP
 from andrey.search.calm import moral_graph
 from andrey.search.ges import ges
@@ -232,3 +233,32 @@ def test_bottom_up_parce_lingam_ties(monkeypatch) -> None:
     monkeypatch.setattr(module, "tie_ranks", _by_position)
     by_position = order(x, np.arange(3))
     assert any(order(x, columns) != by_position for columns in orders)
+
+
+def test_gin_ties(monkeypatch) -> None:
+    """Two clusters of two indicators each pass as the root with the same lowest p-value.
+
+    Every row is followed by a copy with the clusters swapped, so each leading block of rows, which
+    the HSIC bandwidth reads, is symmetric too. The orders keep each cluster's members in order,
+    because the surrogate reads the first member of each cluster.
+    """
+    rng = np.random.default_rng(15)
+    latent = rng.uniform(-1, 1, (400, 2)) ** 3
+    noise = rng.uniform(-1, 1, (400, 4)) ** 3
+    z = np.round(20 * (latent[:, [0, 0, 1, 1]] * np.array([1, 2, 1, 2]) + 0.3 * noise))
+    x = np.empty((800, 4))
+    x[0::2], x[1::2] = z, z[:, [2, 3, 0, 1]]
+    cov = np.cov(x, rowvar=False)
+    lowest = [_independence_pvalue(x, cov, [a, b], [a + 1]) for a, b in ((0, 2), (2, 0))]
+    assert round(lowest[0], _KEY_DP) == round(lowest[1], _KEY_DP)
+    orders = [np.arange(4), np.array([2, 3, 0, 1])]
+
+    def causal_order(columns: np.ndarray) -> list[list[int]]:
+        return [sorted(int(columns[v]) for v in c) for c in gin(x[:, columns]).causal_order]
+
+    want = causal_order(orders[0])
+    assert len(want) == 2
+    assert all(causal_order(columns) == want for columns in orders)
+    monkeypatch.setattr(importlib.import_module("andrey.latent.gin"), "tie_ranks", _by_position)
+    by_position = causal_order(orders[0])
+    assert any(causal_order(columns) != by_position for columns in orders)

@@ -70,10 +70,12 @@ def gin(
     at a time, given the latents already ordered: the next latent is a root, whose cluster passes
     the independence test at ``alpha`` paired with each other remaining cluster [1]_. When several
     candidates pass, the one whose lowest p-value is highest is taken, so latents with no causal
-    path between them are still ordered, arbitrarily. When none passes, the ordering stops and
-    the remaining latents stay unordered, as the method adds a latent to the order only when the
-    test passes. Each comparison rejects a true root with probability about ``alpha``, the test's
-    nominal size, so a correct model can still leave the latents from that step on unordered.
+    path between them are still ordered, arbitrarily; equal p-values are decided by each column's
+    rank, as in :func:`~andrey.hc`, so reordering whole clusters does not change the choice. When
+    none passes, the ordering stops and the remaining latents stay unordered, as the method adds a
+    latent to the order only when the test passes. Each comparison rejects a true root with
+    probability about ``alpha``, the test's nominal size, so a correct model can still leave the
+    latents from that step on unordered.
 
     **Limitations.** Measured on simulated linear measurement models with uniform noise and 1,000
     rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its
