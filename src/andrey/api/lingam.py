@@ -209,9 +209,9 @@ def ica_lingam(
     the columns are reordered and does not depend on the CPU. FastICA itself can still differ:
     with few rows per variable it converges slowly, and last-bit rounding differences, such as
     those between CPUs or BLAS builds, can lead it to a different unmixing matrix and so to a
-    different order and graph. In simulations with ten rows per variable, the graph changed with
-    the BLAS kernel on every dataset, and tighter FastICA tolerances did not prevent it; with 100
-    rows per variable, FastICA converged quickly and gave the same graph under each kernel.
+    different order and graph; tighter FastICA tolerances do not prevent this. With more rows per
+    variable, FastICA converges in fewer iterations and these differences shrink. Reordering the
+    columns gives the same order and graph only where FastICA converges.
 
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
