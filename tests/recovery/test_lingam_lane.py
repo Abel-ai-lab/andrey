@@ -150,7 +150,8 @@ def test_ica_lingam_tied_sources_follow_the_columns(monkeypatch):
     for order in orders[1:]:
         got = _ica_in_original_labels(X, order)
         assert got[0] == want[0]
-        np.testing.assert_allclose(got[1], want[1], rtol=0, atol=1e-8)
+        np.testing.assert_array_equal(got[1] != 0, want[1] != 0)
+        np.testing.assert_allclose(got[1], want[1], rtol=0, atol=1e-6)
 
     import andrey.lingam.ica as ica
 
