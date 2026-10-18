@@ -33,6 +33,10 @@ change names its pull request.
 - Hill climbing and tabu search break exact score ties by a rank computed from each column's own
   data instead of by column position, so reordering the columns no longer changes the graph they
   find, and the same data give the same graph on other machines. ([#168], [#179])
+- BOSS and GRaSP search the columns sorted by the same rank, so their seeded starting and visiting
+  orders and their score ties follow each column's data instead of its position: reordering the
+  columns no longer changes the graph they find, and a seed's graph can differ from 0.6.0's.
+  ([#TBD])
 - `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#169])
 - `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
   measure values calibrated before this change again with `andrey calibrate`. ([#169])
