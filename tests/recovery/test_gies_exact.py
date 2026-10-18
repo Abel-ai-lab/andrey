@@ -117,6 +117,12 @@ def _random_interventional(
     return X, mask
 
 
+def test_gies_finds_no_edges_between_independent_columns_with_interventions():
+    X, mask = _random_interventional(0, 4, 0.0, 2, n=600)
+    assert mask.any()
+    assert andrey.gies(X, mask).structure.oriented_edges() == []
+
+
 # The cases with targets run the search with interventions. On the observational (5, 15, 0.3)
 # data, a step changes the candidates of a line neighbor of a vertex whose marks it changed. On
 # the observational (5, 6, 0.6) data, the turning phase meets a line that fails the separation
@@ -217,13 +223,16 @@ def test_exact_search_output_contract():
 
 
 @pytest.mark.parametrize("search_method", ["astar", "dp"])
-def test_exact_search_ignores_the_variables_means(search_method):
-    """Independent columns have no edges whatever their means, and a shift keeps the class."""
-    rng = np.random.default_rng(0)
-    independent = rng.normal(5.0, 1.0, size=(500, 3))
+def test_exact_search_finds_no_edges_between_independent_columns(search_method):
+    """Columns with a nonzero mean, so the score has to center them."""
+    independent = np.random.default_rng(0).normal(5.0, 1.0, size=(500, 3))
     found = andrey.exact_search(independent, search_method=search_method).structure
     assert found.oriented_edges() == []
-    # A shift can change which score-tied DAG is returned, not its Markov equivalence class.
+
+
+@pytest.mark.parametrize("search_method", ["astar", "dp"])
+def test_exact_search_ignores_the_variables_means(search_method):
+    """A shift can change which score-tied DAG is returned, not its Markov equivalence class."""
     x = datagen.generate("gauss_5v")
     centered = andrey.exact_search(x, search_method=search_method).structure
     shifted = andrey.exact_search(x + 7.0, search_method=search_method).structure
