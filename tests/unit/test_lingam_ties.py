@@ -163,20 +163,30 @@ def test_copy_order_follows_columns(copy: str) -> None:
     _assert_order_follows_columns(_direct, [_chain_with_copy(copy)])
 
 
-def test_copy_pair_scores_nan_in_both_implementations() -> None:
-    """Both copies score NaN; the other candidates keep finite scores."""
-    X = _chain_with_copy("near")
-    for scores in (pwling.score_candidates, pwling.score_candidates_serial):
-        s = scores(X, [0, 1, 2, 3])
-        assert np.isnan(s[[1, 3]]).all() and np.isfinite(s[[0, 2]]).all(), scores
+@pytest.mark.parametrize("copy", ["exact", "near", "reversed"])
+def test_copy_comes_after_its_cause(copy: str) -> None:
+    """The root x0 comes first, and the copies of x1 follow it, next to each other."""
+    order = pwling.find_causal_order(_chain_with_copy(copy))
+    assert order[0] == 0
+    assert sorted(order[1:3]) == [1, 3], order
 
 
-def test_residual_of_a_copy_is_exact_zeros() -> None:
-    """A rounding-sized residual becomes exact zeros; a constant regressor leaves its input."""
+def test_copy_groups_pick_the_representative_by_rank() -> None:
+    """A copy group is scored by its lowest-ranked column, whatever the order of the candidates."""
     X = _chain_with_copy("near")
-    assert not pwling.compute_residual(X[:, 3], X[:, 1]).any()
-    assert not pwling.compute_residual(2 * X[:, 1], X[:, 1]).any()
-    np.testing.assert_array_equal(pwling.compute_residual(X[:, 0], np.full(300, 0.5)), X[:, 0])
+    ranks = np.array([0, 2, 3, 1])
+    for U in ([0, 1, 2, 3], [3, 2, 1, 0]):
+        groups = pwling.copy_groups([X], U, ranks)
+        assert groups == {u: ([1] if u == 3 else []) for u in U if u != 1}, U
+
+
+def test_multi_group_copy_comes_after_its_cause() -> None:
+    """A copy in one group joins the copy group; the shared order relabels with the columns."""
+    groups = [_chain_with_copy("near"), _chain_with_copy("near")[::-1].copy()]
+    groups[1][:, 3] = groups[1][:, 3] + 0.1 * np.sin(np.arange(300))
+    order = _shared(groups)
+    assert order[0] == 0 and sorted(order[1:3]) == [1, 3], order
+    _assert_order_follows_columns(_shared, groups)
 
 
 @pytest.mark.parametrize("copy", ["exact", "near", "reversed"])
@@ -184,13 +194,14 @@ def test_copy_takes_its_twin_as_only_parent(copy: str) -> None:
     """The later copy has one parent, the earlier copy, with weight 1 up to sign, and no children.
 
     A regression on both copies would split their effect between them by rounding, which differs
-    between CPUs.
+    between CPUs. x1 keeps its parent x0 and its child x2.
     """
     order, B = direct.direct_lingam(_chain_with_copy(copy))
     first, second = sorted([1, 3], key=order.index)
     assert np.flatnonzero(B[second]).tolist() == [first]
     assert not B[:, second].any()
     np.testing.assert_allclose(abs(B[second, first]), 1.0, atol=1e-9)
+    assert np.flatnonzero(B[first]).tolist() == [0] and np.flatnonzero(B[2]).tolist() == [first]
 
 
 def test_rounding_sized_perturbation_keeps_the_edges() -> None:

@@ -41,7 +41,9 @@ def _find_shared_causal_order(groups: list[np.ndarray], n_features: int) -> list
 
     Mirrors :func:`pwling.find_causal_order` but sums the candidate scores across groups (each
     weighted by ``n_g / total_n``) and residualizes every group independently against the pick.
-    Ties are broken by :func:`~andrey.search.hc.tie_ranks` of the stacked input groups.
+    Ties are broken by :func:`~andrey.search.hc.tie_ranks` of the stacked input groups. Columns
+    that are copies in any group form one copy group (:func:`pwling.copy_groups`), scored by its
+    representative and followed directly by the other copies.
     """
     total_n = sum(len(X) for X in groups)
     remaining = list(range(n_features))
@@ -51,17 +53,19 @@ def _find_shared_causal_order(groups: list[np.ndarray], n_features: int) -> list
     ranks = tie_ranks(np.vstack(groups))
 
     while remaining:
-        if len(remaining) == 1:
-            m = remaining[0]
+        copies = pwling.copy_groups(residualized, remaining, ranks)
+        candidates = list(copies)
+        if len(candidates) == 1:
+            m = candidates[0]
         else:
-            neg_mg = np.zeros(len(remaining), dtype=np.float64)
+            neg_mg = np.zeros(len(candidates), dtype=np.float64)
             for X in residualized:
-                neg_mg += (len(X) / total_n) * pwling.score_candidates(X, remaining)
-            m = pwling.pick(neg_mg, remaining, ranks)
+                neg_mg += (len(X) / total_n) * pwling.score_candidates(X, candidates)
+            m = pwling.pick(neg_mg, candidates, ranks)
+        placed = [m, *copies[m]]
+        remaining = [u for u in remaining if u not in placed]
         for X in residualized:
             for i in remaining:
-                if i != m:
-                    X[:, i] = pwling.compute_residual(X[:, i], X[:, m])
-        order.append(m)
-        remaining = [u for u in remaining if u != m]
+                X[:, i] = pwling.compute_residual(X[:, i], X[:, m])
+        order += placed
     return order

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.lingam.pwling import _DEGENERATE_TOL
+from andrey.lingam.pwling import _COPY_TOL
 
 
 def predict_adaptive_lasso(
@@ -55,7 +55,7 @@ def estimate(X: np.ndarray, order: list[int], *, refit: bool = False) -> np.ndar
     """Weighted adjacency ``B`` from a fixed order: each vertex regressed on its predecessors.
 
     A vertex that its kept predecessors determine, so that a least-squares fit leaves at most
-    ``_DEGENERATE_TOL`` of its variance (a copy of another column, up to scale), takes the
+    ``_COPY_TOL`` of its variance (a copy of another column, up to scale), takes the
     least-squares weights, without the ones whose contribution is rounding-sized, and is left out
     of later regressions, where it would split its effect with the column it copies by rounding.
     Every other vertex is kept and takes :func:`predict_adaptive_lasso` weights, with ``refit``.
@@ -69,11 +69,11 @@ def estimate(X: np.ndarray, order: list[int], *, refit: bool = False) -> np.ndar
         y, P = X[:, target], X[:, kept]
         ols = LinearRegression().fit(P, y)
         residual = y - ols.intercept_ - P @ ols.coef_
-        if np.var(residual) > _DEGENERATE_TOL * np.var(y):
+        if np.var(residual) > _COPY_TOL * np.var(y):
             B[target, kept] = _adaptive_lasso(X, kept, target, ols.coef_, refit=refit)
             kept.append(target)
         else:
             coef = ols.coef_.copy()
-            coef[np.abs(coef) * P.std(axis=0) <= _DEGENERATE_TOL**0.5 * y.std()] = 0.0
+            coef[np.abs(coef) * P.std(axis=0) <= _COPY_TOL**0.5 * y.std()] = 0.0
             B[target, kept] = coef
     return B
