@@ -161,7 +161,9 @@ def test_granger_equals_lassocv_on_each_variable(workers):
 
 def test_var_lingam_output_contract():
     order, adj = var_lingam(datagen.generate("var_4v_stable"))
-    assert list(order) == [0, 1, 2, 3] and np.asarray(adj).shape == (2, 4, 4)
+    # The planted instantaneous order is x0, x1, x2, x3.
+    assert list(order) == datagen.column_of("var_4v_stable").tolist()
+    assert np.asarray(adj).shape == (2, 4, 4)
 
 
 def test_granger_output_contract():
@@ -177,8 +179,10 @@ def var_lag2_fit():
 
 
 def _var_lag2_truth() -> np.ndarray:
-    """The planted lag weights of ``var_3v_lag2`` as ``[lag - 1, cause, effect]``."""
-    return np.asarray(datagen.CASES["var_3v_lag2"]["lags"]).transpose(0, 2, 1)
+    """The planted lag weights of ``var_3v_lag2`` as ``[lag - 1, cause, effect]``, by column."""
+    order = datagen.column_order("var_3v_lag2")
+    lags = np.asarray(datagen.CASES["var_3v_lag2"]["lags"]).transpose(0, 2, 1)
+    return lags[:, order][:, :, order]
 
 
 def test_granger_finds_the_planted_lagged_edges_as_the_largest_weights(var_lag2_fit):
