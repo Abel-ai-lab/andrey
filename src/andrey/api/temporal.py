@@ -616,11 +616,11 @@ def lpcmci(
     distinct separating sets stored and found among the neighbors of the two. A mark that rules
     orient both ways is a conflict. The candidates of a step are ordered by statistics frozen when
     its group of links starts, so the order in which a group's links are tested changes nothing.
-    Equal statistics are ordered by each variable's rank, as in :func:`~andrey.hc`, so the order
-    of the variables changes nothing either, unless two columns are identical. The collider
-    rule stores every separating set its tests find, each made weakly minimal by dropping first
-    the node whose removal leaves the largest p-value, so the stored sets do not depend on the
-    order of the variables.
+    Equal statistics are ordered by each variable's rank, as in :func:`~andrey.hc`, so their order
+    does not depend on the order of the variables either, unless two columns are identical. The
+    collider rule stores every separating set its tests find, each made weakly minimal by dropping
+    first the node whose removal leaves the largest p-value, so the stored sets do not depend on
+    the order of the variables.
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``, and every node a test
     conditions on lies within ``tau_max`` steps of the later end. A test's partial correlation is
