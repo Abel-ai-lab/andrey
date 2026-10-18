@@ -7,6 +7,8 @@
 # `rcot` is RCIT::RCoT at Andrey's RCoT settings (5 features for x and y, 100 for the conditioning
 # set, the Hall-Buckley-Eagleson p-value, seed 0); `kcit` is RCIT::KCIT with its gamma
 # approximation (`Bootstrap = FALSE`), as Andrey's KCI.
+# library() attaches momentchi2 and MASS, which RCIT calls without a namespace (`hbe`, `ginv`).
+suppressPackageStartupMessages(library(RCIT))
 args <- commandArgs(trailingOnly = TRUE)
 test <- args[1]
 files <- list.files(args[2], pattern = "^d[0-9]+[.]csv$")
