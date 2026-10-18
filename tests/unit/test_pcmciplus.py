@@ -58,7 +58,10 @@ class Oracle:
 
 
 def _run(b0, a_stack, tau_max=1, collider_rule="majority") -> PCMCIPlusResult:
-    return run_phases(Oracle(b0, a_stack, tau_max), b0.shape[0], tau_max, 0.01, collider_rule)
+    n_vars = b0.shape[0]
+    return run_phases(
+        Oracle(b0, a_stack, tau_max), n_vars, tau_max, 0.01, collider_rule, range(n_vars)
+    )
 
 
 def _lagged(result: PCMCIPlusResult) -> set[tuple[int, int, int]]:

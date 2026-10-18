@@ -13,11 +13,13 @@ from itertools import permutations
 
 import numpy as np
 
+import andrey
 from andrey.core.ci import FisherZ
 from andrey.core.score import BICScore
 from andrey.search.calm import moral_graph
 from andrey.search.ges import ges
 from andrey.search.xges import xges
+from andrey.temporal.pcmci import design_test
 
 
 def _by_position(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarray:
@@ -61,10 +63,33 @@ def _strong_chain(seed: int, n: int = 2000) -> np.ndarray:
     return np.vstack([z, z[:, [3, 1, 2, 0]]])
 
 
+def _swap_symmetric_series(seed: int, period: int = 64, tau_max: int = 2) -> np.ndarray:
+    """Series 0 and 1 share a signal of ``period`` steps, and series 2 follows it one step later.
+
+    Series 1 is series 0 shifted by one period, and series 2 repeats with that period, so swapping
+    series 0 and 1 shifts all three by one period. The first ``2 * tau_max`` steps repeat the last
+    ones, so every window of lags of the swapped series is a window of the original. The values are
+    integers, so sums over the windows are exact.
+    """
+    rng = np.random.default_rng(seed)
+    shared, driven = np.zeros(period), np.zeros(period)
+    noise = rng.standard_normal(period)
+    for _ in range(3):  # each pass wraps around, so the period's start follows its end
+        for t in range(period):
+            shared[t] = 0.5 * shared[t - 1] + noise[t]
+    noise = rng.standard_normal(period)
+    for _ in range(3):
+        for t in range(period):
+            driven[t] = 0.5 * driven[t - 1] + 0.3 * shared[t - 1] + noise[t]
+    first = np.round(10 * (np.tile(shared, 2) + 0.5 * rng.standard_normal(2 * period)))
+    x = np.column_stack([first, np.roll(first, period), np.round(10 * np.tile(driven, 2))])
+    return np.vstack([x[-2 * tau_max :], x])
+
+
 def _mapped(fit, x: np.ndarray, order: np.ndarray) -> np.ndarray:
     """``fit`` on the columns of ``x`` in ``order``, mapped back to the original labels."""
     back = np.argsort(order)
-    return fit(x[:, order])[np.ix_(back, back)]
+    return fit(x[:, order])[..., back[:, None], back]
 
 
 def _assert_order_free(fit, x: np.ndarray, module: str, monkeypatch) -> None:
@@ -115,3 +140,36 @@ def test_calm_moral_graph_zero_p_values() -> None:
     want = moral_graph(x)
     for order in permutations(range(4)):
         np.testing.assert_array_equal(_mapped(moral_graph, x, np.array(order)), want)
+
+
+def test_pcmciplus_ties(monkeypatch) -> None:
+    """PC1 meets equal strengths for the lagged links of series 0 and 1 into series 2."""
+    x = _swap_symmetric_series(0)
+    test = design_test("student_t", x, 2)
+    statistics, _ = test.statistic_pvalues(np.array([3, 4]), np.array([2, 2]), np.zeros((2, 0)))
+    assert statistics[0] == statistics[1]
+
+    def fit(data: np.ndarray) -> np.ndarray:
+        graph = andrey.pcmciplus(data, tau_max=2, pc_alpha=0.2).structure
+        return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
+
+    _assert_order_free(fit, x, "andrey.temporal.pcmciplus", monkeypatch)
+
+
+def test_pcmci_parents_ties(monkeypatch) -> None:
+    """PC1's choice of parents for series 2 follows the series when they are reordered."""
+    x = _swap_symmetric_series(0)
+
+    def parents(order: np.ndarray) -> dict[int, list[tuple[int, int]]]:
+        found = andrey.pcmci(x[:, order], tau_max=2, pc_alpha=0.2).metadata["parents"]
+        return {
+            int(order[j]): [(int(order[i]), lag) for i, lag in links]
+            for j, links in enumerate(found)
+        }
+
+    orders = [np.array(order) for order in permutations(range(3))]
+    want = parents(np.arange(3))
+    assert all(parents(order) == want for order in orders)
+    monkeypatch.setattr(importlib.import_module("andrey.temporal.pcmci"), "tie_ranks", _by_position)
+    by_position = parents(np.arange(3))
+    assert any(parents(order) != by_position for order in orders)
