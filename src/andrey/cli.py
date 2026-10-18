@@ -1038,8 +1038,8 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
     context_settings={"help_option_names": ["-h", "--help"]},  # -h works everywhere, not just `run`
     help=(
-        "Accelerated, accurate, agentic causal discovery. List the methods, run one on a data file, and "
-        "check the configuration."
+        "Accelerated, accurate, agentic causal discovery. List the methods, run one on a data "
+        "file, and check the configuration."
     ),
 )
 

@@ -36,18 +36,6 @@ QUALITY = 75  # about 20 KB under MAX_BYTES at 75, 11 KB at 76, 1 KB at 77. No b
 # LinkedIn shows a card at 480 px wide, where 92 px becomes about 37.
 TITLE_FITS = ((92, 2), (72, 3))
 TITLE_WIDTH = 1040
-# An accent word (``ACCENT`` on the homepage's card and the README banner) is drawn at rest, as the
-# homepage's motion ends: amber, slanted like Inter's italic, and sharp, with the trace of its
-# letters on its right: copies of the word behind it, each further right and fainter, blurred
-# sideways and fading out by TRAIL past its end, inside the space before the next word. ROOM is
-# the space added after the word, which keeps the gaps on its two sides even (the slant leans it
-# toward the previous word); TRAIL and BLUR are in font sizes too; TRACE is the copies' opacities,
-# nearest first.
-SLANT = 11
-ROOM = 0.04
-TRAIL = 0.2
-BLUR = 0.06
-TRACE = (0.5, 0.4, 0.3, 0.22, 0.14, 0.08)
 
 
 def _width(text: str, size: int, weight: str) -> float:
@@ -127,39 +115,10 @@ def _credit() -> str:
     )
 
 
-def _text(word: str, x: float, y: float, size: int, fill: str, extra: str = "") -> str:
+def _text(word: str, x: float, y: float, size: int, fill: str) -> str:
     return (
         f'<text x="{x:.1f}" y="{y:.1f}" dominant-baseline="middle" font-family="Inter" '
-        f'font-weight="600" font-size="{size}" fill="{fill}"{extra}>{html.escape(word)}</text>'
-    )
-
-
-def _accent(word: str, x: float, y: float, size: int, key: str) -> tuple[str, str]:
-    """``word`` in amber at (``x``, ``y``), slanted, with its trace after it: its defs and its
-    drawing."""
-    width, trail = _width(word, size, "SemiBold"), size * TRAIL
-    defs = (
-        _text(word, x, y, size, grain.AMBER, f' id="{key}"')
-        # The trace shows at half strength across the word, at full near its end, and fades out
-        # by the end of its reach.
-        + f'<linearGradient id="{key}-fade" gradientUnits="userSpaceOnUse" x1="{x:.1f}" '
-        f'x2="{x + width + trail:.1f}" y1="0" y2="0"><stop offset="0" stop-color="#ffffff" '
-        'stop-opacity="0.5"/><stop offset="0.65" stop-color="#ffffff"/>'
-        '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>'
-        f'<mask id="{key}-trace"><rect x="{x:.1f}" y="{y - size:.1f}" width="{width + trail:.1f}" '
-        f'height="{size * 2}" fill="url(#{key}-fade)"/></mask>'
-        f'<filter id="{key}-blur" x="-50%" y="-50%" width="200%" height="200%">'
-        f'<feGaussianBlur stdDeviation="{size * BLUR:.1f} 0"/></filter>'
-    )
-    step = trail / len(TRACE)
-    copies = "".join(
-        f'<use href="#{key}" x="{(k + 1) * step:.1f}" opacity="{alpha}"/>'
-        for k, alpha in enumerate(TRACE)
-    )
-    slant = f"translate({x:.1f} {y:.1f}) skewX(-{SLANT}) translate({-x:.1f} {-y:.1f})"
-    return defs, (
-        f'<g transform="{slant}"><g mask="url(#{key}-trace)"><g filter="url(#{key}-blur)">'
-        f'{copies}</g></g><use href="#{key}"/></g>'
+        f'font-weight="600" font-size="{size}" fill="{fill}">{html.escape(word)}</text>'
     )
 
 
@@ -173,29 +132,21 @@ def _title(
     left: bool = False,
 ) -> str:
     """``lines`` in white, each centered on ``x0`` (or starting at it, when ``left``) at its middle
-    in ``middles``; each word in ``accents`` drawn as an accent, with its trace's space added
-    after it."""
+    in ``middles``; each word in ``accents`` in amber."""
     space = _width(" ", size, "SemiBold")
-    defs, drawing = [], []
-    for row, (line, y) in enumerate(zip(lines, middles, strict=True)):
+    drawing = []
+    for line, y in zip(lines, middles, strict=True):
         words = line.split(" ")
         widths = [_width(word, size, "SemiBold") for word in words]
-        rooms = [size * ROOM if word in accents else 0 for word in words]
-        x = x0 if left else x0 - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
-        for i, (word, width, room) in enumerate(zip(words, widths, rooms, strict=True)):
-            if word in accents:
-                more, drawn = _accent(word, x, y, size, f"accent-{row}-{i}")
-                defs.append(more)
-                drawing.append(drawn)
-            else:
-                drawing.append(_text(word, x, y, size, "#ffffff"))
-            x += width + space + room
-    return f"<defs>{''.join(defs)}</defs>{''.join(drawing)}"
+        x = x0 if left else x0 - (sum(widths) + space * (len(words) - 1)) / 2
+        for word, width in zip(words, widths, strict=True):
+            drawing.append(_text(word, x, y, size, grain.AMBER if word in accents else "#ffffff"))
+            x += width + space
+    return "".join(drawing)
 
 
 def card_svg(title: str, accents: tuple[str, ...] = ()) -> str:
-    """The card as SVG: ``title`` on up to three lines, each word in ``accents`` drawn as an
-    accent.
+    """The card as SVG: ``title`` on up to three lines, each word in ``accents`` in amber.
 
     Raises ``ValueError`` when the title does not fit, rather than dropping any of it.
     """
@@ -252,7 +203,8 @@ BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at
 BANNER_RADIUS = 27
 BANNER_QUALITY = 65  # its base64 inside the SVG is about 290 KB, under MAX_BYTES
 TAGLINE = "Accelerated, accurate, agentic causal discovery"
-# The tagline's words drawn as accents, on the homepage's card and the banner: the three A's.
+# The tagline's words in amber, on the homepage's card, the banner, and the social preview: the
+# three A's.
 ACCENT = ("Accelerated,", "accurate,", "agentic")
 
 
@@ -597,8 +549,8 @@ def _kit_icon(ink: str, ground: str | None = None) -> str:
 
 
 def social_svg() -> str:
-    """The repository's social preview: the wordmark, the tagline with ``ACCENT`` drawn as
-    accents, and the site's address at the bottom, over the lanes art."""
+    """The repository's social preview: the wordmark, the tagline with ``ACCENT`` in amber, and
+    the site's address at the bottom, over the lanes art."""
     lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_W - 2 * BANNER_LEFT, 2)
     step = round(SOCIAL_TITLE * 1.14)
     top = SOCIAL_H / 2 - (len(lines) - 1) * step / 2 + 10
