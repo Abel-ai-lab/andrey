@@ -19,7 +19,7 @@ import andrey.viz
 ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "README.md"
 IMAGES = ".github/readme"
-SUMMARY = ROOT / "benchmarks/published/alpha-2026-09/summary.json"
+SUMMARY = ROOT / "benchmarks/published/0.1.0/summary.json"
 POSTS = ROOT / "docs" / "blog"
 CONF = (ROOT / "docs" / "conf.py").read_text()
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")

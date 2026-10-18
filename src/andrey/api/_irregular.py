@@ -5,9 +5,6 @@ Fitted models are read by attribute name.
 * **ANM, PNL** (``(pval_forward, pval_backward, stat_forward, stat_backward)``): a two-node
   ``dag`` with the edge :func:`_direction` picks, or none; the p-values and statistics go in
   metadata as ``float``.
-* **CAM-UV** (``(P, U)``): ``P[i]`` holds the parents of ``i``; ``U`` holds pairs sharing an
-  unobserved cause. A ``pag`` with the directed edges and a ``<->`` per pair; the pairs also go
-  in metadata.
 * **RCD** (``adjacency_matrix_``): a finite nonzero ``B[i, j]`` is ``j -> i`` and a ``NaN`` cell
   is ``<->``, in a ``pag``; ``weighted_adjacency`` holds ``B`` with ``NaN`` as ``0``.
 * **BottomUpParceLiNGAM** (``adjacency_matrix_``, ``causal_order_``): a ``NaN`` pair is
@@ -17,7 +14,6 @@ Fitted models are read by attribute name.
 
 from __future__ import annotations
 
-from itertools import combinations
 from typing import Any
 
 import numpy as np
@@ -25,7 +21,7 @@ import numpy as np
 from andrey.core import ARROW, TAIL, GraphStructure, StructureOutput
 
 from ._adapt import structure_output
-from ._marks import directed_marks, marks_from_signed, set_bidirected
+from ._marks import marks_from_signed
 
 # ---- shared helpers -----------------------------------------------------------------------------
 
@@ -174,34 +170,6 @@ def _adapt_pnl(
         stat_backward=stat_backward,
         alpha=alpha,
         labels=labels,
-    )
-
-
-# ---- CAMUV (parents + confounded pairs) ---------------------------------------------------------
-
-
-def _adapt_camuv(P: Any, U: Any, n_vars: int) -> StructureOutput:
-    """CAMUV ``execute`` -> directed edges from ``P`` + bidirected ``<->`` from ``U`` in a ``pag``.
-
-    ``P[i]`` is the parent set of variable ``i`` (edge ``j -> i`` for ``j in P[i]``); ``U`` is a
-    list of index sets sharing an unobserved confounder. Each confounded pair, as a sorted
-    ``[i, j]`` list, rides in ``metadata["confounded_pairs"]``. No ``weighted_adjacency``.
-    """
-    B = np.zeros((n_vars, n_vars), dtype=np.float64)
-    items = P.items() if isinstance(P, dict) else enumerate(P)
-    for i, parents in items:
-        for j in parents:
-            B[int(i), int(j)] = 1.0  # B[i, j] != 0 => edge j -> i
-    M = directed_marks(B)
-    confounded_pairs: list[list[int]] = []
-    for group in U:
-        for a, b in combinations(sorted(int(x) for x in group), 2):
-            confounded_pairs.append([a, b])
-            set_bidirected(M, a, b)
-    confounded_pairs.sort()
-    structure = GraphStructure.from_numpy(M, kind="pag")
-    return structure_output(
-        structure, metadata={"algorithm": "CAMUV", "confounded_pairs": confounded_pairs}
     )
 
 

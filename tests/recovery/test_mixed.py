@@ -17,8 +17,6 @@ from andrey.core import ARROW
 from andrey.data import sample_mixed
 from andrey.metrics import shd, to_cpdag
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 CATEGORICAL = [0, 4]
 DIRECTED = {(0, 2), (1, 2), (2, 3)}
 UNDIRECTED = {(0, 4)}

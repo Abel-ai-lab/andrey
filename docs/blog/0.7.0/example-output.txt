@@ -1,0 +1,2 @@
+collider_order='column': 10 graphs from 10 column orders
+collider_order='p_value': 1 graph from 10 column orders

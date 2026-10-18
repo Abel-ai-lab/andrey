@@ -13,7 +13,7 @@ SUMMARY = (
     Path(__file__).resolve().parents[2]
     / "benchmarks"
     / "published"
-    / "alpha-2026-09"
+    / "0.1.0"
     / "public-datasets.json"
 )
 

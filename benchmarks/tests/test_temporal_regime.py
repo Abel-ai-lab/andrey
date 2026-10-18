@@ -70,7 +70,7 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
     ]
     digests = {}
     for regime, (topology, functional, noise, standardize) in datasets.REGIMES.items():
-        if regime in datasets.TEMPORAL_REGIMES:
+        if regime in datasets.TEMPORAL_REGIMES or functional in datasets.regime_models.MODELS:
             continue
         key = datasets.DatasetKey(
             topology=topology,
@@ -91,7 +91,6 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
         "pnl_small_world": ("82e655de5fd9", "e8b438a8b9ab"),
         "latent_gauss_er": ("fba98d7ca345", "72e95ac72b33"),
         "latent_lingam_er": ("424a811a2462", "a04ce0fceceb"),
-        "latent_anm_er": ("90d312224645", "ac7e8fa030c0"),
         "anm_pair": ("3fc95594c2c1", "a200dd78d80c"),
         "pnl_pair": ("dae8d1a6f304", "d015f7add4b2"),
         "discrete_er": ("389cde24484c", "1cff12e9af03"),

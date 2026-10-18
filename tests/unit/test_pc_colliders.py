@@ -8,8 +8,9 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.constraint.cdnod import _orient_with_context
 from andrey.constraint.pc import _orient_colliders, _undirect_conflicts
-from andrey.core import ARROW, TAIL
+from andrey.core import ARROW, NULL, TAIL
 from andrey.core.orient import meek
 
 
@@ -84,7 +85,20 @@ def test_column_order_keeps_the_collider_visited_first():
     np.testing.assert_array_equal(out, marks(4, directed=[(0, 1), (2, 1)], undirected=[(2, 3)]))
 
 
-def test_an_unknown_collider_order_is_rejected():
+@pytest.mark.parametrize("method", ["pc", "cdnod"])
+def test_an_unknown_collider_order_is_rejected(method):
     x = np.random.default_rng(0).standard_normal((40, 2))
+    args = (x, np.repeat([0.0, 1.0], 20)) if method == "cdnod" else (x,)
     with pytest.raises(ValueError, match="collider_order must be 'p_value' or 'column'"):
-        andrey.pc(x, collider_order="first")
+        getattr(andrey, method)(*args, collider_order="first")
+
+
+def test_cdnod_directs_context_edges_before_ranking_colliders():
+    # Context 3 is adjacent to 0 and 1, which are separated: a collider at the context, ranked
+    # first. Directing 3 -> 0 first skips it, so the collider 2 -> 0 <- 3 is kept.
+    skeleton = marks(4, undirected=[(0, 3), (1, 3), (0, 2)])
+    sepsets = {(0, 1): (), (2, 3): ()}
+    pvalues = {(0, 1): 0.9, (2, 3): 0.5}
+    pdag = _orient_with_context(skeleton, sepsets, pvalues, context=3)
+    np.testing.assert_array_equal(pdag, marks(4, directed=[(3, 0), (3, 1), (2, 0)]))
+    assert np.array_equal(pdag != NULL, skeleton != NULL)

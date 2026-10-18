@@ -267,22 +267,27 @@ def test_errors_compare_as_a_share_rounded_against_andrey():
     ]
 
 
-def test_methods_list_every_registered_method():
+def test_methods_list_every_registered_method(monkeypatch):
+    # GFCI is experimental here, so it carries the status label and no seal.
+    specs = [
+        s.model_copy(update={"status": "experimental"}) if s.name == "gfci" else s
+        for s in list_specs()
+    ]
+    monkeypatch.setattr(build, "list_specs", lambda: specs)
     summaries = placeholder_summaries()
     title, html = build.methods(summaries)
-    specs = list_specs()
     assert title.startswith(f"{len(specs)} methods in ")
     assert html.count('class="method"') == len(specs)
     for spec in specs:
         assert f"docs/code/generated/andrey.{spec.name}.html" in html
     # Each supported method a release's summary compares with another package has the seal, and a
     # tooltip that describes it.
+    status = {s.name: s.status for s in specs}
     measured = {build.registry_name(m) for s in summaries for m in s["methods"]}
     sealed = sorted(re.findall(r'aria-describedby="bench-(\w+)"', html))
-    assert sealed == sorted(n for n in measured if get_spec(n).status == "supported")
+    assert sealed == sorted(n for n in measured if status[n] == "supported")
     assert html.count('role="tooltip"') == len(sealed) and "Benchmarked</a>" not in html
-    experimental = [s for s in specs if s.status == "experimental"]
-    assert html.count('class="method-status"') == len(experimental)
+    assert html.count('class="method-status"') == 1
     assert "Experimental Score-then-FCI hybrid" in re.sub(r"<[^>]+>", "", html)  # read as text
 
 
@@ -562,8 +567,8 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     for release, name in build.PANEL:
         size, bars = shown[name]
         # The slide is the method's largest size with a published ratio, at the panel's mean
-        # degree, and Andrey's bar prints that ratio, "≥" before a lower bound. A pair's size is
-        # its rows.
+        # degree, or the size PANEL_SIZES names, and Andrey's bar prints that ratio, "≥" before a
+        # lower bound. A pair's size is its rows.
         methods = [m for m in by_release[release]["methods"] if m["method"] == name]
         rows = [
             r
@@ -574,7 +579,7 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
         pairs = methods[0].get("family") == "pairwise"
         unit = "rows" if pairs else "variables"
         size_of = (lambda r: r["n"]) if pairs else (lambda r: r.get("observed", r["d"]))
-        largest = max(size_of(r) for r in rows)
+        largest = build.PANEL_SIZES.get((release, name), max(size_of(r) for r in rows))
         assert size == f"{largest:,} {unit}"
         ratio, at_least = max(build.claimed_ratio(r) for r in rows if size_of(r) == largest)
         andrey = next(label for package, _, label in bars if package == "Andrey")
@@ -728,7 +733,7 @@ def test_every_speedup_bar_comes_from_andreys_paired_ratios():
 def test_every_timed_package_needs_a_published_ratio():
     """No silent fallback to a time quotient for a package without a paired ratio."""
     summaries = placeholder_summaries()
-    release, name = build.PANEL[2]
+    release, name = build.PANEL[0]
     summary = summaries[build.RELEASES.index(release)]
     method = next(m for m in summary["methods"] if m["method"] == name)
     row = max((r for r in method["rows"] if r["ratio"]), key=lambda r: r["d"])

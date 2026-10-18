@@ -47,7 +47,6 @@ def _bic(x: np.ndarray, dag) -> float:
     return float(sum(score.score(i, sorted(parents[i])) for i in range(x.shape[1])))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")  # exact_search
 def test_tabu_reaches_the_score_optimum_on_gauss_5v():
     """Tabu search returns the CPDAG of the best-scoring DAG, which exact search finds, and that
     DAG's score. The graph and score match the recorded output."""
@@ -68,7 +67,6 @@ def test_tabu_finds_no_edges_between_independent_columns():
     assert out.metadata["score"] == _bic(x, out.structure)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")  # exact_search
 @pytest.mark.parametrize("seed", range(12))
 def test_tabu_score_lies_between_the_optimum_and_hill_climbing(seed):
     x = _er_sample(8, seed).data
