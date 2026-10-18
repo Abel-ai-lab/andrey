@@ -48,6 +48,7 @@ LAYOUT = (
 def render_homepage(summary, *, placeholder=False):
     """The homepage template filled from ``summary``, as the site build fills it."""
     jinja2 = pytest.importorskip("jinja2")
+    pytest.importorskip("PIL")  # the sweep traces the art; Pillow is the viz extra's, not dev's
     loader = jinja2.ChoiceLoader(
         [
             jinja2.DictLoader(
@@ -306,6 +307,7 @@ def test_unpublished_summary_needs_the_placeholder_flag():
     with pytest.raises(ValueError, match="andrey_placeholder=1"):
         build.load_summary(PLACEHOLDER)
     summary = build.load_summary(PLACEHOLDER, placeholder=True)
+    pytest.importorskip("PIL")  # the context traces the art's sweep
     marked = build.homepage_context(summary, placeholder=True)
     assert 'content="noindex"' in marked["robots"] and "Not for release" in marked["banner"]
     unmarked = build.homepage_context(summary)
@@ -1473,7 +1475,8 @@ def test_the_sweep_follows_the_streak_in_the_art():
     # The traced path lies on the art's amber pixels from its foot to its tip, so the light runs
     # up the streak, the trail's dots, or the arm, and nowhere else.
     import numpy as np
-    from PIL import Image
+
+    Image = pytest.importorskip("PIL.Image")
 
     assert set(build.SWEPT) == {art for _, _, art, _ in build.ACTS} | {
         build.EXAMPLE_ART,

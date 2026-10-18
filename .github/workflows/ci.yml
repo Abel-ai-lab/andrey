@@ -116,19 +116,17 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
       - name: Build wheel + sdist, check contents, clean-venv install/import
-        # The torch-free/numba-free asserts are the point: both live behind extras, so a stray
-        # top-level import in the shipped package fails here. check_dist lists both artifacts and
-        # fails on any file outside the packaging allowlist.
+        # The torch-free assert is the point: torch lives behind an extra, so a stray top-level
+        # import in the shipped package fails here. check_dist lists both artifacts and fails on
+        # any file outside the packaging allowlist.
         run: |
           uv build
           uv venv --python ${{ matrix.python-version }}
           uvx twine check --strict dist/*
           uv run --no-project python scripts/check_dist.py dist --list
           uv pip install dist/*.whl
-          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None, 'core must be torch-free'; assert u.find_spec('numba') is None, 'core must be numba-free ([numba] extra)'; import andrey, numpy; print('andrey', andrey.__version__, '| numpy', numpy.__version__)"
+          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None, 'core must be torch-free'; import andrey, numpy; print('andrey', andrey.__version__, '| numpy', numpy.__version__)"
           uv run --no-project python -c "import numpy as np, andrey; print(andrey.pc(np.random.default_rng(0).standard_normal((500, 4))).structure.to_numpy())"
-          uv pip install numba
-          uv run --no-project python -c "import numba; print('numba', numba.__version__)"
 
   # On-device kernels need GPU hardware; cross-platform.yml covers macOS and Windows (docs/docs/ci.md).
   extras:
@@ -144,10 +142,10 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
-      - name: Correctness suites, all extras - recovery, determinism, JIT kernels
+      - name: Correctness suites, all extras - recovery, determinism, torch kernels
         run: |
           uv sync --all-extras --python ${{ matrix.python-version }}
-          uv run --no-sync python -c "import torch, numba; print('torch', torch.__version__, '| numba', numba.__version__)"
+          uv run --no-sync python -c "import torch; print('torch', torch.__version__)"
           uv run --no-sync python -m pytest tests -q -rs --durations=15
 
   # The single required check. `build-install` is path-filtered, so a PR touching only

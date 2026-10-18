@@ -29,15 +29,13 @@ driver = _driver()
 
 
 def test_the_field_is_what_the_campaign_says_it_is() -> None:
-    """A 2x2 on the penalty: three Andrey backends at each weight, both XGES weights."""
+    """The list includes serial and parallel Andrey at each weight, and both XGES weights."""
     names = [a.name for a in driver.solutions(1.0)]
     assert names == [
         "andrey.ges.numpy.serial",
         "andrey.ges.numpy.parallel",
-        "andrey.ges.numba.serial",
         "andrey.ges.numpy.serial.heavy",
         "andrey.ges.numpy.parallel.heavy",
-        "andrey.ges.numba.serial.heavy",
         "causal-learn.ges",
         "xges.ges",
         "xges.ges.shipped",
@@ -62,7 +60,7 @@ def test_each_penalty_gets_its_own_names_and_its_own_weight() -> None:
 
     light = [n for n in field if n.startswith("andrey") and not n.endswith(".heavy")]
     heavy = [n for n in field if n.endswith(".heavy")]
-    assert len(light) == len(heavy) == 3
+    assert len(light) == len(heavy) == 2
     assert {n + ".heavy" for n in light} == set(heavy)
 
     for name in light:

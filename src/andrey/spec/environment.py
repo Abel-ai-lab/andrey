@@ -16,13 +16,12 @@ from .models import EnvVarSpec
 ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_BACKEND",
-        values="auto, numpy, numba, cpu/none, cuda, mps/metal",
+        values="auto, numpy, cpu/none, cuda, mps/metal",
         default="auto",
         effect=(
-            "Compute backend preference. `auto` uses `cuda` above an operation's size threshold "
-            "and `numba` when installed, else numpy; it never selects `cpu` or `mps`. `numpy` "
-            "forces plain NumPy in float64 (the reference results); `numba` the JIT kernels "
-            "(`[numba]` extra); `cpu` runs torch on the CPU; `mps` runs unvalidated float32 "
+            "Compute backend preference. `auto` uses `cuda` above an operation's size threshold, "
+            "else numpy; it never selects `cpu` or `mps`. `numpy` forces plain NumPy in float64 "
+            "(the reference results); `cpu` runs torch on the CPU; `mps` runs unvalidated float32 "
             "kernels on Apple Metal. An unavailable backend warns once and falls back. "
             "`ANDREY_DEVICE` is an alias."
         ),

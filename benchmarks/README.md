@@ -148,7 +148,7 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 
 | method | solutions |
 |---|---|
-| GES | Andrey (numpy/serial, numpy/parallel, numba/serial), causal-learn, gCastle, pcalg |
+| GES | Andrey (numpy/serial, numpy/parallel), causal-learn, gCastle, pcalg |
 | XGES (GES family) | Andrey and xges, each with and without the extended search |
 | HC | Andrey, bnlearn (`hc`), pgmpy (categorical data) |
 | Tabu | Andrey, bnlearn (`tabu`) |
@@ -1126,12 +1126,13 @@ Read `params` before comparing solutions because their defaults may optimize dif
 ## Layout
 
 - `benchmark.py` - defines solutions, slice, and ladder, then writes one `runs.parquet`. Copy it.
-- `xges_ges.py` - compares three Andrey GES backends, causal-learn GES, and XGES at two BIC weights
-  on CPU, with the baseline.
+- `xges_ges.py` - compares serial and parallel Andrey GES, causal-learn GES, and XGES at two BIC
+  weights on CPU, with the baseline.
 - `andrey_bench/aggregate.py` - pools a results root and joins each run with its provenance.
 - `andrey_bench/pairing.py` - defines valid comparisons, including run pairing, dataset grouping,
   duration skew, and timeout meaning.
-- `ges_cpu.py` - compares three Andrey backends, causal-learn, gCastle, and the baseline on CPU.
+- `ges_cpu.py` - compares serial and parallel Andrey GES, causal-learn, gCastle, and the baseline
+  on CPU.
 - `boss_grasp_cpu.py` - compares BOSS and GRaSP with causal-learn at matched BIC penalties.
 - `boss_grasp_reach.py` - extends the paired BOSS comparison beyond GRaSP's measured range.
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.

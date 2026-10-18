@@ -768,7 +768,7 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     from andrey.core.backend import Backend
     from andrey.spec.generate import env_dict
 
-    state = Backend(backend="auto", num_workers=-1, numba=False, torch=True, cuda=False, mps=True)
+    state = Backend(backend="auto", num_workers=-1, torch=True, cuda=False, mps=True)
     monkeypatch.setattr("andrey.describe", lambda: state)
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "-1")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "90000")
@@ -779,7 +779,6 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     assert report["configuration"] == {"backend": "auto", "num_workers": -1}
     assert report["available_backends"] == {
         "numpy": True,
-        "numba": False,
         "cpu": True,
         "cuda": False,
         "mps": True,
@@ -800,15 +799,13 @@ def test_config_report_is_readable_when_piped(capsys, monkeypatch):
     monkeypatch.setattr("sys.stdout.isatty", lambda: False)
     monkeypatch.setattr(
         "andrey.describe",
-        lambda: Backend(
-            backend="numpy", num_workers=1, numba=False, torch=False, cuda=False, mps=False
-        ),
+        lambda: Backend(backend="numpy", num_workers=1, torch=False, cuda=False, mps=False),
     )
     code, out, err = _run(["config"], capsys)
     assert code == 0 and not err
     assert "Backend preference: numpy" in out
     assert "Available backends: numpy" in out
-    assert "  numba: the [numba] extra is not installed" in out
+    assert all(f"  {name}: " in out for name in ("cpu", "cuda", "mps"))  # a reason per backend
     assert "Platform: " in out and "usable cores" in out
     assert "Extras:" in out
     assert "andrey config --help" in out
@@ -821,15 +818,12 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
 
     monkeypatch.setattr(
         "andrey.describe",
-        lambda: Backend(
-            backend="auto", num_workers=1, numba=False, torch=True, cuda=False, mps=False
-        ),
+        lambda: Backend(backend="auto", num_workers=1, torch=True, cuda=False, mps=False),
     )
     monkeypatch.setattr(
         cli,
         "_extra_packages",
         lambda: {
-            "numba": ["numba"],
             "torch": ["torch"],
             "viz": ["matplotlib", "pygraphviz"],
             "data": ["safetensors"],
@@ -850,7 +844,6 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
     assert not extras["viz"]["installed"]  # pygraphviz is missing
     assert extras["viz"]["install"] == 'pip install "andrey-core[viz]"'
     assert system["unavailable_backends"] == {
-        "numba": "the [numba] extra is not installed",
         "cuda": "torch finds no CUDA device",
         "mps": "Apple MPS needs macOS",
     }
@@ -875,7 +868,7 @@ def test_config_and_describe_report_one_availability_shape(torch, cuda, capsys, 
     # the ANDREY_BACKEND vocabulary, where `cpu` is torch on the CPU.
     from andrey.core import backend
 
-    installed = {"numba": False, "torch": torch}
+    installed = {"torch": torch}
     monkeypatch.setattr(backend, "_installed", lambda name: installed.get(name, False))
     monkeypatch.setattr(backend, "_torch_gpu_build", lambda: True)
     monkeypatch.setattr(backend, "_is_available", lambda device: cuda and device == "cuda")
@@ -884,7 +877,7 @@ def test_config_and_describe_report_one_availability_shape(torch, cuda, capsys, 
     code, out, err = _run(["config", "--json"], capsys)
     assert code == 0 and not err
     reported = json.loads(out)["available_backends"]
-    expected = {"numpy": True, "numba": False, "cpu": torch, "cuda": cuda, "mps": False}
+    expected = {"numpy": True, "cpu": torch, "cuda": cuda, "mps": False}
     assert reported == backend.describe().as_dict()["available_backends"] == expected
 
 

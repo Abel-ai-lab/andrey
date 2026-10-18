@@ -1,4 +1,4 @@
-"""The ``andrey`` command-line interface, generated from the spec registry.
+"""The ``andrey`` command-line interface, generated from method and configuration definitions.
 
 ``andrey list`` enumerates methods, ``andrey run <method> --help`` explains one method, and
 ``--help --json`` returns its versioned contract without execution. Root ``--help --json`` returns
@@ -853,7 +853,6 @@ def check_environment() -> None:
 
 # What each optional extra enables. `andrey config` reports whether each is installed.
 EXTRAS = {
-    "numba": "the `numba` backend: JIT kernels for GES's reachability check",
     "torch": "the `cpu`, `cuda`, and `mps` backends, GPU correlation and entropy tables, and CALM",
     "viz": (
         "`andrey.viz.mpl` chart styling (matplotlib) and Graphviz layouts for `andrey.viz.draw` "
@@ -891,8 +890,6 @@ def _version(distribution: str) -> str | None:
 
 
 def _unavailable_reason(backend: str, extras: dict[str, bool]) -> str:
-    if backend == "numba":
-        return "the [numba] extra is not installed"
     if not extras["torch"]:
         return "the [torch] extra is not installed"
     if backend == "mps" and sys.platform != "darwin":

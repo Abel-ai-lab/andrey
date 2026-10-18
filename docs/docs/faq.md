@@ -96,7 +96,7 @@ speed support.
 ### Why is it faster?
 
 It batches independent tests and scores into array operations, reuses work across steps, skips
-work that cannot change the result, and uses compiled or GPU code where that helps.
+work that cannot change the result, and uses GPU code where that helps.
 [Why Andrey is fast](../blog/20261008-why-andrey-is-fast.md) explains the four ideas.
 
 ### Do I need a GPU?
@@ -108,11 +108,10 @@ large enough to repay the transfer; correlation matrices move too when you set
 
 ### What do the optional extras add?
 
-- `numba`: compiled CPU code for GES's path checks.
 - `torch`: the PyTorch backend for GPUs, and CALM.
 - `viz`: Matplotlib chart styling (`andrey.viz.mpl`), and Graphviz layouts for drawn graphs.
 - `data`: saving and loading generated datasets (`andrey.data`).
-- `all`: all four.
+- `all`: all three.
 
 ### Can it use more CPU cores?
 

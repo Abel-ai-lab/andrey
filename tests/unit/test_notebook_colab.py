@@ -79,6 +79,6 @@ def test_colab_installs_the_release_from_pypi(notebook, monkeypatch):
     (command,) = commands
     words = shlex.split(command)
     assert words[:2] == ["pip", "install"]
-    assert f"andrey-core[numba,viz]=={andrey.__version__}" in words
+    assert f"andrey-core[viz]=={andrey.__version__}" in words
     assert not any(".whl" in word or " @ " in word for word in words)  # PyPI, not a file
     assert ("causal-learn==0.1.4.8" in words) == (notebook.stem == "speed_on_your_machine")
