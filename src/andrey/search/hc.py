@@ -9,6 +9,7 @@ score; lower is better.
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 from collections.abc import Collection
 from itertools import compress
 from operator import ne
@@ -18,7 +19,7 @@ import numpy as np
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import MIXED_SCORES, BICScore, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
@@ -51,13 +52,36 @@ ScannedMove = tuple[float, int, int, int, tuple[str, int, int]]
 StructureKey = tuple[int, ...]
 
 
-def tie_ranks(x: np.ndarray) -> np.ndarray:
-    """Each column's place in the tie-break order: by a hash of its values, then by position.
+def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarray:
+    """Each column's place in the tie-break order: by its pattern, then its values, then position.
 
-    The hash travels with the column, so reordering the columns reorders their ranks the same way;
-    only identical columns fall back to their positions.
+    A continuous column's pattern is its steps, the signs of ``x[i + 1] - x[i]`` down the rows.
+    Steps are exact comparisons, so data that differ in their last bits, as a BLAS kernel's output
+    does from one CPU to another, keep their ranks unless two consecutive values of a column lie
+    within rounding of each other. A column ``categorical`` marks has its codes renumbered in order
+    of first appearance as its pattern, so recoding its categories keeps its rank. Columns are
+    ordered by a hash of their pattern; columns with the same pattern, such as a column and an
+    increasing function of it, by a hash of their values. Both keys travel with the column, so
+    reordering the columns reorders their ranks the same way; only identical columns fall back to
+    their positions.
     """
-    digests = [hashlib.blake2b(col.tobytes(), digest_size=8).digest() for col in x.T]
+    mask = np.zeros(x.shape[1], dtype=bool) if categorical is None else categorical
+    patterns = []
+    for col, is_categorical in zip(x.T, mask.tolist(), strict=True):
+        if is_categorical:
+            _, first, codes = np.unique(col, return_index=True, return_inverse=True)
+            seen = np.empty(first.size, dtype=np.int64)
+            seen[np.argsort(first)] = np.arange(first.size)
+            pattern = seen[codes]
+        else:
+            col = np.ascontiguousarray(col)
+            pattern = (col[1:] > col[:-1]).astype(np.int8) - (col[1:] < col[:-1])
+        patterns.append(hashlib.blake2b(pattern.tobytes(), digest_size=8).digest())
+    shared = {key for key, count in Counter(patterns).items() if count > 1}
+    digests = [
+        (key, hashlib.blake2b(col.tobytes(), digest_size=8).digest() if key in shared else b"")
+        for key, col in zip(patterns, x.T, strict=True)
+    ]
     order = sorted(range(len(digests)), key=digests.__getitem__)
     ranks = np.empty(len(order), dtype=np.intp)
     ranks[order] = np.arange(len(order))
@@ -416,6 +440,7 @@ def hc(
     score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     forbidden = None
+    mask = np.full(d, score_func in DISCRETE_SCORES)
     if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
         mask = column_mask(categorical, d)
         forbidden = mask[:, None] & ~mask[None, :]
@@ -425,7 +450,7 @@ def hc(
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
-        scanner = MoveScanner(delta, d, ranks=tie_ranks(X), forbidden=forbidden)
+        scanner = MoveScanner(delta, d, ranks=tie_ranks(X, mask), forbidden=forbidden)
         moves = 0
         while max_iter is None or moves < max_iter:
             best = scanner.best(adj_int, parents_of)

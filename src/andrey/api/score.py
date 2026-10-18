@@ -520,8 +520,11 @@ def hc(
     after ``max_iter`` moves when set. Under a mixed-data score, no move gives a categorical column
     a continuous parent, so the DAG found is a conditional linear Gaussian network. Exact score ties
     between moves, such as adding ``x -> y`` or ``y -> x`` under a score-equivalent score, break by
-    a hash of each column's values, so reordering the columns does not change the graph found
-    unless two columns are identical.
+    a pattern of each column, then by its values, so reordering the columns does not change the
+    graph found unless two columns are identical. A continuous column's pattern is the signs of its
+    changes from row to row, which rounding in the last bits of the data, such as a BLAS kernel's on
+    another CPU, does not change; a categorical column's is which rows share a category, which
+    recoding the categories does not change.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
     to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)

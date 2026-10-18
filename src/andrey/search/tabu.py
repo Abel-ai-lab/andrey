@@ -13,7 +13,7 @@ import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore, LocalScore, make_score
+from andrey.core.score import DISCRETE_SCORES, BICScore, LocalScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE
@@ -128,9 +128,10 @@ def tabu(
     d = X.shape[1]
     score = make_score(score_func, X, lambda_value=lambda_value)
 
+    ranks = tie_ranks(X, np.full(d, score_func in DISCRETE_SCORES))
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
-        best_key, moves = _search(score, tie_ranks(X), tabu_length, max_tabu, max_iter)
+        best_key, moves = _search(score, ranks, tabu_length, max_tabu, max_iter)
     if max_iter is not None and moves == max_iter:
         warn_once(
             f"tabu stopped at its limit of max_iter={max_iter} moves; a longer search may find a "
