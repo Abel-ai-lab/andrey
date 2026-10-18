@@ -88,7 +88,6 @@ UNUSABLE = {
 }
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("case", list(UNUSABLE))
 @pytest.mark.parametrize("method", list(SINGLE))
 def test_unusable_data_raises_a_value_error_naming_it(method, case):
@@ -106,7 +105,6 @@ def test_a_dataframe_error_names_the_constant_column():
         andrey.pc(frame)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     "method",
     [
@@ -121,7 +119,6 @@ def test_one_column_gives_a_one_node_graph(method):
     assert structure.oriented_edges() == []
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("method", ["pc", "ges", "hc", "xges"])
 def test_no_columns_give_an_empty_graph(method):
     assert SINGLE[method](_data(d=0)).structure.n_nodes == 0
@@ -147,7 +144,6 @@ BROKEN = {
 
 
 # Every BIC search runs the check; one of them shows the pairwise message.
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("method", "case"), [(m, "sum of two columns") for m in BIC] + [("ges", "scaled copy")]
 )
@@ -157,7 +153,6 @@ def test_bic_searches_reject_dependent_columns(method, case):
         SINGLE[method](make())
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("method", [m for m in BIC if m != "exact_search"])
 def test_bic_searches_fit_fewer_rows_than_columns(method):
     out = SINGLE[method](np.random.default_rng(0).standard_normal((6, 12)))
@@ -168,7 +163,6 @@ def test_bic_searches_fit_fewer_rows_than_columns(method):
         assert np.isfinite(out.metadata["score"])
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_exact_search_gives_no_variable_more_parents_than_rows_minus_2():
     dag = andrey.exact_search(np.random.default_rng(0).standard_normal((4, 6))).structure
     heads = [v for _, v, _ in dag.oriented_edges(index=True)]
@@ -182,7 +176,6 @@ def test_time_series_methods_need_two_variables(fit):
         fit(_data(d=1))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("setting", "value", "error"),
     [
@@ -211,7 +204,6 @@ def test_pairwise_tests_reject_unusable_data(fit):
         fit(_with(_data(d=2), (slice(None), 1), 3.0))
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("fit", "name", "least"),
     [
@@ -226,7 +218,6 @@ def test_multi_dataset_methods_name_the_dataset_at_fault(fit, name, least):
         fit([_data()])
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_multi_group_direct_lingam_needs_the_same_columns_in_every_group():
     with pytest.raises(ValueError, match="data_groups needs the same columns"):
         andrey.multi_group_direct_lingam([_data(d=3), _data(d=4)])
@@ -240,7 +231,6 @@ def test_longitudinal_lingam_takes_n_lags_up_to_the_time_points_minus_one(n_lags
     assert andrey.longitudinal_lingam(data, n_lags=2).structure.n_lags == 3  # lags 0, 1, 2
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("order", "error"),
     [((-1, 1), ValueError), ((0, 0), ValueError), ((1,), TypeError), ((1.0, 1), TypeError)],
@@ -250,7 +240,6 @@ def test_varma_lingam_checks_order(order, error):
         andrey.varma_lingam(_data(), order=order)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("params", "error", "name"),
     [
@@ -275,7 +264,6 @@ def test_pcmci_needs_enough_time_steps_for_every_test():
     assert andrey.pcmci(_data(n=27), tau_max=3, pc_alpha=0.99).structure.lags == (1, 2, 3)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("params", "error", "name"),
     [
@@ -307,7 +295,6 @@ def test_pcmciplus_takes_one_variable():
     assert out.structure.lag(0).oriented_edges() == []
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("params", "error", "name"),
     [
@@ -346,14 +333,12 @@ def test_pcmci_takes_one_variable():
     assert out.metadata["parents"] == [[]]
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("alpha", [0.0, 1.0, 2.0])
 def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
     with pytest.raises(ValueError, match="alpha"):
         andrey.gin(_data(d=4), alpha=alpha)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("fit", "setting", "value", "error"),
     [
@@ -372,7 +357,6 @@ def test_hidden_confounder_methods_reject_a_bad_setting(fit, setting, value, err
         fit(_data(), **{setting: value})
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_gin_labels_name_each_column():
     with pytest.raises(ValueError, match="labels must name each of the 4 columns"):
         andrey.gin(_data(d=4), labels=("a", "b"))
@@ -496,7 +480,6 @@ def _categories(n=200, d=3):
     return np.random.default_rng(0).integers(0, 3, (n, d)).astype(np.float64)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
 def test_a_categorical_setting_rejects_a_fractional_value(setting):
     _, option, value = setting
@@ -515,7 +498,6 @@ CATEGORY_COLUMNS = {
 }
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("kind", list(CATEGORY_COLUMNS))
 @pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
 def test_a_categorical_setting_reads_a_column_of_categories_like_its_codes(setting, kind):
@@ -532,7 +514,6 @@ def test_a_categorical_setting_reads_a_column_of_categories_like_its_codes(setti
     assert np.array_equal(fit(typed).structure.to_numpy(), fit(frame).structure.to_numpy())
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("setting", list(CATEGORICAL), ids="-".join)
 def test_a_categorical_setting_names_a_missing_category(setting):
     pd = pytest.importorskip("pandas")
@@ -542,7 +523,6 @@ def test_a_categorical_setting_names_a_missing_category(setting):
         CATEGORICAL[setting](frame)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("score_func", "indep_test"), [("local_score_BDeu", "fisherz"), ("local_score_BIC", "chisq")]
 )
@@ -564,7 +544,6 @@ def test_a_categorical_error_names_the_dataframe_column():
         andrey.pc(frame, indep_test="chisq")
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     "fit", [andrey.ges, andrey.hc, andrey.tabu, partial(andrey.gfci, indep_test="chisq")]
 )
@@ -574,7 +553,6 @@ def test_bdeu_still_checks_lambda_value(fit):
         fit(_categories(), score_func="local_score_BDeu", lambda_value=-1.0)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
     c_indx = np.r_[0.5, np.zeros(99), np.ones(100)]
     with pytest.raises(ValueError, match=r"domain_index .* 0\.5 at row 0"):
@@ -629,7 +607,6 @@ def _mixed_data(n=200):
     ).astype(np.float64)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
 def test_a_mixed_setting_infers_whole_number_columns_and_says_so(setting):
     """Columns 0 and 2 hold three and two whole numbers; column 1 is continuous."""
@@ -640,7 +617,6 @@ def test_a_mixed_setting_infers_whole_number_columns_and_says_so(setting):
     assert np.array_equal(named.structure.to_numpy(), out.structure.to_numpy())
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
 def test_a_mixed_setting_without_categorical_columns_warns_and_runs(setting):
     with pytest.warns(andrey.DataTypeWarning, match="with categorical=\\[\\], so it runs as the"):
@@ -706,7 +682,6 @@ def test_a_continuous_setting_hints_at_columns_that_look_like_codes(fit):
     assert "categorical" not in out.metadata
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)
 def test_a_mixed_setting_rejects_a_fractional_category(setting):
     with pytest.raises(ValueError, match=r"reads data .* 0\.5 at row 7, column 2"):
@@ -732,7 +707,6 @@ def test_categorical_lists_columns_the_data_has(data, categorical, error, messag
         andrey.pc(x, indep_test="degen_gauss", categorical=categorical)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     "fit",
     [
@@ -761,7 +735,6 @@ def test_a_column_that_does_not_hold_numbers_must_be_categorical():
         andrey.pc(frame, indep_test="degen_gauss")
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("score_func", "indep_test"),
     [
@@ -775,7 +748,6 @@ def test_gfci_rejects_a_mixed_score_or_test_without_its_pair(score_func, indep_t
         andrey.gfci(_mixed_data(), score_func=score_func, indep_test=indep_test, categorical=[0])
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_cdnod_with_a_mixed_test_takes_continuous_data_and_rejects_a_fractional_index():
     """The index is the categorical variable, so the data may have no categorical column."""
     x = _mixed_data()[:, [1]]
@@ -791,7 +763,6 @@ def _intervened(rows, column):
     return mask
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(
     ("interventions", "message"),
     [

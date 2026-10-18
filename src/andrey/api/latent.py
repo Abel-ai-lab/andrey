@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
-from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -63,12 +62,6 @@ def gin(
         If ``alpha`` is not in ``(0, 1)``, or if ``labels`` does not give one name per column of
         ``data``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
     A group of observed variables forms a cluster when the linear combination of the group that is
@@ -82,8 +75,12 @@ def gin(
     test passes. Each comparison rejects a true root with probability about ``alpha``, the test's
     nominal size, so a correct model can still leave the latents from that step on unordered.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on 6 observed indicators of 2 latents and
-    on 9 indicators of 3 latents, with 1,000 rows. Given the true clusters of a chain of three
+    **Limitations.** Measured on simulated linear measurement models with uniform noise and 1,000
+    rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its
+    own. With 2 and 3 latents its clusters matched the true ones (median adjusted Rand index 1);
+    with 4 latents (12 indicators) the median index was 0.89, and a median of one latent was
+    missed. The median fit took 3.5 s with 6 indicators, 15 s with 9, and 38 s with 12, on 4 cores.
+    Given the true clusters of a chain of three
     latents and of a complete three-latent model, with 1,000 rows, the order stopped early on 1 of
     10 seeds for each, and no latent was put after one it causes. It tests every group of observed
     variables of each size, from pairs upward, so the number of tests grows combinatorially with the
@@ -114,7 +111,6 @@ def gin(
     >>> out.metadata["clusters"], out.structure.labels
     ([[0, 1, 2]], ('X1', 'X2', 'X3', 'L1'))
     """
-    warn_experimental("gin")
     from andrey.latent.gin import gin_structure
 
     X = data_matrix(data)

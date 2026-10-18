@@ -49,7 +49,8 @@ Recover a three-variable chain with GES.
 :img-top: /_generated/thumbs/constraint_based.svg
 :img-alt: The graph PC or FCI recovers in this notebook
 
-PC's CPDAG and FCI's PAG from conditional-independence tests.
+PC's CPDAG and FCI's and GFCI's PAGs from conditional-independence tests, and CD-NOD on data
+from several domains.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -71,7 +72,19 @@ BOSS and GRaSP search over orderings of the variables for the best-scoring graph
 :img-top: /_generated/thumbs/score_search.svg
 :img-alt: The true graph of this notebook's data
 
-XGES, hill climbing, and Tabu search look for the graph with the best BIC score.
+XGES, hill climbing, Tabu search, and exact search look for the graph with the best BIC score;
+GIES also learns from interventions.
+
+{bdg-secondary-line}`Notebook · Colab`
+:::
+
+:::{grid-item-card} Continuous optimization: CALM
+:link: calm
+:link-type: doc
+:img-top: /_generated/thumbs/calm.svg
+:img-alt: The true graph of this notebook's data
+
+CALM learns a weighted DAG by gradient descent on a penalized likelihood; it runs on torch.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -82,7 +95,8 @@ XGES, hill climbing, and Tabu search look for the graph with the best BIC score.
 :img-top: /_generated/thumbs/lingam.svg
 :img-alt: The DAG DirectLiNGAM or ICA-LiNGAM recovers in this notebook
 
-DirectLiNGAM and ICA-LiNGAM orient every edge when the noise is non-Gaussian.
+DirectLiNGAM and ICA-LiNGAM orient every edge when the noise is non-Gaussian; MultiGroupDirectLiNGAM
+fits several datasets, and GIN finds latent variables.
 
 {bdg-secondary-line}`Notebook · Colab`
 :::
@@ -152,6 +166,7 @@ ges_quickstart
 constraint_based
 permutation_based
 score_search
+calm
 lingam
 rcd
 bottom_up_parce_lingam

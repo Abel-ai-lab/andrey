@@ -22,7 +22,6 @@ from andrey.api._adapt import (
     open_unit_interval,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -550,9 +549,6 @@ def gfci(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When the mixed-data score and test infers the categorical columns, or finds none and so runs
         as the linear-Gaussian form, or when a continuous setting meets columns that look like
@@ -583,16 +579,20 @@ def gfci(
     ends, against all the nodes it was reached from, so the set does not depend on that order, and
     it can be larger.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 600 rows,
-    and on 2,000 rows with 5 variables. It runs a full :func:`~andrey.ges` search before any test,
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2) with one variable in ten hidden, from 20 to 200 variables counting the hidden ones (18
+    to 180 observed), with ten rows per variable. Its median endpoint errors, each mismatched tail,
+    arrowhead, or circle, stayed below the empty graph's at every size (197 against 444 at 180
+    observed variables). The median fit took 0.54 s at 90 observed variables and 2.6 s at 180, on 4
+    cores. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
     linear relations with Gaussian noise. With fewer rows than columns the BIC score is
     unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
     GES search never selects one, nor any parent set that leaves its child a residual variance of at
     most ``1e-12`` times its variance. Rule R5 has the search bound described under
     :func:`~andrey.fci`. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
-    data the result can still depend on the column order. With the mixed-data score and test, its
-    tests run it on 5 variables with 3,000 rows.
+    data the result can still depend on the column order. With the mixed-data score and test, it is
+    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -616,7 +616,6 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    warn_experimental("gfci")
     from andrey.search.gfci import gfci as _gfci
 
     # Both phases read the same data, so the score and the test must agree on its type.
@@ -737,9 +736,6 @@ def cdnod(
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When a mixed-data test infers the categorical columns, or finds none and so runs as the
         linear-Gaussian form, or when a continuous setting meets columns that look like category
@@ -779,24 +775,29 @@ def cdnod(
     The step is off by default, because with these tests only a variable whose mean follows the
     index reaches it, and such a shared trend makes the changes depend on each other.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 500 rows,
-    and on 2,000 rows with 5 variables, and the independent-change step on at most 4 variables with
-    600 rows from 20 domains. It runs the PC search with the index as one more variable, so it costs
-    about as much as :func:`~andrey.pc` on the data plus one column. Its partial-correlation tests
-    assume linear relations with Gaussian noise and find only a change in a variable's mean that is
-    linear in the index: on two variables from two domains with 600 rows, a mean shift of the cause
-    oriented the edge on 20 of 20 seeds, and a change of its variance alone, or of the weight of the
-    effect on a mean-zero cause alone, on none. Without the independent-change step, an edge between
-    two variables that both change with the index stays undirected unless the collider or Meek's
-    rules orient it. The step reaches only variables whose means follow the index. On two variables
-    from 20 domains with 600 rows, both means rising linearly by about 1 across the domains, the
-    cause's noise scale drawn per domain, and the effect's weight on it drawn per domain from (0.5,
-    2.5), at the threshold 0.06 it oriented the edge on 1 of 20 seeds. Given the true skeleton of
-    ten complete three-variable DAGs from 20 domains with 600 rows, no mean trend, and weights in
-    (-2, 2) drawn per domain, it oriented 18 of their 30 edges correctly and 4 against the truth.
-    The paper fits the kernel widths, the index kernel, and the ridge of the step by
-    Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, its tests run it on 5
-    variables with 3,000 rows.
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), with 2,000 rows pooled from four domains of equal size, in which one variable in
+    three shifts its mean with the domain, from 10 to 50 variables with 20 datasets per size. Its
+    median errors (SHD against the CPDAG the domain index makes identifiable) stayed below the empty
+    graph's at every size (12 against 50 at 50 variables). The median fit took 0.18 s at 50
+    variables, on 4 cores. The independent-change step is not benchmarked yet; its tests run it on
+    at most 4 variables with 600 rows from 20 domains. It runs the PC search with the index as one
+    more variable, so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
+    partial-correlation tests assume linear relations with Gaussian noise and find only a change in
+    a variable's mean that is linear in the index: on two variables from two domains with 600 rows,
+    a mean shift of the cause oriented the edge on 20 of 20 seeds, and a change of its variance
+    alone, or of the weight of the effect on a mean-zero cause alone, on none. Without the
+    independent-change step, an edge between two variables that both change with the index stays
+    undirected unless the collider or Meek's rules orient it. The step reaches only variables whose
+    means follow the index. On two variables from 20 domains with 600 rows, both means rising
+    linearly by about 1 across the domains, the cause's noise scale drawn per domain, and the
+    effect's weight on it drawn per domain from (0.5, 2.5), at the threshold 0.06 it oriented the
+    edge on 1 of 20 seeds. Given the true skeleton of ten complete three-variable DAGs from 20
+    domains with 600 rows, no mean trend, and weights in (-2, 2) drawn per domain, it oriented 18 of
+    their 30 edges correctly and 4 against the truth. The paper fits the kernel widths, the index
+    kernel, and the ridge of the step by Gaussian-process likelihood; Andrey fixes them. With a
+    mixed-data test, it is experimental and not benchmarked yet; its tests run it on 5 variables
+    with 3,000 rows.
 
     References
     ----------
@@ -815,7 +816,6 @@ def cdnod(
     >>> cdnod(np.column_stack([x, y]), domain_index).structure.oriented_edges()
     [(0, 1, 'directed')]
     """
-    warn_experimental("cdnod")
     from andrey.constraint.cdnod import cdnod as _cdnod
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.

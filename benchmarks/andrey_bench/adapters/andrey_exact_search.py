@@ -41,8 +41,7 @@ class AndreyExactSearch:
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run the search and return DAG endpoint marks. The only timed region.
 
-        Calls the search directly, so the facade's experimental warning and input checks stay
-        outside the timing.
+        Calls the search directly, so the facade's input checks stay outside the timing.
         """
         from andrey.search.exact import exact_search
 

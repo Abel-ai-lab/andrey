@@ -12,8 +12,6 @@ from andrey.core import LATENT, OBSERVED, GraphStructure, StructureOutput
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 _CASE = "measurement_6v"
 
 

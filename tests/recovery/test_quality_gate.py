@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from andrey import GraphStructure
+from andrey.core import LATENT
 from andrey.data import real
 from qa import quality_gate as qg
 
@@ -28,13 +29,17 @@ def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
 
 
 def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
-    """The true graph with each variable moved one column: an off-by-one in column handling."""
+    """The true graph with each variable moved one column: an off-by-one in column handling. A
+    measurement model moves its indicators and keeps its latents last."""
     if target in qg.SERIES_TARGETS:
         return shifted_series_truth(draw.truth, target)
     truth = qg.target_truth(draw.truth, target)
     marks = truth.to_numpy()
-    shift = np.roll(np.arange(len(marks)), 1)
-    return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=truth.kind)
+    shift = np.arange(len(marks))
+    types = None if target != "clusters" else np.asarray(truth.node_types)
+    observed = shift if types is None else np.flatnonzero(types != LATENT)
+    shift[observed] = np.roll(observed, 1)
+    return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=truth.kind, node_types=types)
 
 
 def shifted_series_truth(truth: object, target: qg.Target) -> object:
@@ -100,6 +105,33 @@ def test_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) ->
                 latents=bench.latents_for(regime, d),
             )
             assert qg.regime_kwargs(regime, d, n, 3) == bench.generation_kwargs(key)
+
+
+def test_model_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The gate draws CD-NOD's, MultiGroupDirectLiNGAM's, and GIN's regimes as the harness does."""
+    pytest.importorskip("fcntl")  # the harness's dataset store locks files with fcntl
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "benchmarks"))
+    bench = importlib.import_module("andrey_bench.datasets")
+    for regime, (model, noise) in qg.MODEL_REGIMES.items():
+        topology, functional, bench_noise, standardize = bench.REGIMES[regime]
+        assert (functional, bench_noise) == (model, noise)
+        d, n = qg.MODEL_SIZES[regime][0]
+        spec = qg.regime_models.MODELS[model]
+        key = bench.DatasetKey(
+            topology=topology,
+            functional=functional,
+            noise=noise,
+            density=getattr(spec, "indicators", bench.CANONICAL_DENSITY),
+            d=d,
+            n=n,
+            seed=3,
+            standardize=standardize,
+            latents=bench.latents_for(regime, d),
+        )
+        data, marks, kind, _ = bench.generate_one(key)
+        draw = qg.model_draws(regime, d, n)[3]
+        assert np.array_equal(draw.data, data) and np.array_equal(draw.truth.to_numpy(), marks)
+        assert draw.truth.kind == kind
 
 
 def test_pairs_match_the_benchmark_drivers(monkeypatch: pytest.MonkeyPatch) -> None:

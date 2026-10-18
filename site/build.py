@@ -51,13 +51,13 @@ PUBLISHED = ROOT / "benchmarks" / "published"
 # PUBLISHED. The speed and accuracy sections cover them all. The first is SUMMARY, the one a
 # placeholder preview replaces.
 RELEASES = (
-    "alpha-2026-09",
-    "hidden-confounders-2026-10",
-    "score-search-2026-10",
-    "pairwise-2026-10",
-    "direct-lingam-2026-10",
-    "time-series-2026-10",
-    "data-types-2026-10",
+    "0.1.0",
+    "0.2.0",
+    "0.3.0",
+    "0.4.0",
+    "0.4.1",
+    "0.5.0",
+    "0.6.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -257,16 +257,16 @@ def error_kind(method: dict) -> str:
     at each size, in the measure the summary records for both:
 
     - ``shd``: the structural Hamming distance to the true graph, the edges to add, remove, or
-      reorient to reach it (the alpha-2026-09 and score-search-2026-10 summaries).
+      reorient to reach it (the 0.1.0 and 0.3.0 summaries).
     - ``directed``: on data with hidden common causes, the directed edges in one graph but not the
       other, against the true graph's projection onto the observed variables; a reversed edge
-      counts twice (the hidden-confounders-2026-10 summary).
+      counts twice (the 0.2.0 summary).
     - ``direction``: on cause-effect pairs, the pairs whose direction is reversed (the
-      pairwise-2026-10 summary). Each package names a direction on every pair it fits, so a fitted
+      0.4.0 summary). Each package names a direction on every pair it fits, so a fitted
       pair is either right or reversed; a summary with a pair left without an edge fails to load.
     - ``temporal``: in a time series, the errors in the method's own unit, which its summary's
       ``error_metric`` defines: the lag-resolved SHD, the endpoint SHD over a window of lags, or
-      the lagged or cross-link edges missed plus those added (the time-series-2026-10 summary).
+      the lagged or cross-link edges missed plus those added (the 0.5.0 summary).
 
     Fewer is better in each. A comparison whose rows give none of them fails, rather than drop out
     of the count.
@@ -451,12 +451,12 @@ def ratio_label(row: dict) -> str:
 # The methods the README chart shows, each from a release's summary: (folder in RELEASES,
 # method). The chart orders them by speedup.
 PANEL = (
-    ("alpha-2026-09", "PC"),
-    ("alpha-2026-09", "FCI"),
-    ("alpha-2026-09", "GES"),
-    ("score-search-2026-10", "XGES"),
-    ("score-search-2026-10", "Tabu search"),
-    ("direct-lingam-2026-10", "DirectLiNGAM"),
+    ("0.1.0", "PC"),
+    ("0.1.0", "FCI"),
+    ("0.1.0", "GES"),
+    ("0.3.0", "XGES"),
+    ("0.3.0", "Tabu search"),
+    ("0.4.1", "DirectLiNGAM"),
 )
 
 
