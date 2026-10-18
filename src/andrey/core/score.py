@@ -39,6 +39,7 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
+from scipy.linalg import get_lapack_funcs
 from scipy.sparse.csgraph import connected_components
 from scipy.special import gammaln
 
@@ -634,6 +635,20 @@ class DGScore:
     columns, so on continuous columns only, the two scores are equal. Scores are memoized by
     ``(node, sorted parents)``.
 
+    The parents' columns are collinear when one parent's categories determine another's, as in a
+    network with deterministic conditional probabilities, and a solve on their singular covariance
+    can return a wrong fit without raising. A pivoted Cholesky factorization of their correlation
+    matrix then picks, one at a time, the column with the most residual variance given the columns
+    already picked, and stops when none keeps more than :data:`ZERO_RESIDUAL` of its variance.
+    ``Y`` is regressed on the picked columns, which fit it as all of them do, and ``|X|`` still
+    counts every column.
+
+    The family is unavailable, and the score ``inf``, when a combination of the node's columns
+    keeps at most :data:`ZERO_RESIDUAL` of its variance given the parents, the rule
+    :func:`local_score_bic` applies to a single column. A node its parents determine, such as a
+    merge of a parent's categories, is one. A search that minimizes the score never selects an
+    unavailable family.
+
     Parameters
     ----------
     data : ndarray, shape (n, d)
@@ -665,13 +680,31 @@ class DGScore:
         self.lambda_value = penalty_weight(lambda_value)
         self.log_n = float(np.log(self.n))
         self._cov_diag = np.diag(self._dg.cov)
+        self._sd = np.sqrt(self._cov_diag)
+        # When every eigenvalue of the embedded columns' correlation matrix exceeds ZERO_RESIDUAL,
+        # so does each column's share of variance left given any other columns: no parents are
+        # collinear.
+        corr = self._dg.cov / np.outer(self._sd, self._sd)
+        try:
+            np.linalg.cholesky(corr - ZERO_RESIDUAL * np.eye(len(corr)))
+            self._check_collinear = False
+        except np.linalg.LinAlgError:
+            self._check_collinear = True
         self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
 
     def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
         cov = self._dg.cov
         ys = self._dg.columns([node])
         xs = self._dg.columns(parents)
-        if ys.size == 1:
+        kept = xs
+        if self._check_collinear and xs.size > 1:
+            sd = self._sd[xs]
+            corr = cov[np.ix_(xs, xs)] / np.outer(sd, sd)
+            (pstrf,) = get_lapack_funcs(("pstrf",), (corr,))
+            _, pivots, rank, _ = pstrf(corr, tol=ZERO_RESIDUAL, lower=1)
+            if rank < xs.size:
+                kept = xs[np.sort(pivots[:rank] - 1)]
+        if ys.size == 1 and kept.size == xs.size:
             return local_score_bic(
                 cov,
                 self.n,
@@ -681,12 +714,18 @@ class DGScore:
                 log_n=self.log_n,
                 cov_diag=self._cov_diag,
             )
-        residual = cov[np.ix_(ys, ys)]
-        if xs.size:
-            cross = cov[np.ix_(xs, ys)]
-            residual = residual - cross.T @ _solve(cov[np.ix_(xs, xs)], cross)
-        sign, log_det = np.linalg.slogdet(residual)
-        log_det = log_det if sign > 0 else -np.inf
+        own = cov[np.ix_(ys, ys)]
+        residual = own
+        if kept.size:
+            cross = cov[np.ix_(kept, ys)]
+            residual = own - cross.T @ _solve(cov[np.ix_(kept, kept)], cross)
+        try:
+            # Positive definite when every combination of the node's columns keeps more than
+            # ZERO_RESIDUAL of its variance.
+            np.linalg.cholesky(residual - ZERO_RESIDUAL * own)
+        except np.linalg.LinAlgError:
+            return math.inf
+        log_det = np.linalg.slogdet(residual)[1]
         return float(self.n * log_det + self.log_n * self.lambda_value * ys.size * xs.size)
 
     def score(self, node: int, parents: Sequence[int]) -> float:

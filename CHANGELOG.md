@@ -107,6 +107,10 @@ change names its pull request.
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
   dropping the edge. ([#187])
+- With the degenerate Gaussian score, on data where one variable's categories determine another's,
+  `boss` no longer raises `ValueError` or `StopIteration` and no search picks parents by a wrong or
+  minus-infinite score: collinear parents are fit by the columns that span them, and a node its
+  parents determine scores `inf`, unavailable as under the BIC. ([#203])
 
 ## [0.6.0] - 2026-10-17
 
@@ -324,3 +328,4 @@ First alpha release.
 [#190]: https://github.com/Abel-ai-lab/andrey/pull/190
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
+[#203]: https://github.com/Abel-ai-lab/andrey/pull/203
