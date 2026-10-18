@@ -1,8 +1,10 @@
 #!/usr/bin/env python
-"""Benchmark PC with the nonlinear CI tests on CPU: Andrey against causal-learn and tigramite.
+"""Benchmark PC and FCI with the nonlinear CI tests on CPU: Andrey against the reference packages.
 
 Runs Andrey's PC with each nonlinear test (KCI, RCoT, CMIknn, GPDC) and with Fisher-Z, causal-learn's
-PC with KCI and RCoT, tigramite's PC with CMIknn and GPDC, and the empty graph as a quality baseline.
+PC with KCI and RCoT, tigramite's PC with CMIknn and GPDC, pcalg's PC with RCIT's RCoT, and the empty
+graph as a quality baseline. ``--method fci`` runs Andrey's FCI with the same tests and
+causal-learn's FCI with KCI and RCoT instead; FCI is scored against the true graph's PAG.
 The data is additive nonlinear noise (``x = sum w (p + sin p) + e``, Gaussian ``e``) on Erdos-Renyi
 graphs at average degree 2, standardized; ``--regime nonmonotone_er`` replaces ``p + sin p`` by
 ``cos p``, which partial correlation does not see. A nonlinear test's cost grows with the rows, so
@@ -10,8 +12,9 @@ rows are their own axis (``--rows``) rather than a multiple of ``d``. Every solu
 runs at Andrey's defaults; the adapters map them to each package's names.
 
 tigramite's solutions run in an environment of their own: build it with
-``benchmarks/start_tigramite.sh`` and export ``ANDREY_BENCH_TIGRAMITE_PYTHON``. A run whose
-``--solutions`` leaves them out does not need it.
+``benchmarks/start_tigramite.sh`` and export ``ANDREY_BENCH_TIGRAMITE_PYTHON``. pcalg's needs the R
+library of ``benchmarks/start_r.sh`` and the settings ``benchmarks/start_r.sh --env`` prints. A run
+whose ``--solutions`` leaves them out does not need them.
 
     $ANDREY_BENCH_PYTHON benchmarks/nonlinear_ci_cpu.py --out outputs/nonlinear-ci \\
         --cap-mem-mb 32000
@@ -30,9 +33,12 @@ from pathlib import Path
 import pandas as pd
 
 from andrey_bench import datasets, memcap, rundir
+from andrey_bench.adapters.andrey_fci import AndreyFCI
 from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
+from andrey_bench.adapters.causal_learn_fci import CausalLearnFCI
 from andrey_bench.adapters.causal_learn_pc import CausalLearnPC
+from andrey_bench.adapters.pcalg_pc import PcalgPCRCoT
 from andrey_bench.adapters.tigramite_pc import PYTHON_ENV_VAR, tigramite_pc_adapter
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
@@ -52,14 +58,23 @@ SMOKE = {"ladder": [4], "rows": [100], "seeds": 1, "repeats": 1, "cap_wall_s": 3
 WARMUP = 1
 
 
-def solutions() -> list:
-    """Every solution, Andrey's first; tigramite's read their interpreter from the environment."""
+def solutions(method: str = "pc") -> list:
+    """Every solution of ``method``, Andrey's first; tigramite's read their interpreter from the
+    environment."""
+    if method == "fci":
+        return [
+            *[AndreyFCI(indep_test=test) for test in ANDREY_TESTS],
+            CausalLearnFCI("kci"),
+            CausalLearnFCI("rcot"),
+            BaselineEmpty(),
+        ]
     return [
         *[AndreyPC(test) for test in ANDREY_TESTS],
         CausalLearnPC("kci"),
         CausalLearnPC("rcot"),
         tigramite_pc_adapter("cmiknn"),
         tigramite_pc_adapter("gpdc"),
+        PcalgPCRCoT(),
         BaselineEmpty(),
     ]
 
@@ -101,8 +116,9 @@ def _log(msg: str = "") -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="PC with nonlinear CI tests, three packages, CPU")
+    p = argparse.ArgumentParser(description="PC or FCI with nonlinear CI tests, CPU")
     p.add_argument("--out", required=True, help="output directory, created if absent")
+    p.add_argument("--method", choices=("pc", "fci"), default="pc", help="search (default: pc)")
     p.add_argument(
         "--ladder",
         type=int,
@@ -155,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.smoke:
         vars(args).update(SMOKE)
 
-    field = solutions()
+    field = solutions(args.method)
     if args.solutions is not None:
         chosen = set(args.solutions.split(","))
         known = {a.name for a in field}
@@ -173,6 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     # Written before the first fit, so an interrupted benchmark still says what it was asked for.
     run_meta = {
         "driver": Path(__file__).name,
+        "method": args.method,
         "solution list": [a.name for a in field],
         "params": {a.name: dict(a.params()) for a in field},
         "tigramite_python": {PYTHON_ENV_VAR: os.environ.get(PYTHON_ENV_VAR, "")},
@@ -196,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         extra_venvs={"tigramite": venv} if venv else None,
     )
 
-    _log(f"=== PC with nonlinear CI tests, Andrey, causal-learn, and tigramite -> {out} ===")
+    _log(f"=== {args.method.upper()} with nonlinear CI tests -> {out} ===")
     for name, value in run_meta.items():
         _log(f"{name:16s}: {value}")
     _log(f"{'git_sha':16s}: {prov['git_sha']}")

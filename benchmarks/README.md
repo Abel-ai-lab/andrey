@@ -173,8 +173,10 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | GIES | Andrey, pcalg (`gies`) |
 | Exact search | Andrey, causal-learn (`bic_exact_search`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
-| PC with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT), tigramite (CMIknn, GPDC) |
+| PC with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT), tigramite (CMIknn, GPDC), pcalg with RCIT (RCoT) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
+| FCI with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT) |
+| Nonlinear CI tests, query by query | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT, FastKCI), tigramite (CMIknn, GPDC), RCIT (RCoT, KCIT) |
 | GFCI | Andrey, Tetrad |
 | CALM | Andrey (two optimizer schedules), causal-learn |
 | BOSS | Andrey, causal-learn |
@@ -197,20 +199,26 @@ DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gauss
 identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selects CUDA inside
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
 
-`nonlinear_ci_cpu.py` runs PC with each nonlinear CI test on additive nonlinear noise, with rows
-as an axis of their own. `--regime nonmonotone_er` makes each effect `w cos(parent)`, an even
-function partial correlation does not see. Every reference runs at Andrey's defaults under its own
-names:
+`nonlinear_ci_cpu.py` runs PC, or with `--method fci` FCI, with each nonlinear CI test on additive
+nonlinear noise, with rows as an axis of their own. `--regime nonmonotone_er` makes each effect
+`w cos(parent)`, an even function partial correlation does not see. Every reference runs at
+Andrey's defaults under its own names:
 
-| Andrey | causal-learn | tigramite |
-|---|---|---|
-| `indep_test="kci"` | `indep_test="kci"` | - |
-| `indep_test="rcot"` | `indep_test="rcit"`, `rcit=False`, `approx="hbe"` | - |
-| RCoT `n_features=5`, `n_features_cond=100` | `num_f2=5`, `num_f=100` | - |
-| `indep_test="cmiknn"` | - | `CMIknn`, `significance="shuffle_test"`, `sig_blocklength=1` |
-| CMIknn `k_cmi=0.1`, `k_perm=5`, `n_permutations=500` | - | `knn=0.1`, `shuffle_neighbors=5`, `sig_samples=500` |
-| `indep_test="gpdc"` | - | `GPDC`, `significance="analytic"` |
-| `alpha=0.05` | `alpha=0.05` | `pc_alpha=0.05`, `contemp_collider_rule="none"` |
+| Andrey | causal-learn | tigramite | RCIT (R) |
+|---|---|---|---|
+| `indep_test="kci"` | `indep_test="kci"` | - | `KCIT(Bootstrap = FALSE)` |
+| `indep_test="rcot"` | `indep_test="rcit"`, `rcit=False`, `approx="hbe"` | - | `RCoT(approx = "hbe")` |
+| RCoT `n_features=5`, `n_features_cond=100` | `num_f2=5`, `num_f=100` | - | `num_f2 = 5`, `num_f = 100` |
+| `indep_test="cmiknn"` | - | `CMIknn`, `significance="shuffle_test"`, `sig_blocklength=1` | - |
+| CMIknn `k_cmi=0.1`, `k_perm=5`, `n_permutations=500` | - | `knn=0.1`, `shuffle_neighbors=5`, `sig_samples=500` | - |
+| `indep_test="gpdc"` | - | `GPDC`, `significance="analytic"` | - |
+| `alpha=0.05` | `alpha=0.05` | `pc_alpha=0.05`, `contemp_collider_rule="none"` | pcalg `alpha = 0.05` |
+
+pcalg's PC with RCIT's RCoT (`pcalg.pc.rcot`) needs the R library of `start_r.sh`, which installs
+RCIT from its GitHub repository at a fixed commit. `nonlinear_ci_queries.py` compares the tests
+themselves: every contestant answers the same queries on the same seeded draws, independent and
+dependent, and the summary gives each one's level, power, distance of its p-values to the uniform
+under independence, agreement with Andrey's test, and seconds per query.
 
 The harness does not submit jobs. One file is one job.
 
@@ -1408,6 +1416,10 @@ Read `params` before comparing solutions because their defaults may optimize dif
   BIC.
 - `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
 - `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
+- `nonlinear_ci_cpu.py` - compares PC and FCI with the nonlinear CI tests with causal-learn,
+  tigramite, and pcalg with RCIT on additive nonlinear noise.
+- `nonlinear_ci_queries.py` - compares the nonlinear CI tests query by query with causal-learn,
+  tigramite, and RCIT. `start_tigramite.sh` builds the environment of tigramite's fits.
 - `discrete_cpu.py` - compares PC with the chi-square and G-square tests, GES with BDeu, and hill
   climbing with BDeu and the multinomial BIC with causal-learn, bnlearn, and pgmpy on categorical
   data. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical tests and

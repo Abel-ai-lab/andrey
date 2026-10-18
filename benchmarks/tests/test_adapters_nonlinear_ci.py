@@ -1,7 +1,8 @@
-"""The adapters and the driver of the nonlinear CI lane: PC with KCI, RCoT, CMIknn, and GPDC.
+"""The adapters and drivers of the nonlinear CI lane: PC and FCI with KCI, RCoT, CMIknn, and GPDC,
+and the per-query comparison.
 
 Every solution runs at Andrey's defaults under the package's own names, and every fit returns a
-CPDAG the harness scores the same way. tigramite fits only in its own environment, so its fit
+graph the harness scores the same way. tigramite fits only in its own environment, so its fit
 runs when ``ANDREY_BENCH_TIGRAMITE_PYTHON`` names one; its graph conversion is checked here.
 """
 
@@ -13,13 +14,16 @@ import subprocess
 from pathlib import Path
 
 import nonlinear_ci_cpu
+import nonlinear_ci_queries
 import numpy as np
 import pytest
 
 import andrey
 from andrey import GraphStructure
 from andrey_bench import datasets
+from andrey_bench.adapters.andrey_fci import AndreyFCI
 from andrey_bench.adapters.andrey_pc import AndreyPC
+from andrey_bench.adapters.causal_learn_fci import CausalLearnFCI
 from andrey_bench.adapters.causal_learn_pc import CI_TESTS, CausalLearnPC
 from andrey_bench.adapters.tigramite_pc import (
     PYTHON_ENV_VAR,
@@ -38,14 +42,17 @@ def _nonlinear_data(seed: int = 0, n: int = 200) -> np.ndarray:
     return np.column_stack([x0, np.abs(x0) + 0.2 * rng.standard_normal(n), rng.standard_normal(n)])
 
 
-def test_every_solution_has_its_own_name_and_test() -> None:
-    field = nonlinear_ci_cpu.solutions()
+@pytest.mark.parametrize("method", ["pc", "fci"])
+def test_every_solution_has_its_own_name_and_test(method: str) -> None:
+    field = nonlinear_ci_cpu.solutions(method)
     names = [a.name for a in field]
     assert len(set(names)) == len(names)
+    assert {a.algorithm for a in field if a.package != "baseline"} == {method}
     tested = {(a.package, a.params().get("indep_test")) for a in field if a.package != "baseline"}
     assert {("andrey", t) for t in ("fisherz", *NONLINEAR)} <= tested
     assert {("causal-learn", "kci"), ("causal-learn", "rcot")} <= tested
-    assert {("tigramite", "cmiknn"), ("tigramite", "gpdc")} <= tested
+    if method == "pc":
+        assert {("tigramite", "cmiknn"), ("tigramite", "gpdc"), ("pcalg+RCIT", "rcot")} <= tested
 
 
 def _defaults(cls) -> dict:
@@ -75,7 +82,7 @@ def test_the_regime_is_additive_nonlinear_noise() -> None:
 def test_the_nonmonotone_regime_hides_its_edges_from_partial_correlation() -> None:
     """On ``nonmonotone_er`` Fisher-Z misses edges RCoT finds: the regime's purpose."""
     (key,) = nonlinear_ci_cpu.ladder_keys([8], [1000], seeds=1, regime="nonmonotone_er")
-    data, marks, _ = datasets.generate_one(key)
+    data, marks, *_ = datasets.generate_one(key)
     truth = np.asarray(marks) != 0
     errors = {}
     for test in ("fisherz", "rcot"):
@@ -106,10 +113,57 @@ def test_causal_learn_pc_runs_each_reference_test(test: str) -> None:
     assert adapter.to_structure(native).kind == "cpdag"
 
 
-@pytest.mark.parametrize("cls", [AndreyPC, CausalLearnPC, TigramitePC])
+@pytest.mark.parametrize("cls", [AndreyPC, CausalLearnPC, TigramitePC, CausalLearnFCI])
 def test_an_unknown_test_is_rejected(cls) -> None:
     with pytest.raises(ValueError, match="indep_test"):
         cls("no_such_test")
+
+
+@pytest.mark.parametrize("test", ["rcot", "kci"])
+def test_fci_runs_each_test(test: str) -> None:
+    """Andrey's FCI variant finds the one dependent pair; causal-learn's returns a PAG."""
+    adapter = AndreyFCI(indep_test=test)
+    assert adapter.name == f"andrey.fci.{test}.numpy"
+    adapter.setup()
+    structure = adapter.to_structure(adapter.fit(_nonlinear_data(), adapter.params()))
+    adjacent = np.asarray(structure.to_numpy()) != 0
+    assert structure.kind == "pag" and set(zip(*np.nonzero(np.triu(adjacent)))) == {(0, 1)}
+    pytest.importorskip("causallearn")
+    reference = CausalLearnFCI(test)
+    assert reference.name == f"causal-learn.fci.{test}"
+    native = reference.fit(_nonlinear_data(), reference.params())
+    assert reference.to_structure(native).kind == "pag"
+
+
+def test_query_summary_reads_level_power_and_agreement() -> None:
+    """Level and power are rejection shares at alpha; agreement compares each reference's
+    decisions with Andrey's test of the same kind on the same draws; a timeout is not counted."""
+    records = []
+    for name, ps in [
+        ("andrey.kci", {("null", 0): 0.01, ("null", 1): 0.5, ("alt", 0): 0.001}),
+        ("causal-learn.kci", {("null", 0): 0.2, ("null", 1): 0.6, ("alt", 0): 0.002}),
+        ("rcit.kcit", {("null", 0): 0.03, ("null", 1): None, ("alt", 0): 0.004}),
+    ]:
+        for (kind, seed), p in ps.items():
+            answer = {"status": "timeout"} if p is None else {"status": "ok", "p": p, "seconds": 1}
+            records.append(
+                {"contestant": name, "n": 50, "k": 1, "kind": kind, "seed": seed, **answer}
+            )
+    rows = {r["contestant"]: r for r in nonlinear_ci_queries.summary(records, alpha=0.05)}
+    assert (rows["andrey.kci"]["level"], rows["andrey.kci"]["power"]) == (0.5, 1.0)
+    assert rows["andrey.kci"]["agreement"] is None
+    assert rows["causal-learn.kci"]["agreement"] == pytest.approx(2 / 3)
+    assert (rows["rcit.kcit"]["answered"], rows["rcit.kcit"]["agreement"]) == (2, 1.0)
+
+
+def test_query_driver_records_every_draw(tmp_path: Path) -> None:
+    """One record per contestant and draw, and a summary row per cell."""
+    out = tmp_path / "q"
+    args = ["--out", str(out), "--contestants", "andrey.rcot,andrey.kci", "--rows", "60"]
+    assert nonlinear_ci_queries.main([*args, "--k", "0", "1", "--null", "2", "--alt", "1"]) == 0
+    lines = (out / "records.jsonl").read_text().splitlines()
+    assert len(lines) == 2 * 2 * 3
+    assert len((out / "summary.csv").read_text().splitlines()) == 1 + 2 * 2
 
 
 def test_tigramite_links_convert_to_a_cpdag_adjacency() -> None:
