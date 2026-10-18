@@ -805,7 +805,7 @@ def test_config_report_is_readable_when_piped(capsys, monkeypatch):
     assert code == 0 and not err
     assert "Backend preference: numpy" in out
     assert "Available backends: numpy" in out
-    assert "  cpu: the [torch] extra is not installed" in out
+    assert all(f"  {name}: " in out for name in ("cpu", "cuda", "mps"))  # a reason per backend
     assert "Platform: " in out and "usable cores" in out
     assert "Extras:" in out
     assert "andrey config --help" in out
