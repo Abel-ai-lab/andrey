@@ -59,15 +59,9 @@ def _edges(out, kinds):
     return {(a, b) for a, b, kind in out.structure.oriented_edges() if kind in kinds}
 
 
-# The ``discrete_5v`` replicate a fit runs on, when not the pinned sample. From every column order,
-# hill climbing stops at a local optimum that is the network on replicate 4 but not on the pinned
-# sample, where a positional tie rule reaches the network from only some orders.
-REPLICATE = {"hc-bdeu": 4, "hc-bic": 4}
-
-
 @pytest.mark.parametrize("fit", list(CPDAG_FITS))
 def test_cpdag_methods_recover_the_categorical_network(fit):
-    out = CPDAG_FITS[fit](datagen.generate("discrete_5v", replicate=REPLICATE.get(fit, 0)))
+    out = CPDAG_FITS[fit](datagen.generate("discrete_5v"))
     assert out.structure.kind == "cpdag"
     assert _edges(out, {"directed"}) == TRUTH
     assert _edges(out, {"undirected"}) == set()

@@ -182,7 +182,7 @@ def test_exact_ties_break_independently_of_column_order(search, score_func, monk
         np.testing.assert_array_equal(_graph(search, x, score_func, order), want)
 
     module = importlib.import_module(search.__module__)
-    monkeypatch.setattr(module, "tie_ranks", lambda x: np.arange(x.shape[1]))
+    monkeypatch.setattr(module, "tie_ranks", lambda x, categorical=None: np.arange(x.shape[1]))
     by_position = _graph(search, x, score_func, np.arange(d))
     assert any((_graph(search, x, score_func, o) != by_position).any() for o in orders)
 
@@ -193,3 +193,27 @@ def test_tie_ranks_move_with_the_columns() -> None:
     order = np.array([3, 0, 5, 1, 4, 2])
     np.testing.assert_array_equal(tie_ranks(x[:, order]), tie_ranks(x)[order])
     np.testing.assert_array_equal(tie_ranks(x[:, [2, 2, 2]]), [0, 1, 2])
+
+
+def test_recoding_categories_keeps_the_tie_ranks() -> None:
+    """A categorical column ranks by which rows share a category, not by the codes."""
+    x = _categorical(0, 200, 6)
+    recoded = x * np.array([3.0, -1.0, 2.0, -5.0, 1.0, 7.0]) + np.arange(6.0)
+    every = np.ones(6, dtype=bool)
+    assert not np.array_equal(tie_ranks(recoded), tie_ranks(x))
+    np.testing.assert_array_equal(tie_ranks(recoded, every), tie_ranks(x, every))
+
+
+@pytest.mark.parametrize("search", [hc, tabu])
+def test_rounding_in_the_last_bits_keeps_the_graph(search) -> None:
+    """Small perturbations of these data preserve column ranks and the final CPDAG.
+
+    The perturbations model last-bit differences in BLAS output across machines.
+    """
+    x = _TIED_DATA["local_score_BIC_from_cov"](1)
+    rng = np.random.default_rng(0)
+    unit = np.finfo(np.float64).eps * np.abs(x).max(axis=0)
+    nudged = x + rng.integers(-4, 5, size=x.shape) * unit
+    assert (nudged != x).any(axis=0).all()
+    np.testing.assert_array_equal(tie_ranks(nudged), tie_ranks(x))
+    np.testing.assert_array_equal(search(nudged)[0].to_numpy(), search(x)[0].to_numpy())
