@@ -51,7 +51,8 @@ def test_calm_finds_no_edges_between_independent_columns() -> None:
 
 def test_calm_recovers_the_class_of_a_tree(tree_fit) -> None:
     """The tree 0 -> 1, 0 -> 2, 1 -> 3, 1 -> 4 has no collider, so its CPDAG is undirected."""
-    assert to_cpdag(tree_fit.structure).oriented_edges() == [
+    cpdag = datagen.to_variables("gauss_tree_5v", to_cpdag(tree_fit.structure))
+    assert cpdag.oriented_edges(index=True) == [
         (0, 1, "undirected"),
         (0, 2, "undirected"),
         (1, 3, "undirected"),

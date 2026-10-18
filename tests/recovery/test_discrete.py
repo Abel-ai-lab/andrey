@@ -3,7 +3,7 @@
 The fixed cases have one answer: ``discrete_5v`` is the network ``x0 -> x2 <- x1``, ``x2 -> x3 ->
 x4``, whose CPDAG has every edge oriented, and ``discrete_independent_4v`` has no edges. The
 ground-truth case is a random network from :func:`andrey.data.sample_discrete`, scored against its
-CPDAG with a margin.
+CPDAG with a margin. Edges are named by variable and mapped to the case's columns.
 """
 
 from __future__ import annotations
@@ -22,7 +22,9 @@ from andrey.data import sample_discrete
 from andrey.metrics import shd, to_cpdag
 from tests.recovery.helpers import datagen
 
-TRUTH = {(0, 2), (1, 2), (2, 3), (3, 4)}
+CASE = "discrete_5v"
+COLUMN = datagen.column_of(CASE)  # the column of each variable
+TRUTH = datagen.to_columns(CASE, {(0, 2), (1, 2), (2, 3), (3, 4)})
 
 # Each fit that learns a CPDAG from categorical data, by its categorical setting.
 CPDAG_FITS = {
@@ -59,7 +61,7 @@ def _edges(out, kinds):
 
 @pytest.mark.parametrize("fit", list(CPDAG_FITS))
 def test_cpdag_methods_recover_the_categorical_network(fit):
-    out = CPDAG_FITS[fit](datagen.generate("discrete_5v"))
+    out = CPDAG_FITS[fit](datagen.generate(CASE))
     assert out.structure.kind == "cpdag"
     assert _edges(out, {"directed"}) == TRUTH
     assert _edges(out, {"undirected"}) == set()
@@ -67,12 +69,14 @@ def test_cpdag_methods_recover_the_categorical_network(fit):
 
 @pytest.mark.parametrize("fit", list(PAG_FITS))
 def test_pag_methods_find_the_skeleton_and_the_collider(fit):
-    out = PAG_FITS[fit](datagen.generate("discrete_5v"))
+    out = PAG_FITS[fit](datagen.generate(CASE))
     assert out.structure.kind == "pag"
     marks = out.structure.to_numpy()
-    assert {(a, b) for a, b, _ in out.structure.oriented_edges()} == TRUTH
+    skeleton = {tuple(sorted(edge)) for edge in TRUTH}
+    assert {tuple(sorted((a, b))) for a, b, _ in out.structure.oriented_edges()} == skeleton
     # Arrowheads at x2 from both parents: the collider every method must see.
-    assert marks[2, 0] == ARROW and marks[2, 1] == ARROW  # M[i, j] is the mark at i
+    x0, x1, x2 = COLUMN[:3]
+    assert marks[x2, x0] == ARROW and marks[x2, x1] == ARROW  # M[i, j] is the mark at i
 
 
 @pytest.mark.parametrize("fit", [*CPDAG_FITS, *PAG_FITS])
@@ -84,7 +88,7 @@ def test_independent_columns_give_no_edges(fit):
 @pytest.mark.parametrize("fit", list(CPDAG_FITS))
 def test_the_codes_need_not_start_at_zero(fit):
     """Each distinct value is a category, so recoding a column leaves the graph unchanged."""
-    x = datagen.generate("discrete_5v")
+    x = datagen.generate(CASE)
     recoded = x * np.array([3.0, -1.0, 2.0, 5.0, 1.0]) + np.array([-7.0, 4.0, 0.0, 11.0, 100.0])
     assert np.array_equal(
         CPDAG_FITS[fit](recoded).structure.to_numpy(), CPDAG_FITS[fit](x).structure.to_numpy()
@@ -92,8 +96,8 @@ def test_the_codes_need_not_start_at_zero(fit):
 
 
 def test_a_dataframe_names_the_nodes():
-    x = datagen.generate("discrete_5v")
-    frame = pd.DataFrame(x, columns=list("abcde"))
+    x = datagen.generate(CASE)
+    frame = pd.DataFrame(x, columns=["abcde"[v] for v in datagen.column_order(CASE)])
     out = andrey.pc(frame, indep_test="chisq")
     assert set(out.structure.oriented_edges()) == {
         ("a", "c", "directed"),
@@ -107,7 +111,7 @@ def test_a_dataframe_names_the_nodes():
 @pytest.mark.parametrize("fit", ["ges", "hc"])
 def test_bdeu_fits_one_or_two_columns(fit, d):
     """With two or fewer variables the structure prior is left out, so the score stays finite."""
-    x = datagen.generate("discrete_5v")[:, [2, 3][:d]]
+    x = datagen.generate(CASE)[:, COLUMN[[2, 3][:d]]]  # x2, and x3 with its parent x2
     out = getattr(andrey, fit)(x, score_func="local_score_BDeu")
     assert np.isfinite(out.metadata["score"])
     assert len(out.structure.oriented_edges()) == d - 1
@@ -148,7 +152,7 @@ def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
 
 
 def test_a_fractional_value_is_refused_by_the_categorical_bic():
-    x = datagen.generate("discrete_5v")
+    x = datagen.generate(CASE)
     x[0, 0] = 0.5
     with pytest.raises(ValueError, match="whole number"):
         andrey.ges(x, score_func="local_score_BIC_categorical")
