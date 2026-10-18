@@ -130,7 +130,8 @@ def labeled(marks, kind="cpdag"):
 @functools.cache
 def dataset():
     """Return the standardized, rounded observations (read-only) and the true DAG."""
-    sample = MODEL.sample(n=N_SAMPLES, seed=SEED, scale="standardize")
+    # The columns keep the order of LABELS, which names them and the recorded graphs.
+    sample = MODEL.sample(n=N_SAMPLES, seed=SEED, scale="standardize", shuffle=False)
     # The generator's matrix products differ in the last bit between BLAS kernels; six decimals,
     # as a CSV would store them, give every machine the same bytes.
     data = np.round(sample.data, 6)

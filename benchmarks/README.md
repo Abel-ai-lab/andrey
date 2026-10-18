@@ -173,6 +173,17 @@ identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selec
 
 The harness does not submit jobs. One file is one job.
 
+### Column order
+
+A generated dataset lists its columns in an order drawn from its seed, with its truth permuted the
+same way, so a method's accuracy cannot depend on the column order the simulation used. The shuffle
+is part of the generator call: a shuffled dataset has its own `dataset_id` and a label ending in
+`-shuffled`, the registry records its `column_order`, and `DatasetKey(shuffle=False)` keeps the
+generated order under the `dataset_id` its records carry. The PCMCI, PCMCI+, LPCMCI, and
+longitudinal LiNGAM simulations draw an order that carries no information about the graph and take
+no shuffle step. The summaries published up to 0.6.0 were measured on the generated order and stay
+as recorded.
+
 ### Hidden confounders
 
 `latent_gauss_er` hides one node in ten, at least one, from an Erdos-Renyi linear-Gaussian graph.
@@ -488,13 +499,15 @@ ANDREY_BENCH_DATA=outputs/discrete-cpu/data $ANDREY_BENCH_PYTHON benchmarks/disc
 
 The p-values and BDeu scores of Andrey and causal-learn follow the same definitions (Andrey's BDeu
 is `-2` times causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py`
-the two packages return the same graph. Each comparator's objective is checked against Andrey's in
+the two packages return the same graph, with Andrey's PC on the column-order collider rule that
+causal-learn's PC runs; PC's default p-value order can orient conflicting colliders differently.
+Each comparator's objective is checked against Andrey's in
 `benchmarks/tests/test_adapters_discrete_comparators.py`, where R or pgmpy is installed: the scores
-agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets,
-and each declared setting takes effect. pgmpy's search ends in a different local optimum on some
+agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets, and
+each declared setting takes effect. pgmpy's search ends in a different local optimum on some
 datasets: each package takes the first of equal moves in its own scan order, and the graphs can
-differ at equal settings. pgmpy breaks ties by the iteration order of a set of column-name pairs,
-so its columns are named by integer position, which keeps the graph the same under any
+differ at equal settings. pgmpy breaks ties by the iteration order of a set of column-name pairs, so
+its columns are named by integer position, which keeps the graph the same under any
 `PYTHONHASHSEED`. Read the error columns beside the speed-up: where the graphs differ, the
 difference is a result to report.
 
@@ -530,16 +543,17 @@ package's names for the settings map to Andrey's:
 | `alpha=0.05` | `--alpha 0.05` | `alpha = 0.05` |
 | `lambda_value=1.0` | `--penaltyDiscount 1` | the default `k = log(n) / 2` |
 
-Tetrad's PC runs order-independent (`--stableFAS`), keeps the first of two conflicting colliders
-(`--conflictRule 1`), and has no depth cap, as Andrey's PC does. FGES runs with no structure prior
-(`--structurePrior 0`), since Andrey's GES has none. Both hill climbings take the best add, remove,
-or reverse move from the empty graph until none improves the score, with no restarts, and neither
-gives a categorical node a continuous parent. bnlearn's hill climbing returns a DAG, so its
-comparable error is `mec_shd`; every other row is a CPDAG, scored by `shd`. The two packages define
-some of these tests and scores differently from Andrey, so their graphs can differ on the same
-data: Tetrad's conditional Gaussian parameter count leaves out each category's means, its
-degenerate Gaussian test statistic is twice the likelihood ratio, and its degenerate Gaussian score
-sums one regression per category of a categorical child.
+Tetrad's PC runs order-independent (`--stableFAS`) and has no depth cap, as Andrey's PC does. It
+keeps Tetrad's default collider conflict rule (`--conflictRule 1`), under which a later collider
+replaces an earlier one; Andrey's PC keeps the collider whose pair was separated with the larger
+p-value. FGES runs with no structure prior (`--structurePrior 0`), since Andrey's GES has none. Both
+hill climbings take the best add, remove, or reverse move from the empty graph until none improves
+the score, with no restarts, and neither gives a categorical node a continuous parent. bnlearn's
+hill climbing returns a DAG, so its comparable error is `mec_shd`; every other row is a CPDAG,
+scored by `shd`. The two packages define some of these tests and scores differently from Andrey, so
+their graphs can differ on the same data: Tetrad's conditional Gaussian parameter count leaves out
+each category's means, its degenerate Gaussian test statistic is twice the likelihood ratio, and its
+degenerate Gaussian score sums one regression per category of a categorical child.
 
 causal-cmd 1.12.0 parses `--numCategories` but never stores it, so its own command line reads every
 column as continuous. Tetrad's fits therefore run through `andrey_bench/adapters/TetradDriver.java`,
@@ -779,8 +793,9 @@ its paper, drawn by `andrey_bench/lingam_models.py`:
 | `varma_lingam_paper` | VARMA-LiNGAM | Hyvarinen et al. (2010), Sect. 5.4, plus one moving-average matrix | N x T, one series |
 | `longitudinal_lingam_paper` | LongitudinalLiNGAM | Kadowaki et al. (2013), JSAI Sect. 6.1 | N x T, M units per time point |
 
-`varma_lingam_paper` draws a strictly lower-triangular same-step matrix with 0.8 N links and a
-lag-1 matrix with 2 N links, the paper's 40% of entries at N = 5 held per variable as N grows,
+`varma_lingam_paper` draws a same-step DAG with 0.8 N links (strictly lower-triangular before the
+[column shuffle](#column-order)) and a lag-1 matrix with 2 N links, the paper's 40% of entries at
+N = 5 held per variable as N grows,
 weights 0.05 to 0.5 in magnitude with a random sign, and super-Gaussian noise. The paper's model
 has no moving-average part, so the series adds one moving-average matrix drawn like the lag-1 one.
 `longitudinal_lingam_paper` draws, at every time point, a dense same-step DAG with weights 0.5 to
@@ -846,9 +861,9 @@ Three thresholds were calibrated once on one machine. Later measurements found e
 25x for `cov`, and 40x for entropy. Each error kept the faster path disabled.
 
 **The worker-pool default suits a single fit, not a campaign.** A campaign runs many fits in one
-process, and after the first pool start (about 2 s) the pool pays off at smaller sizes. With 8
-workers, `andrey calibrate` measured about 1,100 for GES, against the default of 10,000. Repeated
-runs produce a range because other node activity affects pool round-trip time.
+process, and after the first pool start the pool can pay off at smaller sizes. `andrey calibrate`
+measures the cutoff in the gate's unit, the largest estimated work of a pass. Repeated runs produce
+a range because other node activity affects pool round-trip time.
 
 Measure on the campaign node with the pool size used for fits, and **apply the measured
 thresholds**. Recording an unused calibration is worse than no calibration: it records a threshold
@@ -986,7 +1001,8 @@ and guidance in [Reading a result](#reading-a-result).
 | `provenance.json` | package versions and BLAS of the bench venv, CPU, GPU, git sha. Captured |
 | | once, so a resume keeps the recorded build |
 | `run_meta.json` | flags and literals, written before the first fit |
-| `data/registry.json` | each dataset's generator call; under `$ANDREY_BENCH_DATA` when set |
+| `data/registry.json` | each dataset's generator call and column order; under |
+| | `$ANDREY_BENCH_DATA` when set |
 
 Each fit uses a temporary compute-node directory for its pickled job, result, and start marker. The
 runner removes the directory after the fit.

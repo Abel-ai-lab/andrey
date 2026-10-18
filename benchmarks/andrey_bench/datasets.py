@@ -24,6 +24,9 @@ The regimes of the VAR-LiNGAM and longitudinal LiNGAM papers are drawn by
 as a coefficient stack (:mod:`andrey_bench.coefficients`), with the kind ``"temporal_coefficients"``
 or ``"panel_coefficients"``. A panel key's ``times`` is its number of time points, and its ``n``
 the number of units observed at each; a panel dataset's data has shape ``(times, n, d)``.
+
+A key's ``shuffle`` lists the columns in an order drawn from the seed, with the truth permuted the
+same way, so the column order does not follow the graph's construction (:class:`DatasetKey`).
 """
 
 from __future__ import annotations
@@ -159,6 +162,11 @@ WINDOW_KIND = "temporal_window"
 #: The registry's ``graph_kind`` for a truth stored as a coefficient stack, by model.
 COEFFICIENT_KINDS = {"varma2010": "temporal_coefficients", "panel2013": "panel_coefficients"}
 
+#: Functionals whose column order carries no information about the graph, so their keys take no
+#: shuffle step: the PCMCI-family models draw each variable independently and link uniformly drawn
+#: pairs, and the longitudinal LiNGAM panel lists its variables in a random order.
+ORDER_FREE = frozenset({*temporal_models.MODELS, "panel2013"})
+
 #: Regimes with hidden confounders, mapped to the number of generated nodes per hidden node. At
 #: least one node is hidden. Andrey's ``latent_confounded_er`` family uses the same rule as
 #: ``latent_gauss_er``, at ER density 3.0 instead of 2.0.
@@ -251,6 +259,12 @@ class DatasetKey:
 
     ``categorical_share`` and ``categories`` reach the generator only for the mixed functional,
     :data:`MIXED_FUNCTIONAL`, where they join the label too. Every other key keeps its identity.
+
+    ``shuffle`` lists the observed columns in an order drawn from the seed and permutes the truth
+    the same way; hidden nodes stay last. It enters the generator call, and so the digest, only
+    when on, and a shuffled key's label ends in ``-shuffled``: an unshuffled key keeps the label and
+    digest its dataset has in records measured on the generated order. A functional in
+    :data:`ORDER_FREE` takes no shuffle step and needs ``shuffle`` on.
     """
 
     topology: str
@@ -265,6 +279,7 @@ class DatasetKey:
     categorical_share: float = 0.5
     categories: tuple[int, int] = (2, 3)
     times: int = 0
+    shuffle: bool = True
 
     @property
     def label(self) -> str:
@@ -280,16 +295,17 @@ class DatasetKey:
             else ""
         )
         panel = f"-T{self.times}" if self.times else ""
+        shuffled = "-shuffled" if self.shuffle and self.functional not in ORDER_FREE else ""
         return (
             f"{self.topology}-{self.functional}-{self.noise}-deg{self.density:g}"
-            f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}{mixed}{panel}"
+            f"-d{self.d}-n{self.n}-s{self.seed}-{self.standardize}{hidden}{mixed}{panel}{shuffled}"
         )
 
     @property
     def digest(self) -> str:
         """Hash the generator call returned by :func:`generation_kwargs`.
 
-        Only coordinates passed to ``sample_scm`` affect the hash. Sorted JSON keys make the identity
+        Only coordinates in the generator call affect the hash. Sorted JSON keys make the identity
         independent of dictionary order.
         """
         payload = json.dumps(generation_kwargs(self), sort_keys=True, separators=(",", ":"))
@@ -308,7 +324,14 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
     ``"generator"`` naming it, and a mixed key the ``andrey.data.sample_mixed`` arguments. A paper
     model's call is :func:`andrey_bench.temporal_models.sample`'s, with the model's whole setup, so a
     change to the setup is a new dataset.
+
+    A shuffled key's call holds ``shuffle=True``. An unshuffled key's call leaves ``shuffle`` out,
+    and :func:`generate_one` passes ``shuffle=False`` to the generator. A key of an
+    :data:`ORDER_FREE` functional raises ``ValueError`` with ``shuffle`` off.
     """
+    if key.functional in ORDER_FREE and not key.shuffle:
+        raise ValueError(f"{key.label}: {key.functional} has no shuffle step to turn off")
+    shuffle = {"shuffle": True} if key.shuffle else {}
     if key.functional in temporal_models.MODELS:
         call: dict[str, object] = {
             "generator": "andrey_bench.temporal_models.sample",
@@ -337,6 +360,8 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
         }
         if panel:
             call["times"] = key.times
+        else:
+            call.update(shuffle)
         return call
     if key.functional == MIXED_FUNCTIONAL:
         if key.standardize != "raw" or key.latents:
@@ -353,6 +378,7 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
             "categorical_share": key.categorical_share,
             "categories": list(key.categories),
             **MIXED_SETTINGS,
+            **shuffle,
         }
     if key.functional == DISCRETE_FUNCTIONAL:
         if key.standardize != "raw" or key.latents:
@@ -365,6 +391,7 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
             "seed": key.seed,
             "density": key.density,
             **DISCRETE_SETTINGS,
+            **shuffle,
         }
     try:
         graph = TOPOLOGY_TO_GRAPH[key.topology]
@@ -383,6 +410,7 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
         "seed": key.seed,
         "scale": scale,
         "density": key.density,
+        **shuffle,
     }
     if key.latents:
         kwargs["latents"] = key.latents
@@ -418,8 +446,8 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
     }
 
 
-def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
-    """Return ``(data_f64, graph_marks_int8, graph_kind)`` generated by ``andrey.data``.
+def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int] | None]:
+    """Return ``(data_f64, graph_marks_int8, graph_kind, column_order)`` for ``key``.
 
     Samples are contiguous canonical ``float64``. Truth uses ``ds.graph.to_numpy()`` endpoint marks,
     as consumed by the scorer and Andrey adapter. With hidden nodes, the truth covers all ``d``
@@ -427,21 +455,27 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
     returned as :func:`lag_only_marks` with the kind ``"temporal"``. A paper model's series and
     truth come from :mod:`andrey_bench.temporal_models` or :mod:`andrey_bench.lingam_models`, as
     the module docstring says.
+
+    ``column_order[j]`` is the observed column that column ``j`` holds with ``shuffle`` off: the
+    identity for an unshuffled key, and ``None`` for an :data:`ORDER_FREE` functional.
     """
     kwargs = generation_kwargs(key)
     if key.functional in temporal_models.MODELS:
         series, window = temporal_models.sample(key.functional, key.d, key.n, key.seed)
         series = np.ascontiguousarray(series, dtype=CANONICAL_DTYPE)
         if temporal_models.MODELS[key.functional].same_step:
-            return series, window, WINDOW_KIND
-        return series, lag_marks(window[1:] != 0), "temporal"
+            return series, window, WINDOW_KIND, None
+        return series, lag_marks(window[1:] != 0), "temporal", None
     if key.functional == "varma2010":
-        series, stack = lingam_models.sample_varma(key.functional, key.d, key.n, key.seed)
-        return series, stack, COEFFICIENT_KINDS[key.functional]
+        series, stack, columns = lingam_models.sample_varma(
+            key.functional, key.d, key.n, key.seed, shuffle=key.shuffle
+        )
+        return series, stack, COEFFICIENT_KINDS[key.functional], columns.tolist()
     if key.functional == "panel2013":
         panel, stack = lingam_models.sample_panel(key.functional, key.d, key.times, key.n, key.seed)
-        return panel, stack, COEFFICIENT_KINDS[key.functional]
+        return panel, stack, COEFFICIENT_KINDS[key.functional], None
     generator = kwargs.pop("generator", None)
+    kwargs["shuffle"] = key.shuffle  # an unshuffled key's call leaves it out
     if generator == "sample_discrete":
         ds = data.sample_discrete(**kwargs)  # type: ignore[arg-type]
     elif generator == "sample_mixed":
@@ -450,9 +484,10 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
     else:
         ds = data.sample_scm(**kwargs)  # type: ignore[arg-type]
     data_arr = np.ascontiguousarray(ds.data, dtype=CANONICAL_DTYPE)
+    columns = [int(j) for j in ds.provenance["column_order"]]
     graph = ds.graph
     if isinstance(graph, TemporalStructure):
-        return data_arr, lag_only_marks(key, graph), "temporal"
+        return data_arr, lag_only_marks(key, graph), "temporal", columns
     if not hasattr(graph, "to_numpy"):
         raise TypeError(
             f"graph for {key.label} has no to_numpy() (kind={type(graph).__name__}); "
@@ -463,7 +498,7 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str]:
     if not np.array_equal(hidden, np.arange(key.d - key.latents, key.d)):
         raise ValueError(f"{key.label}: hidden nodes are not the last {key.latents} nodes")
     marks = np.ascontiguousarray(graph.to_numpy())  # int8 endpoint marks
-    return data_arr, marks, str(graph.kind)
+    return data_arr, marks, str(graph.kind), columns
 
 
 def lag_only_marks(key: DatasetKey, truth: TemporalStructure) -> np.ndarray:
@@ -522,7 +557,8 @@ def materialize(keys: Iterable[DatasetKey], out_dir: str | Path) -> dict:
 
     Deduplicates by :attr:`DatasetKey.label`, including when multiple fit dtypes share a key.
     Each :func:`generate_one` result is saved as ``data`` and ``graph`` arrays in a ``.npz`` for all
-    readers to reuse. Existing files are reused only when the recorded ``generation_call`` matches.
+    readers to reuse, with its ``column_order`` in the registry entry. Existing files are reused only
+    when the recorded ``generation_call`` matches.
 
     Dataset and registry writes use temporary files and atomic renames to prevent partial files
     after interruption. The registry is re-read and merged under a store lock, preserving concurrent
@@ -548,7 +584,7 @@ def materialize(keys: Iterable[DatasetKey], out_dir: str | Path) -> dict:
         if path.exists() and _same_call(recorded.get("generation_call"), generation_kwargs(key)):
             mine[label] = recorded
             continue
-        data_arr, marks, graph_kind = generate_one(key)
+        data_arr, marks, graph_kind, columns = generate_one(key)
         # Write uncompressed arrays for fast reloads. The temporary file prevents partial writes;
         # pass a file object so savez does not append another ``.npz`` suffix.
         tmp = _scratch(out, key.filename)
@@ -569,6 +605,7 @@ def materialize(keys: Iterable[DatasetKey], out_dir: str | Path) -> dict:
             "data_dtype": str(data_arr.dtype),
             "graph_shape": list(marks.shape),
             "graph_dtype": str(marks.dtype),
+            "column_order": columns,
             "generation_call": generation_kwargs(key),
         }
 
@@ -632,6 +669,7 @@ __all__ = [
     "LAG_ONLY_DENSITY",
     "WINDOW_KIND",
     "COEFFICIENT_KINDS",
+    "ORDER_FREE",
     "DEFAULT_REGIME",
     "latents_for",
     "latent_node_types",

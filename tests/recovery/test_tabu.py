@@ -9,6 +9,7 @@ local optimum and tabu search reaches the true equivalence class.
 
 from __future__ import annotations
 
+import math
 import warnings
 
 import numpy as np
@@ -46,18 +47,16 @@ def _bic(x: np.ndarray, dag) -> float:
     return float(sum(score.score(i, sorted(parents[i])) for i in range(x.shape[1])))
 
 
-def test_tabu_recovers_gauss_5v():
-    """The CPDAG of ``gauss_5v``: 0 -> 1, 0 -> 2, 1 -> 3 <- 2, 3 -> 4, with the collider at 3. The
-    graph and score match the recorded output."""
-    out = andrey.tabu(datagen.generate("gauss_5v"))
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")  # exact_search
+def test_tabu_reaches_the_score_optimum_on_gauss_5v():
+    """Tabu search returns the CPDAG of the best-scoring DAG, which exact search finds, and that
+    DAG's score. The graph and score match the recorded output."""
+    x = datagen.generate("gauss_5v")
+    out = andrey.tabu(x)
+    optimum = andrey.exact_search(x).structure
     assert out.structure.kind == "cpdag"
-    assert out.structure.oriented_edges() == [
-        (0, 1, "undirected"),
-        (0, 2, "undirected"),
-        (1, 3, "directed"),
-        (2, 3, "directed"),
-        (3, 4, "directed"),
-    ]
+    assert out.structure.oriented_edges() == to_cpdag(optimum).oriented_edges()
+    assert math.isclose(out.metadata["score"], _bic(x, optimum), rel_tol=0.0, abs_tol=1e-6)
     assert_recorded_output(out, "Tabu", case="gauss_5v")
 
 

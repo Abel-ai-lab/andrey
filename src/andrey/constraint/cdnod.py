@@ -13,9 +13,9 @@ from itertools import combinations
 
 import numpy as np
 
-from andrey.constraint.pc import _discover_skeleton, _lookup_sepset, _points_to
+from andrey.constraint.pc import _discover_skeleton, _lookup_sepset
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
-from andrey.core.orient import meek, to_structure
+from andrey.core.orient import _is_directed, meek, to_structure
 
 
 def cdnod(
@@ -31,8 +31,9 @@ def cdnod(
     ``data`` is an ``(n_samples, n_features)`` array; ``c_indx`` is the ``(n_samples,)`` or
     ``(n_samples, 1)`` domain/context index (one label per row); ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
-    ``indep_test`` selects the CI test, run over the augmented matrix. The context is appended as an
-    extra variable and the result is projected back to the ``n_features`` data variables.
+    ``indep_test`` selects the CI test. The context is appended as an extra variable, the tests run
+    over the augmented matrix, and the result is projected back to the ``n_features`` data
+    variables; with a single domain the context is left out and the search runs on ``data`` alone.
     ``categorical``, a boolean mask of the data's categorical columns, reaches a mixed-data test,
     which also takes the context as categorical. Returns the CPDAG as a ``GraphStructure`` of kind
     ``"cpdag"``.
@@ -51,13 +52,17 @@ def cdnod(
     d = X.shape[1]
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
-        # search runs on ``data`` alone and gives PC's graph.
-        skeleton, sepsets = _discover_skeleton(X, alpha, indep_test, categorical=categorical)
+        # search runs on ``data`` alone and gives PC's graph under ``collider_order="column"``.
+        skeleton, sepsets, _ = _discover_skeleton(
+            X, alpha, indep_test, categorical=categorical, record_pvalues=False
+        )
         pdag = _orient_with_context(skeleton, sepsets, context=None)
     else:
         augmented = np.concatenate([X, context], axis=1)
         mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
-        skeleton, sepsets = _discover_skeleton(augmented, alpha, indep_test, categorical=mask)
+        skeleton, sepsets, _ = _discover_skeleton(
+            augmented, alpha, indep_test, categorical=mask, record_pvalues=False
+        )
         pdag = _orient_with_context(skeleton, sepsets, context=d)
     completed = meek(pdag)
     return to_structure(completed[:d, :d], kind="cpdag")
@@ -92,7 +97,7 @@ def _orient_with_context(
                 continue
             if y in _lookup_sepset(sepsets, x, z):
                 continue
-            if _points_to(pdag, y, x) or _points_to(pdag, y, z):
+            if _is_directed(pdag, y, x) or _is_directed(pdag, y, z):
                 continue
             pdag[x, y], pdag[y, x] = TAIL, ARROW
             pdag[z, y], pdag[y, z] = TAIL, ARROW

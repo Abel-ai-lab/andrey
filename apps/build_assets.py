@@ -1,7 +1,7 @@
 """The interactive examples' pages and thumbnails, for the Space and the docs' Examples gallery.
 
 Every page is a standalone document that takes its theme from the page that embeds it. The
-benchmark explorer renders from the published summary with the homepage's chart functions.
+Space's benchmark page renders from the published summary with the homepage's chart functions.
 """
 
 from __future__ import annotations
@@ -46,13 +46,9 @@ def site_builder():
     return module
 
 
-def benchmarks_page(summary, *, links=SITE_URL, race_tab=False, heading=True):
-    """The controlled benchmark results: the speed charts, every measurement, and the accuracy.
-
-    ``links`` leads to the documentation: absolute in the Space, relative in the docs. With
-    ``race_tab``, the page points to the Space's Race tab for its live timings.
-    ``heading=False`` leaves out the headline, for a page that gives its own title.
-    """
+def benchmarks_page(summary):
+    """The Space's controlled benchmark results: the speed charts, every measurement, and the
+    accuracy, with links to the documentation."""
     builder = site_builder()
     css = (
         builder.tokens_css()
@@ -64,11 +60,10 @@ def benchmarks_page(summary, *, links=SITE_URL, race_tab=False, heading=True):
         "table{border-collapse:collapse}td,th{padding:4px 10px;text-align:right}"
     )
     body = (
-        (f"<h1>{escape(summary['headline'])}</h1>" if heading else "")
-        + "<p>Controlled runs on dedicated hardware. Times are median fit times; ratios "
-        "are medians of per-dataset ratios."
-        + (" The Race tab identifies the server used for live timings." if race_tab else "")
-        + "</p>"
+        f"<h1>{escape(summary['headline'])}</h1>"
+        "<p>Controlled runs on dedicated hardware. Times are median fit times; ratios "
+        "are medians of per-dataset ratios. The Race tab identifies the server used for live "
+        "timings.</p>"
         + builder.speed_chart([summary])
         + builder.speed_table(summary)
         + "<h2>Accuracy</h2>"
@@ -98,14 +93,14 @@ def benchmarks_page(summary, *, links=SITE_URL, race_tab=False, heading=True):
         "<p>FCI uses endpoint SHD. Other methods use structural SHD. "
         "A missing ratio means a package has no time there (it passed its time cap) or no "
         "datasets could be paired.</p>"
-        f'<a href="{links}benchmarks.html" target="_blank" rel="noopener">'
+        f'<a href="{SITE_URL}benchmarks.html" target="_blank" rel="noopener">'
         "Read the full benchmarks</a>"
     )
     return (
         f'<!doctype html><html lang="en"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>Andrey benchmarks</title><style>{css}</style><body>"
-        + body.replace('href="docs/', f'href="{links}')
+        + body.replace('href="docs/', f'href="{SITE_URL}')
         # figures.js drives the belts, so they can be dragged and swiped here too.
         + f"<script>{FRAME_SCRIPT}</script>"
         + f"<script>{(ROOT / 'site' / 'assets' / 'figures.js').read_text()}</script></body></html>"
@@ -148,27 +143,6 @@ def dsep_thumbnail():
     return graph_thumbnail(GraphStructure.from_networkx(preset_dag()))
 
 
-def benchmarks_thumbnail(summary):
-    """The explorer's first chart: fit time against the number of variables."""
-    chart = site_builder().speed_chart([summary])
-    svg = chart[chart.index("<svg") : chart.index("</svg>") + len("</svg>")]
-    light = andrey.viz.LIGHT
-    # The chart's classes resolve to the light palette; the image cannot read the page's tokens.
-    style = (
-        f".tc-grid{{stroke:{light.line}}}.tc-line{{fill:none;stroke-width:2}}"
-        f".tc-andrey{{stroke:{light.accent}}}.tc-other{{stroke:{light.muted}}}"
-        f".tc-other-1{{stroke-dasharray:4 3}}circle.tc-andrey{{fill:{light.accent}}}"
-        f"circle.tc-other{{fill:{light.muted}}}circle.is-open{{fill:{light.surface}}}"
-        f"circle{{stroke:{light.surface};stroke-width:2}}"
-        f"text{{fill:{light.muted};font:500 9px Inter,system-ui,sans-serif}}"
-    )
-    return svg.replace(
-        "<svg ",
-        f'<svg xmlns="http://www.w3.org/2000/svg" style="background:{light.paper}" ',
-        1,
-    ).replace(">", f"><style>{style}</style>", 1)
-
-
 # ---- the Space's files -----------------------------------------------------------------------
 def build_assets(out):
     """Write the Space's teaching pages, its benchmark page, and the summary they come from."""
@@ -177,7 +151,7 @@ def build_assets(out):
     data = out / "data"
     data.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(builder.SUMMARY, data / "summary.json")
-    (data / "benchmarks.html").write_text(benchmarks_page(summary, race_tab=True))
+    (data / "benchmarks.html").write_text(benchmarks_page(summary))
     (data / "pc.html").write_text(pc_page())
     (data / "meek.html").write_text(meek_replay())
     (data / "d-separation.html").write_text(dsep_document())

@@ -22,6 +22,7 @@ from andrey.constraint.fci import (
     _orient_colliders,
     _remove_by_possible_dsep,
     _validate_collider_rule,
+    _validate_possible_dsep,
 )
 from andrey.core import NULL, GraphStructure
 from andrey.core.ci import CITest, make_indep_test
@@ -38,6 +39,7 @@ def gfci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
+    possible_dsep: str = "fast",
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
 
@@ -46,6 +48,7 @@ def gfci(
     X = np.asarray(data, dtype=np.float64)
 
     _validate_collider_rule(collider_rule)
+    _validate_possible_dsep(possible_dsep)
     cpdag_structure, _score = ges(
         X, score_func=score_func, lambda_value=lambda_value, categorical=categorical
     )
@@ -56,7 +59,7 @@ def gfci(
 
     marks = _circle_pag(cpdag != NULL)
     _orient_colliders(marks, sepsets)
-    _remove_by_possible_dsep(marks, test, alpha, sepsets)
+    _remove_by_possible_dsep(marks, test, alpha, sepsets, order_free=possible_dsep == "order_free")
     marks = _circle_pag(marks != NULL)
     ambiguous = (
         _majority_sepsets(marks, test, alpha, sepsets)

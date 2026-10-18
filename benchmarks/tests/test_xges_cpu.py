@@ -39,7 +39,7 @@ TINY = ["--ladder", "8", "--densities", "2", "4", "--seeds", "1", "--warmup", "0
 def _dataset() -> np.ndarray:
     """A dense linear-Gaussian sample on which the extended search changes the graph."""
     key = driver.ladder_keys([8], [4.0], 1)[0]
-    data, _marks, _kind = datasets.generate_one(key)
+    data, _marks, _kind, _columns = datasets.generate_one(key)
     return data
 
 

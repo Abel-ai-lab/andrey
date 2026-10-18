@@ -26,8 +26,10 @@ whole numbers in a column of numbers, each distinct value of a column one catego
 settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
 `"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
 [Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
-needs whole numbers. Other data raises a `ValueError` that names the argument and, for a bad cell,
-its row and column. A single column gives a one-node graph.
+needs whole numbers. Methods that score with BIC also reject a column that repeats another up to
+scale and shift or, given more rows than columns, is a linear function of other columns. Other data
+raises a `ValueError` that names the argument and, for a bad cell, its row and column. A single
+column gives a one-node graph.
 
 `pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
 `"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`
@@ -73,9 +75,12 @@ variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 ti
    granger
 ```
 
-FCI and GFCI use uncovered possibly-directed paths for their R9 and R10 tail orientations:
-nodes two steps apart on each path must be non-adjacent. The same rules determine the oracle PAG
-returned by `andrey.data.latent.marginal(..., "pag")`.
+FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
+apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
+bound. R8 checks each pair of endpoints in both orders, so it does not depend on the node labels.
+The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
+With `possible_dsep="order_free"`, FCI and GFCI build possible-d-separation sets that do not depend
+on the order their search visits nodes; the default, `"fast"`, builds them in that order.
 
 ### Experimental methods
 
@@ -226,7 +231,9 @@ Sachs data end to end.
 
 `andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
 scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
-for the mixed-data tests and scores. Each returns the data with the true graph.
+for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
+an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
+the causal order; `shuffle=False` keeps the order in which the graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data

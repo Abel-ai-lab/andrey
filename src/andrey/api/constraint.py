@@ -37,6 +37,7 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    collider_order: str = "p_value",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
@@ -62,6 +63,12 @@ def pc(
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
         mixed data, continuous and categorical columns, by a likelihood ratio. See Notes.
+    collider_order : {"p_value", "column"}, default="p_value"
+        The order in which colliders are oriented, which decides between two colliders that would
+        orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
+        endpoints were separated with the largest p-value, so the colliders do not depend on the
+        column order. ``"column"`` orients them in column order and keeps the first of two that
+        conflict. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -94,7 +101,7 @@ def pc(
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test.
+        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``.
 
     Warns
     -----
@@ -117,7 +124,7 @@ def pc(
     assumes continuous data, where each variable depends linearly on its causes with roughly
     Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, and for mixed data
     ``"degen_gauss"`` or ``"cond_gauss"``. It is fastest on sparse graphs, where every variable has
-    few neighbors [5]_. An undirected edge (``--``) is one the data cannot orient.
+    few neighbors [5]_.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -125,19 +132,33 @@ def pc(
     **Choosing alpha.** A test removes an edge when it cannot reject independence at ``alpha``. A
     larger ``alpha`` therefore keeps more edges, true and false. On the Sachs data in the
     getting-started guide, raising ``alpha`` from 0.05 to 0.2 found more known links, but a smaller
-    share of the links found were known. No value is right in general. Choose it by weighing the
-    cost of a missed edge against a false one, and report how the graph changes with it.
+    share of the links found were known. No value is right in general: it trades missed edges
+    against false ones, so a result is best reported with how the graph changes with ``alpha``.
 
     **How it works.** Edge removal is order-independent (PC-stable) [3]_. At each conditioning-set
     size, every test uses the adjacencies from the start of that size. Edges found independent are
     removed together. A removed pair's separating set combines all conditioning sets that separated
-    it. If two colliders conflict, the one found first in column order is kept.
+    it. Two colliders conflict when they would orient one edge in opposite directions, so the order
+    in which they are oriented can change the result [3]_. A collider is skipped when it would give
+    an edge an arrowhead at both ends, so of two conflicting colliders the one oriented first is
+    kept. With the default ``collider_order="p_value"``, each collider ``x -> y <- z`` ranks by the
+    largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders are
+    oriented from the highest rank to the lowest. When two conflicting colliders rank exactly
+    equal, the edge they dispute stays undirected, and Meek's rules do not orient it. The colliders
+    therefore do not depend on the column order. This adapts the conflict rule of Ramsey [10]_,
+    which ranks a collider by separating sets that additional tests choose; Andrey ranks it by the
+    tests that removed the edge, so orienting runs no new test. With ``collider_order="column"``,
+    colliders are oriented by middle node, then by endpoint pair, in column order, so the result
+    can depend on the column order. Meek's rules can still depend on the column order: when two
+    rule firings would orient one edge in opposite directions, the one reached first in column
+    order decides.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 400 variables with ten rows per variable: its median errors (SHD) stayed
-    below the empty graph's at every size, 357 against 400 at 400 variables. The median fit took
-    0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network with
-    1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
+    **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
+    default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
+    (mean degree 2), from 20 to 400 variables with ten rows per variable, its median errors (SHD)
+    stayed below the empty graph's at every size, 357 against 400 at 400 variables. The median fit
+    took 0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network
+    with 1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
     practical to roughly 1,000 variables on sparse data with ten rows per variable; runtime grows
     combinatorially with the largest neighborhood, so sparser graphs can stay feasible beyond that.
     On simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the
@@ -194,6 +215,8 @@ def pc(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [9] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
        Statistical Association 84(405), 165-175.
+    .. [10] Ramsey, J. (2016). Improving accuracy and scalability of the PC algorithm by maximizing
+       P-value. arXiv:1610.00378, Section 5.
 
     Examples
     --------
@@ -232,7 +255,9 @@ def pc(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    cpdag = _pc(X, alpha=alpha, indep_test=indep_test, categorical=mask)
+    cpdag = _pc(
+        X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+    )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
     )
@@ -246,6 +271,7 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    possible_dsep: str = "fast",
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -286,6 +312,12 @@ def fci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    possible_dsep : {"fast", "order_free"}, default="fast"
+        How FCI builds each possible-d-separation set [2]_ [3]_, the nodes it conditions on to
+        remove edges the first step kept. ``"fast"`` checks each node when the search reaches it,
+        so the set depends on the order the search visits nodes. ``"order_free"`` checks every
+        node once the search ends, so the set does not depend on that order; its sets can be
+        larger, so it can run more tests. See Notes.
 
     Returns
     -------
@@ -305,8 +337,8 @@ def fci(
         an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
-        is not in ``(0, 1)``, if ``collider_rule`` is not a supported choice, or if ``data`` or
-        ``categorical`` does not suit the test, as for :func:`~andrey.pc`.
+        is not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice,
+        or if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`.
 
     Warns
     -----
@@ -331,12 +363,7 @@ def fci(
     **When not to.** When every common cause is measured, :func:`~andrey.pc` orients more of the
     graph with fewer tests. FCI's possible-d-separation step runs tests PC does not.
 
-    **Choosing alpha.** As for :func:`~andrey.pc`, a larger ``alpha`` keeps more edges, true and
-    false.
-
-    **Choosing collider_rule.** ``"sepsets"`` uses the separating set recorded when the edge was
-    removed. ``"majority"`` tests the pair again given every subset of either endpoint's neighbors
-    and follows the majority [4]_, at the cost of the extra tests described under the parameter.
+    **Choosing alpha.** A larger ``alpha`` keeps more edges, true and false.
 
     **How it works.** FCI runs in three steps. First, it removes edges by conditional-independence
     tests, as PC does, and orients colliders from the separating sets. Next, it tests each remaining
@@ -345,11 +372,35 @@ def fci(
     applies Zhang's orientation rules R1-R10 [3]_ until no mark changes. An endpoint no rule
     resolves stays a circle.
 
-    The result can depend on the column order, for example, through the possible-d-separation step.
-    Keep a fixed column order for reproducible results.
+    The result can depend on the column order, for example, through the order in which the
+    possible-d-separation step visits pairs and conditioning sets, and with
+    ``possible_dsep="fast"`` through the sets themselves. A fixed column order gives reproducible
+    results.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
+    It considers every circle path, up to a fixed search bound, so a covered route through a node
+    never hides an uncovered route through the same node. Rule R8 checks each pair of endpoints in
+    both orders, so whether it fires does not depend on the node labels.
+
+    **Possible-d-separation set.** FCI builds each possible-d-separation set [2]_ [3]_ with a search
+    that walks out from one endpoint of the pair and keeps a node when a node it was reached from
+    has a possibly directed path, one with no arrowhead pointing back along it, to the endpoint or
+    to the node. With ``possible_dsep="fast"``, FCI checks a node when the search reaches it,
+    against the nodes it was reached from so far, so the set depends on the order the search visits
+    nodes. With ``"order_free"``, it checks every node once the search ends, against all the nodes
+    it was reached from, so the set does not depend on that order; it holds every node of the
+    ``"fast"`` set and sometimes more. Either set can be smaller than the published definition of
+    the set [2]_, so FCI can keep an edge that the published set would remove, even with exact
+    tests. FCI keeps this search because the published set grows quickly with the graph, the
+    search's set is the one FCI has been measured with, and on simulated data the published set did
+    not give more accurate PAGs. FCI tests every subset of the set, except the empty set and the
+    subsets of either endpoint's neighbors, which the first step already tested.
+
+    **Separating sets.** When several conditioning sets of the same size make a pair independent
+    in the first step, FCI records their union as the pair's separating set. FCI keeps the union
+    because it does not depend on the order of the tests, and on simulated data it gave more
+    accurate PAGs than the first set found.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) with one variable in ten hidden, from 20 to 800 variables counting the hidden ones,
@@ -357,8 +408,11 @@ def fci(
     circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at
     800 (2,579 against 1,772). The median fit took 0.061 s at 20 variables and 72 s at 800, on 16
     cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
-    passed the empty graph's (696 against 676). With the mixed-data tests, it is experimental and
-    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    passed the empty graph's (696 against 676). Rule R5 stops searching a pair after a fixed number
+    of partial paths and leaves its circles, so on graphs with many circle-circle edges it can miss
+    an undirected cycle. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
+    data the result can still depend on the column order. With the mixed-data tests, it is
+    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -389,7 +443,14 @@ def fci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pag = _fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule, categorical=mask)
+    pag = _fci(
+        X,
+        alpha=alpha,
+        indep_test=indep_test,
+        collider_rule=collider_rule,
+        categorical=mask,
+        possible_dsep=possible_dsep,
+    )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
     )
@@ -405,6 +466,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    possible_dsep: str = "fast",
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -452,6 +514,12 @@ def gfci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    possible_dsep : {"fast", "order_free"}, default="fast"
+        How GFCI builds each possible-d-separation set [2]_ [4]_, the nodes it conditions on to
+        remove edges the adjacency search kept. ``"fast"`` checks each node when the search reaches
+        it, so the set depends on the order the search visits nodes. ``"order_free"`` checks every
+        node once the search ends, so the set does not depend on that order; its sets can be
+        larger, so it can run more tests. See Notes.
 
     Returns
     -------
@@ -471,9 +539,11 @@ def gfci(
         an int.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
-        ``collider_rule`` is not a supported choice, if ``score_func`` and ``indep_test`` read
-        different data (continuous, categorical, or mixed), or if ``data`` or ``categorical`` does
-        not suit them, as for :func:`~andrey.pc`.
+        ``collider_rule`` or ``possible_dsep`` is not a supported choice, if ``score_func`` and
+        ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
+        ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
+        column repeats another up to scale and shift given more than two rows or, with more rows
+        than columns, is a linear function of other columns.
 
     Warns
     -----
@@ -495,12 +565,25 @@ def gfci(
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
+    It considers every circle path, up to a fixed search bound, and rule R8 checks each pair of
+    endpoints in both orders. GFCI shares FCI's possible-d-separation sets [2]_ [4]_, built as
+    ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
+    both and the reasons for keeping them. With ``possible_dsep="fast"``, GFCI checks each node
+    when the search reaches it, against the nodes it was reached from so far, so the set depends on
+    the order the search visits nodes. With ``"order_free"``, it checks every node once the search
+    ends, against all the nodes it was reached from, so the set does not depend on that order, and
+    it can be larger.
 
     **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
     and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
-    linear relations with Gaussian noise. With the mixed-data score and test, its tests run it on
-    5 variables with 3,000 rows.
+    linear relations with Gaussian noise. With fewer rows than columns the BIC score is
+    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
+    GES search never selects one, nor any parent set that leaves its child a residual variance of at
+    most ``1e-12`` times its variance. Rule R5 has the search bound described under
+    :func:`~andrey.fci`. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
+    data the result can still depend on the column order. With the mixed-data score and test, its
+    tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -511,6 +594,8 @@ def gfci(
        1873-1896.
     .. [3] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
+    .. [4] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd ed. MIT Press.
 
     Examples
     --------
@@ -547,6 +632,7 @@ def gfci(
         indep_test=indep_test,
         collider_rule=collider_rule,
         categorical=mask,
+        possible_dsep=possible_dsep,
     )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}

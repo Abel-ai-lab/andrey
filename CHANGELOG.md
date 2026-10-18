@@ -9,6 +9,48 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `fci` and `gfci` take `possible_dsep`: `"fast"`, the default, builds each possible-d-separation
+  set as before, in the order the search visits nodes, and `"order_free"` builds sets that do not
+  depend on that order, at the cost of more tests on some graphs. ([#168])
+
+### Changed
+
+- `pc` orients conflicting colliders by the p-value that separated each collider's pair, highest
+  first, so its colliders no longer depend on the column order and its default output can change,
+  and `collider_order="column"` keeps the column-order rule. ([#168])
+- `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
+  order with the true graph, from the seed, so the order no longer follows how the graph was drawn
+  (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
+- Hill climbing and tabu search break exact score ties by a hash of each column's values, so
+  reordering the columns no longer changes the graph they find. ([#168])
+- `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#169])
+- `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
+  measure values calibrated before this change again with `andrey calibrate`. ([#169])
+
+### Removed
+
+- The benchmark explorer page is retired, and its address redirects to the release cards. ([#175])
+
+### Fixed
+
+- `fci` and `gfci` no longer turn every edge with a tail at one end and a circle at the other
+  into an undirected edge; the rule that sets such tails now needs a third node. ([#168])
+- In `fci` and `gfci`, rule R5 searches every uncovered circle path up to a fixed bound, rule R8
+  checks both endpoint orders, and the possible-d-separation step tests every conditioning subset,
+  so they remove false edges and orient endpoints they used to miss;
+  `andrey.data.latent.marginal(..., "pag")` follows the same rules. ([#168])
+- `ges`, `gies`, `gfci`, `xges`, `hc`, `tabu`, `boss`, and `grasp` return the same graph however
+  small the data's scale, where squared covariances used to underflow and change the result.
+  ([#169])
+- These searches and `exact_search` raise a `ValueError` naming the columns when a column repeats
+  another up to scale and shift given more than two rows or, with more rows than columns, is a
+  linear function of other columns, instead of returning a graph from scores of a zero residual
+  variance, which were infinite or finite but meaningless. ([#169])
+- With no more rows than columns, these searches no longer pick a parent set of `n_samples - 1` or
+  more variables, which fits its child exactly. ([#169])
+
 ## [0.6.0] - 2026-10-17
 
 ### Highlights
@@ -214,3 +256,6 @@ First alpha release.
 [#95]: https://github.com/Abel-ai-lab/andrey/pull/95
 [#94]: https://github.com/Abel-ai-lab/andrey/pull/94
 [#167]: https://github.com/Abel-ai-lab/andrey/pull/167
+[#168]: https://github.com/Abel-ai-lab/andrey/pull/168
+[#169]: https://github.com/Abel-ai-lab/andrey/pull/169
+[#175]: https://github.com/Abel-ai-lab/andrey/pull/175

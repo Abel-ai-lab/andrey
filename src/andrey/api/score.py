@@ -104,7 +104,9 @@ def ges(
         with a categorical score, if ``data`` holds a number that is not whole, or, with
         a mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another score.
+        with another score. With the BIC score, also if a column repeats
+        another up to scale and shift given more than two rows or, with more rows than columns, is a
+        linear function of other columns.
 
     Warns
     -----
@@ -124,8 +126,7 @@ def ges(
     assumes continuous data, where each variable depends linearly on its causes with Gaussian noise;
     in that setting it is a fast, accurate default. For categorical data, use
     ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, and for mixed data
-    ``"local_score_degen_gauss"`` or
-    ``"local_score_cond_gauss"``. It returns the equivalence class.
+    ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -174,10 +175,13 @@ def ges(
     below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against
     200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
     and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
-    the default parent cap, its median errors passed the empty graph's (612 against 338). On
-    simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the first
-    half of the variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000
-    rows, its median errors at 40 variables were 8 with ``"local_score_degen_gauss"`` and 6.5 with
+    the default parent cap, its median errors passed the empty graph's (612 against 338). With
+    fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more
+    variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated
+    mixed data (conditional linear Gaussian networks on sparse random graphs, the first half of the
+    variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000 rows, its
+    median errors at 40 variables were 8 with ``"local_score_degen_gauss"`` and 6.5 with
     ``"local_score_cond_gauss"``, against 40, and the median fit took 0.75 s and 1.2 s on 4 cores.
     On simulated categorical networks with 2 or 3 categories per variable, of the same sizes and
     rows, ``"local_score_BDeu"`` gave 6 against 40 at 40 variables, in 0.60 s. The multinomial BIC
@@ -278,7 +282,9 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     Raises
     ------
     ValueError
-        If ``lambda_value`` is negative or non-finite.
+        If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
+        column up to scale and shift given more than two rows, or, with more rows than columns, is a
+        linear function of other columns.
 
     Warns
     -----
@@ -291,6 +297,9 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 600 rows. It
     takes observational data only, so it returns the graph and score that :func:`~andrey.ges`
     returns on the same data, and the limitations of GES apply.
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -359,8 +368,10 @@ def xges(
     TypeError
         If ``extended_search`` is not a bool.
     ValueError
-        If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
-        no constant column, or if ``lambda_value`` is negative or non-finite.
+        If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, if
+        ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
+        column up to scale and shift given more than two rows, or, with more rows than columns, is a
+        linear function of other columns.
 
     See Also
     --------
@@ -388,6 +399,9 @@ def xges(
     edge it tries to delete and retries the edges after keeping a result, so its run time grows
     with the number of edges and of results kept. Its BIC score assumes linear relations with
     Gaussian noise.
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -486,7 +500,9 @@ def hc(
         positions, or ``max_categories`` is not an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
-        or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`.
+        or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With
+        the BIC score, also if a column repeats another up to scale and shift given more than two
+        rows or, with more rows than columns, is a linear function of other columns.
 
     Warns
     -----
@@ -502,16 +518,22 @@ def hc(
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set. Under a mixed-data score, no move gives a categorical column
-    a continuous parent, so the DAG found is a conditional linear Gaussian network.
+    a continuous parent, so the DAG found is a conditional linear Gaussian network. Exact score ties
+    between moves, such as adding ``x -> y`` or ``y -> x`` under a score-equivalent score, break by
+    a hash of each column's values, so reordering the columns does not change the graph found
+    unless two columns are identical.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
     to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
     exceeded the empty graph's. The median fit took under a second at 800 variables and about 20 s
     at 3,200, on 4 cores. It has no move limit by default; run time grows with the moves the search
     takes. A graph that no single move improves need not be the best-scoring one. Its BIC score
-    assumes linear relations with Gaussian noise. On simulated mixed data (conditional linear
-    Gaussian networks on sparse random graphs, the first half of the variables categorical with 2 to
-    5 categories), from 10 to 40 variables with 2,000 rows, its median errors at 40 variables were
+    assumes linear relations with Gaussian noise. With fewer rows than columns the BIC score is
+    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
+    search never selects one, nor any parent set that leaves its child a residual variance of at
+    most ``1e-12`` times its variance. On simulated mixed data (conditional linear Gaussian
+    networks on sparse random graphs, the first half of the variables categorical with 2 to 5
+    categories), from 10 to 40 variables with 2,000 rows, its median errors at 40 variables were
     12.5 with ``"local_score_degen_gauss"`` and 11 with ``"local_score_cond_gauss"``, against 40. On
     simulated categorical networks with 2 or 3 categories per variable, of the same sizes and rows,
     they were 18 with ``"local_score_BDeu"`` and 20 with ``"local_score_BIC_categorical"``. Every
@@ -604,7 +626,9 @@ def tabu(
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
         less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or, with a categorical
-        score, if ``data`` holds a number that is not whole.
+        score, if ``data`` holds a number that is not whole. With the BIC score, also if a column
+        repeats another up to scale and shift given more than two rows or, with more rows than
+        columns, is a linear function of other columns.
 
     Warns
     -----
@@ -631,8 +655,11 @@ def tabu(
     at 3,200, on 4 cores. It takes hill climbing's moves plus up to ``max_tabu`` non-improving
     moves between new best scores, with no move limit by default; run time grows with the moves
     taken. It avoids only the last ``tabu_length`` DAGs, so a better DAG beyond that reach may be
-    missed. Its BIC score assumes linear relations with Gaussian noise. With a categorical score,
-    its tests run it on small fixed categorical networks.
+    missed. Its BIC score assumes linear relations with Gaussian noise. With fewer rows than
+    columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more variables fits
+    its child exactly, so the search never selects one, nor any parent set that leaves its child a
+    residual variance of at most ``1e-12`` times its variance. With a categorical score, its tests
+    run it on small fixed categorical networks.
 
     References
     ----------
@@ -736,7 +763,9 @@ def exact_search(
         an int.
     ValueError
         If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical``
-        does not suit the score, as for :func:`~andrey.ges`.
+        does not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column
+        repeats another up to scale and shift given more than two rows or, with more rows than
+        columns, is a linear function of other columns.
 
     Warns
     -----
@@ -766,6 +795,9 @@ def exact_search(
     It scores every possible parent set of every variable, so its run time at least doubles with
     each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
     its memory doubles as well.
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
