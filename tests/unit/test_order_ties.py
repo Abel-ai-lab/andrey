@@ -63,8 +63,13 @@ def _strong_chain(seed: int, n: int = 2000) -> np.ndarray:
     return np.vstack([z, z[:, [3, 1, 2, 0]]])
 
 
-def _swap_symmetric_series(seed: int, period: int = 64, tau_max: int = 2) -> np.ndarray:
+def _swap_symmetric_series(
+    seed: int, drive: float = 0.3, memory: float = 0.5, period: int = 64, tau_max: int = 2
+) -> np.ndarray:
     """Series 0 and 1 share a signal of ``period`` steps, and series 2 follows it one step later.
+
+    Series 2 is ``memory`` times its last value plus ``drive`` times the signal's last value plus
+    noise.
 
     Series 1 is series 0 shifted by one period, and series 2 repeats with that period, so swapping
     series 0 and 1 shifts all three by one period. The first ``2 * tau_max`` steps repeat the last
@@ -80,7 +85,7 @@ def _swap_symmetric_series(seed: int, period: int = 64, tau_max: int = 2) -> np.
     noise = rng.standard_normal(period)
     for _ in range(3):
         for t in range(period):
-            driven[t] = 0.5 * driven[t - 1] + 0.3 * shared[t - 1] + noise[t]
+            driven[t] = memory * driven[t - 1] + drive * shared[t - 1] + noise[t]
     first = np.round(10 * (np.tile(shared, 2) + 0.5 * rng.standard_normal(2 * period)))
     x = np.column_stack([first, np.roll(first, period), np.round(10 * np.tile(driven, 2))])
     return np.vstack([x[-2 * tau_max :], x])
@@ -142,12 +147,17 @@ def test_calm_moral_graph_zero_p_values() -> None:
         np.testing.assert_array_equal(_mapped(moral_graph, x, np.array(order)), want)
 
 
-def test_pcmciplus_ties(monkeypatch) -> None:
-    """PC1 meets equal strengths for the lagged links of series 0 and 1 into series 2."""
-    x = _swap_symmetric_series(0)
+def _assert_lag_one_tie(x: np.ndarray) -> None:
+    """Series 0 and 1 at lag 1 have the same statistic against series 2, with no conditions."""
     test = design_test("student_t", x, 2)
     statistics, _ = test.statistic_pvalues(np.array([3, 4]), np.array([2, 2]), np.zeros((2, 0)))
     assert statistics[0] == statistics[1]
+
+
+def test_pcmciplus_ties(monkeypatch) -> None:
+    """PC1 meets equal strengths for the lagged links of series 0 and 1 into series 2."""
+    x = _swap_symmetric_series(0)
+    _assert_lag_one_tie(x)
 
     def fit(data: np.ndarray) -> np.ndarray:
         graph = andrey.pcmciplus(data, tau_max=2, pc_alpha=0.2).structure
@@ -173,3 +183,15 @@ def test_pcmci_parents_ties(monkeypatch) -> None:
     monkeypatch.setattr(importlib.import_module("andrey.temporal.pcmci"), "tie_ranks", _by_position)
     by_position = parents(np.arange(3))
     assert any(parents(order) != by_position for order in orders)
+
+
+def test_lpcmci_ties(monkeypatch) -> None:
+    """The separating-set searches for series 2 meet equal statistics of series 0 and 1."""
+    x = _swap_symmetric_series(0, drive=1.0, memory=0.0)
+    _assert_lag_one_tie(x)
+
+    def fit(data: np.ndarray) -> np.ndarray:
+        graph = andrey.lpcmci(data, tau_max=2, pc_alpha=0.2).structure
+        return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
+
+    _assert_order_free(fit, x, "andrey.temporal.lpcmci", monkeypatch)

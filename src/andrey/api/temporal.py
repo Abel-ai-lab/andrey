@@ -615,8 +615,9 @@ def lpcmci(
     Whether a node lies outside the separating set of two others is a majority vote over the
     distinct separating sets stored and found among the neighbors of the two. A mark that rules
     orient both ways is a conflict. The candidates of a step are ordered by statistics frozen when
-    its group of links starts, so the order in which a group's links are tested changes nothing
-    and, apart from exact ties, the order of the variables changes nothing either. The collider
+    its group of links starts, so the order in which a group's links are tested changes nothing.
+    Equal statistics are ordered by each variable's rank, as in :func:`~andrey.hc`, so the order
+    of the variables changes nothing either, unless two columns are identical. The collider
     rule stores every separating set its tests find, each made weakly minimal by dropping first
     the node whose removal leaves the largest p-value, so the stored sets do not depend on the
     order of the variables.
