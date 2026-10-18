@@ -13,10 +13,11 @@ and the dataset loaders and simulators of `andrey.data` - generated from the sou
 
 ## Structure-learning methods
 
-Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with three
-exceptions: `cdnod` also takes a domain index, `longitudinal_lingam` takes a list of datasets, and
-`multi_group_direct_lingam` takes a list of datasets and returns one result per dataset. Each
-method is either supported or experimental; `andrey list` prints the status.
+Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with four
+exceptions: `cdnod` also takes a domain index, `gies` also takes which variables were intervened on
+in each row, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes
+a list of datasets and returns one result per dataset. Each method is either supported or
+experimental; `andrey list` prints the status.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column names.
@@ -100,7 +101,6 @@ in a process.
    calm
    multi_group_direct_lingam
    gin
-   camuv
 ```
 
 A method becomes supported once it has:

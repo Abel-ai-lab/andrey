@@ -149,7 +149,7 @@ reaching a code path no other test reaches, on the smallest input that reaches i
 
 - Parametrize over cases that take different branches (both sides of a size cutoff, each failure
   mode, the degenerate input); another size or seed on the same branches adds time, not coverage.
-- Two entry points that share a code path need one test: GIES and GFCI call `ges()`.
+- Two entry points that share a code path need one test: GES and GFCI both call `ges()`.
 - A fixed input with one certain answer is an integrity check; a threshold on a median over random
   draws is a quality measurement.
 - A fit made once per module is shared by the tests that inspect it.

@@ -9,7 +9,9 @@ import numpy as np
 # A graph candidate also carries the scalar objective score (from metadata).
 _SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu"})
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
-_GRAPH = frozenset({"PC", "FCI", "GFCI", "CDNOD", "ExactSearch", "BOSS", "GRaSP"}) | _SCORE_GRAPH
+_GRAPH = (
+    frozenset({"PC", "FCI", "GFCI", "CDNOD", "ExactSearch", "BOSS", "GRaSP", "CALM"}) | _SCORE_GRAPH
+)
 # LiNGAM: candidate = ordering + weighted_adjacency, transposing native W back to the B layout.
 _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})
 # Hidden-confounder PAGs: candidate = graph + weighted_adjacency as returned.
@@ -44,6 +46,8 @@ def project_output(out: Any, algorithm: str) -> dict:
         return candidate
     if algorithm in _PAIRWISE:
         return {"graph": out.structure.to_numpy()} | {k: out.metadata[k] for k in _PAIRWISE_FIELDS}
+    if algorithm == "GIN":  # the graph over indicators and latents, and the clusters in order
+        return {"graph": out.structure.to_numpy(), "causal_order": out.metadata["causal_order"]}
     if algorithm in _PCMCI:
         s = out.structure
         candidate = {
@@ -84,7 +88,4 @@ def project_output(out: Any, algorithm: str) -> dict:
             "psis": np.asarray(s.lag_weights).transpose(0, 2, 1),
             "omegas": np.asarray(s.lag_weights_ma).transpose(0, 2, 1),
         }
-    raise KeyError(
-        f"no output projection registered for {algorithm!r} "
-        "(lossy layouts like Granger and CAM-UV add their own in-slice)"
-    )
+    raise KeyError(f"no output projection registered for {algorithm!r}")

@@ -43,9 +43,32 @@ def test_ica_lingam_recovery():
     assert_recorded_output(out, "ICALiNGAM", case="lingam_5v_uniform")
 
 
-def test_multi_group_direct_lingam_recovery():
-    out = andrey.multi_group_direct_lingam(datagen.generate_groups("mgdl_2groups"))
-    assert_recorded_output(out, "MultiGroupDirectLiNGAM", case="mgdl_2groups")
+@pytest.fixture(scope="module")
+def mgdl_fit() -> list:
+    return andrey.multi_group_direct_lingam(datagen.generate_groups("mgdl_2groups"))
+
+
+def test_multi_group_direct_lingam_recovery(mgdl_fit):
+    assert_recorded_output(mgdl_fit, "MultiGroupDirectLiNGAM", case="mgdl_2groups")
+
+
+def test_multi_group_recovers_each_groups_planted_weights(mgdl_fit):
+    """Each group gets its own planted edges and weights, under one order the planted DAGs allow."""
+    for group, out in zip(datagen.GROUP_CASES["mgdl_2groups"]["groups"], mgdl_fit, strict=True):
+        planted = np.asarray(group["weights"]).T  # planted[i, j] weights i -> j
+        position = {v: k for k, v in enumerate(out.ordering)}
+        assert all(position[i] < position[j] for i, j in zip(*np.nonzero(planted), strict=True))
+        estimated = np.asarray(out.weighted_adjacency)
+        np.testing.assert_array_equal(estimated != 0, planted != 0)
+        np.testing.assert_allclose(estimated, planted, atol=0.15)
+
+
+def test_multi_group_finds_no_edge_between_independent_columns():
+    rng = np.random.default_rng(0)
+    groups = [rng.uniform(-1.0, 1.0, (500, 4)), rng.uniform(-1.0, 1.0, (300, 4))]
+    for out in andrey.multi_group_direct_lingam(groups):
+        assert out.structure.oriented_edges() == []
+        assert not np.any(out.weighted_adjacency)
 
 
 def test_ica_lingam_output_contract():
@@ -53,10 +76,9 @@ def test_ica_lingam_output_contract():
     assert out.ordering is not None and out.weighted_adjacency is not None
 
 
-def test_multi_group_output_contract():
-    out = andrey.multi_group_direct_lingam(datagen.generate_groups("mgdl_2groups"))
-    assert len(out) == 2
-    assert all(o.ordering == out[0].ordering for o in out)  # one shared order across groups
+def test_multi_group_output_contract(mgdl_fit):
+    assert len(mgdl_fit) == 2
+    assert all(o.ordering == mgdl_fit[0].ordering for o in mgdl_fit)  # one shared order
 
 
 def test_multi_group_requires_at_least_two_groups():

@@ -55,7 +55,10 @@ The chain `X -- Y -- Z` represents three DAGs: `X -> Y -> Z`, `X <- Y <- Z`, and
 relationships. Undirected edges cannot always be oriented independently.
 
 Andrey uses `kind="cpdag"`. The pair `(TAIL, TAIL)` means an unresolved direction, not two
-opposite causal effects. PC and GES, among other methods, return this kind.
+opposite causal effects. PC and GES, among other methods, return this kind. GIES returns it too
+for data with interventions, where the class holds only the DAGs that also agree on the data under
+each set of intervened variables, so it can direct more edges
+([Hauser and Buhlmann (2012)](#references)).
 
 ```python
 cpdag = GraphStructure.from_numpy(
@@ -81,9 +84,9 @@ assumptions. The circle at `X` leaves that endpoint unresolved. This does not es
 effect from `X` to `Y`. A bidirected edge `X <-> Y` indicates a relation through hidden causes;
 it is not a directed feedback loop and does not identify a particular hidden variable.
 
-FCI and GFCI return `kind="pag"`. RCD, CAM-UV, and BottomUpParceLiNGAM use the same marks without
-the equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that RCD or CAM-UV
-links through a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves
+FCI and GFCI return `kind="pag"`. RCD and BottomUpParceLiNGAM use the same marks without the
+equivalence-class reading: `X -> Y` is an edge they found, `X <-> Y` a pair that RCD links through
+a hidden variable, and `X o-o Y` a pair in the block BottomUpParceLiNGAM leaves
 unordered, which holds the variables a hidden common cause confounds and their observed ancestors.
 A circle is `CIRCLE=3`, so `X o-> Y` has marks `(3, 2)`:
 
@@ -155,8 +158,12 @@ union over all occasions. `NaN` in `time_weights` marks a block that could not b
 |---|---|
 | `dag` | `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `exact_search`, `calm`, `gin`, `anm`, `pnl` |
 | `cpdag` | `pc`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp` |
-| `pag` | `fci`, `gfci`, `rcd`, `camuv`, `bottom_up_parce_lingam` |
+| `pag` | `fci`, `gfci`, `rcd`, `bottom_up_parce_lingam` |
 | `TemporalStructure` | `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `granger` |
+
+`cdnod` returns kind `cpdag`, but its graph is only partially directed: the domain index orients
+edges that the CPDAG of observational data leaves undirected, so score it against the graph CD-NOD
+can identify rather than the true DAG's CPDAG.
 
 `multi_group_direct_lingam` returns a list of results, one per group. GIN includes explicit latent
 nodes, marked by `node_types` (`OBSERVED=0`, `LATENT=1`). ANM and PNL are direction tests on two
@@ -176,6 +183,9 @@ Path("graph.svg").write_text(draw(pag), encoding="utf-8")
 
 - [Chickering (2002), Learning Equivalence Classes of Bayesian-Network Structures][chickering].
 - [Zhang (2008), Causal Reasoning with Ancestral Graphs][zhang].
+- [Hauser and Buhlmann (2012), Characterization and Greedy Learning of Interventional Markov
+  Equivalence Classes of Directed Acyclic Graphs][hauser].
 
 [chickering]: https://jmlr.org/papers/v2/chickering02a.html
 [zhang]: https://www.jmlr.org/papers/v9/zhang08a.html
+[hauser]: https://jmlr.org/papers/v13/hauser12a.html

@@ -4,16 +4,17 @@ The algorithm, its settings, and its references are described on :func:`andrey.c
 
 ``B[i, j]`` weights edge ``i -> j``. IAMB with a Fisher-Z test estimates each variable's Markov
 blanket, and only edges inside that moral graph are candidates. Each candidate has a gate, a logit
-passed through a Gumbel-sigmoid, so the penalty counts edges (an approximate ``l0``). An
-augmented-Lagrangian loop raises ``rho`` across rounds while Adam minimizes the Gaussian
+passed through a Gumbel-sigmoid, so the penalty counts edges (an approximate ``l0``). A
+quadratic-penalty loop raises ``rho`` across rounds while Adam minimizes the Gaussian
 non-equal-variance negative log-likelihood ``0.5 * sum_j log(residual_var_j) - log|det(I - B)|``,
-the gate penalty, and the acyclicity term ``h(M) = tr((I + M/d)^d) - d`` (Yu et al. 2019) on the
-gate mask, until ``h`` is within tolerance. The gates are then thresholded, and any remaining cycle
-loses its weakest edge.
+the gate penalty, and ``0.5 * rho * h**2`` for the acyclicity term ``h(M) = tr((I + M/d)^d) - d``
+(Yu et al. 2019) on the gate mask, until ``h`` is within tolerance. The gates are then
+thresholded, and edges are removed by increasing weight magnitude until no cycle remains.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -107,6 +108,11 @@ def moral_graph(data: np.ndarray, *, alpha: float = 0.01) -> np.ndarray:
 # --------------------------------------------------------------------------------------------
 
 
+_NOT_FINITE = (
+    "CALM's loss or weights are not finite; rescale the data, for example with standardize=True"
+)
+
+
 def _optimize_gated_dag(
     cov: np.ndarray,
     moral_mask: np.ndarray,
@@ -124,12 +130,12 @@ def _optimize_gated_dag(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Fit gate logits and edge weights; return ``(gate_prob, weight)`` numpy arrays.
 
-    Runs the augmented-Lagrangian schedule with a Gumbel-sigmoid gate over the moral-graph support.
+    Runs the quadratic-penalty schedule with a Gumbel-sigmoid gate over the moral-graph support.
     ``gate_prob`` is the noiseless edge probability ``sigmoid(logit / tau)`` and ``weight`` the real
-    coefficient matrix; the caller thresholds them into a binary support.
+    coefficient matrix; the caller thresholds them into a binary support. Raises ``ValueError``
+    when the loss or the fitted parameters are not finite.
     """
     torch = _require_torch()
-    torch.manual_seed(seed)
     gen = torch.Generator(device="cpu").manual_seed(seed)
     d = cov.shape[0]
     cov_t = torch.from_numpy(cov).double()
@@ -169,9 +175,11 @@ def _optimize_gated_dag(
             likelihood = 0.5 * torch.sum(torch.log(resid)) - torch.linalg.slogdet(eye - B)[1]
             h = acyclicity(g)
             loss = likelihood + lambda1 * g.sum() + 0.5 * rho * h * h
+            cur = loss.item()
+            if not math.isfinite(cur):
+                raise ValueError(_NOT_FINITE)
             loss.backward()
             opt.step()
-            cur = loss.item()
             if step > 50 and abs(prev - cur) < 1e-7 * (abs(prev) + 1e-9):
                 break
             prev = cur
@@ -183,6 +191,8 @@ def _optimize_gated_dag(
     with torch.no_grad():
         gate_prob = (torch.sigmoid(logit / tau) * mask_t).cpu().numpy()
         weight_np = weight.detach().cpu().numpy()
+    if not (np.isfinite(gate_prob).all() and np.isfinite(weight_np).all()):
+        raise ValueError(_NOT_FINITE)
     return gate_prob, weight_np
 
 
@@ -271,7 +281,7 @@ def calm(
     ``data`` is an ``(n, d)`` sample matrix (rows are observations). An estimated moral graph
     (Fisher-Z IAMB at level ``alpha``) prunes the candidate edges unless ``use_moral_graph`` is
     false. ``lambda1`` prices the gated ``l0`` edge count and ``tau`` sets the Gumbel-sigmoid
-    temperature. The augmented-Lagrangian outer loop runs up to ``max_outer`` rounds, each an Adam
+    temperature. The quadratic-penalty outer loop runs up to ``max_outer`` rounds, each an Adam
     subproblem of at most ``subproblem_iter`` steps at learning rate ``lr``; the penalty ``rho``
     grows from ``rho_init`` by ``rho_mult`` until the acyclicity residual clears ``h_tol`` or
     ``rho`` exceeds ``rho_max``. A gate is kept when its probability clears ``gate_threshold`` and

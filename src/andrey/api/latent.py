@@ -2,9 +2,9 @@
 
 The callable runs the GIN engine and returns one uniform ``StructureOutput``. GIN recovers a
 linear non-Gaussian latent-variable model from the observed data alone, so the wrapped graph spans
-both the observed indicators and the discovered latents: each latent points to its observed children
-and to every later latent in causal order, and ``node_types`` flags which nodes are latent. The
-recovered clustering and latent causal order are stored in ``metadata``.
+both the observed indicators and the discovered latents: each latent points to its observed
+children, an ordered latent also points to every later latent, and ``node_types`` flags which
+nodes are latent. The recovered clustering and latent causal order are stored in ``metadata``.
 """
 
 from __future__ import annotations
@@ -35,9 +35,9 @@ def gin(
     data : array-like of shape (n_samples, n_variables)
         Observed indicator data, one row per sample. Coerced to ``float64``.
     alpha : float, default=0.05
-        Significance level of the pooled independence test that finds the clusters, in
-        ``(0, 1)``: a group of variables forms a cluster when the test's p-value is at least
-        ``alpha``, so larger values give fewer clusters.
+        Significance level of the pooled independence test, in ``(0, 1)``. A group of variables
+        forms a cluster, and a latent is the next in the order, when the test's p-value is at
+        least ``alpha``, so larger values give fewer clusters and leave more latents unordered.
     labels : tuple of str or None, default=None
         Optional names for the observed variables, one per column. Defaults to a DataFrame's
         column names, else ``X1..Xn``. Latents are auto-named ``L1..Lm``.
@@ -46,13 +46,15 @@ def gin(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over the observed variables (indices
-        ``0`` to ``n_variables - 1``) and one latent per cluster, appended in causal order and
-        named ``L1`` to ``Lm``; ``structure.node_types`` flags the latents. Each latent points to
-        the observed variables in its cluster and to every later latent: edges between latents
-        follow the order only and do not mean a direct effect was found. An observed variable in
-        no cluster has no edges. ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]``
-        lists the clusters as lists of column indices, ``metadata["causal_order"]`` lists them
-        earliest latent first (clusters whose order could not be resolved come last), and
+        ``0`` to ``n_variables - 1``) and one latent per cluster, named ``L1`` to ``Lm``: the
+        ordered latents first, in causal order, then the unordered ones; ``structure.node_types``
+        flags the latents. Each latent points to the observed variables in its cluster. An ordered
+        latent also points to every later latent and to every unordered one, and unordered latents
+        have no edge between them: edges between latents follow the order only and do not mean a
+        direct effect was found. An observed variable in no cluster has no edges.
+        ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]`` lists the clusters as
+        lists of column indices, ``metadata["causal_order"]`` lists the ordered ones earliest
+        latent first, ``metadata["unordered"]`` lists the rest by smallest member, and
         ``metadata["n_latents"]`` is the latent count.
 
     Raises
@@ -69,11 +71,27 @@ def gin(
 
     Notes
     -----
-    **Limitations.** Not benchmarked yet. Its tests run it on 6 observed indicators of 2 latents,
-    with 1,500 rows. It tests every group of observed variables of each size, from pairs upward, so
-    the number of tests grows combinatorially with the variable count, and each HSIC test's time and
-    memory grow with the square of the row count. Clusters have at least two variables, so a latent
-    with a single indicator is not found.
+    A group of observed variables forms a cluster when the linear combination of the group that is
+    uncorrelated with every variable outside it is also independent of each of them; groups grow
+    from pairs upward, and clusters that share a variable merge. The latents are then ordered one
+    at a time, given the latents already ordered: the next latent is a root, whose cluster passes
+    the independence test at ``alpha`` paired with each other remaining cluster [1]_. When several
+    candidates pass, the one whose lowest p-value is highest is taken, so latents with no causal
+    path between them are still ordered, arbitrarily. When none passes, the ordering stops and
+    the remaining latents stay unordered, as the method adds a latent to the order only when the
+    test passes. Each comparison rejects a true root with probability about ``alpha``, the test's
+    nominal size, so a correct model can still leave the latents from that step on unordered.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on 6 observed indicators of 2 latents and
+    on 9 indicators of 3 latents, with 1,000 rows. Given the true clusters of a chain of three
+    latents and of a complete three-latent model, with 1,000 rows, the order stopped early on 1 of
+    10 seeds for each, and no latent was put after one it causes. It tests every group of observed
+    variables of each size, from pairs upward, so the number of tests grows combinatorially with the
+    variable count, and each HSIC test's time and memory grow with the square of the row count.
+    Clusters have at least two variables, so a latent with a single indicator is not found. Each
+    cluster gets one latent, so indicators that share two or more latents appear as one. It assumes
+    every observed variable measures a latent: variables that depend on no other variable pass the
+    cluster test trivially and are grouped into one cluster.
 
     References
     ----------

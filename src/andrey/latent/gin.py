@@ -7,8 +7,12 @@ singular vector of the smallest singular value of ``cov(Z, X)``, and ``e = X @ o
 for the group's noise. ``e`` is independent of every variable in ``Z`` when ``X`` is a pure
 cluster, one whose members share a single latent parent; the per-variable gamma-HSIC p-values are
 pooled by Fisher's method. Clusters grow by size and merge when they overlap. The latents are then
-ordered by repeatedly taking as root the cluster whose ``e``, built against the other clusters and
-given the ones already ordered, is least dependent.
+ordered one root at a time (Xie et al. 2020, Proposition 4 and Algorithm 2): a cluster is a root
+when its ``e``, built with each other remaining cluster in turn and given the clusters already
+ordered, passes the pooled test at ``alpha`` for every one of them. When several candidates pass,
+the one whose lowest pooled p-value is highest is taken. When none passes, the ordering stops and
+the remaining clusters stay unordered: the paper adds a latent to the order only when the
+condition holds.
 """
 
 from __future__ import annotations
@@ -17,7 +21,7 @@ from dataclasses import dataclass
 from itertools import combinations
 
 import numpy as np
-from scipy.special import gammainc
+from scipy.special import gammaincc
 
 from andrey.core.independence import hsic_gamma_test
 from andrey.core.output import StructureOutput
@@ -29,19 +33,26 @@ class GINResult:
     """Recovered latent structure of a linear non-Gaussian latent-variable model.
 
     ``clusters`` groups the observed-variable indices by shared latent parent (an unordered
-    partition). ``causal_order`` lists those same clusters from the earliest latent to the latest;
-    any clusters whose order could not be resolved trail after the ordered ones.
+    partition). ``causal_order`` lists the clusters whose latents were ordered, from the earliest
+    latent to the latest, and ``unordered`` the rest, by smallest member: every latent in
+    ``causal_order`` comes before every unordered one.
     """
 
     clusters: list[list[int]]
     causal_order: list[list[int]]
+    unordered: list[list[int]]
 
 
 def _fisher_combine(pvals: list[float]) -> float:
-    """Pool p-values by Fisher's method, returning the combined right-tail p-value."""
-    clipped = np.clip(np.asarray(pvals, dtype=np.float64), 1e-5, None)
+    """Pool p-values by Fisher's method, returning the combined right-tail p-value.
+
+    The statistic ``-2 sum(log p)`` over ``c`` p-values is chi-square with ``2c`` degrees of
+    freedom under independence. A p-value of zero is raised to the smallest positive float so its
+    logarithm stays finite.
+    """
+    clipped = np.clip(np.asarray(pvals, dtype=np.float64), np.finfo(np.float64).tiny, None)
     statistic = -2.0 * float(np.sum(np.log(clipped)))
-    return float(1.0 - gammainc(len(clipped), 0.5 * statistic))
+    return float(gammaincc(len(clipped), 0.5 * statistic))
 
 
 def _surrogate(data: np.ndarray, cov: np.ndarray, x: list[int], z: list[int]) -> np.ndarray:
@@ -61,16 +72,6 @@ def _independence_pvalue(data: np.ndarray, cov: np.ndarray, x: list[int], z: lis
     e = _surrogate(data, cov, x, z)
     pvals = [hsic_gamma_test(data[:, j], e)[1] for j in z]
     return _fisher_combine(pvals)
-
-
-def _residual_dependence(data: np.ndarray, cov: np.ndarray, x: list[int], z: list[int]) -> float:
-    """Mean gamma-HSIC statistic between the surrogate of ``x`` and each variable in ``z``.
-
-    A larger value means more leftover dependence; the root cluster minimizes it.
-    """
-    e = _surrogate(data, cov, x, z)
-    stats = [hsic_gamma_test(data[:, j], e)[0] for j in z]
-    return float(np.mean(stats))
 
 
 def _merge_overlapping(groups: list[tuple[int, ...]]) -> list[list[int]]:
@@ -119,54 +120,71 @@ def _find_clusters(data: np.ndarray, cov: np.ndarray, alpha: float) -> list[list
 
 
 def _find_root(
-    data: np.ndarray, cov: np.ndarray, clusters: list[list[int]], ordered: list[list[int]]
-) -> list[int]:
-    """Return the cluster with the least residual dependence given the already-ordered prefix."""
+    data: np.ndarray,
+    cov: np.ndarray,
+    clusters: list[list[int]],
+    ordered: list[list[int]],
+    alpha: float,
+) -> list[int] | None:
+    """Return the root among ``clusters`` given the ``ordered`` ones, or ``None`` if none passes.
+
+    The surrogate for a candidate and one other remaining cluster is built from the first member of
+    each and of every ordered cluster, against the candidate's other members and the second member
+    of every ordered cluster. A candidate passes when that pooled p-value is at least ``alpha`` for
+    every other cluster; of the passing candidates, the one with the highest lowest p-value is the
+    root. A single remaining cluster is the root.
+    """
     if len(clusters) == 1:
         return clusters[0]
-    root = clusters[0]
-    best = np.inf
+    best, best_pvalue = None, -1.0
     for candidate in clusters:
-        for other in clusters:
-            if candidate is other:
-                continue
-            x = [candidate[0], other[0]]
-            z = list(candidate[1:])
-            for prefix in ordered:
-                x.append(prefix[0])
-                z.append(prefix[1])
-            dependence = _residual_dependence(data, cov, x, z)
-            if dependence < best:
-                best = dependence
-                root = candidate
-    return root
+        lowest = min(
+            _independence_pvalue(
+                data,
+                cov,
+                [candidate[0], other[0]] + [prefix[0] for prefix in ordered],
+                list(candidate[1:]) + [prefix[1] for prefix in ordered],
+            )
+            for other in clusters
+            if other is not candidate
+        )
+        if lowest >= alpha and lowest > best_pvalue:
+            best, best_pvalue = candidate, lowest
+    return best
 
 
 def _order_clusters(
-    data: np.ndarray, cov: np.ndarray, clusters: list[list[int]]
-) -> list[list[int]]:
-    """Order clusters from earliest to latest latent by iteratively peeling the root."""
+    data: np.ndarray, cov: np.ndarray, clusters: list[list[int]], alpha: float
+) -> tuple[list[list[int]], list[list[int]]]:
+    """Order clusters from the earliest latent by peeling roots; return ``(ordered, unordered)``.
+
+    The peeling stops at the first step where no candidate passes, and the clusters left then are
+    returned unordered, sorted by smallest member.
+    """
     pending = [list(cluster) for cluster in clusters]
     ordered: list[list[int]] = []
     while pending:
-        root = _find_root(data, cov, pending, ordered)
+        root = _find_root(data, cov, pending, ordered, alpha)
+        if root is None:
+            break
         ordered.append(root)
         pending.remove(root)
-    return ordered
+    return ordered, sorted(pending, key=min)
 
 
 def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     """Fit GIN to observed data ``(n_samples, n_variables)``; return clusters and their order.
 
-    ``alpha`` is the significance level of the pooled independence test used to discover clusters.
-    Returns a :class:`GINResult` whose ``clusters`` partition the observed variables by latent
-    parent and whose ``causal_order`` lists those clusters from the earliest latent to the latest.
+    ``alpha`` is the significance level of the pooled independence test that finds the clusters and
+    then the root at each ordering step. Returns a :class:`GINResult` whose ``clusters`` partition
+    the observed variables by latent parent, whose ``causal_order`` lists the ordered clusters
+    from the earliest latent, and whose ``unordered`` lists the clusters left when no root passed.
     """
     data = np.asarray(data, dtype=np.float64)
     cov = np.cov(data, rowvar=False)
     clusters = _find_clusters(data, cov, alpha)
-    ordered = _order_clusters(data, cov, clusters)
-    return GINResult(clusters=clusters, causal_order=ordered)
+    ordered, unordered = _order_clusters(data, cov, clusters, alpha)
+    return GINResult(clusters=clusters, causal_order=ordered, unordered=unordered)
 
 
 def _structure_from_result(
@@ -175,21 +193,25 @@ def _structure_from_result(
     """Assemble the latent-plus-observed graph from a fitted :class:`GINResult`.
 
     Observed variables keep their column index ``0..n_variables-1``; one latent node is appended per
-    ordered cluster. Each latent points to every observed variable in its cluster, and the latents
-    form a complete DAG in causal order (an earlier latent points to every later one), so the graph
-    is a faithful directed model over both node kinds. Observed variables that fell into no cluster
-    remain isolated observed nodes.
+    cluster, the ordered clusters first, in causal order, then the unordered ones. Each latent
+    points to every observed variable in its cluster. An ordered latent points to every later latent
+    and to every unordered one, and unordered latents have no edge between them. GIN finds the
+    order only, so an edge between latents does not mean a direct effect was found. Observed
+    variables that fell into no cluster remain isolated observed nodes.
     """
     ordered = result.causal_order
-    n_latent = len(ordered)
+    latents = ordered + result.unordered
+    n_latent = len(latents)
     n_nodes = n_variables + n_latent
     marks = np.zeros((n_nodes, n_nodes), dtype=np.int8)
 
-    for position, cluster in enumerate(ordered):
+    for position, cluster in enumerate(latents):
         latent = n_variables + position
         for child in cluster:
             marks[latent, child] = TAIL
             marks[child, latent] = ARROW
+        if position >= len(ordered):
+            continue
         for later in range(position + 1, n_latent):
             marks[latent, n_variables + later] = TAIL
             marks[n_variables + later, latent] = ARROW
@@ -210,6 +232,7 @@ def _structure_from_result(
         "n_latents": n_latent,
         "clusters": [list(c) for c in result.clusters],
         "causal_order": [list(c) for c in ordered],
+        "unordered": [list(c) for c in result.unordered],
     }
     return StructureOutput.new(structure, metadata=metadata)
 
@@ -221,9 +244,9 @@ def gin_structure(
 
     A convenience over :func:`gin` that materializes the clustering and latent order as a directed
     graph over observed *and* latent nodes: observed variables occupy indices ``0..n_variables-1``
-    (optionally named by ``labels``), latents follow in causal order named ``L1..Lm``, and
-    ``node_types`` flags which nodes are latent. Each latent points to its observed children and to
-    every later latent; the clustering and order also ride along in ``metadata``.
+    (optionally named by ``labels``), latents follow named ``L1..Lm``, the ordered ones first, and
+    ``node_types`` flags which nodes are latent. Each latent points to its observed children, and an
+    ordered latent to every later latent; the clustering and order also ride along in ``metadata``.
     """
     data = np.asarray(data, dtype=np.float64)
     return _structure_from_result(data.shape[1], gin(data, alpha=alpha), labels)

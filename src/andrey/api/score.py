@@ -255,18 +255,29 @@ def ges(
     )
 
 
-def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
-    """Learn a CPDAG from observational data with greedy interventional equivalence search (GIES).
+def gies(
+    data: npt.ArrayLike,
+    interventions: npt.ArrayLike | None = None,
+    *,
+    lambda_value: float = 1.0,
+) -> StructureOutput:
+    """Learn an interventional essential graph with greedy interventional equivalence search (GIES).
 
-    GIES generalizes GES to interventional data [1]_. This function takes observational data
-    only, where GIES's score and search are those of GES: it returns the same CPDAG and score as
-    :func:`andrey.ges` with the same ``lambda_value``.
+    GIES learns from data that mixes observation with interventions [1]_: in a row where a variable
+    was intervened on, its value was set from outside rather than by its causes. Each variable is
+    scored only on the rows where it was not intervened on, and an edge with exactly one end
+    intervened on in some rows gets its direction from the data. So the result can orient edges
+    that a CPDAG learned from observational data leaves undirected.
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
+    interventions : array-like of shape (n_samples, n_variables), default=None
+        ``True`` (or 1) where the row's value of the variable was set by an intervention, ``False``
+        (or 0) where its causes set it. ``None`` means no interventions: observational data. Every
+        variable needs at least two rows without an intervention.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
@@ -274,17 +285,22 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
-        ``"GIES"`` and ``metadata["score"]`` the BIC score of the result, computed as for
-        :func:`andrey.ges`; lower is better. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open.
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`, the interventional essential
+        graph: directed marks (``->``) are edges every graph in the class orients alike,
+        undirected (``--``) the ones it leaves open. ``metadata["algorithm"]`` is ``"GIES"`` and
+        ``metadata["score"]`` the BIC score of the result, the sum over variables of
+        ``n_v * log(residual variance) + lambda_value * log(n_samples) * n_parents``, where
+        ``n_v`` counts the rows without an intervention on the variable; lower is better.
 
     Raises
     ------
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
-        column up to scale and shift given more than two rows, or, with more rows than columns, is a
-        linear function of other columns.
+        If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
+        no constant column; if ``interventions`` does not have ``data``'s shape, holds a value
+        other than 0 or 1, or leaves a variable fewer than two rows, or one value, without an
+        intervention; if ``lambda_value`` is negative or non-finite; or if a column repeats another
+        up to scale and shift given more than two rows or, with more rows than columns, is a linear
+        function of other columns.
 
     Warns
     -----
@@ -292,14 +308,27 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
         On the first call in a process, because the method is experimental: it has no published
         benchmark, and its API may change without deprecation.
 
+    See Also
+    --------
+    andrey.ges : Searches the same way on observational data, without the turning phase.
+
     Notes
     -----
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 600 rows. It
-    takes observational data only, so it returns the graph and score that :func:`~andrey.ges`
-    returns on the same data, and the limitations of GES apply.
-    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
-    more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance.
+    **When to use it.** GIES makes the assumptions of :func:`~andrey.ges`: continuous data, no
+    unmeasured common causes, and linear relations with Gaussian noise. An intervention replaces
+    the intervened variable's mechanism and leaves every other variable's unchanged.
+
+    **How it works.** The search starts from the empty graph and repeats three phases: adding
+    edges, removing edges, and turning one edge around, each while it improves the score, until a
+    round of removing and turning changes nothing. No variable's parent count is capped. Each step
+    moves to the best neighboring equivalence class, and the classes are those of the
+    interventional setting: two graphs are equivalent when they agree on the data from every
+    observed combination of intervened variables.
+
+    **Limitations.** Not benchmarked yet. Its tests check the graph it learns on at most 8 variables
+    with 3,000 rows. Each distinct set of rows without an intervention on a variable keeps its own
+    covariance matrix of all the variables, so memory grows with the number of intervened variables
+    times the square of the variable count.
 
     References
     ----------
@@ -309,21 +338,27 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     Examples
     --------
     >>> import numpy as np
+    >>> import pandas as pd
     >>> from andrey import gies
     >>> rng = np.random.default_rng(0)
-    >>> x = rng.standard_normal(500)
-    >>> y = x + 0.1 * rng.standard_normal(500)
-    >>> gies(np.column_stack([x, y])).structure.kind
-    'cpdag'
+    >>> x = rng.standard_normal(600)
+    >>> y = x + 0.5 * rng.standard_normal(600)
+    >>> y[400:] = rng.standard_normal(200)  # the last 200 rows set y from outside
+    >>> intervened = np.zeros((600, 2), dtype=bool)
+    >>> intervened[400:, 1] = True
+    >>> gies(pd.DataFrame({"x": x, "y": y}), intervened).structure.oriented_edges()
+    [('x', 'y', 'directed')]
     """
     warn_experimental("gies")
     from andrey.search.gies import gies as _gies
+    from andrey.search.gies import intervention_mask
 
     X = data_matrix(data)
     labels = column_labels(data)
-    cpdag, score = _gies(X, lambda_value=lambda_value)
+    mask = None if interventions is None else intervention_mask(interventions, X)
+    graph, score = _gies(X, mask, lambda_value=lambda_value)
     metadata = {"algorithm": "GIES", "score": json_safe(score)}
-    return structure_output(cpdag, labels=labels, metadata=metadata)
+    return structure_output(graph, labels=labels, metadata=metadata)
 
 
 def xges(
@@ -789,6 +824,11 @@ def exact_search(
 
     Notes
     -----
+    **When to use it.** Exact search makes the assumptions of :func:`~andrey.ges`: continuous
+    data, no unmeasured common causes, and linear relations with Gaussian noise. It suits a few
+    variables, where it returns a graph with the lowest BIC rather than a greedy search's local
+    optimum.
+
     **Categorical data.** ``"local_score_BDeu"`` [5]_ and ``"local_score_BIC_categorical"`` [6]_
     read each distinct value of a column as one category and score a variable by its counts in
     each configuration of its parents, as :func:`~andrey.ges` describes. Both give equivalent graphs
@@ -799,7 +839,7 @@ def exact_search(
     categorical columns as :func:`~andrey.pc` does. Both give equivalent graphs the same score, so
     the optimum is again identified up to its equivalence class.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 5 variables with 1,000 rows,
+    **Limitations.** Not benchmarked yet. Its tests run it on at most 8 variables with 3,000 rows,
     with a mixed-data score on 5 variables with 3,000 rows, and with a categorical score on small
     fixed categorical networks.
     It scores every possible parent set of every variable, so its run time at least doubles with
@@ -883,8 +923,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         - ``w_threshold`` (default ``0.3``) and ``gate_threshold`` (default ``0.5``): an edge is
           kept when its weight magnitude and its gate probability reach these values.
         - ``max_outer`` (default ``25``), ``subproblem_iter`` (default ``3000``), and ``lr``
-          (default ``0.01``): augmented-Lagrangian rounds, Adam steps per round, and learning
-          rate.
+          (default ``0.01``): quadratic-penalty rounds, Adam steps per round, and learning rate.
         - ``tau`` (default ``0.5``), ``rho_init`` (default ``0.001``), ``rho_mult`` (default
           ``3.0``), ``rho_max`` (default ``1e16``), and ``h_tol`` (default ``1e-8``): gate
           temperature and the acyclicity-penalty schedule.
@@ -905,6 +944,9 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         If the ``[torch]`` extra is not installed.
     TypeError
         If ``params`` holds a name the solver does not accept.
+    ValueError
+        If the fit's loss or weights stop being finite, for example when the data's scale
+        overflows its covariance; ``standardize=True`` rescales the columns.
 
     Warns
     -----
@@ -914,17 +956,57 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
 
     Notes
     -----
+    CALM first estimates the moral graph with IAMB [2]_: for each variable it adds, one at a time,
+    the variable most dependent on it given those already added (Fisher-Z at level ``alpha``),
+    then drops any member the others make independent of it. A pair is a candidate edge, in
+    either direction, when each is in the other's set.
+
+    Each candidate edge ``i -> j`` has a weight and a gate. During the fit a gate is a
+    Gumbel-Softmax sample [3]_, ``sigmoid((logit + noise) / tau)``, so ``lambda1`` times the sum
+    of the gates approximates a penalty per edge. With ``B`` the gated weights and ``S`` the
+    sample covariance, the fit minimizes the Gaussian negative log-likelihood with one noise
+    variance per variable [4]_, ``0.5 * sum_j log(((I - B).T @ S @ (I - B))[j, j]) -
+    log|det(I - B)|``, plus that penalty and ``0.5 * rho * h**2``. Here ``h = tr((I + G / d)**d) -
+    d`` [5]_ for the gates ``G`` and ``d`` variables, and ``h`` is zero exactly when the gated
+    graph is acyclic. Adam runs up to ``subproblem_iter`` steps per round; a round ends early once,
+    after 50 steps, the loss changes by less than a ``1e-7`` fraction from one step to the next.
+    Between rounds ``rho`` grows by the factor ``rho_mult``, the quadratic penalty method [6]_,
+    until ``h`` of the noise-free gates ``sigmoid(logit / tau)`` is at most ``h_tol``, ``rho``
+    reaches ``rho_max``, or ``max_outer`` rounds have run.
+
+    An edge is kept when its noise-free gate reaches ``gate_threshold`` and its weight magnitude
+    reaches ``w_threshold``. If the kept edges still form a cycle, edges are removed in order of
+    increasing weight magnitude until none does.
+
+    The defaults are a shorter schedule than the paper's [1]_, which starts ``rho`` at ``1e-5``,
+    runs 40,000 steps per round at learning rate ``0.001``, and keeps every edge whose gate
+    reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
+    larger ``max_outer`` runs that schedule.
+
     **Limitations.** Not benchmarked yet. Its tests run it on at most 6 variables with 800 rows, and
     on 2,000 rows with 5 variables. Every optimizer step computes a determinant and a matrix power
     of the full weight matrix, one row and one column per variable, so a step's cost grows with the
     cube of the variable count; the defaults allow up to 75,000 steps (``max_outer`` times
-    ``subproblem_iter``).
+    ``subproblem_iter``). The fit is nonconvex and can stop at a local optimum: on a collider whose
+    two parents are independent, it can return both edges reversed and an edge between the
+    parents, with the defaults and with the paper's schedule alike.
 
     References
     ----------
     .. [1] Jin, K., Ng, I., Zhang, K., and Huang, B. (2026). Revisiting differentiable structure
        learning: inconsistency of l1 penalty and beyond. AAAI 40(27), 22399-22407.
        https://doi.org/10.1609/aaai.v40i27.39398
+    .. [2] Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Algorithms for large scale
+       Markov blanket discovery. FLAIRS 2003, 376-380.
+    .. [3] Jang, E., Gu, S., and Poole, B. (2017). Categorical reparameterization with
+       Gumbel-Softmax. ICLR 2017.
+    .. [4] Ng, I., Ghassami, A., and Zhang, K. (2020). On the role of sparsity and DAG constraints
+       for learning linear DAGs. NeurIPS 33, 17943-17954.
+    .. [5] Yu, Y., Chen, J., Gao, T., and Yu, M. (2019). DAG-GNN: DAG structure learning with graph
+       neural networks. ICML 2019, PMLR 97, 7154-7163.
+    .. [6] Ng, I., Lachapelle, S., Ke, N. R., Lacoste-Julien, S., and Zhang, K. (2022). On the
+       convergence of continuous constrained optimization for structure learning. AISTATS 2022,
+       PMLR 151, 8176-8198.
 
     Examples
     --------

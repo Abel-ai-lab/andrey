@@ -54,7 +54,7 @@ SINGLE = {
     "pc": andrey.pc,
     "fci": andrey.fci,
     "gfci": andrey.gfci,
-    "cdnod": lambda data: andrey.cdnod(data, c_indx=np.arange(len(data)) % 2),
+    "cdnod": lambda data: andrey.cdnod(data, domain_index=np.arange(len(data)) % 2),
     "ges": andrey.ges,
     "gies": andrey.gies,
     "xges": andrey.xges,
@@ -73,7 +73,6 @@ SINGLE = {
     "granger": andrey.granger,
     "gin": andrey.gin,
     "rcd": andrey.rcd,
-    "camuv": andrey.camuv,
     "bottom_up_parce_lingam": andrey.bottom_up_parce_lingam,
 }
 
@@ -359,15 +358,12 @@ def test_gin_rejects_an_alpha_outside_the_unit_interval(alpha):
     ("fit", "setting", "value", "error"),
     [
         *[(andrey.rcd, "max_explanatory_vars", bad, ValueError) for bad in (0, -1)],
-        *[(andrey.camuv, "max_explanatory_vars", bad, ValueError) for bad in (1, 0, -1)],
         (andrey.rcd, "max_explanatory_vars", 1.5, TypeError),
-        (andrey.camuv, "max_explanatory_vars", 1.5, TypeError),
         *[
             (andrey.rcd, level, bad, ValueError)
             for level in ("cor_alpha", "ind_alpha", "shapiro_alpha")
             for bad in (0.0, 1.0, 2.0)
         ],
-        *[(andrey.camuv, "alpha", bad, ValueError) for bad in (0.0, 1.0, 2.0)],
         *[(andrey.bottom_up_parce_lingam, "alpha", bad, ValueError) for bad in (0.0, 1.0, 2.0)],
     ],
 )
@@ -447,13 +443,13 @@ def test_cdnod_with_one_domain_gives_the_pc_graph():
     rng = np.random.default_rng(1)
     w = np.triu(rng.uniform(0.5, 1.5, (6, 6)) * (rng.random((6, 6)) < 0.4), 1)
     x = rng.standard_normal((500, 6)) @ np.linalg.inv(np.eye(6) - w)
-    one_domain = andrey.cdnod(x, c_indx=np.full(500, 3.0)).structure
+    one_domain = andrey.cdnod(x, domain_index=np.full(500, 3.0)).structure
     assert np.array_equal(one_domain.to_numpy(), andrey.pc(x).structure.to_numpy())
 
 
-def test_cdnod_rejects_nan_in_c_indx():
-    with pytest.raises(ValueError, match="c_indx contains NaN"):
-        andrey.cdnod(_data(), c_indx=np.r_[np.nan, np.zeros(59)])
+def test_cdnod_rejects_nan_in_domain_index():
+    with pytest.raises(ValueError, match="domain_index contains NaN"):
+        andrey.cdnod(_data(), domain_index=np.r_[np.nan, np.zeros(59)])
 
 
 # Every categorical setting of each facade that takes one, called on one data matrix.
@@ -581,7 +577,7 @@ def test_bdeu_still_checks_lambda_value(fit):
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_cdnod_with_a_categorical_test_rejects_a_fractional_index():
     c_indx = np.r_[0.5, np.zeros(99), np.ones(100)]
-    with pytest.raises(ValueError, match=r"c_indx .* 0\.5 at row 0"):
+    with pytest.raises(ValueError, match=r"domain_index .* 0\.5 at row 0"):
         andrey.cdnod(_categories(), c_indx, indep_test="chisq")
 
 
@@ -785,5 +781,27 @@ def test_cdnod_with_a_mixed_test_takes_continuous_data_and_rejects_a_fractional_
     x = _mixed_data()[:, [1]]
     c_indx = np.repeat([0.0, 1.0], 100)
     assert andrey.cdnod(x, c_indx, indep_test="degen_gauss").structure.n_nodes == 1
-    with pytest.raises(ValueError, match=r"c_indx .* 0\.5 at row 0"):
+    with pytest.raises(ValueError, match=r"domain_index .* 0\.5 at row 0"):
         andrey.cdnod(x, np.r_[0.5, c_indx[1:]], indep_test="cond_gauss")
+
+
+def _intervened(rows, column):
+    mask = np.zeros((60, 3), dtype=bool)
+    mask[rows, column] = True
+    return mask
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize(
+    ("interventions", "message"),
+    [
+        (np.zeros((60, 2)), "the shape of data"),
+        (np.zeros((59, 3)), "the shape of data"),
+        (np.full((60, 3), 0.5), "0/1"),
+        (_intervened(slice(None), 1), "variable 1 needs at least two rows"),
+        (_intervened(slice(1, None), 2), "variable 2 needs at least two rows"),
+    ],
+)
+def test_gies_rejects_unusable_interventions(interventions, message):
+    with pytest.raises(ValueError, match=message):
+        andrey.gies(_data(), interventions)

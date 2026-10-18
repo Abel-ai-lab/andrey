@@ -91,6 +91,15 @@ def _rng(name: str, *coordinates: int) -> np.random.Generator:
     return np.random.default_rng([zlib.crc32(name.encode()), *coordinates])
 
 
+def column_order(name: str, d: int, seed: int, shuffle: bool = True) -> np.ndarray:
+    """Return the drawn variable each of `d` columns holds: the identity unless `shuffle`.
+
+    The permutation comes from the column-order stream of ``(name, d, seed)``, which no draw of the
+    data or the truth uses, so turning the shuffle off leaves every other value as it was.
+    """
+    return _rng(name, d, seed, COLUMN_STREAM).permutation(d) if shuffle else np.arange(d)
+
+
 def _sparse(
     rng: np.random.Generator, slots: np.ndarray, count: int, magnitude: tuple[float, float]
 ) -> np.ndarray:
@@ -137,7 +146,7 @@ def sample_varma(
     x = np.zeros((n + BURN_IN, d))
     for t in range(1, n + BURN_IN):
         x[t] = inverse @ (b1 @ x[t - 1] + noise[t] + m1 @ noise[t - 1])
-    columns = _rng(name, d, seed, COLUMN_STREAM).permutation(d) if shuffle else np.arange(d)
+    columns = column_order(name, d, seed, shuffle)
     stack = np.stack([b0, b1, m1])[:, columns][:, :, columns]
     return np.ascontiguousarray(x[BURN_IN:, columns]), np.ascontiguousarray(stack), columns
 

@@ -15,11 +15,10 @@ import pytest
 from andrey.api._irregular import (
     _adapt_anm,
     _adapt_bottom_up_parce,
-    _adapt_camuv,
     _adapt_pnl,
     _adapt_rcd,
 )
-from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, StructureOutput
+from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
 
 
 def _roundtrips(out: StructureOutput, tmp_path, name: str) -> StructureOutput:
@@ -119,33 +118,6 @@ def test_pnl_coerces_shape_one_arrays(tmp_path):
     _roundtrips(out, tmp_path, "pnl")
 
 
-# ---- CAMUV --------------------------------------------------------------------------------------
-
-
-def test_camuv_directed_and_bidirected(tmp_path):
-    # var 1 has parent 0 (edge 0 -> 1); vars 1 and 2 share an unobserved confounder.
-    P = [set(), {0}, set()]
-    U = [{2, 1}]  # unsorted on purpose -> normalized to [1, 2]
-    out = _adapt_camuv(P, U, n_vars=3)
-    g = out.structure
-    assert g.kind == "pag"
-    assert g.endpoints(0, 1) == (TAIL, ARROW)  # directed 0 -> 1
-    assert g.endpoints(1, 2) == (ARROW, ARROW)  # bidirected confounder
-    assert g.endpoints(0, 2) == (NULL, NULL)
-    assert out.weighted_adjacency is None
-    assert out.metadata["confounded_pairs"] == [[1, 2]]
-    _roundtrips(out, tmp_path, "camuv")
-
-
-def test_camuv_no_confounders_is_pure_directed():
-    P = [set(), {0}, {1}]  # chain 0 -> 1 -> 2, no latent confounder
-    out = _adapt_camuv(P, U=[], n_vars=3)
-    g = out.structure
-    assert g.endpoints(0, 1) == (TAIL, ARROW)
-    assert g.endpoints(1, 2) == (TAIL, ARROW)
-    assert out.metadata["confounded_pairs"] == []
-
-
 # ---- RCD ----------------------------------------------------------------------------------------
 
 
@@ -211,7 +183,6 @@ def test_bottom_up_numpy_int_order_is_json_safe(tmp_path):
 def test_hidden_cause_methods_record_their_name():
     B = np.array([[0.0, np.nan], [np.nan, 0.0]])
     named = {
-        "CAMUV": _adapt_camuv([[], []], U=[[0, 1]], n_vars=2),
         "RCD": _adapt_rcd(SimpleNamespace(adjacency_matrix_=B)),
         "BottomUpParceLiNGAM": _adapt_bottom_up_parce(
             SimpleNamespace(adjacency_matrix_=B, causal_order_=[[0, 1]])

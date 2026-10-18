@@ -367,7 +367,7 @@ def render_human(
 
 # Input names are a closed set (the InputSpec names in the registry); a drift test pins the CLI's
 # input flags to them. Everything else is a hyperparameter, passed as `key=value` or via `--config`.
-_INPUT_FLAGS = ("data", "c_indx", "data_groups", "data_list")
+_INPUT_FLAGS = ("data", "domain_index", "interventions", "data_groups", "data_list")
 
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag; a drift guard enforces it.
 _RESERVED_PARAM_NAMES = frozenset(
@@ -653,6 +653,8 @@ def _load_method_inputs(
     positional, headers = [], []
     for inp in spec.data.inputs:
         vals = provided.get(inp.name)
+        if not vals and not inp.required:
+            continue  # optional inputs come last, so the facade's default fills the gap
         if not vals:
             raise CliError(
                 "missing_input",
@@ -1255,11 +1257,18 @@ def cmd_run(
         help="Data file, one row per sample: CSV, TSV, or whitespace-separated text (a header row "
         "names the nodes), or .npy. - reads text from stdin.",
     ),
-    c_indx: Optional[list[str]] = typer.Option(
+    domain_index: Optional[list[str]] = typer.Option(
         None,
-        "--c-indx",
+        "--domain-index",
         metavar="PATH",
         help="cdnod only: the domain index, one value per row of --data.",
+    ),
+    interventions: Optional[list[str]] = typer.Option(
+        None,
+        "--interventions",
+        metavar="PATH",
+        help="gies only: a 0/1 matrix shaped like --data, 1 where the row's value of the variable "
+        "was set by an intervention.",
     ),
     data_groups: Optional[list[str]] = typer.Option(
         None,
@@ -1335,7 +1344,8 @@ def cmd_run(
         return
     provided = {
         "data": data,
-        "c_indx": c_indx,
+        "domain_index": domain_index,
+        "interventions": interventions,
         "data_groups": data_groups,
         "data_list": data_list,
     }

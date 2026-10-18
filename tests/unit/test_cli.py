@@ -126,6 +126,25 @@ def test_run_writes_output_file(capsys, tmp_path, csv_path):
     assert json.loads(dest.read_text())["method"] == "pc"
 
 
+def test_run_gies_with_and_without_interventions(capsys, tmp_path):
+    """The optional input orients x -> y; omitted, the facade's default leaves the edge open."""
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(600)
+    y = x + 0.5 * rng.standard_normal(600)
+    y[400:] = rng.standard_normal(200)
+    mask = np.zeros((600, 2))
+    mask[400:, 1] = 1
+    data_path, mask_path = tmp_path / "xy.csv", tmp_path / "mask.csv"
+    np.savetxt(data_path, np.column_stack([x, y]), delimiter=",")
+    np.savetxt(mask_path, mask, delimiter=",")
+    types = {}
+    for argv in (["--interventions", str(mask_path)], []):
+        code, out, _ = _run(["run", "gies", "--data", str(data_path), *argv], capsys)
+        assert code == 0
+        types[bool(argv)] = [e["type"] for e in json.loads(out)["structure"]["edges"]]
+    assert types == {True: ["directed"], False: ["undirected"]}
+
+
 def test_run_multi_group(capsys, nongaussian_path):
     code, out, _ = _run(
         [
@@ -284,7 +303,7 @@ def test_missing_input_error(capsys):
 
 
 def test_unexpected_input_error(capsys, csv_path):
-    argv = ["run", "pc", "--data", str(csv_path), "--c-indx", str(csv_path)]
+    argv = ["run", "pc", "--data", str(csv_path), "--domain-index", str(csv_path)]
     code, _out, err = _run(argv, capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "unexpected_input"
 
@@ -438,7 +457,6 @@ def test_seeded_run_reports_resolved_seed(capsys, csv_path):
         "granger",
         "gin",
         "rcd",
-        "camuv",
         "bottom_up_parce_lingam",
         "pnl",
         "anm",
@@ -448,7 +466,7 @@ def test_output_envelope_matches_spec(name, capsys, csv_path, nongaussian_path, 
     """The result envelope reflects the method's OutputSpec claims (kind / ordering / weighted)."""
     from andrey.spec import get_spec
 
-    non_gaussian = ("direct_lingam", "gin", "rcd", "camuv", "bottom_up_parce_lingam")
+    non_gaussian = ("direct_lingam", "gin", "rcd", "bottom_up_parce_lingam")
     pairwise = ("pnl", "anm")
     path = nongaussian_path if name in non_gaussian else csv_path
     data = str(pair_path if name in pairwise else path)
