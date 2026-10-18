@@ -39,7 +39,7 @@ change names its pull request.
 - When columns repeat others up to scale and shift, the score-based searches raise one `ValueError`
   that names every group of copies by column name and says to keep one column per group and read
   its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
-  copies make a test's correlation matrix singular. ([#TBD])
+  copies make a test's correlation matrix singular. ([#189])
 
 ### Removed
 
@@ -273,3 +273,4 @@ First alpha release.
 [#175]: https://github.com/Abel-ai-lab/andrey/pull/175
 [#178]: https://github.com/Abel-ai-lab/andrey/pull/178
 [#179]: https://github.com/Abel-ai-lab/andrey/pull/179
+[#189]: https://github.com/Abel-ai-lab/andrey/pull/189
