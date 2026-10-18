@@ -1,9 +1,9 @@
-"""The method registry -- one :class:`MethodSpec` per public facade.
+"""Method definitions used to generate CLI help and JSON schemas.
 
-Keyed on ``andrey.api.__all__``; a drift-guard test asserts the registry and that list stay in
-lockstep and that every spec's inputs / params / defaults match the live facade signature. Summaries
-are bounded "when to reach for this" notes; parameter defaults are the source of truth the CLI
-and JSON schema render.
+Each public function in ``andrey.api.__all__`` has one :class:`MethodSpec` describing its inputs,
+parameters, defaults, and results. Tests check that these definitions cover the public functions
+and match their signatures. Summaries explain when to use each method; the CLI and JSON schemas
+display the parameter defaults defined here.
 """
 
 from __future__ import annotations

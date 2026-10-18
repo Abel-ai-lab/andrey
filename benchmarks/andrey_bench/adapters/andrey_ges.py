@@ -103,11 +103,12 @@ class AndreyGES:
 
 
 def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "") -> list[AndreyGES]:
-    """The two shipped GES builds: numpy serial and numpy parallel.
+    """Two GES benchmark configurations using the ``numpy`` backend: serial and parallel.
 
-    ``lambda_value`` and ``suffix`` exist together and only together: a second penalty needs a
-    second set of names, since ``params`` are excluded from ``run_id``. Called with no arguments,
-    it returns the shipped weight under the shipped names.
+    ``lambda_value`` sets the BIC penalty weight for both configurations. ``suffix`` is appended
+    to their names and must be nonempty for a nondefault weight: ``params`` are excluded from
+    ``run_id``, so distinct weights need distinct names to keep their results separate. With no
+    arguments, the function returns both configurations with the default weight and names.
     """
     if lambda_value != _DEFAULT_LAMBDA and not suffix:
         # Without a suffix the second weight reuses the first's names, so its part files are the
@@ -135,7 +136,7 @@ def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "")
 
 
 def andrey_ges_bdeu() -> AndreyGES:
-    """GES with the BDeu score, for categorical data: numpy, serial.
+    """GES with the BDeu score for categorical data, using the ``numpy`` backend serially.
 
     BDeu moves are scored in the calling process, so a parallel variant would run the same code.
     """

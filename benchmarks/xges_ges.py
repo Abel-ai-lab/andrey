@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Benchmark Andrey GES and XGES over a ladder of graph sizes on CPU.
+"""A comparison of Andrey GES and XGES across graph sizes on CPU.
 
 XGES is a distinct search in the GES family. It shares GES's CPDAG search space and
 linear-Gaussian BIC score but uses a different move order and an optional extended search.
@@ -9,24 +9,25 @@ differences between GES and XGES.
 The Andrey `numpy.serial` row uses one process and the same core budget as XGES. The
 `numpy.parallel` row uses a worker pool, so its timing also reflects the additional workers.
 
-``--ges-min-work`` comes with that arm. Andrey fans a pass out only when its estimated candidate
-work exceeds the gate; below it the pass runs the identical in-process scan as the serial backend,
-and the two solutions publish one code path under two names. The shipped default is a fixed constant
-in ``src/andrey/search/_parallel_ges.py``. Declare the campaign's gate and report it beside the
-table; ``andrey calibrate`` measures a suitable value for the target host.
+``--ges-min-work`` sets a threshold on the estimated number of candidate evaluations. The parallel
+configuration uses worker processes only above that threshold; otherwise it evaluates candidates
+in the calling process, like the serial configuration. Without the flag the fits run under the
+default in ``src/andrey/search/_parallel_ges.py``, since the runner drops an inherited
+``ANDREY_GES_PARALLEL_MIN_WORK``. ``0`` sends every pass to the workers. The chosen threshold
+belongs beside the timing results because it determines which passes run in parallel.
+``andrey calibrate`` measures a suitable value for the target host.
 
-A copy of ``ges_cpu.py`` with a different solution list, which is how a benchmark is written.
+The driver uses the same benchmark procedure as ``ges_cpu.py`` with a different solution list.
 
 **XGES fits run in their own interpreter.** The package pins `numpy<2`, so the adapter names
-``ANDREY_BENCH_XGES_PYTHON`` and the runner spawns its fits there instead of in bench-env. Both
-environments are recorded in ``provenance.json``. Build the second one with
-``benchmarks/start_xges.sh``; a run started without it fails at launch rather than silently
-dropping the solution.
+``ANDREY_BENCH_XGES_PYTHON`` and the runner starts its fits there instead of in the main benchmark
+environment. Both environments are recorded in ``provenance.json``. ``benchmarks/start_xges.sh``
+builds the XGES environment; a run started without it fails at launch.
 
-``--xges-alpha`` declares the penalty XGES searches under. It matters because ``alpha`` and Andrey's
-``lambda_value`` scale the same ``log n`` per-parameter term (see the adapter), so the shipped
-defaults - 2.0 against 1.0 - would put a sparsity setting into the quality column. The default here
-is the matched value.
+``--xges-alpha`` sets XGES's BIC penalty weight. ``alpha`` and Andrey's ``lambda_value`` scale the
+same ``log n`` per-parameter term (see the adapter). Their package defaults are 2.0 and 1.0,
+respectively, so comparing those defaults mixes the effect of the search algorithm with the
+effect of penalizing extra edges more heavily. This benchmark defaults to matching the weights.
 
     ANDREY_BENCH_XGES_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/xges_ges.py \\
         --out outputs/xges --ladder 20 50 100 --cap-mem-mb 32000
@@ -142,8 +143,8 @@ SLICE = {
     "density": datasets.CANONICAL_DENSITY,
 }
 
-#: Untimed fits before each timed one. XGES's numba scorer compiles on its first call, and without a
-#: warm-up that compilation is published as its speed.
+#: Untimed fits before each timed fit. XGES's Numba scorer compiles on its first call, so warm-up
+#: excludes compilation from the reported fit time.
 WARMUP = 1
 
 

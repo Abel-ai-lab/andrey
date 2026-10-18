@@ -1126,12 +1126,13 @@ Read `params` before comparing solutions because their defaults may optimize dif
 ## Layout
 
 - `benchmark.py` - defines solutions, slice, and ladder, then writes one `runs.parquet`. Copy it.
-- `xges_ges.py` - compares two Andrey GES modes, causal-learn GES, and XGES at two BIC weights
-  on CPU, with the baseline.
+- `xges_ges.py` - compares serial and parallel Andrey GES, causal-learn GES, and XGES at two BIC
+  weights on CPU, with the baseline.
 - `andrey_bench/aggregate.py` - pools a results root and joins each run with its provenance.
 - `andrey_bench/pairing.py` - defines valid comparisons, including run pairing, dataset grouping,
   duration skew, and timeout meaning.
-- `ges_cpu.py` - compares two Andrey modes, causal-learn, gCastle, and the baseline on CPU.
+- `ges_cpu.py` - compares serial and parallel Andrey GES, causal-learn, gCastle, and the baseline
+  on CPU.
 - `boss_grasp_cpu.py` - compares BOSS and GRaSP with causal-learn at matched BIC penalties.
 - `boss_grasp_reach.py` - extends the paired BOSS comparison beyond GRaSP's measured range.
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.

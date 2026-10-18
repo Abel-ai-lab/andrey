@@ -22,16 +22,20 @@ The backend and the worker count can also be set in code. The most specific sett
 
 ## Backend
 
-- `ANDREY_BACKEND`: the code a numeric operation runs on. `auto` (the default) uses `cuda` for
-  large inputs, else NumPy; it never picks `cpu` or `mps`. `numpy` runs plain NumPy in float64,
-  the reference results. `cpu` runs PyTorch on the CPU, `cuda` on an NVIDIA GPU, and `mps` on an
-  Apple GPU in float32, which is not yet validated; `none` and `metal` are other names for `cpu`
-  and `mps`. A backend the machine lacks warns once with `andrey.BackendFallbackWarning` and falls
-  back.
-- `ANDREY_DEVICE`: another name for `ANDREY_BACKEND`.
+- `ANDREY_BACKEND`: your preferred implementation for numeric operations. `auto` (the default)
+  considers `cuda` when it is available and the input meets the operation's size threshold, subject
+  to the startup rule under [GPU dispatch](#gpu-dispatch); otherwise it uses `numpy`. It never
+  picks `cpu` or `mps`. `numpy` uses NumPy on the CPU in float64, which we use as the reference.
+  `cpu` uses PyTorch on the CPU, `cuda` uses PyTorch on a CUDA-compatible GPU, and `mps` uses
+  PyTorch on an Apple GPU in float32, which we have not validated. `none` and `metal` are aliases
+  for `cpu` and `mps`. An explicit choice bypasses the size threshold and startup rule. If an
+  operation supports your choice but the machine cannot run it, Andrey warns once with
+  `andrey.BackendFallbackWarning` and uses `auto` for that operation.
+- `ANDREY_DEVICE`: another name for `ANDREY_BACKEND`; if you set both, `ANDREY_BACKEND` takes
+  precedence, but both values must be valid.
 
 A GPU speeds up covariance, correlation, and entropy. GES, hill climbing, and the other searches run
-on the CPU. An operation without the requested backend uses its own default, without a warning.
+on the CPU. An operation without the requested backend uses `auto`, without a warning.
 
 ## Parallel search
 

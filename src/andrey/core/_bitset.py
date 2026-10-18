@@ -1,8 +1,9 @@
-"""Python-int bitmasks of node sets and successor-set reachability.
+"""Node sets stored as Python integers, with traversal along semi-directed paths.
 
-Bit ``v`` of a mask stands for node ``v``. :func:`row_masks` packs a boolean matrix into one mask
-per row, and :func:`semidirected_reach_set` expands a breadth-first frontier with integer ORs, so
-each step is exact for any node count.
+A set bit ``v`` means that node ``v`` belongs to the set. :func:`row_masks` converts a boolean
+matrix to one such integer per row. :func:`semidirected_reach_set` follows the successors in
+these sets to find reachable nodes while excluding a specified set of blocked nodes. Python
+integers allow these sets to represent graphs with more than 64 nodes without losing bits.
 """
 
 from __future__ import annotations
@@ -46,10 +47,12 @@ def row_masks(matrix: np.ndarray) -> list[int]:
 def semidirected_reach_set(succ: list[int], start: int, barrier: int) -> int:
     """Every node reachable from ``start`` once the ``barrier`` nodes are removed, as a bitmask.
 
-    ``succ`` holds each node's successors as a Python int, as :func:`row_masks` packs them, so the
-    breadth-first OR-expansion holds for any node count. ``start`` is never removed and always in
-    the result. For ``t`` outside ``barrier``, bit ``t`` is set iff a successor path from ``start``
-    reaches ``t``: one traversal answers every target that shares a start and a barrier.
+    Bit ``v`` in ``succ[u]`` means that traversal from node ``u`` to node ``v`` is allowed;
+    :func:`row_masks` builds these integers from a boolean successor matrix. Set bits in
+    ``barrier`` identify blocked nodes. ``start`` is never removed and is always in the result,
+    even if its bit is set in ``barrier``. For every other node ``t``, bit ``t`` in the result is
+    set exactly when a path from ``start`` reaches it without entering a blocked node. One
+    traversal answers every target with the same start and barrier, for any node count.
     """
     allowed = ~barrier
     seen = 1 << start

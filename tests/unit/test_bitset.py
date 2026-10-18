@@ -1,7 +1,8 @@
-"""Bitmask reachability and the set BFS agree with an independent oracle at every width.
+"""Bitmask and set-based path checks agree with an independent traversal on sampled graphs.
 
-The oracle walks the successor masks one bit at a time, written apart from both traversals, so a
-bug they share cannot pass.
+The tests include graphs with more than 64 nodes and compare both implementations against a
+separately written traversal that reads each successor mask one bit at a time, so a bug the two
+share cannot pass.
 """
 
 from __future__ import annotations
@@ -48,9 +49,8 @@ def _random_tail_adj(rng: np.random.Generator, d: int) -> np.ndarray:
 
 @pytest.mark.parametrize("seed", range(40))
 def test_setbfs_matches_oracle_across_d(seed):
-    # The set BFS (operators.blocks_semi_directed_paths, the full-rescan references' check) must
-    # agree with the independent bit-iterating oracle at every d, start == target included (both
-    # treat the empty path as reachable).
+    # operators.blocks_semi_directed_paths must agree with the independent traversal on sampled
+    # graph sizes. Both treat start == target as reachable through an empty path.
     rng = np.random.default_rng(seed)
     d = int(rng.integers(2, 130))
     adj = _random_tail_adj(rng, d)

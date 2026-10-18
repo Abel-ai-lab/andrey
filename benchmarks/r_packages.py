@@ -6,7 +6,7 @@ Compare speed, accuracy, and the largest graph each search finishes on the same 
 Each job runs one lane. Their graph-size limits differ by an order of magnitude, so a shared
 ladder would miss larger GES sizes or exhaust its time limit on FCI timeouts:
 
-    --lane score  Andrey GES (3 builds), HC and tabu, pcalg ges, bnlearn hc and tabu
+    --lane score  Andrey GES (serial and parallel), HC and tabu, pcalg ges, bnlearn hc and tabu
     --lane pc     Andrey PC, pcalg pc, bnlearn pc.stable
     --lane fci    Andrey FCI, pcalg fci and rfci
 
@@ -60,12 +60,11 @@ from andrey_bench.runner import available_cores
 
 
 def _score_solutions() -> list:
-    """Return paired GES, hill-climbing, and tabu solutions in one lane for within-run ratios.
+    """Paired GES, hill-climbing, and tabu solutions for ratios measured within the same run.
 
-    Pair pcalg's `ges` with Andrey's GES, bnlearn's `hc` with `andrey.hc`, and bnlearn's
-    `tabu` with `andrey.tabu`.
-    Hill climbing changes one DAG edge at a time; GES searches CPDAG space over neighbor subsets.
-    Include both Andrey GES builds, serial and parallel.
+    The list pairs pcalg's `ges` with Andrey's GES, bnlearn's `hc` with `andrey.hc`, and bnlearn's
+    `tabu` with `andrey.tabu`. Hill climbing changes one DAG edge at a time; GES searches CPDAG
+    space over neighbor subsets. Both serial and parallel Andrey GES configurations are included.
     """
     return [
         *andrey_ges_adapters(),

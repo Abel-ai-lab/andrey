@@ -29,7 +29,7 @@ driver = _driver()
 
 
 def test_the_field_is_what_the_campaign_says_it_is() -> None:
-    """A 2x2 on the penalty: both Andrey modes at each weight, both XGES weights."""
+    """The list includes serial and parallel Andrey at each weight, and both XGES weights."""
     names = [a.name for a in driver.solutions(1.0)]
     assert names == [
         "andrey.ges.numpy.serial",

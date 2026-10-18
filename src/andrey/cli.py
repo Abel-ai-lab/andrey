@@ -1,4 +1,4 @@
-"""The ``andrey`` command-line interface, generated from the spec registry.
+"""The ``andrey`` command-line interface, generated from method and configuration definitions.
 
 ``andrey list`` enumerates methods, ``andrey run <method> --help`` explains one method, and
 ``--help --json`` returns its versioned contract without execution. Root ``--help --json`` returns
