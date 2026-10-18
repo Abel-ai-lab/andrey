@@ -349,9 +349,8 @@
   letter-spacing: -0.055em;
 }
 
-/* The words: amber and slanted, as on the covers and the link-preview card (site/cards.py: SLANT),
-   lit as soft neon to match the art's light: a core a little paler than the amber inside a wide,
-   low halo, so their edges glow rather than cut. */
+/* The words: amber and slanted, lit as soft neon to match the art's light: a core a little paler
+   than the amber inside a wide, low halo, so their edges glow rather than cut. */
 .andrey-home .hero .word {
   display: inline-block;
   color: var(--andrey-ground-amber);

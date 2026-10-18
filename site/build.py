@@ -136,7 +136,7 @@ ERRORS = {
 MEAN_DEGREE = 2.0
 DEMO_URL: str | None = None  # the live demo; link it once its Space is public
 # The one-line description, as pyproject.toml and the README give it.
-DESCRIPTION = "Andrey, a very fast causal discovery package."
+DESCRIPTION = "Andrey: accelerated, accurate, agentic causal discovery."
 
 # Graph colors resolve through the page's tokens, so the drawing follows the light or dark theme.
 TOKEN_PALETTE = andrey.viz.Palette(

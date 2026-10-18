@@ -1035,8 +1035,8 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
     context_settings={"help_option_names": ["-h", "--help"]},  # -h works everywhere, not just `run`
     help=(
-        "A very fast causal discovery package. List the methods, run one on a data file, and "
-        "check the configuration."
+        "Accelerated, accurate, agentic causal discovery. List the methods, run one on a data "
+        "file, and check the configuration."
     ),
 )
 
@@ -1065,7 +1065,7 @@ def _root(
         False, "--skill", help="Print the SKILL.md guide for coding agents."
     ),
 ) -> None:
-    """A very fast causal discovery package.
+    """Accelerated, accurate, agentic causal discovery.
 
     List the methods, run one on a data file, and check the configuration.
     """
