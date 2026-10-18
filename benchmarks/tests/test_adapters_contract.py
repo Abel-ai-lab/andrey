@@ -128,7 +128,6 @@ def test_every_adapter_survives_the_pickle_the_runner_puts_it_through(
 DEFERRED_MODULES = {
     "andrey.ges.numpy.serial": "andrey.search.ges",
     "andrey.ges.numpy.parallel": "andrey.search.ges",
-    "andrey.ges.numba.serial": "andrey.search.ges",
     "andrey.hc.numpy.serial": "andrey.search.hc",
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",

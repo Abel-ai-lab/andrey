@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 Family = Literal["constraint", "score", "permutation", "lingam", "temporal", "latent", "pairwise"]
 Determinism = Literal["deterministic", "stochastic"]
-Accel = Literal["numpy", "numba", "torch"]
+Accel = Literal["numpy", "torch"]
 # supported: benchmarked and gated before each release. experimental: warns once; API may change.
 Status = Literal["supported", "experimental"]
 

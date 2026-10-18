@@ -2,8 +2,8 @@
 """A benchmark: a GES comparison over a ladder of graph sizes, on CPU.
 
 The campaign's headline question — which GES implementation is fastest, and at what size does each
-one stop finishing. Six solutions on identical data: three Andrey backends, two packages, and the
-empty graph as the correctness floor.
+one stop finishing. Five solutions on identical data: two Andrey modes, two packages, and the empty
+graph as the correctness floor.
 
 A copy of ``benchmark.py`` with different literals, which is how a benchmark is written. Run it under
 a memory cap: without one the ceiling a solution reaches is a fact about the node it landed on.
@@ -16,9 +16,9 @@ two solutions publish one code path under two names. The shipped default is a fi
 ``andrey calibrate`` measures a suitable value for the target host.
 
 Size ``--cap-wall-s`` for the slowest *start*, not the slowest fit. The cap covers warm-up and fit
-together, and at small ``d`` the warm-up is import and compilation rather than search — a smoke at
-d=20 on a loaded node put 0.3 s of Andrey GES behind 61 s of warm-up and 8.9 s of causal-learn behind
-236 s. A cap sized for the fit censors the numba backend before it is ever measured.
+together, and at small ``d`` the warm-up is mostly imports rather than search — a smoke at d=20 on
+a loaded node put 8.9 s of causal-learn behind 236 s of warm-up. A cap sized for the fit censors
+such a solution before it is ever measured.
 
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/ges_cpu.py \\
         --out outputs/ges-cpu --ladder 20 50 100 200 --cap-mem-mb 32000
@@ -42,9 +42,9 @@ from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores
 
-#: The solutions. ``andrey_ges_adapters()`` expands to numpy·serial, numpy·parallel and
-#: numba·serial — three builds of one algorithm, so a difference between them is a backend
-#: difference and nothing else. Every solution runs on every dataset.
+#: The solutions. ``andrey_ges_adapters()`` expands to numpy·serial and numpy·parallel — two
+#: builds of one algorithm, so a difference between them is a mode difference and nothing else.
+#: Every solution runs on every dataset.
 SOLUTIONS = [*andrey_ges_adapters(), CausalLearnGES(), GCastleGES(), BaselineEmpty()]
 
 #: The solutions the work gate reaches: parallel-mode Andrey only. A serial fit is pinned to one
@@ -72,8 +72,7 @@ SLICE = {
     "density": datasets.CANONICAL_DENSITY,
 }
 
-#: Untimed fits before each timed one. The numba backend compiles on its first call, and without a
-#: warm-up that compilation is published as its speed.
+#: Untimed fits before each timed one, so first-call setup is not published as speed.
 WARMUP = 1
 
 

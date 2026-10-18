@@ -6,7 +6,7 @@ linear-Gaussian BIC score but uses a different move order and an optional extend
 causal-learn supplies a GES reference, separating differences between GES implementations from
 differences between GES and XGES.
 
-The Andrey `numpy` and `numba` serial rows use one process and the same core budget as XGES. The
+The Andrey `numpy.serial` row uses one process and the same core budget as XGES. The
 `numpy.parallel` row uses a worker pool, so its timing also reflects the additional workers.
 
 ``--ges-min-work`` comes with that arm. Andrey fans a pass out only when its estimated candidate
@@ -142,8 +142,8 @@ SLICE = {
     "density": datasets.CANONICAL_DENSITY,
 }
 
-#: Untimed fits before each timed one. Both numba paths compile on their first call, and without a
-#: warm-up that compilation is published as their speed.
+#: Untimed fits before each timed one. XGES's numba scorer compiles on its first call, and without a
+#: warm-up that compilation is published as its speed.
 WARMUP = 1
 
 

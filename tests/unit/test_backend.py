@@ -10,6 +10,7 @@ import pytest
 
 import andrey
 from andrey.core import backend, stats
+from andrey.core.env import BACKENDS
 
 
 def test_auto_dispatch_stays_on_numpy_below_threshold(monkeypatch):
@@ -74,11 +75,11 @@ def test_backend_precedence_context_over_config_over_env(monkeypatch):
     assert andrey.config.backend == "auto"  # default
     monkeypatch.setenv("ANDREY_BACKEND", "numpy")
     assert andrey.config.backend == "numpy"  # env
-    andrey.config.backend = "numba"
-    assert andrey.config.backend == "numba"  # config object over env
+    andrey.config.backend = "cpu"
+    assert andrey.config.backend == "cpu"  # config object over env
     with andrey.config(backend="numpy"):
         assert andrey.config.backend == "numpy"  # context over config object
-    assert andrey.config.backend == "numba"  # context restored
+    assert andrey.config.backend == "cpu"  # context restored
 
 
 def test_andrey_device_is_alias_of_andrey_backend(monkeypatch):
@@ -103,17 +104,33 @@ def test_bad_backend_value_raises():
         andrey.config.backend = "quantum"
 
 
+def test_numba_backend_raises_naming_the_choices(monkeypatch):
+    def assert_names_choices(exc):
+        assert all(b in str(exc.value) for b in BACKENDS)
+
+    with pytest.raises(ValueError) as exc:
+        andrey.config.backend = "numba"
+    assert_names_choices(exc)
+    with pytest.raises(ValueError) as exc, andrey.config(backend="numba"):
+        pass
+    assert_names_choices(exc)
+    monkeypatch.setenv("ANDREY_BACKEND", "numba")
+    with pytest.raises(ValueError) as exc:
+        andrey.config.backend  # noqa: B018 - reading the property resolves the variable
+    assert_names_choices(exc)
+
+
 def test_describe_reports_state(monkeypatch):
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     d = andrey.describe()
     assert d.backend == "auto" and d.num_workers == 1
     assert set(d.as_dict()) == {"backend", "num_workers", "available_backends"}
-    assert set(d.as_dict()["available_backends"]) == {"numpy", "numba", "cpu", "cuda", "mps"}
+    assert set(d.as_dict()["available_backends"]) == set(BACKENDS) - {"auto"}
 
 
 def test_describe_detects_backends_without_importing_them():
-    # A fresh process: numba stays unimported, and torch does too unless a device check needs it.
+    # A fresh process: torch stays unimported unless a device check needs it.
     import json
     import os
     import pathlib
@@ -125,8 +142,8 @@ def test_describe_detects_backends_without_importing_them():
         "from andrey.core import backend as b\n"
         "d = andrey.describe()\n"
         "device_check = d.torch and (b._torch_gpu_build() or sys.platform == 'darwin')\n"
-        "loaded = sorted({'numba', 'torch'} & set(sys.modules))\n"
-        "found = [d.numba, d.torch, d.cuda, d.mps]\n"
+        "loaded = sorted({'torch'} & set(sys.modules))\n"
+        "found = [d.torch, d.cuda, d.mps]\n"
         "print(json.dumps({'found': found, 'device_check': device_check, 'loaded': loaded}))\n"
     )
     proc = subprocess.run(
@@ -134,9 +151,8 @@ def test_describe_detects_backends_without_importing_them():
     )
     assert proc.returncode == 0, proc.stderr
     child = json.loads(proc.stdout)
-    assert "numba" not in child["loaded"]
     assert child["device_check"] or "torch" not in child["loaded"]
-    assert child["found"] == [backend._is_available(b) for b in ("numba", "cpu", "cuda", "mps")]
+    assert child["found"] == [backend._is_available(b) for b in ("cpu", "cuda", "mps")]
 
 
 @pytest.mark.parametrize(
@@ -157,10 +173,6 @@ def test_torch_gpu_build_reads_the_version_file(version_py, gpu, tmp_path, monke
     spec.submodule_search_locations = [str(tmp_path)]
     monkeypatch.setattr(backend.importlib.util, "find_spec", lambda name: spec)
     assert backend._torch_gpu_build() is gpu
-
-
-def test_resolve_bitset_pin_numpy_ignores_numba():
-    assert backend.resolve_bitset(backend="numpy") == "numpy"
 
 
 def test_per_device_threshold_gates_by_chosen_device(monkeypatch):

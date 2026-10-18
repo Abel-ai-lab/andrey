@@ -23,11 +23,11 @@ The backend and the worker count can also be set in code. The most specific sett
 ## Backend
 
 - `ANDREY_BACKEND`: the code a numeric operation runs on. `auto` (the default) uses `cuda` for
-  large inputs and `numba` when it is installed, else NumPy; it never picks `cpu` or `mps`. `numpy`
-  runs plain NumPy in float64, the reference results. `numba` runs the compiled kernels of the
-  `numba` extra. `cpu` runs PyTorch on the CPU, `cuda` on an NVIDIA GPU, and `mps` on an Apple GPU
-  in float32, which is not yet validated; `none` and `metal` are other names for `cpu` and `mps`. A
-  backend the machine lacks warns once with `andrey.BackendFallbackWarning` and falls back.
+  large inputs, else NumPy; it never picks `cpu` or `mps`. `numpy` runs plain NumPy in float64,
+  the reference results. `cpu` runs PyTorch on the CPU, `cuda` on an NVIDIA GPU, and `mps` on an
+  Apple GPU in float32, which is not yet validated; `none` and `metal` are other names for `cpu`
+  and `mps`. A backend the machine lacks warns once with `andrey.BackendFallbackWarning` and falls
+  back.
 - `ANDREY_DEVICE`: another name for `ANDREY_BACKEND`.
 
 A GPU speeds up covariance, correlation, and entropy. GES, hill climbing, and the other searches run

@@ -33,7 +33,7 @@ class _AlwaysDependent:
 
 def _backend_fallback(monkeypatch):
     monkeypatch.setattr(backend, "_is_available", lambda name: False)
-    return lambda: backend.resolve_bitset(backend="numba")
+    return lambda: backend.select(backend._TORCH_PINNABLE, backend._TORCH_AUTO, backend="cuda")
 
 
 def _pc_expensive_pass(monkeypatch):

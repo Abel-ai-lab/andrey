@@ -59,7 +59,7 @@ What changed in each release.
 
 ## Documentation
 
-- [Install](guides/getting-started.md#install) Andrey and choose optional CPU or GPU acceleration.
+- [Install](guides/getting-started.md#install) Andrey and choose optional GPU acceleration.
 - [Get started](guides/getting-started.md#learn-a-graph) by learning a causal graph from real data.
 - [Examples](examples/index) are notebooks; [demos](demos/index) run in your browser.
 - [API reference](code/index.md) covers methods, graph structures, and visualization.

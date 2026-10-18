@@ -22,13 +22,12 @@ With [uv](https://docs.astral.sh/uv/), add it to your project (`uv init` creates
 
 ```shell
 uv add andrey-core            # base (pure NumPy)
-uv add "andrey-core[numba]"   # CPU JIT for GES, up to 64 variables
 uv add "andrey-core[torch]"   # torch backend: GPU primitives
 uv add "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
 uv add "andrey-core[all]"     # every extra
 ```
 
-With pip, use the same names: `pip install andrey-core`, `pip install "andrey-core[numba]"`, and so
+With pip, use the same names: `pip install andrey-core`, `pip install "andrey-core[torch]"`, and so
 on.
 
 ### PyTorch for a GPU

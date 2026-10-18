@@ -103,7 +103,7 @@ class AndreyGES:
 
 
 def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "") -> list[AndreyGES]:
-    """The three shipped GES builds: numpy serial, numpy parallel, numba serial.
+    """The two shipped GES builds: numpy serial and numpy parallel.
 
     ``lambda_value`` and ``suffix`` exist together and only together: a second penalty needs a
     second set of names, since ``params`` are excluded from ``run_id``. Called with no arguments,
@@ -121,7 +121,6 @@ def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "")
     specs = (
         ("andrey.ges.numpy.serial", "numpy", "serial"),
         ("andrey.ges.numpy.parallel", "numpy", "parallel"),
-        ("andrey.ges.numba.serial", "numba", "serial"),
     )
     return [
         AndreyGES(
@@ -138,8 +137,7 @@ def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "")
 def andrey_ges_bdeu() -> AndreyGES:
     """GES with the BDeu score, for categorical data: numpy, serial.
 
-    BDeu moves are scored in the calling process, so a parallel variant would run the same code;
-    the numpy backend keeps the numba compile out of the first fit.
+    BDeu moves are scored in the calling process, so a parallel variant would run the same code.
     """
     return AndreyGES(
         name="andrey.ges.bdeu",

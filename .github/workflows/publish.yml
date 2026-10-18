@@ -66,7 +66,7 @@ jobs:
         run: |
           uv venv --python ${{ matrix.python-version }}
           uv pip install dist/${{ matrix.artifact }}
-          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None; assert u.find_spec('numba') is None; import numpy as np, andrey; print(andrey.__version__, andrey.pc(np.random.default_rng(0).standard_normal((500, 4))).structure.to_numpy())"
+          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None; import numpy as np, andrey; print(andrey.__version__, andrey.pc(np.random.default_rng(0).standard_normal((500, 4))).structure.to_numpy())"
 
   # The supported methods against known graphs, on the commit being published (qa/README.md).
   quality-gate:

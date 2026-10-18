@@ -273,7 +273,7 @@ _add(
             "a mixed-data setting read",
         ),
         determinism="deterministic",
-        accel="numba",
+        accel="numpy",
         status="supported",
         params=(
             ParamSpec(
@@ -305,7 +305,7 @@ _add(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
         ),
         determinism="deterministic",
-        accel="numba",
+        accel="numpy",
         status="experimental",
         params=(_LAMBDA_VALUE,),
         references=("Hauser & Buhlmann 2012",),

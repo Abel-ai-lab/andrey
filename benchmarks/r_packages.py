@@ -65,8 +65,7 @@ def _score_solutions() -> list:
     Pair pcalg's `ges` with Andrey's GES, bnlearn's `hc` with `andrey.hc`, and bnlearn's
     `tabu` with `andrey.tabu`.
     Hill climbing changes one DAG edge at a time; GES searches CPDAG space over neighbor subsets.
-    Include all Andrey GES builds to cover every backend. Allow for the `numba` reachability
-    kernel's first-call compilation during warm-up in `--cap-wall-s`.
+    Include both Andrey GES builds, serial and parallel.
     """
     return [
         *andrey_ges_adapters(),
