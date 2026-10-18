@@ -103,6 +103,10 @@ change names its pull request.
   chain of three or more latents is no longer misordered. ([#187])
 - `gin` pools its independence tests without capping any one p-value, so a strongly dependent
   group with many variables outside it is no longer accepted as a cluster. ([#187])
+- `gin` runs each root test once per member of the clusters it compares, and searches the columns
+  sorted by the rank hill climbing breaks ties by, so the latent order no longer depends on which
+  indicator comes first, and reordering the columns no longer changes the clusters or the order.
+  ([#PRNUM])
 - `calm` raises `ValueError` when its loss stops being finite instead of returning NaN weights, and
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
