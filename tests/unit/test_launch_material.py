@@ -165,6 +165,12 @@ def test_the_old_demo_address_redirects_to_the_examples():
     assert '"demo/index": "demo-redirect.html"' in CONF
 
 
+def test_the_benchmark_explorer_address_redirects_to_the_release_cards():
+    template = (ROOT / "docs" / "_templates" / "benchmark-explorer-redirect.html").read_text()
+    assert 'content="0; url=../benchmarks.html"' in template
+    assert '"docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html"' in CONF
+
+
 def test_the_faq_cites_what_the_readme_cites():
     # Readers copy the entry from either page, so both carry the same BibTeX block.
     def bibtex(text):

@@ -461,7 +461,14 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
     for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
         assert f"https://andrey.abel.ai/{required}" in urls, required
     # Left out: pages with no content of their own, and the redirects from moved addresses.
-    left_out = ("search.html", "404.html", "genindex.html", "blog/drafts.html", "demo/index.html")
+    left_out = (
+        "search.html",
+        "404.html",
+        "genindex.html",
+        "blog/drafts.html",
+        "demo/index.html",
+        "docs/demos/benchmark-explorer.html",
+    )
     moved = (
         "blog/andrey-0-2-0.html",
         "blog/introducing-andrey.html",
