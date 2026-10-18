@@ -204,6 +204,15 @@ def ica_lingam(
     orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
     converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
 
+    **Results across machines.** When several variables can come next in the causal order, the one
+    whose column ranks first by its own values goes first, so the choice moves with its column when
+    the columns are reordered and does not depend on the CPU. FastICA itself can still differ:
+    with few rows per variable it converges slowly, and last-bit rounding differences, such as
+    those between CPUs or BLAS builds, can lead it to a different unmixing matrix and so to a
+    different order and graph. In simulations with ten rows per variable, the graph changed with
+    the BLAS kernel on every dataset, and tighter FastICA tolerances did not prevent it; with 100
+    rows per variable, FastICA converged quickly and gave the same graph under each kernel.
+
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
     passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at

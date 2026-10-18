@@ -101,6 +101,9 @@ change names its pull request.
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
   dropping the edge. ([#187])
+- When several variables can come next in its causal order, `ica_lingam` picks one by a rank
+  computed from each column's own data instead of by column position, so reordering the columns no
+  longer changes that choice, and its order and graph can change. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 
