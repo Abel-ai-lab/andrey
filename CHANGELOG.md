@@ -22,7 +22,7 @@ change names its pull request.
   set as before, in the order the search visits nodes, and `"order_free"` builds sets that do not
   depend on that order, at the cost of more tests on some graphs. ([#168])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
-  only 3; smaller depths search less and run faster. ([#TBD])
+  only 3; smaller depths search less and run faster. ([#190])
 
 ### Changed
 
@@ -271,3 +271,4 @@ First alpha release.
 [#175]: https://github.com/Abel-ai-lab/andrey/pull/175
 [#178]: https://github.com/Abel-ai-lab/andrey/pull/178
 [#179]: https://github.com/Abel-ai-lab/andrey/pull/179
+[#190]: https://github.com/Abel-ai-lab/andrey/pull/190
