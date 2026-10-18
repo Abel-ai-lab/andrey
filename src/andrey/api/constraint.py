@@ -18,6 +18,7 @@ from andrey.api._adapt import (
     check_categories,
     checked_data,
     column_labels,
+    copies_named,
     data_kind,
     open_unit_interval,
     structure_output,
@@ -100,7 +101,9 @@ def pc(
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``.
+        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. When
+        copies of a column, up to scale and shift, make that matrix singular, the message names
+        every group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -254,9 +257,10 @@ def pc(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    cpdag = _pc(
-        X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
-    )
+    with copies_named(labels):
+        cpdag = _pc(
+            X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+        )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
     )
@@ -335,9 +339,11 @@ def fci(
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int.
     ValueError
-        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
-        is not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice,
-        or if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`.
+        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
+        not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice, or
+        if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. When
+        copies of a column, up to scale and shift, make that matrix singular, the message names
+        every group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -442,14 +448,15 @@ def fci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pag = _fci(
-        X,
-        alpha=alpha,
-        indep_test=indep_test,
-        collider_rule=collider_rule,
-        categorical=mask,
-        possible_dsep=possible_dsep,
-    )
+    with copies_named(labels):
+        pag = _fci(
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=possible_dsep,
+        )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
     )
@@ -545,7 +552,8 @@ def gfci(
         ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
         ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
         column repeats another up to scale and shift given more than two rows or, with more rows
-        than columns, is a linear function of other columns.
+        than columns, is a linear function of other columns. One message names every group of copies
+        and says to keep one column per group.
 
     Warns
     -----
@@ -632,16 +640,17 @@ def gfci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pag = _gfci(
-        X,
-        score_func=score_func,
-        lambda_value=lambda_value,
-        alpha=alpha,
-        indep_test=indep_test,
-        collider_rule=collider_rule,
-        categorical=mask,
-        possible_dsep=possible_dsep,
-    )
+    with copies_named(labels):
+        pag = _gfci(
+            X,
+            score_func=score_func,
+            lambda_value=lambda_value,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=possible_dsep,
+        )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
     )
@@ -834,15 +843,16 @@ def cdnod(
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
     if dependence_threshold is not None:
         dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
-    cpdag = _cdnod(
-        X,
-        c,
-        alpha=alpha,
-        indep_test=indep_test,
-        collider_order=collider_order,
-        categorical=mask,
-        dependence_threshold=dependence_threshold,
-    )
+    with copies_named(labels):
+        cpdag = _cdnod(
+            X,
+            c,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_order=collider_order,
+            categorical=mask,
+            dependence_threshold=dependence_threshold,
+        )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}
     )

@@ -33,12 +33,13 @@ data-types. Proceedings of Machine Learning Research 104:4-21.
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
+from scipy.sparse.csgraph import connected_components
 from scipy.special import gammaln
 
 from . import categorical, stats
@@ -147,6 +148,64 @@ def _from_residual(residual: float, variance: float, n: int, penalty: float) -> 
     return float(n * np.log(residual) + penalty)
 
 
+class CopiedColumnsError(ValueError):
+    """Raised when data columns repeat other columns up to scale and shift.
+
+    ``groups`` holds each group of copies as column positions, as :func:`copy_groups` returns
+    them; the message is :func:`copies_message` of those groups.
+    """
+
+    groups: tuple[tuple[int, ...], ...] = ()
+
+
+def copy_groups(corr: np.ndarray, n: int) -> tuple[tuple[int, ...], ...]:
+    """Return the groups of columns that repeat one another up to scale and shift.
+
+    Two columns are copies when ``1 - corr**2`` is at most ``ZERO_RESIDUAL``: either one's residual
+    variance given the other is zero up to rounding. A group is a connected set of copies, given as
+    its positions in increasing order, so the first is the column to keep. Groups are ordered by
+    that first column. With at most two rows ``n`` every pair of columns is a copy, so the result is
+    empty.
+
+    Parameters
+    ----------
+    corr : ndarray, shape (d, d)
+        Correlation matrix of the data's columns.
+    n : int
+        Sample count.
+    """
+    if n <= 2 or corr.shape[0] < 2:
+        return ()
+    alike = np.abs(corr)
+    np.fill_diagonal(alike, 0.0)
+    copies = 1.0 - alike**2 <= ZERO_RESIDUAL
+    if not copies.any():
+        return ()
+    _, component = connected_components(copies, directed=False)
+    members: dict[int, list[int]] = {}
+    for j, label in enumerate(component.tolist()):
+        members.setdefault(label, []).append(j)
+    return tuple(tuple(group) for group in members.values() if len(group) > 1)
+
+
+def copies_message(groups: Sequence[Sequence[int]], name: Callable[[int], str] = str) -> str:
+    """Return the error message for the groups of copies ``groups``, naming columns by ``name``.
+
+    The message names every group, its first column the one to keep, and says what to do: keep one
+    column per group and read its edges as the group's.
+    """
+    parts = []
+    for kept, *copies in groups:
+        names = [name(j) for j in copies]
+        listed = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+        parts.append(f"{listed} {'repeats' if len(names) == 1 else 'repeat'} {name(kept)}")
+    return (
+        f"data columns repeat other columns up to scale and shift: {'; '.join(parts)}. Copies of "
+        "one variable cannot be told apart, so keep one column per group, drop the others before "
+        "the fit, and read the kept column's edges as the group's"
+    )
+
+
 def check_columns(cov: np.ndarray, n: int) -> None:
     """Raise ``ValueError`` when a column of the data behind ``cov`` makes BIC scoring meaningless.
 
@@ -155,7 +214,8 @@ def check_columns(cov: np.ndarray, n: int) -> None:
     of that column); and with more rows than columns, when its residual variance given all other
     columns is at most ``ZERO_RESIDUAL`` times its variance (a linear function of other columns).
     Every column is a linear function of any ``n - 1`` others, so the last two checks apply only
-    where the row count does not force such a fit.
+    where the row count does not force such a fit. Copies raise one :class:`CopiedColumnsError`
+    that names every group :func:`copy_groups` finds.
 
     The residual variance of column ``j`` given all others, relative to its variance, is
     ``1 / inv(corr)[j, j]`` for the correlation matrix ``corr``. It is at least the smallest
@@ -171,9 +231,11 @@ def check_columns(cov: np.ndarray, n: int) -> None:
 
     Raises
     ------
+    CopiedColumnsError
+        If a column is an affine copy of another column when ``n`` exceeds 2.
     ValueError
-        If a column is constant, an affine copy of another column when ``n`` exceeds 2, or a linear
-        function of other columns when ``n`` exceeds the column count.
+        If a column is constant, or a linear function of other columns when ``n`` exceeds the
+        column count.
     """
     variance = np.diag(cov)
     constant = np.flatnonzero(~(variance > 0.0))
@@ -184,13 +246,11 @@ def check_columns(cov: np.ndarray, n: int) -> None:
         return
     sd = np.sqrt(variance)
     corr = cov / np.outer(sd, sd)
-    alike = np.abs(corr)
-    np.fill_diagonal(alike, 0.0)
-    i, j = sorted(int(k) for k in np.unravel_index(np.argmax(alike), alike.shape))
-    if 1.0 - alike[i, j] ** 2 <= ZERO_RESIDUAL:
-        raise ValueError(
-            f"data column {j} is a linear function of column {i}; drop one of them before the fit"
-        )
+    groups = copy_groups(corr, n)
+    if groups:
+        error = CopiedColumnsError(copies_message(groups))
+        error.groups = groups
+        raise error
     if n <= d:
         return
     if np.linalg.eigvalsh(corr)[0] > ZERO_RESIDUAL:

@@ -58,6 +58,10 @@ change names its pull request.
   ([#187])
 - The `calm` reference explains each step of the fit, how to run the paper's longer schedule, and
   where the fit can stop at a local optimum. ([#187])
+- When columns repeat others up to scale and shift, the score-based searches raise one `ValueError`
+  that names every group of copies by column name and says to keep one column per group and read
+  its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
+  copies make a test's correlation matrix singular. ([#189])
 
 ### Removed
 
@@ -304,3 +308,4 @@ First alpha release.
 [#179]: https://github.com/Abel-ai-lab/andrey/pull/179
 [#184]: https://github.com/Abel-ai-lab/andrey/pull/184
 [#187]: https://github.com/Abel-ai-lab/andrey/pull/187
+[#189]: https://github.com/Abel-ai-lab/andrey/pull/189

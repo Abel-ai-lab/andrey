@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
-from collections.abc import Iterable, Mapping
+from collections.abc import Generator, Iterable, Mapping
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
-from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES
+from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
 from andrey.core.structure import relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
 
@@ -498,6 +499,26 @@ def column_labels(data: object) -> tuple[str, ...] | None:
         return None
     names = list(columns)
     return None if names == list(range(len(names))) else node_labels(names)
+
+
+@contextlib.contextmanager
+def copies_named(labels: tuple[str, ...] | None) -> Generator[None]:
+    """Name the columns of a copies error raised in the block by ``labels``.
+
+    A :class:`~andrey.core.score.CopiedColumnsError`, or a
+    :class:`~andrey.core.ci.SingularCorrelationError` that found copies, names columns by position;
+    with ``labels``, the message names them by label instead. A position past the labels, such as a
+    column a method adds to the data, keeps its number.
+    """
+    try:
+        yield
+    except (CopiedColumnsError, SingularCorrelationError) as error:
+        if labels is not None and error.groups:
+            named = copies_message(
+                error.groups, lambda j: repr(labels[j]) if j < len(labels) else str(j)
+            )
+            error.args = (str(error).replace(copies_message(error.groups), named),)
+        raise
 
 
 def shared_labels(label_sets: Iterable[tuple[str, ...] | None]) -> tuple[str, ...] | None:

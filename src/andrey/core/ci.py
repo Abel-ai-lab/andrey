@@ -56,6 +56,7 @@ from scipy.special import chdtrc, ndtr, stdtr
 
 from . import categorical, stats
 from .mixed import ConditionalGaussian, DegenerateGaussian
+from .score import copies_message, copy_groups
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
@@ -74,8 +75,13 @@ class SingularCorrelationError(ValueError):
 
     Its smallest eigenvalue is at most ``_SINGULAR_RTOL`` times its largest, so its inverse cannot
     give the partial correlation. :meth:`PartialCorrelationTest.residual_statistic_pvalues` gives it
-    from the data instead.
+    from the data instead. When the data hold columns that repeat others up to scale and shift,
+    ``groups`` holds them as :func:`~andrey.core.score.copy_groups` returns them, and the message
+    gives :func:`~andrey.core.score.copies_message` of those groups as the cause; otherwise
+    ``groups`` is empty.
     """
+
+    groups: tuple[tuple[int, ...], ...] = ()
 
 
 @runtime_checkable
@@ -112,6 +118,9 @@ class PartialCorrelationTest:
     Their p-values match exactly, so repeated queries take the same ``p > alpha`` decision across
     call paths, including at the threshold.
     """
+
+    # The data's groups of copies, set by the first singular inversion.
+    _copies: tuple[tuple[int, ...], ...]
 
     def __init__(self, data: np.ndarray) -> None:
         arr = np.asarray(data, dtype=np.float64)
@@ -171,11 +180,29 @@ class PartialCorrelationTest:
             r = (rxy - rxz * ryz) / math.sqrt((1.0 - rxz * rxz) * (1.0 - ryz * ryz))
         else:
             var = (x_int, y_int, *cond)
-            inv = _invert_nonsingular(corr[np.ix_(var, var)][None])[0]
+            inv = self._invert(corr[np.ix_(var, var)][None])[0]
             r = -float(inv[0, 1]) / math.sqrt(abs(float(inv[0, 0]) * float(inv[1, 1])))
         return (
             -_ONE_MINUS_EPS if r < -_ONE_MINUS_EPS else _ONE_MINUS_EPS if r > _ONE_MINUS_EPS else r
         )
+
+    def _invert(self, stack: np.ndarray) -> np.ndarray:
+        """:func:`_invert_nonsingular` of ``stack``; a singular error names the data's copies.
+
+        The groups of copies come from the full correlation matrix, found once per test.
+        """
+        try:
+            return _invert_nonsingular(stack)
+        except SingularCorrelationError as error:
+            if not hasattr(self, "_copies"):
+                self._copies = copy_groups(self._corr, self._n)
+            if not self._copies:
+                raise
+            named = SingularCorrelationError(
+                f"correlation matrix is singular because {copies_message(self._copies)}"
+            )
+            named.groups = self._copies
+            raise named from error
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
         """Return p-values for one ``(x, y)`` pair over many conditioning sets.
@@ -248,7 +275,7 @@ class PartialCorrelationTest:
             var[:, 0] = lo
             var[:, 1] = hi
             var[:, 2:] = conds
-            inv = _invert_nonsingular(corr[var[:, :, None], var[:, None, :]])
+            inv = self._invert(corr[var[:, :, None], var[:, None, :]])
             r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         r = np.clip(r, -_ONE_MINUS_EPS, _ONE_MINUS_EPS)
         return r, np.asarray(self._pvalue(r, df))

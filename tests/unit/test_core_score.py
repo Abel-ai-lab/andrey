@@ -7,10 +7,12 @@ from the implementation's internals; the inline baseline pins current outputs.
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pytest
 
-from andrey.core.score import BICScore, Score, local_score_bic
+from andrey.core.score import BICScore, CopiedColumnsError, Score, copy_groups, local_score_bic
 
 
 @pytest.fixture(autouse=True)
@@ -252,8 +254,45 @@ def test_check_columns_rejects_a_constant_column():
 def test_check_columns_rejects_a_scaled_and_shifted_copy(n):
     x = _columns(n, 8)
     x[:, 6] = 2.5 * x[:, 1] - 4.0
-    with pytest.raises(ValueError, match="column 6 is a linear function of column 1"):
+    with pytest.raises(CopiedColumnsError, match=r"\b6 repeats 1\b") as error:
         BICScore(x)
+    assert error.value.groups == ((1, 6),)
+
+
+def _two_groups(n=60):
+    """Columns 2 and 7 repeat column 1, and column 5 repeats column 3, up to scale and shift."""
+    x = _columns(n, 8)
+    x[:, 2] = 2.0 * x[:, 1] + 1.0
+    x[:, 7] = -x[:, 1]
+    x[:, 5] = 3.0 * x[:, 3] - 2.0
+    return x
+
+
+def test_copy_groups_finds_every_group_with_the_kept_column_first():
+    corr = np.corrcoef(_two_groups(), rowvar=False)
+    assert copy_groups(corr, 60) == ((1, 2, 7), (3, 5))
+
+
+def test_copy_groups_joins_copies_of_copies_into_one_group():
+    x = _columns(60, 5)
+    x[:, 4] = 2.0 * x[:, 0]
+    x[:, 2] = x[:, 4] - 1.0
+    assert copy_groups(np.corrcoef(x, rowvar=False), 60) == ((0, 2, 4),)
+
+
+@pytest.mark.parametrize(("n", "d"), [(60, 8), (2, 3)])
+def test_copy_groups_is_empty_without_copies_or_with_two_rows(n, d):
+    assert copy_groups(np.corrcoef(_columns(n, d), rowvar=False), n) == ()
+
+
+def test_check_columns_names_every_group_of_copies_and_the_fix():
+    with pytest.raises(CopiedColumnsError) as error:
+        BICScore(_two_groups())
+    message = str(error.value)
+    assert error.value.groups == ((1, 2, 7), (3, 5))
+    assert re.search(r"\b2 and 7 repeat 1\b", message)
+    assert re.search(r"\b5 repeats 3\b", message)
+    assert "keep one column" in message
 
 
 def test_check_columns_rejects_a_linear_function_of_other_columns():
