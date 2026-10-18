@@ -9,10 +9,10 @@ folder under `published/` with the summary its numbers come from:
 
 | Release | Release card | Summary |
 |---|---|---|
-| 0.4.0 | [Pairwise direction](../docs/docs/benchmarks/0.4.0.md) | [`published/pairwise-2026-10/summary.json`](published/pairwise-2026-10/summary.json) |
-| 0.3.0 | [Score-based search](../docs/docs/benchmarks/0.3.0.md) | [`published/score-search-2026-10/summary.json`](published/score-search-2026-10/summary.json) |
-| 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
-| 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |
+| 0.4.0 | [Pairwise direction](../docs/docs/benchmarks/0.4.0.md) | [`published/0.4.0/summary.json`](published/0.4.0/summary.json) |
+| 0.3.0 | [Score-based search](../docs/docs/benchmarks/0.3.0.md) | [`published/0.3.0/summary.json`](published/0.3.0/summary.json) |
+| 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/0.2.0/summary.json`](published/0.2.0/summary.json) |
+| 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/0.1.0/summary.json`](published/0.1.0/summary.json) |
 
 A summary holds one row per comparison and size. It is generated from the recorded fits; those
 records and the script that writes it are kept outside this repository. A released report and its

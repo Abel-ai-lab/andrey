@@ -19,9 +19,7 @@ from andrey_bench.datasets import DatasetKey
 from andrey_bench.window import TAIL
 
 #: A summary measured on columns in the generated order that names its datasets.
-DATA_TYPES_SUMMARY = (
-    Path(__file__).resolve().parents[1] / "published" / "data-types-2026-10" / "summary.json"
-)
+DATA_TYPES_SUMMARY = Path(__file__).resolve().parents[1] / "published" / "0.6.0" / "summary.json"
 
 #: Regimes whose generators take the shuffle step, and those whose column order is already free.
 SHUFFLED_REGIMES = sorted(
