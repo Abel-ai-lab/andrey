@@ -19,10 +19,6 @@ from andrey.core.score import BICScore, LocalScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.search.boss import PERMUTATION_SCORES
 
-# The depth-first search of covered tucks descends at most this many score-preserving moves before
-# backtracking.
-_DEPTH = 3
-
 # DFS accepts a tuck when the total negated BIC increases by more than this tolerance;
 # changes in (-tolerance, tolerance] are explored as ties. Grow recomputes full BIC scores
 # when a candidate's score is this close to the score of the current parent set or another
@@ -381,6 +377,7 @@ def grasp(
     data: np.ndarray,
     *,
     lambda_value: float = 1.0,
+    depth: int = 3,
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",
     categorical: np.ndarray | None = None,
@@ -398,6 +395,8 @@ def grasp(
         Data matrix; rows are observations, columns are variables.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
+    depth : int
+        Most tucks in one chain of moves, at least ``1``.
     random_state : int
         Seed for the private RNG that fixes the initial permutation and DFS shuffles.
     score_func : str
@@ -434,7 +433,7 @@ def grasp(
         order.set_local_score(y, local_score)
         order.bump_edges(len(y_parents))
 
-    while _dfs(_DEPTH - 1, set(), [], order, gsts, rng):
+    while _dfs(depth - 1, set(), [], order, gsts, rng):
         pass
 
     adj = np.zeros((n_features, n_features), dtype=np.int8)

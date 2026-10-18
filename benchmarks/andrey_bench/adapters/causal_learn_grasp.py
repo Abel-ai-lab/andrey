@@ -10,7 +10,7 @@ from andrey_bench.adapters.bic_penalty import CAUSAL_LEARN_LAMBDA, SEARCH_SEED
 from andrey_bench.adapters.causal_learn_convert import generalgraph_to_adjacency
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
-#: causal-learn's default tuck-relaxation depth and the only value Andrey implements.
+#: causal-learn's default tuck-relaxation depth, and Andrey's.
 _DEFAULT_DEPTH = 3
 
 

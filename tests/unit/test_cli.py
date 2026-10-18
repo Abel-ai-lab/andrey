@@ -9,6 +9,7 @@ import warnings
 import numpy as np
 import pytest
 
+import andrey
 from andrey.cli import graph_view, main, render_method_help
 from andrey.spec import REGISTRY, SCHEMA_VERSION
 
@@ -406,7 +407,11 @@ def test_run_enum_rejects_bad_value(capsys, csv_path):
     assert json.loads(err)["error"]["code"] == "invalid_params"
 
 
-def test_run_unsupported_value_is_usage_error(capsys, csv_path):
+def test_run_unsupported_value_is_usage_error(capsys, csv_path, monkeypatch):
+    def unsupported(*_args, **_kwargs):
+        raise NotImplementedError("GRaSP supports depth=3, not 2")
+
+    monkeypatch.setattr(andrey, "grasp", unsupported)
     code, _out, err = _run(["run", "grasp", "--data", str(csv_path), "depth=2"], capsys)
     assert code == 2
     assert json.loads(err)["error"]["code"] == "unsupported_value"

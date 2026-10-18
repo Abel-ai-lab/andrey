@@ -624,7 +624,8 @@ _add(
                 name="depth",
                 type="int",
                 default=3,
-                doc="Maximum number of tucks in one chain of moves. Only 3 is supported.",
+                doc="Maximum number of tucks in one chain of moves, at least 1; larger depths "
+                "search more chains and run longer.",
             ),
             _SEED,
             _CATEGORICAL,
