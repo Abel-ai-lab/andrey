@@ -218,9 +218,7 @@ def ica_lingam(
     passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at
     100. The median fit took 0.44 s at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's
     protein-signaling data (853 rows, 11 variables), its errors were below the empty graph's (14
-    against 17). Under three BLAS kernels on one machine, it gave the same graph under every kernel
-    from 100 rows per variable, at 20 and 50 variables; with fewer rows the graph can change with
-    the kernel.
+    against 17).
 
     References
     ----------
