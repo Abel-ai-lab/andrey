@@ -22,7 +22,8 @@ _TIE_TOL = 1e-10
 # Two columns are degenerate when the residual of one on the other keeps at most this fraction of
 # its variance (1 - corr^2), so that its standardized entropy is undefined (0 / 0) or rounding
 # noise, and which of the two a CPU's rounding gives differs by kernel. Copies, exact or perturbed
-# by 1e-12, measure < 1e-15; distinct columns of rank-transformed near-copies measure > 1e-7.
+# by 1e-12, measure < 2e-15 at every step; rank-transformed near-copies with |corr| up to 0.999999
+# measure > 7e-6, and orders differed between CPUs only for pairs below 1e-14.
 _DEGENERATE_TOL = 1e-12
 
 
