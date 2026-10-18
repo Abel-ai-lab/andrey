@@ -37,7 +37,7 @@ change names its pull request.
   2020) to orient edges between variables that both change with the domain index; it is off by
   default. ([#187])
 - `andrey.data.sortability.index_correlation` measures how much a dataset's column order reveals
-  of its causal order: the rank correlation of each column's index with its causal depth. ([#199])
+  of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
   only 3; smaller depths search less and run faster. ([#190])
 
@@ -52,7 +52,7 @@ change names its pull request.
 - `andrey.data.load_dataset` lists a bnlearn network's columns in an order drawn from the seed,
   with `feature_names` and the graph's labels in the same order, because the network files list
   their variables close to causal order; `shuffle=False` keeps the file's order, and Sachs keeps
-  its own. ([#199])
+  its own. ([#202])
 - Hill climbing and tabu search break exact score ties by a rank computed from each column's own
   data instead of by column position, so reordering the columns no longer changes the graph they
   find, and the same data give the same graph on other machines. ([#168], [#179])
@@ -323,4 +323,4 @@ First alpha release.
 [#189]: https://github.com/Abel-ai-lab/andrey/pull/189
 [#190]: https://github.com/Abel-ai-lab/andrey/pull/190
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
-[#199]: https://github.com/Abel-ai-lab/andrey/pull/199
+[#202]: https://github.com/Abel-ai-lab/andrey/pull/202
