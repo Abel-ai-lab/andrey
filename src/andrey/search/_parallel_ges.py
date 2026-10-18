@@ -177,7 +177,7 @@ def forward_chunk_best(
             continue  # y already carries the maximum admissible parent count.
         pa_set = set(int(p) for p in paj)
         # Group valid candidates by their base parent set; each base scores its adds in one batch.
-        groups: dict[tuple[int, ...], list[tuple[int, int, tuple[int, ...]]]] = {}
+        groups: dict[tuple[int, ...], list[tuple[int, tuple[int, ...]]]] = {}
         for x, _t_index, T, clique in _insert_candidates(y, adj, state):
             if reachable(y, x, clique):
                 continue  # some semi-directed y ~> x path misses the clique: invalid Insert.
