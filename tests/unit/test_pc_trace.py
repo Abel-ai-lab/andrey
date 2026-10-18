@@ -24,13 +24,13 @@ def observations(d, density, seed):
 
 
 def replay(trace, d):
-    """Rebuild the CPDAG and separating sets from the trace, checking each record on the way."""
+    """Rebuild the CPDAG, separating sets and p-values from the trace, checking each record."""
     steps = [r["step"] for r in trace]
-    assert steps == sorted(steps, key=["test", "collider", "meek"].index)
+    assert steps == sorted(steps, key=["test", "collider", "meek", "conflict"].index)
     tests = [r for r in trace if r["step"] == "test"]
     assert [r["depth"] for r in tests] == sorted(r["depth"] for r in tests)
     adj = np.ones((d, d), dtype=np.int8) - np.eye(d, dtype=np.int8)
-    sepsets = {}
+    sepsets, pvalues = {}, {}
     for depth in sorted({r["depth"] for r in tests}):
         snapshot = adj.copy()
         tried, marked = set(), set()
@@ -45,13 +45,20 @@ def replay(trace, d):
             if r["removed"]:
                 marked.add((x, y))
                 sepsets.setdefault((x, y), set()).update(S)
+                pvalues[(x, y)] = max(pvalues.get((x, y), r["p"]), r["p"])
         for x, y in marked:
             adj[x, y] = adj[y, x] = 0
+    colliders = [r for r in trace if r["step"] == "collider"]
+    ranks = [r["p"] for r in colliders]
+    assert ranks == sorted(ranks, reverse=True)  # decided from the highest rank down
+    for r in colliders:
+        x, _, z = r["triple"]
+        assert r["p"] == pvalues[(x, z)]
     for r in trace:
         if r["step"] != "test":
             np.testing.assert_array_equal(r["before"], adj)
             adj = r["after"]
-    return adj, {pair: tuple(sorted(s)) for pair, s in sepsets.items()}
+    return adj, {pair: tuple(sorted(s)) for pair, s in sepsets.items()}, pvalues
 
 
 def digest(trace):
@@ -75,10 +82,11 @@ def test_trace_replays_to_the_graph_pc_returns(d, density, seed):
     traced = pc(X, alpha=ALPHA, _trace=trace)
     expected = andrey.pc(X, alpha=ALPHA).structure.to_numpy()
     np.testing.assert_array_equal(traced.to_numpy(), expected)
-    marks, sepsets = replay(trace, d)
+    marks, sepsets, pvalues = replay(trace, d)
     np.testing.assert_array_equal(marks, expected)
-    _, engine_sepsets = _discover_skeleton(X, ALPHA)
+    _, engine_sepsets, engine_pvalues = _discover_skeleton(X, ALPHA)
     assert sepsets == engine_sepsets
+    assert pvalues == engine_pvalues
 
 
 def test_cases_reach_every_skeleton_path_and_step():
@@ -89,8 +97,14 @@ def test_cases_reach_every_skeleton_path_and_step():
         depths |= {r["depth"] for r in trace if r["step"] == "test"}
         steps |= {r["step"] for r in trace}
         steps |= {"oriented" for r in trace if r.get("oriented")}
+        # A collider skipped because a higher-ranked one already put an arrowhead on its edge.
+        steps |= {
+            "skipped"
+            for r in trace
+            if r["step"] == "collider" and not r["oriented"] and r["triple"][1] not in r["sepset"]
+        }
     assert {0, 1, 2, 3} <= depths  # both closed-form passes and the batched scan
-    assert steps == {"test", "collider", "meek", "oriented"}
+    assert steps == {"test", "collider", "meek", "oriented", "skipped"}
 
 
 def test_trace_is_identical_across_runs():

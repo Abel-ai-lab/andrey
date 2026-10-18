@@ -59,10 +59,11 @@ def _key(regime: str, d: int, n: int, seed: int = 0, times: int = 0) -> datasets
 
 @pytest.mark.parametrize("d", [5, 10, 40])
 def test_the_varma_model_keeps_its_links_per_variable_at_every_size(d: int) -> None:
-    data, stack = lingam_models.sample_varma("varma2010", d, n=300, seed=0)
+    data, stack, columns = lingam_models.sample_varma("varma2010", d, n=300, seed=0)
     b0, b1, m1 = stack
     assert data.shape == (300, d)
-    assert not np.triu(b0).any()  # strictly lower triangular: the causal order is 0..N-1
+    drawn = np.argsort(columns)  # the column of each drawn variable
+    assert not np.triu(b0[np.ix_(drawn, drawn)]).any()  # strictly lower triangular when drawn
     assert np.count_nonzero(b0) == round(0.8 * d)
     assert np.count_nonzero(b1) == np.count_nonzero(m1) == 2 * d
     for block in stack:
@@ -74,10 +75,11 @@ def test_the_varma_model_keeps_its_links_per_variable_at_every_size(d: int) -> N
 
 
 def test_the_varma_noise_is_super_gaussian_and_the_draw_repeats() -> None:
-    data, stack = lingam_models.sample_varma("varma2010", 5, n=5000, seed=1)
-    again, stack_again = lingam_models.sample_varma("varma2010", 5, n=5000, seed=1)
+    data, stack, columns = lingam_models.sample_varma("varma2010", 5, n=5000, seed=1)
+    again, stack_again, columns_again = lingam_models.sample_varma("varma2010", 5, n=5000, seed=1)
     np.testing.assert_array_equal(data, again)
     np.testing.assert_array_equal(stack, stack_again)
+    np.testing.assert_array_equal(columns, columns_again)
     b0, b1, m1 = stack
     # Recover the noise from the recursion: e_t = (I - B0) x_t - B1 x_{t-1} - M1 e_{t-1}.
     noise = np.zeros_like(data)
@@ -121,7 +123,7 @@ def test_a_panel_key_carries_its_time_points_and_the_other_keys_keep_their_ident
         topology="er", functional="var", noise="gaussian", standardize="raw", density=0.0, d=5,
         n=300, seed=0,
     )  # fmt: skip
-    assert lagged.digest == "d74ca17b53ba" and "-T" not in lagged.label
+    assert lagged.digest == "e8beb2acabe6" and "-T" not in lagged.label
     panel = _key("longitudinal_lingam_paper", d=3, n=500, times=20)
     assert panel.label.endswith("-T20") and datasets.generation_kwargs(panel)["times"] == 20
     assert panel.digest != dataclasses.replace(panel, times=21).digest
@@ -189,7 +191,7 @@ def test_the_structure_hash_reads_links_not_values_and_survives_the_run(tmp_path
 
 
 def test_the_andrey_varma_stack_is_the_structure_andrey_returns() -> None:
-    data, _ = lingam_models.sample_varma("varma2010", 3, n=300, seed=0)
+    data, _, _ = lingam_models.sample_varma("varma2010", 3, n=300, seed=0)
     adapter = AndreyVarmaLiNGAM()
     stack = adapter.fit(data, adapter.params())
     out = andrey.varma_lingam(data, order=(1, 1), criterion=None, prune=True)

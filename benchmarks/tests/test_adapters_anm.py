@@ -81,7 +81,7 @@ def test_a_fit_converts_to_the_planted_two_node_dag(adapter) -> None:
 def test_every_generated_pair_has_one_edge() -> None:
     directions = set()
     for key in anm_pairs.pair_keys([50], seeds=10):
-        _, marks, kind = datasets.generate_one(key)
+        _, marks, kind, _ = datasets.generate_one(key)
         [(source, target, _)] = GraphStructure.from_numpy(marks, kind=kind).oriented_edges()
         directions.add((source, target))
     assert directions == {(0, 1), (1, 0)}  # the seed draws the direction

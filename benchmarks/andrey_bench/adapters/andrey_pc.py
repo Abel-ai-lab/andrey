@@ -75,8 +75,11 @@ class AndreyPC:
         alpha = float(params.get("alpha", _DEFAULT_ALPHA))
         indep_test = params.get("indep_test", _DEFAULT_INDEP_TEST)
 
+        # PC's default collider order applies unless ``params`` names one.
+        order = {"collider_order": params["collider_order"]} if "collider_order" in params else {}
+
         X = np.asarray(data, dtype=np.float64)
-        out = andrey.pc(X, alpha=alpha, indep_test=indep_test)
+        out = andrey.pc(X, alpha=alpha, indep_test=indep_test, **order)
         return np.asarray(out.structure.to_numpy())
 
     def to_structure(self, native: np.ndarray) -> Any:

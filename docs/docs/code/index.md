@@ -73,9 +73,12 @@ variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 ti
    granger
 ```
 
-FCI and GFCI use uncovered possibly-directed paths for their R9 and R10 tail orientations:
-nodes two steps apart on each path must be non-adjacent. The same rules determine the oracle PAG
-returned by `andrey.data.latent.marginal(..., "pag")`.
+FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
+apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
+bound. R8 checks each pair of endpoints in both orders, so it does not depend on the node labels.
+The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
+With `possible_dsep="order_free"`, FCI and GFCI build possible-d-separation sets that do not depend
+on the order their search visits nodes; the default, `"fast"`, builds them in that order.
 
 ### Experimental methods
 
@@ -226,7 +229,9 @@ Sachs data end to end.
 
 `andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
 scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
-for the mixed-data tests and scores. Each returns the data with the true graph.
+for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
+an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
+the causal order; `shuffle=False` keeps the order in which the graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
