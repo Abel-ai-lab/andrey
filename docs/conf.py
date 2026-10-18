@@ -717,9 +717,16 @@ def _dated_posts(app) -> list[tuple[str, str, str]]:  # noqa: ANN001
 
 
 def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
-    """The post about the latest release, whose version the navbar's dot on Release cards names:
-    the newest dated blog post with a version, as its docname and version."""
+    """The post about the latest release, whose date opens the week of the navbar's dot on Release
+    cards: the newest dated blog post with a version, as its docname and version."""
     return _newest_post([post for post in _dated_posts(app) if post[2]])
+
+
+def _newest_card() -> str:
+    """The version of the newest release card under ``docs/benchmarks/``, which the navbar's dot on
+    Release cards names; a card can land before its release's post."""
+    cards = (HERE / "docs" / "benchmarks").glob("*.md")
+    return ".".join(map(str, max(tuple(map(int, card.stem.split("."))) for card in cards)))
 
 
 def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
@@ -729,8 +736,11 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     """
     # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release and the
     # date of its post, which opens the dot's week.
-    release_doc, context["release_version"] = _release_post(app)
-    context["release_date"] = next(d for doc, d, _ in _dated_posts(app) if doc == release_doc)
+    context["release_version"] = _newest_card()
+    posts = _dated_posts(app)
+    release_doc = next((doc for doc, _, v in posts if v == context["release_version"]), None)
+    release_doc = release_doc or _release_post(app)[0]
+    context["release_date"] = next(d for doc, d, _ in posts if doc == release_doc)
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
