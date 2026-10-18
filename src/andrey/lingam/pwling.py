@@ -126,6 +126,8 @@ def copy_groups(groups: list[np.ndarray], U: list[int], ranks: np.ndarray) -> di
         var = np.diag(cov)
         linked |= cov * cov.T >= (1.0 - _COPY_TOL) * np.outer(var, var)
     np.fill_diagonal(linked, False)
+    if not linked.any():
+        return {u: [] for u in U}
     copies: dict[int, list[int]] = {}
     seen = np.zeros(k, dtype=bool)
     for start in range(k):
