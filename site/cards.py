@@ -451,9 +451,9 @@ def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = 
     )
 
 
-def _art_ground(kind: str, width: int, height: int) -> str:
-    """``kind``'s art filling the height, its right edge at ``width``, under a navy fade from the
-    left that keeps white text readable."""
+def _art_ground(kind: str, width: int, height: int, *, left: bool = False) -> str:
+    """``kind``'s art filling the height, its right edge at ``width`` (its left edge at 0, when
+    ``left``), under a navy fade from the left that keeps white text readable."""
     stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
     fade = "".join(
         f'<stop offset="{offset:.2f}" stop-color="{grain.NAVY}" stop-opacity="{opacity:.2f}"/>'
@@ -462,7 +462,7 @@ def _art_ground(kind: str, width: int, height: int) -> str:
     art_w = round(height * COVER_W / COVER_H)
     return (
         f'<defs><linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">{fade}</linearGradient>'
-        f'</defs><image href="{_jpeg_href(_art(kind))}" x="{width - art_w}" y="0" '
+        f'</defs><image href="{_jpeg_href(_art(kind))}" x="{0 if left else width - art_w}" y="0" '
         f'width="{art_w}" height="{height}" preserveAspectRatio="none"/>'
         f'<rect width="{width}" height="{height}" fill="url(#fade)"/>'
     )
@@ -513,7 +513,8 @@ KIT_ICON = 512  # the icon PNGs' side
 KIT_AVATAR = 1024  # the avatar's side
 # The repository's social preview, at GitHub's recommended size; GitHub takes files up to 1 MB.
 SOCIAL_W, SOCIAL_H = 1280, 640
-SOCIAL_TITLE = 84  # the tagline's size, on two lines between the side margins
+SOCIAL_TITLE = 84  # the tagline's size, on three lines left of the lanes' amber streak
+SOCIAL_TEXT_W = 720
 SOCIAL_LINK = 28  # the site's address at the bottom
 SOCIAL_QUALITY = 85
 KIT_NOTE = """Andrey brand kit
@@ -550,14 +551,15 @@ def _kit_icon(ink: str, ground: str | None = None) -> str:
 
 def social_svg() -> str:
     """The repository's social preview: the wordmark, the tagline with ``ACCENT`` in amber, and
-    the site's address at the bottom, over the lanes art."""
-    lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_W - 2 * BANNER_LEFT, 2)
+    the site's address at the bottom, over the lanes art set at its left edge, so the amber streak
+    runs to the right of the tagline."""
+    lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_TEXT_W, 3)
     step = round(SOCIAL_TITLE * 1.14)
     top = SOCIAL_H / 2 - (len(lines) - 1) * step / 2 + 10
     middles = [top + i * step for i in range(len(lines))]
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{SOCIAL_W}" height="{SOCIAL_H}">'
-        + _art_ground("lanes", SOCIAL_W, SOCIAL_H)
+        + _art_ground("lanes", SOCIAL_W, SOCIAL_H, left=True)
         + _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 80, 56)
         + _title(lines, SOCIAL_TITLE, middles, BANNER_LEFT, ACCENT, left=True)
         + f'<text x="{BANNER_LEFT}" y="{SOCIAL_H - 72}" font-family="Inter" font-weight="600" '
