@@ -284,10 +284,15 @@ _GAUSS_5V_PAG = [
 ]
 
 
+def _pag_edges(case: str, structure) -> list:
+    """The edges of a PAG over the case's columns, its nodes numbered as the case's variables."""
+    return sorted(datagen.to_variables(case, structure).oriented_edges(index=True))
+
+
 def test_gfci_recovers_the_pag_of_gauss_5v():
-    assert sorted(datagen.planted_pag("gauss_5v").oriented_edges()) == _GAUSS_5V_PAG
+    assert _pag_edges("gauss_5v", datagen.planted_pag("gauss_5v")) == _GAUSS_5V_PAG
     out = andrey.gfci(datagen.generate("gauss_5v"))
-    assert sorted(out.structure.oriented_edges()) == _GAUSS_5V_PAG
+    assert _pag_edges("gauss_5v", out.structure) == _GAUSS_5V_PAG
 
 
 # Observed columns a, b, c, d, e of ``confounded_gauss_5v``; h is hidden.
@@ -304,11 +309,11 @@ def test_gfci_recovers_the_planted_pag():
     """The planted PAG has a bidirected edge, and GES on the data has an adjacency it lacks, so
     GFCI's tests must remove it."""
     x = datagen.generate(_LATENT)
-    assert sorted(datagen.planted_pag(_LATENT).oriented_edges()) == _PLANTED_PAG
-    ges = andrey.ges(x).structure
+    assert _pag_edges(_LATENT, datagen.planted_pag(_LATENT)) == _PLANTED_PAG
+    ges = datagen.to_variables(_LATENT, andrey.ges(x).structure)
     adjacent = {frozenset(edge[:2]) for edge in ges.oriented_edges(index=True)}
     assert adjacent - {frozenset(edge[:2]) for edge in _PLANTED_PAG}
-    assert sorted(andrey.gfci(x).structure.oriented_edges()) == _PLANTED_PAG
+    assert _pag_edges(_LATENT, andrey.gfci(x).structure) == _PLANTED_PAG
 
 
 def test_gfci_output_contract():

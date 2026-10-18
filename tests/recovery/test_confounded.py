@@ -35,14 +35,16 @@ _FORK = "confounded_fork_4v"
 _FORK_OBSERVED = "fork_5v_observed"
 
 
-def _assert_pairs_and_edges(out, case: str, mark: str, *, exact_edges: bool = True) -> None:
-    """Check ``out`` against the planted structure of ``case``.
+def _assert_pairs_and_edges(
+    out, case: str, mark: str, *, replicate: int = 0, exact_edges: bool = True
+) -> None:
+    """Check ``out`` against the planted structure of ``case`` at ``replicate``.
 
     The confounded pairs match the structure's ``mark`` edges, and ``metadata`` where the method
     lists them; no other kind of edge appears. The planted direct edges
     are all present, and with ``exact_edges`` no other direct edge appears.
     """
-    edges, pairs = datagen.planted_structure(case)
+    edges, pairs = datagen.planted_structure(case, replicate=replicate)
     found = out.structure.oriented_edges()
     if mark == "bidirected":  # BottomUpParceLiNGAM lists no pairs: its o-o block is unordered
         assert out.metadata["confounded_pairs"] == [list(pair) for pair in sorted(pairs)]
@@ -55,13 +57,13 @@ def _assert_pairs_and_edges(out, case: str, mark: str, *, exact_edges: bool = Tr
 @pytest.mark.parametrize("replicate", _REPLICATES)
 def test_rcd_reports_the_confounded_pair(replicate):
     out = andrey.rcd(datagen.generate(_FORK, replicate=replicate))
-    _assert_pairs_and_edges(out, _FORK, "bidirected")
+    _assert_pairs_and_edges(out, _FORK, "bidirected", replicate=replicate)
 
 
 @pytest.mark.parametrize("replicate", _REPLICATES)
 def test_rcd_reports_no_pair_when_the_cause_is_observed(replicate):
     out = andrey.rcd(datagen.generate(_FORK_OBSERVED, replicate=replicate))
-    _assert_pairs_and_edges(out, _FORK_OBSERVED, "bidirected")
+    _assert_pairs_and_edges(out, _FORK_OBSERVED, "bidirected", replicate=replicate)
 
 
 # BottomUpParceLiNGAM runs at alpha=0.01: at the default 0.1 its Bonferroni-corrected sink test
@@ -72,8 +74,8 @@ def test_rcd_reports_no_pair_when_the_cause_is_observed(replicate):
 @pytest.mark.parametrize("replicate", _REPLICATES)
 def test_bottom_up_parce_lingam_leaves_the_confounded_pair_unordered(replicate):
     out = andrey.bottom_up_parce_lingam(datagen.generate(_FORK, replicate=replicate), alpha=0.01)
-    _assert_pairs_and_edges(out, _FORK, "circle", exact_edges=False)
-    _edges, pairs = datagen.planted_structure(_FORK)
+    _assert_pairs_and_edges(out, _FORK, "circle", replicate=replicate, exact_edges=False)
+    _edges, pairs = datagen.planted_structure(_FORK, replicate=replicate)
     unordered = [set(item) for item in out.metadata["causal_order"] if isinstance(item, list)]
     assert unordered == [set(pair) for pair in sorted(pairs)]
 
@@ -82,7 +84,7 @@ def test_bottom_up_parce_lingam_leaves_the_confounded_pair_unordered(replicate):
 def test_bottom_up_parce_lingam_orders_everything_when_the_cause_is_observed(replicate):
     x = datagen.generate(_FORK_OBSERVED, replicate=replicate)
     out = andrey.bottom_up_parce_lingam(x, alpha=0.01)
-    _assert_pairs_and_edges(out, _FORK_OBSERVED, "circle", exact_edges=False)
+    _assert_pairs_and_edges(out, _FORK_OBSERVED, "circle", replicate=replicate, exact_edges=False)
     assert not any(isinstance(item, list) for item in out.metadata["causal_order"])
 
 
@@ -107,7 +109,7 @@ def test_a_planted_pair_has_no_direct_edge():
 def test_confounded_6v_hides_its_pair_behind_a_direct_edge():
     """``confounded_6v`` hides its confounded pair behind a direct edge, so no pair is planted."""
     edges, pairs = datagen.planted_structure("confounded_6v")
-    assert (1, 2) in edges
+    assert datagen.to_columns("confounded_6v", [(1, 2)]) <= edges  # x1 -> x2
     assert not pairs
 
 

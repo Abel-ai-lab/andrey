@@ -3,6 +3,11 @@
   "case": "var_3v_lag2",
   "input": {
     "case": "var_3v_lag2",
+    "column_order": [
+      0,
+      1,
+      2
+    ],
     "seed": 20240619,
     "sha256": "6d69e0ff0ad3d759188b38795df3e3e3473a4c38d81723ba618f6feadd9ccf73",
     "shape": [

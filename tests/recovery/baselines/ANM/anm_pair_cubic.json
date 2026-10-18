@@ -3,8 +3,12 @@
   "case": "anm_pair_cubic",
   "input": {
     "case": "anm_pair_cubic",
+    "column_order": [
+      1,
+      0
+    ],
     "seed": 20240615,
-    "sha256": "4bb873df682d4d2b0546c7438535bae9880a0c3a8b97973c4b1bd13c723d16d8",
+    "sha256": "a1d2ad6b2ce3a88744c2930b2fc49051aeda31f67556da15f566d4bc3f19e65b",
     "shape": [
       200,
       2
@@ -14,17 +18,17 @@
     "graph": [
       [
         0,
-        1
+        2
       ],
       [
-        2,
+        1,
         0
       ]
     ],
-    "pval_backward": 0.0,
-    "pval_forward": 0.057189819194472635,
-    "stat_backward": 7.533826670052997,
-    "stat_forward": 1.6836339116140204
+    "pval_backward": 0.05718981919445598,
+    "pval_forward": 0.0,
+    "stat_backward": 1.6836339116141026,
+    "stat_forward": 7.53382667005382
   },
   "schema_version": 3
 }

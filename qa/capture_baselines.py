@@ -150,6 +150,7 @@ def capture(args: argparse.Namespace) -> None:
             input_block = {
                 "case": case,
                 "seeds": seeds,
+                "column_order": datagen.column_order(case).tolist(),
                 "shapes": [list(X.shape) for X in groups],
                 "sha256": datagen.input_sha256(case),
             }
@@ -160,6 +161,7 @@ def capture(args: argparse.Namespace) -> None:
             input_block = {
                 "case": case,
                 "seed": datagen.CASES[case]["seed"],
+                "column_order": datagen.column_order(case).tolist(),
                 "shape": list(X.shape),
                 "sha256": datagen.input_sha256(case),
             }
