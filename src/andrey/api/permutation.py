@@ -18,6 +18,7 @@ from andrey.api._adapt import (
     checked_data,
     column_labels,
     copies_named,
+    int_in_range,
     json_safe,
     structure_output,
 )
@@ -229,7 +230,10 @@ def grasp(
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
         be finite and non-negative.
     depth : int, default=3
-        Maximum number of tucks in one chain of moves. Only ``3`` is supported.
+        Maximum number of tucks in one chain of moves, at least ``1``. The depth-first search
+        follows a chain of tucks that leave the score unchanged until one improves it or the chain
+        reaches ``depth`` tucks. ``1`` tries single tucks only; larger depths search more chains,
+        which can reach a better score, and run longer.
     seed : int or None, default=None
         Seed for the random starting order and the order in which the search visits variables.
         ``None`` uses the ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so
@@ -259,16 +263,16 @@ def grasp(
     Raises
     ------
     NotImplementedError
-        If ``score_func`` names no available score, or ``depth`` is not ``3``.
+        If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        If ``depth`` is not an int, ``categorical`` is not a list of column names and positions, or
+        ``max_categories`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
-        suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
-        another up to scale and shift given more than two rows or, with more rows than columns, is a
-        linear function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        If ``depth`` is less than ``1``, ``lambda_value`` is negative or non-finite, or if ``data``
+        or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
+        also if a column repeats another up to scale and shift given more than two rows or, with
+        more rows than columns, is a linear function of other columns. One message names every
+        group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -359,8 +363,7 @@ def grasp(
 
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(f"GRaSP supports {PERMUTATION_SCORES}, not {score_func!r}")
-    if depth != 3:
-        raise NotImplementedError(f"GRaSP supports depth=3, not {depth!r}")
+    depth = int_in_range(depth, "depth", 1)
     X, mask = checked_data(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
@@ -369,6 +372,7 @@ def grasp(
         cpdag, score = _grasp(
             X,
             lambda_value=lambda_value,
+            depth=depth,
             random_state=resolve_seed(seed),
             score_func=score_func,
             categorical=mask,

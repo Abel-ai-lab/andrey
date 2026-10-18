@@ -36,6 +36,8 @@ change names its pull request.
 - `cdnod` takes `dependence_threshold`, which runs CD-NOD's independent-change step (Huang et al.
   2020) to orient edges between variables that both change with the domain index; it is off by
   default. ([#187])
+- `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
+  only 3; smaller depths search less and run faster. ([#190])
 
 ### Changed
 
@@ -309,3 +311,4 @@ First alpha release.
 [#184]: https://github.com/Abel-ai-lab/andrey/pull/184
 [#187]: https://github.com/Abel-ai-lab/andrey/pull/187
 [#189]: https://github.com/Abel-ai-lab/andrey/pull/189
+[#190]: https://github.com/Abel-ai-lab/andrey/pull/190

@@ -9,7 +9,7 @@ import numpy as np
 from andrey_bench.adapters.bic_penalty import ANDREY_LAMBDA, SEARCH_SEED
 
 _DEFAULT_SCORE_FUNC = "local_score_BIC_from_cov"
-#: causal-learn's default tuck-relaxation depth and the only value Andrey implements.
+#: causal-learn's default tuck-relaxation depth, and Andrey's.
 _DEFAULT_DEPTH = 3
 
 
