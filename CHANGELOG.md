@@ -97,6 +97,11 @@ change names its pull request.
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
   dropping the edge. ([#187])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` treat
+  causal-order candidates whose scores differ only by rounding as tied and pick among them by a
+  rank computed from each column's own data, so two interchangeable columns, such as two balanced
+  binary columns, no longer get a different order on another CPU or after reordering the columns.
+  ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 

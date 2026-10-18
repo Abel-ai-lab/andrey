@@ -16,6 +16,7 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.lingam import adjacency, pwling
+from andrey.search.hc import tie_ranks
 
 
 def multi_group_direct_lingam(
@@ -40,12 +41,14 @@ def _find_shared_causal_order(groups: list[np.ndarray], n_features: int) -> list
 
     Mirrors :func:`pwling.find_causal_order` but sums the candidate scores across groups (each
     weighted by ``n_g / total_n``) and residualizes every group independently against the pick.
+    Ties are broken by :func:`~andrey.search.hc.tie_ranks` of the stacked input groups.
     """
     total_n = sum(len(X) for X in groups)
     remaining = list(range(n_features))
     order: list[int] = []
     # Copy + float64 so the in-place residual write-back never truncates.
     residualized = [np.array(X, dtype=np.float64) for X in groups]
+    ranks = tie_ranks(np.vstack(groups))
 
     while remaining:
         if len(remaining) == 1:
@@ -54,7 +57,7 @@ def _find_shared_causal_order(groups: list[np.ndarray], n_features: int) -> list
             neg_mg = np.zeros(len(remaining), dtype=np.float64)
             for X in residualized:
                 neg_mg += (len(X) / total_n) * pwling.score_candidates(X, remaining)
-            m = remaining[int(np.argmax(neg_mg))]
+            m = pwling.pick(neg_mg, remaining, ranks)
         for X in residualized:
             for i in remaining:
                 if i != m:

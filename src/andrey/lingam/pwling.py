@@ -13,6 +13,12 @@ from collections.abc import Callable
 import numpy as np
 
 from andrey.core import stats
+from andrey.search.hc import tie_ranks
+
+# A score is ``-sum_j min(0, diff_j)^2``, so ``sqrt(-score)`` is the norm of the negative entropy
+# differences, and rounding moves it by at most the norm of their rounding errors. Mathematically
+# tied candidates measure < 1e-12 apart in this norm and distinct ones > 5e-10 apart.
+_TIE_TOL = 1e-10
 
 
 def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -34,8 +40,8 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
 
     Returns an array aligned with ``U``: ``score(i) = -sum_j min(0, diff_mi(i, j))^2`` with
     ``diff_mi(i, j) = (H(x_j) + H(r_{i|j})) - (H(x_i) + H(r_{j|i}))`` on standardized columns.
-    Entropy is batched over a stack of residuals; DirectLiNGAM takes the ``argmax``, MultiGroup
-    sums across groups. Order-exactness needs the float64 entropy path -- on a float32 device
+    Entropy is batched over a stack of residuals; :func:`pick` chooses the best, MultiGroup sums
+    across groups first. Order-exactness needs the float64 entropy path -- on a float32 device
     (atol 1e-3) a near-tie could flip the pick, so pin ``ANDREY_DEVICE=numpy`` for exact order.
     """
     cols = np.asarray(U)
@@ -84,26 +90,41 @@ def score_candidates_serial(X: np.ndarray, U: list[int]) -> np.ndarray:
     return scores
 
 
+def pick(scores: np.ndarray, candidates: list[int], ranks: np.ndarray) -> int:
+    """The candidate with the highest score; the lowest ``ranks`` entry among tied candidates.
+
+    ``scores`` are aligned with ``candidates`` and ``<= 0``; two tie when their ``sqrt(-score)``
+    values both lie within ``_TIE_TOL`` of the best one. ``ranks`` is indexed by column, as
+    :func:`~andrey.search.hc.tie_ranks` returns for the input data.
+    """
+    norm = np.sqrt(-scores)
+    tied = np.flatnonzero(norm <= norm.min() + _TIE_TOL)
+    return min((candidates[t] for t in tied), key=lambda c: ranks[c])
+
+
 def find_causal_order(
     X: np.ndarray,
     *,
     scores: Callable[[np.ndarray, list[int]], np.ndarray] = score_candidates,
 ) -> list[int]:
-    """Peel exogenous variables (``argmax`` of ``scores``) one at a time, residualizing the rest.
+    """Peel exogenous variables (:func:`pick` of ``scores``) one at a time, residualizing the rest.
 
-    ``scores(X, U) -> array aligned with U`` is injectable. Single-dataset; MultiGroupDirectLiNGAM
-    runs its own group loop (per-group residualization), reusing :func:`score_candidates` and
-    :func:`compute_residual` directly.
+    ``scores(X, U) -> array aligned with U`` is injectable. Ties are broken by
+    :func:`~andrey.search.hc.tie_ranks` of the input columns, which are identical on every machine
+    and keep their ranks when the columns are reordered; residualized columns differ in the last
+    bits across machines. Single-dataset; MultiGroupDirectLiNGAM runs its own group loop
+    (per-group residualization), reusing :func:`score_candidates` and :func:`pick` directly.
     """
     remaining = list(range(X.shape[1]))
     order: list[int] = []
     residualized = np.array(X, dtype=np.float64)  # copy + float64: the write-back must not truncate
+    ranks = tie_ranks(residualized)
     while remaining:
         # The last variable needs no scoring (and one candidate has no pair to score).
         if len(remaining) == 1:
             m = remaining[0]
         else:
-            m = remaining[int(np.argmax(scores(residualized, remaining)))]
+            m = pick(scores(residualized, remaining), remaining, ranks)
         for i in remaining:
             if i != m:
                 residualized[:, i] = compute_residual(residualized[:, i], residualized[:, m])
