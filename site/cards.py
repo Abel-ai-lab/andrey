@@ -36,7 +36,7 @@ QUALITY = 75  # about 20 KB under MAX_BYTES at 75, 11 KB at 76, 1 KB at 77. No b
 # LinkedIn shows a card at 480 px wide, where 92 px becomes about 37.
 TITLE_FITS = ((92, 2), (72, 3))
 TITLE_WIDTH = 1040
-# The accent word (``ACCENT`` on the homepage's card and the README banner) is drawn at rest, as the
+# An accent word (``ACCENT`` on the homepage's card and the README banner) is drawn at rest, as the
 # homepage's motion ends: amber, slanted like Inter's italic, and sharp, with the trace of its
 # letters on its right: copies of the word behind it, each further right and fainter, blurred
 # sideways and fading out by TRAIL past its end, inside the space before the next word. ROOM is
@@ -164,20 +164,26 @@ def _accent(word: str, x: float, y: float, size: int, key: str) -> tuple[str, st
 
 
 def _title(
-    lines: list[str], size: int, middles: list[float], x0: float, accent: str, *, left: bool = False
+    lines: list[str],
+    size: int,
+    middles: list[float],
+    x0: float,
+    accents: tuple[str, ...],
+    *,
+    left: bool = False,
 ) -> str:
     """``lines`` in white, each centered on ``x0`` (or starting at it, when ``left``) at its middle
-    in ``middles``; each word equal to ``accent`` drawn as the accent, with its trace's space added
+    in ``middles``; each word in ``accents`` drawn as an accent, with its trace's space added
     after it."""
     space = _width(" ", size, "SemiBold")
     defs, drawing = [], []
     for row, (line, y) in enumerate(zip(lines, middles, strict=True)):
         words = line.split(" ")
         widths = [_width(word, size, "SemiBold") for word in words]
-        rooms = [size * ROOM if accent and word == accent else 0 for word in words]
+        rooms = [size * ROOM if word in accents else 0 for word in words]
         x = x0 if left else x0 - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
         for i, (word, width, room) in enumerate(zip(words, widths, rooms, strict=True)):
-            if accent and word == accent:
+            if word in accents:
                 more, drawn = _accent(word, x, y, size, f"accent-{row}-{i}")
                 defs.append(more)
                 drawing.append(drawn)
@@ -187,8 +193,8 @@ def _title(
     return f"<defs>{''.join(defs)}</defs>{''.join(drawing)}"
 
 
-def card_svg(title: str, accent: str = "") -> str:
-    """The card as SVG: ``title`` on up to three lines, each word equal to ``accent`` drawn as the
+def card_svg(title: str, accents: tuple[str, ...] = ()) -> str:
+    """The card as SVG: ``title`` on up to three lines, each word in ``accents`` drawn as an
     accent.
 
     Raises ``ValueError`` when the title does not fit, rather than dropping any of it.
@@ -208,7 +214,7 @@ def card_svg(title: str, accent: str = "") -> str:
         f'<image href="data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}" '
         f'width="{W}" height="{H}"/>'
     )
-    text = _title(lines, size, [top + i * lead for i in range(len(lines))], W / 2, accent)
+    text = _title(lines, size, [top + i * lead for i in range(len(lines))], W / 2, accents)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}">'
         f"{ground}{text}{_credit()}</svg>"
@@ -235,9 +241,9 @@ def _jpeg(svg: str, quality: int) -> bytes:
     return out.getvalue()
 
 
-def card_jpeg(title: str, accent: str = "", quality: int = QUALITY) -> bytes:
+def card_jpeg(title: str, accents: tuple[str, ...] = (), quality: int = QUALITY) -> bytes:
     """The card as a JPEG."""
-    return _jpeg(card_svg(title, accent), quality)
+    return _jpeg(card_svg(title, accents), quality)
 
 
 BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at twice that
@@ -245,8 +251,9 @@ BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at
 # at the README's width, so their corners match.
 BANNER_RADIUS = 27
 BANNER_QUALITY = 65  # its base64 inside the SVG is about 290 KB, under MAX_BYTES
-TAGLINE = "The fastest causal discovery package"
-ACCENT = "fastest"  # the tagline's word drawn as the accent, on the homepage's card and the banner
+TAGLINE = "Accelerated, accurate, agentic causal discovery"
+# The tagline's words drawn as accents, on the homepage's card and the banner: the three A's.
+ACCENT = ("Accelerated,", "accurate,", "agentic")
 
 
 def banner_svg() -> str:
@@ -554,7 +561,7 @@ KIT_ICON = 512  # the icon PNGs' side
 KIT_AVATAR = 1024  # the avatar's side
 # The repository's social preview, at GitHub's recommended size; GitHub takes files up to 1 MB.
 SOCIAL_W, SOCIAL_H = 1280, 640
-SOCIAL_TITLE = 100  # the tagline's size, on two lines
+SOCIAL_TITLE = 84  # the tagline's size, on two lines between the side margins
 SOCIAL_LINK = 28  # the site's address at the bottom
 SOCIAL_QUALITY = 85
 KIT_NOTE = """Andrey brand kit
@@ -590,9 +597,9 @@ def _kit_icon(ink: str, ground: str | None = None) -> str:
 
 
 def social_svg() -> str:
-    """The repository's social preview: the wordmark, the tagline with ``ACCENT`` drawn as the
-    accent, and the site's address at the bottom, over the lanes art."""
-    lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_W, 2)
+    """The repository's social preview: the wordmark, the tagline with ``ACCENT`` drawn as
+    accents, and the site's address at the bottom, over the lanes art."""
+    lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_W - 2 * BANNER_LEFT, 2)
     step = round(SOCIAL_TITLE * 1.14)
     top = SOCIAL_H / 2 - (len(lines) - 1) * step / 2 + 10
     middles = [top + i * step for i in range(len(lines))]

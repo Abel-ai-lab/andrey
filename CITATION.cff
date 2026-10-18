@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use Andrey in your work, please cite it."
-title: "Andrey: The fastest causal discovery package"
+title: "Andrey: Accelerated, accurate, agentic causal discovery"
 type: software
 authors:
   - name: Abel AI Lab
