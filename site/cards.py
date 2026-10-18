@@ -315,6 +315,7 @@ ART = {
         "methods",
         "tide",
         "abacus",
+        "punch-cards",
     )
 }
 CENTERED = {kind: BRAND / f"art-{kind}-center.jpg" for kind in ("tide",)}
@@ -330,6 +331,7 @@ COVERS = {
     "methods": "a prism fanning one beam into many rays, one amber",
     "tide": "the moon over a swelling sea, its light an amber path on the waves",
     "abacus": "an abacus seen at an angle, one bead amber",
+    "punch-cards": "a shuffled fan of punch cards, one card amber",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge, at the cover's height
