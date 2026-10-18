@@ -261,9 +261,10 @@ methods, and draw the learned graph beside the known one.
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
 per sample and one column per variable. Most methods take that one argument and return the same
-kind of result; `cdnod` also takes a domain index, and `multi_group_direct_lingam` and
-`longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
-{doc}`graph-types` explains which graph each one returns.
+kind of result; `cdnod` also takes a domain index, `gies` also takes which variables were
+intervened on in each row, and `multi_group_direct_lingam` and `longitudinal_lingam` take a list of
+datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph each one
+returns.
 
 ## Data types
 
@@ -324,9 +325,9 @@ JSON result lists the categorical columns under `metadata.categorical` and the w
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
 `ANDREY_BACKEND` and `ANDREY_NUM_WORKERS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
-worker, GES, GIES, and GFCI scan each pass in worker processes, and GES returns the same graph as it
-does serially. `granger` fits its variables on worker threads, with the same coefficients, and
-needs none of the guard below.
+worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
+serially. `granger` fits its variables on worker threads, with the same coefficients, and needs
+none of the guard below.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_NUM_WORKERS` above 1, or `-1` for every core) must put its entry

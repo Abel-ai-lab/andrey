@@ -38,7 +38,8 @@ def write_structure(out: str | Path, run_id: str, structure) -> None:
 
     A temporal structure is written as its ``(L, n, n)`` link stack, with the kind ``temporal``, a
     window graph as its window marks, with the kind ``temporal_window``, and a coefficient stack as
-    its coefficients, with the kind ``coefficients``.
+    its coefficients, with the kind ``coefficients``. A graph with latent nodes of its own, such as
+    GIN's, keeps its node types.
     """
     from andrey import TemporalStructure
 
@@ -69,11 +70,13 @@ def write_structure(out: str | Path, run_id: str, structure) -> None:
             n_nodes=np.asarray(structure.n_nodes),
         )
         return
+    types = getattr(structure, "node_types", None)
     np.savez_compressed(
         path,
         edges=np.asarray(structure.to_edges()),
         kind=np.asarray(structure.kind),
         n_nodes=np.asarray(structure.n_nodes),
+        **({} if types is None else {"node_types": np.asarray(types)}),
     )
 
 
@@ -91,7 +94,14 @@ def read_structure(out: str | Path, run_id: str):
             return CoefficientStack(z["stack"], kind=str(z["stack_kind"]))
         if str(z["kind"]) == "temporal_window":
             return WindowGraph(z["marks"], lag0=str(z["lag0"]))
-        return GraphStructure.from_edges(z["edges"], n_nodes=int(z["n_nodes"]), kind=str(z["kind"]))
+        graph = GraphStructure.from_edges(
+            z["edges"], n_nodes=int(z["n_nodes"]), kind=str(z["kind"])
+        )
+        if "node_types" not in z:
+            return graph
+        return GraphStructure.from_numpy(
+            graph.to_numpy(), kind=graph.kind, node_types=z["node_types"].copy()
+        )
 
 
 def part_path(records_dir: str | Path, dataset_id: str, name: str, environment_id: str) -> Path:

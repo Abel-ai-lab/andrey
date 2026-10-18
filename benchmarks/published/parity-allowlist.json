@@ -2,7 +2,7 @@
   "about": "Published rows where the reference package has fewer errors than Andrey, each with its cause. qa/reference_parity.py accepts an entry only when its cause is correct-by-paper, reference-defect, or tie-break, it gives a reason and a citation, and it pins the row's current error values; a tie-break entry's evidence gives the row's error values with the columns in reversed order, where the row passes.",
   "entries": [
     {
-      "summary": "alpha-2026-09",
+      "summary": "0.1.0",
       "method": "FCI",
       "comparator": "causal-learn",
       "row": {"d": 50},
@@ -13,7 +13,7 @@
       "citation": "causal-learn 0.1.4.8 (MIT): causallearn/graph/GraphNode.py, GraphNode.__hash__ returns hash(self.name); causallearn/search/ConstraintBased/FCI.py, getPossibleDsep iterates set(graph.get_adjacent_nodes(x)). Possible-D-Sep: Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search, 2nd ed. MIT Press."
     },
     {
-      "summary": "alpha-2026-09",
+      "summary": "0.1.0",
       "method": "FCI",
       "comparator": "causal-learn",
       "row": {"d": 100},
@@ -24,7 +24,7 @@
       "citation": "Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the presence of latent confounders and selection bias. Artificial Intelligence 172(16-17), 1873-1896. causal-learn 0.1.4.8 (MIT): causallearn/search/ConstraintBased/FCI.py, the orientation loop and getPossibleDsep."
     },
     {
-      "summary": "score-search-2026-10",
+      "summary": "0.3.0",
       "method": "Hill climbing",
       "comparator": "bnlearn",
       "row": {"mean_degree": 2.0, "d": 50, "n": 500},
@@ -35,7 +35,7 @@
       "citation": "Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2), 461-464. Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3, 507-554."
     },
     {
-      "summary": "time-series-2026-10",
+      "summary": "0.5.0",
       "method": "VARMA-LiNGAM",
       "comparator": "lingam",
       "row": {"d": 10, "n": 100},
@@ -46,7 +46,7 @@
       "citation": "lingam 1.13.0 (MIT): lingam/varma_lingam.py, VARMALiNGAM._pruning, np.roll(X, p, axis=0) and np.roll(ee, q + 1, axis=0). Hyvarinen, A., Zhang, K., Shimizu, S., and Hoyer, P. O. (2010). Estimation of a structural vector autoregression model using non-Gaussianity. JMLR 11, 1709-1731, Sect. 2.1-2.2, Eqs. (1) and (3): x(t) regressed on x(t - tau) for observed t = 1, ..., T. Kawahara, Y., Shimizu, S., and Washio, T. (2011). Analyzing relationships among ARMA processes based on non-Gaussianity of external influences. Neurocomputing 74(12-13), 2212-2221."
     },
     {
-      "summary": "time-series-2026-10",
+      "summary": "0.5.0",
       "method": "VARMA-LiNGAM",
       "comparator": "lingam",
       "row": {"d": 20, "n": 300},
@@ -57,7 +57,7 @@
       "citation": "lingam 1.13.0 (MIT): lingam/varma_lingam.py, VARMALiNGAM._pruning, np.roll(X, p, axis=0) and np.roll(ee, q + 1, axis=0). Hyvarinen, A., Zhang, K., Shimizu, S., and Hoyer, P. O. (2010). Estimation of a structural vector autoregression model using non-Gaussianity. JMLR 11, 1709-1731, Sect. 2.1-2.2, Eqs. (1) and (3): x(t) regressed on x(t - tau) for observed t = 1, ..., T. Kawahara, Y., Shimizu, S., and Washio, T. (2011). Analyzing relationships among ARMA processes based on non-Gaussianity of external influences. Neurocomputing 74(12-13), 2212-2221."
     },
     {
-      "summary": "time-series-2026-10",
+      "summary": "0.5.0",
       "method": "LPCMCI",
       "comparator": "tigramite",
       "row": {"d": 20, "observed": 14, "n": 500},
@@ -68,7 +68,7 @@
       "citation": "Gerhardus and Runge (2020), High-recall causal discovery for autocorrelated time series with latent confounders, NeurIPS; Supplement S5 (Algorithm S2 line 7; order-independent separating sets)."
     },
     {
-      "summary": "data-types-2026-10",
+      "summary": "0.6.0",
       "method": "GES on mixed data, degenerate Gaussian score",
       "comparator": "Tetrad",
       "row": {"mean_degree": 2.0, "d": 10, "n": 2000},
@@ -79,7 +79,7 @@
       "citation": "Chickering, D. M. (2002). Optimal structure identification with greedy search. JMLR 3, 507-554. Ramsey, J., Glymour, M., Sanchez-Romero, R., and Glymour, C. (2017). A million variables and more: the fast greedy equivalence search algorithm. IJDSA 3(2), 121-129. Andrews, B., Ramsey, J., and Cooper, G. F. (2019). Learning high-dimensional directed acyclic graphs with mixed data-types. PMLR 104, 4-21. Tetrad 7.6.3 (GPL), tetrad-lib edu/cmu/tetrad/search/score/DegenerateGaussianScore.java, localScore; Tetrad 7.6.10, the same file, and edu/cmu/tetrad/search/Fges.java, search."
     },
     {
-      "summary": "data-types-2026-10",
+      "summary": "0.6.0",
       "method": "Hill climbing on discrete data, BDeu score",
       "comparator": "pgmpy",
       "row": {"mean_degree": 2.0, "d": 10, "n": 2000},
@@ -102,7 +102,7 @@
       }
     },
     {
-      "summary": "data-types-2026-10",
+      "summary": "0.6.0",
       "method": "Hill climbing on discrete data, BDeu score",
       "comparator": "pgmpy",
       "row": {"mean_degree": 2.0, "d": 20, "n": 2000},
@@ -125,7 +125,7 @@
       }
     },
     {
-      "summary": "data-types-2026-10",
+      "summary": "0.6.0",
       "method": "Hill climbing on discrete data, BDeu score",
       "comparator": "pgmpy",
       "row": {"mean_degree": 2.0, "d": 40, "n": 2000},
@@ -148,7 +148,7 @@
       }
     },
     {
-      "summary": "data-types-2026-10",
+      "summary": "0.6.0",
       "method": "Hill climbing on discrete data, BIC score",
       "comparator": "pgmpy",
       "row": {"mean_degree": 2.0, "d": 20, "n": 2000},

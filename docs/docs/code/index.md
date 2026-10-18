@@ -13,10 +13,11 @@ and the dataset loaders and simulators of `andrey.data` - generated from the sou
 
 ## Structure-learning methods
 
-Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with three
-exceptions: `cdnod` also takes a domain index, `longitudinal_lingam` takes a list of datasets, and
-`multi_group_direct_lingam` takes a list of datasets and returns one result per dataset. Each
-method is either supported or experimental; `andrey list` prints the status.
+Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with four
+exceptions: `cdnod` also takes a domain index, `gies` also takes which variables were intervened on
+in each row, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes
+a list of datasets and returns one result per dataset. Each method is either supported or
+experimental; `andrey list` prints the status.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column names.
@@ -27,9 +28,13 @@ settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_sc
 `"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
 [Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
 needs whole numbers. Methods that score with BIC also reject a column that repeats another up to
-scale and shift or, given more rows than columns, is a linear function of other columns. Other data
-raises a `ValueError` that names the argument and, for a bad cell, its row and column. A single
-column gives a one-node graph.
+scale and shift or, given more rows than columns, is a linear function of other columns. Copies of
+one variable cannot be told apart, so one `ValueError` names every group of copies, such as `x2`
+and `x7` repeating `x1`, and asks you to keep one column per group and read its edges as the
+group's; no option drops or merges the copies for you. A partial-correlation test in `pc`, `fci`,
+`gfci`, or `cdnod` that meets a singular correlation matrix from copies names the groups the same
+way. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
+column. A single column gives a one-node graph.
 
 `pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
 `"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`
@@ -40,11 +45,12 @@ and `"cond_gauss"` for mixed data.
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
 workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs),
-[0.2.0](../benchmarks/0.2.0.md#known-limits), [0.3.0](../benchmarks/0.3.0.md#known-limits), and
-[0.5.0](../benchmarks/0.5.0.md#known-limits) release cards show where a method scores worse than
-the empty graph, as ICA-LiNGAM does at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from
-8 observed variables, hill climbing and Tabu search do from 50 variables with ten rows per
-variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 time steps.
+[0.2.0](../benchmarks/0.2.0.md#known-limits), [0.3.0](../benchmarks/0.3.0.md#known-limits),
+[0.5.0](../benchmarks/0.5.0.md#known-limits), and [0.7.0](../benchmarks/0.7.0.md#limits) release
+cards show where a method scores worse than the empty graph, or about as well, as ICA-LiNGAM does
+at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, hill climbing
+and Tabu search do from 50 variables with ten rows per variable, PCMCI does from 40 series, Granger
+does from 20 series at 1,000 time steps, and GES does at 200 variables with ten rows per variable.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -55,18 +61,25 @@ variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 ti
 
    pc
    fci
+   gfci
+   cdnod
    ges
+   gies
    xges
    hc
    tabu
+   exact_search
+   calm
    boss
    grasp
    direct_lingam
    ica_lingam
+   multi_group_direct_lingam
    anm
    pnl
    rcd
    bottom_up_parce_lingam
+   gin
    varma_lingam
    longitudinal_lingam
    pcmci
@@ -84,26 +97,10 @@ on the order their search visits nodes; the default, `"fast"`, builds them in th
 
 ### Experimental methods
 
-These methods ship and pass recovery tests, but have no published benchmark. Their API may change
-without deprecation, and each warns with {py:class}`~andrey.ExperimentalWarning` on its first call
-in a process.
-
-```{eval-rst}
-.. autosummary::
-   :toctree: generated
-   :nosignatures:
-
-   gfci
-   cdnod
-   gies
-   exact_search
-   calm
-   multi_group_direct_lingam
-   gin
-   camuv
-```
-
-A method becomes supported once it has:
+Every method is supported. A new method ships as experimental: it passes recovery tests but has no
+published benchmark, its API may change without deprecation, and it warns with
+{py:class}`~andrey.ExperimentalWarning` on its first call in a process. It becomes supported once it
+has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
   in its release's [release card](../benchmarks.md);

@@ -8,8 +8,6 @@ when any final endpoint mark differs from the fit in the original order. Fits us
 settings on numpy, with one worker and one BLAS thread.
 """
 
-import warnings
-
 import numpy as np
 from threadpoolctl import threadpool_limits
 
@@ -49,7 +47,6 @@ def changes(method: str, x: np.ndarray, seed: int) -> int:
 
 
 if __name__ == "__main__":
-    warnings.simplefilter("ignore", andrey.ExperimentalWarning)  # GFCI is experimental
     with andrey.config(backend="numpy", num_workers=1), threadpool_limits(limits=1):
         grid = list(models())
         for method in ("fci", "gfci"):

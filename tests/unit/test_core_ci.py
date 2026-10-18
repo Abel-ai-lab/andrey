@@ -10,6 +10,7 @@ partial correlation with a Student-t p-value, checked against a direct scipy com
 
 from __future__ import annotations
 
+import re
 import sys
 from itertools import combinations
 
@@ -18,6 +19,7 @@ import pytest
 from scipy import stats
 from scipy.special import ndtr
 
+import andrey
 from andrey.core import ci
 from andrey.core.ci import FisherZ, StudentT
 
@@ -238,6 +240,43 @@ def test_a_singular_submatrix_raises_the_singular_error_type():
     with pytest.raises(ci.SingularCorrelationError):
         StudentT(X).statistic_pvalues(np.array([1]), np.array([2]), np.array([[0, 4]]))
     assert issubclass(ci.SingularCorrelationError, ValueError)
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_a_singular_submatrix_from_copies_names_every_group(test_class):
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((100, 8))
+    X[:, 2] = 2.0 * X[:, 1] + 1.0
+    X[:, 7] = -X[:, 1]
+    X[:, 5] = 3.0 * X[:, 3] - 2.0
+    test = test_class(X)
+    for query in (lambda: test(0, 4, [1, 2]), lambda: test.batched_call(0, 4, [[1, 2], [3, 6]])):
+        with pytest.raises(ci.SingularCorrelationError) as error:
+            query()
+        assert error.value.groups == ((1, 2, 7), (3, 5))
+        assert re.search(r"\b2 and 7 repeat 1\b", str(error.value))
+        assert re.search(r"\b5 repeats 3\b", str(error.value))
+        assert "keep one column" in str(error.value)
+
+
+def test_a_singular_submatrix_without_copies_names_no_group():
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((100, 5))
+    X[:, 4] = X[:, 2] - X[:, 3]
+    with pytest.raises(ci.SingularCorrelationError, match="singular") as error:
+        StudentT(X)(0, 1, [2, 3, 4])
+    assert error.value.groups == ()
+
+
+def test_pc_names_copies_by_column_name_when_a_test_meets_them():
+    pd = pytest.importorskip("pandas")
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(1000)
+    b = x + rng.standard_normal(1000)
+    y = x + b + rng.standard_normal(1000)
+    frame = pd.DataFrame({"x": x, "b": b, "y": y, "b2": 2.0 * b + 1.0})
+    with pytest.raises(ci.SingularCorrelationError, match=r"'b2' repeats 'b'"):
+        andrey.pc(frame)
 
 
 def test_too_few_samples_raises_value_error():

@@ -18,11 +18,11 @@ from andrey.api._adapt import (
     check_categories,
     checked_data,
     column_labels,
+    copies_named,
     data_kind,
     open_unit_interval,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -101,7 +101,9 @@ def pc(
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``.
+        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. When
+        copies of a column, up to scale and shift, make that matrix singular, the message names
+        every group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -255,9 +257,10 @@ def pc(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    cpdag = _pc(
-        X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
-    )
+    with copies_named(labels):
+        cpdag = _pc(
+            X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+        )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
     )
@@ -336,9 +339,11 @@ def fci(
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int.
     ValueError
-        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
-        is not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice,
-        or if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`.
+        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
+        not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice, or
+        if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. When
+        copies of a column, up to scale and shift, make that matrix singular, the message names
+        every group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -443,14 +448,15 @@ def fci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pag = _fci(
-        X,
-        alpha=alpha,
-        indep_test=indep_test,
-        collider_rule=collider_rule,
-        categorical=mask,
-        possible_dsep=possible_dsep,
-    )
+    with copies_named(labels):
+        pag = _fci(
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=possible_dsep,
+        )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
     )
@@ -470,9 +476,10 @@ def gfci(
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
-    GFCI [1]_ builds a skeleton with score-based GES, then applies FCI orientation to account for
-    possible latent confounding. Its scored skeleton is usually more accurate than FCI's test-only
-    one.
+    GFCI [1]_ starts from the adjacencies of a score-based GES search, removes those that
+    conditional-independence tests reject, and orients the endpoints with FCI's rules to account
+    for possible latent confounding. Its scored skeleton is usually more accurate than FCI's
+    test-only one.
 
     Parameters
     ----------
@@ -498,12 +505,14 @@ def gfci(
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
-        How GFCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
-        are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the recorded
-        separating set of ``x`` and ``y``. ``"majority"`` tests ``x`` and ``y`` given every subset
-        of ``x``'s neighbors and every subset of ``y``'s neighbors, and makes it a collider when
-        fewer than half of the separating subsets (``p >= alpha``) contain ``z`` [3]_; at exactly
-        half the triple stays unoriented. Majority runs up to ``2**degree`` extra tests per triple.
+        How GFCI decides whether ``z`` is a collider on a triple ``x - z - y`` where the tests
+        removed the GES edge between ``x`` and ``y``; on the other triples whose ends are not
+        adjacent, the GES CPDAG decides (see Notes). ``"sepsets"`` makes it a collider when ``z``
+        is not in the recorded separating set of ``x`` and ``y``. ``"majority"`` tests ``x`` and
+        ``y`` given every subset of ``x``'s neighbors and every subset of ``y``'s neighbors, and
+        makes it a collider when fewer than half of the separating subsets (``p >= alpha``)
+        contain ``z`` [3]_; at exactly half the triple stays unoriented. Majority runs up to
+        ``2**degree`` extra tests per triple.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and
@@ -543,13 +552,11 @@ def gfci(
         ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
         ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
         column repeats another up to scale and shift given more than two rows or, with more rows
-        than columns, is a linear function of other columns.
+        than columns, is a linear function of other columns. One message names every group of copies
+        and says to keep one column per group.
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When the mixed-data score and test infers the categorical columns, or finds none and so runs
         as the linear-Gaussian form, or when a continuous setting meets columns that look like
@@ -557,11 +564,17 @@ def gfci(
 
     Notes
     -----
-    GFCI keeps the adjacencies of the GES CPDAG and tests each non-adjacent pair given subsets of
-    the two endpoints' neighbors to find its separating set. FCI's possible-d-separation step can
-    remove more edges but never adds one, so the PAG's adjacencies are a subset of the GES CPDAG's.
-    Zhang's rules R1-R10 [2]_ then orient the endpoints; an endpoint no rule resolves stays a
-    circle.
+    GFCI first runs :func:`~andrey.ges` and keeps its CPDAG. FCI's adjacency search then starts
+    from the CPDAG's adjacencies instead of a complete graph: it removes an edge ``x - y`` when a
+    subset of ``x``'s or ``y``'s neighbors makes the two independent, and records that subset as
+    their separating set. On a triple ``x - z - y`` whose ends are not adjacent, ``z`` is a
+    collider when the CPDAG has ``x -> z <- y``; when the CPDAG had the edge ``x - y``, the
+    separating set decides, as ``collider_rule`` describes. FCI's possible-d-separation step can
+    remove more edges, after which the colliders are decided again. No step adds an edge, so the
+    PAG's adjacencies are a subset of the GES CPDAG's. Zhang's rules R1-R10 [2]_ then orient the
+    endpoints; an endpoint no rule resolves stays a circle. A rule that needs the separating set
+    of a pair GES left non-adjacent uses the first subset, by increasing size, of the two
+    endpoints' CPDAG neighbors that makes the pair independent.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
@@ -574,16 +587,20 @@ def gfci(
     ends, against all the nodes it was reached from, so the set does not depend on that order, and
     it can be larger.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
-    and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2) with one variable in ten hidden, from 20 to 200 variables counting the hidden ones (18
+    to 180 observed), with ten rows per variable. Its median endpoint errors, each mismatched tail,
+    arrowhead, or circle, stayed below the empty graph's at every size (197 against 444 at 180
+    observed variables). The median fit took 0.54 s at 90 observed variables and 2.6 s at 180, on 4
+    cores. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
     linear relations with Gaussian noise. With fewer rows than columns the BIC score is
     unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
     GES search never selects one, nor any parent set that leaves its child a residual variance of at
     most ``1e-12`` times its variance. Rule R5 has the search bound described under
     :func:`~andrey.fci`. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
-    data the result can still depend on the column order. With the mixed-data score and test, its
-    tests run it on 5 variables with 3,000 rows.
+    data the result can still depend on the column order. With the mixed-data score and test, it is
+    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -607,7 +624,6 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    warn_experimental("gfci")
     from andrey.search.gfci import gfci as _gfci
 
     # Both phases read the same data, so the score and the test must agree on its type.
@@ -624,16 +640,17 @@ def gfci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pag = _gfci(
-        X,
-        score_func=score_func,
-        lambda_value=lambda_value,
-        alpha=alpha,
-        indep_test=indep_test,
-        collider_rule=collider_rule,
-        categorical=mask,
-        possible_dsep=possible_dsep,
-    )
+    with copies_named(labels):
+        pag = _gfci(
+            X,
+            score_func=score_func,
+            lambda_value=lambda_value,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=possible_dsep,
+        )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
     )
@@ -641,14 +658,16 @@ def gfci(
 
 def cdnod(
     data: npt.ArrayLike,
-    c_indx: npt.ArrayLike,
+    domain_index: npt.ArrayLike,
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    collider_order: str = "p_value",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    dependence_threshold: float | None = None,
 ) -> StructureOutput:
-    """Learn a CPDAG over the data variables from nonstationary / multi-domain data with CDNOD.
+    """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
     CDNOD [1]_ adds a domain/context index as an extra causal parent, so distribution shifts
     across regimes are modeled, then runs PC-style discovery. Use it when samples are pooled across
@@ -660,7 +679,7 @@ def cdnod(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    c_indx : array-like of shape (n_samples,) or (n_samples, 1)
+    domain_index : array-like of shape (n_samples,) or (n_samples, 1)
         Domain or context index of each row of ``data``, such as ``0`` and ``1`` for two domains, or
         the time step for data that drift over time. Coerced to ``float64``; whole numbers with
         ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. See Notes for more than two
@@ -674,6 +693,11 @@ def cdnod(
         (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
         coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data, as for
         :func:`~andrey.pc`; see Notes for the index.
+    collider_order : {"p_value", "column"}, default="p_value"
+        The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
+        largest p-value that separated each collider's endpoints, so the colliders do not depend on
+        the column order, and ``"column"`` in column order. Under either order, the edges out of
+        the index are directed first, and no collider puts an arrowhead at the index.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -685,15 +709,24 @@ def cdnod(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    dependence_threshold : float or None, default=None
+        Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
+        dependence measure: two modules whose measure is at most the threshold count as changing
+        independently. ``None`` skips the step. See Notes.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
+        Wraps a :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
         ``metadata["algorithm"]`` is ``"CDNOD"``. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        undirected (``--``) the ones left open. The graph is partially directed, not the CPDAG of
+        an observational equivalence class: the index orients edges that the true DAG's CPDAG
+        leaves undirected, and the graph stands for the DAGs that agree on every direction CD-NOD
+        can identify [1]_. Andrey has no kind for such a graph, so it is tagged ``cpdag``, and
+        :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result
+        against the graph CD-NOD can identify instead.
+        Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
+        read, by name or 0-based position.
 
     Raises
     ------
@@ -703,16 +736,15 @@ def cdnod(
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int.
     ValueError
-        If ``c_indx`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
-        ``data`` has too few rows for a test, if ``alpha`` is not in ``(0, 1)``, if ``data`` or
-        ``categorical`` does not suit the test, as for :func:`~andrey.pc`, or, with a categorical
-        or mixed-data test, if ``c_indx`` holds a value that is not a whole number.
+        If ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` /
+        ``inf``, if ``data`` has too few rows for a test, if ``alpha`` or ``dependence_threshold``
+        is not in ``(0, 1)``, if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index`` holds a
+        value that is not a whole number. Also if ``collider_order`` is not ``"p_value"`` or
+        ``"column"``.
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When a mixed-data test infers the categorical columns, or finds none and so runs as the
         linear-Gaussian form, or when a continuous setting meets columns that look like category
@@ -725,18 +757,56 @@ def cdnod(
     orient edges that PC leaves undirected on the same data.
 
     ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
-    find a shift only when the shift follows the index's values. With two domains the coding does
-    not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
-    undetected, and recoding the domains can change the result. ``"chisq"``, ``"gsq"``,
-    ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they find a
-    shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the index
-    is categorical, so every data column may be continuous.
+    find a change in a variable's mean that follows the index's values. With two domains the coding
+    does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
+    undetected, and recoding the domains can change the result. A change in a variable's noise
+    variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
+    unchanged, so the index keeps no edge to that variable. The paper uses a kernel test [1]_ that
+    detects such changes; Andrey has no kernel test. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and
+    ``"cond_gauss"`` take each index value as a category, so they find a shift in any domain,
+    whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the index is categorical, so
+    every data column may be continuous.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 500 rows,
-    and on 1,200 rows with 7 variables. It runs the PC search with the index as one more variable,
-    so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
-    partial-correlation tests assume linear relations with Gaussian noise. With a mixed-data test,
-    its tests run it on 5 variables with 3,000 rows.
+    With ``dependence_threshold`` set, the independent-change step [1]_ orients undirected edges
+    between two variables that both keep an edge to the index. For a candidate direction
+    ``x -> y``, it measures how strongly the change of ``P(x)`` across the index values and the
+    change of ``P(y | x)`` depend on each other, given a set of neighbors that blocks their common
+    causes. ``x -> y`` is oriented when that measure is at most the threshold and the measure for
+    ``y -> x`` is above it; when both are above it, the edge stays undirected. An orientation
+    that would close a directed cycle is skipped, so that edge stays undirected unless Meek's
+    rules orient it. Meek's rules run before and after the step. The measure compares the index
+    values as separate domains, so the step needs many domains, each with many rows: with two
+    domains, the two changes always depend on each other, and nothing is oriented; a per-row
+    index, such as a time step, makes every row its own domain, and the step cannot measure a
+    change. The paper leaves the threshold open. For two modules that change independently, the
+    measure sits near ``1 / (K - 1)`` over ``K`` domains, so the threshold has to rise as the
+    number of domains falls; the 0.06 below is the value the measurements used, not a default.
+    The step is off by default, because with these tests only a variable whose mean follows the
+    index reaches it, and such a shared trend makes the changes depend on each other.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), with 2,000 rows pooled from four domains of equal size, in which one variable in
+    three shifts its mean with the domain, from 10 to 50 variables with 20 datasets per size. Its
+    median errors (SHD against the CPDAG the domain index makes identifiable) stayed below the empty
+    graph's at every size (12 against 50 at 50 variables). The median fit took 0.18 s at 50
+    variables, on 4 cores. The independent-change step is not benchmarked yet; its tests run it on
+    at most 4 variables with 600 rows from 20 domains. It runs the PC search with the index as one
+    more variable, so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
+    partial-correlation tests assume linear relations with Gaussian noise and find only a change in
+    a variable's mean that is linear in the index: on two variables from two domains with 600 rows,
+    a mean shift of the cause oriented the edge on 20 of 20 seeds, and a change of its variance
+    alone, or of the weight of the effect on a mean-zero cause alone, on none. Without the
+    independent-change step, an edge between two variables that both change with the index stays
+    undirected unless the collider or Meek's rules orient it. The step reaches only variables whose
+    means follow the index. On two variables from 20 domains with 600 rows, both means rising
+    linearly by about 1 across the domains, the cause's noise scale drawn per domain, and the
+    effect's weight on it drawn per domain from (0.5, 2.5), at the threshold 0.06 it oriented the
+    edge on 1 of 20 seeds. Given the true skeleton of ten complete three-variable DAGs from 20
+    domains with 600 rows, no mean trend, and weights in (-2, 2) drawn per domain, it oriented 18 of
+    their 30 edges correctly and 4 against the truth. The paper fits the kernel widths, the index
+    kernel, and the ridge of the step by Gaussian-process likelihood; Andrey fixes them. With a
+    mixed-data test, it is experimental and not benchmarked yet; its tests run it on 5 variables
+    with 3,000 rows.
 
     References
     ----------
@@ -749,13 +819,12 @@ def cdnod(
     >>> import numpy as np
     >>> from andrey import cdnod
     >>> rng = np.random.default_rng(0)
-    >>> c_indx = np.repeat([0.0, 1.0], 300)
-    >>> x = 2.0 * c_indx + rng.standard_normal(600)
+    >>> domain_index = np.repeat([0.0, 1.0], 300)
+    >>> x = 2.0 * domain_index + rng.standard_normal(600)
     >>> y = x + 0.5 * rng.standard_normal(600)
-    >>> cdnod(np.column_stack([x, y]), c_indx).structure.oriented_edges()
+    >>> cdnod(np.column_stack([x, y]), domain_index).structure.oriented_edges()
     [(0, 1, 'directed')]
     """
-    warn_experimental("cdnod")
     from andrey.constraint.cdnod import cdnod as _cdnod
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
@@ -769,10 +838,21 @@ def cdnod(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    c = np.asarray(c_indx, dtype=np.float64)
+    c = np.asarray(domain_index, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
-        check_categories(c, None, f"indep_test={indep_test!r}", name="c_indx")
-    cpdag = _cdnod(X, c, alpha=alpha, indep_test=indep_test, categorical=mask)
+        check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
+    if dependence_threshold is not None:
+        dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
+    with copies_named(labels):
+        cpdag = _cdnod(
+            X,
+            c,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_order=collider_order,
+            categorical=mask,
+            dependence_threshold=dependence_threshold,
+        )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}
     )
