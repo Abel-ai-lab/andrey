@@ -1,7 +1,7 @@
 ---
 name: demos-index
 description: Demos that run in your browser - step through PC and Meek's rules, explore
-  d-separation, compare methods on one dataset, and browse the benchmarks.
+  d-separation, and compare methods on one dataset.
 meta:
   type: index
 html_theme.sidebar_secondary.remove: true
@@ -10,8 +10,8 @@ html_theme.sidebar_secondary.remove: true
 # Demos
 
 Demos run in your browser, with nothing to install. Step through PC and Meek's rules, explore
-d-separation, compare methods on one dataset, or browse the benchmark results. The
-[examples](../examples/index) are notebooks you run yourself.
+d-separation, or compare methods on one dataset. The [examples](../examples/index) are notebooks
+you run yourself.
 
 ::::{grid} 1 2 2 3
 :gutter: 3
@@ -60,17 +60,6 @@ Choose two variables and a conditioning set; see which paths stay open.
 
 {bdg-secondary-line}`In your browser`
 :::
-
-:::{grid-item-card} Benchmark explorer
-:link: benchmark-explorer
-:link-type: doc
-:img-top: /_generated/thumbs/benchmark-explorer.svg
-:img-alt: Fit time against the number of variables for Andrey and other packages
-
-Every recorded timing and error count, as charts and a table.
-
-{bdg-secondary-line}`In your browser`
-:::
 ::::
 
 ```{include} ../../_generated/examples/live-demo.md
@@ -84,5 +73,4 @@ compare
 pc-replay
 meek
 d-separation
-benchmark-explorer
 ```

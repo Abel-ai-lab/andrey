@@ -43,7 +43,7 @@ from andrey.core.score import BICScore
 from andrey.core.score_delta import add_deltas
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE
-from andrey.search.ges import _reach_factory, _recompute_objective, _reform_cpdag
+from andrey.search.ges import _reachable, _recompute_objective, _reform_cpdag
 
 # The extended search keeps a branch when it lowers the deviance by more than this times the sample
 # count (1e-7 times the sample count in log-likelihood units).
@@ -805,15 +805,12 @@ class _Search:
         by the sum of :func:`_extension_scores`, a function of the graph, so every kept branch
         lowers it and no graph is kept twice. A branch rescores only the chain components of the
         nodes whose parents or neighbors it changed; the other nodes keep their extension parents.
-        No branch scores below a total of nan or -inf, so then none is tried.
         """
         tolerance = _ACCEPT_PER_SAMPLE * n_samples
         score = self.add_deltas.score
         scores = _extension_scores(self.g.pa, self.g.ne, range(self.d), score)
         local = [scores[v] for v in range(self.d)]
         total = sum(local)
-        if np.isnan(total) or total == -np.inf:
-            return total
         pending: list[tuple] = []
         fresh = False
         while pending or not fresh:
@@ -945,7 +942,7 @@ def _insert_marks(adj: np.ndarray, x: int, y: int, T: frozenset[int]) -> np.ndar
 
 
 def _rescan_moves(
-    adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]], reach: Callable
+    adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]]
 ) -> Iterable[np.ndarray]:
     """The graphs reached by improving base-search moves on ``adj``, in search order."""
     for _, x, y, C, _E in _improving(_all_deletes(adj, score)):
@@ -954,7 +951,7 @@ def _rescan_moves(
         cut = adj.copy()
         cut[x, y] = cut[y, x] = NULL
         yield _insert_marks(cut, x, y, T)
-    for _, x, y, T in _improving(_all_inserts(adj, score, forbidden, reach(adj))):
+    for _, x, y, T in _improving(_all_inserts(adj, score, forbidden, _reachable(adj))):
         yield _insert_marks(adj, x, y, T)
 
 
@@ -962,10 +959,9 @@ def _rescan_base_search(
     adj: np.ndarray, score: BICScore, forbidden: set[tuple[int, int]]
 ) -> np.ndarray:
     """The base search with every operator rescanned after each move, skipping visited graphs."""
-    build_state = _reach_factory(adj.shape[0])
     seen = {adj.tobytes()}
     while True:
-        for moved in _rescan_moves(adj, score, forbidden, build_state):
+        for moved in _rescan_moves(adj, score, forbidden):
             if moved.tobytes() not in seen:
                 seen.add(moved.tobytes())
                 adj = moved
@@ -989,8 +985,6 @@ def _rescan_search(score: BICScore, d: int, extended: bool) -> np.ndarray:
         return adj
     tolerance = _ACCEPT_PER_SAMPLE * score.n
     total = _marks_total(adj, score)
-    if np.isnan(total) or total == -np.inf:
-        return adj
     forbidden: set[tuple[int, int]] = set()
     pending: list[tuple] = []
     fresh = False

@@ -132,13 +132,18 @@ intersphinx_mapping = {
 
 # ---- notebooks -------------------------------------------------------------------------------
 EXAMPLES = HERE / "docs" / "examples"
+# The example notebooks carry their outputs, so a slow builder runs none of them:
+# `scripts/execute_notebooks.py` stores the outputs, and the docs workflow checks they match a fresh
+# run. speed_on_your_machine.ipynb ships without outputs: its timings belong to the reader's
+# machine. calm.ipynb needs torch, which the docs workflow does not install, so its stored outputs
+# come from a local run and the workflow does not rerun it. The getting-started guide, a MyST
+# notebook, runs at build time.
 nb_execution_mode = "cache"
-nb_execution_timeout = 180
+nb_execution_timeout = 600
 nb_execution_raise_on_error = True
 nb_execution_in_temp = True
 nb_execution_cache_path = str(HERE / "_build" / ".jupyter_cache")
-# Timings belong to the reader's machine, not the docs builder; the page ships without outputs.
-nb_execution_excludepatterns = ["docs/examples/speed_on_your_machine.ipynb"]
+nb_execution_excludepatterns = ["docs/examples/*.ipynb"]
 # Warnings print local paths.
 nb_output_stderr = "remove"
 
@@ -292,7 +297,11 @@ NAV_ICONS = {
     "docs/brand": "palette",
 }
 NAV_SHOWN = 5
-html_additional_pages = {"index": "homepage.html", "demo/index": "demo-redirect.html"}
+html_additional_pages = {
+    "index": "homepage.html",
+    "demo/index": "demo-redirect.html",
+    "docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html",
+}
 
 # ---- blog (ABlog) ----------------------------------------------------------------------------
 # A post is a page under blog/ whose front matter sets `blogpost: true`, with its `date`. ABlog
@@ -379,7 +388,6 @@ def _methods_text() -> dict[str, str]:
     return {
         "method_count": f"{len(list_specs())} methods",
         "n_supported": str(len(supported)),
-        "n_experimental": str(len(list_specs()) - len(supported)),
         "supported_methods": ", ".join(supported[:-1]) + f", and {supported[-1]}",
     }
 
@@ -478,9 +486,11 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
 
 def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: ANN001
     """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
-    image), and its structured data (``discovery.head_tags``): the organization, the website, the
-    software at the release the page belongs to, the page or post, and its breadcrumbs. The pages
-    in ``UNINDEXED`` are ``noindex``. The description and ``og:description`` are one value."""
+    image), its canonical address, and its structured data (``discovery.head_tags``): the
+    organization, the website, the software at the release the page belongs to, the page or post,
+    and its breadcrumbs. The pages in ``UNINDEXED`` are ``noindex`` and name no canonical address.
+    The description and ``og:description`` are one value, as are ``og:url`` and the canonical
+    address."""
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
@@ -510,6 +520,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         f'content="{html.escape(value, quote=True)}">\n'
         for key, value in tags.items()
     )
+    if pagename not in UNINDEXED:
+        preview += f'<link rel="canonical" href="{html.escape(url, quote=True)}">\n'
     page = {"title": title, "description": description, "url": url, "image": image}
     if pagename in UNINDEXED:
         page["indexable"] = False
@@ -705,9 +717,16 @@ def _dated_posts(app) -> list[tuple[str, str, str]]:  # noqa: ANN001
 
 
 def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
-    """The post about the latest release, whose version the navbar's dot on Release cards names:
-    the newest dated blog post with a version, as its docname and version."""
+    """The post about the latest release, whose date opens the week of the navbar's dot on Release
+    cards: the newest dated blog post with a version, as its docname and version."""
     return _newest_post([post for post in _dated_posts(app) if post[2]])
+
+
+def _newest_card() -> str:
+    """The version of the newest release card under ``docs/benchmarks/``, which the navbar's dot on
+    Release cards names; a card can land before its release's post."""
+    cards = (HERE / "docs" / "benchmarks").glob("*.md")
+    return ".".join(map(str, max(tuple(map(int, card.stem.split("."))) for card in cards)))
 
 
 def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
@@ -717,8 +736,11 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     """
     # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release and the
     # date of its post, which opens the dot's week.
-    release_doc, context["release_version"] = _release_post(app)
-    context["release_date"] = next(d for doc, d, _ in _dated_posts(app) if doc == release_doc)
+    context["release_version"] = _newest_card()
+    posts = _dated_posts(app)
+    release_doc = next((doc for doc, _, v in posts if v == context["release_version"]), None)
+    release_doc = release_doc or _release_post(app)[0]
+    context["release_date"] = next(d for doc, d, _ in posts if doc == release_doc)
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
@@ -1060,8 +1082,8 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
 
 
 # ---- the examples and demos galleries ------------------------------------------------------------
-# Each demo's page (docs/demos/), and, from the summary, the generated file that page shows at full
-# width and the gallery card's thumbnail.
+# Each demo's page (docs/demos/), the generated file that page shows at full width, and the gallery
+# card's thumbnail.
 INTERACTIVE = {
     "docs/demos/compare": (
         "compare.html",
@@ -1082,11 +1104,6 @@ INTERACTIVE = {
         "d-separation.html",
         lambda summary: build_assets.dsep_document(heading=False),
         lambda summary: build_assets.dsep_thumbnail(),
-    ),
-    "docs/demos/benchmark-explorer": (
-        "benchmarks.html",
-        lambda summary: build_assets.benchmarks_page(summary, links="../../docs/", heading=False),
-        build_assets.benchmarks_thumbnail,
     ),
 }
 THUMBS = GENERATED / "thumbs"

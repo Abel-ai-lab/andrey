@@ -52,8 +52,7 @@ Andrey in its first cell.
 
 ### Which methods are there?
 
-{{ n_supported }} are supported: {{ supported_methods }}. {{ n_experimental }} more are experimental,
-including time-series, hidden-variable, and multi-dataset methods. The
+{{ n_supported }} are supported: {{ supported_methods }}. The
 [API reference](code/index.md#structure-learning-methods) lists them all, and `andrey list` prints
 them with their status.
 
@@ -61,7 +60,8 @@ them with their status.
 
 A supported method is benchmarked and checked on known graphs before each release. An experimental
 method has recovery tests but no published benchmark. It warns with `andrey.ExperimentalWarning` the
-first time it runs in a process.
+first time it runs in a process. Every method is supported now; a new method starts as
+experimental.
 
 ### Which method should I start with?
 
@@ -96,7 +96,7 @@ speed support.
 ### Why is it faster?
 
 It batches independent tests and scores into array operations, reuses work across steps, skips
-work that cannot change the result, and uses compiled or GPU code where that helps.
+work that cannot change the result, and uses GPU code where that helps.
 [Why Andrey is fast](../blog/20261008-why-andrey-is-fast.md) explains the four ideas.
 
 ### Do I need a GPU?
@@ -108,15 +108,14 @@ large enough to repay the transfer; correlation matrices move too when you set
 
 ### What do the optional extras add?
 
-- `numba`: compiled CPU code for GES's path checks.
 - `torch`: the PyTorch backend for GPUs, and CALM.
 - `viz`: Matplotlib chart styling (`andrey.viz.mpl`), and Graphviz layouts for drawn graphs.
 - `data`: saving and loading generated datasets (`andrey.data`).
-- `all`: all four.
+- `all`: all three.
 
 ### Can it use more CPU cores?
 
-GES, GIES, and GFCI (in its GES phase) can spread each pass over worker processes: set
+GES and GFCI (in its GES phase) can spread each pass over worker processes: set
 `ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one. A script that
 does this must put its entry point under `if __name__ == "__main__":`, because starting the workers
 re-imports the script; [Getting started](guides/getting-started.md#backends-and-parallelism) shows
@@ -135,11 +134,16 @@ row names the nodes) or a `.npy` file.
 
 ### Does it handle discrete or mixed data?
 
-Not yet; it is part of stage 1 of the [roadmap](roadmap.md). Every method assumes continuous data:
-PC and FCI test independence with Fisher's z by default, or with an experimental nonlinear test
-([`indep_test`](code/index.md#conditional-independence-tests)); GES, XGES, hill climbing, Tabu
-search, BOSS, and GRaSP score with the linear-Gaussian BIC; and the LiNGAM methods assume
-continuous non-Gaussian noise.
+Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
+text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
+data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, and exact
+search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`. Mixed data,
+with continuous and categorical columns, is experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing,
+BOSS, GRaSP, and exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
+`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`. They infer which columns are
+categorical unless you name them with `categorical`, and warn about what they inferred. We have not
+benchmarked them yet. [Data types](guides/getting-started.md#data-types) explains the settings, the
+inference rule, and how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
@@ -224,9 +228,9 @@ citation.
 ```bibtex
 @software{andrey,
   author = {{Abel AI Lab}},
-  title = {Andrey: A very fast causal discovery package},
+  title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.5.0},
+  version = {0.6.0},
   url = {https://andrey.abel.ai},
 }
 ```

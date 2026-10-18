@@ -98,10 +98,14 @@ def test_fisherz_default_matches_explicit():
     assert np.array_equal(default, explicit)
 
 
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_registry_surface(clean_registry):
-    """``register`` / ``make`` / ``available`` behave as documented; ``fisherz`` is shipped."""
+    """``register`` / ``make`` / ``available`` behave as documented; every shipped name builds."""
     assert set(ci.SHIPPED_INDEP_TESTS) <= set(ci.available_indep_tests())
-    assert ci.SHIPPED_INDEP_TESTS[:2] == ("fisherz", "student_t")
+    assert {"fisherz", "student_t"} < set(ci.SHIPPED_INDEP_TESTS)
+    assert set(ci.DISCRETE_INDEP_TESTS) < set(ci.SHIPPED_INDEP_TESTS)
+    for name in ci.SHIPPED_INDEP_TESTS:
+        assert 0.0 <= ci.make_indep_test(name, np.round(_chain_data()))(0, 1) <= 1.0
     ci.register_indep_test("delegate", lambda data: ci.FisherZ(data))
     assert "delegate" in ci.available_indep_tests()
     assert isinstance(ci.make_indep_test("fisherz", _chain_data()), ci.FisherZ)

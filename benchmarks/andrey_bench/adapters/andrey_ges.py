@@ -52,6 +52,8 @@ class AndreyGES:
     #: value its own ``name``, because ``params`` are excluded from ``run_id`` and two weights under
     #: one name would collide in the part files.
     lambda_value: float = _DEFAULT_LAMBDA
+    #: The local score. A variant with another score needs its own ``name``, as a weight does.
+    score_func: str = _DEFAULT_SCORE_FUNC
     #: Most directed parents a node may hold and still gain one; ``None`` lifts the cap, as the
     #: public ``andrey.ges`` does. A benchmark that changes it gives the arm its own ``name``.
     max_parents: float | None = _DEFAULT_MAX_PARENTS
@@ -67,11 +69,14 @@ class AndreyGES:
         from andrey.search.ges import ges  # noqa: F401
 
     def params(self) -> dict[str, Any]:
-        return {
-            "score_func": _DEFAULT_SCORE_FUNC,
-            "lambda_value": float(self.lambda_value),
+        """The score, its BIC weight (BDeu has none), and the parent cap."""
+        params: dict[str, Any] = {
+            "score_func": self.score_func,
             "max_parents": self.max_parents,
         }
+        if self.score_func != "local_score_BDeu":
+            params["lambda_value"] = float(self.lambda_value)
+        return params
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Return the CPDAG endpoint array for this backend and mode. The only timed region."""
@@ -98,11 +103,12 @@ class AndreyGES:
 
 
 def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "") -> list[AndreyGES]:
-    """The three shipped GES builds: numpy serial, numpy parallel, numba serial.
+    """Two GES benchmark configurations using the ``numpy`` backend: serial and parallel.
 
-    ``lambda_value`` and ``suffix`` exist together and only together: a second penalty needs a
-    second set of names, since ``params`` are excluded from ``run_id``. Called with no arguments,
-    it returns the shipped weight under the shipped names.
+    ``lambda_value`` sets the BIC penalty weight for both configurations. ``suffix`` is appended
+    to their names and must be nonempty for a nondefault weight: ``params`` are excluded from
+    ``run_id``, so distinct weights need distinct names to keep their results separate. With no
+    arguments, the function returns both configurations with the default weight and names.
     """
     if lambda_value != _DEFAULT_LAMBDA and not suffix:
         # Without a suffix the second weight reuses the first's names, so its part files are the
@@ -116,7 +122,6 @@ def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "")
     specs = (
         ("andrey.ges.numpy.serial", "numpy", "serial"),
         ("andrey.ges.numpy.parallel", "numpy", "parallel"),
-        ("andrey.ges.numba.serial", "numba", "serial"),
     )
     return [
         AndreyGES(
@@ -128,3 +133,17 @@ def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "")
         )
         for name, backend, mode in specs
     ]
+
+
+def andrey_ges_bdeu() -> AndreyGES:
+    """GES with the BDeu score for categorical data, using the ``numpy`` backend serially.
+
+    BDeu moves are scored in the calling process, so a parallel variant would run the same code.
+    """
+    return AndreyGES(
+        name="andrey.ges.bdeu",
+        backend="numpy",
+        mode="serial",
+        package_version=_andrey_version(),
+        score_func="local_score_BDeu",
+    )

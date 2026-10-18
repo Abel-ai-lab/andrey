@@ -22,13 +22,12 @@ With [uv](https://docs.astral.sh/uv/), add it to your project (`uv init` creates
 
 ```shell
 uv add andrey-core            # base (pure NumPy)
-uv add "andrey-core[numba]"   # CPU JIT for GES, up to 64 variables
 uv add "andrey-core[torch]"   # torch backend: GPU primitives
 uv add "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
 uv add "andrey-core[all]"     # every extra
 ```
 
-With pip, use the same names: `pip install andrey-core`, `pip install "andrey-core[numba]"`, and so
+With pip, use the same names: `pip install andrey-core`, `pip install "andrey-core[torch]"`, and so
 on.
 
 ### PyTorch for a GPU
@@ -264,18 +263,73 @@ methods, and draw the learned graph beside the known one.
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
 per sample and one column per variable. Most methods take that one argument and return the same
-kind of result; `cdnod` also takes a domain index, and `multi_group_direct_lingam` and
-`longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
-{doc}`graph-types` explains which graph each one returns.
+kind of result; `cdnod` also takes a domain index, `gies` also takes which variables were
+intervened on in each row, and `multi_group_direct_lingam` and `longitudinal_lingam` take a list of
+datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph each one
+returns.
+
+## Data types
+
+Each test and score reads the columns as one kind of data:
+
+| Data | `indep_test` | `score_func` |
+|---|---|---|
+| Continuous | `fisherz` (the default), `student_t` | `local_score_BIC` (the default) |
+| Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
+| Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
+
+`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, and `exact_search` take
+every score, `tabu` the continuous and categorical ones, and `boss` and `grasp` the continuous and
+mixed ones. `gfci` takes a score and a test
+that read the same kind of data, such as
+`andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
+
+**Categorical data.** Each distinct value of a column is one category. A column may hold whole
+numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
+
+**Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
+`andrey.pc(data, indep_test="cond_gauss")` or
+`andrey.ges(data, score_func="local_score_cond_gauss")`. The degenerate Gaussian (`degen_gauss`)
+turns each categorical column into indicator columns and treats every column as Gaussian, so it
+suits effects that are linear and add up across categories. The conditional Gaussian
+(`cond_gauss`) gives each combination of categories its own Gaussian, so a category can change a
+variable's spread as well as its mean; it needs several rows for each combination of categories it
+conditions on. Both are experimental. With either score, `hc` gives no categorical column a
+continuous parent.
+
+**Marking the categorical columns.** Name them with `categorical`, by column name or 0-based
+position: `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without
+`categorical`, a mixed-data setting infers them: a DataFrame's `category`, `bool`, and text columns,
+and every column whose values, over all its rows, are at most `max_categories` distinct whole
+numbers (10 by default). pandas does not mark a column as categorical by itself, so this follows
+the rule Tetrad applies when it loads mixed data. A `DataTypeWarning` names the inferred columns and
+why; check them, and pass `categorical=[...]` to choose the columns yourself or `categorical=[]`
+for none. The result's `metadata["categorical"]` lists the categorical columns it read.
+
+**No categorical column.** A mixed-data setting that finds no categorical column, or gets
+`categorical=[]`, warns and runs as its linear-Gaussian form: both tests become the likelihood-ratio
+form of the partial-correlation test, close to `fisherz`, and the degenerate Gaussian score becomes
+the BIC.
+
+**Integer-coded columns.** The default test and score read a column of codes such as 0, 1, 2 as
+numbers, which assumes the categories are ordered and evenly spaced. When columns of at most
+`max_categories` distinct whole numbers reach them, a one-time `DataTypeWarning` names those
+columns; if they are categories, choose a mixed-data setting.
+
+From the command line, the same settings are `key=value` arguments, such as
+`andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
+`max_categories=5`. The data file holds numbers only, so code each category as a whole number. The
+JSON result lists the categorical columns under `metadata.categorical` and the warnings under
+`run.warnings`.
 
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
 `ANDREY_BACKEND` and `ANDREY_NUM_WORKERS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
-worker, GES, GIES, and GFCI scan each pass in worker processes, and GES returns the same graph as it
-does serially. `granger` fits its variables on worker threads, with the same coefficients, and
-needs none of the guard below.
+worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
+serially. `granger` fits its variables on worker threads, with the same coefficients, and needs
+none of the guard below.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_NUM_WORKERS` above 1, or `-1` for every core) must put its entry
@@ -300,11 +354,12 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-FCI and GFCI depend on column order, and GES was more accurate with a stronger penalty on the large
-sparse benchmark graphs. PC is practical to roughly 1,000 variables; FCI's errors passed the empty
-graph's at 800 ([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API
-page states the data and sizes it was measured on. See
-[Known limits](../benchmarks/0.1.0.md#known-limits).
+FCI and GFCI depend on column order: `possible_dsep="order_free"` builds possible-d-separation sets
+that do not, but on sampled data the result can still change with the column order. GES was more
+accurate with a stronger penalty on the large sparse benchmark graphs. PC is practical to roughly
+1,000 variables; FCI's errors passed the empty graph's at 800
+([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API page states the
+data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 

@@ -12,9 +12,9 @@ which variables drive which. It runs PC, FCI, GES, BOSS, GRaSP, the LiNGAM famil
 as one function call, on CPU cores or a GPU. It is for people who use these methods on more
 variables than the usual packages handle quickly, or from a script or a coding agent.
 
-**Over 100x faster on PC, and faster on most other supported methods.**
-The [0.1.0 release card](benchmarks/0.1.0.md) gives each measured speedup compared with
-causal-learn, gCastle, and lingam, including where Andrey is not faster.
+**The fastest causal discovery package.**
+The [release cards](benchmarks.md) give each measured speedup compared with other packages,
+including where Andrey is not faster.
 
 ```shell
 uv add andrey-core
@@ -59,7 +59,7 @@ What changed in each release.
 
 ## Documentation
 
-- [Install](guides/getting-started.md#install) Andrey and choose optional CPU or GPU acceleration.
+- [Install](guides/getting-started.md#install) Andrey and choose optional GPU acceleration.
 - [Get started](guides/getting-started.md#learn-a-graph) by learning a causal graph from real data.
 - [Examples](examples/index) are notebooks; [demos](demos/index) run in your browser.
 - [API reference](code/index.md) covers methods, graph structures, and visualization.

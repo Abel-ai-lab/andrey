@@ -11,7 +11,6 @@ from .api import (
     boss,
     bottom_up_parce_lingam,
     calm,
-    camuv,
     cdnod,
     direct_lingam,
     exact_search,
@@ -42,13 +41,14 @@ from .core.seeding import seed_all
 from .core.warning_policy import (
     AndreyWarning,
     BackendFallbackWarning,
+    DataTypeWarning,
     ExperimentalWarning,
     PerformanceWarning,
     SampleSizeWarning,
     SearchLimitWarning,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     "__version__",
@@ -65,6 +65,7 @@ __all__ = [
     # Warning categories: every warning Andrey raises is an AndreyWarning.
     "AndreyWarning",
     "BackendFallbackWarning",
+    "DataTypeWarning",
     "ExperimentalWarning",
     "PerformanceWarning",
     "SearchLimitWarning",
@@ -101,6 +102,5 @@ __all__ = [
     "pnl",
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
-    "camuv",
     "bottom_up_parce_lingam",
 ]

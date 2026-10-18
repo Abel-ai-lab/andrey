@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.api._experimental import warn_experimental
 from andrey.cli import main
 from andrey.core import backend, ci, warning_policy
 from andrey.core.ci_kernel import RCoT
@@ -34,7 +35,7 @@ class _AlwaysDependent:
 
 def _backend_fallback(monkeypatch):
     monkeypatch.setattr(backend, "_is_available", lambda name: False)
-    return lambda: backend.resolve_bitset(backend="numba")
+    return lambda: backend.select(backend._TORCH_PINNABLE, backend._TORCH_AUTO, backend="cuda")
 
 
 def _pc_expensive_pass(monkeypatch):
@@ -59,8 +60,7 @@ def _default_pool_cutoff(monkeypatch):
 
 
 def _experimental(monkeypatch):
-    data = np.random.default_rng(0).standard_normal((50, 3))
-    return lambda: andrey.gies(data)
+    return lambda: warn_experimental("new_method")  # an experimental facade's first line
 
 
 def _search_limit(monkeypatch):
@@ -73,6 +73,20 @@ def _rcot_few_rows(monkeypatch):
     return lambda: test(0, 1, (2,))
 
 
+def _codes(monkeypatch):
+    return np.random.default_rng(0).integers(0, 3, (200, 3)).astype(float)
+
+
+def _inferred_categories(monkeypatch):
+    data = _codes(monkeypatch)
+    return lambda: andrey.pc(data, indep_test="cond_gauss")
+
+
+def _category_code_hint(monkeypatch):
+    data = _codes(monkeypatch)
+    return lambda: andrey.pc(data)
+
+
 TRIGGERS = {
     "backend fallback": (_backend_fallback, andrey.BackendFallbackWarning),
     "PC expensive pass": (_pc_expensive_pass, andrey.PerformanceWarning),
@@ -80,6 +94,8 @@ TRIGGERS = {
     "experimental method": (_experimental, andrey.ExperimentalWarning),
     "search limit": (_search_limit, andrey.SearchLimitWarning),
     "RCoT few rows": (_rcot_few_rows, andrey.SampleSizeWarning),
+    "inferred categorical columns": (_inferred_categories, andrey.DataTypeWarning),
+    "category code hint": (_category_code_hint, andrey.DataTypeWarning),
 }
 
 

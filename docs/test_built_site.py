@@ -1,8 +1,8 @@
 """Checks on the built website that the unit tests cannot make.
 
 Run from the repo root: ``uv run --group docs python -m pytest docs/test_built_site.py``. The first
-test that needs the site builds all of it from a clean workspace with ``-W``, which executes the
-notebooks and takes a few minutes; the checks then read the built pages. The template and source
+test that needs the site builds all of it from a clean workspace with ``-W``, which takes a few
+minutes; the checks then read the built pages. The template and source
 checks are unit tests, which the docs workflow runs first.
 """
 
@@ -26,6 +26,8 @@ import andrey.core.ci
 import andrey.core.ci_cmiknn
 import andrey.core.ci_gpdc
 import andrey.core.ci_kernel
+import andrey.data.discrete
+import andrey.data.mixed
 import andrey.data.real
 import andrey.metrics
 import andrey.viz
@@ -54,6 +56,8 @@ PUBLIC_MODULES = (
     (andrey.core.ci_cmiknn, "core.ci_cmiknn."),
     (andrey.core.ci_gpdc, "core.ci_gpdc."),
     (andrey.data.real, "data."),
+    (andrey.data.discrete, "data."),
+    (andrey.data.mixed, "data."),
     (andrey.metrics, "metrics."),
     (andrey.viz, "viz."),
     (andrey.viz.mpl, "viz.mpl."),
@@ -459,11 +463,20 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         path = urlsplit(url).path.lstrip("/") or "index.html"
         content = (html / path).read_text()
         assert f'<meta property="og:url" content="{url}"' in content, url
+        assert content.count('rel="canonical"') == 1, url
+        assert f'<link rel="canonical" href="{url}">' in content, url
         assert 'name="robots"' not in content, url
     for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
         assert f"https://andrey.abel.ai/{required}" in urls, required
     # Left out: pages with no content of their own, and the redirects from moved addresses.
-    left_out = ("search.html", "404.html", "genindex.html", "blog/drafts.html", "demo/index.html")
+    left_out = (
+        "search.html",
+        "404.html",
+        "genindex.html",
+        "blog/drafts.html",
+        "demo/index.html",
+        "docs/demos/benchmark-explorer.html",
+    )
     moved = (
         "blog/andrey-0-2-0.html",
         "blog/introducing-andrey.html",

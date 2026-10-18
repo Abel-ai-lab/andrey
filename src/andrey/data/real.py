@@ -7,7 +7,8 @@ when given, else ``ANDREY_DATA_DIR``, else ``$XDG_CACHE_HOME/andrey`` (``~/.cach
 
 ``sachs`` is measured data. ``asia``, ``alarm``, ``hepar2``, and ``andes`` are published
 Bayesian-network structures from the bnlearn repository; their data are simulated on the graph by
-a seeded linear-Gaussian model, since the networks' own tables are discrete.
+a seeded linear-Gaussian model or, with ``discrete=True``, sampled from the networks' own
+conditional probability tables.
 
 >>> from andrey.data import list_datasets
 >>> list_datasets()
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import heapq
 import numbers
 import os
 import re
@@ -32,8 +34,9 @@ import numpy as np
 from andrey.core import GraphStructure, env
 
 from . import functional, noise
+from .discrete import _forward_sample
 from .graphs import FixedDAG
-from .scm import SCM
+from .scm import _NOISE, SCM, _component_rng
 
 __all__ = ["RealDataset", "list_datasets", "load_dataset"]
 
@@ -165,6 +168,124 @@ def read_bif(text: str) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
     return nodes, tuple(arcs)
 
 
+_BIF_STATES = re.compile(
+    r"variable\s+([^\s{]+)\s*\{[^}]*?type\s+discrete\s*\[\s*\d+\s*\]\s*\{([^}]*)\}", re.DOTALL
+)
+_BIF_BLOCK = re.compile(r"probability\s*\(([^)]*)\)\s*\{([^}]*)\}", re.DOTALL)
+_BIF_ROW = re.compile(r"(?:\(([^)]*)\)|(table))\s*([^;]*);")
+
+
+@dataclass(frozen=True)
+class Tables:
+    """A discrete network's conditional probability tables, read from a BIF file.
+
+    ``states[j]`` names variable ``j``'s categories, ``parents[j]`` its parents in the order of its
+    ``probability`` line, and ``tables[j]`` its table, shape ``(q, r)``: row ``i`` is the
+    distribution of its ``r`` categories under parent configuration ``i``, numbered in mixed radix
+    with the first parent the most significant digit.
+    """
+
+    nodes: tuple[str, ...]
+    states: tuple[tuple[str, ...], ...]
+    parents: tuple[tuple[int, ...], ...]
+    tables: tuple[np.ndarray, ...]
+
+    def sample(self, n: int, rng: np.random.Generator) -> np.ndarray:
+        """Draw ``n`` rows in causal order; return each variable's category codes as float64."""
+        order = _causal_order(self.parents)
+        cards = np.array([len(s) for s in self.states], dtype=np.int64)
+        parents = [np.array(p, dtype=np.int64) for p in self.parents]
+        return _forward_sample(order, parents, cards, list(self.tables), n, rng)
+
+
+def read_bif_tables(text: str) -> Tables:
+    """Return a BIF network's categories, parents, and conditional probability tables.
+
+    Reads each ``variable``'s ``type discrete`` categories and each ``probability`` block: a root's
+    ``table`` line, and one ``(parent categories) probabilities;`` line per configuration of a
+    variable's parents.
+
+    Raises
+    ------
+    ValueError
+        If a variable is not discrete or has no probability block, a block names an undeclared
+        variable or category, a variable with parents gives a ``table`` line, a line has the wrong
+        number of probabilities, a parent configuration is missing, or a row is not a distribution.
+    """
+    nodes = tuple(_BIF_VARIABLE.findall(text))
+    found = {
+        name: tuple(s.strip() for s in body.split(",")) for name, body in _BIF_STATES.findall(text)
+    }
+    other = [name for name in nodes if name not in found]
+    if other:
+        raise ValueError(f"the BIF variables {other} are not discrete")
+    index = {name: j for j, name in enumerate(nodes)}
+    parents: list[tuple[int, ...] | None] = [None] * len(nodes)
+    tables: list[np.ndarray | None] = [None] * len(nodes)
+    for head, body in _BIF_BLOCK.findall(text):
+        child, _, given = head.partition("|")
+        child = child.strip()
+        names = [p.strip() for p in given.split(",") if p.strip()]
+        unknown = [v for v in [child, *names] if v not in index]
+        if unknown:
+            raise ValueError(f"the BIF probability block names undeclared variables {unknown}")
+        sizes = [len(found[p]) for p in names]
+        r = len(found[child])
+        table = np.full((int(np.prod(sizes, dtype=np.int64)), r), np.nan)
+        for config, is_table, values in _BIF_ROW.findall(body):
+            probs = [float(v) for v in values.replace(",", " ").split()]
+            if len(probs) != r or (is_table and names):
+                raise ValueError(f"the BIF table of {child!r} has a malformed line")
+            row = 0
+            labels = [c.strip() for c in config.split(",")] if config else []
+            if len(labels) != len(names):
+                raise ValueError(f"the BIF table of {child!r} has a malformed line")
+            for p, label in zip(names, labels, strict=True):
+                if label not in found[p]:
+                    raise ValueError(
+                        f"the BIF table of {child!r} names category {label!r} of {p!r}"
+                    )
+                row = row * len(found[p]) + found[p].index(label)
+            table[row] = probs
+        if np.isnan(table).any():
+            raise ValueError(f"the BIF table of {child!r} misses a parent configuration")
+        if (table < 0).any() or not np.allclose(table.sum(axis=1), 1.0, atol=1e-6):
+            raise ValueError(f"every row of the BIF table of {child!r} must be a distribution")
+        parents[index[child]] = tuple(index[p] for p in names)
+        tables[index[child]] = table
+    missing = [nodes[j] for j, t in enumerate(tables) if t is None]
+    if missing:
+        raise ValueError(f"the BIF variables {missing} have no probability block")
+    return Tables(
+        nodes=nodes,
+        states=tuple(found[name] for name in nodes),
+        parents=tuple(p for p in parents if p is not None),
+        tables=tuple(t for t in tables if t is not None),
+    )
+
+
+def _causal_order(parents: tuple[tuple[int, ...], ...]) -> list[int]:
+    """Order the variables so each follows its parents, the lowest-numbered ready one first."""
+    waiting = [len(set(p)) for p in parents]
+    children: list[list[int]] = [[] for _ in parents]
+    for child, ps in enumerate(parents):
+        for p in set(ps):
+            children[p].append(child)
+    ready = [j for j, k in enumerate(waiting) if k == 0]
+    heapq.heapify(ready)
+    order = []
+    while ready:
+        j = heapq.heappop(ready)
+        order.append(j)
+        for child in children[j]:
+            waiting[child] -= 1
+            if waiting[child] == 0:
+                heapq.heappush(ready, child)
+    if len(order) != len(parents):
+        raise ValueError("the BIF network has a directed cycle")
+    return order
+
+
 def _read_bif_gz(raw: bytes) -> Contents:
     nodes, arcs = read_bif(gzip.decompress(raw).decode("utf-8"))
     return Contents(nodes, arcs, None)
@@ -176,9 +297,8 @@ _PGMPY = (
     "920f4e03fce2a319af0fbc8dc6fad1ac99ff4318/discrete/{name}.bif.gz"
 )
 _SIMULATED = """\
-The graph is the published network's structure; the data are simulated on it, not measured. The
-network's own probability tables are not used: the rows come from a linear-Gaussian structural
-causal model on the graph ({simulation}).
+The graph is the published network's structure; the data are simulated on it, not measured.
+{simulation}
 
 Source: the bnlearn Bayesian network repository (M. Scutari, www.bnlearn.com/bnrepository,
 CC BY-SA 3.0), also in pgmpy/example_models (MIT).
@@ -319,6 +439,7 @@ def load_dataset(
     *,
     n: int | None = None,
     seed: int | None = None,
+    discrete: bool = False,
     as_frame: bool = True,
     data_home: str | os.PathLike[str] | None = None,
 ) -> RealDataset:
@@ -339,13 +460,20 @@ def load_dataset(
         - ``"asia"`` (8 variables, 8 arcs), ``"alarm"`` (37, 46), ``"hepar2"`` (70, 123), and
           ``"andes"`` (223, 338): published Bayesian networks [2]_. The graph is the network's
           structure; the data are simulated on it by a linear-Gaussian structural causal model,
-          standardized, since the networks' own tables are discrete.
+          standardized, or, with ``discrete=True``, sampled from the network's own conditional
+          probability tables.
     n : int or None, default=None
         Rows to simulate on a published network; ``None`` gives 1000. Measured data such as
         ``"sachs"`` take no ``n``.
     seed : int or None, default=None
         Seed of the simulation's weights and noise; ``None`` gives 0. The same seed and ``n``
         give the same rows. Measured data take no ``seed``.
+    discrete : bool, default=False
+        Sample a published network from its own conditional probability tables instead of a
+        linear-Gaussian model: each variable is drawn from its table's row for its parents'
+        categories, in causal order. A DataFrame column holds the network's category names as a
+        pandas ``category``, in the file's order; an array holds the codes ``0..r-1`` in that
+        order. Measured data take no ``discrete``.
     as_frame : bool, default=True
         Return the observations as a pandas DataFrame named by variable, so a method run on them
         names its nodes. ``False`` returns a float64 NumPy array in the same column order.
@@ -362,9 +490,9 @@ def load_dataset(
     Raises
     ------
     ValueError
-        If ``name`` is not a dataset, ``n`` or ``seed`` is given for measured data, ``n`` is not
-        an integer of at least 2, or ``seed`` is not a non-negative integer. These are checked
-        before any download.
+        If ``name`` is not a dataset, ``n``, ``seed``, or ``discrete`` is given for measured data,
+        ``n`` is not an integer of at least 2, or ``seed`` is not a non-negative integer. These are
+        checked before any download.
     OSError
         If no source gives the file with its recorded SHA-256, for example without network
         access. The message lists each URL tried and the path to put the file at by hand, and
@@ -373,6 +501,11 @@ def load_dataset(
     Notes
     -----
     Each dataset's ``description`` gives its source, license, and citation.
+
+    **Limitations.** A sample from a network's own tables can leave a category unseen, or a
+    variable with one category, in few rows: some of these networks' table rows put almost all
+    their mass on one category. The categorical settings then read that variable as having fewer
+    categories, and refuse a column that holds one value.
 
     References
     ----------
@@ -390,12 +523,17 @@ def load_dataset(
     >>> alarm = load_dataset("alarm", n=2000, seed=1)  # doctest: +SKIP
     >>> alarm.data.shape, len(alarm.graph.oriented_edges())  # doctest: +SKIP
     ((2000, 37), 46)
+    >>> asia = load_dataset("asia", n=5000, discrete=True)  # doctest: +SKIP
+    >>> asia.data["either"].cat.categories.tolist()  # doctest: +SKIP
+    ['yes', 'no']
     """
     if name not in DATASETS:
         raise ValueError(f"unknown dataset {name!r}; choose one of {list_datasets()}")
     remote = DATASETS[name]
-    if remote.measured and (n is not None or seed is not None):
-        raise ValueError(f"{name!r} is measured data: n and seed apply to simulated datasets")
+    if remote.measured and (n is not None or seed is not None or discrete):
+        raise ValueError(
+            f"{name!r} is measured data: n, seed, and discrete apply to simulated datasets"
+        )
     if n is not None and not (_is_int(n) and n >= 2):
         raise ValueError(f"n must be an integer of at least 2, got {n!r}")
     if seed is not None and not (_is_int(seed) and seed >= 0):
@@ -408,20 +546,41 @@ def load_dataset(
     contents = remote.read(raw)
     description = remote.description
     values = contents.values
-    if values is None:
+    states = None
+    if values is None and discrete:
+        n, seed = SIMULATED_ROWS if n is None else n, 0 if seed is None else seed
+        tables = read_bif_tables(gzip.decompress(raw).decode("utf-8"))
+        values = tables.sample(n, _component_rng(np.random.SeedSequence(seed), _NOISE))
+        values = values.astype(np.float64)
+        states = tables.states
+        description = description.replace(
+            "{simulation}",
+            "The rows are sampled from the network's own conditional probability tables "
+            f"(n={n}, seed={seed}).",
+        )
+    elif values is None:
         n, seed = SIMULATED_ROWS if n is None else n, 0 if seed is None else seed
         scm = SCM(
             graph=FixedDAG(nodes=contents.nodes, arcs=contents.arcs),
             functional=functional.linear(),
             noise=noise.gaussian(),
         )
-        values = scm.sample(n=n, seed=seed, scale="standardize").data
-        description = description.replace("{simulation}", f"n={n}, seed={seed}")
+        # The columns keep the network's own variable order, which the names and graph follow.
+        values = scm.sample(n=n, seed=seed, scale="standardize", shuffle=False).data
+        description = description.replace(
+            "{simulation}",
+            "The network's own probability tables are not used: the rows come from a "
+            f"linear-Gaussian structural causal model on the graph (n={n}, seed={seed}).",
+        )
     data: Any = values
     if as_frame:
         import pandas as pd
 
         data = pd.DataFrame(values, columns=list(contents.nodes))
+        if states is not None:
+            for j, column in enumerate(contents.nodes):
+                codes = values[:, j].astype(np.int64)
+                data[column] = pd.Categorical.from_codes(codes, categories=states[j])
     return RealDataset(data, _graph(contents), contents.nodes, description)
 
 

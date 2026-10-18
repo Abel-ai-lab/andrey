@@ -44,7 +44,7 @@ repos:
       - id: gitleaks          # no secrets/identities reach the public branch
 
   # Local (not the astral-sh/ty-pre-commit mirror): ty resolves imports from the
-  # project's synced env, so the numeric stack (numba/scipy/...) must be installed.
+  # project's synced env, so the numeric stack (numpy/scipy/...) must be installed.
   # `uv run --group dev` guarantees that env; a standalone `uvx ty`/mirror hook can't
   # see it. The [tool.ty] config lives in pyproject.toml.
   - repo: local

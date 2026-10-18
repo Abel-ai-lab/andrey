@@ -200,7 +200,7 @@ class KCI:
         width = (1.2 if n < 200 else 0.7 if n < 1200 else 0.4) * np.sqrt(len(cond))
         z = data[:, cond]
         if self._rank is not None:
-            return self._low_rank_pvalue(data[:, x_int], data[:, y_int], z, width)
+            return self._low_rank_pvalue(data[:, x_int], data[:, y_int], z, width, self._rank)
         xs = np.column_stack([data[:, x_int], 0.5 * z])
         dev = _kci_backend(n)
         if dev != "numpy":
@@ -215,13 +215,14 @@ class KCI:
         resid = (eigvec * shrink) @ eigvec.T  # R = ridge (Ks + ridge I)^-1
         return _gamma_pvalue(*_kci_moments(resid @ kxs @ resid, resid @ ky @ resid))
 
-    def _low_rank_pvalue(self, x: np.ndarray, y: np.ndarray, z: np.ndarray, width: float) -> float:
+    def _low_rank_pvalue(
+        self, x: np.ndarray, y: np.ndarray, z: np.ndarray, width: float, rank: int
+    ) -> float:
         """The p-value with each kernel replaced by its centered incomplete Cholesky factors.
 
         With ``Ks ~ Ls Ls'``, ``R = ridge (Ks + ridge I)^-1 = I - Ls (Ls' Ls + ridge I)^-1 Ls'``,
         so ``A = R Kxs R = P P'`` with ``P = R Lxs``, and ``B = Q Q'`` with ``Q = R Ly``.
         """
-        rank = self._rank
         lxs = _centered_cholesky_factor(np.column_stack([x, 0.5 * z]), width, rank)
         ly = _centered_cholesky_factor(y[:, None], width, rank)
         ls = _centered_cholesky_factor(z, width, rank)
@@ -410,6 +411,8 @@ class RCoT:
        (2007). A kernel statistical test of independence. Advances in Neural Information
        Processing Systems 20, 585-592.
     """
+
+    pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
 
     def __init__(
         self,

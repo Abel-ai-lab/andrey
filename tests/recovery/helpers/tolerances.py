@@ -47,6 +47,11 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {},
     },
+    # CALM's weights come from a torch optimizer, so only the graph is recorded.
+    "CALM": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
     "CDNOD": {
         "structural": ["graph"],
         "numeric": {},
@@ -121,6 +126,11 @@ SPEC: dict[str, dict] = {
     "Granger": {
         "structural": ["adj"],
         "numeric": {"coeff": {"atol": 1e-6, "rtol": 1e-5}},
+    },
+    # GIN: the latent graph and the clusters in causal order, both exact.
+    "GIN": {
+        "structural": ["graph", "causal_order"],
+        "numeric": {},
     },
     # --- Irregular / pairwise & latent-confounder methods.
     # ANM/PNL: the decided two-node graph, and both p-values and HSIC statistics.

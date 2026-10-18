@@ -9,8 +9,33 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- Seven more methods are supported: `gfci`, `cdnod`, `gies`, `exact_search`, `calm`,
+  `multi_group_direct_lingam`, and `gin` have published benchmarks in the 0.7.0 release card and
+  checks in the release quality gate, and no longer warn with `ExperimentalWarning`. ([#184])
+
+### Breaking
+
+- The `numba` extra and backend are removed, because no method ran Numba code anymore:
+  `andrey.config(backend="numba")` and `ANDREY_BACKEND=numba` raise a `ValueError`,
+  `andrey.describe()` has no `numba` field, and `numpy` or the default `auto` runs the same code as
+  before. ([#178])
+- `camuv` and `andrey.irregular.camuv` are removed: on simulated nonlinear data with hidden common
+  causes, its graphs had more errors than the empty graph at every size measured. ([#187])
+- `cdnod` takes the domain index as `domain_index`, and `andrey run cdnod` as `--domain-index`;
+  the names `c_indx` and `--c-indx` are gone. ([#187])
+
 ### Added
 
+- `fci` and `gfci` take `possible_dsep`: `"fast"`, the default, builds each possible-d-separation
+  set as before, in the order the search visits nodes, and `"order_free"` builds sets that do not
+  depend on that order, at the cost of more tests on some graphs. ([#168])
+- `gies` learns from data that mixes observation with interventions: `interventions`
+  (`--interventions` in the CLI) marks the variables set by an intervention in each row. ([#187])
+- `cdnod` takes `dependence_threshold`, which runs CD-NOD's independent-change step (Huang et al.
+  2020) to orient edges between variables that both change with the domain index; it is off by
+  default. ([#187])
 - `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
   detect nonlinear dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#TBD])
 - The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
@@ -24,6 +49,93 @@ change names its pull request.
   partial correlation does not see. ([#TBD])
 - KCI and CMIknn run on a CUDA GPU, KCI in float64 and CMIknn with the CPU's p-values, from the
   cutoffs `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`. ([#TBD])
+
+### Changed
+
+- `pc` and `cdnod` orient conflicting colliders by the p-value that separated each collider's pair,
+  highest first, so their colliders no longer depend on the column order and their default output
+  can change, and `collider_order="column"` keeps the column-order rule. ([#168], [#187])
+- `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
+  order with the true graph, from the seed, so the order no longer follows how the graph was drawn
+  (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
+- Hill climbing and tabu search break exact score ties by a rank computed from each column's own
+  data instead of by column position, so reordering the columns no longer changes the graph they
+  find, and the same data give the same graph on other machines. ([#168], [#179])
+- `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#169])
+- `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
+  measure values calibrated before this change again with `andrey calibrate`. ([#169])
+- `gies` runs its own search in one process, adding, removing, and turning edges, so on
+  observational data its graph can differ from `ges`'s. ([#187])
+- `gin` orders a latent only when its cluster passes the root test at `alpha`, and leaves the
+  remaining latents unordered, listed in `metadata["unordered"]`, when no candidate passes.
+  ([#187])
+- The `calm` reference explains each step of the fit, how to run the paper's longer schedule, and
+  where the fit can stop at a local optimum. ([#187])
+- When columns repeat others up to scale and shift, the score-based searches raise one `ValueError`
+  that names every group of copies by column name and says to keep one column per group and read
+  its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
+  copies make a test's correlation matrix singular. ([#189])
+
+### Removed
+
+- The benchmark explorer page is retired, and its address redirects to the release cards. ([#175])
+
+### Fixed
+
+- `fci` and `gfci` no longer turn every edge with a tail at one end and a circle at the other
+  into an undirected edge; the rule that sets such tails now needs a third node. ([#168])
+- In `fci` and `gfci`, rule R5 searches every uncovered circle path up to a fixed bound, rule R8
+  checks both endpoint orders, and the possible-d-separation step tests every conditioning subset,
+  so they remove false edges and orient endpoints they used to miss;
+  `andrey.data.latent.marginal(..., "pag")` follows the same rules. ([#168])
+- `ges`, `gies`, `gfci`, `xges`, `hc`, `tabu`, `boss`, and `grasp` return the same graph however
+  small the data's scale, where squared covariances used to underflow and change the result.
+  ([#169])
+- These searches and `exact_search` raise a `ValueError` naming the columns when a column repeats
+  another up to scale and shift given more than two rows or, with more rows than columns, is a
+  linear function of other columns, instead of returning a graph from scores of a zero residual
+  variance, which were infinite or finite but meaningless. ([#169])
+- With no more rows than columns, these searches no longer pick a parent set of `n_samples - 1` or
+  more variables, which fits its child exactly. ([#169])
+- `gfci` follows the published algorithm: independence tests remove edges from the GES graph
+  before the orientation rules run, so its PAG drops the extra edges GES adds around a hidden
+  common cause. ([#187])
+- `gin` tests each candidate for the next latent against every other remaining cluster, so a
+  chain of three or more latents is no longer misordered. ([#187])
+- `gin` pools its independence tests without capping any one p-value, so a strongly dependent
+  group with many variables outside it is no longer accepted as a cluster. ([#187])
+- `calm` raises `ValueError` when its loss stops being finite instead of returning NaN weights, and
+  leaves the global torch random number generator untouched. ([#187])
+- Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
+  dropping the edge. ([#187])
+
+## [0.6.0] - 2026-10-17
+
+### Highlights
+
+- Categorical and mixed data: PC, GES, hill climbing, and seven more methods take tests and scores
+  for categorical columns and for tables that mix them with numbers. On categorical data, GES runs
+  more than 50x faster than causal-learn at every size and returns the same graph on every
+  dataset, and hill climbing runs more than 20x faster than pgmpy at every size. The 0.6.0 release
+  card gives the numbers and each method's limits. ([#167])
+
+### Added
+
+- Categorical and mixed data: `pc`, `fci`, `gfci`, and `cdnod` take the chi-square, G-square,
+  degenerate Gaussian, and conditional Gaussian tests (`indep_test="chisq"`, `"gsq"`,
+  `"degen_gauss"`, `"cond_gauss"`), and `ges`, `gfci`, `hc`, `tabu`, `boss`, `grasp`, and
+  `exact_search` take the matching scores. ([#167])
+- `andrey.data.sample_discrete` and `sample_mixed` sample a discrete or a conditional linear
+  Gaussian network with its true graph. ([#167])
+- The categorical scores include the multinomial BIC beside BDeu on the BIC's `-2` log scale, read
+  text, string, and `category` columns as categories, and `load_dataset(..., discrete=True)` samples
+  ASIA, ALARM, HEPAR2, and ANDES from their own conditional probability tables (with Rui Zhu,
+  [#94]). ([#167])
+
+### Changed
+
+- `hc` with a mixed-data score never adds a continuous -> categorical edge, which the conditional
+  linear Gaussian model cannot express, and scores its candidate parent sets in batches. ([#167])
 
 ## [0.5.0] - 2026-10-16
 
@@ -178,7 +290,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.3.0...v0.4.0
@@ -199,3 +312,13 @@ First alpha release.
 [#127]: https://github.com/Abel-ai-lab/andrey/pull/127
 [#133]: https://github.com/Abel-ai-lab/andrey/pull/133
 [#95]: https://github.com/Abel-ai-lab/andrey/pull/95
+[#94]: https://github.com/Abel-ai-lab/andrey/pull/94
+[#167]: https://github.com/Abel-ai-lab/andrey/pull/167
+[#168]: https://github.com/Abel-ai-lab/andrey/pull/168
+[#169]: https://github.com/Abel-ai-lab/andrey/pull/169
+[#175]: https://github.com/Abel-ai-lab/andrey/pull/175
+[#178]: https://github.com/Abel-ai-lab/andrey/pull/178
+[#179]: https://github.com/Abel-ai-lab/andrey/pull/179
+[#184]: https://github.com/Abel-ai-lab/andrey/pull/184
+[#187]: https://github.com/Abel-ai-lab/andrey/pull/187
+[#189]: https://github.com/Abel-ai-lab/andrey/pull/189

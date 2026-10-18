@@ -9,7 +9,7 @@ import warnings
 import numpy as np
 import pytest
 
-from andrey.cli import graph_view, main
+from andrey.cli import graph_view, main, render_method_help
 from andrey.spec import REGISTRY, SCHEMA_VERSION
 
 
@@ -124,6 +124,25 @@ def test_run_writes_output_file(capsys, tmp_path, csv_path):
     code, out, _ = _run(["run", "pc", "--data", str(csv_path), "-o", str(dest)], capsys)
     assert code == 0 and out.strip() == ""  # stdout stays clean when -o is given
     assert json.loads(dest.read_text())["method"] == "pc"
+
+
+def test_run_gies_with_and_without_interventions(capsys, tmp_path):
+    """The optional input orients x -> y; omitted, the facade's default leaves the edge open."""
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(600)
+    y = x + 0.5 * rng.standard_normal(600)
+    y[400:] = rng.standard_normal(200)
+    mask = np.zeros((600, 2))
+    mask[400:, 1] = 1
+    data_path, mask_path = tmp_path / "xy.csv", tmp_path / "mask.csv"
+    np.savetxt(data_path, np.column_stack([x, y]), delimiter=",")
+    np.savetxt(mask_path, mask, delimiter=",")
+    types = {}
+    for argv in (["--interventions", str(mask_path)], []):
+        code, out, _ = _run(["run", "gies", "--data", str(data_path), *argv], capsys)
+        assert code == 0
+        types[bool(argv)] = [e["type"] for e in json.loads(out)["structure"]["edges"]]
+    assert types == {True: ["directed"], False: ["undirected"]}
 
 
 def test_run_multi_group(capsys, nongaussian_path):
@@ -285,7 +304,7 @@ def test_missing_input_error(capsys):
 
 
 def test_unexpected_input_error(capsys, csv_path):
-    argv = ["run", "pc", "--data", str(csv_path), "--c-indx", str(csv_path)]
+    argv = ["run", "pc", "--data", str(csv_path), "--domain-index", str(csv_path)]
     code, _out, err = _run(argv, capsys)
     assert code == 2 and json.loads(err)["error"]["code"] == "unexpected_input"
 
@@ -320,8 +339,8 @@ def test_per_method_help(capsys):
     assert "andrey run pc" in out and "alpha=" in out and "andrey run pc --help --json" in out
     assert "--config" in out  # run-level flags are listed in per-method help
     assert "Experimental" not in out
-    _, out, _ = _run(["run", "gfci", "--help"], capsys)
-    assert "Experimental: no published benchmark" in out
+    experimental = REGISTRY["pc"].model_copy(update={"status": "experimental"})
+    assert "Experimental: no published benchmark" in render_method_help(experimental)
 
 
 # --- edge orientation + mark constants ------------------------------------------------------------
@@ -439,7 +458,6 @@ def test_seeded_run_reports_resolved_seed(capsys, csv_path):
         "granger",
         "gin",
         "rcd",
-        "camuv",
         "bottom_up_parce_lingam",
         "pnl",
         "anm",
@@ -449,7 +467,7 @@ def test_output_envelope_matches_spec(name, capsys, csv_path, nongaussian_path, 
     """The result envelope reflects the method's OutputSpec claims (kind / ordering / weighted)."""
     from andrey.spec import get_spec
 
-    non_gaussian = ("direct_lingam", "gin", "rcd", "camuv", "bottom_up_parce_lingam")
+    non_gaussian = ("direct_lingam", "gin", "rcd", "bottom_up_parce_lingam")
     pairwise = ("pnl", "anm")
     path = nongaussian_path if name in non_gaussian else csv_path
     data = str(pair_path if name in pairwise else path)
@@ -475,11 +493,11 @@ def test_fit_warnings_go_in_the_envelope_not_stderr(capsys, csv_path, filter_act
     """An error filter (``PYTHONWARNINGS=error``) does not turn a fit's warning into a failure."""
     with warnings.catch_warnings():
         warnings.simplefilter(filter_action)
-        code, out, err = _run(["run", "gfci", "--data", str(csv_path)], capsys)
+        code, out, err = _run(["run", "hc", "--data", str(csv_path), "max_iter=1"], capsys)
     assert code == 0 and err == ""
     [warning] = json.loads(out)["run"]["warnings"]
-    assert warning["category"] == "ExperimentalWarning"
-    assert warning["message"].startswith("andrey.gfci is experimental")
+    assert warning["category"] == "SearchLimitWarning"
+    assert warning["message"].startswith("hc stopped at its limit of max_iter=1 moves")
 
 
 def test_supported_run_has_no_warnings(capsys, csv_path):
@@ -492,9 +510,9 @@ def test_supported_run_has_no_warnings(capsys, csv_path):
 
 def test_human_summary_ends_with_the_fit_warnings(capsys, monkeypatch, csv_path):
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
-    _, out, err = _run(["run", "gfci", "--data", str(csv_path)], capsys)
+    _, out, err = _run(["run", "hc", "--data", str(csv_path), "max_iter=1"], capsys)
     assert err == ""
-    assert out.rstrip().splitlines()[-1].startswith("  ExperimentalWarning: andrey.gfci is")
+    assert out.rstrip().splitlines()[-1].startswith("  SearchLimitWarning: hc stopped at its")
 
 
 def test_run_prints_human_summary_on_tty(capsys, monkeypatch, csv_path):
@@ -769,7 +787,7 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     from andrey.core.backend import Backend
     from andrey.spec.generate import env_dict
 
-    state = Backend(backend="auto", num_workers=-1, numba=False, torch=True, cuda=False, mps=True)
+    state = Backend(backend="auto", num_workers=-1, torch=True, cuda=False, mps=True)
     monkeypatch.setattr("andrey.describe", lambda: state)
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "-1")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "90000")
@@ -780,7 +798,6 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     assert report["configuration"] == {"backend": "auto", "num_workers": -1}
     assert report["available_backends"] == {
         "numpy": True,
-        "numba": False,
         "cpu": True,
         "cuda": False,
         "mps": True,
@@ -801,15 +818,13 @@ def test_config_report_is_readable_when_piped(capsys, monkeypatch):
     monkeypatch.setattr("sys.stdout.isatty", lambda: False)
     monkeypatch.setattr(
         "andrey.describe",
-        lambda: Backend(
-            backend="numpy", num_workers=1, numba=False, torch=False, cuda=False, mps=False
-        ),
+        lambda: Backend(backend="numpy", num_workers=1, torch=False, cuda=False, mps=False),
     )
     code, out, err = _run(["config"], capsys)
     assert code == 0 and not err
     assert "Backend preference: numpy" in out
     assert "Available backends: numpy" in out
-    assert "  numba: the [numba] extra is not installed" in out
+    assert all(f"  {name}: " in out for name in ("cpu", "cuda", "mps"))  # a reason per backend
     assert "Platform: " in out and "usable cores" in out
     assert "Extras:" in out
     assert "andrey config --help" in out
@@ -822,15 +837,12 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
 
     monkeypatch.setattr(
         "andrey.describe",
-        lambda: Backend(
-            backend="auto", num_workers=1, numba=False, torch=True, cuda=False, mps=False
-        ),
+        lambda: Backend(backend="auto", num_workers=1, torch=True, cuda=False, mps=False),
     )
     monkeypatch.setattr(
         cli,
         "_extra_packages",
         lambda: {
-            "numba": ["numba"],
             "torch": ["torch"],
             "viz": ["matplotlib", "pygraphviz"],
             "data": ["safetensors"],
@@ -851,7 +863,6 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
     assert not extras["viz"]["installed"]  # pygraphviz is missing
     assert extras["viz"]["install"] == 'pip install "andrey-core[viz]"'
     assert system["unavailable_backends"] == {
-        "numba": "the [numba] extra is not installed",
         "cuda": "torch finds no CUDA device",
         "mps": "Apple MPS needs macOS",
     }
@@ -876,7 +887,7 @@ def test_config_and_describe_report_one_availability_shape(torch, cuda, capsys, 
     # the ANDREY_BACKEND vocabulary, where `cpu` is torch on the CPU.
     from andrey.core import backend
 
-    installed = {"numba": False, "torch": torch}
+    installed = {"torch": torch}
     monkeypatch.setattr(backend, "_installed", lambda name: installed.get(name, False))
     monkeypatch.setattr(backend, "_torch_gpu_build", lambda: True)
     monkeypatch.setattr(backend, "_is_available", lambda device: cuda and device == "cuda")
@@ -885,7 +896,7 @@ def test_config_and_describe_report_one_availability_shape(torch, cuda, capsys, 
     code, out, err = _run(["config", "--json"], capsys)
     assert code == 0 and not err
     reported = json.loads(out)["available_backends"]
-    expected = {"numpy": True, "numba": False, "cpu": torch, "cuda": cuda, "mps": False}
+    expected = {"numpy": True, "cpu": torch, "cuda": cuda, "mps": False}
     assert reported == backend.describe().as_dict()["available_backends"] == expected
 
 
@@ -979,3 +990,33 @@ def test_documented_schema_version_matches_code(path):
 
     text = (Path(__file__).parents[2] / path).read_text()
     assert set(re.findall(r'`schema_version`?:? \(?`?"(\d+)"', text)) == {SCHEMA_VERSION}
+
+
+def test_categorical_names_header_columns_or_positions(capsys, tmp_path):
+    rng = np.random.default_rng(3)
+    g = rng.integers(0, 3, 600)
+    u = rng.standard_normal(600)
+    v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(600)
+    path = tmp_path / "mixed.csv"
+    path.write_text("g,u,v\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(g, u, v)))
+    base = ["run", "pc", "--data", str(path), "indep_test=degen_gauss"]
+    code, by_name, _ = _run([*base, "categorical=[g]"], capsys)
+    assert code == 0 and json.loads(by_name)["run"]["params"]["categorical"] == ["g"]
+    code, by_position, _ = _run([*base, "categorical=[0]"], capsys)
+    assert json.loads(by_position)["structure"] == json.loads(by_name)["structure"]
+    code, _out, err = _run([*base, "categorical=[h]"], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "unknown_column"
+
+
+def test_a_mixed_run_reports_inferred_columns_and_its_warning(capsys, tmp_path):
+    rng = np.random.default_rng(4)
+    g = rng.integers(0, 3, 400)
+    u = rng.standard_normal(400)
+    v = np.array([-1.0, 0.0, 1.0])[g] + u + 0.5 * rng.standard_normal(400)
+    path = tmp_path / "mixed.csv"
+    path.write_text("g,u,v\n" + "\n".join(f"{a},{b},{c}" for a, b, c in zip(g, u, v)))
+    code, out, _ = _run(["run", "pc", "--data", str(path), "indep_test=cond_gauss"], capsys)
+    env = json.loads(out)
+    assert code == 0 and env["metadata"]["categorical"] == ["g"]
+    [warning] = [w for w in env["run"]["warnings"] if w["category"] == "DataTypeWarning"]
+    assert "'g' (3 values)" in warning["message"]

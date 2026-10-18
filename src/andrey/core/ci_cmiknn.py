@@ -166,7 +166,9 @@ class CMIknn:
     p-value is ``(b + 1) / (B + 1)``: the observed data count as one more draw, so the p-value is
     never zero [3]_. In the skeleton searches of PC, FCI, GFCI, and CD-NOD, a query's shuffles stop
     once ``p > alpha`` or ``p <= alpha`` is certain whatever the remaining shuffles give, so the
-    search decides as with every shuffle. An empty conditioning set shuffles ``x`` over all rows,
+    search decides as with every shuffle; where the search orients colliders by p-value
+    (``collider_order="p_value"``), only ``p <= alpha`` stops them, so every p-value it ranks is
+    the full one. An empty conditioning set shuffles ``x`` over all rows,
     and the estimate becomes the mutual information estimate of ``x`` and ``y`` [2]_. The default
     ``k_cmi``, a tenth of the rows, is the low end of the range [1]_ recommends; a larger share
     smooths the estimate, which costs power as the conditioning set grows.
@@ -197,6 +199,8 @@ class CMIknn:
        calculating exact p-values when permutations are randomly drawn. Statistical Applications
        in Genetics and Molecular Biology 9(1), Article 39.
     """
+
+    pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
 
     def __init__(
         self,
@@ -232,7 +236,12 @@ class CMIknn:
         return self._bounded_pvalue(x, y, condition_set, None)
 
     def _bounded_pvalue(
-        self, x: int, y: int, condition_set: Iterable[int], alpha: float | None
+        self,
+        x: int,
+        y: int,
+        condition_set: Iterable[int],
+        alpha: float | None,
+        exact_above: bool = False,
     ) -> float:
         """The p-value, or with ``alpha`` given, a bound on it on the same side of ``alpha``.
 
@@ -241,7 +250,8 @@ class CMIknn:
         ``(b + 1) / (B + 1)`` and ``(b + r + 1) / (B + 1)``, so the shuffles stop once the first
         exceeds ``alpha`` (that bound is returned) or the second does not (that one is). The
         division is the full p-value's and is monotone in the numerator, so ``p > alpha`` is
-        decided as with every shuffle.
+        decided as with every shuffle. With ``exact_above``, only the second stop applies, so a
+        p-value above ``alpha`` is the full one: the scans that rank colliders by p-value pass it.
         """
         x_int, y_int, cond = _canonical(x, y, condition_set)
         cond = tuple(cond)
@@ -254,7 +264,7 @@ class CMIknn:
         exceed = 0
         for left, hit in zip(range(self._n_permutations, 0, -1), hits):
             if alpha is not None:
-                if (exceed + 1) / total > alpha:
+                if not exact_above and (exceed + 1) / total > alpha:
                     return (exceed + 1) / total
                 if (exceed + left + 1) / total <= alpha:
                     return (exceed + left + 1) / total

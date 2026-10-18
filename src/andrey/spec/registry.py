@@ -1,14 +1,20 @@
-"""The method registry -- one :class:`MethodSpec` per public facade.
+"""Method definitions used to generate CLI help and JSON schemas.
 
-Keyed on ``andrey.api.__all__``; a drift-guard test asserts the registry and that list stay in
-lockstep and that every spec's inputs / params / defaults match the live facade signature. Summaries
-are bounded "when to reach for this" notes; parameter defaults are the source of truth the CLI
-and JSON schema render.
+Each public function in ``andrey.api.__all__`` has one :class:`MethodSpec` describing its inputs,
+parameters, defaults, and results. Tests check that these definitions cover the public functions
+and match their signatures. Summaries explain when to use each method; the CLI and JSON schemas
+display the parameter defaults defined here.
 """
 
 from __future__ import annotations
 
+from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.search.boss import PERMUTATION_SCORES
+from andrey.search.exact import EXACT_SCORES
+from andrey.search.ges import GES_SCORES
+from andrey.search.hc import HC_SCORES
+from andrey.search.tabu import TABU_SCORES
 
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
 
@@ -28,13 +34,35 @@ _INDEP_TEST = ParamSpec(
     name="indep_test",
     type="str",
     default="fisherz",
-    doc="Conditional-independence test. fisherz and student_t test the partial correlation, for "
-    "linear effects: fisherz = Fisher's z-transform and the normal distribution; student_t = the "
-    "Student-t distribution, exact for Gaussian data at any sample size. The experimental "
-    "nonlinear tests, each far slower per test: kci = kernel test; rcot = its random-feature "
+    doc="Conditional-independence test. For continuous data, on the partial correlation: "
+    "fisherz = Fisher's z-transform and the normal distribution; student_t = the Student-t "
+    "distribution, exact for Gaussian data at any sample size. For categorical data coded by whole "
+    "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
+    "columns named by categorical: degen_gauss = degenerate Gaussian and "
+    "cond_gauss = conditional Gaussian likelihood ratio. Experimental, for nonlinear effects in "
+    "continuous data and each far slower per test: kci = kernel test; rcot = its random-feature "
     "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
     "Gaussian-process regression and distance correlation.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
+)
+_CATEGORICAL = ParamSpec(
+    name="categorical",
+    type="str_list",
+    default=None,
+    doc="The categorical columns, for a mixed-data test or score: column names from the data "
+    "file's header or 0-based positions, for example, categorical=[smoker,region]; [] marks none. "
+    "null infers them: every column of at most max_categories distinct whole numbers, named in a "
+    "DataTypeWarning; with none, the setting runs as its linear-Gaussian form and warns. Other "
+    "tests and scores reject it.",
+    nullable=True,
+)
+_MAX_CATEGORIES = ParamSpec(
+    name="max_categories",
+    type="int",
+    default=10,
+    doc="The most distinct whole numbers a column may hold to be inferred as categorical, at least "
+    "2. With a continuous test or score, such columns get a one-time DataTypeWarning that they may "
+    "be category codes.",
 )
 _COLLIDER_RULE = ParamSpec(
     name="collider_rule",
@@ -45,6 +73,25 @@ _COLLIDER_RULE = ParamSpec(
     "separating set of x and y; majority = test x and y given every subset of each one's "
     "neighbors, and z is a collider when fewer than half of the separating subsets contain it "
     "(exactly half: unoriented). Majority costs up to 2**degree tests per triple.",
+)
+_POSSIBLE_DSEP = ParamSpec(
+    name="possible_dsep",
+    type="str",
+    default="fast",
+    choices=("fast", "order_free"),
+    doc="How each possible-d-separation set is built: fast = a node's check runs when the search "
+    "reaches it, so the set depends on the order the search visits nodes; order_free = the checks "
+    "run after the search, so it does not. order_free can run more tests.",
+)
+_COLLIDER_ORDER = ParamSpec(
+    name="collider_order",
+    type="str",
+    default="p_value",
+    choices=COLLIDER_ORDERS,
+    doc="The order in which colliders are oriented, which decides between two that would orient "
+    "one edge in opposite directions: p_value = the collider whose endpoints were separated with "
+    "the largest p-value first, independent of the column order; column = in column order, the "
+    "first of two conflicting colliders kept.",
 )
 _LAMBDA_VALUE = ParamSpec(
     name="lambda_value",
@@ -87,13 +134,18 @@ _add(
         summary="General-purpose structure learning from i.i.d. observational data: "
         "conditional-independence tests remove edges, then orientation rules direct the edges the "
         "data determine; returns a CPDAG. A good first method when nothing is known about the "
-        "graph.",
+        "graph; indep_test=chisq or gsq for categorical data, degen_gauss or cond_gauss for mixed "
+        "data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(structure_type="graph", graph_kind="cpdag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        params=(_ALPHA, _INDEP_TEST),
+        params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
         references=(
             "Spirtes & Glymour 1991",
             "Spirtes, Glymour & Scheines 2000",
@@ -110,11 +162,22 @@ _add(
         "PAG. A circle mark is an endpoint the data cannot determine; a bidirected edge (<->) "
         "marks a latent common cause. Use when unmeasured confounding is plausible.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(structure_type="graph", graph_kind="pag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        params=(_ALPHA, _INDEP_TEST, _COLLIDER_RULE),
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+            _POSSIBLE_DSEP,
+        ),
         references=(
             "Spirtes, Meek & Richardson 1995",
             "Spirtes, Glymour & Scheines 2000",
@@ -127,27 +190,45 @@ _add(
     MethodSpec(
         name="gfci",
         family="constraint",
-        summary="Score-then-FCI hybrid: a GES-scored skeleton refined by FCI orientation. Latent-"
-        "aware like FCI but usually more accurate on the skeleton. Returns a PAG.",
+        summary="Score-then-FCI hybrid: GES adjacencies, pruned by independence tests and oriented "
+        "with FCI's rules. Latent-aware like FCI but usually more accurate on the skeleton. "
+        "Returns a PAG.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(structure_type="graph", graph_kind="pag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score for the GES phase.",
-                choices=("local_score_BIC",),
+                doc="Local score for the GES phase: local_score_BIC = linear-Gaussian BIC; "
+                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
+                "categorical data coded by whole numbers; "
+                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
+                "Gaussian BIC, for mixed data (experimental). The test must read the same kind of "
+                "data.",
+                choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
             _INDEP_TEST,
             _ALPHA,
             _COLLIDER_RULE,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+            _POSSIBLE_DSEP,
         ),
-        references=("Ogarrio, Spirtes & Ramsey 2016", "Colombo & Maathuis 2014"),
+        references=(
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Zhang 2008",
+            "Colombo & Maathuis 2014",
+            "Spirtes, Glymour & Scheines 2000",
+        ),
     )
 )
 _add(
@@ -156,25 +237,44 @@ _add(
         family="constraint",
         summary="Constraint-based discovery for data pooled from several domains or regimes: adds "
         "the domain index as a variable that can only be a cause, which can orient more edges. "
-        "Returns a CPDAG over the data variables.",
+        "Returns a partially directed graph over the data variables, tagged cpdag.",
         data=DataSpec(
             inputs=(
                 _DATA_MATRIX,
                 InputSpec(
-                    name="c_indx",
+                    name="domain_index",
                     kind="context",
                     doc="Domain / context index, (n_samples,) or (n_samples, 1), aligned to the "
                     "data rows.",
                 ),
             ),
             layout=_MATRIX_LAYOUT,
-            notes="c_indx becomes a trailing pseudo-node, then projected out of the result.",
+            notes="domain_index becomes a trailing pseudo-node, then projected out of the result.",
         ),
-        output=OutputSpec(structure_type="graph", graph_kind="cpdag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
-        params=(_ALPHA, _INDEP_TEST),
+        status="supported",
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_ORDER,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+            ParamSpec(
+                name="dependence_threshold",
+                type="float",
+                default=None,
+                doc="Runs the independent-change step, which orients edges between variables that "
+                "both change with the index, at this threshold on its module dependence measure. "
+                "null skips the step.",
+                nullable=True,
+            ),
+        ),
         references=("Huang et al. 2020",),
     )
 )
@@ -185,24 +285,35 @@ _add(
     MethodSpec(
         name="ges",
         family="score",
-        summary="Greedy equivalence search: a BIC-scored greedy search over CPDAGs. Fast and "
-        "accurate on linear-Gaussian data; the BIC score is in metadata['score'].",
+        summary="Greedy equivalence search: a score-based greedy search over CPDAGs. Fast and "
+        "accurate on linear-Gaussian data with the BIC; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data. The score is in metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="deterministic",
-        accel="numba",
+        accel="numpy",
         status="supported",
         params=(
             ParamSpec(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score objective.",
-                choices=("local_score_BIC",),
+                doc="Local score objective: local_score_BIC = linear-Gaussian BIC; "
+                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
+                "categorical data coded by whole numbers; "
+                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
+                "Gaussian BIC, for mixed data.",
+                choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Chickering 2002",),
     )
@@ -211,15 +322,29 @@ _add(
     MethodSpec(
         name="gies",
         family="score",
-        summary="Greedy interventional equivalence search. Only the observational "
-        "(no-intervention) case is exposed, where it coincides with GES; returns a CPDAG + score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        summary="Greedy interventional equivalence search: GES for data that mixes observation "
+        "with interventions, scoring each variable on the rows where it was not intervened on. "
+        "Returns the interventional essential graph + score.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="interventions",
+                    kind="context",
+                    doc="(n_samples, n_variables) 0/1 matrix aligned to the data: 1 where the "
+                    "row's value of the variable was set by an intervention. Omit it for "
+                    "observational data.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
         ),
         determinism="deterministic",
-        accel="numba",
-        status="experimental",
+        accel="numpy",
+        status="supported",
         params=(_LAMBDA_VALUE,),
         references=("Hauser & Buhlmann 2012",),
     )
@@ -270,11 +395,16 @@ _add(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
-        "BIC score improves; a simple greedy baseline. Stops at a local optimum, or after max_iter "
-        "moves when set. Returns the CPDAG of the final DAG and its score.",
+        "score improves; a simple greedy baseline. BIC by default; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
+        "when set. Returns the CPDAG of the final DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -284,8 +414,12 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC_from_cov",
-                doc="Local score objective (covariance-based BIC).",
-                choices=("local_score_BIC_from_cov",),
+                doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
+                "categorical data coded by whole numbers; "
+                "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
+                "Gaussian BIC, for mixed data.",
+                choices=HC_SCORES,
             ),
             _LAMBDA_VALUE,
             ParamSpec(
@@ -296,6 +430,8 @@ _add(
                 "ends). Reaching a set limit warns with SearchLimitWarning.",
                 nullable=True,
             ),
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Chickering, Geiger & Heckerman 1995", "Scutari 2010"),
     )
@@ -306,8 +442,9 @@ _add(
         family="score",
         summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the best "
         "non-improving move, never returning to a recently visited DAG, and keeps the best DAG "
-        "seen. With the same settings its BIC score is never worse than hc's. Returns the CPDAG "
-        "of that DAG and its score.",
+        "seen. With the same settings its score is never worse than hc's. BIC by default; "
+        "score_func=local_score_BDeu or local_score_BIC_categorical for categorical data. Returns "
+        "the CPDAG of that DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
@@ -320,8 +457,10 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC_from_cov",
-                doc="Local score objective (covariance-based BIC).",
-                choices=("local_score_BIC_from_cov",),
+                doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+                "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
+                "categorical data coded by whole numbers.",
+                choices=TABU_SCORES,
             ),
             _LAMBDA_VALUE,
             ParamSpec(
@@ -355,14 +494,20 @@ _add(
     MethodSpec(
         name="exact_search",
         family="score",
-        summary="Globally optimal BIC search over DAGs (A* or dynamic programming). Exact but "
+        summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
-        "the best-scoring equivalence class.",
+        "the best-scoring equivalence class. BIC by default; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(structure_type="graph", graph_kind="dag"),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="dag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="search_method",
@@ -371,6 +516,18 @@ _add(
                 doc="Exact search strategy: A* or dynamic programming.",
                 choices=("astar", "dp"),
             ),
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC",
+                doc="Local score: local_score_BIC = linear-Gaussian BIC; local_score_BDeu = BDeu "
+                "and local_score_BIC_categorical = multinomial BIC, for categorical data coded by "
+                "whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
+                "and conditional Gaussian BIC, for mixed data.",
+                choices=EXACT_SCORES,
+            ),
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Yuan & Malone 2013", "Silander & Myllymaki 2006"),
     )
@@ -391,7 +548,7 @@ _add(
         ),
         determinism="stochastic",
         accel="torch",
-        status="experimental",
+        status="supported",
         seeded=True,
         passthrough=True,
         params=(
@@ -414,24 +571,30 @@ _BOSS_SCORE = ParamSpec(
     name="score_func",
     type="str",
     default="local_score_BIC_from_cov",
-    doc="Local score objective (covariance-based BIC).",
-    choices=("local_score_BIC_from_cov",),
+    doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+    "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional Gaussian BIC, "
+    "for mixed data (experimental).",
+    choices=PERMUTATION_SCORES,
 )
 _add(
     MethodSpec(
         name="boss",
         family="permutation",
         summary="Best-order score search: a permutation search over the linear-Gaussian BIC, fast "
-        "and accurate on linear-Gaussian data. Returns a CPDAG + score.",
+        "and accurate on linear-Gaussian data; score_func=local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="stochastic",
         accel="numpy",
         status="supported",
         seeded=True,
-        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED),
+        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
     )
 )
@@ -440,10 +603,15 @@ _add(
         name="grasp",
         family="permutation",
         summary="Greedy relaxation of the sparsest permutation: a permutation search over the "
-        "linear-Gaussian BIC, like BOSS with a different move (tucks). Returns a CPDAG + score.",
+        "linear-Gaussian BIC, like BOSS with a different move (tucks); "
+        "score_func=local_score_degen_gauss or local_score_cond_gauss for mixed data. Returns a "
+        "CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
-            structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
         ),
         determinism="stochastic",
         accel="numpy",
@@ -459,6 +627,8 @@ _add(
                 doc="Maximum number of tucks in one chain of moves. Only 3 is supported.",
             ),
             _SEED,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
         ),
         references=("Lam, Andrews & Ramsey 2022",),
     )
@@ -554,7 +724,7 @@ _add(
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(_RANDOM_STATE,),
         references=("Shimizu 2012",),
     )
@@ -991,17 +1161,18 @@ _add(
             structure_type="graph",
             graph_kind="dag",
             has_latents=True,
-            doc="observed + latent nodes; metadata clusters + causal_order.",
+            doc="observed + latent nodes; metadata clusters, causal_order + unordered.",
         ),
         determinism="deterministic",
         accel="numpy",
-        status="experimental",
+        status="supported",
         params=(
             ParamSpec(
                 name="alpha",
                 type="float",
                 default=0.05,
-                doc="Significance level of the independence test that finds the causal clusters.",
+                doc="Significance level of the independence test that finds the causal clusters "
+                "and each next latent in the order.",
             ),
             ParamSpec(
                 name="labels",
@@ -1065,42 +1236,6 @@ _add(
         accel="numpy",
         status="supported",
         references=("Maeda & Shimizu 2020",),
-    )
-)
-
-_add(
-    MethodSpec(
-        name="camuv",
-        family="latent",
-        summary="Causal additive models with unobserved variables (CAM-UV) for nonlinear data: "
-        "direct causes as ->, pairs linked through an unobserved variable as <->.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        params=(
-            ParamSpec(
-                name="alpha",
-                type="float",
-                default=0.01,
-                doc="Significance level of the HSIC independence tests.",
-            ),
-            ParamSpec(
-                name="max_explanatory_vars",
-                type="int",
-                default=3,
-                doc="Largest set of variables tested together, the variable itself included, "
-                "at least 2 (parent sets up to one fewer); larger values find more parents and "
-                "take longer.",
-            ),
-        ),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="pag",
-            doc="PAG over the observed variables; metadata confounded_pairs lists the <-> pairs, "
-            "joined by a causal path through a hidden variable or by hidden common causes.",
-        ),
-        determinism="deterministic",
-        accel="numpy",
-        status="experimental",
-        references=("Maeda & Shimizu 2021",),
     )
 )
 

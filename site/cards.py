@@ -36,18 +36,6 @@ QUALITY = 75  # about 20 KB under MAX_BYTES at 75, 11 KB at 76, 1 KB at 77. No b
 # LinkedIn shows a card at 480 px wide, where 92 px becomes about 37.
 TITLE_FITS = ((92, 2), (72, 3))
 TITLE_WIDTH = 1040
-# The accent word (``ACCENT`` on the homepage's card and the README banner) is drawn at rest, as the
-# homepage's motion ends: amber, slanted like Inter's italic, and sharp, with the trace of its
-# letters on its right: copies of the word behind it, each further right and fainter, blurred
-# sideways and fading out by TRAIL past its end, inside the space before the next word. ROOM is
-# the space added after the word, which keeps the gaps on its two sides even (the slant leans it
-# toward the previous word); TRAIL and BLUR are in font sizes too; TRACE is the copies' opacities,
-# nearest first.
-SLANT = 11
-ROOM = 0.04
-TRAIL = 0.2
-BLUR = 0.06
-TRACE = (0.5, 0.4, 0.3, 0.22, 0.14, 0.08)
 
 
 def _width(text: str, size: int, weight: str) -> float:
@@ -127,69 +115,38 @@ def _credit() -> str:
     )
 
 
-def _text(word: str, x: float, y: float, size: int, fill: str, extra: str = "") -> str:
+def _text(word: str, x: float, y: float, size: int, fill: str) -> str:
     return (
         f'<text x="{x:.1f}" y="{y:.1f}" dominant-baseline="middle" font-family="Inter" '
-        f'font-weight="600" font-size="{size}" fill="{fill}"{extra}>{html.escape(word)}</text>'
-    )
-
-
-def _accent(word: str, x: float, y: float, size: int, key: str) -> tuple[str, str]:
-    """``word`` in amber at (``x``, ``y``), slanted, with its trace after it: its defs and its
-    drawing."""
-    width, trail = _width(word, size, "SemiBold"), size * TRAIL
-    defs = (
-        _text(word, x, y, size, grain.AMBER, f' id="{key}"')
-        # The trace shows at half strength across the word, at full near its end, and fades out
-        # by the end of its reach.
-        + f'<linearGradient id="{key}-fade" gradientUnits="userSpaceOnUse" x1="{x:.1f}" '
-        f'x2="{x + width + trail:.1f}" y1="0" y2="0"><stop offset="0" stop-color="#ffffff" '
-        'stop-opacity="0.5"/><stop offset="0.65" stop-color="#ffffff"/>'
-        '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>'
-        f'<mask id="{key}-trace"><rect x="{x:.1f}" y="{y - size:.1f}" width="{width + trail:.1f}" '
-        f'height="{size * 2}" fill="url(#{key}-fade)"/></mask>'
-        f'<filter id="{key}-blur" x="-50%" y="-50%" width="200%" height="200%">'
-        f'<feGaussianBlur stdDeviation="{size * BLUR:.1f} 0"/></filter>'
-    )
-    step = trail / len(TRACE)
-    copies = "".join(
-        f'<use href="#{key}" x="{(k + 1) * step:.1f}" opacity="{alpha}"/>'
-        for k, alpha in enumerate(TRACE)
-    )
-    slant = f"translate({x:.1f} {y:.1f}) skewX(-{SLANT}) translate({-x:.1f} {-y:.1f})"
-    return defs, (
-        f'<g transform="{slant}"><g mask="url(#{key}-trace)"><g filter="url(#{key}-blur)">'
-        f'{copies}</g></g><use href="#{key}"/></g>'
+        f'font-weight="600" font-size="{size}" fill="{fill}">{html.escape(word)}</text>'
     )
 
 
 def _title(
-    lines: list[str], size: int, middles: list[float], x0: float, accent: str, *, left: bool = False
+    lines: list[str],
+    size: int,
+    middles: list[float],
+    x0: float,
+    accents: tuple[str, ...],
+    *,
+    left: bool = False,
 ) -> str:
     """``lines`` in white, each centered on ``x0`` (or starting at it, when ``left``) at its middle
-    in ``middles``; each word equal to ``accent`` drawn as the accent, with its trace's space added
-    after it."""
+    in ``middles``; each word in ``accents`` in amber."""
     space = _width(" ", size, "SemiBold")
-    defs, drawing = [], []
-    for row, (line, y) in enumerate(zip(lines, middles, strict=True)):
+    drawing = []
+    for line, y in zip(lines, middles, strict=True):
         words = line.split(" ")
         widths = [_width(word, size, "SemiBold") for word in words]
-        rooms = [size * ROOM if accent and word == accent else 0 for word in words]
-        x = x0 if left else x0 - (sum(widths) + space * (len(words) - 1) + sum(rooms)) / 2
-        for i, (word, width, room) in enumerate(zip(words, widths, rooms, strict=True)):
-            if accent and word == accent:
-                more, drawn = _accent(word, x, y, size, f"accent-{row}-{i}")
-                defs.append(more)
-                drawing.append(drawn)
-            else:
-                drawing.append(_text(word, x, y, size, "#ffffff"))
-            x += width + space + room
-    return f"<defs>{''.join(defs)}</defs>{''.join(drawing)}"
+        x = x0 if left else x0 - (sum(widths) + space * (len(words) - 1)) / 2
+        for word, width in zip(words, widths, strict=True):
+            drawing.append(_text(word, x, y, size, grain.AMBER if word in accents else "#ffffff"))
+            x += width + space
+    return "".join(drawing)
 
 
-def card_svg(title: str, accent: str = "") -> str:
-    """The card as SVG: ``title`` on up to three lines, each word equal to ``accent`` drawn as the
-    accent.
+def card_svg(title: str, accents: tuple[str, ...] = ()) -> str:
+    """The card as SVG: ``title`` on up to three lines, each word in ``accents`` in amber.
 
     Raises ``ValueError`` when the title does not fit, rather than dropping any of it.
     """
@@ -208,7 +165,7 @@ def card_svg(title: str, accent: str = "") -> str:
         f'<image href="data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}" '
         f'width="{W}" height="{H}"/>'
     )
-    text = _title(lines, size, [top + i * lead for i in range(len(lines))], W / 2, accent)
+    text = _title(lines, size, [top + i * lead for i in range(len(lines))], W / 2, accents)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}">'
         f"{ground}{text}{_credit()}</svg>"
@@ -235,9 +192,9 @@ def _jpeg(svg: str, quality: int) -> bytes:
     return out.getvalue()
 
 
-def card_jpeg(title: str, accent: str = "", quality: int = QUALITY) -> bytes:
+def card_jpeg(title: str, accents: tuple[str, ...] = (), quality: int = QUALITY) -> bytes:
     """The card as a JPEG."""
-    return _jpeg(card_svg(title, accent), quality)
+    return _jpeg(card_svg(title, accents), quality)
 
 
 BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at twice that
@@ -245,8 +202,10 @@ BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at
 # at the README's width, so their corners match.
 BANNER_RADIUS = 27
 BANNER_QUALITY = 65  # its base64 inside the SVG is about 290 KB, under MAX_BYTES
-TAGLINE = "A very fast causal discovery package"
-ACCENT = "fast"  # the tagline's word drawn as the accent, on the homepage's card and the banner
+TAGLINE = "Accelerated, accurate, agentic causal discovery"
+# The tagline's words in amber, on the homepage's card, the banner, and the social preview: the
+# three A's.
+ACCENT = ("Accelerated,", "accurate,", "agentic")
 
 
 def banner_svg() -> str:
@@ -314,6 +273,8 @@ ART = {
         "docs",
         "methods",
         "tide",
+        "abacus",
+        "punch-cards",
     )
 }
 CENTERED = {kind: BRAND / f"art-{kind}-center.jpg" for kind in ("tide",)}
@@ -328,6 +289,8 @@ COVERS = {
     "docs": "the pages of a vast atlas fanning open, one edge amber like a bookmark",
     "methods": "a prism fanning one beam into many rays, one amber",
     "tide": "the moon over a swelling sea, its light an amber path on the waves",
+    "abacus": "an abacus seen at an angle, one bead amber",
+    "punch-cards": "a shuffled fan of punch cards, one card amber",
     "ground": "the stipple ground",
 }
 BANNER_LEFT = 104  # the text column's left edge, at the cover's height
@@ -337,6 +300,10 @@ BANNER_FADE_PEAK = 0.6  # its opacity at the left edge
 # shows the banner at a third of its size.
 BANNER_TITLE = (88, 720, 2)
 BANNER_LINE = 40  # the release or kind under the title
+# The arts whose banner sets the title low, the line's baseline at BANNER_BOTTOM, to leave the art
+# its height; the others center it under the wordmark.
+BANNER_LOW = {"punch-cards"}
+BANNER_BOTTOM = 552
 # An earlier post's thumbnail on the blog's front page: the art, THUMB_W wide, sharp at three
 # times the rows' 10 rem.
 THUMB_W = 480
@@ -460,12 +427,16 @@ def _jpeg_href(image: Image.Image) -> str:
 def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = H) -> str:
     """The banner as SVG, ``width`` x ``height``: ``kind``'s art filling the height, its right edge
     aligned with the banner's. The wordmark, ``title``, and ``line`` sit over the left side, with
-    an amber dot before ``line``. Text sizes follow the height."""
+    an amber dot before ``line``, the title low for an art in ``BANNER_LOW``. Text sizes follow
+    the height."""
     k = height / COVER_H
     size, line_width, most = BANNER_TITLE
     lines = _lines(title, size, line_width, most) or [title]
     step = round(size * 1.14)
-    top = 284 if len(lines) == most else 334
+    if kind in BANNER_LOW:
+        top = BANNER_BOTTOM - 95 - (len(lines) - 1) * step
+    else:
+        top = 284 if len(lines) == most else 334
     title_text = "".join(
         f'<text x="{BANNER_LEFT}" y="{top + i * step}" font-family="Inter" font-weight="600" '
         f'font-size="{size}" letter-spacing="-2" fill="#ffffff">{html.escape(text)}</text>'
@@ -490,9 +461,9 @@ def preview_svg(kind: str, title: str, line: str, width: int = W, height: int = 
     )
 
 
-def _art_ground(kind: str, width: int, height: int) -> str:
-    """``kind``'s art filling the height, its right edge at ``width``, under a navy fade from the
-    left that keeps white text readable."""
+def _art_ground(kind: str, width: int, height: int, *, left: bool = False) -> str:
+    """``kind``'s art filling the height, its right edge at ``width`` (its left edge at 0, when
+    ``left``), under a navy fade from the left that keeps white text readable."""
     stops = ((0, BANNER_FADE_PEAK), (BANNER_FADE * 0.55, BANNER_FADE_PEAK * 0.75), (BANNER_FADE, 0))
     fade = "".join(
         f'<stop offset="{offset:.2f}" stop-color="{grain.NAVY}" stop-opacity="{opacity:.2f}"/>'
@@ -501,7 +472,7 @@ def _art_ground(kind: str, width: int, height: int) -> str:
     art_w = round(height * COVER_W / COVER_H)
     return (
         f'<defs><linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">{fade}</linearGradient>'
-        f'</defs><image href="{_jpeg_href(_art(kind))}" x="{width - art_w}" y="0" '
+        f'</defs><image href="{_jpeg_href(_art(kind))}" x="{0 if left else width - art_w}" y="0" '
         f'width="{art_w}" height="{height}" preserveAspectRatio="none"/>'
         f'<rect width="{width}" height="{height}" fill="url(#fade)"/>'
     )
@@ -552,7 +523,8 @@ KIT_ICON = 512  # the icon PNGs' side
 KIT_AVATAR = 1024  # the avatar's side
 # The repository's social preview, at GitHub's recommended size; GitHub takes files up to 1 MB.
 SOCIAL_W, SOCIAL_H = 1280, 640
-SOCIAL_TITLE = 100  # the tagline's size, on two lines
+SOCIAL_TITLE = 84  # the tagline's size, on three lines left of the lanes' amber streak
+SOCIAL_TEXT_W = 720
 SOCIAL_LINK = 28  # the site's address at the bottom
 SOCIAL_QUALITY = 85
 KIT_NOTE = """Andrey brand kit
@@ -588,15 +560,16 @@ def _kit_icon(ink: str, ground: str | None = None) -> str:
 
 
 def social_svg() -> str:
-    """The repository's social preview: the wordmark, the tagline with ``ACCENT`` drawn as the
-    accent, and the site's address at the bottom, over the lanes art."""
-    lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_W, 2)
+    """The repository's social preview: the wordmark, the tagline with ``ACCENT`` in amber, and
+    the site's address at the bottom, over the lanes art set at its left edge, so the amber streak
+    runs to the right of the tagline."""
+    lines = _lines(TAGLINE, SOCIAL_TITLE, SOCIAL_TEXT_W, 3)
     step = round(SOCIAL_TITLE * 1.14)
     top = SOCIAL_H / 2 - (len(lines) - 1) * step / 2 + 10
     middles = [top + i * step for i in range(len(lines))]
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{SOCIAL_W}" height="{SOCIAL_H}">'
-        + _art_ground("lanes", SOCIAL_W, SOCIAL_H)
+        + _art_ground("lanes", SOCIAL_W, SOCIAL_H, left=True)
         + _placed(BRAND / "wordmark-dark.svg", BANNER_LEFT, 80, 56)
         + _title(lines, SOCIAL_TITLE, middles, BANNER_LEFT, ACCENT, left=True)
         + f'<text x="{BANNER_LEFT}" y="{SOCIAL_H - 72}" font-family="Inter" font-weight="600" '

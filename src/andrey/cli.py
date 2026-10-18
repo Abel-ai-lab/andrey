@@ -1,4 +1,4 @@
-"""The ``andrey`` command-line interface, generated from the spec registry.
+"""The ``andrey`` command-line interface, generated from method and configuration definitions.
 
 ``andrey list`` enumerates methods, ``andrey run <method> --help`` explains one method, and
 ``--help --json`` returns its versioned contract without execution. Root ``--help --json`` returns
@@ -367,7 +367,7 @@ def render_human(
 
 # Input names are a closed set (the InputSpec names in the registry); a drift test pins the CLI's
 # input flags to them. Everything else is a hyperparameter, passed as `key=value` or via `--config`.
-_INPUT_FLAGS = ("data", "c_indx", "data_groups", "data_list")
+_INPUT_FLAGS = ("data", "domain_index", "interventions", "data_groups", "data_list")
 
 # A ParamSpec may not shadow a CLI flag or a reserved-for-future flag; a drift guard enforces it.
 _RESERVED_PARAM_NAMES = frozenset(
@@ -653,6 +653,8 @@ def _load_method_inputs(
     positional, headers = [], []
     for inp in spec.data.inputs:
         vals = provided.get(inp.name)
+        if not vals and not inp.required:
+            continue  # optional inputs come last, so the facade's default fills the gap
         if not vals:
             raise CliError(
                 "missing_input",
@@ -666,6 +668,29 @@ def _load_method_inputs(
         positional.append(arr)
         headers.append(labels)
     return positional, headers[0]
+
+
+def column_positions(
+    columns: list[str] | tuple[str, ...], labels: tuple[str, ...] | None
+) -> list[int]:
+    """Turn ``categorical=`` entries into 0-based column positions the facade reads.
+
+    An entry names a column of the data file's header, or else gives a position as digits.
+    """
+    positions = []
+    for column in columns:
+        if labels is not None and column in labels:
+            positions.append(labels.index(column))
+        elif column.isdigit():
+            positions.append(int(column))
+        else:
+            known = f"; the header names {list(labels)}" if labels is not None else ""
+            raise CliError(
+                "unknown_column",
+                f"categorical names column {column!r}, which the data file does not have{known}",
+                EXIT_USAGE,
+            )
+    return positions
 
 
 def execute_run(
@@ -691,6 +716,14 @@ def execute_run(
             fkwargs = {**fkwargs, "labels": labels}
             resolved = {**resolved, "labels": list(labels)}
         labels = None
+    if fkwargs.get("categorical") is not None:
+        fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
+    if labels is not None and any(p.name == "categorical" for p in spec.params):
+        # A method that reads column types names the header's columns in its warnings and in
+        # metadata["categorical"].
+        import pandas as pd
+
+        positional = [pd.DataFrame(positional[0], columns=list(labels)), *positional[1:]]
 
     fn = getattr(andrey, spec.name)
     start = time.perf_counter()
@@ -822,7 +855,6 @@ def check_environment() -> None:
 
 # What each optional extra enables. `andrey config` reports whether each is installed.
 EXTRAS = {
-    "numba": "the `numba` backend: JIT kernels for GES's reachability check",
     "torch": "the `cpu`, `cuda`, and `mps` backends, GPU correlation and entropy tables, and CALM",
     "viz": (
         "`andrey.viz.mpl` chart styling (matplotlib) and Graphviz layouts for `andrey.viz.draw` "
@@ -860,8 +892,6 @@ def _version(distribution: str) -> str | None:
 
 
 def _unavailable_reason(backend: str, extras: dict[str, bool]) -> str:
-    if backend == "numba":
-        return "the [numba] extra is not installed"
     if not extras["torch"]:
         return "the [torch] extra is not installed"
     if backend == "mps" and sys.platform != "darwin":
@@ -1007,8 +1037,8 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
     context_settings={"help_option_names": ["-h", "--help"]},  # -h works everywhere, not just `run`
     help=(
-        "A very fast causal discovery package. List the methods, run one on a data file, and "
-        "check the configuration."
+        "Accelerated, accurate, agentic causal discovery. List the methods, run one on a data "
+        "file, and check the configuration."
     ),
 )
 
@@ -1037,7 +1067,7 @@ def _root(
         False, "--skill", help="Print the SKILL.md guide for coding agents."
     ),
 ) -> None:
-    """A very fast causal discovery package.
+    """Accelerated, accurate, agentic causal discovery.
 
     List the methods, run one on a data file, and check the configuration.
     """
@@ -1162,17 +1192,17 @@ def calibration_report(results: dict, workers: int) -> dict:
     """The measured crossovers as JSON: per method, the bracket, the timings, and the setting."""
     from andrey.search import calibrate as cal
 
-    def side(d: int | None) -> dict | None:
-        return None if d is None else {"d": d, "work": d * (d - 1)}
+    def side(c: cal.Crossover, d: int | None) -> dict | None:
+        return None if d is None else {"d": d, "work": c.work(d)}
 
     methods = {
         m: {
             "variable": cal.CUTOFFS[m],
             "cutoff": c.cutoff,
-            "serial_faster_at": side(c.below),
-            "pool_faster_at": side(c.above),
+            "serial_faster_at": side(c, c.below),
+            "pool_faster_at": side(c, c.above),
             "timings": [
-                {"d": d, "work": d * (d - 1), "serial_s": round(s, 4), "pooled_s": round(p, 4)}
+                {"d": d, "work": c.work(d), "serial_s": round(s, 4), "pooled_s": round(p, 4)}
                 for d, s, p in c.timings
             ],
         }
@@ -1227,11 +1257,18 @@ def cmd_run(
         help="Data file, one row per sample: CSV, TSV, or whitespace-separated text (a header row "
         "names the nodes), or .npy. - reads text from stdin.",
     ),
-    c_indx: Optional[list[str]] = typer.Option(
+    domain_index: Optional[list[str]] = typer.Option(
         None,
-        "--c-indx",
+        "--domain-index",
         metavar="PATH",
         help="cdnod only: the domain index, one value per row of --data.",
+    ),
+    interventions: Optional[list[str]] = typer.Option(
+        None,
+        "--interventions",
+        metavar="PATH",
+        help="gies only: a 0/1 matrix shaped like --data, 1 where the row's value of the variable "
+        "was set by an intervention.",
     ),
     data_groups: Optional[list[str]] = typer.Option(
         None,
@@ -1307,7 +1344,8 @@ def cmd_run(
         return
     provided = {
         "data": data,
-        "c_indx": c_indx,
+        "domain_index": domain_index,
+        "interventions": interventions,
         "data_groups": data_groups,
         "data_list": data_list,
     }

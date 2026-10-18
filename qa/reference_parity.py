@@ -7,9 +7,12 @@ central errors (the mean or median over the series), it fails when Andrey's are 
 margin fails: a consistent shortfall, however small, is a shortfall.
 
 ``parity-allowlist.json``, next to the summaries, exempts a failing row only when it names the
-cause: Andrey is correct by the paper the method comes from, or the reference has a defect. Each
-entry gives the reason and a citation, and pins the row's two error values, so a re-run that
-changes the row voids the entry. An entry that matches no failing row also fails. A released
+cause: Andrey is correct by the paper the method comes from, the reference has a defect, or the two
+packages end at different local optima after an exact score tie that Andrey breaks by column order
+(a tie-break). Each entry gives the reason and a citation, and pins the row's two error values, so
+a re-run that changes the row voids the entry. A tie-break entry also gives, as its evidence, the
+row's two error values with the columns in reversed order, where the row must pass. An entry that
+matches no failing row also fails. A released
 summary never changes, so a method re-measured against the same reference in a later summary is
 judged by the later rows only.
 
@@ -38,7 +41,7 @@ ERRORS: tuple[str, ...] = ("shd", "directed_errors")
 #: Row fields that name a row within its method's table.
 ROW_KEYS: tuple[str, ...] = ("mean_degree", "d", "observed", "n")
 #: The causes an allowlist entry may name.
-CAUSES: frozenset[str] = frozenset({"correct-by-paper", "reference-defect"})
+CAUSES: frozenset[str] = frozenset({"correct-by-paper", "reference-defect", "tie-break"})
 
 
 @dataclass(frozen=True)
@@ -160,6 +163,20 @@ def _entry_problem(entry: dict, row: Row) -> str | None:
     pinned = (entry.get("andrey_errors"), entry.get("comparator_errors"))
     if pinned != (row.andrey, row.reference):
         return f"it pins {pinned}, the row has ({row.andrey:g}, {row.reference:g})"
+    if entry["cause"] == "tie-break":
+        return _tie_break_problem(entry.get("evidence"))
+    return None
+
+
+def _tie_break_problem(evidence: object) -> str | None:
+    """Check a tie-break's evidence: the row's error values with the columns reversed, passing."""
+    if not isinstance(evidence, dict) or evidence.get("column_order") != "reversed":
+        return "a tie-break needs evidence with the result on the reversed column order"
+    values = (evidence.get("andrey_errors"), evidence.get("comparator_errors"))
+    if not all(isinstance(v, (int, float)) for v in values):
+        return "its evidence needs andrey_errors and comparator_errors"
+    if values[0] > values[1]:
+        return f"with the columns reversed the row still fails: {values}"
     return None
 
 

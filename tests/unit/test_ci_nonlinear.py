@@ -315,13 +315,17 @@ def test_cmiknn_bounded_pvalue_decides_as_every_shuffle(alpha):
             full, bounded = test(*query), test._bounded_pvalue(*query, alpha)
             assert (bounded > alpha) == (full > alpha)
             assert bounded <= full if full > alpha else bounded >= full
+            exact_above = test._bounded_pvalue(*query, alpha, True)
+            assert exact_above == full if full > alpha else exact_above == bounded
             sides.add(full > alpha)
             stopped += bounded != full
     assert sides == {True, False} and stopped
 
 
-def test_pc_with_cmiknn_decides_as_with_every_shuffle(monkeypatch):
-    """PC's skeleton with CMIknn's early stop keeps the graph and every test's decision."""
+@pytest.mark.parametrize("collider_order", ["p_value", "column"])
+def test_pc_with_cmiknn_decides_as_with_every_shuffle(collider_order, monkeypatch):
+    """PC's skeleton with CMIknn's early stop keeps the graph and every test's decision; where it
+    orients colliders by p-value, every separating p-value is the full one."""
     data = _common_cause(seed=7, n=150, n_cond=3, shared=0.3)
 
     def run(early_stop: bool):
@@ -332,13 +336,24 @@ def test_pc_with_cmiknn_decides_as_with_every_shuffle(monkeypatch):
 
         monkeypatch.setitem(ci._CI_REGISTRY, "cmiknn_run", factory)
         trace = []
-        graph = pc_engine(data, indep_test="cmiknn_run", _trace=trace)
-        tests = [(r["x"], r["y"], r["S"], r["removed"]) for r in trace if r["step"] == "test"]
+        graph = pc_engine(
+            data, indep_test="cmiknn_run", collider_order=collider_order, _trace=trace
+        )
+        tests = [r for r in trace if r["step"] == "test"]
         return graph.to_numpy(), tests
 
     graph, tests = run(early_stop=True)
     full_graph, full_tests = run(early_stop=False)
-    assert np.array_equal(graph, full_graph) and tests == full_tests
+    assert np.array_equal(graph, full_graph)
+    assert [(r["x"], r["y"], r["S"], r["removed"]) for r in tests] == [
+        (r["x"], r["y"], r["S"], r["removed"]) for r in full_tests
+    ]
+    separating = [(r["p"], f["p"]) for r, f in zip(tests, full_tests) if r["removed"]]
+    assert separating
+    if collider_order == "p_value":
+        assert all(p == full for p, full in separating)
+    else:
+        assert any(p != full for p, full in separating)
 
 
 # ---- the contract ------------------------------------------------------------------------------
@@ -498,11 +513,11 @@ def _blas_threads() -> int:
 
 
 @pytest.mark.parametrize("method", ["pc", "fci"])
-@pytest.mark.parametrize("pin_blas", [None, False])
-def test_skeleton_pins_blas_unless_the_test_opts_out(method, pin_blas, monkeypatch):
-    """The skeleton scan runs a test on one BLAS thread, as Fisher-Z needs, unless the test sets
-    ``pin_blas = False``."""
-    assert getattr(ci.FisherZ, "pin_blas", True) and getattr(ci.StudentT, "pin_blas", True)
+@pytest.mark.parametrize("pin_blas", [None, True, False])
+def test_skeleton_pins_blas_as_the_test_sets(method, pin_blas, monkeypatch):
+    """The skeleton scan runs a test on one BLAS thread when it sets ``pin_blas`` true; one that
+    sets it false, or a registered test without it or partial correlation's ``to_seed``, runs on
+    every thread."""
     seen = []
 
     class Recording:
@@ -520,18 +535,18 @@ def test_skeleton_pins_blas_unless_the_test_opts_out(method, pin_blas, monkeypat
         if _blas_threads() < 2:
             pytest.skip("the BLAS library runs one thread")
         getattr(andrey, method)(_common_cause(seed=0, n=60, n_cond=2), indep_test="recording")
-    assert seen and set(seen) == {1 if pin_blas is None else 2}
+    assert seen and set(seen) == {1 if pin_blas else 2}
 
 
 def test_kci_uses_every_blas_thread_from_its_cutoff():
     x = np.random.default_rng(0).standard_normal((ci_kernel._KCI_BLAS_THREADS_FROM, 3))
-    assert (KCI(x[:-1]).pin_blas, KCI(x).pin_blas) == (True, False)
+    assert (ci.pins_blas(KCI(x[:-1])), ci.pins_blas(KCI(x))) == (True, False)
 
 
 @pytest.mark.parametrize("cls", [RCoT, CMIknn, GPDC])
 def test_the_other_nonlinear_tests_use_one_blas_thread(cls):
     x = np.random.default_rng(0).standard_normal((4000, 3))
-    assert getattr(cls(x if cls is RCoT else x[:50]), "pin_blas", True)
+    assert ci.pins_blas(cls(x if cls is RCoT else x[:50]))
 
 
 # ---- device dispatch ---------------------------------------------------------------------------

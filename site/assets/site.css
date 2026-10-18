@@ -263,10 +263,6 @@
   margin-inline: auto;
 }
 
-.andrey-home .hero .lede {
-  color: var(--andrey-muted);
-}
-
 .andrey-home .hero .install-line {
   border-color: color-mix(in srgb, var(--andrey-ground-ink) 32%, transparent);
   background: color-mix(in srgb, var(--andrey-ground-navy) 45%, transparent);
@@ -353,9 +349,8 @@
   letter-spacing: -0.055em;
 }
 
-/* The words: amber and slanted, as on the covers and the link-preview card (site/cards.py: SLANT),
-   lit as soft neon to match the art's light: a core a little paler than the amber inside a wide,
-   low halo, so their edges glow rather than cut. */
+/* The words: amber and slanted, lit as soft neon to match the art's light: a core a little paler
+   than the amber inside a wide, low halo, so their edges glow rather than cut. */
 .andrey-home .hero .word {
   display: inline-block;
   color: var(--andrey-ground-amber);
@@ -499,15 +494,6 @@
     opacity: 0.15;
     translate: 0 -4%;
   }
-}
-
-.andrey-home .lede {
-  max-width: 34ch;
-  margin: 1.5rem 0 0;
-  color: var(--andrey-muted);
-  font-size: clamp(1.15rem, 2vw, 1.5rem);
-  line-height: 1.65;
-  text-wrap: pretty;
 }
 
 .andrey-home .install-line {
@@ -832,8 +818,7 @@
 /* On a narrow or upright screen the type crosses the art's streak, past the reach of the covers'
    left fade, so a soft navy halo keeps it clear of the light. */
 @media (max-width: 47.99rem), (orientation: portrait) {
-  .andrey-home .act-cover--hero .act-head,
-  .andrey-home .hero .lede {
+  .andrey-home .act-cover--hero .act-head {
     text-shadow: 0 0 1.2em color-mix(in srgb, var(--andrey-ground-navy) 70%, transparent);
   }
 }
@@ -2551,12 +2536,6 @@
 @media (max-width: 30rem) {
   .andrey-home .hero-ground {
     padding-top: calc(1.5rem + var(--pst-header-height));
-  }
-
-  .andrey-home .lede {
-    margin-top: 0.7rem;
-    font-size: 1rem;
-    line-height: 1.55;
   }
 
   .andrey-home .hero-actions {

@@ -20,7 +20,6 @@ The project uses [`uv`](https://docs.astral.sh/uv/). An editable install with th
 git clone https://github.com/Abel-ai-lab/andrey
 cd andrey
 uv sync                       # base + dev group (ruff, ty, pytest)
-uv sync --extra numba         # optional: CPU JIT for GES reachability, up to 64 variables
 uv sync --extra torch         # optional: the torch backend (CPU by default; see below)
 ```
 

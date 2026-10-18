@@ -69,6 +69,23 @@ class StubSetupAdapter(_BaseStub):
         return np.array([[_SETUP_CALLS[0]]], dtype=np.int64)
 
 
+#: Counts ``fit()`` calls inside one child.
+_FIT_CALLS = [0]
+
+
+class StubSearchTimedAdapter(_BaseStub):
+    """Report a 0.05 s search in a 0.3 s fit; return the fit count and the warm-ups handed in."""
+
+    search_s = None
+    warmup = 0
+
+    def fit(self, data, params):
+        _FIT_CALLS[0] += 1
+        time.sleep(0.3)
+        self.search_s = 0.05
+        return np.array([[_FIT_CALLS[0], self.warmup]], dtype=np.int64)
+
+
 class StubPidThenHangAdapter(_BaseStub):
     """Write the worker PID to ``params["pid_path"]``, then exceed the cap.
 
@@ -191,6 +208,18 @@ def test_fit_only_timing_excludes_warmup():
     assert m["output_hash"]
     assert m["cpu_s"] is not None
     assert m["peak_rss_mb"] > 0.0
+    assert m["process_s"] is None  # the worker's clock is the fit's wall time
+
+
+def test_an_adapter_timing_its_own_search_reports_it_as_wall_s():
+    from andrey_bench.runner import run_task
+
+    adapter = StubSearchTimedAdapter()
+    m = run_task(adapter, _tiny_data(), {}, cap_wall_s=15.0, repeats=1, warmup=2)[0]
+    assert m["status"] == "ok", m
+    assert m["wall_s"] == 0.05, m  # the adapter's search time, not the 0.3 s call
+    assert m["process_s"] >= 0.25, m  # the whole call
+    assert m["adj"].tolist() == [[1, 2]], m  # one fit, with both warm-ups handed to it
 
 
 def test_wall_cap_timeouts_and_kills_child():

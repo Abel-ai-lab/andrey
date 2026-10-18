@@ -1,13 +1,19 @@
-"""Exact BIC-optimal DAG search, the engine behind :func:`andrey.exact_search`.
+"""Exact score-optimal DAG search, the engine behind :func:`andrey.exact_search`.
 
 The algorithm, its settings, and its references are described on :func:`andrey.exact_search`.
 
-A node's local score is ``n * log(resid / n) + len(parents) * log(n)``, where ``resid`` is the
-residual sum of squares of the centered node on its centered parents, solved from the Gram matrix
-(a pseudo-inverse when the parents' block is singular). Both searches run over the order graph,
-whose nodes are variable subsets: the shortest path from the empty set to the full set gives each
-variable its best parent set among the variables before it. The result is the optimal DAG itself,
-not its CPDAG, and each search breaks score ties deterministically.
+Under the linear-Gaussian BIC, a node's local score is ``n * log(resid / n) + len(parents) *
+log(n)``, where ``resid`` is the residual sum of squares of the centered node on its centered
+parents, solved from the Gram matrix (a pseudo-inverse when the parents' block is singular). A
+parent set of more than ``n - 2`` members, or one that leaves ``resid`` at most ``ZERO_RESIDUAL``
+times the node's sum of squares, scores ``inf`` and is never chosen. The categorical scores are
+:class:`~andrey.core.score.BDeuScore` and :class:`~andrey.core.score.CategoricalBICScore`, and the
+mixed-data scores :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.score.CGScore`, each
+BIC with ``lambda_value=1``. Both searches, A* (``"astar"``) and the subset-lattice dynamic
+program (``"dp"``), run over the order graph, whose nodes are variable subsets: the shortest
+path from the empty set to the full set gives each variable its best parent set among the
+variables before it. The result is the optimal DAG itself, not its CPDAG, and each
+search breaks score ties deterministically.
 """
 
 from __future__ import annotations
@@ -21,7 +27,16 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import to_structure
-from andrey.core.score import Score
+from andrey.core.score import ZERO_RESIDUAL, Score, check_columns, make_score
+
+#: The local scores :func:`exact_search` accepts.
+EXACT_SCORES: tuple[str, ...] = (
+    "local_score_BIC",
+    "local_score_BDeu",
+    "local_score_BIC_categorical",
+    "local_score_degen_gauss",
+    "local_score_cond_gauss",
+)
 
 # One node of a variable's parent graph: its parent set, that set's local score, and the set as a
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.
@@ -57,7 +72,8 @@ class _GramBICScore:
     Centers each column, then precomputes the Gram matrix ``S = X.T @ X`` and its diagonal once;
     :meth:`score` regresses a node on its parents through the normal equations on ``S`` to get the
     residual sum of squares, then applies the ``lambda=1`` BIC penalty. Without the centering, a
-    nonzero mean would count as shared signal and link independent variables.
+    nonzero mean would count as shared signal and link independent variables. Raises
+    ``ValueError`` for a column :func:`~andrey.core.score.check_columns` rejects.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -66,9 +82,12 @@ class _GramBICScore:
         self._diag = np.diag(self._gram)
         self._n = data.shape[0]
         self._log_n = float(np.log(self._n))
+        check_columns(self._gram / (self._n - 1), self._n)
 
     def score(self, node: int, parents: Sequence[int]) -> float:
         """Return the negative local BIC score for ``node`` given ``parents`` (lower is better)."""
+        if len(parents) > self._n - 2:
+            return float("inf")
         if not parents:
             resid = self._diag[node]
         else:
@@ -77,6 +96,8 @@ class _GramBICScore:
             gram_node_pa = self._gram[node, pa]
             beta = _solve_normal_equations(gram_pa, gram_node_pa)
             resid = self._diag[node] - gram_node_pa @ beta
+        if not resid > ZERO_RESIDUAL * self._diag[node]:
+            return float("inf")
         return float(self._n * np.log(resid / self._n) + len(parents) * self._log_n)
 
 
@@ -207,10 +228,17 @@ def _dp_shortest_path(
     return tuple(structures)
 
 
-def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStructure:
-    """Return the globally BIC-optimal DAG for ``data`` as a ``dag`` structure.
+def exact_search(
+    data: np.ndarray,
+    *,
+    search_method: str = "astar",
+    score_func: str = "local_score_BIC",
+    categorical: np.ndarray | None = None,
+) -> GraphStructure:
+    """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
-    Scores candidates with the linear-Gaussian BIC (``lambda=1``) on mean-centered data.
+    Scores candidates with ``score_func``; the default, the linear-Gaussian BIC (``lambda=1``), on
+    mean-centered data.
     Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
     ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score but may return
     different score-tied representatives of the same Markov equivalence class. Exponential in the
@@ -222,20 +250,33 @@ def exact_search(data: np.ndarray, *, search_method: str = "astar") -> GraphStru
         Data matrix; rows are observations, columns are variables.
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
+    score_func : str
+        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC, a categorical score, or
+        a mixed-data BIC.
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score.
 
     Returns
     -------
     GraphStructure
-        The BIC-optimal DAG, edge ``i -> j`` when ``i`` is an optimal parent of ``j``.
+        The score-optimal DAG, edge ``i -> j`` when ``i`` is an optimal parent of ``j``.
     """
     X = np.asarray(data, dtype=np.float64)
     if search_method not in ("astar", "dp"):
         raise ValueError(f"unknown search method {search_method!r}; use 'astar' or 'dp'")
+    if score_func not in EXACT_SCORES:
+        raise NotImplementedError(
+            f"unsupported score_func {score_func!r}; use one of {EXACT_SCORES}"
+        )
     n_vars = X.shape[1]
     if n_vars <= 1:  # no candidate parents -- the optimum is the edgeless graph
         return to_structure(np.zeros((n_vars, n_vars), dtype=np.int8), kind="dag")
 
-    score = _GramBICScore(X)
+    score: Score = (
+        _GramBICScore(X)
+        if score_func == "local_score_BIC"
+        else make_score(score_func, X, categorical=categorical)
+    )
     parent_graphs = [_generate_parent_graph(score, i, n_vars) for i in range(n_vars)]
 
     if search_method == "astar":

@@ -8,32 +8,50 @@ meta:
 # API reference
 
 The public API of Andrey - everything exported by `andrey`, `andrey.metrics`, and `andrey.viz`,
-the dataset loaders of `andrey.data`, and the conditional-independence tests of `andrey.core` -
-generated from the source docstrings.
+the dataset loaders and simulators of `andrey.data`, and the conditional-independence tests of
+`andrey.core` - generated from the source docstrings.
 `andrey.__version__` gives the installed version.
 
 ## Structure-learning methods
 
-Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with three
-exceptions: `cdnod` also takes a domain index, `longitudinal_lingam` takes a list of datasets, and
-`multi_group_direct_lingam` takes a list of datasets and returns one result per dataset. Each
-method is either supported or experimental; `andrey list` prints the status.
+Each method takes a data matrix and returns a {py:class}`~andrey.StructureOutput`, with four
+exceptions: `cdnod` also takes a domain index, `gies` also takes which variables were intervened on
+in each row, `longitudinal_lingam` takes a list of datasets, and `multi_group_direct_lingam` takes
+a list of datasets and returns one result per dataset. Each method is either supported or
+experimental; `andrey list` prints the status.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
-least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column
-names. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
+least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column names.
+The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
+`"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
+whole numbers in a column of numbers, each distinct value of a column one category. The mixed-data
+settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
+`"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
+[Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
+needs whole numbers. Methods that score with BIC also reject a column that repeats another up to
+scale and shift or, given more rows than columns, is a linear function of other columns. Copies of
+one variable cannot be told apart, so one `ValueError` names every group of copies, such as `x2`
+and `x7` repeating `x1`, and asks you to keep one column per group and read its edges as the
+group's; no option drops or merges the copies for you. A partial-correlation test in `pc`, `fci`,
+`gfci`, or `cdnod` that meets a singular correlation matrix from copies names the groups the same
+way. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
 column. A single column gives a one-node graph.
+
+`pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
+`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`
+and `"cond_gauss"` for mixed data.
 
 ### Supported methods
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
 workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs),
-[0.2.0](../benchmarks/0.2.0.md#known-limits), [0.3.0](../benchmarks/0.3.0.md#known-limits), and
-[0.5.0](../benchmarks/0.5.0.md#known-limits) release cards show where a method scores worse than
-the empty graph, as ICA-LiNGAM does at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from
-8 observed variables, hill climbing and Tabu search do from 50 variables with ten rows per
-variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 time steps.
+[0.2.0](../benchmarks/0.2.0.md#known-limits), [0.3.0](../benchmarks/0.3.0.md#known-limits),
+[0.5.0](../benchmarks/0.5.0.md#known-limits), and [0.7.0](../benchmarks/0.7.0.md#limits) release
+cards show where a method scores worse than the empty graph, or about as well, as ICA-LiNGAM does
+at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, hill climbing
+and Tabu search do from 50 variables with ten rows per variable, PCMCI does from 40 series, Granger
+does from 20 series at 1,000 time steps, and GES does at 200 variables with ten rows per variable.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -44,18 +62,25 @@ variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 ti
 
    pc
    fci
+   gfci
+   cdnod
    ges
+   gies
    xges
    hc
    tabu
+   exact_search
+   calm
    boss
    grasp
    direct_lingam
    ica_lingam
+   multi_group_direct_lingam
    anm
    pnl
    rcd
    bottom_up_parce_lingam
+   gin
    varma_lingam
    longitudinal_lingam
    pcmci
@@ -64,32 +89,19 @@ variable, PCMCI does from 40 series, and Granger does from 20 series at 1,000 ti
    granger
 ```
 
-FCI and GFCI use uncovered possibly-directed paths for their R9 and R10 tail orientations:
-nodes two steps apart on each path must be non-adjacent. The same rules determine the oracle PAG
-returned by `andrey.data.latent.marginal(..., "pag")`.
+FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
+apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
+bound. R8 checks each pair of endpoints in both orders, so it does not depend on the node labels.
+The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
+With `possible_dsep="order_free"`, FCI and GFCI build possible-d-separation sets that do not depend
+on the order their search visits nodes; the default, `"fast"`, builds them in that order.
 
 ### Experimental methods
 
-These methods ship and pass recovery tests, but have no published benchmark. Their API may change
-without deprecation, and each warns with {py:class}`~andrey.ExperimentalWarning` on its first call
-in a process.
-
-```{eval-rst}
-.. autosummary::
-   :toctree: generated
-   :nosignatures:
-
-   gfci
-   cdnod
-   gies
-   exact_search
-   calm
-   multi_group_direct_lingam
-   gin
-   camuv
-```
-
-A method becomes supported once it has:
+Every method is supported. A new method ships as experimental: it passes recovery tests but has no
+published benchmark, its API may change without deprecation, and it warns with
+{py:class}`~andrey.ExperimentalWarning` on its first call in a process. It becomes supported once it
+has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
   in its release's [release card](../benchmarks.md);
@@ -196,6 +208,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
+| {py:class}`~andrey.DataTypeWarning` | A mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:
@@ -231,6 +244,7 @@ name.
    BackendFallbackWarning
    SearchLimitWarning
    SampleSizeWarning
+   DataTypeWarning
 ```
 
 ## Datasets
@@ -245,8 +259,9 @@ name.
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
 
-A published network's data come from a linear-Gaussian model on its graph, standardized, since its
-own tables are discrete; `n` (default 1000) and `seed` (default 0) set the rows. The first load
+A published network's data come from a linear-Gaussian model on its graph, standardized, or, with
+`discrete=True`, from its own conditional probability tables, each column a pandas `category` of
+the network's category names; `n` (default 1000) and `seed` (default 0) set the rows. The first load
 downloads the file, checks its SHA-256, and caches it; later loads need no network. The
 cache directory is the `data_home` argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey`
 (`~/.cache/andrey` when `XDG_CACHE_HOME` is unset). Without network access, the error names the
@@ -263,6 +278,25 @@ Sachs data end to end.
    load_dataset
    list_datasets
    RealDataset
+```
+
+### Simulators
+
+`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
+scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
+for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
+an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
+the causal order; `shuffle=False` keeps the order in which the graph was drawn.
+
+```{eval-rst}
+.. currentmodule:: andrey.data
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   sample_discrete
+   sample_mixed
 ```
 
 ## Metrics

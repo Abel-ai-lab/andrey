@@ -56,6 +56,15 @@ class SampleSizeWarning(AndreyWarning):
     """
 
 
+class DataTypeWarning(AndreyWarning):
+    """How a call reads its columns' types: inferred, missing, or possibly mistaken.
+
+    A mixed-data test or score warns when it infers the categorical columns or finds none, and so
+    runs as its linear-Gaussian form; a continuous one warns once when columns look like category
+    codes.
+    """
+
+
 def warn_once(message: str, category: type[AndreyWarning]) -> None:
     """Warn with ``message`` the first time this process sees it, at the caller's line."""
     key = (category, message)

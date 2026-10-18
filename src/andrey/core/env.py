@@ -19,7 +19,7 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
-BACKENDS = ("auto", "numpy", "numba", "cuda", "mps", "cpu")
+BACKENDS = ("auto", "numpy", "cuda", "mps", "cpu")
 BACKEND_ALIASES = {"none": "cpu", "metal": "mps"}
 _ON = ("1", "true", "yes", "on")
 _OFF = ("0", "false", "no", "off")

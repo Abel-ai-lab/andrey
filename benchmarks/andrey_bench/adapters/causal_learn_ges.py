@@ -1,4 +1,4 @@
-"""causal-learn GES benchmark adapter."""
+"""causal-learn GES benchmark adapters: BIC, and BDeu for categorical data."""
 
 from __future__ import annotations
 
@@ -34,6 +34,8 @@ class CausalLearnGES:
     mode: str = "serial"
     algorithm: str = "ges"
     output_type: str = "cpdag"
+    #: The local score; a variant with another score has its own ``name``.
+    score_func: str = _DEFAULT_SCORE_FUNC
 
     def setup(self) -> None:
         """Import causal-learn before timing; see `contracts.SetupAdapter`.
@@ -47,7 +49,7 @@ class CausalLearnGES:
 
     def params(self) -> dict[str, Any]:
         return {
-            "score_func": _DEFAULT_SCORE_FUNC,
+            "score_func": self.score_func,
             "lambda_value": _DEFAULT_LAMBDA,
             "max_parents": _DEFAULT_MAX_PARENTS,
         }
@@ -78,3 +80,18 @@ class CausalLearnGES:
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+class CausalLearnGESBDeu(CausalLearnGES):
+    """causal-learn's GES with its BDeu score, for categorical data.
+
+    causal-learn builds BDeu with its default priors (sample prior 1, structure prior 1) whatever
+    ``parameters`` holds, so the params carry no ``lambda_value``.
+    """
+
+    name: str = "causal-learn.ges.bdeu"
+    score_func: str = "local_score_BDeu"
+
+    def params(self) -> dict[str, Any]:
+        """BDeu with at most four parents."""
+        return {"score_func": self.score_func, "max_parents": _DEFAULT_MAX_PARENTS}

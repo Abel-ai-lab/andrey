@@ -13,7 +13,7 @@ license: apache-2.0
 
 ## Andrey
 
-Causal discovery, fast. Over 1,000x faster on PNL, and faster on most other supported methods.
+Causal discovery, fast. The fastest causal discovery package.
 
 Compare live PC, FCI, and DirectLiNGAM fits with Andrey and the other installed packages.
 Explore a preset or numeric CSV, read the controlled benchmarks, and step through PC, Meek's

@@ -149,7 +149,7 @@ reaching a code path no other test reaches, on the smallest input that reaches i
 
 - Parametrize over cases that take different branches (both sides of a size cutoff, each failure
   mode, the degenerate input); another size or seed on the same branches adds time, not coverage.
-- Two entry points that share a code path need one test: GIES and GFCI call `ges()`.
+- Two entry points that share a code path need one test: GES and GFCI both call `ges()`.
 - A fixed input with one certain answer is an integrity check; a threshold on a median over random
   draws is a quality measurement.
 - A fit made once per module is shared by the tests that inspect it.
@@ -225,8 +225,10 @@ Measure speed and accuracy against every package that implements the method: cop
 ([`benchmarks/README.md`](benchmarks/README.md)). A reference package's answer is measured, not a
 target, but every difference needs a cause. Both packages are deterministic on the same data, so
 each differing series has a first step where they diverge: fix an Andrey defect, with a test that
-fails before the fix; make an arbitrary tie-break independent of column order; and where Andrey is
-correct by the method's paper or the reference has a defect, add a cited entry to the allowlist.
+fails before the fix; make an arbitrary tie-break independent of column order, or, until it is, add
+a `tie-break` entry to the allowlist with the row's result on the reversed column order; and where
+Andrey is correct by the method's paper or the reference has a defect, add a cited entry to the
+allowlist.
 The fit records stay outside the repository.
 
 ### 6. Mark it supported

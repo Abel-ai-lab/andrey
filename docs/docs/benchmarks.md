@@ -17,42 +17,105 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.5.0
+:link: benchmarks/0.7.0
 :link-type: doc
-:link-alt: The 0.5.0 release card: time series
-:class-card: release-cover release-art release-art-0-5-0
+:link-alt: The 0.7.0 release card: permutation invariance
+:class-card: release-cover release-art release-art-0-7-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Time series
+Permutation invariance
 
-0.5.0
+0.7.0
 :::
 
 ::::{div} release-tldr
 
-0.5.0 is here: PCMCI, PCMCI+, LPCMCI, lasso Granger causality, VARMA-LiNGAM, and LongitudinalLiNGAM,
-methods for data ordered in time, are now supported. Tested against tigramite on the same series,
-PCMCI+ returns the same graphs and runs more than 50x faster at every size, and more than 100x at 80
-variables and 2,000 time steps.
+0.7.0 is here: PC, hill climbing, and tabu search are order-independent (Colombo and Maathuis,
+2014), so their graph is the same up to relabeling the nodes however you order the columns, and
+GIES, exact search, CD-NOD, MultiGroupDirectLiNGAM, GFCI, GIN, and CALM are supported.
+GES runs more than 60x faster than causal-learn at 50 to 150 variables, with the same graph on
+every dataset at those sizes.
 
 :::{div} release-stats
 
-- **110 of 110** datasets with the same PCMCI+ graph as tigramite
-- **More than 50x** PCMCI+ speedup over tigramite at every size
-- **More than 20x** PCMCI speedup over tigramite at 10 variables
+- **More than 60x** GES speedup over causal-learn from 50 to 150 variables
+- **More than 20x** GIN speedup over Tetrad at every size
+- **More than 15x** CD-NOD speedup over causal-learn from 20 variables, with fewer errors
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.5.0.md)
-[Read the post](../blog/20261016-andrey-0-5-0.md)
+[Read the release card](benchmarks/0.7.0.md)
+[Read the post](../blog/20261031-andrey-0-7-0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.6.0
+:link-type: doc
+:link-alt: The 0.6.0 release card: mixed and categorical data
+:class-card: release-tile release-art-0-6-0
+:shadow: none
+:margin: 0
+
+0.6.0
+:::
+
+:::{div} release-body
+<h3>Mixed and categorical data</h3>
+
+PC, GES, hill climbing, and seven more methods for categorical columns and for tables that mix them
+with numbers, compared with causal-learn, pgmpy, bnlearn, and Tetrad.
+
+- **10** methods
+- GES **more than 50x** faster than causal-learn at every size
+:::
+
+:::{div} release-meta
+Released October 17, 2026
+
+- [Release card<span class="visually-hidden"> 0.6.0</span>](benchmarks/0.6.0.md)
+- [Post: Mixed and categorical data](../blog/20261017-andrey-0-6-0.md)
+:::
+::::
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.5.0
+:link-type: doc
+:link-alt: The 0.5.0 release card: time series
+:class-card: release-tile release-art-0-5-0
+:shadow: none
+:margin: 0
+
+0.5.0
+:::
+
+:::{div} release-body
+<h3>Time series</h3>
+
+PCMCI, PCMCI+, LPCMCI, and three more methods for data ordered in time, compared with tigramite,
+causal-learn, and lingam.
+
+- **6** methods
+- PCMCI+ **more than 50x** faster than tigramite at every size
+:::
+
+:::{div} release-meta
+Released October 16, 2026
+
+- [Release card<span class="visually-hidden"> 0.5.0</span>](benchmarks/0.5.0.md)
+- [Post: Time series](../blog/20261016-andrey-0-5-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -181,6 +244,8 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.7.0: permutation invariance <benchmarks/0.7.0>
+0.6.0: mixed and categorical data <benchmarks/0.6.0>
 0.5.0: time series <benchmarks/0.5.0>
 0.4.0: pairwise direction <benchmarks/0.4.0>
 0.3.0: score-based search <benchmarks/0.3.0>

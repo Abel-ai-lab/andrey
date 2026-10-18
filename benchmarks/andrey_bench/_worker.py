@@ -266,9 +266,14 @@ def _run(adapter, data: np.ndarray, params, warmup: int) -> dict:
         setup_s = time.perf_counter() - s0
         _mark(setup_s=setup_s)
 
+    # An adapter that times its own search runs its warm-ups inside the timed fit's process.
+    times_search = hasattr(adapter, "search_s")
+    if times_search:
+        adapter.warmup = max(0, warmup or 0)
+
     # Warm up JIT compilation, CUDA, and caches outside the fit timer.
     warmup_s = setup_s
-    if warmup and warmup > 0:
+    if warmup and warmup > 0 and not times_search:
         w0 = time.perf_counter()
         for _ in range(warmup):
             adapter.fit(data, params)
@@ -295,6 +300,9 @@ def _run(adapter, data: np.ndarray, params, warmup: int) -> dict:
 
     # Pair fit-only wall time with CPU used by this process and its children.
     wall_s = t1 - t0
+    process_s = None
+    if times_search:
+        wall_s, process_s = float(adapter.search_s), wall_s
     self_cpu_s = (ru1.ru_utime + ru1.ru_stime) - (ru0.ru_utime + ru0.ru_stime)
     child_cpu_s = max(0.0, c1 - c0)
     cpu_s = self_cpu_s + child_cpu_s
@@ -309,6 +317,7 @@ def _run(adapter, data: np.ndarray, params, warmup: int) -> dict:
     return {
         "status": "ok",
         "wall_s": wall_s,
+        "process_s": process_s,
         "cpu_s": cpu_s,
         "child_cpu_s": child_cpu_s,
         "warmup_s": warmup_s,

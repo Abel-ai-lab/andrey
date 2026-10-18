@@ -17,6 +17,44 @@ from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
 from .graphs import csr_from_endpoints
 
 
+def latent_order(edges: np.ndarray, d: int, n_latent: int, rng: np.random.Generator) -> np.ndarray:
+    """Choose ``n_latent`` confounders; return the node order that puts them last.
+
+    Parameters
+    ----------
+    edges : np.ndarray of shape (m, 2)
+        Directed edges ``(parent, child)`` in the full node-label space.
+    d : int
+        Total node count.
+    n_latent : int
+        Number of latent confounders to hide.
+    rng : np.random.Generator
+        Stream for choosing which qualifying nodes become latent.
+
+    Returns
+    -------
+    np.ndarray of shape (d,)
+        ``order[j]`` is the label of the node re-indexed as ``j``: the observed labels ascending,
+        then the latent ones ascending.
+
+    Raises
+    ------
+    ValueError
+        If fewer than ``n_latent`` nodes have >= 2 children (no genuine confounder to hide).
+    """
+    out_degree = np.bincount(edges[:, 0], minlength=d) if edges.shape[0] else np.zeros(d, dtype=int)
+    candidates = np.flatnonzero(out_degree >= 2)  # >= 2 children (confounding, possibly transitive)
+    if candidates.size < n_latent:
+        raise ValueError(
+            f"only {candidates.size} node(s) have >= 2 children; "
+            f"cannot hide {n_latent} latent confounder(s)"
+        )
+    chosen = rng.choice(candidates, size=n_latent, replace=False)
+    is_latent = np.zeros(d, dtype=bool)
+    is_latent[chosen] = True
+    return np.concatenate([np.flatnonzero(~is_latent), np.flatnonzero(is_latent)])
+
+
 def with_latents(
     data: np.ndarray, edges: np.ndarray, d: int, n_latent: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -49,28 +87,13 @@ def with_latents(
     ValueError
         If fewer than ``n_latent`` nodes have >= 2 children (no genuine confounder to hide).
     """
-    out_degree = np.bincount(edges[:, 0], minlength=d) if edges.shape[0] else np.zeros(d, dtype=int)
-    candidates = np.flatnonzero(out_degree >= 2)  # >= 2 children (confounding, possibly transitive)
-    if candidates.size < n_latent:
-        raise ValueError(
-            f"only {candidates.size} node(s) have >= 2 children; "
-            f"cannot hide {n_latent} latent confounder(s)"
-        )
-    chosen = rng.choice(candidates, size=n_latent, replace=False)
-    is_latent = np.zeros(d, dtype=bool)
-    is_latent[chosen] = True
-
-    observed_old = np.flatnonzero(~is_latent)  # old labels of observed nodes (sorted)
-    latent_old = np.flatnonzero(is_latent)
-    order = np.concatenate([observed_old, latent_old])  # new index -> old label (observed first)
+    order = latent_order(edges, d, n_latent, rng)  # new index -> old label (observed first)
+    n_obs = d - n_latent
     new_label = np.empty(d, dtype=np.int64)
     new_label[order] = np.arange(d)  # old label -> new index
-
-    new_edges = new_label[edges]
     node_types = np.full(d, OBSERVED, dtype=np.int8)
-    node_types[new_label[latent_old]] = LATENT  # latents occupy the last indices
-    data_observed = data[:, observed_old]  # column j == observed node with new index j
-    return data_observed, new_edges, node_types
+    node_types[n_obs:] = LATENT
+    return data[:, order[:n_obs]], new_label[edges], node_types
 
 
 def marginal(graph: GraphStructure, target: str = "mag", *, max_nodes: int = 500) -> GraphStructure:

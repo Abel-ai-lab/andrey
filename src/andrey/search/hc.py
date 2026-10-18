@@ -1,12 +1,15 @@
 """Hill climbing over DAGs, the engine behind :func:`andrey.hc`.
 
-Candidate moves use Schur-complement deltas from :mod:`andrey.core.score_delta`;
-:class:`MoveScanner` caches them between passes, recomputing only changed targets. Output is the
-DAG's CPDAG and total BIC; lower is better.
+Under BIC, candidate moves use Schur-complement deltas from :mod:`andrey.core.score_delta`; under
+the categorical and mixed-data scores, the difference of two full local scores. :class:`MoveScanner`
+caches them between passes, recomputing only changed targets. Output is the DAG's CPDAG and total
+score; lower is better.
 """
 
 from __future__ import annotations
 
+import hashlib
+from collections import Counter
 from collections.abc import Collection
 from itertools import compress
 from operator import ne
@@ -14,20 +17,36 @@ from operator import ne
 import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore
-from andrey.core.score_delta import DeltaBICScore, add_deltas, remove_deltas
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, BICScore, make_score
+from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
-# Moves are keyed on ``delta / n_samples`` rounded to ``_KEY_DP`` places, not on the raw delta.
-# Two equal moves (add x->y vs y->x, from different cov submatrices) differ in their last bits;
-# the key makes them tie, and the lower ``(u, v, op_rank)`` wins. Schur noise scales as
-# ~n_samples * cond(cov) * eps, like a real improvement, so the normalized residual is
-# ~cond * eps: ``_KEY_DP`` = 9 clears it for cond up to ~1e5, independent of n. A mitigation, not
-# a proof: a normalized delta within ULP of a grid line can round either way. Rounding is
-# monotone, so non-tied order holds; the reported score is recomputed from the final structure.
+# Moves are compared by ``delta / n_samples`` rounded to ``_KEY_DP`` decimal places; ``delta`` is
+# the change in score, with lower values preferred. Under a score-equivalent score, adding
+# ``x -> y`` or ``y -> x`` from the empty graph ties mathematically, but computing their score
+# changes can introduce different rounding errors. If the rounded values tie, the lower
+# ``(ranks[u], ranks[v], op_rank)`` wins, with ``ranks`` from :func:`tie_ranks`.
+# Schur updates compute BIC score changes from covariance submatrices. Their rounding error scales
+# as ~n_samples * cond(cov) * eps, where cond(cov) is the covariance condition number and eps is
+# machine precision. Dividing by n_samples leaves ~cond(cov) * eps; ``_KEY_DP`` = 9 usually absorbs
+# this error for condition numbers up to ~1e5, independent of sample count. Rounding mitigates
+# numerical differences but can still split a tie within one grid step: a value near a rounding
+# boundary can round either way.
+# Rounding preserves the order of values that remain distinct; the reported score is recomputed
+# from the final structure.
 __all__ = ["hc"]
+
+#: The local scores :func:`hc` accepts.
+HC_SCORES: tuple[str, ...] = (
+    "local_score_BIC_from_cov",
+    "local_score_BDeu",
+    "local_score_BIC_categorical",
+    "local_score_degen_gauss",
+    "local_score_cond_gauss",
+)
 
 
 # (delta, u, v, op_rank, (op, u, v)). op_rank: remove 0 < reverse 1; add is 0 and never shares
@@ -36,6 +55,61 @@ ScannedMove = tuple[float, int, int, int, tuple[str, int, int]]
 
 # Out-neighbor bitset rows, ``tuple(adj_int)``, used as tabu keys.
 StructureKey = tuple[int, ...]
+
+
+def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarray:
+    """Each column's rank for choosing between moves with equal rounded score changes.
+
+    A continuous column's pattern records whether each value rises, falls, or stays equal to the
+    preceding row's value, using comparisons rather than subtraction. A categorical column's
+    pattern assigns codes in order of first appearance, so changing category labels preserves the
+    pattern. Columns are ordered by a hash of their pattern, then by a hash of their values if
+    pattern hashes match. For example, a column and a strictly increasing function of it share a
+    pattern. If both hashes match, as for identical columns, column position decides. Otherwise,
+    each rank moves with its column when the columns are reordered. The rank is arbitrary with
+    respect to causal structure.
+
+    Distinct pattern hashes give the same ranks across machines when the patterns are unchanged.
+    Last-bit differences in data, such as those from different CPUs' BLAS calculations, preserve
+    continuous patterns unless they change a comparison between consecutive rows. If pattern
+    hashes match, the fallback to raw values can make ranks sensitive to these differences or to
+    category recoding.
+
+    Parameters
+    ----------
+    x : ndarray, shape (n_samples, n_features)
+        Data matrix; rows are observations, columns are variables.
+    categorical : ndarray of bool, shape (n_features,), optional
+        Marks columns that use first-appearance category codes. ``None`` treats all columns as
+        continuous.
+
+    Returns
+    -------
+    ndarray of int, shape (n_features,)
+        Each column's position in the tie-break order, from zero to ``n_features - 1``. Lower ranks
+        take precedence when moves have equal rounded score changes.
+    """
+    mask = np.zeros(x.shape[1], dtype=bool) if categorical is None else categorical
+    patterns = []
+    for col, is_categorical in zip(x.T, mask.tolist(), strict=True):
+        if is_categorical:
+            _, first, codes = np.unique(col, return_index=True, return_inverse=True)
+            seen = np.empty(first.size, dtype=np.int64)
+            seen[np.argsort(first)] = np.arange(first.size)
+            pattern = seen[codes]
+        else:
+            col = np.ascontiguousarray(col)
+            pattern = (col[1:] > col[:-1]).astype(np.int8) - (col[1:] < col[:-1])
+        patterns.append(hashlib.blake2b(pattern.tobytes(), digest_size=8).digest())
+    shared = {key for key, count in Counter(patterns).items() if count > 1}
+    digests = [
+        (key, hashlib.blake2b(col.tobytes(), digest_size=8).digest() if key in shared else b"")
+        for key, col in zip(patterns, x.T, strict=True)
+    ]
+    order = sorted(range(len(digests)), key=digests.__getitem__)
+    ranks = np.empty(len(order), dtype=np.intp)
+    ranks[order] = np.arange(len(order))
+    return ranks
 
 
 def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
@@ -62,9 +136,15 @@ class MoveScanner:
     ``single[v, u]`` is the add or remove delta of ``u -> v``, or ``inf`` when ``v -> u`` exists or
     ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
     ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
-    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score. Its delta is set
-    to zero to prevent Schur rounding noise exceeding ``_EPS_IMPROVE`` from creating a false
-    improvement.
+    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, the
+    categorical scores, and the mixed-data scores, all score-equivalent. Its finite delta is set to
+    zero to prevent rounding noise exceeding ``_EPS_IMPROVE`` from creating a false improvement. A
+    BIC delta is ``inf`` when the move enters an unavailable family
+    (:func:`~andrey.core.score.local_score_bic`), so no move does.
+
+    ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
+    legal. ``None`` forbids none. ``ranks[u]`` is column ``u``'s place in the tie-break order,
+    :func:`tie_ranks` of the data.
 
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
@@ -73,11 +153,19 @@ class MoveScanner:
     cycles.
     """
 
-    def __init__(self, delta: DeltaBICScore, d: int) -> None:
+    def __init__(
+        self,
+        delta: DeltaBICScore | FullScoreDelta,
+        d: int,
+        *,
+        ranks: np.ndarray,
+        forbidden: np.ndarray | None = None,
+    ) -> None:
+        self._delta = delta
         self._score = delta.score_obj
-        self._cond = delta.cond_threshold
         self._d = d
         self._inv_n = 1.0 / self._score.n
+        self._ranks: list[int] = np.asarray(ranks).tolist()
         self._add = np.full((d, d), np.inf)
         self._rem = np.full((d, d), np.inf)
         self._parent = np.zeros((d, d), dtype=bool)  # [v, u]: the edge u -> v exists
@@ -92,6 +180,8 @@ class MoveScanner:
         self._ids: dict[tuple[int, ...], int] = {}
         self._set_of = np.zeros(d, dtype=np.intp)
         self._set_with = np.zeros(d, dtype=np.intp)
+        # [v, u]: the edge u -> v is never added, nor made by a reverse.
+        self._forbidden = np.zeros((d, d), dtype=bool) if forbidden is None else forbidden
 
     def best(
         self,
@@ -103,9 +193,10 @@ class MoveScanner:
     ) -> ScannedMove | None:
         """The best legal move with delta below ``floor``.
 
-        Moves are keyed ``(delta / n_samples rounded to _KEY_DP places, u, v, op_rank)``, a strict
-        total order. The default ``floor`` admits improving moves only; ``floor=inf`` admits every
-        legal move. A move that leads to a structure in ``tabu`` is skipped.
+        Moves are keyed ``(delta / n_samples rounded to _KEY_DP places, ranks[u], ranks[v],
+        op_rank)``, a strict total order that moves with the columns. The default ``floor`` admits
+        improving moves only; ``floor=inf`` admits every legal move. A move that leads to a
+        structure in ``tabu`` is skipped.
         """
         if self._d < 2:
             return None
@@ -114,8 +205,8 @@ class MoveScanner:
         tails, heads = self._tails, self._heads
         with np.errstate(invalid="ignore"):  # a degenerate row's deltas may be infinite
             rev = self._add[tails, heads] + self._rem[heads, tails]
-        rev[self._set_of[heads] == self._set_with[tails]] = 0.0
-        rev[np.isnan(rev) | self._cyclic] = np.inf
+        rev[(self._set_of[heads] == self._set_with[tails]) & np.isfinite(rev)] = 0.0
+        rev[np.isnan(rev) | self._cyclic | self._forbidden[tails, heads]] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:
             while True:
@@ -149,8 +240,7 @@ class MoveScanner:
             lost += [(u, v) for v in _bits(old[u] & ~adj_int[u])]
         for v in range(d) if first else {v for _, v in gained + lost}:
             pa = parents_of[v]
-            self._add[v] = add_deltas(self._score, v, pa, cond_threshold=self._cond)
-            self._rem[v] = remove_deltas(self._score, v, pa, cond_threshold=self._cond)
+            self._add[v], self._rem[v] = self._deltas(v, pa)
             ids = self._ids
             self._set_of[v] = ids.setdefault(tuple(pa), len(ids))
             self._set_with[v] = ids.setdefault(tuple(sorted([*pa, v])), len(ids))
@@ -180,9 +270,33 @@ class MoveScanner:
         for v in rows:
             row = np.where(self._parent[v], self._rem[v], self._add[v])
             row[self._parent[:, v] | reach[v] | np.isnan(row)] = np.inf
+            row[self._forbidden[v] & ~self._parent[v]] = np.inf  # forbidden adds; removes stay
             self._single[v] = row
             self._low[v] = row.min()
         self._adj = list(adj_int)
+
+    def _deltas(self, v: int, pa: list[int]) -> tuple[np.ndarray, np.ndarray]:
+        """Every add delta and every remove delta at target ``v`` with parents ``pa``.
+
+        BIC takes the vectorized Schur updates. A score without one, such as BDeu, differences two
+        full local scores per candidate, all scored in one :meth:`score_many` call. Entries that are
+        not a legal add or remove, or are a forbidden add, are ``inf``.
+        """
+        delta = self._delta
+        if isinstance(delta, DeltaBICScore):
+            cond = delta.cond_threshold
+            return (
+                add_deltas(delta.score_obj, v, pa, cond_threshold=cond),
+                remove_deltas(delta.score_obj, v, pa, cond_threshold=cond),
+            )
+        adds = [u for u in range(self._d) if u != v and u not in pa and not self._forbidden[v, u]]
+        sets = [pa, *(sorted([*pa, u]) for u in adds), *([p for p in pa if p != u] for u in pa)]
+        scores = np.array(self._score.score_many(v, sets))
+        add = np.full(self._d, np.inf)
+        rem = np.full(self._d, np.inf)
+        add[adds] = scores[1 : 1 + len(adds)] - scores[0]
+        rem[pa] = scores[1 + len(adds) :] - scores[0]
+        return add, rem
 
     def _unreach(self, tails: list[int]) -> list[int]:
         """Recompute ``reach`` after edges out of ``tails`` went; return the nodes it changed for.
@@ -258,12 +372,14 @@ class MoveScanner:
             u, v = int(tails[i]), int(heads[i])
             if self._reverse_ok(u, v):
                 found.append((float(rev[i]), u, v, 1, "reverse"))
+        ranks = self._ranks
         best: ScannedMove | None = None
+        best_key: tuple[float, int, int, int] | None = None
         for value, u, v, rank, op in found:
             if value < floor:
-                cand = (round(value * inv_n, _KEY_DP), u, v, rank, (op, u, v))
-                if best is None or cand[:4] < best[:4]:
-                    best = cand
+                key = (round(value * inv_n, _KEY_DP), ranks[u], ranks[v], rank)
+                if best_key is None or key < best_key:
+                    best, best_key = (key[0], u, v, rank, (op, u, v)), key
         return best
 
 
@@ -304,47 +420,62 @@ def hc(
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
     max_iter: int | None = None,
+    categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Hill-Climbing over the linear-Gaussian BIC score.
+    """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
-    BIC or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
-    CPDAG. Returns the CPDAG and the DAG's total BIC objective (lower is better), the sum of the
-    final per-node local scores.
+    score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
+    CPDAG. Moves with equal rounded score changes are chosen by :func:`tie_ranks`, whose ranks
+    follow the columns when reordered, subject to its hash and rounding limits. These choices can
+    affect later moves and the final CPDAG; the ranks do not indicate causal direction. Under a
+    mixed-data score the DAG stays a conditional linear Gaussian network: no move gives a
+    categorical node a continuous parent. Returns the CPDAG and the DAG's total objective (lower
+    is better), the sum of the final per-node local scores.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score; ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC) is supported.
+        Local score: ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC), ``"local_score_BDeu"``
+        (BDeu on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors),
+        ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
+        :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
+        ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
+        ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
     lambda_value : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     max_iter : int or None
         Maximum moves; ``None`` sets no limit. Taking ``max_iter`` moves warns with
         ``SearchLimitWarning``.
+    categorical : ndarray of bool or None
+        Marks the categorical columns for a mixed-data score; the other scores ignore it.
 
     Returns
     -------
     tuple[GraphStructure, float]
-        The CPDAG (``kind="cpdag"``) and the total BIC score of the discovered DAG.
+        The CPDAG (``kind="cpdag"``) and the total score of the discovered DAG.
     """
-    if score_func != "local_score_BIC_from_cov":
-        raise NotImplementedError(
-            f"unsupported score_func {score_func!r}; use 'local_score_BIC_from_cov'"
-        )
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
 
-    score = BICScore(X, lambda_value=lambda_value)
-    delta = DeltaBICScore(score)
+    if score_func not in HC_SCORES:
+        raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {HC_SCORES}")
+    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
+    forbidden = None
+    mask = np.full(d, score_func in DISCRETE_SCORES)
+    if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
+        mask = column_mask(categorical, d)
+        forbidden = mask[:, None] & ~mask[None, :]
 
     adj_int: list[int] = [0] * d
     parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
-        scanner = MoveScanner(delta, d)
+        scanner = MoveScanner(delta, d, ranks=tie_ranks(X, mask), forbidden=forbidden)
         moves = 0
         while max_iter is None or moves < max_iter:
             best = scanner.best(adj_int, parents_of)

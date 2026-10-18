@@ -1,8 +1,9 @@
 """causal-learn PC adapter — the reference constraint-based competitor.
 
 Calls ``pc(X, alpha=0.05, indep_test="fisherz", show_progress=False)``; those pins are also
-causal-learn's own defaults. Unlike the GES adapter this path needs no ``np.mat`` shim — it never
-imports ``ScoreUtils``.
+causal-learn's own defaults. :class:`CausalLearnPCChisq` and :class:`CausalLearnPCGsq` run its
+chi-square and G-square tests, for categorical data. Unlike the GES adapter this path needs no
+``np.mat`` shim — it never imports ``ScoreUtils``.
 
 ``CausalLearnPC("kci")`` and ``CausalLearnPC("rcot")`` are the references for Andrey's KCI and
 RCoT, named ``causal-learn.pc.<indep_test>``. Their settings map to Andrey's as follows:
@@ -34,6 +35,8 @@ _DEFAULT_INDEP_TEST = "fisherz"
 #: match Andrey's defaults (see the module docstring).
 CI_TESTS: dict[str, tuple[str, dict[str, Any]]] = {
     "fisherz": ("fisherz", {}),
+    "chisq": ("chisq", {}),
+    "gsq": ("gsq", {}),
     "kci": ("kci", {}),
     "rcot": ("rcit", {"rcit": False, "num_f2": 5, "num_f": 100, "approx": "hbe"}),
 }
@@ -62,8 +65,12 @@ class CausalLearnPC:
     mode: str = "serial"
     algorithm: str = "pc"
     output_type: str = "cpdag"
+    #: The CI test this solution runs; a variant with another test has its own ``name``.
+    indep_test: str = _DEFAULT_INDEP_TEST
 
-    def __init__(self, indep_test: str = _DEFAULT_INDEP_TEST) -> None:
+    def __init__(self, indep_test: str | None = None) -> None:
+        if indep_test is None:  # the class's own test
+            return
         if indep_test not in CI_TESTS:
             raise ValueError(f"Unsupported indep_test: {indep_test!r}")
         self.indep_test = indep_test
@@ -104,3 +111,17 @@ class CausalLearnPC:
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+class CausalLearnPCChisq(CausalLearnPC):
+    """causal-learn's PC with its chi-square test, for categorical data."""
+
+    name: str = "causal-learn.pc.chisq"
+    indep_test: str = "chisq"
+
+
+class CausalLearnPCGsq(CausalLearnPC):
+    """causal-learn's PC with its G-square test, for categorical data."""
+
+    name: str = "causal-learn.pc.gsq"
+    indep_test: str = "gsq"

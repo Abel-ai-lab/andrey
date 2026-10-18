@@ -1,8 +1,9 @@
 """Andrey PC solution adapter — the home team's constraint-based entry.
 
 Calls the public facade ``andrey.pc(X, alpha=0.05, indep_test=...)``. ``alpha=0.05`` and
-``indep_test="fisherz"`` are Andrey's own defaults; ``AndreyPC("kci")`` and the other nonlinear
-tests (``"rcot"``, ``"cmiknn"``, ``"gpdc"``) are separate solutions, named
+``indep_test="fisherz"`` are Andrey's own defaults. :class:`AndreyPCChisq` and :class:`AndreyPCGsq`
+run the chi-square and G-square tests, for categorical data; ``AndreyPC("kci")`` and the other
+nonlinear tests (``"rcot"``, ``"cmiknn"``, ``"gpdc"``) are separate solutions, named
 ``andrey.pc.<indep_test>.numpy``, each at the test's default settings.
 
 PC has no accelerated backend axis — its CI tests are numpy and its Meek orientation is pure
@@ -55,8 +56,12 @@ class AndreyPC:
     mode: str = "serial"
     algorithm: str = "pc"
     output_type: str = "cpdag"
+    #: The CI test this solution runs; a variant with another test has its own ``name``.
+    indep_test: str = _DEFAULT_INDEP_TEST
 
-    def __init__(self, indep_test: str = _DEFAULT_INDEP_TEST) -> None:
+    def __init__(self, indep_test: str | None = None) -> None:
+        if indep_test is None:  # the class's own test
+            return
         if indep_test != _DEFAULT_INDEP_TEST and indep_test not in NONLINEAR_TEST_MODULES:
             raise ValueError(f"Unsupported indep_test: {indep_test!r}")
         self.indep_test = indep_test
@@ -79,7 +84,7 @@ class AndreyPC:
             importlib.import_module(NONLINEAR_TEST_MODULES[self.indep_test])
 
     def params(self) -> dict[str, Any]:
-        """``alpha=0.05`` and the adapter's CI test, at that test's default settings."""
+        """The solution's CI test at ``alpha=0.05``, at Andrey's default settings."""
         return {"alpha": _DEFAULT_ALPHA, "indep_test": self.indep_test}
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
@@ -97,10 +102,13 @@ class AndreyPC:
         alpha = float(params.get("alpha", _DEFAULT_ALPHA))
         indep_test = params.get("indep_test", self.indep_test)
 
+        # PC's default collider order applies unless ``params`` names one.
+        order = {"collider_order": params["collider_order"]} if "collider_order" in params else {}
+
         X = np.asarray(data, dtype=np.float64)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-            out = andrey.pc(X, alpha=alpha, indep_test=indep_test)
+            out = andrey.pc(X, alpha=alpha, indep_test=indep_test, **order)
         return np.asarray(out.structure.to_numpy())
 
     def to_structure(self, native: np.ndarray) -> Any:
@@ -111,3 +119,17 @@ class AndreyPC:
         from andrey import GraphStructure
 
         return GraphStructure.from_numpy(native, kind=self.output_type)
+
+
+class AndreyPCChisq(AndreyPC):
+    """Andrey's PC with Pearson's chi-square test, for categorical data."""
+
+    name: str = "andrey.pc.chisq"
+    indep_test: str = "chisq"
+
+
+class AndreyPCGsq(AndreyPC):
+    """Andrey's PC with the G-square test, for categorical data."""
+
+    name: str = "andrey.pc.gsq"
+    indep_test: str = "gsq"

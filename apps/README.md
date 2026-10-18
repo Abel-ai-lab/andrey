@@ -25,7 +25,7 @@ installs. uv adds them in a temporary environment on top of the project's, so th
 `uv.lock`.
 
 The app uses the homepage's chart renderer and
-`benchmarks/published/alpha-2026-09/summary.json`. Generated files go in the ignored
+`benchmarks/published/0.1.0/summary.json`. Generated files go in the ignored
 `apps/live-discovery/data/` directory. A missing ratio means a package has no time there (it
 passed its time cap) or no datasets could be paired.
 

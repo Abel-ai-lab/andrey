@@ -11,35 +11,22 @@ one chunk in memory however many subsets it visits.
 
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Iterable
+from functools import partial
 from itertools import combinations, islice
 
 import numpy as np
 
-from andrey.core import backend
 from andrey.core.ci import CITest
 
-Removal = tuple[int, int, tuple[int, ...]]  # (x, y, separating set) for one removed pair
+#: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
+#: p-value is ``None`` when the scan does not record it.
+Removal = tuple[int, int, tuple[int, ...], float | None]
 
 # One batched_call inverts a stack of (k+2, k+2) correlation submatrices; cap how many subsets that
 # stack holds at once so a huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one
 # array. Each row's inverse is computed independently, so the chunk boundary never changes a result.
 _CHUNK = 4096
-
-
-def blas_scope(test: CITest) -> contextlib.AbstractContextManager:
-    """The BLAS threads of a serial scan with ``test``: one, unless the test sets ``pin_blas``
-    false.
-
-    One thread makes a partial-correlation test's submatrix inversions match the one-thread
-    parallel skeleton workers whatever the host's thread count, and a registered test keeps it too.
-    KCI sets ``pin_blas`` false from 2,000 rows: it has no parallel workers, its kernel products run
-    faster there on every BLAS thread, and its p-values are reproducible for a fixed thread count.
-    """
-    if getattr(test, "pin_blas", True):
-        return backend.one_blas_thread()
-    return contextlib.nullcontext()
 
 
 def scan_conditioning_sets(
@@ -52,13 +39,16 @@ def scan_conditioning_sets(
     separating: set[int],
     skip_within: set[int] | None = None,
     trace: list[dict] | None = None,
+    largest: list[float] | None = None,
 ) -> bool:
     """Test every size-``size`` subset of ``candidates`` as a conditioning set for ``(a, b)``.
 
     Each subset whose p-value exceeds ``alpha`` (``a`` conditionally independent of ``b``
     given the subset) is unioned into ``separating`` in place. Returns whether any subset separated
-    the pair. There is no early exit: the whole subset space is scanned so ``separating``
-    accumulates the union over every separating set, exactly as the scalar loop it replaces did.
+    the pair. With ``largest`` given, the largest p-value among the separating subsets is appended
+    to it when one separated the pair; without it, no p-value is compared. There is no early exit:
+    the whole subset space is scanned so ``separating`` accumulates the union over every separating
+    set.
 
     With ``skip_within`` given, subsets lying entirely inside it are not tested: the caller passes
     the candidates the pair's other endpoint already scanned at this size, so each shared subset is
@@ -66,9 +56,10 @@ def scan_conditioning_sets(
 
     When ``test`` exposes ``batched_call(a, b, condition_sets)`` the subsets are evaluated in
     vectorized, size-bounded chunks; otherwise each is tested with a scalar ``test(a, b, subset)``
-    call, or ``test._bounded_pvalue(a, b, subset, alpha)`` where the test has one. All paths visit
+    call, or ``test._bounded_pvalue(a, b, subset, alpha, exact_above)`` where the test has one,
+    with ``exact_above`` true when ``largest`` is given. All paths visit
     the same subsets in the same order and take the same ``p > alpha`` decisions, so the
-    accumulated ``separating`` and the return value are identical.
+    accumulated ``separating``, the largest p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
     runs once per chunk.
@@ -76,16 +67,17 @@ def scan_conditioning_sets(
     subsets = combinations(candidates, size)
     if skip_within is not None and len(skip_within) >= size:
         subsets = (s for s in subsets if not skip_within.issuperset(s))
-    batched = getattr(test, "batched_call", None)
-    if batched is None:
-        # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain.
-        bounded = getattr(test, "_bounded_pvalue", None)
-        batched = (
-            (lambda a, b, chunk: [bounded(a, b, subset, alpha) for subset in chunk])
-            if bounded is not None
-            else (lambda a, b, chunk: [test(a, b, subset) for subset in chunk])
-        )
+    # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
+    # above alpha that `largest` records comes from every shuffle.
+    bounded = getattr(test, "_bounded_pvalue", None)
+    scalar = (
+        test if bounded is None else partial(bounded, alpha=alpha, exact_above=largest is not None)
+    )
+    batched = getattr(test, "batched_call", None) or (
+        lambda a, b, chunk: [scalar(a, b, subset) for subset in chunk]
+    )
     found = False
+    top = 0.0
     while True:
         chunk = list(islice(subsets, _CHUNK))
         if not chunk:
@@ -97,6 +89,10 @@ def scan_conditioning_sets(
             if p > alpha:
                 found = True
                 separating.update(subset)
+                if largest is not None and p > top:
+                    top = float(p)
+    if found and largest is not None:
+        largest.append(top)
     return found
 
 
@@ -142,14 +138,19 @@ def prescreen_capable(test: CITest) -> bool:
 
 
 def marginal_removals(
-    test: CITest, adjacent_upper: np.ndarray, alpha: float, trace: list[dict] | None = None
-) -> list[tuple[int, int]]:
-    """(size 0) The still-adjacent pairs the marginal test separates, as ``(x, y)`` with ``x < y``.
+    test: CITest,
+    adjacent_upper: np.ndarray,
+    alpha: float,
+    trace: list[dict] | None = None,
+    record_pvalues: bool = True,
+) -> list[tuple[int, int, float | None]]:
+    """(size 0) The still-adjacent pairs the marginal test separates, as ``(x, y, p)``, ``x < y``.
 
     ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized read
     of the correlation matrix flags every pair with marginal ``p > alpha``; the return is those in
-    row-major order (matching the serial loop's visitation). Each carries an empty separating set.
-    With ``trace`` given, every adjacent pair's test is recorded.
+    row-major order (matching the serial loop's visitation), each with its p-value, or ``None``
+    when ``record_pvalues`` is false; each pair's separating set is empty. With ``trace`` given,
+    every adjacent pair's test is recorded.
     """
     pmat = test.marginal_pvalues()  # ty: ignore[unresolved-attribute]  # gated by prescreen_capable
     separated = adjacent_upper & (pmat > alpha)
@@ -157,7 +158,9 @@ def marginal_removals(
         for x, y in zip(*np.nonzero(adjacent_upper)):
             record_tests(trace, 0, int(x), int(y), [()], [pmat[x, y]], alpha)
     xs, ys = np.nonzero(separated)
-    return list(zip(xs.tolist(), ys.tolist()))
+    if not record_pvalues:
+        return [(x, y, None) for x, y in zip(xs.tolist(), ys.tolist())]
+    return list(zip(xs.tolist(), ys.tolist(), pmat[xs, ys].tolist()))
 
 
 def first_order_separating(
@@ -167,21 +170,27 @@ def first_order_separating(
     candidates: list[int],
     alpha: float,
     trace: list[dict] | None = None,
-) -> list[int]:
-    """(size 1) The sorted candidates whose first-order test separates ``(x, y)`` (``p > alpha``).
+    record_pvalues: bool = True,
+) -> tuple[list[int], float | None]:
+    """(size 1) The candidates whose first-order test separates ``(x, y)``, and their largest p.
 
-    ``candidates`` is the pair's start-of-size snapshot conditioners (PC: either endpoint's
-    neighbors minus the partner; FCI: the lower endpoint's). Vectorized over the candidates in one
-    shot; no cache writes. Returns the separating conditioners sorted ascending (the separating-set
-    key order); empty when none separate. With ``trace`` given, every candidate's test is recorded.
+    ``candidates`` is the pair's start-of-size snapshot conditioners: either endpoint's neighbors
+    minus the pair, in PC and FCI alike. Vectorized over the candidates in one shot; no cache
+    writes. Returns the separating conditioners sorted ascending (the separating-set key order) and
+    the largest p-value among their tests, ``([], None)`` when none separate; the p-value is
+    ``None`` when ``record_pvalues`` is false. With ``trace`` given, every candidate's test is
+    recorded.
     """
     if not candidates:
-        return []
+        return [], None
     pvals = test.first_order_pvalues(x, y, candidates)  # ty: ignore[unresolved-attribute]
     if trace is not None:
         record_tests(trace, 1, x, y, [(c,) for c in candidates], pvals, alpha)
     passing = np.asarray(candidates)[pvals > alpha]
-    return sorted(passing.tolist())
+    if not passing.size or not record_pvalues:
+        return sorted(passing.tolist()), None
+    # Some candidate separates, so the largest p-value is a separating one.
+    return sorted(passing.tolist()), max(pvals.tolist())
 
 
 def scan_pairs(
@@ -191,12 +200,15 @@ def scan_pairs(
     size: int,
     alpha: float,
     trace: list[dict] | None = None,
+    record_pvalues: bool = True,
 ) -> list[Removal]:
     """Scan adjacent ``pairs`` at conditioning ``size`` against a start-of-size neighbor snapshot.
 
-    Returns ``(x, y, separating)`` for every pair some size-``size`` conditioning set separates.
-    Each pair is tested from either endpoint and the separating sets are unioned, so the removals
-    do not depend on column order; a subset both endpoints offer is tested once, from the first.
+    Returns ``(x, y, separating, p)`` for every pair some size-``size`` conditioning set separates,
+    with ``p`` the largest p-value among the separating tests, or ``None`` when ``record_pvalues``
+    is false. Each pair is tested from either endpoint and the separating sets are unioned, so the
+    removals do not depend on column order; a subset both endpoints offer is tested once, from the
+    first.
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
     and the parallel workers share it, so they stay identical. With ``trace`` given, every test is
     recorded in the order it runs.
@@ -205,6 +217,7 @@ def scan_pairs(
     for x, y in pairs:
         separating: set[int] = set()
         found = False
+        largest: list[float] | None = [] if record_pvalues else None
         from_x = neighbors[x][neighbors[x] != y].tolist()
         from_y = neighbors[y][neighbors[y] != x].tolist()
         # Once the x side has scanned, the y side skips the subsets both sides offer.
@@ -212,10 +225,12 @@ def scan_pairs(
         for a, b, candidates, seen in ((x, y, from_x, None), (y, x, from_y, shared)):
             if len(candidates) < size:
                 continue
-            if scan_conditioning_sets(test, a, b, candidates, size, alpha, separating, seen, trace):
+            if scan_conditioning_sets(
+                test, a, b, candidates, size, alpha, separating, seen, trace, largest
+            ):
                 found = True
         if found:
-            removals.append((x, y, tuple(sorted(separating))))
+            removals.append((x, y, tuple(sorted(separating)), max(largest) if largest else None))
     return removals
 
 

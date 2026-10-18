@@ -239,8 +239,9 @@ def meek_replay(heading=True):
     return document("Meek's rules", body, script)
 
 
-# PC as andrey.constraint.pc runs it: PC-stable neighborhoods, every subset tried, and the
-# prioritize-existing collider rule. Each entry is (indent, text); frames name lines by number.
+# PC as andrey.constraint.pc runs it: PC-stable neighborhoods, every subset tried, and colliders
+# taken by their separating p-value, highest first. Each entry is (indent, text); frames name lines
+# by number.
 PC_LINES = (
     (0, "G <- the complete undirected graph"),
     (0, "for d = 0, 1, 2, … while some node has > d neighbors"),
@@ -248,9 +249,9 @@ PC_LINES = (
     (1, "for each adjacent pair (x, y)"),
     (2, "for each S of size d from adj(x) \\ {y} or adj(y) \\ {x}"),
     (3, "p <- test(x, y | S)"),
-    (3, "if p > α: mark x – y, add S to sepset(x, y)"),
+    (3, "if p > α: mark x – y, add S to sepset(x, y), keep the largest p as p(x, y)"),
     (1, "remove the marked edges from G"),
-    (0, "for each unshielded triple x – y – z"),
+    (0, "for each unshielded triple x – y – z, highest p(x, z) first"),
     (1, "if y ∉ sepset(x, z) and neither y -> x nor y -> z"),
     (2, "orient x -> y <- z"),
     (0, "apply Meek's rules R1–R3 until nothing changes"),
@@ -426,6 +427,7 @@ def pc_walkthrough(X, labels, alpha=0.05):
                 variables=[
                     ("triple", f"{labels[x]} – {labels[y]} – {labels[z]}"),
                     (f"sepset({labels[x]}, {labels[z]})", sepset),
+                    (f"p({labels[x]}, {labels[z]})", f"{r['p']:.3g}"),
                 ],
             )
         elif r["step"] == "meek":

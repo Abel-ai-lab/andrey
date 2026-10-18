@@ -13,6 +13,8 @@ a derived score. This file pins three contracts, and the first two for its vecto
   two-full-score fallback (monkeypatch-counted), still exact;
 * **purity** -- the same query returns byte-identical deltas even after the chained
   ``score_many_with_base`` has polluted the shared residual cache in between.
+
+The batch-dependence bounds ``delta_many_with_base`` can report leave the deltas unchanged.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from andrey.core import score as score_module
 from andrey.core import score_delta
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
@@ -28,6 +31,11 @@ from andrey.core.score_delta import DeltaBICScore
 def _well_conditioned(seed: int, n: int, d: int) -> np.ndarray:
     rng = np.random.default_rng(seed)
     return rng.standard_normal((n, d))
+
+
+def _unchecked(x: np.ndarray) -> BICScore:
+    """A score on ``x`` without the column check, which rejects a column this close to a copy."""
+    return BICScore.from_cov(np.cov(x, rowvar=False), len(x), lambda_value=2.0)
 
 
 def _full_delta(score: BICScore, v: int, base: tuple[int, ...], u: int, op: str) -> float:
@@ -84,7 +92,7 @@ def test_fallback_fires_on_ill_conditioned_base(monkeypatch: pytest.MonkeyPatch)
     # Two columns collinear to ~1 part in 1e9 -> cov[base, base] condition well above 1e10.
     collinear = base_cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))
     x = np.hstack([base_cols, collinear])  # column 4 ~= column 0
-    score = BICScore(x, lambda_value=2.0)
+    score = _unchecked(x)
     delta = DeltaBICScore(score)
 
     calls: list[tuple] = []
@@ -102,6 +110,59 @@ def test_fallback_fires_on_ill_conditioned_base(monkeypatch: pytest.MonkeyPatch)
     # The fallback is still exact: it IS two full scores.
     want = [_full_delta(score, 1, base, 0, "remove"), _full_delta(score, 1, base, 4, "remove")]
     assert got == want
+
+
+def test_stricter_threshold_applies_to_a_cached_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A base cached under the default threshold still falls back under a stricter one."""
+    score = BICScore(_well_conditioned(3, 400, 4))
+    calls: list[tuple] = []
+    real = score_delta._delta_two_scores
+
+    def _counting(score_obj, i, base, u, op):
+        calls.append((i, base, u, op))
+        return real(score_obj, i, base, u, op)
+
+    monkeypatch.setattr(score_delta, "_delta_two_scores", _counting)
+
+    score_delta.add_deltas(score, 3, (0, 1))
+    assert not calls
+    # Every condition-number proxy is at least 1, so a threshold of 0.5 rejects every base.
+    score_delta.add_deltas(score, 3, (0, 1), cond_threshold=0.5)
+    assert sorted(u for _, _, u, _ in calls) == [2]
+
+
+def test_bounds_leave_deltas_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reported bounds leave each delta byte-identical; they are 0 where no batch can change it.
+
+    Adds off the empty base, adds off an ill-conditioned base, and removes do not depend on the
+    batch. Adds off a well-conditioned base get a small finite bound, and an add whose rank-one
+    update cancels gets an infinite one.
+    """
+    # BICScore's input check rejects the near-duplicate column; the bounds still cover it.
+    monkeypatch.setattr(score_module, "check_columns", lambda cov, n: None)
+    rng = np.random.default_rng(0)
+    cols = rng.standard_normal((400, 6))
+    x = np.hstack([cols, cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))])  # 6 ~= 0
+    delta = DeltaBICScore(BICScore(x, lambda_value=2.0))
+    queries = [
+        ((), [("add", 2), ("add", 3), ("add", 6)], "zero"),
+        ((0, 6), [("add", 2), ("add", 3)], "zero"),
+        ((2, 3), [("add", 0), ("add", 4), ("add", 5)], "small"),
+        ((2, 3), [("remove", 2), ("remove", 3)], "zero"),
+        ((0,), [("add", 6)], "inf"),
+    ]
+    for base, moves, kind in queries:
+        plain = delta.delta_many_with_base(1, base, moves)
+        bounds: list[float] = []
+        got = delta.delta_many_with_base(1, base, moves, bounds=bounds)
+        assert [g.hex() for g in got] == [p.hex() for p in plain]
+        assert len(bounds) == len(moves)
+        if kind == "zero":
+            assert bounds == [0.0] * len(moves), base
+        elif kind == "small":
+            assert all(0.0 < b < 1e-9 * 400 for b in bounds), bounds
+        else:
+            assert bounds == [np.inf], bounds
 
 
 def test_purity_survives_chained_cache_pollution() -> None:
@@ -166,9 +227,40 @@ def test_row_deltas_are_two_full_scores_on_ill_conditioned_base() -> None:
     rng = np.random.default_rng(0)
     base_cols = rng.standard_normal((400, 4))
     x = np.hstack([base_cols, base_cols[:, 0:1] + 1e-11 * rng.standard_normal((400, 1))])
-    score = BICScore(x, lambda_value=2.0)
+    score = _unchecked(x)
     base = (0, 4)  # columns 0 and 4 are collinear
     add = score_delta.add_deltas(score, 1, base)
     remove = score_delta.remove_deltas(score, 1, base)
     assert [add[u] for u in (2, 3)] == [_full_delta(score, 1, base, u, "add") for u in (2, 3)]
     assert [remove[u] for u in base] == [_full_delta(score, 1, base, u, "remove") for u in base]
+
+
+@pytest.mark.parametrize("scale", [1e-80, 1e-90])
+def test_add_deltas_do_not_depend_on_the_data_scale(scale: float) -> None:
+    """Rescaling the data leaves every BIC delta unchanged, even where squared covariances
+    underflow."""
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((300, 5))
+    x[:, 1] += x[:, 0]
+    x[:, 2] += x[:, 1] - x[:, 3]
+    unit, scaled = BICScore(x), BICScore(x * scale)
+    for base in [(), (3,)]:
+        want = score_delta.add_deltas(unit, 2, base)
+        got = score_delta.add_deltas(scaled, 2, base)
+        np.testing.assert_allclose(got, want, rtol=1e-9)
+
+
+def test_adds_past_n_minus_2_parents_are_inf_on_every_path() -> None:
+    """With 6 rows a parent set of 5 fits its child exactly; every delta path scores an add to 4
+    parents as ``inf`` and an add to 3 as two full scores do."""
+    score = BICScore(np.random.default_rng(0).standard_normal((6, 10)))
+    delta = DeltaBICScore(score)
+    full, below = (1, 2, 3, 4), (1, 2, 3)
+    moves = [("add", u) for u in (5, 6, 7)]
+    assert np.all(score_delta.add_deltas(score, 0, full) == np.inf)
+    assert delta.delta_many_with_base(0, full, moves) == [np.inf] * 3
+    assert delta.score_many_with_base(0, full, moves) == [np.inf] * 3
+    assert delta.delta(0, full, 5, "add") == np.inf
+    got = score_delta.add_deltas(score, 0, below)
+    for u in range(4, 10):
+        assert got[u] == pytest.approx(_full_delta(score, 0, below, u, "add"), rel=1e-9)

@@ -74,8 +74,8 @@ def _structural_field_failure(name: str, candidate: object, baseline: object) ->
     """``None`` if a structural field matches exactly, else a diagnostic string.
 
     Handles both rectangular arrays (graph adjacency: NaN-aware, cell-diff diagnostics) and ragged
-    nested lists (for example, CAMUV parent-index lists), which numpy cannot stack into one array --
-    those fall back to exact nested equality.
+    nested lists, which numpy cannot stack into one array -- those fall back to exact nested
+    equality.
     """
     if not (_is_rectangular(candidate) and _is_rectangular(baseline)):
         return None if candidate == baseline else f"{name}: structural mismatch"

@@ -19,7 +19,7 @@ import andrey.viz
 ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "README.md"
 IMAGES = ".github/readme"
-SUMMARY = ROOT / "benchmarks/published/alpha-2026-09/summary.json"
+SUMMARY = ROOT / "benchmarks/published/0.1.0/summary.json"
 POSTS = ROOT / "docs" / "blog"
 CONF = (ROOT / "docs" / "conf.py").read_text()
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
@@ -44,7 +44,7 @@ def test_readme_blocks_match_summary_and_registry(monkeypatch, offline_datasets)
     # The claims sit above the fold, before any table or code, and are the homepage's.
     assert readme.index(end) < readme.index("```")
     summaries = build.release_summaries(summary)
-    assert f"- **Fast**: {build.claim_sentence(summaries)}" in pitch
+    assert f"- **Fast**: {build.CLAIM}" in pitch
     lead, fewer = build.more_than(build.fewest_errors(summaries))
     claim = f"- **Accurate**: {lead.lower()} {fewer}% fewer errors than other popular packages."
     assert claim in pitch
@@ -163,6 +163,12 @@ def test_the_old_demo_address_redirects_to_the_examples():
     template = (ROOT / "docs" / "_templates" / "demo-redirect.html").read_text()
     assert 'content="0; url=../docs/demos/index.html"' in template
     assert '"demo/index": "demo-redirect.html"' in CONF
+
+
+def test_the_benchmark_explorer_address_redirects_to_the_release_cards():
+    template = (ROOT / "docs" / "_templates" / "benchmark-explorer-redirect.html").read_text()
+    assert 'content="0; url=../benchmarks.html"' in template
+    assert '"docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html"' in CONF
 
 
 def test_the_faq_cites_what_the_readme_cites():

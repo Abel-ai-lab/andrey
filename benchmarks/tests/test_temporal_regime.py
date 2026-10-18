@@ -50,8 +50,19 @@ def _lagged_key(**overrides) -> datasets.DatasetKey:
 
 
 def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
-    """Every digest and label of the existing regimes and the tiny keys, written out."""
+    """Every digest and label of the existing regimes and the tiny keys, written out.
+
+    Each regime's second digest is its unshuffled key's: the one records of the generated column
+    order carry.
+    """
     assert [(k.digest, k.label) for k in TINY_KEYS] == [
+        ("1e8116e3e634", "er-linear-gaussian-deg2-d6-n200-s0-standardized-shuffled"),
+        ("a2adb337ea6a", "er-linear-gaussian-deg2-d6-n200-s1-standardized-shuffled"),
+        ("28df48505299", "er-linear-gaussian-deg2-d10-n200-s0-standardized-shuffled"),
+        ("50616bb18cc5", "er-linear-gaussian-deg2-d10-n200-s1-standardized-shuffled"),
+    ]
+    unshuffled = [dataclasses.replace(k, shuffle=False) for k in TINY_KEYS]
+    assert [(k.digest, k.label) for k in unshuffled] == [
         ("8fc43b7bfa82", "er-linear-gaussian-deg2-d6-n200-s0-standardized"),
         ("5c97ae989c9b", "er-linear-gaussian-deg2-d6-n200-s1-standardized"),
         ("f94d1499d8f6", "er-linear-gaussian-deg2-d10-n200-s0-standardized"),
@@ -59,7 +70,7 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
     ]
     digests = {}
     for regime, (topology, functional, noise, standardize) in datasets.REGIMES.items():
-        if regime in datasets.TEMPORAL_REGIMES:
+        if regime in datasets.TEMPORAL_REGIMES or functional in datasets.regime_models.MODELS:
             continue
         key = datasets.DatasetKey(
             topology=topology,
@@ -72,17 +83,18 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
             seed=0,
             latents=datasets.latents_for(regime, 10),
         )
-        digests[regime] = key.digest
+        digests[regime] = (key.digest, dataclasses.replace(key, shuffle=False).digest)
     assert digests == {
-        "linear_gauss_er": "d25169e594f4",
-        "lingam_sf": "830725644ac9",
-        "nonlinear_hub": "839a214ce06a",
-        "pnl_small_world": "e8b438a8b9ab",
-        "latent_gauss_er": "72e95ac72b33",
-        "latent_lingam_er": "a04ce0fceceb",
-        "latent_anm_er": "ac7e8fa030c0",
-        "anm_pair": "a200dd78d80c",
-        "pnl_pair": "d015f7add4b2",
+        "linear_gauss_er": ("afa2b12be325", "d25169e594f4"),
+        "lingam_sf": ("a780444aa58c", "830725644ac9"),
+        "nonlinear_hub": ("5446cf75fd51", "839a214ce06a"),
+        "pnl_small_world": ("82e655de5fd9", "e8b438a8b9ab"),
+        "latent_gauss_er": ("fba98d7ca345", "72e95ac72b33"),
+        "latent_lingam_er": ("424a811a2462", "a04ce0fceceb"),
+        "anm_pair": ("3fc95594c2c1", "a200dd78d80c"),
+        "pnl_pair": ("dae8d1a6f304", "d015f7add4b2"),
+        "discrete_er": ("389cde24484c", "1cff12e9af03"),
+        "mixed_er": ("7fb1f31c503f", "cb7595f71def"),
     }
 
 
@@ -97,15 +109,19 @@ def test_a_lagged_key_is_a_sample_scm_call_of_its_own():
         "seed": 0,
         "scale": "raw",
         "density": 0.0,
+        "shuffle": True,
     }
-    assert key.label == "er-var-gaussian-deg0-d5-n300-s0-raw"  # gitleaks:allow
+    assert key.label == "er-var-gaussian-deg0-d5-n300-s0-raw-shuffled"  # gitleaks:allow
     assert key.digest != _lagged_key(seed=1).digest != _lagged_key(n=301).digest
 
 
 def test_the_lagged_datasets_keep_their_identity_beside_the_paper_regimes():
-    """The digests the lagged regime had before the paper regimes existed."""
-    assert _lagged_key().digest == "d74ca17b53ba"
-    assert _lagged_key(d=20, n=1000, seed=2).digest == "e09ae500537f"
+    """The lagged regime's digests, shuffled and unshuffled, beside the paper regimes."""
+    assert _lagged_key().digest == "e8beb2acabe6"
+    assert _lagged_key(d=20, n=1000, seed=2).digest == "67ffe3cad0bd"
+    # The unshuffled digests are the ones records of the generated column order carry.
+    assert _lagged_key(shuffle=False).digest == "d74ca17b53ba"
+    assert _lagged_key(d=20, n=1000, seed=2, shuffle=False).digest == "e09ae500537f"
 
 
 # --- the stored truth ------------------------------------------------------------------------------

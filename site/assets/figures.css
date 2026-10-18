@@ -1,7 +1,7 @@
 /* The timing comparison, the speed charts, the accuracy figures, and the code windows: on the
-   homepage, in the launch post, and in the benchmark explorer. Every color is an --andrey-* token generated from
-   src/andrey/viz/theme.py, so this file names no hex. Motion runs only with no reduced-motion
-   preference, and every element is visible before it starts. */
+   homepage, in the posts and the release cards, and on the Space's benchmark page. Every color is
+   an --andrey-* token generated from src/andrey/viz/theme.py, so this file names no hex. Motion
+   runs only with no reduced-motion preference, and every element is visible before it starts. */
 
 :root {
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -332,11 +332,14 @@ div[class*="highlight-"].window pre {
   background: var(--andrey-surface);
 }
 
+/* The claim sits right of the method's name; on a card too narrow for both, it moves under the
+   name. */
 .tchart figcaption {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: last baseline;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0 1rem;
   margin: 0;
   padding: 0;
   color: inherit;

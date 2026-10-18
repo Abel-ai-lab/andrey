@@ -8,7 +8,8 @@ Every number on the homepage comes from a release's published benchmark summary 
 from the method registry. A method measured against the same package in two summaries shows the
 newer summary's rows (:func:`newest`). The speed and accuracy sections cover every comparison with
 another package whose method the registry supports; each family's tile shows its largest ratio
-rounded down to one digit, and the README claim is the one :func:`claim_sentence` words from them.
+rounded down to one digit. The README, the live demo, and the homepage's description state
+``CLAIM``, which carries no number; :func:`claim_sentence` words the first summary's headline.
 The README chart shows one card per method in ``PANEL``. The method list comes from the method
 registry. A summary outside ``benchmarks/published/`` loads only as a placeholder, which marks the
 page as not for release. Links are relative to the site root.
@@ -50,12 +51,14 @@ PUBLISHED = ROOT / "benchmarks" / "published"
 # PUBLISHED. The speed and accuracy sections cover them all. The first is SUMMARY, the one a
 # placeholder preview replaces.
 RELEASES = (
-    "alpha-2026-09",
-    "hidden-confounders-2026-10",
-    "score-search-2026-10",
-    "pairwise-2026-10",
-    "direct-lingam-2026-10",
-    "time-series-2026-10",
+    "0.1.0",
+    "0.2.0",
+    "0.3.0",
+    "0.4.0",
+    "0.4.1",
+    "0.5.0",
+    "0.6.0",
+    "0.7.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -100,6 +103,13 @@ REGIMES = {
     "varma_lingam_paper": "linear non-Gaussian time series with a moving average",
     "longitudinal_lingam_paper": "linear non-Gaussian longitudinal data",
     "var2_lagged": "lagged linear-Gaussian time series",
+    "mixed_er": "mixed continuous and categorical data from Erdos-Renyi graphs",
+    "discrete_er": "categorical data from Erdos-Renyi graphs",
+    "interventional_gauss_er": "linear-Gaussian data from Erdos-Renyi graphs with interventions",
+    "multi_group_er": "linear non-Gaussian data in three groups sharing one Erdos-Renyi graph",
+    "latent_measurement": "linear data with latent variables, each measured by three indicators",
+    "domain_shift_er": "linear-Gaussian data from Erdos-Renyi graphs whose mechanisms shift "
+    "across domains",
 }
 METHOD_KEYS = {"method", "comparator", "regime", "hardware", "build", "rows"}
 ROW_KEYS = {"d", "seeds", "andrey_s", "comparator_s", "ratio"}
@@ -125,6 +135,10 @@ ERRORS = {
         "in a time series, a link that the learned and true graphs do not share, or a link end "
         "they mark differently",
     ),
+    "latents": (
+        ("andrey_latents_missed", "comparator_latents_missed", "empty_latents_missed"),
+        "a latent variable whose indicators the learned model does not group as one cluster",
+    ),
 }
 # The density the homepage shows. A summary that measures more than one mean degree at a size
 # gives the panel, the charts, and the counts its rows at mean degree 2, the density of the other
@@ -132,7 +146,7 @@ ERRORS = {
 MEAN_DEGREE = 2.0
 DEMO_URL: str | None = None  # the live demo; link it once its Space is public
 # The one-line description, as pyproject.toml and the README give it.
-DESCRIPTION = "Andrey, a very fast causal discovery package."
+DESCRIPTION = "Andrey: accelerated, accurate, agentic causal discovery."
 
 # Graph colors resolve through the page's tokens, so the drawing follows the light or dark theme.
 TOKEN_PALETTE = andrey.viz.Palette(
@@ -150,7 +164,8 @@ TOKEN_PALETTE = andrey.viz.Palette(
 # ---- the summaries ---------------------------------------------------------------------------
 def load_summary(path: Path, *, placeholder: bool = False) -> dict:
     """Read a release's benchmark summary and check its layout; refuse unpublished files for
-    release."""
+    release. A comparison with an earlier Andrey build (``"comparison": "earlier-build"``) is left
+    out."""
     if not placeholder and not path.resolve().is_relative_to(PUBLISHED):
         raise ValueError(
             f"{path} is not under benchmarks/published/; preview it with -D andrey_placeholder=1"
@@ -186,7 +201,12 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
                 )
             if row.get("ratio_is_lower_bound") and row.get("ratio_lower_bound") is None:
                 raise ValueError(f"{name} d={row['d']}: a lower bound is flagged, but not given")
-    return summary
+    # A comparison with an earlier Andrey build measures Andrey's own progress, not another
+    # package, so no page counts it; its release card gives it.
+    return {
+        **summary,
+        "methods": [m for m in summary["methods"] if m.get("comparison") != "earlier-build"],
+    }
 
 
 def release_summaries(summary: dict) -> list[dict]:
@@ -253,16 +273,18 @@ def error_kind(method: dict) -> str:
     at each size, in the measure the summary records for both:
 
     - ``shd``: the structural Hamming distance to the true graph, the edges to add, remove, or
-      reorient to reach it (the alpha-2026-09 and score-search-2026-10 summaries).
+      reorient to reach it (the 0.1.0 and 0.3.0 summaries).
     - ``directed``: on data with hidden common causes, the directed edges in one graph but not the
       other, against the true graph's projection onto the observed variables; a reversed edge
-      counts twice (the hidden-confounders-2026-10 summary).
+      counts twice (the 0.2.0 summary).
     - ``direction``: on cause-effect pairs, the pairs whose direction is reversed (the
-      pairwise-2026-10 summary). Each package names a direction on every pair it fits, so a fitted
+      0.4.0 summary). Each package names a direction on every pair it fits, so a fitted
       pair is either right or reversed; a summary with a pair left without an edge fails to load.
     - ``temporal``: in a time series, the errors in the method's own unit, which its summary's
       ``error_metric`` defines: the lag-resolved SHD, the endpoint SHD over a window of lags, or
-      the lagged or cross-link edges missed plus those added (the time-series-2026-10 summary).
+      the lagged or cross-link edges missed plus those added (the 0.5.0 summary).
+    - ``latents``: for a method that finds latent variables from their indicators, the true
+      latents whose indicators it does not return as one cluster (GIN in the 0.7.0 summary).
 
     Fewer is better in each. A comparison whose rows give none of them fails, rather than drop out
     of the count.
@@ -415,8 +437,12 @@ def speed_claim(summaries: list[dict]) -> tuple[str, str]:
     return lead, rest
 
 
+# The speed claim the README, the live demo, and the homepage's description state.
+CLAIM = "The fastest causal discovery package."
+
+
 def claim_sentence(summaries: list[dict]) -> str:
-    """The speed claim as one sentence: the homepage's, under its heading, and the README's."""
+    """The speed claim as one sentence, the form of a summary's ``headline``."""
     lead, rest = speed_claim(summaries)
     return f"{lead}, and {rest}." if rest else f"{lead}."
 
@@ -434,11 +460,6 @@ def fastest(summary: dict) -> tuple[dict, dict]:
     return method, row
 
 
-def home_claim(summaries: list[dict]) -> str:
-    """The homepage's speed claim, the line under its heading."""
-    return claim_sentence(summaries)
-
-
 def ratio_label(row: dict) -> str:
     """A row's speedup as the page prints it, with "≥" before a lower bound."""
     return ("≥" if row["at_least"] else "") + ratio_text(row["ratio"])
@@ -448,13 +469,18 @@ def ratio_label(row: dict) -> str:
 # The methods the README chart shows, each from a release's summary: (folder in RELEASES,
 # method). The chart orders them by speedup.
 PANEL = (
-    ("alpha-2026-09", "PC"),
-    ("alpha-2026-09", "FCI"),
-    ("alpha-2026-09", "GES"),
-    ("score-search-2026-10", "XGES"),
-    ("score-search-2026-10", "Tabu search"),
-    ("direct-lingam-2026-10", "DirectLiNGAM"),
+    ("0.1.0", "PC"),
+    ("0.1.0", "FCI"),
+    ("0.7.0", "GES"),
+    ("0.3.0", "XGES"),
+    ("0.3.0", "Tabu search"),
+    ("0.4.1", "DirectLiNGAM"),
 )
+
+
+# A PANEL method's slide size where its largest measured one is not it: GES's errors reach the
+# empty graph's at 200 variables in 0.7.0, so its slide shows 150.
+PANEL_SIZES = {("0.7.0", "GES"): 150}
 
 
 def speedup_text(speed: float) -> str:
@@ -463,7 +489,8 @@ def speedup_text(speed: float) -> str:
 
 
 def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str, float, str]]]]:
-    """Each ``PANEL`` method's speedups at its largest size with a published ratio, fastest first.
+    """Each ``PANEL`` method's speedups at its largest size with a published ratio, or at the size
+    ``PANEL_SIZES`` names, fastest first.
 
     A slide is the method, its size as it prints, and its bars: each package, its speed relative
     to the slowest package (1x), and the label it prints. The slides go by Andrey's speed, largest
@@ -483,11 +510,17 @@ def speedup_slides(summaries: list[dict]) -> list[tuple[str, str, list[tuple[str
     slides = []
     for release, name in PANEL:
         found = [m for m in comparisons(by_release[release]) if m["method"] == name]
+        size = PANEL_SIZES.get((release, name))
         if not found:
             raise ValueError(f"the README chart needs {name} in {release}")
         if found[0]["status"] != "supported":
             raise ValueError(f"the README chart shows supported methods; {name} is not")
-        claimed = [(row["d"], m) for m in found for row in m["rows"] if row["ratio"]]
+        claimed = [
+            (row["d"], m)
+            for m in found
+            for row in m["rows"]
+            if row["ratio"] and size in (None, row["d"])
+        ]
         if not claimed:
             raise ValueError(f"the README chart needs a published {name} ratio")
         d, lead = max(claimed, key=lambda item: item[0])
@@ -560,21 +593,20 @@ def log_scale(lo: float, hi: float, a: float, b: float):
     return lambda v: a + (b - a) * math.log10(v / lo) / span
 
 
-# The sizes a time chart labels on its axis, those inside the charts' range.
-SIZE_TICKS = (5, 10, 20, 50, 100, 200, 400, 800, 1600, 3200)
-
-
-def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: list[int]) -> str:
+def time_chart(name: str, methods: list[dict], xr: tuple[float, float]) -> str:
     """Fit time (x) against problem size (y) for Andrey and each package, both on log scales.
 
     Up and to the left is better: larger problems in less time. The size is in the comparisons'
-    ``unit``, variables or rows. A hollow point is a size with no paired ratio; a package past its
-    time cap has no point at that size.
+    ``unit``, variables or rows, and its axis spans and labels the sizes the chart measures. A
+    hollow point is a size with no paired ratio; a package past its time cap has no point at that
+    size.
     """
     unit = methods[0]["unit"]
+    sizes = sorted({r["d"] for m in methods for r in m["rows"]})
     w, h, left, right, top, bottom = 320, 232, 44, 306, 22, 196
     x = log_scale(xr[0], xr[1], left, right)
-    y = log_scale(sizes[0], sizes[-1], bottom, top)
+    lo, hi = (sizes[0], sizes[-1]) if len(sizes) > 1 else (sizes[0] / 2, sizes[0] * 2)
+    y = log_scale(lo, hi, bottom, top)
     grid = []
     for k in range(round(math.log10(xr[0])), round(math.log10(xr[1])) + 1):
         v = 10.0**k
@@ -582,7 +614,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
             f'<line x1="{x(v):.1f}" x2="{x(v):.1f}" y1="{top}" y2="{bottom}" class="tc-grid"/>'
             f'<text x="{x(v):.1f}" y="{bottom + 14}" text-anchor="middle">{seconds_axis(v)}</text>'
         )
-    for d in (v for v in SIZE_TICKS if sizes[0] <= v <= sizes[-1]):
+    for d in sizes:
         grid.append(
             f'<line x1="{left}" x2="{right}" y1="{y(d):.1f}" y2="{y(d):.1f}" class="tc-grid"/>'
             f'<text x="{left - 6}" y="{y(d) + 3:.1f}" text-anchor="end">{d:,}</text>'
@@ -616,7 +648,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
         (r for m in methods for r in m["rows"] if r["ratio"] is not None),
         key=lambda r: r["ratio"],
     )
-    lead, shown = more_than(best["ratio"])
+    _, shown = more_than(best["ratio"])
     peers = " and ".join(m["comparator"] for m in methods)
     legend = "".join(
         f'<span class="tc-key {cls}"><i aria-hidden="true"></i>{escape(label)}</span>'
@@ -625,7 +657,7 @@ def time_chart(name: str, methods: list[dict], xr: tuple[float, float], sizes: l
     return (
         '<figure class="tchart"><figcaption>'
         f'<span class="tchart-name"><strong>{escape(name)}</strong></span>'
-        f'<span class="tchart-up">{lead.lower()} <b>{shown:,}x</b></span></figcaption>'
+        f'<span class="tchart-up"><b>{shown:,}x+</b></span></figcaption>'
         f'<p class="tc-legend">{legend}</p>'
         f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{escape(name)}: fit time against '
         f'the number of {unit} for Andrey and {escape(peers)}">'
@@ -643,8 +675,8 @@ def seconds_axis(v: float) -> str:
 
 def speed_figures(summaries: list[dict]) -> list[tuple[str, str]]:
     """A chart per method (or per run where a method's comparisons differ), each with its largest
-    speedup, as (registry family, chart). The charts share axes so they compare at a glance: one
-    time axis, and one size axis per unit."""
+    speedup, as (registry family, chart). The charts share one time axis, so they compare at a
+    glance; each size axis spans its own chart's sizes."""
     # A speedup chart: a comparison where Andrey is not faster stays in the release cards' tables.
     groups = [(n, ms) for n, ms in time_groups(summaries) if all(faster(m) for m in ms)]
     times = [
@@ -656,14 +688,7 @@ def speed_figures(summaries: list[dict]) -> list[tuple[str, str]]:
         if t is not None
     ]
     xr = (10 ** math.floor(math.log10(min(times))), 10 ** math.ceil(math.log10(max(times))))
-    sizes: dict[str, set[int]] = {}
-    for _, methods in groups:
-        for m in methods:
-            sizes.setdefault(m["unit"], set()).update(r["d"] for r in m["rows"])
-    return [
-        (methods[0]["family"], time_chart(name, methods, xr, sorted(sizes[methods[0]["unit"]])))
-        for name, methods in groups
-    ]
+    return [(methods[0]["family"], time_chart(name, methods, xr)) for name, methods in groups]
 
 
 def speed_chart(summaries: list[dict]) -> str:
@@ -894,18 +919,20 @@ def speed_source(summary: dict) -> str:
 
 
 def speed_table(summary: dict, *, notes: bool = True) -> str:
-    """Every row of an SHD summary, the chart's table-view equivalent.
+    """Every row of a summary, the chart's table-view equivalent, each comparison's errors in its
+    own measure (:func:`error_kind`).
 
     With ``notes=False`` the exceptions and the source line are left out.
     """
     head = (
         "<tr><th scope='col'>d</th><th scope='col'>Datasets</th><th scope='col'>Andrey</th>"
         "<th scope='col'>Other package</th><th scope='col'>Speedup</th>"
-        "<th scope='col'>Andrey SHD</th><th scope='col'>Other SHD</th>"
-        "<th scope='col'>Empty-graph SHD</th></tr>"
+        "<th scope='col'>Andrey errors</th><th scope='col'>Other errors</th>"
+        "<th scope='col'>Empty-graph errors</th></tr>"
     )
     body = []
     for method in ordered(summary):
+        ours, theirs, empty = ERRORS[error_kind(method)][0]
         body.append(
             f"<tr><th scope='rowgroup' colspan='8'><strong>{escape(method['method'])}</strong> "
             f"with {escape(method['comparator'])}: {REGIMES[method['regime']]}; "
@@ -920,9 +947,9 @@ def speed_table(summary: dict, *, notes: bool = True) -> str:
                 seconds_text(r["andrey_s"]),
                 seconds_text(r["comparator_s"]),
                 ratio,
-                number_text(r["andrey_shd"]),
-                number_text(r["comparator_shd"]),
-                number_text(r["empty_shd"]),
+                number_text(r[ours]),
+                number_text(r[theirs]),
+                "-" if empty is None else number_text(r[empty]),
             ]
             body.append("<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>")
     listed_notes = notes_list(exceptions(summary)) if notes else ""
@@ -1660,7 +1687,7 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
             f"{accuracy} <b>{fewer}%</b> fewer errors than other popular packages.",
         ),
         "agentic": (
-            "Runs with no one watching",
+            "Built for agents",
             "A command line that never prompts and answers in JSON, so an agent can run it alone.",
         ),
         "all-in-one": (
@@ -2134,11 +2161,10 @@ def page_description(summaries: list[dict]) -> str:
     registered = {spec.name for spec in list_specs()}
     if missing := [m for m in DESCRIPTION_METHODS if m.lower() not in registered]:
         raise ValueError(f"the description names unregistered methods: {', '.join(missing)}")
-    lead, _ = speed_claim(summaries)  # the rest would take it past what search results show
     named, more = ", ".join(DESCRIPTION_METHODS), len(registered) - len(DESCRIPTION_METHODS)
     return (
-        f"Causal discovery for Python. Learn causal graphs with {named} and {more} more methods, "
-        f"{lead[0].lower() + lead[1:]} than other popular packages."
+        f"Causal discovery for Python. Learn causal graphs with {named} and {more} more methods. "
+        f"{CLAIM}"
     )
 
 
