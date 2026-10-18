@@ -325,10 +325,14 @@ def gies(
     interventional setting: two graphs are equivalent when they agree on the data from every
     observed combination of intervened variables.
 
-    **Limitations.** Not benchmarked yet. Its tests check the graph it learns on at most 8 variables
-    with 3,000 rows. Each distinct set of rows without an intervention on a variable keeps its own
-    covariance matrix of all the variables, so memory grows with the number of intervened variables
-    times the square of the variable count.
+    **Limitations.** Measured on simulated linear-Gaussian data that mixes observation with
+    interventions, from sparse random graphs (mean degree 2), from 10 to 200 variables with ten
+    rows per variable and four intervention targets per ten variables. Its median errors (SHD
+    against the true interventional essential graph) stayed below the empty graph's at every size
+    (181 against 198 at 200 variables, where one of the five fits had more). The median fit took
+    0.25 s at 100 variables and 1.0 s at 200, on 4 cores. Each distinct set of rows without an
+    intervention on a variable keeps its own covariance matrix of all the variables, so memory
+    grows with the number of intervened variables times the square of the variable count.
 
     References
     ----------
@@ -839,9 +843,12 @@ def exact_search(
     categorical columns as :func:`~andrey.pc` does. Both give equivalent graphs the same score, so
     the optimum is again identified up to its equivalence class.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 8 variables with 3,000 rows,
-    with a mixed-data score on 5 variables with 3,000 rows, and with a categorical score on small
-    fixed categorical networks.
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), from 5 to 15 variables with ten rows per variable. Its median errors (SHD) stayed
+    below the empty graph's at every size (7 against 15 at 15 variables). The median fit took
+    0.11 s at 10 variables and 6.4 s at 15, on 4 cores. With a mixed-data or categorical score it
+    is not benchmarked yet: its tests run it with a mixed-data score on 5 variables with 3,000 rows,
+    and with a categorical score on small fixed categorical networks.
     It scores every possible parent set of every variable, so its run time at least doubles with
     each added variable. The ``"dp"`` search also keeps one entry per subset of the variables, so
     its memory doubles as well.
@@ -983,12 +990,16 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
     larger ``max_outer`` runs that schedule.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 6 variables with 800 rows, and
-    on 2,000 rows with 5 variables. Every optimizer step computes a determinant and a matrix power
-    of the full weight matrix, one row and one column per variable, so a step's cost grows with the
-    cube of the variable count; the defaults allow up to 75,000 steps (``max_outer`` times
-    ``subproblem_iter``). The fit is nonconvex and can stop at a local optimum: on a collider whose
-    two parents are independent, it can return both edges reversed and an edge between the
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), from 10 to 50 variables with ten rows per variable. Its median errors (SHD) stayed
+    below the empty graph's at every size (15 against 50 at 50 variables). The median fit took 18 s
+    at 10 variables and 59 s at 50, on 4 cores. The paper's schedule (``lr=0.001``,
+    ``max_outer=100``, ``subproblem_iter=40000``, ``rho_init=1e-5``, ``w_threshold=0.0``) took 174 s
+    and 472 s for median errors of 6 and 12. Every optimizer step computes a determinant and a
+    matrix power of the full weight matrix, one row and one column per variable, so a step's cost
+    grows with the cube of the variable count; the defaults allow up to 75,000 steps (``max_outer``
+    times ``subproblem_iter``). The fit is nonconvex and can stop at a local optimum: on a collider
+    whose two parents are independent, it can return both edges reversed and an edge between the
     parents, with the defaults and with the paper's schedule alike.
 
     References

@@ -287,8 +287,11 @@ def multi_group_direct_lingam(
 
     Notes
     -----
-    **Limitations.** Not benchmarked yet. Its tests run it on two groups of 5 variables with 800
-    rows each, and on three groups of 3 variables. It assumes linear effects and non-Gaussian noise
+    **Limitations.** Measured on three groups of 1,000 rows over the same variables, from one
+    sparse random graph (mean degree 2) with linear effects, uniform noise, and weights drawn for
+    each group, from 5 to 20 variables. Its median errors (SHD summed over the groups) were 0 at 5
+    and 10 variables and 1 at 20, against the empty graph's 15, 30, and 60. The median fit took
+    1.2 s at 20 variables, on 4 cores. It assumes linear effects and non-Gaussian noise
     in every group, and it gives every group the one shared causal order, even when a group's own
     order differs.
 
