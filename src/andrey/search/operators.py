@@ -216,7 +216,7 @@ def blocks_semi_directed_paths(
     Equivalent to ``target`` being unreachable from ``start`` once ``blocked`` is removed; ``start``
     and ``target`` themselves are never treated as blocked. ``start == target`` is reachable (the
     empty path), so it returns ``False`` -- the negation the uint64 bitmask BFS returns. No bit
-    packing, so it holds for any node count -- the path GES takes above the cap.
+    packing, so it holds for any node count.
     """
     if start == target:
         return False

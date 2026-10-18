@@ -33,7 +33,7 @@ from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP, stable_key
-from andrey.search.ges import _reach_factory, _reform_cpdag
+from andrey.search.ges import _reachable, _reform_cpdag
 
 # Shared helpers re-exported for GES callers and tests.
 even_chunks = par.even_chunks
@@ -299,7 +299,6 @@ class _ForwardScan:
         self.delta_engine = delta_engine
         self.n = n
         self.max_parents = max_parents
-        self.build_reach = _reach_factory(n)
         self.everyone = (1 << n) - 1
         self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
         # Per target: each base's group; the candidates that can improve, sorted by lowest exact
@@ -317,7 +316,7 @@ class _ForwardScan:
         """The best-improving Insert into the targets, by ``(stable_key, x, y, t_idx)``."""
         if _FULL_RESCAN:
             state = neighborhood_state(adj, self.n)
-            reachable = self.build_reach(adj)
+            reachable = _reachable(adj)
             return forward_chunk_best(
                 self.targets, adj, self.delta_engine, self.n, self.max_parents, state, reachable
             )
@@ -499,10 +498,9 @@ def _backward_inprocess(
 # target partition; a pass then sends only the current ``adj`` snapshot (int8, d*d bytes). Workers
 # score through a private PURE Schur delta engine over the shared cov, so every process feeds
 # identical bytes into ``local_score_bic`` -- bit-identical to serial under one BLAS thread.
-# Reachability is backend-invariant, so workers pin the numpy/set-BFS path (no per-worker numba
-# warmup). The task functions take their targets positionally, so ``StableWorkerSet.dispatch``
-# drives them directly. A worker always receives the same targets, so it keeps their forward
-# candidates in one :class:`_ForwardScan` across the passes it runs.
+# The task functions take their targets positionally, so ``StableWorkerSet.dispatch`` drives them
+# directly. A worker always receives the same targets, so it keeps their forward candidates in
+# one :class:`_ForwardScan` across the passes it runs.
 
 # Per-worker state installed once by ``_init_worker`` and reused across every task and pass, so the
 # delta engine's pure inv-cov cache persists across passes -- the cross-pass reuse lever.
@@ -521,19 +519,15 @@ def _init_worker(
     """Seed a worker with the shared covariance and pin its numeric environment.
 
     Runs once per worker process. Caps BLAS to one thread (a 128-worker pool would otherwise
-    oversubscribe, and multi-thread BLAS reduction order is not bit-stable), pins the numpy backend
-    (so an inherited ``ANDREY_BACKEND`` cannot make a worker resolve reachability differently), and
-    builds the PURE Schur delta engine over the parent's exact ``cov`` bytes. Its inv-cov cache is a
-    pure function of the parent set, so it persists across tasks and passes for free. ``n_samples``
-    is the observation count the BIC penalty uses; ``n_vars`` is the graph's node count.
+    oversubscribe, and multi-thread BLAS reduction order is not bit-stable) and builds the PURE
+    Schur delta engine over the parent's exact ``cov`` bytes. Its inv-cov cache is a pure function
+    of the parent set, so it persists across tasks and passes for free. ``n_samples`` is the
+    observation count the BIC penalty uses; ``n_vars`` is the graph's node count.
     """
     global _WORKER_DELTA, _WORKER_N, _WORKER_TOKEN, _WORKER_BLAS
     from threadpoolctl import threadpool_limits
 
-    from andrey.core import backend as _backend
-
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
-    _backend.config.backend = "numpy"
     _WORKER_DELTA = DeltaBICScore(BICScore.from_cov(cov, n_samples, lambda_value=lambda_value))
     _WORKER_N = n_vars
     _WORKER_TOKEN = run_token
