@@ -72,13 +72,20 @@ def fci(
 
 
 def _fast_adjacency_search(
-    X: np.ndarray, test: CITest, alpha: float, *, prescreen: bool = True, workers: int = 1
+    X: np.ndarray,
+    test: CITest,
+    alpha: float,
+    *,
+    prescreen: bool = True,
+    workers: int = 1,
+    support: np.ndarray | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]:
     """Learn the undirected skeleton and every removed pair's separating set (stable, FAS-style).
 
-    Grows the conditioning size from zero over a complete graph; at each size, every still-adjacent
-    pair ``(x, y)`` is tested against subsets of a start-of-size snapshot of *either* endpoint's
-    neighborhood, and pairs found independent are removed together after the size completes.
+    Grows the conditioning size from zero over a complete graph, or over the boolean adjacency
+    ``support`` when one is given; at each size, every still-adjacent pair ``(x, y)`` is tested
+    against subsets of a start-of-size snapshot of *either* endpoint's neighborhood, and pairs
+    found independent are removed together after the size completes.
     A removed pair's separating set is the union of every conditioning set that made it independent.
 
     Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
@@ -91,7 +98,7 @@ def _fast_adjacency_search(
     scan.
     """
     d = X.shape[1]
-    support = np.ones((d, d), dtype=bool)
+    support = np.ones((d, d), dtype=bool) if support is None else np.array(support, dtype=bool)
     np.fill_diagonal(support, False)
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 

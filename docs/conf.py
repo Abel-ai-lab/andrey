@@ -386,7 +386,6 @@ def _methods_text() -> dict[str, str]:
     return {
         "method_count": f"{len(list_specs())} methods",
         "n_supported": str(len(supported)),
-        "n_experimental": str(len(list_specs()) - len(supported)),
         "supported_methods": ", ".join(supported[:-1]) + f", and {supported[-1]}",
     }
 

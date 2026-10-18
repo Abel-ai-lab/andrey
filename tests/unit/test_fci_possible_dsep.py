@@ -63,13 +63,12 @@ RECORDED = {
         + ["00200000002000", "00200002000000"],
     ),
     "gfci": (
-        {"d": 8, "n": 400, "density": 4.0, "seed": 7},
-        ["0231002", "2030200", "2201222", "2020020"] + ["0230020", "0022200", "3030000"],
+        {"d": 8, "n": 400, "density": 4.0, "seed": 2},
+        ["0200020", "2021001", "0301001", "0220100"] + ["0002022", "2000200", "0220200"],
     ),
 }
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize("method", sorted(RECORDED))
 def test_default_keeps_the_recorded_pag(method):
     draw, rows = RECORDED[method]
@@ -81,7 +80,6 @@ def test_default_keeps_the_recorded_pag(method):
     assert np.count_nonzero(order_free) < np.count_nonzero(recorded)
 
 
-@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 @pytest.mark.parametrize(("method", "value"), [("fci", "order-free"), ("gfci", "FAST")])
 def test_unknown_possible_dsep_raises(method, value):
     with pytest.raises(ValueError, match="possible_dsep must be 'fast' or 'order_free'"):

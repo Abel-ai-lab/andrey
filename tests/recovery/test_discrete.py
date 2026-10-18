@@ -22,8 +22,6 @@ from andrey.data import sample_discrete
 from andrey.metrics import shd, to_cpdag
 from tests.recovery.helpers import datagen
 
-pytestmark = pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-
 TRUTH = {(0, 2), (1, 2), (2, 3), (3, 4)}
 
 # Each fit that learns a CPDAG from categorical data, by its categorical setting.

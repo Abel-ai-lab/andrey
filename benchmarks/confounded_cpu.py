@@ -1,16 +1,14 @@
 #!/usr/bin/env python
 """Benchmark hidden-confounder methods on CPU: Andrey against lingam.
 
-Runs RCD, BottomUpParceLiNGAM, and CAM-UV from both packages on data with hidden common causes,
-with the empty graph as a quality baseline. RCD and BottomUpParceLiNGAM run on the
-``latent_lingam_er`` regime, linear with uniform noise. CAM-UV runs on ``latent_anm_er``,
-nonlinear with Gaussian additive noise. Every solution is serial, and both packages run a method
-with the same settings.
+Runs RCD and BottomUpParceLiNGAM from both packages on data with hidden common causes, with the
+empty graph as a quality baseline, on the ``latent_lingam_er`` regime, linear with uniform noise.
+Every solution is serial, and both packages run a method with the same settings.
 
 ``d`` includes hidden nodes: one node in five is hidden, at least one, so each rung has
 ``d - latents`` data columns. Every estimate is scored against the PAG of the observed nodes, its
-directed edges against the latent projection and the direct edges, and the pairs it attributes to
-a hidden common cause against three sets of true pairs (:data:`scoring.CONFOUNDED_TARGETS`);
+directed edges against the latent projection, and the pairs it attributes to a hidden common cause
+against two sets of true pairs (:data:`scoring.CONFOUNDED_TARGETS`);
 :data:`TARGETS` names the ones each method estimates. A timeout is a timeout: it has no scores.
 
     ANDREY_BENCH_PYTHON=... $ANDREY_BENCH_PYTHON benchmarks/confounded_cpu.py \\
@@ -31,19 +29,17 @@ from typing import Mapping
 import pandas as pd
 
 from andrey import GraphStructure
-from andrey_bench import datasets, memcap, rundir, scoring
+from andrey_bench import datasets, memcap, pairing, rundir, scoring
 from andrey_bench.adapters.andrey_bottom_up_parce import AndreyBottomUpParceLiNGAM
-from andrey_bench.adapters.andrey_camuv import AndreyCAMUV
 from andrey_bench.adapters.andrey_rcd import AndreyRCD
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.lingam_bottom_up_parce import LingamBottomUpParceLiNGAM
-from andrey_bench.adapters.lingam_camuv import LingamCAMUV
 from andrey_bench.adapters.lingam_rcd import LingamRCD
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
-from andrey_bench.runner import available_cores
+from andrey_bench.runner import available_cores, check_interpreters
 
-#: Each regime with the solutions that run on it. The empty graph runs on both.
+#: Each regime with the solutions that run on it.
 LANES: dict[str, list] = {
     "latent_lingam_er": [
         AndreyRCD(),
@@ -52,7 +48,6 @@ LANES: dict[str, list] = {
         LingamBottomUpParceLiNGAM(),
         BaselineEmpty(),
     ],
-    "latent_anm_er": [AndreyCAMUV(), LingamCAMUV(), BaselineEmpty()],
 }
 
 #: Which edge marks carry each solution's confounded pairs. The empty graph declares none and has
@@ -64,8 +59,8 @@ CONFOUNDED_MARK = {
 #: Smallest run that touches every solution: one tiny dataset per regime.
 SMOKE = {"ladder": [5], "seeds": 1, "n": 500, "cap_wall_s": 300.0}
 
-#: Untimed fits before each measurement. RCD and CAM-UV fits take minutes, so a warm-up fit would
-#: double their cost against the wall cap.
+#: Untimed fits before each measurement. RCD fits take minutes, so a warm-up fit would double their
+#: cost against the wall cap.
 WARMUP = 0
 
 
@@ -247,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
         _log(f"rescored    : {len(table)} rows  -> {out / 'runs.parquet'}")
         _summarize(table)
         return 0
+    # Every interpreter before any rung runs, so a missing environment stops the run here.
+    check_interpreters([a for lane in LANES.values() for a in lane])
     records_dir = rundir.start_run(out, run_meta, resume=args.resume)
     prov = rundir.provenance_once(out, timestamp=datetime.now(timezone.utc).isoformat())
 
@@ -316,9 +313,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 #: The directed-edge and pair targets each regime's methods estimate, read by :func:`_summarize`:
-#: RCD and BottomUpParceLiNGAM estimate the latent projection, and CAM-UV direct edges plus the pairs
-#: an unobserved path joins.
-TARGETS = {"linear": ("projection", "hidden_cause"), "anm": ("direct", "unobserved_path")}
+#: RCD and BottomUpParceLiNGAM estimate the latent projection and the pairs a hidden cause reaches.
+TARGETS = {"linear": ("projection", "hidden_cause")}
 
 
 def _summarize(table: pd.DataFrame) -> None:
@@ -328,24 +324,33 @@ def _summarize(table: pd.DataFrame) -> None:
     directed-edge errors are medians over the finished fits. The F1 columns are means over the fits
     where F1 is defined, so ``nan`` marks a rung where every fit had nothing to find and claimed
     nothing; ``rec pair`` is the pair recall, the score to read for BottomUpParceLiNGAM, and
-    ``pairs`` the mean number of true pairs.
+    ``pairs`` the mean number of true pairs. ``same`` counts, for another package's solution, the
+    datasets where it returned the graph of Andrey's solution of the method, of those both finished.
     """
     if table.empty:
         return
     _log("")
     _log(
         f"{'regime':10s} {'solution':30s} {'d':>3s} {'ok/all':>7s} {'wall_s':>8s} "
-        f"{'dir err':>7s} {'f1 dir':>7s} {'f1 pair':>7s} {'rec pair':>8s} {'pairs':>6s}"
+        f"{'dir err':>7s} {'f1 dir':>7s} {'f1 pair':>7s} {'rec pair':>8s} {'pairs':>6s} "
+        f"{'same':>6s}"
     )
     for (regime, name, d), rows in table.groupby(["functional", "name", "d"], sort=True):
         ok = rows[rows["status"] == "ok"]
         edges, pairs = TARGETS[regime]
+        same = ""
+        algorithm = rows["algorithm"].iloc[0]
+        andrey = table[
+            (table["package"] == "andrey") & (table["algorithm"] == algorithm) & (table["d"] == d)
+        ]
+        if rows["package"].iloc[0] != "andrey" and algorithm != "baseline" and len(andrey):
+            same = "{}/{}".format(*pairing.same_graph(andrey, rows))
         _log(
             f"{regime:10s} {name:30s} {d:3d} {len(ok):3d}/{len(rows):<3d} "
             f"{ok['wall_s'].median():8.3g} {ok[f'directed_{edges}_errors'].median():7.3g} "
             f"{ok[f'directed_{edges}_f1'].mean():7.3f} {ok[f'confounded_{pairs}_f1'].mean():7.3f} "
             f"{ok[f'confounded_{pairs}_recall'].mean():8.3f} "
-            f"{ok[f'confounded_{pairs}_n_true'].mean():6.2f}"
+            f"{ok[f'confounded_{pairs}_n_true'].mean():6.2f} {same:>6s}"
         )
 
 
