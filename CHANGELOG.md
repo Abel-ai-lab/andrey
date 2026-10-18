@@ -9,6 +9,12 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- Seven more methods are supported: `gfci`, `cdnod`, `gies`, `exact_search`, `calm`,
+  `multi_group_direct_lingam`, and `gin` have published benchmarks in the 0.7.0 release card and
+  checks in the release quality gate, and no longer warn with `ExperimentalWarning`. ([#184])
+
 ### Breaking
 
 - The `numba` extra and backend are removed, because no method ran Numba code anymore:
@@ -296,3 +302,4 @@ First alpha release.
 [#175]: https://github.com/Abel-ai-lab/andrey/pull/175
 [#178]: https://github.com/Abel-ai-lab/andrey/pull/178
 [#179]: https://github.com/Abel-ai-lab/andrey/pull/179
+[#184]: https://github.com/Abel-ai-lab/andrey/pull/184
