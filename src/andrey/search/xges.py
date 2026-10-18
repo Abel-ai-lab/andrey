@@ -495,16 +495,18 @@ class _AddDeltas:
 class _Search:
     """XGES over a :class:`_Graph`, with a priority queue per operator type.
 
-    Queue entries are ``(key, seq, x, y, subset, E[, Pa(x)])``: ``key`` is :func:`_move_key` of
-    the delta, ``seq`` orders entries of one operator found more than once, ``subset`` is an
-    Insert's or Reverse's ``T`` and a Delete's ``C``, and ``E`` the target's parent set the delta
-    was scored with. ``ranks`` holds each column's :func:`~andrey.search.hc.tie_ranks`.
+    Queue entries are ``(delta, seq, x, y, subset, E[, Pa(x)])``: ``seq`` orders entries of one
+    operator found more than once, ``subset`` is an Insert's or Reverse's ``T`` and a Delete's
+    ``C``, and ``E`` the target's parent set the delta was scored with. :meth:`tied` takes entries
+    in :func:`_move_key` order, ranking only the entries whose rounded deltas tie; ``ranks`` holds
+    each column's :func:`~andrey.search.hc.tie_ranks`.
     """
 
     def __init__(self, score: BICScore, d: int, ranks: list[int]) -> None:
         self.add_deltas = _AddDeltas(score, d)
         self.d = d
         self.n_samples = score.n
+        self.tie_gap = score.n * 10.0**-_KEY_DP
         self.ranks = ranks
         self.g = _Graph(d)
         self.paths: PathMap = defaultdict(set)
@@ -518,7 +520,7 @@ class _Search:
         """A copy of the graph and path records, with empty queues and the same score cache."""
         out = _Search.__new__(_Search)
         out.add_deltas, out.d, out.seq = self.add_deltas, self.d, self.seq
-        out.n_samples, out.ranks = self.n_samples, self.ranks
+        out.n_samples, out.tie_gap, out.ranks = self.n_samples, self.tie_gap, self.ranks
         out.g = self.g.copy()
         out.paths = defaultdict(set, {k: set(v) for k, v in self.paths.items()})
         out.fingerprint = self.fingerprint
@@ -527,9 +529,29 @@ class _Search:
 
     # -- finding operators ----------------------------------------------------------------------
 
-    def key(self, delta: float, x: int, y: int, subset: frozenset[int]) -> tuple:
-        """:func:`_move_key` of a move."""
-        return _move_key(delta, self.n_samples, x, y, subset, self.ranks)
+    def tied(self, heap: list[tuple], entry: tuple) -> tuple:
+        """The entry to take after popping ``entry`` from ``heap``, in :func:`_move_key` order.
+
+        The heap orders entries by raw delta, and the caller has checked that the next delta lies
+        within ``tie_gap`` of ``entry``'s. The entries whose deltas per sample round to ``entry``'s
+        at ``_KEY_DP`` decimals are ranked by ``ranks[x]``, ``ranks[y]``, and the sorted ranks of
+        the subset, then by ``seq``; the others go back on the heap. Entries of one operator alone
+        keep the heap's order: at most one of them matches the current parents.
+        """
+        n, gap, ranks = self.n_samples, self.tie_gap, self.ranks
+        lowest = round(entry[0] / n, _KEY_DP)
+        tied = [entry]
+        while heap and heap[0][0] - entry[0] < gap and round(heap[0][0] / n, _KEY_DP) == lowest:
+            tied.append(heapq.heappop(heap))
+        if any(other[2:5] != entry[2:5] for other in tied[1:]):
+
+            def rank(e: tuple) -> tuple:
+                return (ranks[e[2]], ranks[e[3]], sorted(ranks[v] for v in e[4]), e[1])
+
+            tied.sort(key=rank)
+        for other in tied[1:]:
+            heapq.heappush(heap, other)
+        return tied[0]
 
     def subsets(
         self, t0: list[int], na: set[int], E: frozenset[int]
@@ -568,9 +590,7 @@ class _Search:
                     deltas = self.add_deltas(y, E)[far]
                     keep = deltas < -_EPS_IMPROVE
                     for x, dl in zip(far[keep].tolist(), deltas[keep].tolist(), strict=True):
-                        heapq.heappush(
-                            self.inserts, (self.key(dl, x, y, T), next(self.seq), x, y, T, E)
-                        )
+                        heapq.heappush(self.inserts, (dl, next(self.seq), x, y, T, E))
         for x in near:
             na = ne_y & g.ad[x]
             if not g.is_clique(na):
@@ -580,9 +600,7 @@ class _Search:
                 if out is not None:
                     out.append((delta, x, y, T, E))
                 elif delta < -_EPS_IMPROVE:
-                    heapq.heappush(
-                        self.inserts, (self.key(delta, x, y, T), next(self.seq), x, y, T, E)
-                    )
+                    heapq.heappush(self.inserts, (delta, next(self.seq), x, y, T, E))
 
     def drop_delta(self, y: int, E: frozenset[int], x: int) -> float:
         """Score change of removing parent ``x`` of ``y`` from ``E``, from two memoized scores."""
@@ -599,7 +617,7 @@ class _Search:
             return
         for C, E in self.subsets(sorted(g.ne[y] & g.ad[x]), set(), frozenset(g.pa[y] | {x})):
             delta = self.drop_delta(y, E, x)
-            entry = (self.key(delta, x, y, C), next(self.seq), x, y, C, E)
+            entry = (delta, next(self.seq), x, y, C, E)
             if out is not None:
                 heapq.heappush(out, entry)
             elif delta < -_EPS_IMPROVE:
@@ -617,7 +635,7 @@ class _Search:
         for delta, _x, _y, T, E in inserts:
             delta += drop
             if delta < -_EPS_IMPROVE:
-                entry = (self.key(delta, x, y, T), next(self.seq), x, y, T, E, pa_x)
+                entry = (delta, next(self.seq), x, y, T, E, pa_x)
                 heapq.heappush(self.reverses, entry)
 
     def inserts_on_empty_graph(self) -> None:
@@ -627,7 +645,7 @@ class _Search:
             deltas = self.add_deltas(y, empty)
             keep = np.nonzero(deltas < -_EPS_IMPROVE)[0]
             self.inserts.extend(
-                (self.key(dl, x, y, empty), next(self.seq), x, y, empty, empty)
+                (dl, next(self.seq), x, y, empty, empty)
                 for x, dl in zip(keep.tolist(), deltas[keep].tolist(), strict=True)
             )
         heapq.heapify(self.inserts)
@@ -795,20 +813,25 @@ class _Search:
         g, paths = self.g, self.paths
         moves: list[_Changes] = []
         visits = {self.fingerprint: [0]}  # fingerprint -> len(moves) at each graph with it
+        pop, gap = heapq.heappop, self.tie_gap
         while self.deletes or self.reverses or self.inserts:
             log = _Changes()
-            if self.deletes:
-                _, _, x, y, C, E = heapq.heappop(self.deletes)
+            heap = self.deletes or self.reverses or self.inserts
+            entry = pop(heap)
+            if heap and heap[0][0] - entry[0] < gap:
+                entry = self.tied(heap, entry)
+            if heap is self.deletes:
+                _, _, x, y, C, E = entry
                 if not _delete_valid(g, x, y, C, E):
                     continue
                 _apply_delete(g, x, y, C, log)
-            elif self.reverses:
-                _, _, x, y, T, E, pa_x = heapq.heappop(self.reverses)
+            elif heap is self.reverses:
+                _, _, x, y, T, E, pa_x = entry
                 if g.pa[x] != pa_x or not _insert_valid(g, x, y, T, E, paths, reverse=True):
                     continue
                 _apply_reverse(g, x, y, T, log)
             else:
-                _, _, x, y, T, E = heapq.heappop(self.inserts)
+                _, _, x, y, T, E = entry
                 if not _insert_valid(g, x, y, T, E, paths):
                     continue
                 _apply_insert(g, x, y, T, log)
@@ -850,7 +873,10 @@ class _Search:
                 if not pending:
                     return total
                 fresh = True
-            _, _, x, y, C, E = heapq.heappop(pending)
+            entry = heapq.heappop(pending)
+            if pending and pending[0][0] - entry[0] < self.tie_gap:
+                entry = self.tied(pending, entry)
+            _, _, x, y, C, E = entry
             if not _delete_valid(self.g, x, y, C, E):
                 continue
             trial = self.branch()
