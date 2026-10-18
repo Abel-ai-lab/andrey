@@ -15,6 +15,7 @@ import numpy as np
 
 from andrey.core.score import BICScore
 from andrey.search.ges import ges
+from andrey.search.xges import xges
 
 _ORDERS = [np.array(order) for order in permutations(range(3))]
 
@@ -57,3 +58,16 @@ def test_ges_ties(monkeypatch) -> None:
     score = BICScore(x)
     assert score.score(2, [0]) == score.score(2, [1])
     _assert_order_free(lambda data: ges(data)[0].to_numpy(), x, "andrey.search.ges", monkeypatch)
+
+
+def test_xges_ties(monkeypatch) -> None:
+    """XGES meets the tie GES meets: column 2's edges to 0 and to 1."""
+    x = _swap_symmetric(0)
+    for rescan in (False, True):
+        _assert_order_free(
+            lambda data: xges(data, _rescan=rescan)[0].to_numpy(),
+            x,
+            "andrey.search.xges",
+            monkeypatch,
+        )
+        monkeypatch.undo()

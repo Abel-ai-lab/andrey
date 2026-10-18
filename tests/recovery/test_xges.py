@@ -21,6 +21,7 @@ from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.core.score import BICScore
 from andrey.metrics import shd, to_cpdag
 from andrey.search.ges import _recompute_objective
+from andrey.search.hc import tie_ranks
 from andrey.search.xges import (
     _UNDIRECTED,
     _edge_key,
@@ -209,7 +210,7 @@ def test_the_extended_search_scores_the_graph_it_returns(seed):
     graph's class. On seeds 0 and 4 the search keeps branches."""
     x = _dense(seed).data
     score = BICScore(x)
-    search = _Search(score, x.shape[1])
+    search = _Search(score, x.shape[1], tie_ranks(x).tolist())
     with threadpool_limits(limits=1):
         search.inserts_on_empty_graph()
         search.base_search()

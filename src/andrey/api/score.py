@@ -426,7 +426,10 @@ def xges(
     else addition; the search stops when no move improves the score [1]_. The extended search then
     deletes each edge of that graph, best score first, forbids adding it back in that direction, and
     reruns the search. It keeps a result whose score is lower by more than ``2e-7 * n_samples``, and
-    stops once a fresh pass over the edges keeps nothing. No variable has a parent limit.
+    stops once a fresh pass over the edges keeps nothing. No variable has a parent limit. Moves
+    whose score changes are equal after rounding are taken in the order of each column's rank, as
+    in :func:`~andrey.hc`, so reordering the columns reorders the graph's nodes and changes nothing
+    else, unless two columns are identical.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) and denser ones (mean degree 4), from 25 to 1,000 variables with ten rows per
