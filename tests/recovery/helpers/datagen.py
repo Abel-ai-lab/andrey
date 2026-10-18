@@ -172,34 +172,10 @@ def _confounded_sem(
 
     ``weights`` is strictly lower-triangular over the full order (latents first);
     projecting away the latent columns leaves confounded observed pairs for
-    RCD / CAM-UV / BottomUpParceLiNGAM to recover.
+    RCD / BottomUpParceLiNGAM to recover.
     """
     X_full = _linear_sem(seed=seed, n_samples=n_samples, weights=weights, noise=noise)
     return X_full[:, list(observed)]
-
-
-def _confounded_anm(
-    seed: int, n_samples: int, noise_scale: float, observed: list[int]
-) -> np.ndarray:
-    """Nonlinear additive-noise SEM over ``h, x0, x1, x2, x3``, returning only ``observed`` columns.
-
-    The hidden ``h`` is uniform on ``(-1, 1)`` and drives ``x0 = sin(3h) + n`` and
-    ``x1 = cos(3h) + n``: an odd and an even function of ``h``, so neither variable is an additive
-    function of the other. Then ``x2 = x1**2 + n`` and ``x3 = tanh(2 x0) + n``. Each ``n`` is an
-    independent uniform draw on ``(-noise_scale, noise_scale)``. Column indices in ``observed``
-    count ``h`` as column 0.
-
-    ``sin``, ``cos``, and ``tanh`` use numpy kernels chosen from the host's CPU features, so the
-    last bits of the output, and its input hash, can differ by machine; no baseline pins this case.
-    """
-    rng = np.random.default_rng(seed)
-    h = rng.uniform(-1.0, 1.0, size=n_samples)
-    n = rng.uniform(-noise_scale, noise_scale, size=(n_samples, 4))
-    x0 = np.sin(3.0 * h) + n[:, 0]
-    x1 = np.cos(3.0 * h) + n[:, 1]
-    x2 = x1 * x1 + n[:, 2]
-    x3 = np.tanh(2.0 * x0) + n[:, 3]
-    return np.column_stack([h, x0, x1, x2, x3])[:, list(observed)]
 
 
 def _categorical_bn(
@@ -226,6 +202,35 @@ def _categorical_bn(
         rule = np.minimum(X[:, pa].sum(axis=1), k - 1)
         X[:, j] = np.where(rng.random(n_samples) < strength, rule, uniform)
     return X.astype(np.float64)
+
+
+def _measurement(
+    seed: int,
+    n_samples: int,
+    latent_weights: list[list[float]],
+    loadings: list[list[float]],
+    noise_scale: float,
+) -> np.ndarray:
+    """Linear non-Gaussian measurement model: latents in causal order, each with pure indicators.
+
+    Latent ``k`` is ``sum_j latent_weights[k][j] * latent_j`` plus a uniform draw on ``(-1, 1)``.
+    ``loadings[k]`` holds the coefficients of latent ``k``'s indicators; each indicator adds
+    ``noise_scale`` times its own uniform draw. Columns are the indicators, latent by latent. Only
+    uniform draws, sums, and products enter, so the bytes are the same on every machine.
+    """
+    rng = np.random.default_rng(seed)
+    latents: list[np.ndarray] = []
+    for row in latent_weights:
+        latent = rng.uniform(-1.0, 1.0, size=n_samples)
+        for weight, parent in zip(row, latents):
+            latent = latent + weight * parent
+        latents.append(latent)
+    columns = [
+        weight * latent + noise_scale * rng.uniform(-1.0, 1.0, size=n_samples)
+        for latent, row in zip(latents, loadings, strict=True)
+        for weight in row
+    ]
+    return np.column_stack(columns)
 
 
 # Full order h, x0, x1, x2, x3 (``weights[j][i]`` is the coefficient of ``i`` in ``j``). A strong
@@ -282,6 +287,20 @@ CASES: dict[str, dict] = {
             [0.0, 0.0, 0.0, 0.7, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.0],
+        ],
+    },
+    # Linear-Gaussian tree with no collider - CALM: 0 -> 1, 0 -> 2, 1 -> 3, 1 -> 4. Its CPDAG
+    # leaves every edge undirected.
+    "gauss_tree_5v": {
+        "noise": "gaussian",
+        "seed": 20261014,
+        "n_samples": 2000,
+        "weights": [
+            [0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.8, 0.0, 0.0, 0.0, 0.0],
+            [0.7, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.9, 0.0, 0.0, 0.0],
+            [0.0, -0.8, 0.0, 0.0, 0.0],
         ],
     },
     # Stable VAR(1), non-Gaussian noise - VARLiNGAM and (linear) Granger.
@@ -396,31 +415,29 @@ CASES: dict[str, dict] = {
         "observed": [0, 1, 2, 3, 4],
         "weights": _FORK_WEIGHTS,
     },
-    # The fork graph with nonlinear additive-noise mechanisms (see ``_confounded_anm``) - CAM-UV.
-    # ``edges`` and ``confounded_pairs`` index the observed columns.
-    "confounded_fork_4v_anm": {
-        "model": "confounded_anm",
-        "seed": 20240618,
-        "n_samples": 1000,
-        "noise_scale": 0.3,
-        "observed": [1, 2, 3, 4],
-        "edges": [(0, 3), (1, 2)],
-        "confounded_pairs": [(0, 1)],
+    # Linear-Gaussian SEM with a hidden confounder - GFCI. Full order h, a, d, b, c, e; the
+    # observed columns are a, b, c, d, e. h drives b and c, with a -> b, d -> c, and c -> e. Its
+    # PAG is a o-> b <-> c <-o d with c -> e. No DAG over the observed columns has its
+    # independences, so GES adds an edge the PAG lacks.
+    "confounded_gauss_5v": {
+        "model": "confounded",
+        "noise": "gaussian",
+        "seed": 20261013,
+        "n_samples": 2000,
+        "observed": [1, 3, 4, 2, 5],
+        "weights": [
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  # h  (latent)
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  # a
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  # d
+            [1.0, 0.8, 0.0, 0.0, 0.0, 0.0],  # b <- h, a
+            [1.0, 0.0, 0.8, 0.0, 0.0, 0.0],  # c <- h, d
+            [0.0, 0.0, 0.0, 0.0, 0.8, 0.0],  # e <- c
+        ],
     },
-    # The same nonlinear SEM with h kept as a column: no variable is hidden.
-    "fork_5v_anm_observed": {
-        "model": "confounded_anm",
-        "seed": 20240618,
-        "n_samples": 1000,
-        "noise_scale": 0.3,
-        "observed": [0, 1, 2, 3, 4],
-        "edges": [(0, 1), (0, 2), (1, 4), (2, 3)],
-        "confounded_pairs": [],
-    },
-    # Linear non-Gaussian SEM with a hidden confounder (column 0 dropped) -
-    # CAM-UV, RCD, BottomUpParceLiNGAM. Full order: h, x0..x5; h drives x1 and x2, which also share
-    # the direct edge x1 -> x2. A method marks that pair or orients the edge depending on its
-    # tests' power, so tests on this case check output shape and CAM-UV's parent sets.
+    # Linear non-Gaussian SEM with a hidden confounder (column 0 dropped) - RCD,
+    # BottomUpParceLiNGAM. Full order: h, x0..x5; h drives x1 and x2, which also share the direct
+    # edge x1 -> x2. A method marks that pair or orients the edge depending on its tests' power,
+    # so tests on this case check output shape.
     "confounded_6v": {
         "model": "confounded",
         "noise": "uniform",
@@ -455,6 +472,41 @@ CASES: dict[str, dict] = {
         "cardinalities": [2, 3, 4, 2],
         "parents": {},
         "strength": 0.0,
+    },
+    # Two latents, L1 -> L2, each measured by three pure indicators - GIN. ``clusters`` lists the
+    # indicator columns of each latent, earliest latent first.
+    "measurement_6v": {
+        "model": "measurement",
+        "seed": 20261013,
+        "n_samples": 1000,
+        "noise_scale": 0.3,
+        "latent_weights": [[], [0.9]],
+        "loadings": [[1.0, 0.9, 1.1], [0.8, 1.2, 0.9]],
+        "clusters": [[0, 1, 2], [3, 4, 5]],
+    },
+    # Three latents in a chain, L1 -> L2 -> L3 with no L1 -> L3 edge, three pure indicators each -
+    # GIN. The pair L2, L3 meets the root condition on its own, so only a root tested against
+    # every other cluster gives the order.
+    "measurement_chain_9v": {
+        "model": "measurement",
+        "seed": 20261015,
+        "n_samples": 1000,
+        "noise_scale": 0.3,
+        "latent_weights": [[], [0.9], [0.0, 0.9]],
+        "loadings": [[1.0, 0.9, 1.1], [0.8, 1.2, 0.9], [1.0, 1.1, 0.9]],
+        "clusters": [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
+    },
+    # Two latents with a hidden common cause that has no indicators, and no edge between them -
+    # GIN. The first ``latent_weights`` row is the hidden cause; neither measured latent is a
+    # root, so the root test fails for both.
+    "measurement_hidden_cause_6v": {
+        "model": "measurement",
+        "seed": 0,
+        "n_samples": 1000,
+        "noise_scale": 0.3,
+        "latent_weights": [[], [2.0], [2.0, 0.0]],
+        "loadings": [[], [1.0, 0.9, 1.1], [0.8, 1.2, 0.9]],
+        "clusters": [[0, 1, 2], [3, 4, 5]],
     },
 }
 
@@ -575,13 +627,6 @@ def generate(case_id: str, *, replicate: int = 0) -> np.ndarray:
             noise=spec["noise"],
             observed=spec["observed"],
         )
-    if model == "confounded_anm":
-        return _confounded_anm(
-            seed=seed,
-            n_samples=spec["n_samples"],
-            noise_scale=spec["noise_scale"],
-            observed=spec["observed"],
-        )
     if model == "categorical":
         return _categorical_bn(
             seed=seed,
@@ -589,6 +634,14 @@ def generate(case_id: str, *, replicate: int = 0) -> np.ndarray:
             cardinalities=spec["cardinalities"],
             parents=spec["parents"],
             strength=spec["strength"],
+        )
+    if model == "measurement":
+        return _measurement(
+            seed=seed,
+            n_samples=spec["n_samples"],
+            latent_weights=spec["latent_weights"],
+            loadings=spec["loadings"],
+            noise_scale=spec["noise_scale"],
         )
     raise ValueError(f"unknown case model: {model!r}")
 
@@ -598,12 +651,10 @@ def planted_structure(case_id: str) -> tuple[set[tuple[int, int]], set[tuple[int
 
     ``edges`` holds ``(i, j)`` for each direct cause ``i -> j`` between observed columns, and
     ``confounded_pairs`` each ``(i, j)``, ``i < j``, of non-adjacent observed columns with a shared
-    hidden parent. Indices count positions in the generated matrix. A linear case derives both from
-    its weights; a nonlinear case lists them.
+    hidden parent. Indices count positions in the generated matrix. Both derive from the case's
+    weights.
     """
     spec = CASES[case_id]
-    if spec["model"] == "confounded_anm":
-        return {tuple(e) for e in spec["edges"]}, {tuple(p) for p in spec["confounded_pairs"]}
     B = np.asarray(spec["weights"])  # B[j, i] != 0 is the edge i -> j over the full order
     observed = list(spec["observed"])
     hidden = [c for c in range(B.shape[0]) if c not in observed]
@@ -615,6 +666,31 @@ def planted_structure(case_id: str) -> tuple[set[tuple[int, int]], set[tuple[int
         if B[a, b] == 0 and B[b, a] == 0 and any(B[a, h] != 0 and B[b, h] != 0 for h in hidden)
     }
     return edges, confounded
+
+
+def planted_pag(case_id: str):
+    """Return the PAG over the observed columns of a linear case.
+
+    Builds the case's DAG over every variable, observed columns first and hidden ones flagged
+    latent, and projects it with :func:`andrey.data.latent.marginal`. A case without an
+    ``"observed"`` list observes every variable.
+    """
+    from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
+    from andrey.data.latent import marginal
+
+    spec = CASES[case_id]
+    B = np.asarray(spec["weights"])  # B[j, i] != 0 is the edge i -> j over the full order
+    observed = list(spec.get("observed", range(B.shape[0])))
+    order = observed + [c for c in range(B.shape[0]) if c not in observed]
+    position = {column: k for k, column in enumerate(order)}
+    marks = np.zeros(B.shape, dtype=np.int8)
+    for j, i in zip(*np.nonzero(B)):
+        marks[position[i], position[j]] = TAIL
+        marks[position[j], position[i]] = ARROW
+    types = np.array(
+        [OBSERVED] * len(observed) + [LATENT] * (len(order) - len(observed)), dtype=np.int8
+    )
+    return marginal(GraphStructure.from_numpy(marks, kind="dag", node_types=types), "pag")
 
 
 def generate_groups(case_id: str) -> list[np.ndarray]:
