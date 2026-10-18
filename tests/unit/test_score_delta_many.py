@@ -112,6 +112,25 @@ def test_fallback_fires_on_ill_conditioned_base(monkeypatch: pytest.MonkeyPatch)
     assert got == want
 
 
+def test_stricter_threshold_applies_to_a_cached_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A base cached under the default threshold still falls back under a stricter one."""
+    score = BICScore(_well_conditioned(3, 400, 4))
+    calls: list[tuple] = []
+    real = score_delta._delta_two_scores
+
+    def _counting(score_obj, i, base, u, op):
+        calls.append((i, base, u, op))
+        return real(score_obj, i, base, u, op)
+
+    monkeypatch.setattr(score_delta, "_delta_two_scores", _counting)
+
+    score_delta.add_deltas(score, 3, (0, 1))
+    assert not calls
+    # Every condition-number proxy is at least 1, so a threshold of 0.5 rejects every base.
+    score_delta.add_deltas(score, 3, (0, 1), cond_threshold=0.5)
+    assert sorted(u for _, _, u, _ in calls) == [2]
+
+
 def test_bounds_leave_deltas_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
     """Reported bounds leave each delta byte-identical; they are 0 where no batch can change it.
 
