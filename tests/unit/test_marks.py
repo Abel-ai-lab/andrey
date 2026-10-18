@@ -56,7 +56,7 @@ def test_set_circle_order_unknown():
 
 
 def test_directed_plus_confounder_mixed():
-    # A directed edge alongside a confounded pair: the common adapter shape (RCD / CAMUV).
+    # A directed edge alongside a confounded pair: the common adapter shape (RCD).
     B = np.zeros((3, 3))
     B[1, 0] = 0.9  # edge 0 -> 1
     M = directed_marks(B)

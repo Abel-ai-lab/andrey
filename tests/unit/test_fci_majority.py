@@ -96,7 +96,7 @@ def test_majority_runs_after_possible_dsep_only(engine, monkeypatch):
     events = []
     snapshots = {}
     for name, event in [
-        ("_orient_colliders", "colliders"),
+        ("_orient_colliders" if engine == "fci" else "_orient_colliders_from_pattern", "colliders"),
         ("_remove_by_possible_dsep", "possible_dsep"),
         ("_majority_sepsets", "majority"),
         ("_fci_orient", "orient"),

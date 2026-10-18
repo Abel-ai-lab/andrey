@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.api._experimental import warn_experimental
 from andrey.spec import REGISTRY
 
 
@@ -25,35 +26,39 @@ def experimental(caught: list[warnings.WarningMessage]) -> list[warnings.Warning
     return [w for w in caught if w.category is andrey.ExperimentalWarning]
 
 
-def test_warns_once_on_the_first_call(chain):
+# An experimental facade calls ``warn_experimental`` first (DEVELOPMENT.md, Add a method), so these
+# tests make that call for a method name of their own.
+
+
+def test_warns_once_on_the_first_call():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        andrey.gies(chain)
-        andrey.gies(chain)
+        warn_experimental("new_method")
+        warn_experimental("new_method")
     [warning] = experimental(caught)
-    assert str(warning.message).startswith("andrey.gies is experimental")
+    assert str(warning.message).startswith("andrey.new_method is experimental")
     assert "may change without deprecation" in str(warning.message)
     assert warning.filename == __file__  # the caller's line, not the package's
 
 
-def test_each_method_warns_on_its_own_first_call(chain):
+def test_each_method_warns_on_its_own_first_call():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        andrey.gies(chain)
-        andrey.exact_search(chain)
-        andrey.gies(chain)
+        warn_experimental("first_method")
+        warn_experimental("second_method")
+        warn_experimental("first_method")
     assert [str(w.message).split()[0] for w in experimental(caught)] == [
-        "andrey.gies",
-        "andrey.exact_search",
+        "andrey.first_method",
+        "andrey.second_method",
     ]
 
 
-def test_an_error_filter_fails_every_call(chain):
+def test_an_error_filter_fails_every_call():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         for _ in range(2):  # a call the filter stopped does not use up the warning
-            with pytest.raises(andrey.ExperimentalWarning, match="andrey.gies"):
-                andrey.gies(chain)
+            with pytest.raises(andrey.ExperimentalWarning, match="andrey.new_method"):
+                warn_experimental("new_method")
 
 
 def test_is_a_user_warning():
@@ -63,10 +68,19 @@ def test_is_a_user_warning():
 @pytest.mark.parametrize("name", sorted(n for n, s in REGISTRY.items() if s.status == "supported"))
 def test_supported_methods_do_not_warn_experimental(name, chain):
     """Only ``ExperimentalWarning`` fails here: a numerical warning from a fit is not a status. A
-    pairwise direction test takes the pair ``x -> y``, and a panel method three time points."""
-    data = chain[:200, :2] if REGISTRY[name].family == "pairwise" else chain
-    if REGISTRY[name].data.inputs[0].kind == "panel":
+    pairwise direction test takes the pair ``x -> y``, a panel method three time points or groups,
+    and a required context, such as CD-NOD's domain index, two domains of equal size."""
+    spec = REGISTRY[name]
+    if spec.accel == "torch":
+        pytest.importorskip("torch")
+    data = chain[:200, :2] if spec.family == "pairwise" else chain
+    if spec.data.inputs[0].kind == "panel":
         data = [chain[:300], chain[300:600], chain[600:900]]
+    contexts = [
+        np.repeat([0.0, 1.0], len(chain) // 2)
+        for i in spec.data.inputs[1:]
+        if i.kind == "context" and i.required
+    ]
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
-        getattr(andrey, name)(data)
+        getattr(andrey, name)(data, *contexts)

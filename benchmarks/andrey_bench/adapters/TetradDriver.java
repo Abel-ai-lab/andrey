@@ -55,8 +55,8 @@ import java.util.StringJoiner;
  * marks a column categorical only when the column holds at most 0 distinct values: it reads every
  * column as continuous. The {@code search} mode takes causal-cmd's own argument parser, parameters,
  * and algorithm factory from the jar and replaces only that reader with one that marks a column
- * categorical when it holds at most {@code --numCategories} distinct values. The file runs from
- * source, with no build step:
+ * categorical when it holds at most {@code --numCategories} distinct values; continuous data takes
+ * no {@code --numCategories}. The file runs from source, with no build step:
  *
  * <pre>
  * java --class-path causal-cmd-1.12.0-jar-with-dependencies.jar TetradDriver.java search ARGS
@@ -98,7 +98,7 @@ public class TetradDriver {
         System.out.flush();
     }
 
-    /** The value of {@code --numCategories} in causal-cmd's arguments. */
+    /** The value of {@code --numCategories} in causal-cmd's arguments, required for mixed data. */
     static int numCategories(String[] args) {
         int at = Arrays.asList(args).indexOf("--numCategories");
         if (at < 0 || at + 1 >= args.length) {
@@ -145,7 +145,8 @@ public class TetradDriver {
             argv = Arrays.copyOfRange(argv, 2, argv.length);
         }
         CmdArgs args = CmdParser.parse(argv);
-        DataSet data = read(args, numCategories(argv));
+        boolean mixed = args.getDataType() == DataType.Mixed;
+        DataSet data = read(args, mixed ? numCategories(argv) : 0);
         Graph graph = null;
         double seconds = 0;
         for (int i = 0; i <= warmup; i++) {

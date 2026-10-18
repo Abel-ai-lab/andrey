@@ -52,8 +52,7 @@ Andrey in its first cell.
 
 ### Which methods are there?
 
-{{ n_supported }} are supported: {{ supported_methods }}. {{ n_experimental }} more are experimental,
-including time-series, hidden-variable, and multi-dataset methods. The
+{{ n_supported }} are supported: {{ supported_methods }}. The
 [API reference](code/index.md#structure-learning-methods) lists them all, and `andrey list` prints
 them with their status.
 
@@ -61,7 +60,8 @@ them with their status.
 
 A supported method is benchmarked and checked on known graphs before each release. An experimental
 method has recovery tests but no published benchmark. It warns with `andrey.ExperimentalWarning` the
-first time it runs in a process.
+first time it runs in a process. Every method is supported now; a new method starts as
+experimental.
 
 ### Which method should I start with?
 
@@ -115,7 +115,7 @@ large enough to repay the transfer; correlation matrices move too when you set
 
 ### Can it use more CPU cores?
 
-GES, GIES, and GFCI (in its GES phase) can spread each pass over worker processes: set
+GES and GFCI (in its GES phase) can spread each pass over worker processes: set
 `ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one. A script that
 does this must put its entry point under `if __name__ == "__main__":`, because starting the workers
 re-imports the script; [Getting started](guides/getting-started.md#backends-and-parallelism) shows

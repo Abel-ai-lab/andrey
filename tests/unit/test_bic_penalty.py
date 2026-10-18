@@ -38,6 +38,9 @@ def _marks(structure) -> int:
 
 _SENSITIVE = _gaussian_sem(1, 400, 8, 0.4)
 _LIGHT, _HEAVY = 0.5, 16.0
+# GFCI's tests remove the edges a light penalty lets GES add, so its answer moves only once the
+# penalty drops a true edge.
+_GFCI_HEAVY = 32.0
 
 
 def _cpdag(result):
@@ -47,24 +50,24 @@ def _cpdag(result):
 
 
 @pytest.mark.parametrize(
-    "name,run",
+    "name,run,weight",
     [
-        ("ges", ges),
-        ("hc", hc),
-        ("boss", boss),
-        ("grasp", grasp),
-        ("gies", gies),
-        ("gfci", gfci),
-        ("andrey.ges", andrey.ges),
-        ("andrey.hc", andrey.hc),
-        ("andrey.boss", andrey.boss),
-        ("andrey.grasp", andrey.grasp),
-        ("andrey.gies", andrey.gies),
-        ("andrey.gfci", andrey.gfci),
+        ("ges", ges, _HEAVY),
+        ("hc", hc, _HEAVY),
+        ("boss", boss, _HEAVY),
+        ("grasp", grasp, _HEAVY),
+        ("gies", gies, _HEAVY),
+        ("gfci", gfci, _GFCI_HEAVY),
+        ("andrey.ges", andrey.ges, _HEAVY),
+        ("andrey.hc", andrey.hc, _HEAVY),
+        ("andrey.boss", andrey.boss, _HEAVY),
+        ("andrey.grasp", andrey.grasp, _HEAVY),
+        ("andrey.gies", andrey.gies, _HEAVY),
+        ("andrey.gfci", andrey.gfci, _GFCI_HEAVY),
     ],
 )
-def test_penalty_moves_the_answer(name, run):
-    heavy = _marks(_cpdag(run(_SENSITIVE, lambda_value=_HEAVY)))
+def test_penalty_moves_the_answer(name, run, weight):
+    heavy = _marks(_cpdag(run(_SENSITIVE, lambda_value=weight)))
     light = _marks(_cpdag(run(_SENSITIVE, lambda_value=_LIGHT)))
     assert heavy < light, f"{name}: lambda_value did not change the graph ({light} -> {heavy})"
 
