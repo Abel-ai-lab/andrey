@@ -23,9 +23,9 @@ change names its pull request.
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
-- Hill climbing and tabu search break exact score ties by the signs of each column's changes from
-  row to row, or by which rows share a category, instead of by column position, so reordering the
-  columns no longer changes the graph they find, on any machine. ([#168], [#179])
+- Hill climbing and tabu search break exact score ties by a rank computed from each column's own
+  data instead of by column position, so reordering the columns no longer changes the graph they
+  find, and the same data give the same graph on other machines. ([#168], [#179])
 - `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#169])
 - `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
   measure values calibrated before this change again with `andrey calibrate`. ([#169])

@@ -206,8 +206,10 @@ def test_recoding_categories_keeps_the_tie_ranks() -> None:
 
 @pytest.mark.parametrize("search", [hc, tabu])
 def test_rounding_in_the_last_bits_keeps_the_graph(search) -> None:
-    """Data off by a few rounding units in every column, as one BLAS kernel's output is from
-    another's, rank their columns the same and give the same graph."""
+    """Small perturbations of these data preserve column ranks and the final CPDAG.
+
+    The perturbations model last-bit differences in BLAS output across machines.
+    """
     x = _TIED_DATA["local_score_BIC_from_cov"](1)
     rng = np.random.default_rng(0)
     unit = np.finfo(np.float64).eps * np.abs(x).max(axis=0)

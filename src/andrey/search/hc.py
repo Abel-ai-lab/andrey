@@ -24,14 +24,19 @@ from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, r
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 
-# Moves are keyed on ``delta / n_samples`` rounded to ``_KEY_DP`` places, not on the raw delta.
-# Two equal moves (add x->y vs y->x, from different cov submatrices) differ in their last bits;
-# the key makes them tie, and the lower ``(ranks[u], ranks[v], op_rank)`` wins, with ``ranks`` from
-# :func:`tie_ranks`, so the winner does not depend on the column order. Schur noise scales as
-# ~n_samples * cond(cov) * eps, like a real improvement, so the normalized residual is
-# ~cond * eps: ``_KEY_DP`` = 9 clears it for cond up to ~1e5, independent of n. A mitigation, not
-# a proof: a normalized delta within ULP of a grid line can round either way. Rounding is
-# monotone, so non-tied order holds; the reported score is recomputed from the final structure.
+# Moves are compared by ``delta / n_samples`` rounded to ``_KEY_DP`` decimal places; ``delta`` is
+# the change in score, with lower values preferred. Under a score-equivalent score, adding
+# ``x -> y`` or ``y -> x`` from the empty graph ties mathematically, but computing their score
+# changes can introduce different rounding errors. If the rounded values tie, the lower
+# ``(ranks[u], ranks[v], op_rank)`` wins, with ``ranks`` from :func:`tie_ranks`.
+# Schur updates compute BIC score changes from covariance submatrices. Their rounding error scales
+# as ~n_samples * cond(cov) * eps, where cond(cov) is the covariance condition number and eps is
+# machine precision. Dividing by n_samples leaves ~cond(cov) * eps; ``_KEY_DP`` = 9 usually absorbs
+# this error for condition numbers up to ~1e5, independent of sample count. Rounding mitigates
+# numerical differences but can still split a tie within one grid step: a value near a rounding
+# boundary can round either way.
+# Rounding preserves the order of values that remain distinct; the reported score is recomputed
+# from the final structure.
 __all__ = ["hc"]
 
 #: The local scores :func:`hc` accepts.
@@ -53,17 +58,36 @@ StructureKey = tuple[int, ...]
 
 
 def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarray:
-    """Each column's place in the tie-break order: by its pattern, then its values, then position.
+    """Each column's rank for choosing between moves with equal rounded score changes.
 
-    A continuous column's pattern is its steps, the signs of ``x[i + 1] - x[i]`` down the rows.
-    Steps are exact comparisons, so data that differ in their last bits, as a BLAS kernel's output
-    does from one CPU to another, keep their ranks unless two consecutive values of a column lie
-    within rounding of each other. A column ``categorical`` marks has its codes renumbered in order
-    of first appearance as its pattern, so recoding its categories keeps its rank. Columns are
-    ordered by a hash of their pattern; columns with the same pattern, such as a column and an
-    increasing function of it, by a hash of their values. Both keys travel with the column, so
-    reordering the columns reorders their ranks the same way; only identical columns fall back to
-    their positions.
+    A continuous column's pattern records whether each value rises, falls, or stays equal to the
+    preceding row's value, using comparisons rather than subtraction. A categorical column's
+    pattern assigns codes in order of first appearance, so changing category labels preserves the
+    pattern. Columns are ordered by a hash of their pattern, then by a hash of their values if
+    pattern hashes match. For example, a column and a strictly increasing function of it share a
+    pattern. If both hashes match, as for identical columns, column position decides. Otherwise,
+    each rank moves with its column when the columns are reordered. The rank is arbitrary with
+    respect to causal structure.
+
+    Distinct pattern hashes give the same ranks across machines when the patterns are unchanged.
+    Last-bit differences in data, such as those from different CPUs' BLAS calculations, preserve
+    continuous patterns unless they change a comparison between consecutive rows. If pattern
+    hashes match, the fallback to raw values can make ranks sensitive to these differences or to
+    category recoding.
+
+    Parameters
+    ----------
+    x : ndarray, shape (n_samples, n_features)
+        Data matrix; rows are observations, columns are variables.
+    categorical : ndarray of bool, shape (n_features,), optional
+        Marks columns that use first-appearance category codes. ``None`` treats all columns as
+        continuous.
+
+    Returns
+    -------
+    ndarray of int, shape (n_features,)
+        Each column's position in the tie-break order, from zero to ``n_features - 1``. Lower ranks
+        take precedence when moves have equal rounded score changes.
     """
     mask = np.zeros(x.shape[1], dtype=bool) if categorical is None else categorical
     patterns = []
@@ -398,15 +422,16 @@ def hc(
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
 ) -> tuple[GraphStructure, float]:
-    """Discover a CPDAG by Hill-Climbing over a BIC, categorical, or mixed-data score.
+    """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
     Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
     score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
-    CPDAG. Exact ties between moves break by :func:`tie_ranks`, so reordering the columns of the
-    data reorders the result the same way unless two columns are identical. Under a mixed-data
-    score the DAG stays a conditional linear Gaussian network: no move gives a categorical node a
-    continuous parent. Returns the CPDAG and the DAG's total objective (lower is better), the sum of
-    the final per-node local scores.
+    CPDAG. Moves with equal rounded score changes are chosen by :func:`tie_ranks`, whose ranks
+    follow the columns when reordered, subject to its hash and rounding limits. These choices can
+    affect later moves and the final CPDAG; the ranks do not indicate causal direction. Under a
+    mixed-data score the DAG stays a conditional linear Gaussian network: no move gives a
+    categorical node a continuous parent. Returns the CPDAG and the DAG's total objective (lower
+    is better), the sum of the final per-node local scores.
 
     Parameters
     ----------
