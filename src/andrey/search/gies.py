@@ -30,7 +30,7 @@ from andrey.core.orient import to_structure
 from andrey.core.score import BICScore, check_columns
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE, stable_key
-from andrey.search.ges import _reach_factory, _recompute_objective
+from andrey.search.ges import _reachable, _recompute_objective
 
 
 def intervention_mask(interventions: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
@@ -509,7 +509,6 @@ class _Search:
     def __init__(self, score: InterventionalBICScore, n: int) -> None:
         self.score = score
         self.n = n
-        self.build_state = _reach_factory(n)
         self.adj = np.zeros((n, n), dtype=np.int8)
         self.objective = _Objective(score, n)
         self.forward: dict[int, list[tuple[tuple, int, set[int]]]] = {}
@@ -519,7 +518,7 @@ class _Search:
         """The best-improving insertion as ``(u, v, C)`` (Prop. 25)."""
         adj, n = self.adj, self.n
         if _FULL_RESCAN:
-            reachable = self.build_state(adj)
+            reachable = _reachable(adj)
             valid = (
                 (key, u, C)
                 for v in range(n)
@@ -535,7 +534,7 @@ class _Search:
         if not heap:
             return None
         heapq.heapify(heap)
-        reachable = self.build_state(adj)
+        reachable = _reachable(adj)
         while heap:
             _key, v, i = heapq.heappop(heap)
             moves = self.forward[v]
