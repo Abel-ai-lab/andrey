@@ -41,19 +41,6 @@ def tail_successor_masks(adj: np.ndarray) -> np.ndarray:
     return ((adj == TAIL).astype(np.uint64) * weights).sum(axis=1)
 
 
-def tail_successor_masks_wide(adj: np.ndarray) -> list[int]:
-    """Per-node Python-int successor masks: the width-unlimited :func:`tail_successor_masks`.
-
-    ``adj`` is a dense ``(d, d)`` endpoint-mark matrix; bit ``c`` of ``succ[node]`` is set iff
-    ``adj[node, c] == TAIL`` (a semi-directed successor). A Python ``int`` has no width cap, so this
-    holds for any ``d`` -- the packing :func:`tail_successor_masks` refuses above 64. Consumed by
-    :func:`semidirected_reaches_wide`, it drives the same breadth-first bitmask reachability the
-    ``uint64`` kernel runs at ``d <= 64``, but width-unlimited.
-    """
-    tail = adj == TAIL
-    return [bitmask(np.nonzero(tail[node])[0].tolist()) for node in range(adj.shape[0])]
-
-
 def bitmask(nodes: Iterable[int]) -> int:
     """Return the integer with bit ``v`` set for each ``v`` in ``nodes``."""
     m = 0
@@ -85,46 +72,13 @@ def row_masks(matrix: np.ndarray) -> list[int]:
     return list(map(int.from_bytes, np.packbits(padded, axis=1).view(f"V{width}").ravel().tolist()))
 
 
-def semidirected_reaches_wide(succ: list[int], start: int, target: int, barrier: int) -> bool:
-    """Arbitrary-width int-bitmask BFS: the ``d > 64`` analog of the numpy bitmask BFS.
-
-    Identical reachability predicate -- ``True`` iff ``target`` is reachable from ``start`` over the
-    semi-directed successor edges once the ``barrier`` bits are removed (``start`` / ``target`` are
-    never removed) -- but over per-node Python-int masks (:func:`tail_successor_masks_wide`) so no
-    node index overflows a machine word. Boolean graph reachability is traversal-order-independent,
-    so this returns exactly what the width-unlimited set BFS
-    (``operators.blocks_semi_directed_paths``) negates.
-    """
-    if start == target:
-        return True
-    start_bit = 1 << start
-    target_bit = 1 << target
-    bar = barrier & ~(start_bit | target_bit)
-    visited = start_bit
-    frontier = start_bit
-    while frontier:
-        nxt = 0
-        bits = frontier
-        while bits:
-            lsb = bits & (-bits)
-            nxt |= succ[lsb.bit_length() - 1]
-            bits ^= lsb
-        nxt &= ~bar & ~visited
-        if nxt & target_bit:
-            return True
-        visited |= nxt
-        frontier = nxt
-    return False
-
-
 def semidirected_reach_set(succ: list[int], start: int, barrier: int) -> int:
     """Every node reachable from ``start`` once the ``barrier`` nodes are removed, as a bitmask.
 
-    The same breadth-first OR-expansion as :func:`semidirected_reaches_wide`, over the per-node
-    Python-int masks of :func:`tail_successor_masks_wide`, so it holds for any node count.
-    ``start`` is never removed and always in the result. Bit ``t`` of the result, for ``t`` outside
-    ``barrier``, equals ``semidirected_reaches_wide(succ, start, t, barrier)``: one traversal
-    answers every target that shares a start and a barrier.
+    ``succ`` holds each node's successors as a Python int, as :func:`row_masks` packs them, so the
+    breadth-first OR-expansion holds for any node count. ``start`` is never removed and always in
+    the result. For ``t`` outside ``barrier``, bit ``t`` is set iff a successor path from ``start``
+    reaches ``t``: one traversal answers every target that shares a start and a barrier.
     """
     allowed = ~barrier
     seen = 1 << start

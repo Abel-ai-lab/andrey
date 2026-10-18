@@ -126,8 +126,7 @@ def ges(
     assumes continuous data, where each variable depends linearly on its causes with Gaussian noise;
     in that setting it is a fast, accurate default. For categorical data, use
     ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, and for mixed data
-    ``"local_score_degen_gauss"`` or
-    ``"local_score_cond_gauss"``. It returns the equivalence class.
+    ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.

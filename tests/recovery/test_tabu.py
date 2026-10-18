@@ -20,7 +20,6 @@ from andrey import data
 from andrey.core import backend
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent, to_cpdag
-from andrey.search._parallel import _KEY_DP
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -57,8 +56,7 @@ def test_tabu_reaches_the_score_optimum_on_gauss_5v():
     optimum = andrey.exact_search(x).structure
     assert out.structure.kind == "cpdag"
     assert out.structure.oriented_edges() == to_cpdag(optimum).oriented_edges()
-    tolerance = x.shape[0] * 10.0**-_KEY_DP  # the move keys' grid, on the total score
-    assert math.isclose(out.metadata["score"], _bic(x, optimum), rel_tol=0.0, abs_tol=tolerance)
+    assert math.isclose(out.metadata["score"], _bic(x, optimum), rel_tol=0.0, abs_tol=1e-6)
     assert_recorded_output(out, "Tabu", case="gauss_5v")
 
 

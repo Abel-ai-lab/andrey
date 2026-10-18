@@ -161,11 +161,11 @@ def test_ties_are_exercised_by_the_sweep():
     x = _gaussian_sem(0, 600, 10, 0.4)
     n = x.shape[1]
     score = BICScore(x, lambda_value=1.0)
-    from andrey.search.ges import _reach_factory
+    from andrey.search.ges import _reachable
 
     adj = np.zeros((n, n), dtype=np.int8)
     state = pg.neighborhood_state(adj, n)
-    reachable = _reach_factory(n)(adj)
+    reachable = _reachable(adj)
     deltas: list[float] = []
     for y in range(n):
         for xx in range(n):

@@ -119,30 +119,11 @@ def test_numba_d64_bit63_barrier():
         assert bool(reaches_nb(succ, start, target, barrier)) == want, (start, target)
 
 
-def test_ges_numpy_and_numba_agree():
-    """GES returns the same CPDAG whether reachability runs on numpy or numba (same result)."""
-    if backend.numba() is None:
-        pytest.skip("numba (the [numba] extra) is not installed")
-    from andrey.search.ges import ges
-
-    x = np.random.default_rng(0).standard_normal((300, 6))
-    with backend.config(backend="numpy"):
-        cpdag_np, _ = ges(x)
-    with backend.config(backend="numba"):
-        cpdag_nb, _ = ges(x)
-    assert cpdag_np == cpdag_nb  # GraphStructure value-equality: the same CPDAG
-
-
-def test_ges_runs_without_numba(monkeypatch):
-    """The default (no [numba]) install: numba is unavailable, GES uses the numpy reference."""
+def test_reaches_impl_falls_back_to_numpy_without_numba(monkeypatch):
+    """Without the [numba] extra, the bitset kernels resolve to the numpy reference."""
     monkeypatch.setattr(backend, "numba", lambda: None)
     assert backend.resolve_bitset() == "numpy"
     assert _bitset.reaches_impl() is _bitset._semidirected_reaches_numpy
-    from andrey.search.ges import ges
-
-    x = np.random.default_rng(1).standard_normal((200, 5))
-    cpdag, _ = ges(x)
-    assert cpdag.n_nodes == 5  # runs to completion on the numpy path
 
 
 def _random_tail_adj(rng: np.random.Generator, d: int) -> np.ndarray:
@@ -154,10 +135,10 @@ def _random_tail_adj(rng: np.random.Generator, d: int) -> np.ndarray:
 
 @pytest.mark.parametrize("seed", range(40))
 def test_setbfs_matches_oracle_across_d(seed):
-    # The width-unlimited set BFS (operators.blocks_semi_directed_paths, the d > 64 GES fallback)
-    # must agree with the independent bit-iterating oracle at every d, including past the uint64 cap
-    # -- and with the uint64 bitmask BFS wherever that one is valid (d <= 64), start == target
-    # included (all three treat the empty path as reachable).
+    # The width-unlimited set BFS (operators.blocks_semi_directed_paths, the full-rescan references'
+    # check) must agree with the independent bit-iterating oracle at every d, including past the
+    # uint64 cap -- and with the uint64 bitmask BFS wherever that one is valid (d <= 64), start ==
+    # target included (all three treat the empty path as reachable).
     rng = np.random.default_rng(seed)
     d = int(rng.integers(2, 130))  # spans the d <= 64 packing cap
     adj = _random_tail_adj(rng, d)
@@ -198,12 +179,19 @@ def test_setbfs_path_through_high_bit():
     assert ops.blocks_semi_directed_paths(succ_lists, 5, 5, {5}) is False
 
 
+def test_tail_successor_masks_rejects_above_cap() -> None:
+    """The single-``uint64`` packing raises above 64 instead of silently truncating high bits."""
+    _bitset.tail_successor_masks(np.zeros((64, 64), dtype=np.int8))  # the cap itself is fine
+    with pytest.raises(ValueError, match="d <= 64"):
+        _bitset.tail_successor_masks(np.zeros((65, 65), dtype=np.int8))
+
+
 @pytest.mark.parametrize("seed", range(40))
 def test_reach_set_matches_oracle_across_d(seed):
     """One reach-set traversal answers every target outside the barrier, past 64 nodes too."""
     rng = np.random.default_rng(seed)
     d = int(rng.integers(2, 200))
-    succ = _bitset.tail_successor_masks_wide(_random_tail_adj(rng, d))
+    succ = _bitset.row_masks(_random_tail_adj(rng, d) == TAIL)
     for _ in range(4):
         start = int(rng.integers(0, d))
         barrier = _bitset.bitmask(v for v in range(d) if v != start and rng.random() < 0.2)

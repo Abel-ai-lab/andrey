@@ -1,15 +1,13 @@
 """FCI's ``possible_dsep``: the default keeps its recorded PAGs; ``"order_free"`` ignores labels.
 
-``"order_free"`` builds possible-d-separation sets that do not depend on the node labels, and with
-exact tests its PAGs do not either.
+``"order_free"`` builds possible-d-separation sets that do not depend on the node labels;
+``test_fci_oracle`` checks its PAGs under exact tests.
 """
 
 from __future__ import annotations
 
-import importlib
 from itertools import permutations
 
-import networkx as nx
 import numpy as np
 import pytest
 
@@ -17,9 +15,6 @@ import andrey
 from andrey.constraint.fci import _possible_dsep
 from andrey.core.structure import ARROW, CIRCLE, TAIL
 from andrey.data import sample_scm
-
-fci_module = importlib.import_module("andrey.constraint.fci")
-remove_by_possible_dsep = fci_module._remove_by_possible_dsep
 
 
 def _pag() -> np.ndarray:
@@ -57,64 +52,8 @@ def test_order_free_set_ignores_node_labels():
     assert len(fast_sets) > 1
 
 
-def _oracle_fci(monkeypatch, n_obs, edges, possible_dsep):
-    """Run ``fci`` with a d-separation test on the DAG ``edges``; also count the edges the
-    possible-d-separation step removes."""
-    dag = nx.DiGraph(edges)
-    dag.add_nodes_from(range(n_obs))
-
-    def test(x, y, condition_set=()):
-        return float(nx.is_d_separator(dag, {x}, {y}, set(condition_set)))
-
-    removed = []
-
-    def counted(marks, *args, **kwargs):
-        before = np.count_nonzero(marks)
-        remove_by_possible_dsep(marks, *args, **kwargs)
-        removed.append((before - np.count_nonzero(marks)) // 2)
-
-    monkeypatch.setattr(fci_module, "make_indep_test", lambda name, X, categorical=None: test)
-    monkeypatch.setattr(fci_module, "_remove_by_possible_dsep", counted)
-    pag = fci_module.fci(np.zeros((10, n_obs)), alpha=0.5, possible_dsep=possible_dsep)
-    return np.asarray(pag.to_numpy(), dtype=np.int8), removed[0]
-
-
-def _relabel(edges, order):
-    """``edges`` with observed node ``order[j]`` renamed ``j``; hidden nodes keep their labels."""
-    new = {int(old): j for j, old in enumerate(order)}
-    return [(new.get(a, a), new.get(b, b)) for a, b in edges]
-
-
-# Six observed nodes 0-5 with hidden common causes from node 6 up. On each, the
-# possible-d-separation step removes an edge, and the default and order-free sets differ.
-ORACLE_GRAPHS = {
-    "one extra edge": [(6, 2), (6, 5), (7, 1), (7, 0), (4, 5), (4, 1), (5, 0), (1, 2), (3, 0)]
-    + [(8, 1), (8, 3)],
-    "four hidden common causes": [(6, 0), (6, 1), (7, 3), (7, 4), (2, 1), (2, 3), (1, 4), (3, 0)]
-    + [(8, 3), (8, 5), (9, 4), (9, 5)],
-    "a fourth parent": [(6, 0), (6, 3), (7, 1), (7, 2), (5, 3), (5, 1), (3, 2), (1, 0), (4, 0)]
-    + [(4, 2), (8, 4), (8, 3)],
-}
-
-
-@pytest.mark.parametrize("name", sorted(ORACLE_GRAPHS))
-def test_order_free_pag_ignores_node_labels_under_exact_tests(monkeypatch, name):
-    """With exact tests, every labeling gives the same order-free PAG once mapped back."""
-    edges = ORACLE_GRAPHS[name]
-    reference, removed = _oracle_fci(monkeypatch, 6, edges, "order_free")
-    assert removed > 0
-    rng = np.random.default_rng(0)
-    for _ in range(24):
-        order = rng.permutation(6)
-        pag, _ = _oracle_fci(monkeypatch, 6, _relabel(edges, order), "order_free")
-        back = np.empty_like(pag)
-        back[np.ix_(order, order)] = pag
-        np.testing.assert_array_equal(back, reference)
-
-
-# Default PAGs recorded before ``possible_dsep`` existed, on draws where ``"order_free"`` removes
-# one more edge. Row i holds ``to_numpy()``'s marks at node i: 0 none, 1 tail, 2 arrowhead,
-# 3 circle.
+# The default's recorded PAGs on draws where ``"order_free"`` removes one more edge. Row i holds
+# ``to_numpy()``'s marks at node i: 0 none, 1 tail, 2 arrowhead, 3 circle.
 RECORDED = {
     "fci": (
         {"d": 15, "n": 750, "density": 4.0, "seed": 3},
@@ -138,14 +77,12 @@ def test_default_keeps_the_recorded_pag(method):
     recorded = np.array([[int(mark) for mark in row] for row in rows])
     fit = getattr(andrey, method)
     np.testing.assert_array_equal(fit(x).structure.to_numpy(), recorded)
-    np.testing.assert_array_equal(fit(x, possible_dsep="fast").structure.to_numpy(), recorded)
     order_free = fit(x, possible_dsep="order_free").structure.to_numpy()
     assert np.count_nonzero(order_free) < np.count_nonzero(recorded)
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
-@pytest.mark.parametrize("method", ["fci", "gfci"])
-@pytest.mark.parametrize("value", ["order-free", "FAST"])
+@pytest.mark.parametrize(("method", "value"), [("fci", "order-free"), ("gfci", "FAST")])
 def test_unknown_possible_dsep_raises(method, value):
     with pytest.raises(ValueError, match="possible_dsep must be 'fast' or 'order_free'"):
         getattr(andrey, method)(

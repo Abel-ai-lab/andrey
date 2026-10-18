@@ -71,8 +71,8 @@ def test_the_default_cutoff_warns_once_the_largest_pass_reaches_a_tenth_of_it(d,
         warnings.simplefilter("always")
         _fit("ges", workers=2, d=d)
     reached = pg.largest_pass_work >= cal.WARN_FRACTION * pg._DEFAULT_MIN_WORK
-    assert reached is warns
-    assert len(_cutoff_warnings(caught)) == int(warns)
+    assert reached is warns  # the case lands on the side it names
+    assert len(_cutoff_warnings(caught)) == int(reached)
 
 
 @pytest.mark.parametrize("method", METHODS)

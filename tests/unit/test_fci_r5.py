@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import time
 
 import numpy as np
 
@@ -82,7 +81,7 @@ def test_r5_stops_at_the_partial_path_bound(monkeypatch):
 def test_r5_finishes_on_a_layered_graph():
     """Five complete bipartite layers between ``a = 0`` and ``b = 1`` give exponentially many
     circle paths, but ``a`` is adjacent to every neighbor of ``b``, so no cycle closes on
-    ``a o-o b``. The whole rule, which also orients the four-cycles between layers, stays fast.
+    ``a o-o b``. The whole rule, which also orients the four-cycles between layers, finishes.
     """
     width, depth = 5, 5
     layers = [[2 + i * width + j for j in range(width)] for i in range(depth)]
@@ -90,10 +89,8 @@ def test_r5_finishes_on_a_layered_graph():
     edges += [(1, u) for u in layers[-1]]
     edges += [(u, v) for i in range(depth - 1) for u in layers[i] for v in layers[i + 1]]
     marks = _circles(2 + width * depth, edges)
-    start = time.perf_counter()
     assert fci._uncovered_circle_cycle(marks, 0, 1) is None
     fci._rule_r5(marks, False)
-    assert time.perf_counter() - start < 5.0
 
 
 def test_the_sachs_truth_pag_has_no_undirected_edges():

@@ -43,8 +43,8 @@ _SCALES = ("raw", "standardize", "rescale")
 _TEMPORAL_BURN_IN = 200  # discarded prefix so the returned window is stationary
 
 # Per-component sub-keys off the root SeedSequence: the graph, the weights, the noise, the latent
-# selection, the temporal lag matrices, and the column shuffle each get an independent stream so
-# refactoring one axis never perturbs another's bytes.
+# selection, the temporal lag matrices, and the column shuffle each get an independent stream, so
+# a change to one component's draws never shifts another's.
 _GRAPH, _WEIGHTS, _NOISE, _LATENT, _LAG, _COLUMNS = 0, 1, 2, 3, 4, 5
 _SEED_SCHEME = 1  # bump if the seed-derivation layout ever changes (recorded in provenance)
 
@@ -131,9 +131,8 @@ class SCM:
             ``max_attempts``); the accept rate is recorded in ``report.faithfulness_accept_rate``.
         dtype : npt.DTypeLike, default=np.float64
             Output dtype of ``data``. The structural equations are always solved in ``float64``;
-            this only controls the final cast. Every consumer upcasts to ``float64`` anyway, so the
-            default avoids a lossy round-trip; pass ``np.float32`` to opt into a
-            half-footprint array.
+            this only controls the final cast. Every consumer upcasts to ``float64``, so the
+            default avoids a lossy round-trip; ``np.float32`` gives a half-footprint array.
         shuffle : bool, default=True
             Shuffle the observed columns with a permutation from the seed's own column stream, and
             relabel the true graph and the per-node parameters to match; latent nodes stay last.
@@ -366,6 +365,13 @@ def sample_scm(
     density : float, default=4.0
         Mean total degree (``2 * |E| / d``), for every ``graph``. Each builder rounds it to the
         nearest value it can draw.
+    scale : {"raw", "standardize", "rescale"}, default="raw"
+        How the columns are scaled; forwarded to :meth:`SCM.sample`. Temporal functionals take
+        only ``"raw"``.
+    latents : int, default=0
+        How many of the ``d`` nodes to hide as latent confounders, chosen among nodes with at least
+        two children: ``data`` drops them, and the true graph lists them last. Temporal
+        functionals take only ``0``.
     dtype : npt.DTypeLike, default=np.float64
         Output dtype of the sampled ``data``; forwarded to :meth:`SCM.sample`.
     shuffle : bool, default=True

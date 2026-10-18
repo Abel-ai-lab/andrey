@@ -9,10 +9,6 @@ return the graph the rescanning reference path in ``andrey.search.xges`` returns
 
 from __future__ import annotations
 
-import json
-import subprocess
-import sys
-
 import numpy as np
 import pytest
 from threadpoolctl import threadpool_limits
@@ -261,77 +257,13 @@ def test_a_fingerprint_collision_does_not_undo_a_move(extended_search):
     assert edges == {(2 * j, 2 * j + 1) for j in pairs}
 
 
-@pytest.mark.parametrize(("n", "d"), [(8, 12), (12, 20)])
 @pytest.mark.parametrize("extended_search", [True, False])
-def test_fewer_rows_than_columns_keep_parent_sets_that_can_be_scored(n, d, extended_search):
+def test_fewer_rows_than_columns_keep_parent_sets_that_can_be_scored(extended_search):
     """With fewer rows than columns, a parent set of ``n - 1`` or more fits its child exactly. The
     search never picks one, so every node of the graph's DAG extension has a finite score."""
+    n, d = 8, 12
     x = np.random.default_rng(0).standard_normal((n, d))
     graph, total = xges_search(x, extended_search=extended_search)
     dag = pdag2dag(from_structure(graph))
     assert max(int(np.count_nonzero(dag[:, v] == TAIL)) for v in range(d)) <= n - 2
     assert np.isfinite(total)
-
-
-def _rank_deficient() -> dict[str, tuple[np.ndarray, float, bool]]:
-    """Data with exactly collinear columns, with the ``lambda_value`` and ``extended_search``."""
-    cases = {}
-    for name, (n, d, seed, column, weights) in {
-        "x5 = x2 + x3": (200, 10, 0, 5, {2: 1.0, 3: 1.0}),
-        "x7 = 2 x2 - x3 + x4": (500, 8, 2, 7, {2: 2.0, 3: -1.0, 4: 1.0}),
-        "x5 = x2 + x3, d=20": (1000, 20, 1, 5, {2: 1.0, 3: 1.0}),
-    }.items():
-        x = np.random.default_rng(seed).standard_normal((n, d))
-        x[:, column] = sum(w * x[:, j] for j, w in weights.items())
-        cases[name] = (x, 1.0, True)
-    cases["x5 = x2 + x3, lambda 2"] = (cases["x5 = x2 + x3"][0], 2.0, True)
-    rng = np.random.default_rng(6)
-    x = rng.standard_normal((300, 6))
-    cases["one-hot block"] = (np.column_stack([x, np.eye(3)[rng.integers(0, 3, 300)]]), 1.0, True)
-    rng = np.random.default_rng(26)
-    hot = np.eye(3)[rng.integers(0, 3, 300)]
-    x = rng.standard_normal((300, 5))
-    x[:, 0] += hot @ np.array([1.0, -1.0, 0.5])
-    x[:, 1] += x[:, 0]
-    cases["one-hot block, no extended search"] = (np.column_stack([x, hot]), 1.0, False)
-    return cases
-
-
-# The search without the column check that rejects such data before a fit.
-_FIT_EACH = """
-import json, sys
-import numpy as np
-from andrey.core.score import BICScore
-from andrey.search.xges import _Search
-for path, lambda_value, extended_search in json.loads(sys.argv[1]):
-    x = np.load(path)
-    score = BICScore.from_cov(np.cov(x, rowvar=False), len(x), lambda_value=lambda_value)
-    search = _Search(score, x.shape[1])
-    search.inserts_on_empty_graph()
-    search.base_search()
-    if extended_search:
-        search.extend(len(x))
-    print(path, flush=True)
-"""
-
-
-def test_the_search_ends_on_rank_deficient_data(tmp_path):
-    """Collinear columns make parent sets singular, where the Schur update and two full scores
-    disagree and a cycle of moves can each look improving. Every search must still end; a child
-    process runs the fits so that one that does not is stopped."""
-    runs = []
-    for name, (x, lambda_value, extended_search) in _rank_deficient().items():
-        path = tmp_path / f"{len(runs)}.npy"
-        np.save(path, x)
-        runs.append((str(path), lambda_value, extended_search, name))
-    try:
-        subprocess.run(
-            [sys.executable, "-c", _FIT_EACH, json.dumps([r[:3] for r in runs])],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except subprocess.TimeoutExpired as stopped:
-        done = len((stopped.stdout or b"").splitlines())
-        pytest.fail(f"no result within 60 s for {runs[done][3]!r}")

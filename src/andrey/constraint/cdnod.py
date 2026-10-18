@@ -31,8 +31,9 @@ def cdnod(
     ``data`` is an ``(n_samples, n_features)`` array; ``c_indx`` is the ``(n_samples,)`` or
     ``(n_samples, 1)`` domain/context index (one label per row); ``alpha`` is the independence-test
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
-    ``indep_test`` selects the CI test, run over the augmented matrix. The context is appended as an
-    extra variable and the result is projected back to the ``n_features`` data variables.
+    ``indep_test`` selects the CI test. The context is appended as an extra variable, the tests run
+    over the augmented matrix, and the result is projected back to the ``n_features`` data
+    variables; with a single domain the context is left out and the search runs on ``data`` alone.
     ``categorical``, a boolean mask of the data's categorical columns, reaches a mixed-data test,
     which also takes the context as categorical. Returns the CPDAG as a ``GraphStructure`` of kind
     ``"cpdag"``.

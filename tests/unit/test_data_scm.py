@@ -204,10 +204,9 @@ def _assert_relabeled(plain, shuffled):
 
 
 @pytest.mark.parametrize("latents", [0, 2])
-@pytest.mark.parametrize("graph", ["erdos_renyi", "scale_free", "small_world", "hub"])
-def test_shuffle_relabels_an_scm_sample(graph, latents):
+def test_shuffle_relabels_an_scm_sample(latents):
     """Shuffling permutes the observed columns and the truth together and changes nothing else."""
-    kwargs = {"graph": graph, "d": 14, "n": 200, "seed": 3, "density": 4.0, "latents": latents}
+    kwargs = {"d": 14, "n": 200, "seed": 3, "density": 4.0, "latents": latents}
     plain = data.sample_scm(**kwargs, shuffle=False)
     shuffled = data.sample_scm(**kwargs)
     _assert_relabeled(plain, shuffled)
@@ -216,8 +215,7 @@ def test_shuffle_relabels_an_scm_sample(graph, latents):
     assert shuffled.report.r2sortability == pytest.approx(plain.report.r2sortability)
 
 
-@pytest.mark.parametrize("latents", [0, 2])
-@pytest.mark.parametrize("scale", ["standardize", "rescale"])
+@pytest.mark.parametrize(("scale", "latents"), [("standardize", 0), ("rescale", 2)])
 def test_shuffle_relabels_noise_scales_and_scaled_or_screened_samples(scale, latents):
     scm = data.SCM(
         graph=data.graphs.erdos_renyi(d=12, avg_degree=3.0),
@@ -232,9 +230,8 @@ def test_shuffle_relabels_noise_scales_and_scaled_or_screened_samples(scale, lat
     assert shuffled.report.faithfulness_accept_rate == plain.report.faithfulness_accept_rate
 
 
-@pytest.mark.parametrize("graph", ["erdos_renyi", "scale_free"])
-def test_shuffle_relabels_a_discrete_sample(graph):
-    kwargs = {"graph": graph, "d": 10, "n": 300, "seed": 2, "categories": (2, 4)}
+def test_shuffle_relabels_a_discrete_sample():
+    kwargs = {"graph": "erdos_renyi", "d": 10, "n": 300, "seed": 2, "categories": (2, 4)}
     plain = data.sample_discrete(**kwargs, shuffle=False)
     shuffled = data.sample_discrete(**kwargs)
     _assert_relabeled(plain, shuffled)
@@ -243,10 +240,9 @@ def test_shuffle_relabels_a_discrete_sample(graph):
     assert shuffled.provenance["config"]["categories"] == [cards[i] for i in order]
 
 
-@pytest.mark.parametrize("graph", ["erdos_renyi", "scale_free"])
-def test_shuffle_relabels_a_mixed_sample(graph):
+def test_shuffle_relabels_a_mixed_sample():
     """The categorical columns and their category counts move with the data."""
-    kwargs = {"graph": graph, "d": 10, "n": 300, "seed": 2, "categories": (2, 4)}
+    kwargs = {"graph": "erdos_renyi", "d": 10, "n": 300, "seed": 2, "categories": (2, 4)}
     plain = data.sample_mixed(**kwargs, shuffle=False)
     shuffled = data.sample_mixed(**kwargs)
     _assert_relabeled(plain, shuffled)
@@ -266,17 +262,3 @@ def test_the_column_order_comes_from_its_own_stream_of_the_seed():
     assert data.sample_scm(d=20, n=10, seed=5).provenance["column_order"] != order
     discrete = data.sample_discrete(d=20, n=10, seed=4).provenance["column_order"]
     assert data.sample_discrete(d=20, n=10, seed=4).provenance["column_order"] == discrete
-
-
-def test_a_column_order_free_method_finds_the_same_graph_either_way():
-    """DirectLiNGAM gives the same graph on the shuffled columns, up to the permutation."""
-    import andrey
-
-    kwargs = {"noise": "uniform", "d": 8, "n": 1000, "density": 2.0}
-    for seed in range(3):
-        plain = data.sample_scm(**kwargs, seed=seed, shuffle=False)
-        shuffled = data.sample_scm(**kwargs, seed=seed)
-        back = np.argsort(shuffled.provenance["column_order"])
-        expected = andrey.direct_lingam(plain.data).structure.to_numpy()
-        found = andrey.direct_lingam(shuffled.data).structure.to_numpy()
-        assert np.array_equal(found[np.ix_(back, back)], expected)

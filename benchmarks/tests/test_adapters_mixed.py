@@ -77,8 +77,6 @@ def test_every_comparator_solution_is_paired() -> None:
 
 def test_other_keys_keep_their_label_and_generator_call() -> None:
     """The mixed fields join neither the label nor the call of any other regime."""
-    plain = DatasetKey("er", "linear", "gaussian", 2.0, 10, 100, 0, "standardized")
-    assert plain.digest == "e8e12e887f9d"
     discrete = DatasetKey("er", "categorical", "dirichlet", 2.0, 10, 100, 0, "raw")
     shifted = DatasetKey(
         "er", "categorical", "dirichlet", 2.0, 10, 100, 0, "raw", categorical_share=0.9

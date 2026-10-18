@@ -105,7 +105,7 @@ def bracket(
     ``work(d)``, called after ``pooled(d)``, gives the largest pass work of the pooled fit at ``d``.
 
     Scans ``grid`` upward for the first size where the pooled pass is faster. If that is the first
-    grid size, halves ``d`` until the serial pass wins again (or ``d`` reaches 4); if no grid size
+    grid size, halves ``d`` until the serial pass is faster (or ``d`` reaches 4); if no grid size
     qualifies, doubles past the grid (up to 256). Then narrows the bracket by ``refine`` bisections
     of ``log d``.
     """
@@ -192,9 +192,11 @@ def fit_timers(
 ) -> tuple[Callable[[int], float], Callable[[int], float], Callable[[int], int]]:
     """Serial and pooled timing functions for a whole ``method`` fit on :func:`sample` data.
 
-    The pooled arm sets the method's cutoff to 0, so every pass runs on the pool and the time
-    includes starting it; the process's first pool start is paid before timing. The third function
-    gives the largest pass work of the last pooled fit at ``d``.
+    Each time is the median of ``repeats`` fits after one warm-up fit, or a single fit once the
+    warm-up takes more than a second. The pooled arm runs ``workers`` processes and sets the
+    method's cutoff to 0, so every pass runs on the pool and the time includes starting it; the
+    process's first pool start is paid before timing. The third function gives the largest pass
+    work of the last pooled fit at ``d``.
     """
     import andrey
     from andrey.search import _parallel_ges

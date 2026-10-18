@@ -146,7 +146,10 @@ def _delta_via_full_score(
     lambda_value: float,
     log_n: float,
 ) -> float:
-    """Fallback delta from two full :func:`local_score_bic` evaluations (exact, O(|S|^3))."""
+    """Fallback delta from two full :func:`local_score_bic` evaluations (exact, O(|S|^3)).
+
+    It is ``inf`` when either family is unavailable.
+    """
     if op == "add":
         S_new: list[int] = sorted([*S_old, u])
     elif op == "remove":
@@ -182,12 +185,11 @@ def local_score_bic_delta(
     """Return ``score(v, S_new) - score(v, S_old)`` for a single ``add``/``remove`` of ``u``.
 
     Computes the delta in O(|S|^2) via the rank-one residual update, given a cached
-    ``inv(cov[S_old, S_old])``. Both caches are mutated as side effects: ``inv_cov_cache`` is keyed
-    by the sorted-tuple parent set, ``residual_cache`` by ``(target, sorted_S_tuple)``; new
-    residuals are written back keyed to ``S_new``. Near-singular ``cov[S, S]`` (conditioning proxy
-    above ``cond_threshold``, or a ``LinAlgError``), an add past ``n - 2`` parents, and a residual
-    ``R(u) <= 0`` or ``R(v)`` at most :data:`~andrey.core.score.ZERO_RESIDUAL` times ``cov[v, v]``
-    route to the two-full-score fallback, which is ``inf`` when either family is unavailable.
+    ``inv(cov[S_old, S_old])``. Both caches are mutated; new residuals are written back keyed to
+    ``S_new``. Near-singular ``cov[S, S]`` (conditioning proxy above ``cond_threshold``, or a
+    ``LinAlgError``), an add past ``n - 2`` parents, and a residual ``R(u) <= 0`` or ``R(v)`` at
+    most :data:`~andrey.core.score.ZERO_RESIDUAL` times ``cov[v, v]`` route to the two-full-score
+    fallback, which is ``inf`` when either family is unavailable.
 
     Parameters
     ----------
@@ -585,7 +587,8 @@ def _delta_two_scores(
     The exact fallback for :func:`delta_many_with_base`: whenever the Schur fast path is unavailable
     (ill-conditioned base, or a candidate masked by the ``R > 0`` safety guards) the delta is served
     by two :meth:`BICScore.score` calls, which are memoized and pure, so the fallback delta is
-    deterministic and identical to differencing two full local scores.
+    deterministic: the difference of two full local scores, or ``inf`` when either family is
+    unavailable.
     """
     u = int(u)
     if op == "add":
@@ -643,18 +646,16 @@ def _add_bounds(
         eta = c * w_v * np.sqrt(w_u2) + 2 * _EPS * e_abs
         ru_lo = R_uU - rho
         t = e_vU * (e_vU / R_uU)  # the scale-free form the delta itself uses
-        R_new = R_v_old - t  # this batch's value wherever its update is safe
+        R_new = R_v_old - t
         t_hi = (e_abs + eta) * ((e_abs + eta) / ru_lo) * (1 + 4 * _EPS)
         # t can rise further than it can fall, so this covers R(v | S + u) moving either way.
         move = t_hi - t + 2 * _EPS * (R_v_old + t_hi)
         ulp = 8 * _EPS * (n * (np.abs(np.log(R_new)) + abs(math.log(R_v_old))) + penalty)
         bound = 2 * (ulp - n * np.log1p(-move / R_new))
-        # Every batch takes the update: R_u stays positive and R(v | S + u) stays above the floor.
         certain = (ru_lo > 0.0) & (R_new - move > floor)
         if certain.all():
             return bound
         bound[~certain] = np.inf
-        # No batch takes the update, so every batch scores the add by two full scores.
         bound[(R_uU + rho <= 0.0) | ((ru_lo > 0.0) & (R_new + move <= floor))] = 0.0
     return bound
 
@@ -871,7 +872,7 @@ def add_deltas(
 ) -> np.ndarray:
     """Return ``score(i, base + u) - score(i, base)`` for every variable ``u``, as one array.
 
-    The vector form of :func:`delta_many_with_base`'s ``add`` moves: ``O(|base|^2 d)`` numpy work
+    The vector form of :func:`delta_many_with_base`'s ``add`` moves: ``O(|base|^2 d)`` NumPy work
     instead of a Python loop over the candidates. It shares the conditioning-gated inverse cache and
     falls back to two full scores where the Schur path is unavailable. Entries for ``i`` itself, for
     the members of ``base``, and for adds to an unavailable family or past ``n - 2`` parents are
