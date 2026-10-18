@@ -567,8 +567,8 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     for release, name in build.PANEL:
         size, bars = shown[name]
         # The slide is the method's largest size with a published ratio, at the panel's mean
-        # degree, and Andrey's bar prints that ratio, "≥" before a lower bound. A pair's size is
-        # its rows.
+        # degree, or the size PANEL_SIZES names, and Andrey's bar prints that ratio, "≥" before a
+        # lower bound. A pair's size is its rows.
         methods = [m for m in by_release[release]["methods"] if m["method"] == name]
         rows = [
             r
@@ -579,7 +579,7 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
         pairs = methods[0].get("family") == "pairwise"
         unit = "rows" if pairs else "variables"
         size_of = (lambda r: r["n"]) if pairs else (lambda r: r.get("observed", r["d"]))
-        largest = max(size_of(r) for r in rows)
+        largest = build.PANEL_SIZES.get((release, name), max(size_of(r) for r in rows))
         assert size == f"{largest:,} {unit}"
         ratio, at_least = max(build.claimed_ratio(r) for r in rows if size_of(r) == largest)
         andrey = next(label for package, _, label in bars if package == "Andrey")
@@ -733,7 +733,7 @@ def test_every_speedup_bar_comes_from_andreys_paired_ratios():
 def test_every_timed_package_needs_a_published_ratio():
     """No silent fallback to a time quotient for a package without a paired ratio."""
     summaries = placeholder_summaries()
-    release, name = build.PANEL[2]
+    release, name = build.PANEL[0]
     summary = summaries[build.RELEASES.index(release)]
     method = next(m for m in summary["methods"] if m["method"] == name)
     row = max((r for r in method["rows"] if r["ratio"]), key=lambda r: r["d"])
