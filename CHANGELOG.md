@@ -16,9 +16,9 @@ change names its pull request.
   `andrey.describe()` has no `numba` field, and `numpy` or the default `auto` runs the same code as
   before. ([#178])
 - `camuv` and `andrey.irregular.camuv` are removed: on simulated nonlinear data with hidden common
-  causes, its graphs had more errors than the empty graph at every size measured. ([#TBD])
+  causes, its graphs had more errors than the empty graph at every size measured. ([#187])
 - `cdnod` takes the domain index as `domain_index`, and `andrey run cdnod` as `--domain-index`;
-  the names `c_indx` and `--c-indx` are gone. ([#TBD])
+  the names `c_indx` and `--c-indx` are gone. ([#187])
 
 ### Added
 
@@ -26,16 +26,16 @@ change names its pull request.
   set as before, in the order the search visits nodes, and `"order_free"` builds sets that do not
   depend on that order, at the cost of more tests on some graphs. ([#168])
 - `gies` learns from data that mixes observation with interventions: `interventions`
-  (`--interventions` in the CLI) marks the variables set by an intervention in each row. ([#TBD])
+  (`--interventions` in the CLI) marks the variables set by an intervention in each row. ([#187])
 - `cdnod` takes `dependence_threshold`, which runs CD-NOD's independent-change step (Huang et al.
   2020) to orient edges between variables that both change with the domain index; it is off by
-  default. ([#TBD])
+  default. ([#187])
 
 ### Changed
 
 - `pc` and `cdnod` orient conflicting colliders by the p-value that separated each collider's pair,
   highest first, so their colliders no longer depend on the column order and their default output
-  can change, and `collider_order="column"` keeps the column-order rule. ([#168], [#TBD])
+  can change, and `collider_order="column"` keeps the column-order rule. ([#168], [#187])
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
@@ -46,12 +46,12 @@ change names its pull request.
 - `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
   measure values calibrated before this change again with `andrey calibrate`. ([#169])
 - `gies` runs its own search in one process, adding, removing, and turning edges, so on
-  observational data its graph can differ from `ges`'s. ([#TBD])
+  observational data its graph can differ from `ges`'s. ([#187])
 - `gin` orders a latent only when its cluster passes the root test at `alpha`, and leaves the
   remaining latents unordered, listed in `metadata["unordered"]`, when no candidate passes.
-  ([#TBD])
+  ([#187])
 - The `calm` reference explains each step of the fit, how to run the paper's longer schedule, and
-  where the fit can stop at a local optimum. ([#TBD])
+  where the fit can stop at a local optimum. ([#187])
 
 ### Removed
 
@@ -76,15 +76,15 @@ change names its pull request.
   more variables, which fits its child exactly. ([#169])
 - `gfci` follows the published algorithm: independence tests remove edges from the GES graph
   before the orientation rules run, so its PAG drops the extra edges GES adds around a hidden
-  common cause. ([#TBD])
+  common cause. ([#187])
 - `gin` tests each candidate for the next latent against every other remaining cluster, so a
-  chain of three or more latents is no longer misordered. ([#TBD])
+  chain of three or more latents is no longer misordered. ([#187])
 - `gin` pools its independence tests without capping any one p-value, so a strongly dependent
-  group with many variables outside it is no longer accepted as a cluster. ([#TBD])
+  group with many variables outside it is no longer accepted as a cluster. ([#187])
 - `calm` raises `ValueError` when its loss stops being finite instead of returning NaN weights, and
-  leaves the global torch random number generator untouched. ([#TBD])
+  leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
-  dropping the edge. ([#TBD])
+  dropping the edge. ([#187])
 
 ## [0.6.0] - 2026-10-17
 
@@ -296,3 +296,4 @@ First alpha release.
 [#175]: https://github.com/Abel-ai-lab/andrey/pull/175
 [#178]: https://github.com/Abel-ai-lab/andrey/pull/178
 [#179]: https://github.com/Abel-ai-lab/andrey/pull/179
+[#187]: https://github.com/Abel-ai-lab/andrey/pull/187
