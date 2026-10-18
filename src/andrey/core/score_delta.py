@@ -53,9 +53,10 @@ _EPS = float(np.finfo(np.float64).eps)
 class _InvCache(OrderedDict):
     """LRU cache of ``inv(cov[S, S])`` that also tracks the total bytes of its stored matrices.
 
-    Used wherever the batched Schur surface amortizes inversions (:func:`score_many_with_base`,
-    :func:`delta_many_with_base`). An entry is ``(inverse, conditioning proxy)``, or the ``_ILL``
-    sentinel for a singular set; only the inverses count toward :attr:`nbytes`.
+    Used wherever batched score calculations reuse covariance inverses
+    (:func:`score_many_with_base`, :func:`delta_many_with_base`). An entry is
+    ``(inverse, conditioning proxy)``, or the ``_ILL`` sentinel for a singular set; only the
+    inverses count toward :attr:`nbytes`.
     """
 
     def __init__(self) -> None:

@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from andrey.data.sortability import causal_depth, index_correlation
 from andrey_bench import datasets, regime_models
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.window import ARROW, TAIL
@@ -159,3 +160,81 @@ def test_the_datasets_a_published_summary_names_are_unshuffled_keys() -> None:
                 assert DatasetKey(**coordinates).digest == entry["dataset"]
                 named += 1
     assert named
+
+
+#: Seeds of each column-order check.
+ORDER_SEEDS = range(100)
+
+
+def _order_edges(truth: np.ndarray, kind: str) -> np.ndarray:
+    """The ``(cause, effect)`` rows that fix a draw's causal order, in its node numbering.
+
+    The DAG, or a CPDAG's directed edges; for a time series, its same-step DAG, or, with lagged
+    links only, its links between different variables; for a coefficient stack, its instantaneous
+    matrix (a panel's at the last time point).
+    """
+    if kind in ("dag", "cpdag"):
+        return np.argwhere((truth == TAIL) & (truth.T == ARROW))
+    if kind == "temporal":  # [lag, cause, effect] marks, a tail at the cause
+        links = np.argwhere((truth == TAIL).any(axis=0))
+        return links[links[:, 0] != links[:, 1]]
+    if kind == datasets.WINDOW_KIND:
+        return np.argwhere((truth[0] == TAIL) & (truth[0].T == ARROW))
+    instantaneous = truth[0] if kind == "temporal_coefficients" else truth[-1][0]
+    effect, cause = np.nonzero(instantaneous)  # [effect, cause] coefficients
+    return np.stack([cause, effect], axis=1)
+
+
+def _correlation(regime: str, seed: int, by_depth: bool) -> tuple[float, int]:
+    """The draw's rank correlation of column index and causal depth, and its column count.
+
+    ``by_depth`` sorts the columns by causal depth first: an order that follows the graph. ``nan``
+    when the links form a cycle or every column has the same depth.
+    """
+    try:
+        x, truth, kind, _ = datasets.generate_one(_key(regime, seed=seed))
+    except ValueError as err:  # a seed with fewer nodes of two children than nodes to hide
+        assert "cannot hide" in str(err)
+        return float("nan"), 0
+    truth = np.asarray(truth)
+    d, k = truth.shape[-1], x.shape[-1]
+    edges = _order_edges(truth, kind)
+    try:
+        depth = causal_depth(edges, d)
+    except ValueError:  # lagged links in a cycle order no variable before another
+        return float("nan"), k
+    if by_depth:
+        column = np.arange(d)
+        column[:k] = np.argsort(np.argsort(depth[:k], kind="stable"), kind="stable")
+        edges = column[edges]
+    return index_correlation(edges, d, n_observed=k), k
+
+
+@pytest.mark.parametrize("regime", sorted(datasets.REGIMES))
+def test_a_regimes_column_order_says_nothing_of_the_causal_order(regime: str) -> None:
+    """Across seeds the mean rank correlation of column index and causal depth is near zero.
+
+    Under a uniform column order the correlation on ``k`` columns has mean 0 and variance
+    ``1 / (k - 1)``, so the mean over ``S`` draws stays within four standard deviations,
+    ``4 sqrt(sum 1 / (k - 1)) / S``. A draw whose links form a cycle has no causal order and is left
+    out, which depends on its graph only. The positive control is the same draws with their columns
+    sorted by causal depth.
+    """
+    drawn = [_correlation(regime, seed, by_depth=False) for seed in ORDER_SEEDS]
+    rho, k = np.array([pair for pair in drawn if np.isfinite(pair[0])]).T
+    bound = 4 * np.sqrt(np.sum(1 / (k - 1))) / len(k)
+    assert abs(rho.mean()) < bound
+    control = [_correlation(regime, seed, by_depth=True)[0] for seed in ORDER_SEEDS]
+    assert abs(np.nanmean(control)) > bound
+
+
+def test_the_varma_paper_model_needs_its_shuffle() -> None:
+    """VARMA-LiNGAM's paper model draws a lower-triangular instantaneous matrix, so its unshuffled
+    columns come in causal order: their mean correlation with causal depth is far outside the
+    bound."""
+    rhos = []
+    for seed in range(30):
+        key = _key("varma_lingam_paper", seed=seed, shuffle=False)
+        _, stack, kind, _ = datasets.generate_one(key)
+        rhos.append(index_correlation(_order_edges(np.asarray(stack), kind), key.d))
+    assert np.nanmean(rhos) > 4 / np.sqrt(30 * (key.d - 1))

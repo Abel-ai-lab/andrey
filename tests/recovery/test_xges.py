@@ -64,7 +64,8 @@ def test_independent_columns_give_no_edges(extended_search):
 def test_recovers_the_cpdag_of_gauss_7v(replicate, extended_search):
     """The collider 0 -> 2 <- 1 orients 2 -> 3 -> 4; nothing orients 5 -- 6."""
     weights = np.asarray(datagen.CASES["gauss_7v"]["weights"])
-    truth = to_cpdag(dag_from_adjacency(weights.T != 0))
+    order = datagen.column_order("gauss_7v", replicate=replicate)
+    truth = to_cpdag(dag_from_adjacency((weights.T != 0)[np.ix_(order, order)]))
     x = datagen.generate("gauss_7v", replicate=replicate)
     out = andrey.xges(x, extended_search=extended_search)
     assert shd(out.structure, truth) == 0

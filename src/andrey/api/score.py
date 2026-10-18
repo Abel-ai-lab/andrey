@@ -319,11 +319,12 @@ def gies(
 
     **How it works.** The search starts from the empty graph and repeats three phases: adding
     edges, removing edges, and turning one edge around, each while it improves the score, until a
-    round of removing and turning changes nothing. No variable's parent count is capped. Each step
-    moves to the best neighboring equivalence class, and the classes are those of the
-    interventional setting: two graphs are equivalent when they agree on the data from every
-    observed combination of intervened variables. Steps whose score changes are equal after
-    rounding are chosen by each column's rank, as in :func:`~andrey.hc`.
+    round of removing and turning changes nothing. No setting caps a variable's parent count. Each
+    step takes its phase's move that improves the score most, from one equivalence class to a
+    neighboring one; the classes are those of the interventional setting: two graphs are equivalent
+    when they agree on the data from every observed combination of intervened variables. Steps whose
+    score changes are equal after rounding are chosen by each column's rank, as in
+    :func:`~andrey.hc`.
 
     **Limitations.** Measured on simulated linear-Gaussian data that mixes observation with
     interventions, from sparse random graphs (mean degree 2), from 10 to 200 variables with ten
@@ -332,7 +333,10 @@ def gies(
     (181 against 198 at 200 variables, where one of the five fits had more). The median fit took
     0.25 s at 100 variables and 1.0 s at 200, on 4 cores. Each distinct set of rows without an
     intervention on a variable keeps its own covariance matrix of all the variables, so memory
-    grows with the number of intervened variables times the square of the variable count.
+    grows with the number of intervened variables times the square of the variable count. A parent
+    set of ``m - 1`` or more variables, where ``m`` counts the rows without an intervention on the
+    child, fits its child exactly, so the search never selects one, nor any parent set that leaves
+    its child a residual variance of at most ``1e-12`` times its variance.
 
     References
     ----------
@@ -835,9 +839,10 @@ def exact_search(
 
     Notes
     -----
-    **When to use it.** Exact search makes the assumptions of :func:`~andrey.ges`: continuous
-    data, no unmeasured common causes, and linear relations with Gaussian noise. It suits a few
-    variables, where it returns a graph with the lowest BIC rather than a greedy search's local
+    **When to use it.** With ``"local_score_BIC"``, exact search makes the assumptions of
+    :func:`~andrey.ges`: continuous data, no unmeasured common causes, and linear relations with
+    Gaussian noise; the categorical and mixed-data scores below make theirs. It suits a few
+    variables, where it returns a graph with the best score rather than a greedy search's local
     optimum.
 
     **Categorical data.** ``"local_score_BDeu"`` [5]_ and ``"local_score_BIC_categorical"`` [6]_
@@ -986,9 +991,8 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     until ``h`` of the noise-free gates ``sigmoid(logit / tau)`` is at most ``h_tol``, ``rho``
     reaches ``rho_max``, or ``max_outer`` rounds have run.
 
-    An edge is kept when its noise-free gate reaches ``gate_threshold`` and its weight magnitude
-    reaches ``w_threshold``. If the kept edges still form a cycle, edges are removed in order of
-    increasing weight magnitude until none does.
+    If the edges that ``gate_threshold`` and ``w_threshold`` keep still form a cycle, edges are
+    removed in order of increasing weight magnitude until none does.
 
     The defaults are a shorter schedule than the paper's [1]_, which starts ``rho`` at ``1e-5``,
     runs 40,000 steps per round at learning rate ``0.001``, and keeps every edge whose gate
@@ -1041,7 +1045,7 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
 
     X = data_matrix(data)
     labels = column_labels(data)
-    used_seed = resolve_seed(seed)  # CALM uses this seed for torch.
+    used_seed = resolve_seed(seed)
     with copies_named(labels):
         result = _calm(X, seed=used_seed, **params)
     return structure_output(

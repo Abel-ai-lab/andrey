@@ -25,8 +25,8 @@ def gin(
     """Learn a latent-variable DAG over observed indicators and their hidden latents with GIN.
 
     GIN exploits the Generalized Independent Noise condition in a linear non-Gaussian model to
-    group observed variables under shared latent parents and to order those latents [1]_. Reach
-    for it when the observed variables are noisy indicators of a few unobserved common causes
+    group observed variables under shared latent parents and to order those latents [1]_. It
+    applies when the observed variables are noisy indicators of a few unobserved common causes
     rather than direct causes of one another.
 
     Parameters
@@ -36,7 +36,7 @@ def gin(
     alpha : float, default=0.05
         Significance level of the pooled independence test, in ``(0, 1)``. A group of variables
         forms a cluster, and a latent is the next in the order, when the test's p-value is at
-        least ``alpha``, so larger values give fewer clusters and leave more latents unordered.
+        least ``alpha``, so larger values make each test harder to pass.
     labels : tuple of str or None, default=None
         Optional names for the observed variables, one per column. Defaults to a DataFrame's
         column names, else ``X1..Xn``. Latents are auto-named ``L1..Lm``.
@@ -64,33 +64,33 @@ def gin(
 
     Notes
     -----
-    A group of observed variables forms a cluster when the linear combination of the group that is
-    uncorrelated with every variable outside it is also independent of each of them; groups grow
-    from pairs upward, and clusters that share a variable merge. The latents are then ordered one
-    at a time, given the latents already ordered: the next latent is a root, whose cluster passes
-    the independence test at ``alpha`` paired with each other remaining cluster [1]_. When several
-    candidates pass, the one whose lowest p-value is highest is taken, so latents with no causal
-    path between them are still ordered, arbitrarily; equal p-values are decided by each column's
-    rank, as in :func:`~andrey.hc`, so reordering whole clusters does not change the choice. When
-    none passes, the ordering stops and the remaining latents stay unordered, as the method adds a
-    latent to the order only when the test passes. Each comparison rejects a true root with
+    A group of observed variables forms a cluster when the linear combination of the group with
+    the smallest covariance with the other variables not yet in a cluster is independent of each of
+    them; groups grow from pairs upward, and clusters that share a variable merge. The latents are
+    then ordered one at a time, given the latents already ordered: the next latent is a root, whose
+    cluster passes the independence test at ``alpha`` paired with each other remaining cluster [1]_.
+    When several candidates pass, the one whose lowest p-value is highest is taken, so latents with
+    no causal path between them are still ordered, arbitrarily; equal p-values are decided by each
+    column's rank, as in :func:`~andrey.hc`, so reordering whole clusters does not change the
+    choice. When none passes, the ordering stops and the remaining latents stay unordered. A single
+    remaining latent is ordered last without a test. Each comparison rejects a true root with
     probability about ``alpha``, the test's nominal size, so a correct model can still leave the
     latents from that step on unordered.
 
     **Limitations.** Measured on simulated linear measurement models with uniform noise and 1,000
     rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its
     own. With 2 and 3 latents its clusters matched the true ones (median adjusted Rand index 1);
-    with 4 latents (12 indicators) the median index was 0.89, and a median of one latent was
-    missed. The median fit took 3.5 s with 6 indicators, 15 s with 9, and 38 s with 12, on 4 cores.
-    Given the true clusters of a chain of three
-    latents and of a complete three-latent model, with 1,000 rows, the order stopped early on 1 of
-    10 seeds for each, and no latent was put after one it causes. It tests every group of observed
-    variables of each size, from pairs upward, so the number of tests grows combinatorially with the
-    variable count, and each HSIC test's time and memory grow with the square of the row count.
-    Clusters have at least two variables, so a latent with a single indicator is not found. Each
-    cluster gets one latent, so indicators that share two or more latents appear as one. It assumes
-    every observed variable measures a latent: variables that depend on no other variable pass the
-    cluster test trivially and are grouped into one cluster.
+    with 4 latents (12 indicators) the median index was 0.89, and a median of one latent was missed.
+    The median fit took 3.5 s with 6 indicators, 15 s with 9, and 38 s with 12, on 4 cores. Given
+    the true clusters of a chain of three latents and of a complete three-latent model, with 1,000
+    rows, the order stopped early on 1 of 10 seeds for each, and no latent was put after one it
+    causes. It tests every group of observed variables of each size, from pairs upward, so the
+    number of tests grows combinatorially with the variable count, and each HSIC test's time and
+    memory grow with the square of the row count. Clusters have at least two variables, so a latent
+    with a single indicator is not found. Each cluster gets one latent, so indicators that share two
+    or more latents appear as one. It assumes every observed variable measures a latent: variables
+    that depend on no other variable pass the cluster test trivially and are grouped into one
+    cluster.
 
     References
     ----------

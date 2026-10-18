@@ -20,6 +20,9 @@ def _force_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
 # host's SIMD kernels rather than on the method.
 _PNL_CUBIC_PVALUES = (0.22597081473440506, 0.01989273405111902)
 _ANM_CUBIC_PVALUES = (0.07269113995001186, 0.0)
+# The columns of ``anm_pair_cubic``'s cause and effect.
+_CAUSE, _EFFECT = (int(column) for column in datagen.column_of("anm_pair_cubic"))
+_PLANTED = [(_CAUSE, _EFFECT, "directed")]
 
 
 def _pnl_pair(rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
@@ -56,7 +59,7 @@ def _pnl_pair(rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
 
 def test_pnl_resolves_the_planted_direction():
     x = datagen.generate("anm_pair_cubic")
-    pval_forward, pval_backward, *_ = pnl(x[:, 0], x[:, 1])
+    pval_forward, pval_backward, *_ = pnl(x[:, _CAUSE], x[:, _EFFECT])
     assert pval_forward > pval_backward  # anm_pair_cubic plants x -> y
     assert np.allclose((pval_forward, pval_backward), _PNL_CUBIC_PVALUES, atol=1e-6)
 
@@ -124,13 +127,14 @@ def _pairs() -> dict[str, np.ndarray]:
     return {"planted": planted, "unrelated": unrelated, "gaussian": gaussian}
 
 
-# The measured p-values are (0.226, 0.020), (0.594, 0.298), and (0.881, 0.922): the comparison
-# rule always draws an edge; the threshold rule draws one only for the planted pair.
+# The measured p-values, the planted pair's from cause to effect first, are (0.226, 0.020), (0.594,
+# 0.298), and (0.881, 0.922): the comparison rule always draws an edge; the threshold rule draws one
+# only for the planted pair.
 @pytest.mark.parametrize(
     ("pair", "alpha", "edges"),
     [
-        ("planted", None, [(0, 1, "directed")]),
-        ("planted", 0.05, [(0, 1, "directed")]),
+        ("planted", None, _PLANTED),
+        ("planted", 0.05, _PLANTED),
         ("unrelated", None, [(0, 1, "directed")]),
         ("unrelated", 0.05, []),
         ("gaussian", None, [(1, 0, "directed")]),
@@ -148,7 +152,8 @@ def test_pnl_names_the_direction_whatever_the_column_order():
 
     from andrey.api.irregular import pnl as pnl_facade
 
-    df = pd.DataFrame(datagen.generate("anm_pair_cubic"), columns=["cause", "effect"])
+    names = [("cause", "effect")[v] for v in datagen.column_order("anm_pair_cubic")]
+    df = pd.DataFrame(datagen.generate("anm_pair_cubic"), columns=names)
     for columns in (["cause", "effect"], ["effect", "cause"]):
         edges = pnl_facade(df[columns]).structure.oriented_edges()
         assert edges == [("cause", "effect", "directed")]
@@ -158,7 +163,7 @@ def test_anm_resolves_the_planted_direction():
     from andrey.api._irregular import _adapt_anm
 
     x = datagen.generate("anm_pair_cubic")
-    pval_forward, pval_backward, stat_forward, stat_backward = anm(x[:, 0], x[:, 1])
+    pval_forward, pval_backward, stat_forward, stat_backward = anm(x[:, _CAUSE], x[:, _EFFECT])
     assert pval_forward > pval_backward
     # Loosely pinned as well: the direction alone would survive a numerical regression in the GP
     # residual path that still left the forward p-value above zero.
@@ -184,7 +189,7 @@ def test_anm_hyperparameter_objective_is_scikit_learns():
     from andrey.irregular.anm import _kernel, _negative_log_marginal_likelihood
 
     x = datagen.generate("anm_pair_cubic")
-    cause, effect = np.ascontiguousarray(x[:, :1]), np.ascontiguousarray(x[:, 1:])
+    cause, effect = np.ascontiguousarray(x[:, [_CAUSE]]), np.ascontiguousarray(x[:, [_EFFECT]])
     gp = GaussianProcessRegressor(kernel=_kernel(), optimizer=None).fit(cause, effect)
     # The start, an interior point, and the signal variance at its floor (y unrelated to x).
     for theta in (gp.kernel_.theta, np.log([2.0, 0.3, 0.05]), np.log([1e-3, 1.0, 1.0])):
@@ -221,25 +226,27 @@ def test_anm_names_the_planted_direction_in_any_units_and_column_order():
 
     planted = datagen.generate("anm_pair_cubic")
     first = anm_facade(planted)
-    assert first.structure.oriented_edges() == [(0, 1, "directed")]
+    assert first.structure.oriented_edges() == _PLANTED
     keys = {"pval_forward", "pval_backward", "stat_forward", "stat_backward"}
     assert set(first.metadata) == {"algorithm", *keys}
     pvalues = (first.metadata["pval_forward"], first.metadata["pval_backward"])
     for scale in (100.0, 0.01, 1e-200):  # 1e-200: squared deviations would underflow
         out = anm_facade(planted * np.array([scale, 1 / scale]))
         assert np.allclose((out.metadata["pval_forward"], out.metadata["pval_backward"]), pvalues)
-    df = pd.DataFrame(planted, columns=["cause", "effect"])
+    names = [("cause", "effect")[v] for v in datagen.column_order("anm_pair_cubic")]
+    df = pd.DataFrame(planted, columns=names)
     for columns in (["cause", "effect"], ["effect", "cause"]):
         edges = anm_facade(df[columns]).structure.oriented_edges()
         assert edges == [("cause", "effect", "directed")]
 
 
-# The measured p-values are (0.057, 0.0), (0.818, 0.478), and (0.795, 0.785): the comparison rule
-# draws an edge between unrelated variables; the threshold rule draws one only for the planted pair.
+# The measured p-values, the planted pair's from cause to effect first, are (0.057, 0.0), (0.818,
+# 0.478), and (0.795, 0.785): the comparison rule draws an edge between unrelated variables; the
+# threshold rule draws one only for the planted pair.
 @pytest.mark.parametrize(
     ("pair", "alpha", "edges"),
     [
-        ("planted", 0.02, [(0, 1, "directed")]),
+        ("planted", 0.02, _PLANTED),
         ("unrelated", None, [(0, 1, "directed")]),
         ("unrelated", 0.05, []),
         ("gaussian", 0.05, []),

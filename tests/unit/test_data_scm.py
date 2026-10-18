@@ -8,6 +8,7 @@ statistical thresholds here.
 
 from __future__ import annotations
 
+import dataclasses
 import tracemalloc
 
 import networkx as nx
@@ -16,6 +17,7 @@ import pytest
 
 import andrey.data as data
 from andrey.core.structure import GraphStructure
+from andrey.data.sortability import causal_depth, index_correlation
 
 
 def _scm(d=12, density=2.0, heteroscedastic=False):
@@ -262,3 +264,95 @@ def test_the_column_order_comes_from_its_own_stream_of_the_seed():
     assert data.sample_scm(d=20, n=10, seed=5).provenance["column_order"] != order
     discrete = data.sample_discrete(d=20, n=10, seed=4).provenance["column_order"]
     assert data.sample_discrete(d=20, n=10, seed=4).provenance["column_order"] == discrete
+
+
+# --- the column order says nothing of the causal order ----------------------------------------
+
+#: Seeds of each column-order check.
+_ORDER_SEEDS = range(200)
+#: A fixed DAG listed in causal order, so its drawn order follows the graph.
+_LISTED = data.graphs.FixedDAG(
+    nodes=tuple("abcdefghij"),
+    arcs=(
+        ("a", "c"),
+        ("b", "c"),
+        ("c", "d"),
+        ("c", "e"),
+        ("d", "f"),
+        ("e", "f"),
+        ("f", "g"),
+        ("b", "h"),
+        ("h", "i"),
+        ("g", "j"),
+    ),
+)
+
+
+def _listed(*, seed: int, shuffle: bool, **_) -> data.CausalDataset:
+    scm = data.SCM(graph=_LISTED, functional=data.functional.linear(), noise=data.noise.gaussian())
+    return scm.sample(n=5, seed=seed, shuffle=shuffle)
+
+
+#: Each generator, its arguments beyond the size, seed, and shuffle, and whether its drawn order
+#: follows the graph without the shuffle: a fixed DAG keeps the order it is listed in, and a
+#: scale-free graph puts its hubs first. An Erdos-Renyi, small-world, or hub draw already numbers
+#: its nodes in a random order.
+_GENERATORS = {
+    "fixed": (_listed, {}, True),
+    "scale_free": (data.sample_scm, {"graph": "scale_free"}, True),
+    "erdos_renyi": (data.sample_scm, {}, False),
+    "small_world": (data.sample_scm, {"graph": "small_world"}, False),
+    "hub": (data.sample_scm, {"graph": "hub"}, False),
+    "latents": (data.sample_scm, {"density": 3.0, "latents": 2}, False),
+    "var": (data.sample_scm, {"functional": "var"}, False),
+    "discrete": (data.sample_discrete, {"graph": "scale_free"}, True),
+    "mixed": (data.sample_mixed, {"graph": "scale_free"}, True),
+}
+
+
+def _draw(generator: str, seed: int, shuffle: bool) -> data.CausalDataset:
+    sample, kwargs, _ = _GENERATORS[generator]
+    return sample(**{"d": 20, "n": 5, "density": 2.0, **kwargs}, seed=seed, shuffle=shuffle)
+
+
+def _order_check(datasets) -> tuple[float, float]:
+    """Return the mean rank correlation of column index and causal depth, and its bound.
+
+    Under a uniform column order the correlation of a dataset with ``k`` columns has mean 0 and
+    variance ``1 / (k - 1)``, so the mean over ``S`` datasets has standard deviation
+    ``sqrt(sum 1 / (k - 1)) / S``; the bound is four of those.
+    """
+    pairs = [
+        (index_correlation(ds.params.edges, ds.graph.n_nodes, n_observed=ds.data.shape[1]), k)
+        for ds in datasets
+        for k in [ds.data.shape[1]]
+    ]
+    rho, k = np.array([p for p in pairs if np.isfinite(p[0])]).T
+    return float(rho.mean()), 4 * float(np.sqrt(np.sum(1 / (k - 1)))) / len(k)
+
+
+def _by_depth(ds: data.CausalDataset) -> data.CausalDataset:
+    """The dataset with its truth's columns sorted by causal depth: an order following the graph."""
+    edges, d = ds.params.edges, ds.graph.n_nodes
+    k = ds.data.shape[1]
+    column = np.arange(d)
+    column[:k] = np.argsort(np.argsort(causal_depth(edges, d)[:k], kind="stable"), kind="stable")
+    params = dataclasses.replace(ds.params, edges=column[edges])
+    return dataclasses.replace(ds, params=params)
+
+
+@pytest.mark.parametrize("generator", list(_GENERATORS))
+def test_the_column_order_says_nothing_of_the_causal_order(generator):
+    """Across seeds the mean correlation of column index and causal depth is within its bound.
+
+    The positive control fails it: the unshuffled order where the drawn order follows the graph,
+    and otherwise the same draws with their columns sorted by causal depth.
+    """
+    shuffled = [_draw(generator, s, True) for s in _ORDER_SEEDS]
+    mean, bound = _order_check(shuffled)
+    assert abs(mean) < bound
+    if _GENERATORS[generator][2]:
+        control, _ = _order_check([_draw(generator, s, False) for s in _ORDER_SEEDS])
+    else:
+        control, _ = _order_check([_by_depth(ds) for ds in shuffled])
+    assert abs(control) > bound

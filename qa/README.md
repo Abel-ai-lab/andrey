@@ -71,8 +71,8 @@ method needs:
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
 - **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
-  each variable, and a CALM fit takes tens of seconds; they run on `linear_gauss_er` at `d = 10`
-  and `15`, and CALM on the smaller one only.
+  each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
+  they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.
 - **Interventions, domains, groups, and indicators.** The published regimes of GIES, CD-NOD,
   MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and
   GIES's benchmark driver): `interventional_gauss_er` at `n = 50d`, with intervention targets on
@@ -81,9 +81,9 @@ method needs:
   `multi_group_er`, three groups of 1,000 rows over one graph with weights drawn for each group;
   and `latent_measurement`, latents that each cause every later one, with three indicators each,
   where `d` counts the latents and the indicators. CD-NOD and MultiGroupDirectLiNGAM run through
-  their benchmark adapters, which build the domain index and split the groups. GIN's fit at the
-  published 16 nodes takes about 40 s, so it runs at the two smaller sizes. A test keeps the
-  domain, group, and measurement draws in step with the harness.
+  their benchmark adapters, which build the domain index and split the groups. GIN's number of
+  tests grows combinatorially with the indicator count, so it runs at the two smaller sizes. A test
+  keeps the domain, group, and measurement draws in step with the harness.
 - **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
   edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
   with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when

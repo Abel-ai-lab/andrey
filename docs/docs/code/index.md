@@ -204,13 +204,15 @@ name.
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
 
 A published network's data come from a linear-Gaussian model on its graph, standardized, or, with
-`discrete=True`, from its own conditional probability tables, each column a pandas `category` of
-the network's category names; `n` (default 1000) and `seed` (default 0) set the rows. The first load
-downloads the file, checks its SHA-256, and caches it; later loads need no network. The
-cache directory is the `data_home` argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey`
-(`~/.cache/andrey` when `XDG_CACHE_HOME` is unset). Without network access, the error names the
-path to put the file at. [Getting started](../guides/getting-started.md) learns and scores the
-Sachs data end to end.
+`discrete=True`, from its own conditional probability tables, each column a pandas `category` of the
+network's category names; `n` (default 1000) and `seed` (default 0) set the rows. The columns come
+in an order drawn from the seed, since a network file often lists its variables in causal order, and
+`feature_names` and the graph's labels follow it; `shuffle=False` keeps the file's order. Sachs
+keeps its file's order, which does not follow its network. The first load downloads the file, checks
+its SHA-256, and caches it; later loads need no network. The cache directory is the `data_home`
+argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andrey` when
+`XDG_CACHE_HOME` is unset). Without network access, the error names the path to put the file at.
+[Getting started](../guides/getting-started.md) learns and scores the Sachs data end to end.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
