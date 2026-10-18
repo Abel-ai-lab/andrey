@@ -1,12 +1,16 @@
-"""Check grow-shrink branch priority and BOSS's tolerance for score ties.
+"""Check grow-shrink branch priority, BOSS's tolerance for score ties, and column-order invariance.
 
 ``_GSTNode.trace`` takes the first branch allowed by the prefix. Branch order therefore determines
 the search path. BOSS's grow and shrink steps break score ties by variable index; its order move
 takes the leftmost tied position. Each step requires an improvement larger than ``_SCORE_EPS``.
+BOSS and GRaSP search the columns sorted by tie rank, so a variable's index, the seeded starting
+order, and the visiting order follow the columns' data, and reordering the columns relabels the
+graph.
 """
 
 from __future__ import annotations
 
+from functools import partial
 from types import SimpleNamespace
 
 import numpy as np
@@ -14,8 +18,11 @@ import pytest
 
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
+from andrey.data import sample_mixed
 from andrey.search import boss as boss_mod
 from andrey.search import grasp as grasp_mod
+from andrey.search.boss import boss, ranked_score
+from andrey.search.grasp import grasp
 
 D_NODES, N_SAMPLES = 12, 400
 
@@ -121,3 +128,88 @@ def test_grasp_grows_best_scoring_branch_first() -> None:
     # Require two branches so `_descending` cannot pass vacuously.
     assert len(node.branches) >= 2, "fixture yields too few improving additions to order"
     assert _descending([b.grow_score for b in node.branches])
+
+
+def _linear(seed: int, n: int = 400, d: int = 10) -> np.ndarray:
+    """Linear-Gaussian data on a random DAG whose topological order is the column order."""
+    rng = np.random.default_rng(seed)
+    b = np.tril(rng.uniform(0.4, 1.2, (d, d)) * (rng.random((d, d)) < 0.3), -1)
+    x = np.zeros((n, d))
+    for j in range(d):
+        x[:, j] = rng.standard_normal(n) + x @ b[j]
+    return x
+
+
+def _mixed() -> tuple[np.ndarray, dict]:
+    """A conditional linear Gaussian network of 6 columns, with its degenerate Gaussian score."""
+    ds = sample_mixed(d=6, n=1000, seed=2)
+    mask = np.zeros(6, dtype=bool)
+    mask[ds.provenance["config"]["categorical"]] = True
+    return ds.data, {"score_func": "local_score_degen_gauss", "categorical": mask}
+
+
+_ORDER_CASES = {
+    **{f"linear-{seed}": lambda seed=seed: (_linear(seed), {}) for seed in (1, 2, 5)},
+    "mixed": _mixed,
+}
+
+
+def _graph(search, x: np.ndarray, order: np.ndarray, **kwargs) -> np.ndarray:
+    """The CPDAG ``search`` finds on the columns of ``x`` in ``order``, mapped back."""
+    back = np.argsort(order)
+    if "categorical" in kwargs:
+        kwargs = {**kwargs, "categorical": kwargs["categorical"][order]}
+    return search(x[:, order], **kwargs)[0].to_numpy()[np.ix_(back, back)]
+
+
+_SEARCHES = {
+    "boss": boss,
+    **{f"grasp-depth{depth}": partial(grasp, depth=depth) for depth in (1, 2, 3)},
+}
+
+
+@pytest.mark.parametrize("search", list(_SEARCHES))
+@pytest.mark.parametrize("case", list(_ORDER_CASES))
+def test_reordering_the_columns_relabels_the_graph(search, case, monkeypatch) -> None:
+    """Every column order gives the graph of the stored order, mapped back.
+
+    Ranking the columns by position instead changes the graph under at least one of the orders, so
+    the orders reach choices that go by variable index.
+    """
+    search = _SEARCHES[search]
+    x, kwargs = _ORDER_CASES[case]()
+    d = x.shape[1]
+    rng = np.random.default_rng(0)
+    orders = [np.arange(d)[::-1], *(rng.permutation(d) for _ in range(3))]
+    want = _graph(search, x, np.arange(d), **kwargs)
+    for order in orders:
+        np.testing.assert_array_equal(_graph(search, x, order, **kwargs), want)
+
+    monkeypatch.setattr(boss_mod, "tie_ranks", lambda x, categorical=None: np.arange(x.shape[1]))
+    by_position = _graph(search, x, np.arange(d), **kwargs)
+    assert any((_graph(search, x, o, **kwargs) != by_position).any() for o in orders)
+
+
+@pytest.mark.parametrize("case", list(_ORDER_CASES))
+def test_ranks_move_with_the_columns_and_the_score_is_the_same(case) -> None:
+    """A reordering moves each column's rank with it and leaves the sorted score bit for bit."""
+    x, kwargs = _ORDER_CASES[case]()
+    score_func = kwargs.get("score_func", "local_score_BIC_from_cov")
+    mask = kwargs.get("categorical")
+    d = x.shape[1]
+    order = np.random.default_rng(1).permutation(d)
+    score, ranks = ranked_score(x, score_func, 1.0, mask)
+    moved, moved_ranks = ranked_score(
+        np.asfortranarray(x[:, order]), score_func, 1.0, None if mask is None else mask[order]
+    )
+    np.testing.assert_array_equal(moved_ranks, ranks[order])
+    sets = [(v, [u for u in range(d) if u != v][: k + 1]) for v in range(d) for k in range(3)]
+    assert [moved.score(v, pa) for v, pa in sets] == [score.score(v, pa) for v, pa in sets]
+
+
+@pytest.mark.parametrize("search", [boss, grasp])
+def test_the_seed_still_matters(search) -> None:
+    """Different seeds shuffle the sorted columns differently and can reach different graphs."""
+    x = _linear(1)
+    graphs = {search(x, random_state=seed)[0].to_numpy().tobytes() for seed in range(4)}
+    assert len(graphs) > 1
