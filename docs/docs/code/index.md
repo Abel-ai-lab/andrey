@@ -26,8 +26,10 @@ whole numbers in a column of numbers, each distinct value of a column one catego
 settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
 `"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
 [Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
-needs whole numbers. Other data raises a `ValueError` that names the argument and, for a bad cell,
-its row and column. A single column gives a one-node graph.
+needs whole numbers. Methods that score with BIC also reject a column that repeats another up to
+scale and shift or, given more rows than columns, is a linear function of other columns. Other data
+raises a `ValueError` that names the argument and, for a bad cell, its row and column. A single
+column gives a one-node graph.
 
 `pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
 `"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`

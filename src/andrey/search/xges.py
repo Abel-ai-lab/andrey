@@ -805,15 +805,12 @@ class _Search:
         by the sum of :func:`_extension_scores`, a function of the graph, so every kept branch
         lowers it and no graph is kept twice. A branch rescores only the chain components of the
         nodes whose parents or neighbors it changed; the other nodes keep their extension parents.
-        No branch scores below a total of nan or -inf, so then none is tried.
         """
         tolerance = _ACCEPT_PER_SAMPLE * n_samples
         score = self.add_deltas.score
         scores = _extension_scores(self.g.pa, self.g.ne, range(self.d), score)
         local = [scores[v] for v in range(self.d)]
         total = sum(local)
-        if np.isnan(total) or total == -np.inf:
-            return total
         pending: list[tuple] = []
         fresh = False
         while pending or not fresh:
@@ -989,8 +986,6 @@ def _rescan_search(score: BICScore, d: int, extended: bool) -> np.ndarray:
         return adj
     tolerance = _ACCEPT_PER_SAMPLE * score.n
     total = _marks_total(adj, score)
-    if np.isnan(total) or total == -np.inf:
-        return adj
     forbidden: set[tuple[int, int]] = set()
     pending: list[tuple] = []
     fresh = False

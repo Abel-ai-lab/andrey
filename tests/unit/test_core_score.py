@@ -198,3 +198,107 @@ def test_baseline_values(data, cov):
         assert local_score_bic(cov, n, node, list(pa), lambda_value=1.0) == pytest.approx(
             expected, abs=1e-12
         )
+
+
+# ---- unavailable families and rejected columns -----------------------------------------------
+
+# Covariances where node 0 is an exact linear function of its parents, one per parent-set branch.
+_DETERMINISTIC = {
+    "no parents": (np.zeros((1, 1)), []),
+    "one parent": (np.array([[1.0, 1.0], [1.0, 1.0]]), [1]),
+    "two parents": (np.array([[2.0, 1.0, 1.0], [1.0, 1.0, 0.0], [1.0, 0.0, 1.0]]), [1, 2]),
+    "three parents": (
+        np.array(
+            [[3.0, 1.0, 1.0, 1.0], [1.0, 1.0, 0.0, 0.0], [1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 1.0]]
+        ),
+        [1, 2, 3],
+    ),
+    "negative residual": (np.array([[0.5, 1.0], [1.0, 1.0]]), [1]),
+}
+
+
+@pytest.mark.parametrize("case", list(_DETERMINISTIC))
+def test_a_residual_of_zero_or_below_scores_inf(case):
+    cov, pa = _DETERMINISTIC[case]
+    assert local_score_bic(cov, 60, 0, pa) == np.inf
+
+
+def test_a_residual_at_rounding_level_scores_inf():
+    cov = np.array([[1.0, 1.0], [1.0, 1.0 + 1e-14]])  # R(0 | 1) is about 1e-14 of var(0)
+    assert local_score_bic(cov, 60, 0, [1]) == np.inf
+    assert np.isfinite(local_score_bic(cov, 60, 0, []))
+
+
+def test_parent_sets_past_n_minus_2_score_inf():
+    x = np.random.default_rng(0).standard_normal((6, 10))
+    score = BICScore(x)
+    assert np.isfinite(score.score(0, [1, 2, 3, 4]))
+    assert score.score(0, [1, 2, 3, 4, 5]) == np.inf
+    assert score.score(0, list(range(1, 10))) == np.inf
+
+
+def _columns(n, d, seed=0):
+    return np.random.default_rng(seed).standard_normal((n, d))
+
+
+def test_check_columns_rejects_a_constant_column():
+    x = _columns(50, 4)
+    x[:, 2] = 3.0
+    with pytest.raises(ValueError, match="column 2 is constant"):
+        BICScore(x)
+
+
+@pytest.mark.parametrize("n", [5, 60, 5000])
+def test_check_columns_rejects_a_scaled_and_shifted_copy(n):
+    x = _columns(n, 8)
+    x[:, 6] = 2.5 * x[:, 1] - 4.0
+    with pytest.raises(ValueError, match="column 6 is a linear function of column 1"):
+        BICScore(x)
+
+
+@pytest.mark.parametrize(("n", "d"), [(200, 10), (1000, 50), (5000, 200)])
+def test_check_columns_rejects_a_linear_function_of_other_columns(n, d):
+    x = _columns(n, d)
+    x[:, 5] = x[:, 2] + x[:, 3]
+    with pytest.raises(ValueError, match=r"columns \[2, 3, 5\] are linearly dependent"):
+        BICScore(x)
+
+
+def test_check_columns_rejects_a_one_hot_block():
+    rng = np.random.default_rng(6)
+    x = np.column_stack([rng.standard_normal((300, 4)), np.eye(3)[rng.integers(0, 3, 300)]])
+    with pytest.raises(ValueError, match=r"columns \[4, 5, 6\] are linearly dependent"):
+        BICScore(x)
+
+
+def _near_sum(relative_residual):
+    """Data whose column 5 is ``x2 + x3`` plus noise, with the given residual variance fraction."""
+    x = _columns(500, 10)
+    others = np.column_stack([np.ones(500), np.delete(x, 5, axis=1)])
+    target = x[:, 2] + x[:, 3]
+    noise = x[:, 5] - others @ np.linalg.lstsq(others, x[:, 5], rcond=None)[0]
+    scale = np.sqrt(relative_residual / (1.0 - relative_residual) * target.var() / noise.var())
+    x[:, 5] = target + scale * noise
+    return x
+
+
+@pytest.mark.parametrize("relative_residual", [3e-12, 1e-11])
+def test_check_columns_accepts_a_residual_above_the_threshold(relative_residual):
+    BICScore(_near_sum(relative_residual))
+
+
+@pytest.mark.parametrize("relative_residual", [3e-13, 0.0])
+def test_check_columns_rejects_a_residual_at_most_the_threshold(relative_residual):
+    with pytest.raises(ValueError, match=r"columns \[2, 3, 5\] are linearly dependent"):
+        BICScore(_near_sum(relative_residual))
+
+
+@pytest.mark.parametrize(("n", "d"), [(101, 100), (20, 30), (2, 3)])
+def test_check_columns_accepts_independent_columns(n, d):
+    BICScore(_columns(n, d))
+
+
+def test_check_columns_accepts_strongly_correlated_columns():
+    x = _columns(1000, 3)
+    x[:, 2] = x[:, 0] + x[:, 1] + 1e-5 * x[:, 2]
+    BICScore(x)

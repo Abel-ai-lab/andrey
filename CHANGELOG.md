@@ -25,6 +25,9 @@ change names its pull request.
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
 - Hill climbing and tabu search break exact score ties by a hash of each column's values, so
   reordering the columns no longer changes the graph they find. ([#168])
+- `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#169])
+- `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
+  measure values calibrated before this change again with `andrey calibrate`. ([#169])
 
 ### Fixed
 
@@ -34,6 +37,15 @@ change names its pull request.
   checks both endpoint orders, and the possible-d-separation step tests every conditioning subset,
   so they remove false edges and orient endpoints they used to miss;
   `andrey.data.latent.marginal(..., "pag")` follows the same rules. ([#168])
+- `ges`, `gies`, `gfci`, `xges`, `hc`, `tabu`, `boss`, and `grasp` return the same graph however
+  small the data's scale, where squared covariances used to underflow and change the result.
+  ([#169])
+- These searches and `exact_search` raise a `ValueError` naming the columns when a column repeats
+  another up to scale and shift given more than two rows or, with more rows than columns, is a
+  linear function of other columns, instead of returning a graph from scores of a zero residual
+  variance, which were infinite or finite but meaningless. ([#169])
+- With no more rows than columns, these searches no longer pick a parent set of `n_samples - 1` or
+  more variables, which fits its child exactly. ([#169])
 
 ## [0.6.0] - 2026-10-17
 
@@ -241,3 +253,4 @@ First alpha release.
 [#94]: https://github.com/Abel-ai-lab/andrey/pull/94
 [#167]: https://github.com/Abel-ai-lab/andrey/pull/167
 [#168]: https://github.com/Abel-ai-lab/andrey/pull/168
+[#169]: https://github.com/Abel-ai-lab/andrey/pull/169

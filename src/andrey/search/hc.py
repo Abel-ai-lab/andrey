@@ -89,8 +89,10 @@ class MoveScanner:
     ``v`` reaches ``u``; ``low[v]`` is the row minimum. Reverses use the edge list and sum an add of
     ``v`` at target ``u`` with a remove of ``u`` at target ``v``. A covered edge ``u -> v``
     (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, the
-    categorical scores, and the mixed-data scores, all score-equivalent. Its delta is set to zero to
-    prevent rounding noise exceeding ``_EPS_IMPROVE`` from creating a false improvement.
+    categorical scores, and the mixed-data scores, all score-equivalent. Its finite delta is set to
+    zero to prevent rounding noise exceeding ``_EPS_IMPROVE`` from creating a false improvement. A
+    BIC delta is ``inf`` when the move enters an unavailable family
+    (:func:`~andrey.core.score.local_score_bic`), so no move does.
 
     ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
     legal. ``None`` forbids none. ``ranks[u]`` is column ``u``'s place in the tie-break order,
@@ -155,7 +157,7 @@ class MoveScanner:
         tails, heads = self._tails, self._heads
         with np.errstate(invalid="ignore"):  # a degenerate row's deltas may be infinite
             rev = self._add[tails, heads] + self._rem[heads, tails]
-        rev[self._set_of[heads] == self._set_with[tails]] = 0.0
+        rev[(self._set_of[heads] == self._set_with[tails]) & np.isfinite(rev)] = 0.0
         rev[np.isnan(rev) | self._cyclic | self._forbidden[tails, heads]] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:

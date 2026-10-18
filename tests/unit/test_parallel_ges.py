@@ -307,13 +307,16 @@ def test_ges_result_independent_of_ambient_blas_threads():
 
 
 def test_parity_on_degenerate_covariance():
-    """Serial and pooled GES agree on near-collinear data.
+    """Serial and pooled GES agree on near-duplicate columns the column check accepts.
 
-    Non-improving and NaN deltas must not change the pooled move selection.
+    GES never scores a parent set that holds both columns of a near-duplicate pair here, so every
+    delta stays on the fast path; the test covers the near-collinear scores, not the fallback to
+    full scores.
     """
     rng = np.random.default_rng(3)
     base = rng.standard_normal((400, 6))
-    x = np.hstack([base, base[:, :2] + 1e-9 * rng.standard_normal((400, 2))])  # near-duplicate cols
+    # Near-duplicate columns, kept just far enough apart for the column check to accept them.
+    x = np.hstack([base, base[:, :2] + 1e-5 * rng.standard_normal((400, 2))])
     serial_struct, serial_score = ges(x)
     par_struct, par_score = _parallel(x, 3)
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())
@@ -362,7 +365,8 @@ def test_no_pool_below_work_gate(monkeypatch):
 
 def test_parity_mixed_gate(monkeypatch):
     """A GES run that crosses the work threshold matches serial output."""
-    monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "1000")  # between pass-1 and dense-pass work
+    # Below the work of the first and the busiest forward passes, above that of most others.
+    monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "200")
     created: list[int] = []
     real = pg._create_pool
     monkeypatch.setattr(pg, "_create_pool", lambda *a, **k: (created.append(1), real(*a, **k))[1])
@@ -426,6 +430,26 @@ def test_balanced_chunks_reduce_skew():
         return max(sum(work[y] for y in c) for c in chunks)
 
     assert heaviest(pg.balanced_chunks(work, 4)) < heaviest(pg.even_chunks(n, 4))
+
+
+def test_forward_scan_rescores_group_with_mixed_bounds():
+    """A group whose passing sources mix a zero bound with a positive one is scored again.
+
+    Target 0 has an empty base with sources 1, 2, and 3. A semi-directed path reaches 3, so 1 and 2
+    pass. Source 1's bound is 0 (its delta does not depend on the batch) and source 2's is positive,
+    so the group's screening deltas are not exact and the passing sources are scored on their own.
+    """
+    x = _gaussian_sem(0, 200, 4, 0.5)
+    engine = DeltaBICScore(BICScore(x, lambda_value=1.0))
+    scan = pg._ForwardScan([0], engine, 4, None)
+    screening = {1: 1.0, 2: 2.0, 3: 3.0}  # not deltas, so a returned screening value shows
+    scan.groups[0] = {(): (0, 0b1110, frozenset({1, 2, 3}), screening, {1: 0.0, 2: 0.5, 3: 0.5})}
+    scan.exact[0] = {}
+    scan.reach[(0, 0)] = 0b1001  # y = 0 reaches source 3
+    deltas, passing = scan._exact(0, ())
+    assert passing == 0b0110
+    expected = engine.delta_many_with_base(0, (), [("add", 1), ("add", 2)])
+    assert [deltas[1], deltas[2]] == expected
 
 
 def test_pool_created_once_spans_passes(monkeypatch):

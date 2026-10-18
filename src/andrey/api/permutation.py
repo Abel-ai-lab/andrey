@@ -93,7 +93,9 @@ def boss(
         an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
-        suit the score, as for :func:`~andrey.ges`.
+        suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
+        another up to scale and shift given more than two rows or, with more rows than columns, is a
+        linear function of other columns.
 
     Warns
     -----
@@ -146,8 +148,11 @@ def boss(
     median errors (SHD) stayed below the empty graph's at every size, 24 against 800 at 800
     variables. The median fit took 0.031 s at 20 variables and 292 s at 800, on 16 cores. On the
     223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``, its median errors
-    passed the empty graph's (506 against 338). The mixed-data scores are experimental and not
-    benchmarked yet; their tests run BOSS on 5 variables with 3,000 rows.
+    passed the empty graph's (506 against 338). With fewer rows than columns the BIC score is
+    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
+    search never selects one, nor any parent set that leaves its child a residual variance of at
+    most ``1e-12`` times its variance. The mixed-data scores are experimental and not benchmarked
+    yet; their tests run BOSS on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -260,7 +265,9 @@ def grasp(
         an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
-        suit the score, as for :func:`~andrey.ges`.
+        suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
+        another up to scale and shift given more than two rows or, with more rows than columns, is a
+        linear function of other columns.
 
     Warns
     -----
@@ -317,9 +324,12 @@ def grasp(
     median errors (SHD) stayed below the empty graph's at every size, 0 against 400 at 400
     variables. The median fit took 0.037 s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16
     cores; larger graphs were not measured. On the 223-variable ANDES network with 1,000 simulated
-    rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338). The
-    mixed-data scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables
-    with 3,000 rows.
+    rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338).
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance. The mixed-data
+    scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables with
+    3,000 rows.
 
     References
     ----------
