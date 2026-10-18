@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from andrey.data.scm import sample_scm
-from andrey.lingam import multi_group, pwling
+from andrey.lingam import direct, multi_group, pwling
 
 # Ranks / 8 of two columns with the same values, whose sample is invariant to swapping them.
 _SWAP_PAIR_N8 = np.array([[5, 4], [4, 6], [2, 8], [3, 5], [7, 2], [1, 7], [6, 3], [8, 1]]) / 8
@@ -177,3 +177,30 @@ def test_residual_of_a_copy_is_exact_zeros() -> None:
     assert not pwling.compute_residual(X[:, 3], X[:, 1]).any()
     assert not pwling.compute_residual(2 * X[:, 1], X[:, 1]).any()
     np.testing.assert_array_equal(pwling.compute_residual(X[:, 0], np.full(300, 0.5)), X[:, 0])
+
+
+@pytest.mark.parametrize("copy", ["exact", "near", "reversed"])
+def test_copy_takes_its_twin_as_only_parent(copy: str) -> None:
+    """The later copy has one parent, the earlier copy, with weight 1 up to sign, and no children.
+
+    A regression on both copies would split their effect between them by rounding, which differs
+    between CPUs.
+    """
+    order, B = direct.direct_lingam(_chain_with_copy(copy))
+    first, second = sorted([1, 3], key=order.index)
+    assert np.flatnonzero(B[second]).tolist() == [first]
+    assert not B[:, second].any()
+    np.testing.assert_allclose(abs(B[second, first]), 1.0, atol=1e-9)
+
+
+@pytest.mark.parametrize("copy", ["near", "reversed"])
+def test_copy_adjacency_follows_columns(copy: str) -> None:
+    """Reordering the columns reorders the weighted adjacency and changes nothing else."""
+    X = _chain_with_copy(copy)
+    _, B = direct.direct_lingam(X)
+    for perm in itertools.permutations(range(4)):
+        _, B_perm = direct.direct_lingam(X[:, list(perm)])
+        relabeled = np.zeros_like(B)
+        relabeled[np.ix_(perm, perm)] = B_perm
+        np.testing.assert_array_equal(relabeled != 0, B != 0, err_msg=str(perm))
+        np.testing.assert_allclose(relabeled, B, atol=1e-9, err_msg=str(perm))

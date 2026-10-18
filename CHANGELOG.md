@@ -102,9 +102,13 @@ change names its pull request.
   rank computed from each column's own data, so two interchangeable columns, such as two balanced
   binary columns, no longer get a different order on another CPU or after reordering the columns.
   ([#TBD])
-- `direct_lingam` and `multi_group_direct_lingam` give the same causal order on every CPU when a
-  column copies another up to scale: the pair counts as degenerate when one column explains all
-  but `1e-12` of the other's variance, instead of when a residual rounds to exactly zero. ([#TBD])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` give the
+  same causal order on every CPU when a column copies another up to scale: the pair counts as
+  degenerate when one column explains all but `1e-12` of the other's variance, instead of when a
+  residual rounds to exactly zero. ([#TBD])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` give a
+  column that copies an earlier one up to scale a single edge from that column, and leave it out
+  of later columns' regressions, so the edges no longer differ between CPUs. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 

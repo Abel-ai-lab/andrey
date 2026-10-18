@@ -111,7 +111,8 @@ def direct_lingam(
     give the same order on other machines. A column that another column determines up to scale,
     such as a copy, comes first among the remaining candidates, ranked against other such columns
     in the same way; a pair counts as such when one explains all but ``1e-12`` of the other's
-    variance.
+    variance. Such a column gets one edge, from the column it copies, and no edges to later
+    columns, which take their edges from that column instead.
 
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
