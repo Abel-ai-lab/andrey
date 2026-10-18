@@ -48,6 +48,7 @@ every dataset at those sizes.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.7.0.md)
+[Read the post](../blog/20261031-andrey-0-7-0.md)
 :::
 ::::
 :::::

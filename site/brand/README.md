@@ -27,6 +27,8 @@
     cover and thumbnail (`CENTERED` in `site/cards.py`).
   - `art-abacus.jpg`: 0.6.0, a Russian schoty in engraved lines, tilted across the frame, its
     beads on rods like categories counted out. One bead is amber.
+  - `art-punch-cards.jpg`: 0.7.0, a fan of 1960s punch cards in engraved lines, shuffled out of
+    order, each card a row of data columns. One card is amber.
   - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
     fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
     crop to the cover's size, so it is softer than the others until the art is drawn again at
