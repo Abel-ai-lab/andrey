@@ -187,8 +187,9 @@ _add(
     MethodSpec(
         name="gfci",
         family="constraint",
-        summary="Score-then-FCI hybrid: a GES-scored skeleton refined by FCI orientation. Latent-"
-        "aware like FCI but usually more accurate on the skeleton. Returns a PAG.",
+        summary="Score-then-FCI hybrid: GES adjacencies, pruned by independence tests and oriented "
+        "with FCI's rules. Latent-aware like FCI but usually more accurate on the skeleton. "
+        "Returns a PAG.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -219,7 +220,12 @@ _add(
             _MAX_CATEGORIES,
             _POSSIBLE_DSEP,
         ),
-        references=("Ogarrio, Spirtes & Ramsey 2016", "Colombo & Maathuis 2014"),
+        references=(
+            "Ogarrio, Spirtes & Ramsey 2016",
+            "Zhang 2008",
+            "Colombo & Maathuis 2014",
+            "Spirtes, Glymour & Scheines 2000",
+        ),
     )
 )
 _add(
@@ -228,19 +234,19 @@ _add(
         family="constraint",
         summary="Constraint-based discovery for data pooled from several domains or regimes: adds "
         "the domain index as a variable that can only be a cause, which can orient more edges. "
-        "Returns a CPDAG over the data variables.",
+        "Returns a partially directed graph over the data variables, tagged cpdag.",
         data=DataSpec(
             inputs=(
                 _DATA_MATRIX,
                 InputSpec(
-                    name="c_indx",
+                    name="domain_index",
                     kind="context",
                     doc="Domain / context index, (n_samples,) or (n_samples, 1), aligned to the "
                     "data rows.",
                 ),
             ),
             layout=_MATRIX_LAYOUT,
-            notes="c_indx becomes a trailing pseudo-node, then projected out of the result.",
+            notes="domain_index becomes a trailing pseudo-node, then projected out of the result.",
         ),
         output=OutputSpec(
             structure_type="graph",
@@ -250,7 +256,22 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="experimental",
-        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_ORDER,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+            ParamSpec(
+                name="dependence_threshold",
+                type="float",
+                default=None,
+                doc="Runs the independent-change step, which orients edges between variables that "
+                "both change with the index, at this threshold on its module dependence measure. "
+                "null skips the step.",
+                nullable=True,
+            ),
+        ),
         references=("Huang et al. 2020",),
     )
 )
@@ -298,9 +319,23 @@ _add(
     MethodSpec(
         name="gies",
         family="score",
-        summary="Greedy interventional equivalence search. Only the observational "
-        "(no-intervention) case is exposed, where it coincides with GES; returns a CPDAG + score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        summary="Greedy interventional equivalence search: GES for data that mixes observation "
+        "with interventions, scoring each variable on the rows where it was not intervened on. "
+        "Returns the interventional essential graph + score.",
+        data=DataSpec(
+            inputs=(
+                _DATA_MATRIX,
+                InputSpec(
+                    name="interventions",
+                    kind="context",
+                    doc="(n_samples, n_variables) 0/1 matrix aligned to the data: 1 where the "
+                    "row's value of the variable was set by an intervention. Omit it for "
+                    "observational data.",
+                    required=False,
+                ),
+            ),
+            layout=_MATRIX_LAYOUT,
+        ),
         output=OutputSpec(
             structure_type="graph", graph_kind="cpdag", doc="score in metadata['score']"
         ),
@@ -1123,7 +1158,7 @@ _add(
             structure_type="graph",
             graph_kind="dag",
             has_latents=True,
-            doc="observed + latent nodes; metadata clusters + causal_order.",
+            doc="observed + latent nodes; metadata clusters, causal_order + unordered.",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -1133,7 +1168,8 @@ _add(
                 name="alpha",
                 type="float",
                 default=0.05,
-                doc="Significance level of the independence test that finds the causal clusters.",
+                doc="Significance level of the independence test that finds the causal clusters "
+                "and each next latent in the order.",
             ),
             ParamSpec(
                 name="labels",
@@ -1197,42 +1233,6 @@ _add(
         accel="numpy",
         status="supported",
         references=("Maeda & Shimizu 2020",),
-    )
-)
-
-_add(
-    MethodSpec(
-        name="camuv",
-        family="latent",
-        summary="Causal additive models with unobserved variables (CAM-UV) for nonlinear data: "
-        "direct causes as ->, pairs linked through an unobserved variable as <->.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        params=(
-            ParamSpec(
-                name="alpha",
-                type="float",
-                default=0.01,
-                doc="Significance level of the HSIC independence tests.",
-            ),
-            ParamSpec(
-                name="max_explanatory_vars",
-                type="int",
-                default=3,
-                doc="Largest set of variables tested together, the variable itself included, "
-                "at least 2 (parent sets up to one fewer); larger values find more parents and "
-                "take longer.",
-            ),
-        ),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="pag",
-            doc="PAG over the observed variables; metadata confounded_pairs lists the <-> pairs, "
-            "joined by a causal path through a hidden variable or by hidden common causes.",
-        ),
-        determinism="deterministic",
-        accel="numpy",
-        status="experimental",
-        references=("Maeda & Shimizu 2021",),
     )
 )
 

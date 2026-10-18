@@ -302,13 +302,15 @@ def multi_group_direct_lingam(
     >>> import numpy as np
     >>> from andrey import multi_group_direct_lingam
     >>> rng = np.random.default_rng(0)
-    >>> def group():
-    ...     x = rng.uniform(-1, 1, 500)
-    ...     y = 0.8 * x + rng.uniform(-1, 1, 500)
-    ...     return np.column_stack([x, y])
-    >>> outs = multi_group_direct_lingam([group(), group()])
-    >>> len(outs), outs[0].structure.kind
-    (2, 'dag')
+    >>> def group(weight):
+    ...     x = rng.uniform(-1, 1, 1000)
+    ...     y = weight * x + rng.uniform(-1, 1, 1000)
+    ...     return np.column_stack([y, x])
+    >>> outs = multi_group_direct_lingam([group(0.8), group(-1.5)])
+    >>> [out.ordering for out in outs]
+    [(1, 0), (1, 0)]
+    >>> [round(float(out.weighted_adjacency[1, 0]), 1) for out in outs]
+    [0.8, -1.5]
     """
     warn_experimental("multi_group_direct_lingam")
     from andrey.lingam.multi_group import multi_group_direct_lingam as _native

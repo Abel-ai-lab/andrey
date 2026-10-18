@@ -1,4 +1,8 @@
-"""Tetrad's PC and FGES on mixed data, run through the causal-cmd jar and a one-file Java driver.
+"""Tetrad's searches, run through the causal-cmd jar and a one-file Java driver.
+
+This module holds the mechanism every Tetrad solution of the harness uses, and the PC and FGES
+solutions on mixed data; :mod:`~andrey_bench.adapters.tetrad_gfci` runs GFCI on continuous data
+through the same class.
 
 causal-cmd 1.12.0 parses ``--numCategories`` but never stores it, so its own command line reads
 every column as continuous. ``TetradDriver.java``, beside this module, takes causal-cmd's argument
@@ -78,7 +82,7 @@ def _java() -> str:
 def _jar() -> Path:
     jar = os.environ.get(JAR_ENV, "").strip()
     if not jar or not Path(jar).is_file():
-        raise RuntimeError(f"set ${JAR_ENV} to the causal-cmd jar (README: Mixed data)")
+        raise RuntimeError(f"set ${JAR_ENV} to the causal-cmd jar (README: Mixed data, GFCI)")
     return Path(jar)
 
 
@@ -174,13 +178,17 @@ class _TetradCmd:
 
     ``search_s`` and ``warmup`` follow the harness's convention for a search timed in another
     process (``contracts.SolutionAdapter``): ``fit`` sets ``search_s``, and the worker sets
-    ``warmup``, the searches the driver runs untimed before the timed one in the same JVM.
+    ``warmup``, the searches the driver runs untimed before the timed one in the same JVM. A
+    subclass sets ``data_type``, ``_arguments``, and, for a graph that is not a CPDAG, ``read``
+    and ``to_structure``.
     """
 
     package: str = "tetrad"
     backend: str = "jvm"
     mode: str = "serial"
     output_type: str = "cpdag"
+    #: causal-cmd's ``--data-type``; only ``mixed`` declares categorical columns.
+    data_type: str = "mixed"
     search_s: float | None = None
     warmup: int = 0
 
@@ -230,9 +238,12 @@ class _TetradCmd:
                 "--warmup",
                 str(self.warmup),
                 "--data-type",
-                "mixed",
-                "--numCategories",
-                str(int(params.get("max_categories", _MAX_CATEGORIES))),
+                self.data_type,
+                *(
+                    ["--numCategories", str(int(params.get("max_categories", _MAX_CATEGORIES)))]
+                    if self.data_type == "mixed"
+                    else []
+                ),
                 "--dataset",
                 str(csv),
                 "--delimiter",
@@ -252,19 +263,28 @@ class _TetradCmd:
                 )
             return result.read_text()
 
+    def read(self, text: str, d: int) -> np.ndarray:
+        """The driver's graph text as the adapter's native array."""
+        return read_graph(text, d)
+
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run the driver, set ``search_s`` to its search time, and read its graph back.
 
-        Raises ``RuntimeError`` unless Tetrad read exactly the lane rule's categorical columns.
+        Raises ``RuntimeError`` unless Tetrad read exactly the lane rule's categorical columns,
+        none for continuous data.
         """
         x = np.asarray(data, dtype=np.float64)
         text = self.run(x, params)
         self.search_s = read_search_s(text)
         declared = read_categorical(text)
-        expected = lane_categorical(x, int(params.get("max_categories", _MAX_CATEGORIES)))
+        expected = (
+            lane_categorical(x, int(params.get("max_categories", _MAX_CATEGORIES)))
+            if self.data_type == "mixed"
+            else []
+        )
         if declared != expected:
             raise RuntimeError(f"Tetrad read {declared} as categorical, the lane rule {expected}")
-        return read_graph(text, x.shape[1])
+        return self.read(text, x.shape[1])
 
     def to_structure(self, native: np.ndarray) -> Any:
         """0/1 CPDAG adjacency -> ``GraphStructure``; untimed."""

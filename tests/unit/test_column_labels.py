@@ -23,9 +23,11 @@ def frame(seed: int = 0) -> pd.DataFrame:
 
 
 def inputs(spec, frames) -> list:
-    """The method's positional inputs, with a DataFrame wherever it takes a data matrix."""
+    """The method's required positional inputs, with a DataFrame wherever it takes a data matrix."""
     args = []
     for inp in spec.data.inputs:
+        if not inp.required:
+            continue
         if inp.kind == "matrix":
             pair = spec.family == "pairwise"
             args.append(frames[0][COLUMNS[:2]] if pair else frames[0])

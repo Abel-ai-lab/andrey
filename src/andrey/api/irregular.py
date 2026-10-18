@@ -1,7 +1,7 @@
 """Facades for the pairwise direction tests (ANM and PNL) and the hidden-confounder methods.
 
-ANM and PNL test both directions in a two-column table. RCD, CAM-UV, and BottomUpParceLiNGAM
-return a PAG over the observed variables. RCD and CAM-UV list the pairs a hidden variable links in
+ANM and PNL test both directions in a two-column table. RCD and BottomUpParceLiNGAM return a PAG
+over the observed variables. RCD lists the pairs a hidden variable links in
 ``metadata["confounded_pairs"]``; BottomUpParceLiNGAM leaves the variables whose order such a
 cause hides unordered.
 """
@@ -13,11 +13,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ._adapt import column_labels, data_matrix, int_in_range, open_unit_interval, with_labels
-from ._experimental import warn_experimental
 from ._irregular import (
     _adapt_anm,
     _adapt_bottom_up_parce,
-    _adapt_camuv,
     _adapt_pnl,
     _adapt_rcd,
 )
@@ -343,88 +341,6 @@ def rcd(
         shapiro_alpha=open_unit_interval(shapiro_alpha, "shapiro_alpha"),
     )
     return with_labels(_adapt_rcd(model), column_labels(data))
-
-
-def camuv(
-    data: npt.ArrayLike, *, alpha: float = 0.01, max_explanatory_vars: int = 3
-) -> StructureOutput:
-    """Learn a nonlinear additive graph with hidden variables by CAM-UV.
-
-    CAM-UV [1]_ extends causal additive models: each variable is a sum of nonlinear functions of
-    its parents plus noise. It finds each variable's direct parents, and the pairs connected
-    through an unobserved variable.
-
-    Parameters
-    ----------
-    data : array-like of shape (n_samples, n_variables)
-        Observations, one variable per column. A DataFrame's column names become the structure's
-        ``labels``.
-    alpha : float, default=0.01
-        Significance level of the HSIC independence tests, in ``(0, 1)``.
-    max_explanatory_vars : int, default=3
-        Largest set of variables tested together, the variable itself included, at least 2: parent
-        sets have up to ``max_explanatory_vars - 1`` variables. Larger values find more parents and
-        take longer.
-
-    Returns
-    -------
-    StructureOutput
-        A :class:`~andrey.core.GraphStructure` of kind ``pag``: ``i -> j`` for a direct cause and
-        ``i <-> j`` for a pair connected through an unobserved variable.
-        ``metadata["algorithm"]`` is ``"CAMUV"``; ``metadata["confounded_pairs"]`` lists the
-        ``<->`` pairs as sorted ``[i, j]`` lists.
-
-    Raises
-    ------
-    TypeError
-        If ``max_explanatory_vars`` is not an int.
-    ValueError
-        If ``data`` has fewer than 6 rows, if ``alpha`` is not in ``(0, 1)``, or if
-        ``max_explanatory_vars`` is less than 2.
-
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
-    Notes
-    -----
-    A ``<->`` pair may share a hidden common cause or be linked by a causal path through a hidden
-    variable; CAM-UV does not tell the two apart. It estimates no edge weights.
-
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 6 variables with 300 rows, and
-    on 1,000 rows with 5 variables. It searches every subset of up to ``max_explanatory_vars``
-    variables, and starts the search over after each parent it adds. Each HSIC test builds kernel
-    matrices with one row and one column per sample, so time and memory grow with the square of the
-    row count.
-
-    References
-    ----------
-    .. [1] Maeda, T. N., and Shimizu, S. (2021). Causal additive models with unobserved variables.
-       UAI, PMLR 161, 97-106.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> import andrey
-    >>> rng = np.random.default_rng(0)
-    >>> u = lambda: rng.uniform(-1, 1, 1000)
-    >>> h = u()  # hidden: a common cause of x0 and x1
-    >>> x0, x1 = np.sin(3 * h) + 0.3 * u(), np.cos(3 * h) + 0.3 * u()
-    >>> data = np.column_stack([x0, x1, np.tanh(2 * x1) + 0.3 * u(), np.tanh(2 * x0) + 0.3 * u()])
-    >>> out = andrey.camuv(data)
-    >>> out.metadata["confounded_pairs"]
-    [[0, 1]]
-    """
-    warn_experimental("camuv")
-    from andrey.irregular.camuv import camuv as _native
-
-    X = data_matrix(data, min_rows=6)  # as rcd: HSIC on fewer rows decides nothing
-    alpha = open_unit_interval(alpha, "alpha")
-    max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 2)
-    parents, confounded = _native(X, alpha=alpha, max_explanatory_vars=max_explanatory_vars)
-    return with_labels(_adapt_camuv(parents, confounded, X.shape[1]), column_labels(data))
 
 
 def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> StructureOutput:

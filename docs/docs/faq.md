@@ -115,7 +115,7 @@ large enough to repay the transfer; correlation matrices move too when you set
 
 ### Can it use more CPU cores?
 
-GES, GIES, and GFCI (in its GES phase) can spread each pass over worker processes: set
+GES and GFCI (in its GES phase) can spread each pass over worker processes: set
 `ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one. A script that
 does this must put its entry point under `if __name__ == "__main__":`, because starting the workers
 re-imports the script; [Getting started](guides/getting-started.md#backends-and-parallelism) shows

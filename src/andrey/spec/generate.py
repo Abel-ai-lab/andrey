@@ -177,8 +177,8 @@ def cli_meta() -> dict:
             "hyperparameters are `key=value` after the method (or a `--config <file>` YAML/JSON "
             "base; overrides win). Types / choices are in each method's `params` schema below -- "
             "for example, alpha=0.05, indep_test=fisherz, 'order=[1,1]', criterion=null. "
-            "Data arrays stay --flags (--data, --data-groups, --data-list, --c-indx), never "
-            "key=value."
+            "Data arrays stay --flags (--data, --data-groups, --data-list, --domain-index, "
+            "--interventions), never key=value."
         ),
         "introspection": {
             "list": "andrey list -- enumerate every method with its status and a one-line summary",

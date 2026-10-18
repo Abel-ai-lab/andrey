@@ -1,0 +1,23 @@
+causal-learn 0.1.4.8 GIN: index the data by the variable, not the loop counter, in both search
+phases (https://github.com/py-why/causal-learn/issues/271). Applied by benchmarks/patch_causal_learn.sh.
+
+--- a/causallearn/search/HiddenCausal/GIN/GIN.py
++++ b/causallearn/search/HiddenCausal/GIN/GIN.py
+@@ -64,7 +64,7 @@
+             remain_var_set = var_set - set(cluster)
+             e = cal_e_with_gin(data, cov, list(cluster), list(remain_var_set))
+             pvals = []
+-            for z in range(len(remain_var_set)):
++            for z in sorted(remain_var_set):
+                 pvals.append(indep_test(data[:, [z]], e[:, None], method=indep_test_method))
+             fisher_pval = fisher_test(pvals)
+             if fisher_pval >= alpha:
+@@ -95,7 +95,7 @@
+                 cluster_j1, cluster_j2 = array_split(cluster_j, 2)
+                 e = cal_e_with_gin(data, cov, X + cluster_i1 + cluster_j1, Z + cluster_i2)
+                 pvals = []
+-                for z in range(len(Z + cluster_i2)):
++                for z in Z + cluster_i2:
+                     pvals.append(indep_test(data[:, [z]], e[:, None], method=indep_test_method))
+                 fisher_pval = fisher_test(pvals)
+                 if fisher_pval < alpha:

@@ -23,7 +23,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 28 methods, each one function call.
+- **One API**: 27 methods, each one function call.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
 <!-- PITCH:END -->
@@ -86,7 +86,7 @@ Four ideas make it fast; each is animated in
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/code/generated/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/code/generated/andrey.grasp.html) | CPDAG |
 | Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.multi_group_direct_lingam.html)\* | DAG |
 | Time series | [`varma_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/code/generated/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/code/generated/andrey.pcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/code/generated/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/code/generated/andrey.granger.html) | Temporal graph |
-| Latent variables | [`gin`](https://andrey.abel.ai/docs/code/generated/andrey.gin.html)\*, [`rcd`](https://andrey.abel.ai/docs/code/generated/andrey.rcd.html), [`camuv`](https://andrey.abel.ai/docs/code/generated/andrey.camuv.html)\*, [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.bottom_up_parce_lingam.html) | DAG, PAG |
+| Latent variables | [`gin`](https://andrey.abel.ai/docs/code/generated/andrey.gin.html)\*, [`rcd`](https://andrey.abel.ai/docs/code/generated/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.bottom_up_parce_lingam.html) | DAG, PAG |
 | Pairwise direction | [`anm`](https://andrey.abel.ai/docs/code/generated/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/code/generated/andrey.pnl.html) | Two-node DAG |
 
 \* [Experimental](https://andrey.abel.ai/docs/code/index.html#experimental-methods):
