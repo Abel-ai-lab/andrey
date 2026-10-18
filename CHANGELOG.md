@@ -103,11 +103,11 @@ change names its pull request.
   dropping the edge. ([#187])
 - `ges`, `gies`, `xges`, `calm`, `gin`, `bottom_up_parce_lingam`, `pcmci`, `pcmciplus`, and `lpcmci`
   break ties between equal score changes or test results by a rank computed from each column's own
-  data instead of by column position; `calm` also assigns its random draws, `gin` its cluster
-  representatives, and `bottom_up_parce_lingam` its regression predictors in that rank order; `calm`
-  chooses each Markov-blanket member by its partial correlation where p-values underflow to zero;
-  and `pc` and `cdnod` orient colliders whose p-values agree to nine decimals together, so these
-  choices no longer depend on the column order. ([#TBD])
+  data instead of by column position; `calm` also assigns its random draws, and
+  `bottom_up_parce_lingam` its regression predictors, in that rank order; `calm` chooses each
+  Markov-blanket member by its partial correlation where p-values underflow to zero; and `pc` and
+  `cdnod` orient colliders whose p-values agree to nine decimals together, so these choices no
+  longer depend on the column order. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 

@@ -314,25 +314,6 @@ def test_gies_ties(monkeypatch) -> None:
     )
 
 
-def test_gin_member_order() -> None:
-    """Reordering the columns inside each cluster keeps the latent order.
-
-    The surrogates read one member of each cluster, chosen by rank rather than by position.
-    """
-    rng = np.random.default_rng(0)
-    first, second = rng.uniform(-1, 1, 600) ** 3, rng.uniform(-1, 1, 600) ** 3
-    noise = 0.3 * rng.uniform(-1, 1, (600, 4)) ** 3
-    x = np.column_stack([first, 2 * first, second, 2 * second]) + noise
-
-    def causal_order(columns: np.ndarray) -> list[list[int]]:
-        return [sorted(int(columns[v]) for v in c) for c in gin(x[:, columns]).causal_order]
-
-    want = causal_order(np.arange(4))
-    assert len(want) == 2
-    for columns in ([1, 0, 3, 2], [1, 0, 2, 3], [3, 2, 1, 0], [2, 3, 1, 0]):
-        assert causal_order(np.array(columns)) == want
-
-
 def test_bottom_up_parce_lingam_weights() -> None:
     """Column 2 is regressed on the unordered block of columns 0 and 1 in an order-free order.
 
