@@ -19,6 +19,7 @@ from andrey.api._adapt import (
     categorical_metadata,
     checked_data,
     column_labels,
+    copies_named,
     data_kind,
     data_matrix,
     flag,
@@ -101,12 +102,13 @@ def ges(
         an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``max_categories`` is less than ``2``,
-        with a categorical score, if ``data`` holds a number that is not whole, or, with
-        a mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
+        with a categorical score, if ``data`` holds a number that is not whole, or, with a
+        mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another score. With the BIC score, also if a column repeats
-        another up to scale and shift given more than two rows or, with more rows than columns, is a
-        linear function of other columns.
+        with another score. With the BIC score, also if a column repeats another up to scale and
+        shift given more than two rows or, with more rows than columns, is a linear function of
+        other columns. One message names every group of copies and says to keep one column per
+        group.
 
     Warns
     -----
@@ -243,7 +245,8 @@ def ges(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
-    cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value, categorical=mask)
+    with copies_named(labels):
+        cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value, categorical=mask)
     return structure_output(
         cpdag,
         labels=labels,
@@ -284,7 +287,8 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
     ValueError
         If ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
         column up to scale and shift given more than two rows, or, with more rows than columns, is a
-        linear function of other columns.
+        linear function of other columns. One message names every group of copies and says to keep
+        one column per group.
 
     Warns
     -----
@@ -321,7 +325,8 @@ def gies(data: npt.ArrayLike, *, lambda_value: float = 1.0) -> StructureOutput:
 
     X = data_matrix(data)
     labels = column_labels(data)
-    cpdag, score = _gies(X, lambda_value=lambda_value)
+    with copies_named(labels):
+        cpdag, score = _gies(X, lambda_value=lambda_value)
     metadata = {"algorithm": "GIES", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -371,7 +376,8 @@ def xges(
         If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, if
         ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
         column up to scale and shift given more than two rows, or, with more rows than columns, is a
-        linear function of other columns.
+        linear function of other columns. One message names every group of copies and says to keep
+        one column per group.
 
     See Also
     --------
@@ -429,9 +435,10 @@ def xges(
     X = data_matrix(data)
     extended_search = flag(extended_search, "extended_search")
     labels = column_labels(data)
-    cpdag, score = _xges(
-        X, score_func=score_func, lambda_value=lambda_value, extended_search=extended_search
-    )
+    with copies_named(labels):
+        cpdag, score = _xges(
+            X, score_func=score_func, lambda_value=lambda_value, extended_search=extended_search
+        )
     metadata = {"algorithm": "XGES", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -502,7 +509,8 @@ def hc(
         If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
         or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With
         the BIC score, also if a column repeats another up to scale and shift given more than two
-        rows or, with more rows than columns, is a linear function of other columns.
+        rows or, with more rows than columns, is a linear function of other columns. One message
+        names every group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -573,9 +581,10 @@ def hc(
     )
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
-    cpdag, score = _hc(
-        X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter, categorical=mask
-    )
+    with copies_named(labels):
+        cpdag, score = _hc(
+            X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter, categorical=mask
+        )
     metadata = {"algorithm": "HC", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -638,7 +647,8 @@ def tabu(
         less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or, with a categorical
         score, if ``data`` holds a number that is not whole. With the BIC score, also if a column
         repeats another up to scale and shift given more than two rows or, with more rows than
-        columns, is a linear function of other columns.
+        columns, is a linear function of other columns. One message names every group of copies and
+        says to keep one column per group.
 
     Warns
     -----
@@ -706,14 +716,15 @@ def tabu(
     )
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
-    cpdag, score = _tabu(
-        X,
-        score_func=score_func,
-        lambda_value=lambda_value,
-        tabu_length=tabu_length,
-        max_tabu=max_tabu,
-        max_iter=max_iter,
-    )
+    with copies_named(labels):
+        cpdag, score = _tabu(
+            X,
+            score_func=score_func,
+            lambda_value=lambda_value,
+            tabu_length=tabu_length,
+            max_tabu=max_tabu,
+            max_iter=max_iter,
+        )
     metadata = {"algorithm": "Tabu", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -772,10 +783,11 @@ def exact_search(
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int.
     ValueError
-        If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical``
-        does not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column
-        repeats another up to scale and shift given more than two rows or, with more rows than
-        columns, is a linear function of other columns.
+        If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical`` does
+        not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
+        another up to scale and shift given more than two rows or, with more rows than columns, is a
+        linear function of other columns. One message names every group of copies and says to keep
+        one column per group.
 
     Warns
     -----
@@ -845,7 +857,8 @@ def exact_search(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
-    dag = _exact(X, search_method=search_method, score_func=score_func, categorical=mask)
+    with copies_named(labels):
+        dag = _exact(X, search_method=search_method, score_func=score_func, categorical=mask)
     return structure_output(
         dag,
         labels=labels,
@@ -945,7 +958,8 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     X = data_matrix(data)
     labels = column_labels(data)
     used_seed = resolve_seed(seed)  # CALM uses this seed for torch.
-    result = _calm(X, seed=used_seed, **params)
+    with copies_named(labels):
+        result = _calm(X, seed=used_seed, **params)
     return structure_output(
         result.dag,
         labels=labels,

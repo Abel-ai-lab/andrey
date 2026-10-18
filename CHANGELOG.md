@@ -36,6 +36,10 @@ change names its pull request.
 - `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#169])
 - `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
   measure values calibrated before this change again with `andrey calibrate`. ([#169])
+- When columns repeat others up to scale and shift, the score-based searches raise one `ValueError`
+  that names every group of copies by column name and says to keep one column per group and read
+  its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
+  copies make a test's correlation matrix singular. ([#TBD])
 
 ### Removed
 

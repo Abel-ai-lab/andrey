@@ -6,6 +6,7 @@ Direct Python calls (not the CLI, which validates inputs of its own) must not le
 
 from __future__ import annotations
 
+import re
 import warnings
 from functools import partial
 
@@ -141,7 +142,7 @@ def _sum_of_two_columns():
 BROKEN = {
     "scaled copy": (
         lambda: np.column_stack([_data(), 2.0 * _data()[:, 0] + 1.0]),
-        r"data column 3 is a linear function of column 0",
+        r"\b3 repeats 0\b",
     ),
     "sum of two columns": (_sum_of_two_columns, r"data columns \[2, 3, 5\] are linearly dependent"),
 }
@@ -156,6 +157,27 @@ def test_bic_searches_reject_dependent_columns(method, case):
     make, message = BROKEN[case]
     with pytest.raises(ValueError, match=message):
         SINGLE[method](make())
+
+
+def _two_groups_of_copies():
+    """x2 and x7 repeat x1, and x5 repeats x3, up to scale and shift."""
+    pd = pytest.importorskip("pandas")
+    x = _data(200, 8)
+    x[:, 2] = 2.0 * x[:, 1] + 1.0
+    x[:, 7] = -x[:, 1]
+    x[:, 5] = 3.0 * x[:, 3] - 2.0
+    return pd.DataFrame(x, columns=[f"x{j}" for j in range(8)])
+
+
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
+@pytest.mark.parametrize("method", BIC)
+def test_bic_searches_name_every_group_of_copies_by_column_name(method):
+    with pytest.raises(ValueError) as error:
+        SINGLE[method](_two_groups_of_copies())
+    message = str(error.value)
+    assert re.search(r"'x2' and 'x7' repeat 'x1'", message)
+    assert re.search(r"'x5' repeats 'x3'", message)
+    assert "keep one column" in message
 
 
 @pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
