@@ -97,6 +97,8 @@ change names its pull request.
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
   dropping the edge. ([#187])
+- `pcmciplus` runs its tests on one BLAS thread, as `pcmci` and `lpcmci` do, so the host's BLAS
+  thread count cannot change its p-values. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 
