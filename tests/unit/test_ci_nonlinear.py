@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import math
 import warnings
+from functools import partial
 
 import numpy as np
 import pytest
 from scipy.integrate import quad
 from scipy.spatial.distance import pdist, squareform
+from scipy.special import digamma
 from scipy.stats import chi2, gamma
 from sklearn.gaussian_process import GaussianProcessRegressor
 from threadpoolctl import threadpool_info, threadpool_limits
@@ -26,7 +28,6 @@ from andrey.constraint.pc import pc as pc_engine
 from andrey.core import backend, ci, ci_cmiknn, ci_kernel
 from andrey.core.ci_cmiknn import (
     CMIknn,
-    _cmi,
     _distances,
     _local_permutation,
     _nearest_in_z,
@@ -215,10 +216,64 @@ def test_cmiknn_estimates_gaussian_mutual_information(rho, n_cond):
     y = rho * x + np.sqrt(1.0 - rho**2) * rng.standard_normal(n)
     if n_cond:  # z drives both, and rho is their correlation given z
         x, y = x + z, y + 0.8 * z
-    ranks = _rank_columns(np.column_stack([x, y, z]), rng)
-    dx, dy, dz = (_distances(ranks[:, c], np.int16) for c in range(3))
-    estimate = _cmi(dx, dy, dz if n_cond else np.zeros_like(dx), k=50)
+    estimate = CMIknn(np.column_stack([x, y, z]), k_cmi=50).statistic(0, 1, (2,)[:n_cond])
     assert estimate == pytest.approx(-0.5 * np.log(1.0 - rho**2), abs=0.03)
+
+
+def _full_matrix_estimate(ranks: np.ndarray, x: int, y: int, cond: tuple, k: int) -> float:
+    """The CMI estimate from whole ``n x n`` distance matrices, the formula in CMIknn's Notes."""
+    dz = np.zeros((len(ranks), len(ranks)), dtype=ranks.dtype)
+    for c in cond:
+        dz = np.maximum(dz, _distances(ranks[:, c], ranks.dtype))
+    dx, dyz = (
+        _distances(ranks[:, x], ranks.dtype),
+        np.maximum(_distances(ranks[:, y], ranks.dtype), dz),
+    )
+    eps = np.partition(np.maximum(dx, dyz), k, axis=1)[:, k][:, None]
+    k_xz = np.count_nonzero(np.maximum(dx, dz) < eps, axis=1)
+    k_yz = np.count_nonzero(dyz < eps, axis=1)
+    k_z = np.count_nonzero(dz < eps, axis=1)
+    return float(digamma(k) + np.mean(digamma(k_z) - digamma(k_xz) - digamma(k_yz)))
+
+
+@pytest.mark.parametrize("n", [63, 64, 200])
+def test_cmiknn_statistic_equals_the_whole_matrix_estimate(n):
+    """The estimate, computed a block of rows at a time, equals the whole-matrix formula exactly
+    with less than one block, exactly one, and several with a remainder; it does not depend on
+    the argument order."""
+    data = _common_cause(seed=11, n=n, n_cond=2, shared=0.3)
+    data[:, 3] = np.round(data[:, 3], 1)  # ties
+    test = CMIknn(data, k_cmi=5)
+    for x, y, cond in [(0, 1, ()), (0, 1, (2,)), (0, 3, (1, 2)), (1, 3, ())]:
+        expected = _full_matrix_estimate(test._ranks, x, y, cond, 5)
+        assert test.statistic(x, y, cond) == expected == test.statistic(y, x, cond[::-1])
+
+
+def test_cmiknn_takes_k_cmi_as_a_count_or_a_fraction():
+    """``k_cmi=5`` and ``k_cmi=5 / n`` choose the same five neighbors."""
+    data = _common_cause(seed=2, n=200, n_cond=1)
+    assert CMIknn(data, k_cmi=5).statistic(0, 1, (2,)) == CMIknn(data, k_cmi=0.025).statistic(
+        0, 1, (2,)
+    )
+
+
+def test_make_indep_test_passes_settings_to_the_test():
+    """Keyword settings reach the test's class, through a registered variant too; a test without
+    the setting raises ``TypeError``."""
+    data = _common_cause(seed=4, n=120, n_cond=1, shared=0.2)
+    direct = CMIknn(data, k_cmi=5, n_permutations=50)(0, 1, (2,))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+        built = ci.make_indep_test("cmiknn", data, k_cmi=5, n_permutations=50)(0, 1, (2,))
+        variant = partial(ci.make_indep_test, "cmiknn", k_cmi=5, n_permutations=50)
+        ci.register_indep_test("cmiknn_k5", variant)
+        try:
+            registered = ci.make_indep_test("cmiknn_k5", data)(0, 1, (2,))
+        finally:
+            del ci._CI_REGISTRY["cmiknn_k5"]
+    assert built == registered == direct
+    with pytest.raises(TypeError, match="k_cmi"):
+        ci.make_indep_test("fisherz", data, k_cmi=5)
 
 
 def test_cmiknn_local_shuffle_stays_near_in_z():
@@ -453,6 +508,9 @@ def test_null_law_of_nan_raises(pvalue):
         (KCI, {"rank": 0}, "rank"),
         (RCoT, {"n_features": 0}, "feature counts"),
         (CMIknn, {"k_cmi": 1.0}, "k_cmi"),
+        (CMIknn, {"k_cmi": 0}, "k_cmi"),
+        (CMIknn, {"k_cmi": 10}, "k_cmi"),
+        (CMIknn, {"k_cmi": True}, "k_cmi"),
         (CMIknn, {"k_perm": 0}, "k_perm"),
         (GPDC, {"n_null": 0}, "n_null"),
     ],

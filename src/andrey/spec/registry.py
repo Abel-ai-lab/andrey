@@ -39,10 +39,10 @@ _INDEP_TEST = ParamSpec(
     "distribution, exact for Gaussian data at any sample size. For categorical data coded by whole "
     "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
     "columns named by categorical: degen_gauss = degenerate Gaussian and "
-    "cond_gauss = conditional Gaussian likelihood ratio. Experimental, for nonlinear effects in "
-    "continuous data and each far slower per test: kci = kernel test; rcot = its random-feature "
-    "approximation; cmiknn = nearest-neighbor conditional mutual information; gpdc = "
-    "Gaussian-process regression and distance correlation.",
+    "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
+    "data, the experimental tests, each far slower per test: kci = kernel test; rcot = its "
+    "random-feature approximation; cmiknn = nearest-neighbor conditional mutual information; "
+    "gpdc = Gaussian-process regression and distance correlation.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _CATEGORICAL = ParamSpec(

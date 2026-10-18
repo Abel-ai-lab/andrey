@@ -41,8 +41,10 @@ change names its pull request.
 - `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
   detect nonlinear dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#TBD])
 - The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
-  and have reference pages; register a variant with `register_indep_test` to select it by name.
-  ([#TBD])
+  and have reference pages; `make_indep_test` passes settings to them, a variant registered with
+  `register_indep_test` is selected by name, `CMIknn(k_cmi=...)` takes a neighbor count or a
+  fraction of the rows, and `CMIknn.statistic` returns its conditional mutual information
+  estimate. ([#TBD])
 - `SampleSizeWarning`: RCoT warns when it conditions on fewer than 500 rows, the smallest sample
   size its reference evaluates. ([#TBD])
 - `KCI(rank=...)`, a low-rank KCI for many rows: each kernel becomes an incomplete Cholesky

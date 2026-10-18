@@ -54,7 +54,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Iterable
 from functools import partial
-from typing import Protocol, Self, cast, runtime_checkable
+from typing import Any, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
@@ -65,7 +65,14 @@ from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_message, copy_groups
 from .warning_policy import ExperimentalWarning, warn_once
 
-__all__ = ["CITest", "FisherZ", "register_indep_test", "available_indep_tests", "make_indep_test"]
+__all__ = [
+    "CITest",
+    "FisherZ",
+    "StudentT",
+    "register_indep_test",
+    "available_indep_tests",
+    "make_indep_test",
+]
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
@@ -655,8 +662,8 @@ class CGTest:
 NONLINEAR_INDEP_TESTS: tuple[str, ...] = ("kci", "rcot", "cmiknn", "gpdc")
 
 
-def _nonlinear(name: str, data: np.ndarray) -> CITest:
-    """Build the experimental nonlinear test ``name``, warning once per process."""
+def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
+    """Build the experimental nonlinear test ``name`` with ``options``, warning once per process."""
     from .ci_cmiknn import CMIknn
     from .ci_gpdc import GPDC
     from .ci_kernel import KCI, RCoT
@@ -667,7 +674,7 @@ def _nonlinear(name: str, data: np.ndarray) -> CITest:
         "may change without deprecation.",
         ExperimentalWarning,
     )
-    return test(data)
+    return test(data, **options)
 
 
 # The indep_test registry: a name maps to a factory building a :class:`CITest` over the data. The
@@ -691,7 +698,7 @@ _CI_REGISTRY: dict[str, Callable[..., CITest]] = {
     "fisherz": FisherZ,
     "student_t": StudentT,
     "chisq": ChiSquare,
-    "gsq": lambda data: ChiSquare(data, g_square=True),
+    "gsq": partial(ChiSquare, g_square=True),
     "degen_gauss": DGTest,
     "cond_gauss": CGTest,
     **{name: partial(_nonlinear, name) for name in NONLINEAR_INDEP_TESTS},
@@ -702,7 +709,9 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
     """Register a :class:`CITest` factory under ``name`` for selection via ``indep_test``.
 
     ``factory`` maps a ``(n_samples, n_features)`` data matrix to a ``CITest`` (a callable
-    ``test(x, y, condition_set) -> p-value``). Overwrites any existing entry for ``name``.
+    ``test(x, y, condition_set) -> p-value``), and takes the keyword settings
+    :func:`make_indep_test` passes, if any. Overwrites any existing entry for ``name``. A variant
+    of a shipped test with other settings is ``partial(make_indep_test, "cmiknn", k_cmi=5)``.
     """
     _CI_REGISTRY[name] = factory
 
@@ -713,10 +722,12 @@ def available_indep_tests() -> tuple[str, ...]:
 
 
 def make_indep_test(
-    name: str, data: np.ndarray, *, categorical: npt.ArrayLike | None = None
+    name: str, data: np.ndarray, *, categorical: npt.ArrayLike | None = None, **options: Any
 ) -> CITest:
     """Construct the registered ``indep_test`` ``name`` over ``data``.
 
+    ``options`` are keyword settings for the test's class, such as
+    ``make_indep_test("cmiknn", data, k_cmi=5)``; a setting the test lacks raises ``TypeError``.
     ``categorical``, a boolean mask of the categorical columns, reaches the mixed tests
     (:data:`MIXED_INDEP_TESTS`) only; another test given one raises ``ValueError``. Raises
     :class:`NotImplementedError` when ``name`` is not registered, listing what is available.
@@ -728,10 +739,10 @@ def make_indep_test(
             f"unknown indep_test {name!r}; registered: {available_indep_tests()}"
         ) from None
     if name in MIXED_INDEP_TESTS:
-        return factory(data, categorical)
+        return factory(data, categorical, **options)
     if categorical is not None:
         raise ValueError(f"indep_test {name!r} reads no column types; categorical must be None")
-    return factory(data)
+    return factory(data, **options)
 
 
 def _checked_data(data: np.ndarray, test_name: str, min_rows: int = 0) -> np.ndarray:

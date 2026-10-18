@@ -274,7 +274,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default), `student_t` | `local_score_BIC` (the default) |
+| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, the experimental `kci`, `rcot`, `cmiknn`, `gpdc` | `local_score_BIC` (the default) |
 | Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
 

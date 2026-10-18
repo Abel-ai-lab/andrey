@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from functools import lru_cache
+from numbers import Integral
 
 import numpy as np
 from scipy.special import digamma
@@ -30,6 +31,9 @@ _CMIKNN_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 1_024, "mps": None}
 # Device memory one batch of shuffled estimates uses, about 20 bytes per distance-matrix entry.
 _DEVICE_BATCH_BYTES = 2**30
 
+# Rows of the distance matrices one step of the CPU estimate holds, so its temporaries stay small.
+_BLOCK_ROWS = 64
+
 
 def _rank_columns(data: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """Rank each column (0 to n - 1), ties ordered by a random key."""
@@ -42,21 +46,42 @@ def _distances(column: np.ndarray, dtype: type) -> np.ndarray:
     return np.abs(column[:, None] - column[None, :]).astype(dtype)
 
 
-def _cmi(dx: np.ndarray, dy: np.ndarray, dz: np.ndarray, k: int) -> float:
-    """The nearest-neighbor CMI estimate from max-norm distance matrices of x, y, and z.
+def _sorted_rows(d: np.ndarray) -> np.ndarray:
+    """Each row of the ``n x n`` distance matrix ``d`` sorted and offset by ``n`` times its index,
+    flattened: one sorted array, in which a binary search for ``i n + eps`` counts the entries of
+    row ``i`` below ``eps``."""
+    n = d.shape[0]
+    dtype = np.int32 if n * n < 2**31 else np.int64
+    return (np.sort(d, axis=1).astype(dtype) + np.arange(0, n * n, n, dtype=dtype)[:, None]).ravel()
+
+
+def _yz_space(dyz: np.ndarray, dz: np.ndarray) -> tuple[np.ndarray, ...]:
+    """The distances of the space of y and z, ``dyz = max(dy, dz)``, and of z, each with its
+    :func:`_sorted_rows`, as :func:`_cmi_given_yz` reads them."""
+    return dyz, dz, _sorted_rows(dyz), _sorted_rows(dz)
+
+
+def _cmi_given_yz(x: np.ndarray, yz: tuple[np.ndarray, ...], k: int) -> float:
+    """The nearest-neighbor CMI estimate from the ranked column ``x`` and the space ``yz`` of
+    :func:`_yz_space`.
 
     The ``k``-th neighbor distance ``eps_i`` is taken in the joint space; each ``k_*,i`` counts the
-    rows strictly closer than ``eps_i`` in a subspace, row ``i`` included.
+    rows strictly closer than ``eps_i`` in a subspace, row ``i`` included. The joint distances and
+    ``k_xz`` take ``_BLOCK_ROWS`` rows at a time; ``k_yz`` and ``k_z`` are binary searches in the
+    sorted rows. The counts are integers, and the estimate is formed once from all of them.
     """
-    return _cmi_given_yz(dx, np.maximum(dy, dz), dz, k)
-
-
-def _cmi_given_yz(dx: np.ndarray, dyz: np.ndarray, dz: np.ndarray, k: int) -> float:
-    """:func:`_cmi` with the distances in the space of y and z, ``max(dy, dz)``, given."""
-    eps = np.partition(np.maximum(dx, dyz), k, axis=1)[:, k][:, None]  # position 0: row i itself
-    k_xz = np.count_nonzero(np.maximum(dx, dz) < eps, axis=1)
-    k_yz = np.count_nonzero(dyz < eps, axis=1)
-    k_z = np.count_nonzero(dz < eps, axis=1)
+    dyz, dz, yz_rows, z_rows = yz
+    n = x.shape[0]
+    eps = np.empty(n, dtype=x.dtype)
+    k_xz = np.empty(n, dtype=np.intp)
+    for start in range(0, n, _BLOCK_ROWS):
+        rows = slice(start, start + _BLOCK_ROWS)
+        dx = np.abs(x[rows, None] - x[None, :])
+        eps[rows] = np.partition(np.maximum(dx, dyz[rows]), k, axis=1)[:, k]  # 0: row i itself
+        k_xz[rows] = np.count_nonzero(np.maximum(dx, dz[rows]) < eps[rows, None], axis=1)
+    offset = np.arange(0, n * n, n, dtype=yz_rows.dtype)
+    k_yz = np.searchsorted(yz_rows, offset + eps) - offset
+    k_z = np.searchsorted(z_rows, offset + eps) - offset
     return float(digamma(k) + np.mean(digamma(k_z) - digamma(k_xz) - digamma(k_yz)))
 
 
@@ -135,10 +160,10 @@ class CMIknn:
     ----------
     data : ndarray of shape (n_samples, n_variables)
         Observed data, one row per sample. Each column is replaced by its ranks.
-    k_cmi : float, default=0.1
-        Nearest neighbors of the estimator, as a fraction of the rows. More neighbors lower the
-        estimate's variance and raise its bias toward zero, which costs power as the conditioning
-        set grows.
+    k_cmi : float or int, default=0.1
+        Nearest neighbors of the estimator: a fraction of the rows in ``(0, 1)``, or a count, an
+        int from 1 to one less than the rows. More neighbors lower the estimate's variance and
+        raise its bias toward zero, which costs power as the conditioning set grows.
     k_perm : int, default=5
         Nearest neighbors in the conditioning set among which ``x`` is shuffled.
     n_permutations : int, default=500
@@ -151,27 +176,36 @@ class CMIknn:
     ------
     ValueError
         If ``data`` is not 2-D, has fewer than 2 rows, or contains NaN or infinity, ``k_cmi`` is
-        not in ``(0, 1)``, or ``k_perm`` or ``n_permutations`` is below 1.
+        neither a fraction in ``(0, 1)`` nor an int from 1 to one less than the rows, or
+        ``k_perm`` or ``n_permutations`` is below 1.
 
     Notes
     -----
     **How it works.** Each column is replaced by its ranks, ties ordered at random, and distances
-    are in the maximum norm. With ``k = round(k_cmi n)``, ``eps_i`` the distance
-    from row ``i`` to its ``k``-th nearest row in the space of ``x``, ``y``, and the conditioning
-    set ``z``, and ``k_xz``, ``k_yz``, ``k_z`` the rows strictly closer than ``eps_i`` in each
-    subspace (row ``i`` counted), the estimate is
-    ``I = psi(k) + mean_i [psi(k_z) - psi(k_xz) - psi(k_yz)]``, ``psi`` the digamma function [1]_.
-    Each null copy maps every row to one of its ``k_perm`` nearest rows in ``z``, avoiding a row
-    already taken where it can. With ``b`` of the ``B`` copies estimating at least ``I``, the
-    p-value is ``(b + 1) / (B + 1)``: the observed data count as one more draw, so the p-value is
-    never zero [3]_. In the skeleton searches of PC, FCI, GFCI, and CD-NOD, a query's shuffles stop
-    once ``p > alpha`` or ``p <= alpha`` is certain whatever the remaining shuffles give, so the
-    search decides as with every shuffle; where the search orients colliders by p-value
-    (``collider_order="p_value"``), only ``p <= alpha`` stops them, so every p-value it ranks is
-    the full one. An empty conditioning set shuffles ``x`` over all rows,
-    and the estimate becomes the mutual information estimate of ``x`` and ``y`` [2]_. The default
-    ``k_cmi``, a tenth of the rows, is the low end of the range [1]_ recommends; a larger share
-    smooths the estimate, which costs power as the conditioning set grows.
+    are in the maximum norm. With ``k`` the neighbor count (``round(k_cmi n)`` for a fraction),
+    ``eps_i`` the distance from row ``i`` to its ``k``-th nearest row in the space of ``x``, ``y``,
+    and the conditioning set ``z``, and ``k_xz``, ``k_yz``, ``k_z`` the rows strictly closer than
+    ``eps_i`` in each subspace (row ``i`` counted), the estimate is ``I = psi(k) + mean_i [psi(k_z)
+    - psi(k_xz) - psi(k_yz)]``, ``psi`` the digamma function [1]_. Each null copy maps every row to
+    one of its ``k_perm`` nearest rows in ``z``, avoiding a row already taken where it can. With
+    ``b`` of the ``B`` copies estimating at least ``I``, the p-value is ``(b + 1) / (B + 1)``: the
+    observed data count as one more draw, so the p-value is never zero [3]_. In the skeleton
+    searches of PC, FCI, GFCI, and CD-NOD, a query's shuffles stop once ``p > alpha`` or ``p <=
+    alpha`` is certain whatever the remaining shuffles give, so the search decides as with every
+    shuffle; where the search orients colliders by p-value (``collider_order="p_value"``), only ``p
+    <= alpha`` stops them, so every p-value it ranks is the full one. An empty conditioning set
+    shuffles ``x`` over all rows, and the estimate becomes the mutual information estimate of ``x``
+    and ``y`` [2]_. The default ``k_cmi``, a tenth of the rows, is the low end of the range [1]_
+    recommends; a larger share smooths the estimate, which costs power as the conditioning set
+    grows.
+
+    :meth:`statistic` returns the estimate ``I`` itself, in nats, for use as a dependence measure.
+    It is biased on finite samples, so compare estimates at the same rows and ``k``: on Gaussian
+    pairs with 1,000 rows and ``k = 5`` it reads 0.01 to 0.05 above the true value, independent
+    pairs included (0.03 to 0.09 with 200 rows), and with ``k`` a tenth of the rows it reads near
+    zero for independent pairs and low for strong dependence, 0.06 below at a correlation of 0.9
+    and 0.26 below given one more variable. The p-value compares ``I`` with shuffled copies, which
+    share the bias.
 
     The tie-breaking is drawn once, from ``seed``, when the test is built. The shuffles come from a
     generator seeded by ``seed`` and the conditioning set, so every query with the same
@@ -211,8 +245,12 @@ class CMIknn:
         n_permutations: int = 500,
         seed: int | None = None,
     ) -> None:
-        if not 0.0 < k_cmi < 1.0:
-            raise ValueError(f"k_cmi must be a fraction of the rows in (0, 1), got {k_cmi}")
+        count = isinstance(k_cmi, Integral) and not isinstance(k_cmi, bool)
+        if not (k_cmi >= 1 if count else 0.0 < k_cmi < 1.0):
+            raise ValueError(
+                f"k_cmi must be a fraction of the rows in (0, 1) or an int count of at least 1, "
+                f"got {k_cmi!r}"
+            )
         if k_perm < 1 or n_permutations < 1:
             raise ValueError(
                 f"k_perm and n_permutations must be at least 1, got {k_perm} and {n_permutations}"
@@ -220,8 +258,10 @@ class CMIknn:
         arr = _checked_data(data, "CMIknn", min_rows=2)
         self._seed = resolve_seed(seed)
         n = arr.shape[0]
+        if count and k_cmi >= n:
+            raise ValueError(f"k_cmi={k_cmi} neighbors needs more rows than {n}")
         self._n = n
-        self._k = min(max(1, round(k_cmi * n)), n - 1)
+        self._k = int(k_cmi) if count else min(max(1, round(k_cmi * n)), n - 1)
         self._k_perm = min(int(k_perm), n)
         self._n_permutations = int(n_permutations)
         self._dtype = np.int16 if n <= np.iinfo(np.int16).max else np.int32
@@ -271,15 +311,29 @@ class CMIknn:
             exceed += hit
         return (exceed + 1) / total
 
+    def statistic(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        """Return the estimate of the conditional mutual information of ``x`` and ``y`` given
+        ``condition_set``, in nats.
+
+        The estimate the p-value compares with its shuffles, from the test's ranks (see Notes);
+        with an empty ``condition_set``, the mutual information estimate. It does not depend on
+        the order of the arguments.
+        """
+        x_int, y_int, cond = _canonical(x, y, condition_set)
+        return _cmi_given_yz(self._ranks[:, x_int], self._yz_space(y_int, tuple(cond)), self._k)
+
     def _hits(self, x: int, y: int, cond: tuple[int, ...]) -> Iterator[bool]:
         """Whether each shuffle's estimate reaches the observed one, computed as they are read."""
-        ranks, dtype, k = self._ranks, self._dtype, self._k
-        dx = _distances(ranks[:, x], dtype)
-        dz = self._cond_distances(cond)
-        dyz = np.maximum(_distances(ranks[:, y], dtype), dz)
-        observed = _cmi_given_yz(dx, dyz, dz, k)
+        ranks, k = self._ranks, self._k
+        yz = self._yz_space(y, cond)
+        observed = _cmi_given_yz(ranks[:, x], yz, k)
         for perm in self._permutations(cond):
-            yield _cmi_given_yz(_distances(ranks[perm, x], dtype), dyz, dz, k) >= observed
+            yield _cmi_given_yz(ranks[perm, x], yz, k) >= observed
+
+    def _yz_space(self, y: int, cond: tuple[int, ...]) -> tuple[np.ndarray, ...]:
+        """The :func:`_yz_space` of ``y`` and the conditioning set."""
+        dz = self._cond_distances(cond)
+        return _yz_space(np.maximum(_distances(self._ranks[:, y], self._dtype), dz), dz)
 
     def _hits_torch(self, x: int, y: int, cond: tuple[int, ...], dev: str) -> Iterator[bool]:
         """:meth:`_hits` with the distances and neighbor counts on ``dev``, a batch of shuffles at

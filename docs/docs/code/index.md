@@ -38,8 +38,9 @@ way. Other data raises a `ValueError` that names the argument and, for a bad cel
 column. A single column gives a one-node graph.
 
 `pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
-`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`
-and `"cond_gauss"` for mixed data.
+`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and
+`"cond_gauss"` for mixed data, and the experimental nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`,
+and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
 
 ### Supported methods
 
@@ -119,6 +120,8 @@ PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_tes
 |---|---|---|
 | `"fisherz"` | Partial correlation with Fisher's z-transform: linear effects, Gaussian noise | Supported |
 | `"student_t"` | Partial correlation with a Student-t p-value, exact for Gaussian data at any size | Supported |
+| `"chisq"`, `"gsq"` | Pearson's chi-square and G-square on category codes | Supported |
+| `"degen_gauss"`, `"cond_gauss"` | Degenerate and conditional Gaussian likelihood ratios on mixed data | Experimental |
 | `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Experimental |
 | `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Experimental |
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Experimental |
@@ -129,19 +132,27 @@ higher cost per test, and have no published benchmark yet. Each warns with
 {py:class}`~andrey.ExperimentalWarning` the first time a process builds it. Inside the search,
 KCI uses every BLAS thread from 2,000 rows and the other tests use one. On every thread,
 a p-value repeats for a fixed thread count and can differ in the last digits between thread counts.
-By name, a test runs with its default settings; to change one, register a variant with
-{py:func}`~andrey.core.ci.register_indep_test` and select it by its new name:
+By name, a test runs with its default settings.
+{py:func}`~andrey.core.ci.make_indep_test` passes keyword settings to the test it builds; to run
+other settings in a search, register a variant with {py:func}`~andrey.core.ci.register_indep_test`
+and select it by its new name:
 
 ```python
 from functools import partial
 
 import andrey
-from andrey.core.ci import register_indep_test
-from andrey.core.ci_cmiknn import CMIknn
+from andrey.core.ci import make_indep_test, register_indep_test
 
-register_indep_test("cmiknn_200", partial(CMIknn, n_permutations=200))
-andrey.pc(data, indep_test="cmiknn_200")
+test = make_indep_test("cmiknn", data, k_cmi=5)  # five neighbors
+p = test(0, 1, [2])
+cmi = test.statistic(0, 1, [2])  # the estimate itself, in nats
+
+register_indep_test("cmiknn_k5", partial(make_indep_test, "cmiknn", k_cmi=5))
+andrey.pc(data, indep_test="cmiknn_k5")
 ```
+
+{py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
+mutual information estimate the test's p-value is built on, a dependence measure of its own.
 
 ```{eval-rst}
 .. currentmodule:: andrey.core
