@@ -2,8 +2,9 @@
 
 A depth-bounded search of tucks (:func:`_dfs`) relaxes a variable order; each variable's parents
 come from its persistent grow-shrink tree (:class:`_GST`). Scores are negated local scores, so the
-search maximizes. The algorithm and its
-reference are described on :func:`andrey.grasp`.
+search maximizes. The search runs on the columns sorted by tie rank
+(:func:`~andrey.search.boss.ranked_score`), so a variable's index is its tie rank. The algorithm and
+its reference are described on :func:`andrey.grasp`.
 """
 
 from __future__ import annotations
@@ -15,9 +16,9 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore, LocalScore, make_score
+from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
-from andrey.search.boss import PERMUTATION_SCORES
+from andrey.search.boss import PERMUTATION_SCORES, ranked_score
 
 # DFS accepts a tuck when the total negated BIC increases by more than this tolerance;
 # changes in (-tolerance, tolerance] are explored as ties. Grow recomputes full BIC scores
@@ -387,7 +388,10 @@ def grasp(
     Runs the greedy relaxation of the sparsest permutation: seeds a permutation, grow-shrinks each
     variable's parents from its predecessors, then relaxes the order through depth-bounded covered
     tucks until no tuck improves the total score. The settled parent sets form a DAG, returned as
-    its CPDAG. The search is stochastic and seeded from ``random_state`` for a reproducible run.
+    its CPDAG. The search is stochastic and seeded from ``random_state`` for a reproducible run. It
+    runs on the columns sorted by :func:`~andrey.search.boss.ranked_score`, so the starting order,
+    the visiting order, and every tie follow the columns' data, and reordering the columns of
+    ``data`` reorders the CPDAG's nodes.
 
     Parameters
     ----------
@@ -420,7 +424,7 @@ def grasp(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
-    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    score, ranks = ranked_score(X, score_func, lambda_value, categorical)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
     gsts = [_GST(v, score, delta, n_features) for v in range(n_features)]
@@ -445,5 +449,5 @@ def grasp(
             adj[x, y] = TAIL
             adj[y, x] = ARROW
 
-    cpdag = dag2cpdag(adj)
+    cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
     return to_structure(cpdag, kind="cpdag"), float(total_bic)

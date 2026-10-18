@@ -136,7 +136,14 @@ def boss(
 
     A move or parent change must improve the score by more than ``1e-6``, a fixed absolute tolerance
     shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties. The
-    earliest order position wins; among candidate parents, the lowest column index wins.
+    earliest order position wins; among candidate parents, the column with the lowest tie rank
+    wins.
+
+    **Column order.** Each column gets a tie rank computed from its own data, as for
+    :func:`~andrey.hc`, and the search runs on the columns sorted by it: it starts from that order,
+    and the seed shuffles the order in which it visits them. Reordering the columns therefore
+    reorders the graph's nodes and changes nothing else, unless two columns are identical. The rank
+    is arbitrary with respect to causal structure.
 
     **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
     data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
@@ -316,6 +323,13 @@ def grasp(
 
     Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
     :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged.
+
+    **Column order.** Each column gets a tie rank computed from its own data, as for
+    :func:`~andrey.hc`, and the search runs on the columns sorted by it: the seed shuffles the
+    sorted columns into the starting order and the order of visiting variables, and ties between
+    candidate parents go to the lowest rank. Reordering the columns therefore reorders the graph's
+    nodes and changes nothing else, unless two columns are identical. The rank is arbitrary with
+    respect to causal structure.
 
     **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
     data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
