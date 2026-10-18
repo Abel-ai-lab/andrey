@@ -31,7 +31,7 @@ change names its pull request.
 
 ### Removed
 
-- The benchmark explorer page is retired, and its address redirects to the release cards. ([#TBD])
+- The benchmark explorer page is retired, and its address redirects to the release cards. ([#175])
 
 ### Fixed
 
@@ -258,3 +258,4 @@ First alpha release.
 [#167]: https://github.com/Abel-ai-lab/andrey/pull/167
 [#168]: https://github.com/Abel-ai-lab/andrey/pull/168
 [#169]: https://github.com/Abel-ai-lab/andrey/pull/169
+[#175]: https://github.com/Abel-ai-lab/andrey/pull/175
