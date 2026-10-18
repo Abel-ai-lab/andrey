@@ -37,7 +37,7 @@ Permutation invariance
 2014), so their graph is the same up to relabeling the nodes however you order the columns, and
 GIES, exact search, CD-NOD, MultiGroupDirectLiNGAM, GFCI, GIN, and CALM are supported.
 GES runs more than 60x faster than causal-learn at 50 to 150 variables, with the same graph on
-every dataset.
+every dataset at those sizes.
 
 :::{div} release-stats
 
