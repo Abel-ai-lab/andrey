@@ -229,7 +229,7 @@ citation.
 ```bibtex
 @software{andrey,
   author = {{Abel AI Lab}},
-  title = {Andrey: A very fast causal discovery package},
+  title = {Andrey: The fastest causal discovery package},
   year = {2026},
   version = {0.6.0},
   url = {https://andrey.abel.ai},

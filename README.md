@@ -1,7 +1,7 @@
 <!-- One image on its own dark ground reads on both GitHub themes; PyPI keeps a plain <img>. The
 banner links the website's homepage. -->
 <p align="center">
-  <a href="https://andrey.abel.ai/"><img alt="Andrey, a very fast causal discovery package"
+  <a href="https://andrey.abel.ai/"><img alt="Andrey, the fastest causal discovery package"
     src=".github/readme/banner.svg" width="830"></a>
 </p>
 
@@ -172,7 +172,7 @@ If you use Andrey in your work, please cite it, or use the
 ```bibtex
 @software{andrey,
   author = {{Abel AI Lab}},
-  title = {Andrey: A very fast causal discovery package},
+  title = {Andrey: The fastest causal discovery package},
   year = {2026},
   version = {0.6.0},
   url = {https://andrey.abel.ai},

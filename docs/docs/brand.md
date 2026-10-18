@@ -66,7 +66,7 @@ Use the social preview, 1280 x 640, where a post, a page, or a repository that l
 shows an image.
 
 ```{raw} html
-<p class="brand-social"><img class="dark-light" src="../_static/brand/andrey-social-preview.jpg" alt="Andrey's wordmark and the tagline A very fast causal discovery package over the lanes art" width="1280" height="640"></p>
+<p class="brand-social"><img class="dark-light" src="../_static/brand/andrey-social-preview.jpg" alt="Andrey's wordmark and the tagline The fastest causal discovery package over the lanes art" width="1280" height="640"></p>
 <p class="brand-asset__files"><a href="../_static/brand/andrey-social-preview.jpg" download>JPEG</a></p>
 ```
 

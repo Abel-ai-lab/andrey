@@ -245,8 +245,8 @@ BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at
 # at the README's width, so their corners match.
 BANNER_RADIUS = 27
 BANNER_QUALITY = 65  # its base64 inside the SVG is about 290 KB, under MAX_BYTES
-TAGLINE = "A very fast causal discovery package"
-ACCENT = "fast"  # the tagline's word drawn as the accent, on the homepage's card and the banner
+TAGLINE = "The fastest causal discovery package"
+ACCENT = "fastest"  # the tagline's word drawn as the accent, on the homepage's card and the banner
 
 
 def banner_svg() -> str:

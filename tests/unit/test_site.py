@@ -469,7 +469,7 @@ def test_the_lede_names_every_registry_family_in_one_sentence(placeholder_page):
 
 def test_the_page_title_is_the_one_line_description(placeholder_page):
     # The description pyproject.toml and the README give, as the browser tab shows it.
-    assert "<title>Andrey, a very fast causal discovery package</title>" in placeholder_page
+    assert "<title>Andrey, the fastest causal discovery package</title>" in placeholder_page
 
 
 # The registry as it is, and without one method the description does not name: the count of "more"
@@ -1566,9 +1566,9 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     assert 'src=".github/readme/banner.svg"' in header
     # The banner links the website's homepage.
     assert '<a href="https://andrey.abel.ai/"><img' in header
-    assert 'alt="Andrey, a very fast causal discovery package"' in header
+    assert 'alt="Andrey, the fastest causal discovery package"' in header
     assert "<picture" not in header and "<h1" not in readme
-    assert cards.TAGLINE == "A very fast causal discovery package"
+    assert cards.TAGLINE == "The fastest causal discovery package"
 
 
 @pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "hourglass", "ground"])
@@ -1685,7 +1685,7 @@ def test_every_hand_written_copy_of_the_claim_is_the_builds():
 def test_the_citation_title_is_the_tagline():
     # The package's own line, as on the README banner; the homepage's headline is campaign wording.
     cff = (ROOT / "CITATION.cff").read_text()
-    assert 'title: "Andrey: A very fast causal discovery package"' in cff
+    assert 'title: "Andrey: The fastest causal discovery package"' in cff
     for page in (ROOT / "README.md", ROOT / "docs" / "docs" / "faq.md"):
         text = page.read_text()
-        assert "title = {Andrey: A very fast causal discovery package}," in text, page.name
+        assert "title = {Andrey: The fastest causal discovery package}," in text, page.name
