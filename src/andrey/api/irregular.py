@@ -378,7 +378,9 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     -----
     The search finds sinks from the bottom up and stops at the first variable it cannot separate,
     leaving it and every variable above it in one unordered block: the variables a hidden cause
-    confounds, their observed ancestors, and any other confounded pairs. An ``o-o`` pair need not
+    confounds, their observed ancestors, and any other confounded pairs. Candidates whose test
+    statistics are equal after rounding are chosen by each column's rank, as in :func:`~andrey.hc`,
+    so reordering the columns does not change the choice. An ``o-o`` pair need not
     share a cause, and edges among the block's variables stay unoriented. The edge weights come
     from an adaptive-Lasso regression of each variable on those before it, which needs more rows
     than columns.

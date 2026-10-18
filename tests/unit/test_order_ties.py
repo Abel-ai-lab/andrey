@@ -15,7 +15,10 @@ import numpy as np
 
 import andrey
 from andrey.core.ci import FisherZ
+from andrey.core.independence import gamma_gram
 from andrey.core.score import BICScore
+from andrey.irregular.bottom_up_parce import _fisher_hsic_test, _residual
+from andrey.search._parallel import _KEY_DP
 from andrey.search.calm import moral_graph
 from andrey.search.ges import ges
 from andrey.search.xges import xges
@@ -195,3 +198,37 @@ def test_lpcmci_ties(monkeypatch) -> None:
         return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
 
     _assert_order_free(fit, x, "andrey.temporal.lpcmci", monkeypatch)
+
+
+def test_bottom_up_parce_lingam_ties(monkeypatch) -> None:
+    """Columns 0 and 1 are children of column 2 and tie as the first sink.
+
+    Every row is followed by a copy with columns 0 and 1 swapped, so each leading block of rows,
+    which the HSIC bandwidth reads, is symmetric too.
+    """
+    rng = np.random.default_rng(0)
+    z = rng.uniform(-1, 1, (300, 3))
+    z[:, :2] += z[:, 2:]
+    z = np.round(10 * z)
+    x = np.empty((600, 3))
+    x[0::2], x[1::2] = z, z[:, [1, 0, 2]]
+    centered = x - x.mean(axis=0)
+    cov = np.cov(centered, rowvar=False)
+    grams = [gamma_gram(centered[:, [j]]) for j in range(3)]
+    stats = []
+    for j in (0, 1):
+        residual = _residual(centered, cov, np.array([1 - j, 2]), j)
+        stats.append(_fisher_hsic_test([grams[1 - j], grams[2]], residual, 600, np.inf)[1])
+    assert round(stats[0], _KEY_DP) == round(stats[1], _KEY_DP)
+
+    def order(data: np.ndarray, columns: np.ndarray) -> list[int]:
+        found = andrey.bottom_up_parce_lingam(data[:, columns]).metadata["causal_order"]
+        return [int(columns[v]) for v in found]
+
+    orders = [np.array(columns) for columns in permutations(range(3))]
+    want = order(x, np.arange(3))
+    assert all(order(x, columns) == want for columns in orders)
+    module = importlib.import_module("andrey.irregular.bottom_up_parce")
+    monkeypatch.setattr(module, "tie_ranks", _by_position)
+    by_position = order(x, np.arange(3))
+    assert any(order(x, columns) != by_position for columns in orders)
