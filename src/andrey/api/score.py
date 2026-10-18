@@ -139,7 +139,9 @@ def ges(
     continuous data on graphs of up to a million variables [2]_.
 
     **How it works.** In the forward phase, a variable with more than ``n_variables / 2`` parents
-    gets no new edges. The backward phase has no cap.
+    gets no new edges. The backward phase has no cap. Moves whose score changes are equal after
+    rounding are chosen by each column's rank, as in :func:`~andrey.hc`, so reordering the columns
+    reorders the graph's nodes and changes nothing else, unless two columns are identical.
 
     **Categorical data.** ``"local_score_BDeu"`` takes each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and

@@ -239,8 +239,8 @@ def stable_key(delta: float, n: int) -> float:
 
     ``n`` is the caller's scale factor (see :data:`_KEY_DP`): HC's sample count, GES's variable
     count. Two cross-path ULP-equal deltas quantize to one bucket, so the reduce breaks the
-    resulting tie on the deterministic ``(x, y, index)`` remainder of the key rather than on
-    unstable low-order bits. Serial and parallel therefore select byte-identical moves however the
+    resulting tie on the deterministic remainder of the caller's key rather than on unstable
+    low-order bits. Serial and parallel therefore select byte-identical moves however the
     targets are chunked or the adds are batched into the einsum.
     """
     return round(delta / n, _KEY_DP)
