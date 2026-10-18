@@ -247,10 +247,12 @@ def _linearly_dependent(kind: str) -> np.ndarray:
     return np.column_stack([a, b, third, noise])
 
 
-@pytest.mark.parametrize("kind", ["duplicate", "combination"])
-def test_exact_search_rejects_linearly_dependent_columns(kind):
+@pytest.mark.parametrize(
+    ("kind", "message"), [("duplicate", "repeats"), ("combination", "linear function of")]
+)
+def test_exact_search_rejects_linearly_dependent_columns(kind, message):
     """A column that is a linear function of others leaves no residual variance to score."""
-    with pytest.raises(ValueError, match="linear function of"):
+    with pytest.raises(ValueError, match=message):
         andrey.exact_search(_linearly_dependent(kind))
 
 
