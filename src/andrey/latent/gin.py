@@ -132,13 +132,13 @@ def _find_root(
 ) -> list[int] | None:
     """Return the root among ``clusters`` given the ``ordered`` ones, or ``None`` if none passes.
 
-    The surrogate for a candidate and one other remaining cluster is built from the first member of
-    each and of every ordered cluster, against the candidate's other members and the second member
-    of every ordered cluster. A candidate passes when that pooled p-value is at least ``alpha`` for
-    every other cluster; of the passing candidates, the one with the highest lowest p-value is the
-    root. Lowest p-values equal to ``_KEY_DP`` decimals go to the cluster whose members' sorted
-    ``ranks``, from :func:`~andrey.search.hc.tie_ranks`, come first. A single remaining cluster is
-    the root.
+    Each cluster lists its members in order of ``ranks``. The surrogate for a candidate and one
+    other remaining cluster is built from the first member of each and of every ordered cluster,
+    against the candidate's other members and the second member of every ordered cluster. A
+    candidate passes when that pooled p-value is at least ``alpha`` for every other cluster; of the
+    passing candidates, the one with the highest lowest p-value is the root. Lowest p-values equal
+    to ``_KEY_DP`` decimals go to the cluster whose members' sorted ``ranks``, from
+    :func:`~andrey.search.hc.tie_ranks`, come first. A single remaining cluster is the root.
     """
     if len(clusters) == 1:
         return clusters[0]
@@ -165,10 +165,13 @@ def _order_clusters(
 ) -> tuple[list[list[int]], list[list[int]]]:
     """Order clusters from the earliest latent by peeling roots; return ``(ordered, unordered)``.
 
-    The peeling stops at the first step where no candidate passes, and the clusters left then are
-    returned unordered, sorted by smallest member.
+    The surrogates read each cluster's members in order of ``ranks``, each variable's
+    :func:`~andrey.search.hc.tie_ranks`, so the members they use follow the variables when the
+    columns are reordered. The peeling stops at the first step where no candidate passes, and the
+    clusters left then are returned unordered, sorted by smallest member. Every returned cluster
+    lists its members in ascending order.
     """
-    pending = [list(cluster) for cluster in clusters]
+    pending = [sorted(cluster, key=ranks.__getitem__) for cluster in clusters]
     ordered: list[list[int]] = []
     while pending:
         root = _find_root(data, cov, pending, ordered, alpha, ranks)
@@ -176,7 +179,7 @@ def _order_clusters(
             break
         ordered.append(root)
         pending.remove(root)
-    return ordered, sorted(pending, key=min)
+    return [sorted(c) for c in ordered], sorted((sorted(c) for c in pending), key=min)
 
 
 def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
