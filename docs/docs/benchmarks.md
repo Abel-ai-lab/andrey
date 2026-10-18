@@ -17,41 +17,74 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.6.0
+:link: benchmarks/0.7.0
 :link-type: doc
-:link-alt: The 0.6.0 release card: mixed and categorical data
-:class-card: release-cover release-art release-art-0-6-0
+:link-alt: The 0.7.0 release card: permutation invariance
+:class-card: release-cover release-art release-art-0-7-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Mixed and categorical data
+Permutation invariance
 
-0.6.0
+0.7.0
 :::
 
 ::::{div} release-tldr
 
-0.6.0 is here: PC, GES, hill climbing, and seven more methods now take tests and scores for
-categorical columns and for tables that mix them with numbers. On categorical data, GES runs more
-than 50x faster than causal-learn at every size and returns the same graph on every dataset.
+0.7.0 is here: PC, hill climbing, and tabu search are order-independent (Colombo and Maathuis,
+2014), so their graph is the same up to relabeling the nodes however you order the columns, and
+GIES, exact search, CD-NOD, MultiGroupDirectLiNGAM, GFCI, GIN, and CALM are supported.
+GES runs more than 60x faster than causal-learn at 50 to 150 variables, with the same graph on
+every dataset.
 
 :::{div} release-stats
 
-- **15 of 15** datasets with the same GES graph as causal-learn
-- **More than 50x** GES speedup over causal-learn at every size
-- **More than 20x** hill climbing speedup over pgmpy at every size
+- **More than 60x** GES speedup over causal-learn from 50 to 150 variables
+- **More than 20x** GIN speedup over Tetrad at every size
+- **More than 15x** CD-NOD speedup over causal-learn from 20 variables, with fewer errors
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.6.0.md)
-[Read the post](../blog/20261017-andrey-0-6-0.md)
+[Read the release card](benchmarks/0.7.0.md)
+[Read the post](../blog/20261031-andrey-0-7-0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.6.0
+:link-type: doc
+:link-alt: The 0.6.0 release card: mixed and categorical data
+:class-card: release-tile release-art-0-6-0
+:shadow: none
+:margin: 0
+
+0.6.0
+:::
+
+:::{div} release-body
+<h3>Mixed and categorical data</h3>
+
+PC, GES, hill climbing, and seven more methods for categorical columns and for tables that mix them
+with numbers, compared with causal-learn, pgmpy, bnlearn, and Tetrad.
+
+- **10** methods
+- GES **more than 50x** faster than causal-learn at every size
+:::
+
+:::{div} release-meta
+Released October 17, 2026
+
+- [Release card<span class="visually-hidden"> 0.6.0</span>](benchmarks/0.6.0.md)
+- [Post: Mixed and categorical data](../blog/20261017-andrey-0-6-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -211,6 +244,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.7.0: permutation invariance <benchmarks/0.7.0>
 0.6.0: mixed and categorical data <benchmarks/0.6.0>
 0.5.0: time series <benchmarks/0.5.0>
 0.4.0: pairwise direction <benchmarks/0.4.0>
