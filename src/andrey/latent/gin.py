@@ -17,6 +17,9 @@ adds a latent to the order only when the condition holds.
 
 The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed from
 each column's own data, so every column order of the same data gives the same clusters and order.
+
+Each column's HSIC kernel matrix is built once per fit and reused by every test, so a fit holds one
+``n x n`` matrix per column for ``n`` rows.
 """
 
 from __future__ import annotations
@@ -27,10 +30,12 @@ from itertools import combinations
 import numpy as np
 from scipy.special import gammaincc
 
-from andrey.core.independence import hsic_gamma_test
+from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.core.output import StructureOutput
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
 from andrey.search.hc import tie_ranks
+
+_Gram = tuple[np.ndarray, float]  # a column's centered HSIC kernel matrix and its mean
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,10 +77,16 @@ def _surrogate(data: np.ndarray, cov: np.ndarray, x: list[int], z: list[int]) ->
     return data[:, x] @ omega
 
 
-def _independence_pvalue(data: np.ndarray, cov: np.ndarray, x: list[int], z: list[int]) -> float:
-    """Fisher-pooled p-value that the surrogate of ``x`` is independent of every member of ``z``."""
-    e = _surrogate(data, cov, x, z)
-    pvals = [hsic_gamma_test(data[:, j], e)[1] for j in z]
+def _independence_pvalue(
+    data: np.ndarray, cov: np.ndarray, grams: list[_Gram], x: list[int], z: list[int]
+) -> float:
+    """Fisher-pooled p-value that the surrogate of ``x`` is independent of every member of ``z``.
+
+    ``grams`` holds each column's :func:`~andrey.core.independence.gamma_gram`, so only the
+    surrogate's is built here.
+    """
+    e_gram = gamma_gram(_surrogate(data, cov, x, z))
+    pvals = [hsic_gamma_from_grams(grams[j], e_gram, data.shape[0])[1] for j in z]
     return _fisher_combine(pvals)
 
 
@@ -100,7 +111,9 @@ def _merge_overlapping(groups: list[tuple[int, ...]]) -> list[list[int]]:
     return [sorted(cluster) for cluster in merged]
 
 
-def _find_clusters(data: np.ndarray, cov: np.ndarray, alpha: float) -> list[list[int]]:
+def _find_clusters(
+    data: np.ndarray, cov: np.ndarray, grams: list[_Gram], alpha: float
+) -> list[list[int]]:
     """Discover causal clusters by growing the group size and keeping GIN-passing groups."""
     n = data.shape[1]
     available = set(range(n))
@@ -112,7 +125,7 @@ def _find_clusters(data: np.ndarray, cov: np.ndarray, alpha: float) -> list[list
             remaining = sorted(available - set(group))
             if not remaining:
                 continue
-            pval = _independence_pvalue(data, cov, list(group), remaining)
+            pval = _independence_pvalue(data, cov, grams, list(group), remaining)
             if pval >= alpha:
                 passing.append(group)
         if passing:
@@ -127,6 +140,7 @@ def _find_clusters(data: np.ndarray, cov: np.ndarray, alpha: float) -> list[list
 def _root_pvalue(
     data: np.ndarray,
     cov: np.ndarray,
+    grams: list[_Gram],
     candidate: list[int],
     other: list[int],
     ordered: list[list[int]],
@@ -145,13 +159,14 @@ def _root_pvalue(
         x = [member, other[k % len(other)]] + [prefix[k % len(prefix)] for prefix in ordered]
         z = [m for m in candidate if m != member]
         z += [prefix[(k + 1) % len(prefix)] for prefix in ordered]
-        pvals.append(_independence_pvalue(data, cov, x, z))
+        pvals.append(_independence_pvalue(data, cov, grams, x, z))
     return _fisher_combine(pvals)
 
 
 def _find_root(
     data: np.ndarray,
     cov: np.ndarray,
+    grams: list[_Gram],
     clusters: list[list[int]],
     ordered: list[list[int]],
     alpha: float,
@@ -167,7 +182,7 @@ def _find_root(
     best, best_pvalue = None, -1.0
     for candidate in clusters:
         lowest = min(
-            _root_pvalue(data, cov, candidate, other, ordered)
+            _root_pvalue(data, cov, grams, candidate, other, ordered)
             for other in clusters
             if other is not candidate
         )
@@ -177,7 +192,7 @@ def _find_root(
 
 
 def _order_clusters(
-    data: np.ndarray, cov: np.ndarray, clusters: list[list[int]], alpha: float
+    data: np.ndarray, cov: np.ndarray, grams: list[_Gram], clusters: list[list[int]], alpha: float
 ) -> tuple[list[list[int]], list[list[int]]]:
     """Order clusters from the earliest latent by peeling roots; return ``(ordered, unordered)``.
 
@@ -187,7 +202,7 @@ def _order_clusters(
     pending = [list(cluster) for cluster in clusters]
     ordered: list[list[int]] = []
     while pending:
-        root = _find_root(data, cov, pending, ordered, alpha)
+        root = _find_root(data, cov, grams, pending, ordered, alpha)
         if root is None:
             break
         ordered.append(root)
@@ -213,8 +228,9 @@ def gin(data: np.ndarray, *, alpha: float = 0.05) -> GINResult:
     by_rank = np.argsort(tie_ranks(data))
     ranked = np.ascontiguousarray(data[:, by_rank])
     cov = np.cov(ranked, rowvar=False)
-    clusters = _find_clusters(ranked, cov, alpha)
-    ordered, unordered = _order_clusters(ranked, cov, clusters, alpha)
+    grams = [gamma_gram(ranked[:, j]) for j in range(ranked.shape[1])]
+    clusters = _find_clusters(ranked, cov, grams, alpha)
+    ordered, unordered = _order_clusters(ranked, cov, grams, clusters, alpha)
 
     def columns(groups: list[list[int]]) -> list[list[int]]:
         return [sorted(int(by_rank[i]) for i in group) for group in groups]

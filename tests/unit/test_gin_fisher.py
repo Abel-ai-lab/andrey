@@ -36,12 +36,12 @@ def test_gin_root_test_puts_every_member_in_the_surrogate(monkeypatch) -> None:
     candidate, other, ordered = [0, 1, 2], [3, 4], [[5, 6], [7, 8, 9, 10]]
     runs: list[tuple[list[int], list[int]]] = []
 
-    def pooled(data, cov, x, z):
+    def pooled(data, cov, grams, x, z):
         runs.append((x, z))
         return 0.1 * len(runs)
 
     monkeypatch.setattr(engine, "_independence_pvalue", pooled)
-    pvalue = engine._root_pvalue(np.zeros((1, 11)), np.eye(11), candidate, other, ordered)
+    pvalue = engine._root_pvalue(np.zeros((1, 11)), np.eye(11), [], candidate, other, ordered)
 
     assert len(runs) == 4
     for cluster in [candidate, other, *ordered]:

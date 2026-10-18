@@ -97,11 +97,12 @@ def gin(
     latent put after one it causes; with the benchmark's random weights instead, 2 of 10 complete
     three-latent models put a latent after one it causes. It tests every group of observed
     variables of each size, from pairs upward, so the number of tests grows combinatorially with
-    the variable count, and each HSIC test's time and memory grow with the square of the row count.
-    Clusters have at least two variables, so a latent with a single indicator is not found. Each
-    cluster gets one latent, so indicators that share two or more latents appear as one. It assumes
-    every observed variable measures a latent: variables that depend on no other variable pass the
-    cluster test trivially and are grouped into one cluster.
+    the variable count, and each HSIC test's time and memory grow with the square of the row count;
+    the fit keeps one such kernel matrix per variable, 8 MB each at 1,000 rows. Clusters have at
+    least two variables, so a latent with a single indicator is not found. Each cluster gets one
+    latent, so indicators that share two or more latents appear as one. It assumes every observed
+    variable measures a latent: variables that depend on no other variable pass the cluster test
+    trivially and are grouped into one cluster.
 
     References
     ----------

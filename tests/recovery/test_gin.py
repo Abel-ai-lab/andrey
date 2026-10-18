@@ -130,12 +130,12 @@ def test_gin_root_is_the_passing_candidate_with_the_highest_p_value(monkeypatch)
     first_step = {(0, 2): 0.9, (0, 4): 0.01, (2, 0): 0.6, (2, 4): 0.8, (4, 0): 0.3, (4, 2): 0.7}
     later_step = {(0, 4): 0.04, (4, 0): 0.001}
 
-    def pooled(data, cov, candidate, other, ordered):
+    def pooled(data, cov, grams, candidate, other, ordered):
         table = later_step if ordered else first_step
         return table[(candidate[0], other[0])]
 
     monkeypatch.setattr(engine, "_root_pvalue", pooled)
     clusters = [[0, 1], [2, 3], [4, 5]]
-    ordered, unordered = engine._order_clusters(np.zeros((1, 6)), np.eye(6), clusters, 0.05)
+    ordered, unordered = engine._order_clusters(np.zeros((1, 6)), np.eye(6), [], clusters, 0.05)
     assert ordered == [[2, 3]]
     assert unordered == [[0, 1], [4, 5]]
