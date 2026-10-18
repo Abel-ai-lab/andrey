@@ -3,7 +3,8 @@
 Each variable owns a grow-shrink tree; sweeps slide variables to their best order position
 (:func:`_better_mutation`) until no move improves the total. Scores are negated local scores, so
 the search maximizes; BIC moves take the Schur update, the mixed-data scores two full scores. The
-algorithm and its reference are described on :func:`andrey.boss`.
+search runs on the columns sorted by tie rank (:func:`ranked_score`), so a variable's index is its
+tie rank. The algorithm and its reference are described on :func:`andrey.boss`.
 """
 
 from __future__ import annotations
@@ -12,11 +13,14 @@ import random
 from collections.abc import Sequence
 
 import numpy as np
+import numpy.typing as npt
 
 from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore, LocalScore, make_score
+from andrey.core.score import MIXED_SCORES, BICScore, LocalScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
+from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
 PERMUTATION_SCORES: tuple[str, ...] = (
@@ -27,6 +31,42 @@ PERMUTATION_SCORES: tuple[str, ...] = (
 
 # Fixed absolute BIC-score tolerance for numerical ties.
 _SCORE_EPS = 1e-6
+
+
+def ranked_score(
+    x: np.ndarray, score_func: str, lambda_value: float, categorical: npt.ArrayLike | None
+) -> tuple[LocalScore, np.ndarray]:
+    """The local score over the columns of ``x`` sorted by :func:`~andrey.search.hc.tie_ranks`.
+
+    A permutation search over this score makes every choice that goes by variable index by each
+    column's data instead of its position: its starting order, the orders its seed shuffles, and
+    its ties between candidate parents and between order moves. The sorted data are C-contiguous
+    whatever the layout of ``x``, so every column order of the same data gives the same score, bit
+    for bit, and reordering the columns of ``x`` reorders the learned graph's nodes and changes
+    nothing else, unless two columns are identical. Under a mixed-data score the categorical
+    columns rank by which rows share a category, and the mask is sorted with them; the BIC score
+    ranks every column as continuous.
+
+    Returns the score and ``ranks``: column ``i`` of ``x`` is variable ``ranks[i]`` of the score,
+    so a matrix ``m`` over the score's variables maps back to the columns of ``x`` as
+    ``m[np.ix_(ranks, ranks)]``. A ``ValueError`` from the score, such as one naming linearly
+    dependent columns, names the columns of ``x``.
+    """
+    mask = column_mask(categorical, x.shape[1]) if score_func in MIXED_SCORES else None
+    ranks = tie_ranks(x, mask)
+    by_rank = np.argsort(ranks)
+    try:
+        score = make_score(
+            score_func,
+            np.ascontiguousarray(x[:, by_rank]),
+            lambda_value=lambda_value,
+            categorical=None if mask is None else mask[by_rank],
+        )
+    except ValueError:
+        # The error names positions in the sorted data; the same check on ``x`` names its columns.
+        make_score(score_func, x, lambda_value=lambda_value, categorical=categorical)
+        raise
+    return score, ranks
 
 
 class _GSTNode:
@@ -260,7 +300,9 @@ def boss(
 
     Notes
     -----
-    See :func:`andrey.boss` for the score tolerance.
+    The search runs on the columns sorted by :func:`ranked_score`, so the starting order, the sweep
+    order, and every tie follow the columns' data, and reordering the columns of ``data`` reorders
+    the CPDAG's nodes. See :func:`andrey.boss` for the score tolerance.
     """
     X = np.asarray(data, dtype=np.float64)
     p = X.shape[1]
@@ -271,7 +313,7 @@ def boss(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
-    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    score, ranks = ranked_score(X, score_func, lambda_value, categorical)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
 
@@ -303,5 +345,5 @@ def boss(
             adj[parent, child] = TAIL
             adj[child, parent] = ARROW
 
-    cpdag = dag2cpdag(adj)
+    cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
     return to_structure(cpdag, kind="cpdag"), float(total)
