@@ -518,10 +518,20 @@ def hc(
     -----
     The search starts from the empty graph and stops when no single move improves the score, or
     after ``max_iter`` moves when set. Under a mixed-data score, no move gives a categorical column
-    a continuous parent, so the DAG found is a conditional linear Gaussian network. Exact score ties
-    between moves, such as adding ``x -> y`` or ``y -> x`` under a score-equivalent score, break by
-    a hash of each column's values, so reordering the columns does not change the graph found
-    unless two columns are identical.
+    a continuous parent, so the DAG found is a conditional linear Gaussian network.
+
+    Under a score-equivalent score, adding ``x -> y`` or ``y -> x`` from the empty graph gives the
+    same score. Such ties recur during search, and choosing one move can change later moves and
+    the final CPDAG. Each column gets a rank computed from its own data to choose between tied
+    moves. The rank moves with the column, so reordering the columns reorders the graph's nodes
+    and changes nothing else, unless two columns are identical. The rank is arbitrary with respect
+    to causal structure.
+
+    A continuous column ranks by whether its values rise, fall, or stay equal from row to row,
+    which last-bit differences in the data, such as a BLAS kernel's on another CPU, leave
+    unchanged; a categorical column ranks by which rows share a category, which recoding the
+    categories leaves unchanged. So the same data give the same graph on other machines, unless two
+    tied score changes round to different values.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
     to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
