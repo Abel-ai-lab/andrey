@@ -33,6 +33,11 @@ def test_grasp_recovery():
     assert_recorded_output(out, "GRaSP", case="gauss_5v")
 
 
+def test_grasp_at_depth_2_recovers_the_depth_3_graph():
+    out = andrey.grasp(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA, depth=2)
+    assert_recorded_output(out, "GRaSP", case="gauss_5v")
+
+
 def test_hc_output_contract():
     out = andrey.hc(datagen.generate("gauss_5v"))
     assert out.structure.kind == "cpdag" and "score" in out.metadata

@@ -21,6 +21,8 @@ change names its pull request.
 - `fci` and `gfci` take `possible_dsep`: `"fast"`, the default, builds each possible-d-separation
   set as before, in the order the search visits nodes, and `"order_free"` builds sets that do not
   depend on that order, at the cost of more tests on some graphs. ([#168])
+- `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
+  only 3; smaller depths search less and run faster. ([#TBD])
 
 ### Changed
 

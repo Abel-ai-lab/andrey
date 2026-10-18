@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
 from andrey.data import sample_scm
 
 
@@ -175,6 +176,22 @@ def test_exact_search_gives_no_variable_more_parents_than_rows_minus_2():
     heads = [v for _, v, _ in dag.oriented_edges(index=True)]
     assert dag.n_nodes == 6
     assert all(heads.count(v) <= 2 for v in range(6))
+
+
+@pytest.mark.parametrize("depth", [1, 2])
+def test_grasp_returns_a_valid_cpdag_at_shallower_depths(depth):
+    data = sample_scm(d=8, n=400, seed=1, density=2.0, scale="standardize").data
+    out = andrey.grasp(data, depth=depth)
+    cpdag = from_structure(out.structure)
+    assert out.structure.kind == "cpdag" and out.structure.n_nodes == 8
+    np.testing.assert_array_equal(dag2cpdag(pdag2dag(cpdag)), cpdag)
+    assert np.isfinite(out.metadata["score"])
+
+
+@pytest.mark.parametrize("depth", [0, -1])
+def test_grasp_rejects_a_depth_below_1(depth):
+    with pytest.raises(ValueError, match="depth must be an int at least 1"):
+        andrey.grasp(_data(), depth=depth)
 
 
 @pytest.mark.parametrize("fit", [andrey.varma_lingam, andrey.granger], ids=lambda f: f.__name__)
