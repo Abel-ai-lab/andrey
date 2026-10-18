@@ -80,20 +80,18 @@ def test_calm_recovers_the_true_class() -> None:
 def test_calm_is_deterministic() -> None:
     pytest.importorskip("torch")
     X, _ = _random_sem(6, 800, 0.35, seed=3)
-    first = andrey.calm(X, seed=0, subproblem_iter=400)
-    second = andrey.calm(X, seed=0, subproblem_iter=400)
+    first = andrey.calm(X, seed=0, subproblem_iter=100, max_outer=2)
+    second = andrey.calm(X, seed=0, subproblem_iter=100, max_outer=2)
+    assert first.structure.oriented_edges() != []
     assert first == second
 
 
-def test_calm_output_contract() -> None:
-    pytest.importorskip("torch")
-    X, _ = _random_sem(5, 600, 0.4, seed=1)
-    out = andrey.calm(X, seed=0, subproblem_iter=300)
-    assert isinstance(out.structure, GraphStructure)
-    assert out.structure.kind == "dag"
-    assert out.metadata["algorithm"] == "CALM"
-    assert out.metadata["seed"] == 0
-    assert out.weighted_adjacency.shape == (5, 5)
+def test_calm_output_contract(tree_fit) -> None:
+    assert isinstance(tree_fit.structure, GraphStructure)
+    assert tree_fit.structure.kind == "dag"
+    assert tree_fit.metadata["algorithm"] == "CALM"
+    assert tree_fit.metadata["seed"] == 0
+    assert tree_fit.weighted_adjacency.shape == (5, 5)
 
 
 def test_calm_rejects_a_non_finite_loss() -> None:

@@ -790,7 +790,7 @@ def cdnod(
     median errors (SHD against the CPDAG the domain index makes identifiable) stayed below the empty
     graph's at every size (12 against 50 at 50 variables). The median fit took 0.18 s at 50
     variables, on 4 cores. The independent-change step is not benchmarked yet; its tests run it on
-    at most 4 variables with 600 rows from 20 domains. It runs the PC search with the index as one
+    at most 3 variables with 600 rows from 20 domains. It runs the PC search with the index as one
     more variable, so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
     partial-correlation tests assume linear relations with Gaussian noise and find only a change in
     a variable's mean that is linear in the index: on two variables from two domains with 600 rows,
