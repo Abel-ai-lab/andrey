@@ -65,6 +65,10 @@ def test_is_a_user_warning():
     assert issubclass(andrey.ExperimentalWarning, UserWarning)
 
 
+#: Settings that shorten a slow fit; the facade path stays the same.
+SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
+
+
 @pytest.mark.parametrize("name", sorted(n for n, s in REGISTRY.items() if s.status == "supported"))
 def test_supported_methods_do_not_warn_experimental(name, chain):
     """Only ``ExperimentalWarning`` fails here: a numerical warning from a fit is not a status. A
@@ -83,4 +87,4 @@ def test_supported_methods_do_not_warn_experimental(name, chain):
     ]
     with warnings.catch_warnings():
         warnings.simplefilter("error", andrey.ExperimentalWarning)
-        getattr(andrey, name)(data, *contexts)
+        getattr(andrey, name)(data, *contexts, **SHORT.get(name, {}))
