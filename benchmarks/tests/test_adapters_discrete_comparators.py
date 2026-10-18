@@ -26,7 +26,6 @@ from conftest import needs_r
 from andrey.core.ci import ChiSquare
 from andrey.core.score import BDeuScore, CategoricalBICScore
 from andrey.data import sample_discrete
-from andrey.search.hc import hc
 from andrey_bench.adapters import pgmpy_hc
 from andrey_bench.adapters.bnlearn_discrete import (
     SCORES,
@@ -55,6 +54,37 @@ def _total(score, adjacency: np.ndarray) -> float:
     """A DAG's total score; ``adjacency[i, j] == 1`` is the edge ``i -> j``."""
     d = len(adjacency)
     return sum(score.score(j, np.flatnonzero(adjacency[:, j]).tolist()) for j in range(d))
+
+
+def _acyclic(adjacency: np.ndarray) -> bool:
+    """Whether ``adjacency`` (``[i, j] == 1`` for ``i -> j``) has no directed cycle."""
+    indegree = adjacency.sum(axis=0)
+    ready = [j for j in range(len(adjacency)) if indegree[j] == 0]
+    seen = 0
+    while ready:
+        i = ready.pop()
+        seen += 1
+        for j in np.flatnonzero(adjacency[i]):
+            indegree[j] -= 1
+            if indegree[j] == 0:
+                ready.append(int(j))
+    return seen == len(adjacency)
+
+
+def _improving_move(score, adjacency: np.ndarray, tol: float) -> tuple[str, int, int] | None:
+    """An edge addition, removal, or reversal that keeps a DAG and lowers the total score by more
+    than ``tol``, or ``None`` when ``adjacency`` is a local optimum of ``score``."""
+    base = _total(score, adjacency)
+    for i, j in zip(*np.nonzero(~np.eye(len(adjacency), dtype=bool)), strict=True):
+        ops = ("remove", "reverse") if adjacency[i, j] else () if adjacency[j, i] else ("add",)
+        for op in ops:
+            new = adjacency.copy()
+            new[i, j] = op == "add"
+            if op == "reverse":
+                new[j, i] = 1
+            if (op == "remove" or _acyclic(new)) and _total(score, new) < base - tol:
+                return op, int(i), int(j)
+    return None
 
 
 _DAG = np.zeros((5, 5), dtype=int)
@@ -359,15 +389,18 @@ def test_a_bnlearn_fit_gives_its_kind_of_graph(adapter) -> None:
 @needs_r()
 @pytest.mark.parametrize("seed", [0, 1, 2])
 @pytest.mark.parametrize("score_func", HC_SCORES)
-def test_bnlearn_hill_climbing_reaches_the_score_andreys_does(score_func: str, seed: int) -> None:
-    """With every setting matched, both climb to a graph of the same score on Andrey's scale."""
+def test_bnlearn_hill_climbing_stops_where_andreys_score_cannot_improve(
+    score_func: str, seed: int
+) -> None:
+    """With every setting matched, bnlearn's climb ends at a graph no single edge move improves on
+    Andrey's scale. Andrey's climb can stop at a different such graph: each breaks exact score ties
+    its own way."""
     x = sample_discrete(d=8, n=2000, seed=seed).data
     adapter = BnlearnHCCategorical(score_func)
     adapter.setup()
     adjacency = adapter.fit(x, adapter.params())
-    _, andrey_total = hc(x, score_func=score_func)
     score = BDeuScore(x) if score_func == "local_score_BDeu" else CategoricalBICScore(x)
-    assert _total(score, adjacency) == pytest.approx(andrey_total, rel=1e-9)
+    assert _improving_move(score, adjacency, 1e-9 * abs(_total(score, adjacency))) is None
 
 
 @needs_r()
