@@ -233,7 +233,6 @@ def test_exact_search_ignores_the_variables_means(search_method):
     independent = rng.normal(5.0, 1.0, size=(500, 3))
     found = andrey.exact_search(independent, search_method=search_method).structure
     assert found.oriented_edges() == []
-    # A shift can change which score-tied DAG is returned, not its Markov equivalence class.
     x = datagen.generate("gauss_5v")
     centered = andrey.exact_search(x, search_method=search_method).structure
     shifted = andrey.exact_search(x + 7.0, search_method=search_method).structure
