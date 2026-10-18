@@ -330,3 +330,27 @@ def test_gin_member_order() -> None:
     assert len(want) == 2
     for columns in ([1, 0, 3, 2], [1, 0, 2, 3], [3, 2, 1, 0], [2, 3, 1, 0]):
         assert causal_order(np.array(columns)) == want
+
+
+def test_bottom_up_parce_lingam_weights() -> None:
+    """Column 2 is regressed on the unordered block of columns 0 and 1 in an order-free order.
+
+    Column 2 depends on columns 0 and 1, and every row is followed by a copy with columns 0 and 1
+    swapped, so the two are left unordered and the adaptive-Lasso fit of column 2 reads both.
+    """
+    rng = np.random.default_rng(4)
+    z = rng.uniform(-1, 1, (300, 3))
+    z[:, 2] += z[:, 0] + z[:, 1]
+    z = np.round(10 * z)
+    x = np.empty((600, 3))
+    x[0::2], x[1::2] = z, z[:, [1, 0, 2]]
+    out = andrey.bottom_up_parce_lingam(x)
+    assert out.metadata["causal_order"] == [[0, 1], 2]
+    want = out.structure.to_numpy()
+    for order in permutations(range(3)):
+        found = _mapped(
+            lambda data: andrey.bottom_up_parce_lingam(data).structure.to_numpy(),
+            x,
+            np.array(order),
+        )
+        np.testing.assert_array_equal(found, want)

@@ -172,12 +172,15 @@ def estimate_adjacency(X: np.ndarray, order: list) -> np.ndarray:
 
     ``B[i, j]`` weights edge ``j -> i``, fitted by adaptive Lasso; an order-unknown block adds no
     directed edges and every pair inside it is set to ``NaN`` at both ``B[i, j]`` and ``B[j, i]``.
+    Each fit lists its predictors by :func:`~andrey.search.hc.tie_ranks`, so the weights follow the
+    columns when they are reordered.
     """
     d = X.shape[1]
+    ranks = tie_ranks(X).tolist()
     B = np.zeros((d, d), dtype=np.float64)
     for position in range(1, len(order)):
         target = order[position]
-        predictors = _flatten(order[:position])
+        predictors = sorted(_flatten(order[:position]), key=ranks.__getitem__)
         if not predictors:
             continue
         B[target, predictors] = adjacency.predict_adaptive_lasso(X, predictors, target)
