@@ -85,6 +85,24 @@ def test_pick_ties_within_the_tolerance_only() -> None:
     assert pwling.pick(np.array([-0.25, -0.25 - 1e-9]), [0, 1], ranks) == 0
 
 
+def test_pick_ranks_nan_scores_highest() -> None:
+    """A NaN score outranks every number, and NaN candidates tie among themselves."""
+    ranks = np.array([3, 2, 1, 0])
+    assert pwling.pick(np.array([-1e-3, np.nan, -0.0, -0.0]), [0, 1, 2, 3], ranks) == 1
+    assert pwling.pick(np.array([-1e-3, np.nan, np.nan, -0.0]), [0, 1, 2, 3], ranks) == 2
+
+
+def test_copied_column_gives_a_full_order() -> None:
+    """Ranked data whose last column copies the one before score NaN for the pair and still fit."""
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal((100, 3))
+    for j in (1, 2):
+        x[:, j] += 2 * np.tanh(x[:, j - 1])
+    x[:, 2] = x[:, 1]
+    ranked = np.argsort(np.argsort(x, axis=0), axis=0) / 100.0
+    assert sorted(pwling.find_causal_order(ranked)) == [0, 1, 2]
+
+
 # Orders a plain argmax of the scores gives on continuous data without ties.
 _CONTINUOUS_ORDERS = {
     (6, "uniform", 0): [4, 2, 0, 3, 1, 5],

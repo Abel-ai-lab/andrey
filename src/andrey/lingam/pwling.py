@@ -93,12 +93,15 @@ def score_candidates_serial(X: np.ndarray, U: list[int]) -> np.ndarray:
 def pick(scores: np.ndarray, candidates: list[int], ranks: np.ndarray) -> int:
     """The candidate with the highest score; the lowest ``ranks`` entry among tied candidates.
 
-    ``scores`` are aligned with ``candidates`` and ``<= 0``; two tie when their ``sqrt(-score)``
-    values both lie within ``_TIE_TOL`` of the best one. ``ranks`` is indexed by column, as
+    ``scores`` are aligned with ``candidates`` and ``<= 0`` or NaN; two tie when their
+    ``sqrt(-score)`` values both lie within ``_TIE_TOL`` of the best one. A NaN score, from a
+    candidate whose pairwise residuals vanish (a column that copies another), ranks highest, as
+    under ``np.argmax``; all NaN candidates then tie. ``ranks`` is indexed by column, as
     :func:`~andrey.search.hc.tie_ranks` returns for the input data.
     """
-    norm = np.sqrt(-scores)
-    tied = np.flatnonzero(norm <= norm.min() + _TIE_TOL)
+    norm = np.sqrt(-np.asarray(scores, dtype=np.float64))
+    nan = np.isnan(norm)
+    tied = np.flatnonzero(nan) if nan.any() else np.flatnonzero(norm <= norm.min() + _TIE_TOL)
     return min((candidates[t] for t in tied), key=lambda c: ranks[c])
 
 
