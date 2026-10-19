@@ -1,7 +1,7 @@
 {#- The site's footer on every page, the homepage's too, modeled on craft.do's: a rounded navy card
     below the page, with the wordmark and three link columns under small capitals, and the
     copyright, license, and Abel's mark at the bottom. -#}
-{%- from "nav-icons.html" import icon, logo %}
+{%- from "nav-icons.html" import icon %}
 <div class="docs-footer">
   <div class="docs-footer__top">
     <a class="docs-footer__brand" href="{{ pathto('', 1) }}" aria-label="Andrey home">
@@ -27,7 +27,7 @@
         </ul>
       </div>
       <div>
-        <p class="docs-footer__heading">{{ logo("github") }}Project</p>
+        <p class="docs-footer__heading">{{ icon("folder") }}Project</p>
         <ul>
           <li><a href="{{ repo_url }}">GitHub</a></li>
           <li><a href="{{ pypi_url }}">PyPI</a></li>
