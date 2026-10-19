@@ -49,10 +49,13 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
     possible_dsep: str = "fast",
+    in_column_order: bool = False,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
 
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data score and test.
+    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
+    of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
     """
     X = np.asarray(data, dtype=np.float64)
 
@@ -81,7 +84,7 @@ def gfci(
         else frozenset()
     )
     _orient_colliders_from_pattern(marks, pattern, sepsets, ambiguous)
-    _fci_orient(marks, test, alpha, sepsets, ambiguous)
+    _fci_orient(marks, test, alpha, sepsets, ambiguous, in_column_order=in_column_order)
 
     return GraphStructure.from_numpy(marks, kind="pag")
 
