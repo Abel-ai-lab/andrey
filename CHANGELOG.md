@@ -38,6 +38,8 @@ change names its pull request.
   default. ([#187])
 - `andrey.data.sortability.index_correlation` measures how much a dataset's column order reveals
   of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
+- `andrey.data.load_dataset("diabetes")`, the bnlearn diabetes network: 413 variables and 602
+  arcs. ([#225])
 - `boss` and `grasp` take `score_func="local_score_BDeu"` for categorical data, with the BDeu
   priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
 - `boss` and `grasp` take `score_func="local_score_BIC_categorical"`, the multinomial BIC that
@@ -408,3 +410,4 @@ First alpha release.
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
 [#220]: https://github.com/Abel-ai-lab/andrey/pull/220
+[#225]: https://github.com/Abel-ai-lab/andrey/pull/225
