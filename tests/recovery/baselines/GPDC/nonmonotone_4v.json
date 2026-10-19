@@ -3,8 +3,14 @@
   "case": "nonmonotone_4v",
   "input": {
     "case": "nonmonotone_4v",
+    "column_order": [
+      2,
+      3,
+      0,
+      1
+    ],
     "seed": 20261014,
-    "sha256": "986eb1ab4273cbb752d6dd7e6e1ff49ffd833f0d1f1c630cba3cfb2efd6a9beb",
+    "sha256": "1242fad5f9dc6bf9ab2ce6d9b0ce40603bde039838d85e873e9d052e7878b9ee",
     "shape": [
       400,
       4

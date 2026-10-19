@@ -78,7 +78,7 @@ def _run_granger(X: np.ndarray, algorithm: str) -> dict:
 def _run_ci_test(X: np.ndarray, algorithm: str) -> dict:
     from tests.recovery.helpers.ci_tests import recorded_pvalues
 
-    return recorded_pvalues(algorithm, X, datagen.CASES["nonmonotone_4v"]["queries"])
+    return recorded_pvalues(algorithm, X, "nonmonotone_4v")
 
 
 def _run_multi_group_direct_lingam(groups: list[np.ndarray], algorithm: str) -> dict:

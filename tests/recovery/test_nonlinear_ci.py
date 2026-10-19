@@ -50,14 +50,17 @@ def indep_test(request):
 
 
 def test_partial_correlation_misses_the_nonmonotone_links():
-    edges = andrey.pc(datagen.generate(CASE)).structure.oriented_edges()
-    assert {(0, 2), (1, 2)}.isdisjoint((i, j) for i, j, _ in edges)
+    edges = datagen.to_variables(CASE, andrey.pc(datagen.generate(CASE)).structure)
+    assert {(0, 2), (1, 2)}.isdisjoint((i, j) for i, j, _ in edges.oriented_edges())
 
 
-@pytest.mark.parametrize("indep_test", CI_TESTS, indirect=True)
+# RCoT is left out: at this case's 400 rows, below the 500 its warning names, a true independence
+# falls below 0.05 for some feature seeds, so the graph follows the seed; the many-graph test
+# below checks RCoT.
+@pytest.mark.parametrize("indep_test", [a for a in CI_TESTS if a != "RCoT"], indirect=True)
 def test_pc_recovers_the_nonmonotone_graph(indep_test):
     out = andrey.pc(datagen.generate(CASE), indep_test=indep_test)
-    assert out.structure.oriented_edges() == TRUE_EDGES
+    assert datagen.to_variables(CASE, out.structure).oriented_edges() == TRUE_EDGES
 
 
 @pytest.mark.parametrize("indep_test", CI_TESTS, indirect=True)
@@ -134,5 +137,5 @@ def test_pc_with_rcot_recovers_most_additive_noise_skeletons(indep_test):
 
 @pytest.mark.parametrize("algorithm", CI_TESTS)
 def test_pvalues_match_the_recorded_output(algorithm):
-    candidate = recorded_pvalues(algorithm, datagen.generate(CASE), datagen.CASES[CASE]["queries"])
+    candidate = recorded_pvalues(algorithm, datagen.generate(CASE), CASE)
     harness.assert_baseline(algorithm, candidate, case=CASE)

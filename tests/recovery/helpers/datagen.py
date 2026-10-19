@@ -318,7 +318,7 @@ CASES: dict[str, dict] = {
     # Meek's first rule, 2 -> 3. ``queries`` are the ``(x, y, condition_set)`` whose p-values are
     # recorded: an independence, a dependence partial correlation misses, the same given the
     # other parent, an independence given the middle node, and a dependence given two variables.
-    # At this seed every test's p-values sit far from 0.05, so no answer hangs on one query.
+    # At this seed KCI, CMIknn, and GPDC answer every query clear of 0.05.
     "nonmonotone_4v": {
         "model": "nonmonotone",
         "seed": 20261014,
@@ -623,6 +623,8 @@ def _n_columns(spec: dict) -> int:
         return len(spec["lags"][0])
     if model == "anm":
         return 2
+    if model == "nonmonotone":
+        return 4
     if model == "categorical":
         return len(spec["cardinalities"])
     if model == "measurement":
@@ -785,6 +787,8 @@ def defined_edges(case_id: str) -> tuple[int, int, np.ndarray]:
         return len(spec["lags"][0]), len(spec["lags"][0]), np.stack([cause, effect], 1)[keep]
     if model == "anm":
         return 2, 2, np.array([[0, 1]])
+    if model == "nonmonotone":
+        return 4, 4, np.array(spec["edges"])
     if model == "categorical":
         k = len(spec["cardinalities"])
         pairs = [(p, c) for c, parents in spec["parents"].items() for p in parents]

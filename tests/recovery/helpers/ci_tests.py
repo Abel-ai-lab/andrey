@@ -13,6 +13,7 @@ import numpy as np
 from andrey.core.ci_cmiknn import CMIknn
 from andrey.core.ci_gpdc import GPDC
 from andrey.core.ci_kernel import KCI, RCoT
+from tests.recovery.helpers import datagen
 
 #: Recorded-output name -> ``indep_test`` name and the factory the tests build it with.
 CI_TESTS = {
@@ -23,7 +24,19 @@ CI_TESTS = {
 }
 
 
-def recorded_pvalues(algorithm: str, data: np.ndarray, queries) -> dict:
-    """The p-values of ``queries`` under the test ``algorithm``, in the recorded-output layout."""
+def recorded_pvalues(algorithm: str, data: np.ndarray, case: str) -> dict:
+    """The p-values of ``case``'s queries under the test ``algorithm``, as recorded outputs.
+
+    ``data`` is the case's input. A query names variables as the case defines them and is asked of
+    the columns that hold them.
+    """
     test = CI_TESTS[algorithm][1](data)
-    return {"pvalues": np.asarray([test(x, y, cond) for x, y, cond in queries])}
+    column = datagen.column_of(case)
+    return {
+        "pvalues": np.asarray(
+            [
+                test(int(column[x]), int(column[y]), tuple(int(column[v]) for v in cond))
+                for x, y, cond in datagen.CASES[case]["queries"]
+            ]
+        )
+    }
