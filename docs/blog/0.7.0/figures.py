@@ -289,93 +289,162 @@ def generator_figure() -> str:
     )
 
 
-def reorder_chart() -> str:
-    # Datasets where a reordering of the columns changed the graph, out of each row's datasets:
-    # the counts the post's tables report, per build. None: not measured.
-    builds = ("Andrey 0.7.0", "Andrey 0.6.0", "causal-learn")
-    rows = (
-        ("Hill climbing, BDeu", 150, (0, 145, None)),
-        ("Hill climbing, BIC", 150, (0, 147, None)),
-        ("Tabu search, BDeu", 150, (0, 112, None)),
-        ("Tabu search, BIC", 150, (0, 118, None)),
-        ("BOSS", 150, (0, 146, 137)),
-        ("GRaSP", 150, (0, 149, 150)),
-        ("GIN", 15, (0, 11, None)),
+def table(title: str, columns: tuple[str, ...], groups: tuple, rank=None, note: str = "") -> str:
+    """A comparison table in the post's one layout: rows grouped under a label set on its side,
+    Andrey's column first and tinted, each row's best cell in bold.
+
+    ``groups`` holds ``(label, rows)``, each row ``(name, detail, cells)`` with a cell per column:
+    a number, a word, or None for a method a package does not have. ``rank`` orders a row's cells,
+    lowest best; it defaults to the number itself.
+    """
+    rank = rank or (lambda cell: cell)
+    ours = ' class="ct-ours"'
+    head = "".join(
+        f'<th scope="col"{ours if k == 0 else ""}>{escape(c)}</th>' for k, c in enumerate(columns)
     )
 
-    def cell(value: int | None, total: int, best: int) -> str:
-        if value is None:
-            return '<td class="rt-na">-</td>'
-        cls = ' class="rt-best"' if value == best else ""
-        return f"<td{cls}>{value} / {total}</td>"
+    def row(name: str, detail: str, cells: tuple) -> str:
+        ranks = [rank(c) for c in cells if c is not None]
+        best = min(ranks) if ranks else None
+        tds = []
+        for k, c in enumerate(cells):
+            cls = ["ct-ours"] if k == 0 else []
+            if c is None:
+                tds.append(f'<td class="{" ".join([*cls, "ct-na"])}">-</td>')
+                continue
+            if rank(c) == best and len(set(ranks)) > 1:
+                cls.append("ct-best")
+            text = f"{c:,}" if isinstance(c, int) else escape(str(c))
+            tds.append(f'<td class="{" ".join(cls)}">{text}</td>')
+        small = f"<small>{escape(detail)}</small>" if detail else ""
+        return f'<th scope="row">{escape(name)}{small}</th>{"".join(tds)}'
 
-    head = "".join(f'<th scope="col">{b}</th>' for b in builds)
     body = "".join(
-        f'<tr><th scope="row">{method}</th>'
-        + "".join(cell(v, total, min(x for x in values if x is not None)) for v in values)
-        + "</tr>"
-        for method, total, values in rows
+        "".join(
+            "<tr>"
+            + (
+                f'<th class="ct-group" rowspan="{len(rows)}"><span>{escape(label)}</span></th>'
+                if i == 0
+                else ""
+            )
+            + row(*r)
+            + "</tr>"
+            for i, r in enumerate(rows)
+        )
+        for label, rows in groups
     )
+    caption = f"<figcaption>{escape(note)}</figcaption>" if note else ""
     return (
-        '<figure class="rt"><p class="rt-title">Datasets where reordering the columns changed the '
-        'graph (lower is better)</p><div class="rt-scroll"><table class="rt-table">'
-        f"<thead><tr><td></td>{head}</tr></thead><tbody>{body}</tbody></table></div>"
-        "</figure>\n"
+        f'<figure class="ct"><p class="ct-title">{escape(title)}</p><div class="ct-scroll">'
+        f'<table class="ct-table"><thead><tr><td colspan="2"></td>{head}</tr></thead>'
+        f"<tbody>{body}</tbody></table></div>{caption}</figure>\n"
+    )
+
+
+def reorder_chart() -> str:
+    # Datasets where a reordering of the columns changed the graph: the counts the post reports.
+    return table(
+        "Datasets where reordering the columns changed the graph (lower is better)",
+        ("Andrey 0.7.0", "Andrey 0.6.0", "causal-learn"),
+        (
+            (
+                "Score-based",
+                (
+                    ("Hill climbing, BDeu", "150 datasets", (0, 145, None)),
+                    ("Hill climbing, BIC", "150 datasets", (0, 147, None)),
+                    ("Tabu search, BDeu", "150 datasets", (0, 112, None)),
+                    ("Tabu search, BIC", "150 datasets", (0, 118, None)),
+                ),
+            ),
+            (
+                "Permutation",
+                (
+                    ("BOSS", "150 datasets", (0, 146, 137)),
+                    ("GRaSP", "150 datasets", (0, 149, 150)),
+                ),
+            ),
+            ("Hidden causes", (("GIN", "15 datasets", (0, 11, None)),)),
+        ),
     )
 
 
 def compare_table() -> str:
     # Whether a reordering of the columns changed each package's graph, at its defaults: three
-    # small datasets per method, each in nine column orders. "same": no reordering changed it;
-    # "changed": one did; "name": it follows the variables' names, so it holds when the names move
-    # with the columns and changes when they follow the positions, as a bare array's do;
-    # "runs" carries a note; None: the package does not implement the method.
-    packages = (
-        "Andrey 0.7.0",
-        "causal-learn 0.1.4.8",
-        "pcalg 2.7-12",
-        "bnlearn 5.2.1",
-        "pgmpy 1.1.2",
-        "Tetrad 7.6.10",
+    # small datasets per method, each in nine column orders. "By name": the graph follows the
+    # variables' names; "By run": it varies between runs, not with the order.
+    order = {"Same graph": 0, "By name": 1, "By run": 1, "Changed": 2, "Changed*": 2}
+    same, changed, name = "Same graph", "Changed", "By name"
+    return table(
+        "Does reordering the columns change the graph?",
+        (
+            "Andrey 0.7.0",
+            "causal-learn 0.1.4.8",
+            "pcalg 2.7-12",
+            "bnlearn 5.2.1",
+            "pgmpy 1.1.2",
+            "Tetrad 7.6.10",
+        ),
+        (
+            (
+                "Constraint",
+                (
+                    ("PC", "", (same, changed, changed, changed, name, name)),
+                    ("FCI", "", (same, changed, changed, None, None, name)),
+                ),
+            ),
+            (
+                "Score-based",
+                (
+                    ("Hill climbing", "", (same, None, None, changed, "By run", None)),
+                    ("Tabu search", "", (same, None, None, changed, None, None)),
+                ),
+            ),
+            (
+                "Permutation",
+                (
+                    ("BOSS", "", (same, changed, None, None, None, changed)),
+                    ("GRaSP", "", (same, changed, None, None, None, changed)),
+                ),
+            ),
+            ("Hidden causes", (("GIN", "", (same, "Changed*", None, None, None, changed)),)),
+        ),
+        rank=order.get,
+        note=(
+            "Each package at its defaults, on three small datasets per method, each in nine "
+            "column orders; causal-learn's and Tetrad's BOSS and GRaSP ran without their own "
+            "randomness. By name: the graph follows the variables' names, so it can change when "
+            "the names follow the positions, as a bare array's do. By run: pgmpy's hill climbing "
+            "breaks ties in Python's hash order, which changes between runs. * causal-learn's GIN "
+            "also tests columns by position, a known bug (py-why/causal-learn#271)."
+        ),
     )
-    rows = (
-        ("PC", ("same", "changed", "changed", "changed", "name", "name")),
-        ("FCI", ("same", "changed", "changed", None, None, "name")),
-        ("Hill climbing", ("same", None, None, "changed", "runs", None)),
-        ("Tabu search", ("same", None, None, "changed", None, None)),
-        ("BOSS", ("same", "changed", None, None, None, "changed")),
-        ("GRaSP", ("same", "changed", None, None, None, "changed")),
-        ("GIN", ("same", "bug", None, None, None, "changed")),
-    )
-    marks = {
-        "same": ("co-yes", "Same graph", "Same graph under every reordering"),
-        "changed": ("co-no", "Changed", "A reordering changed the graph"),
-        "name": ("co-name", "By name", "Sorts by name: same graph if the names move"),
-        "runs": ("co-name", "By run", "Varies between runs, not with the order"),
-        "bug": ("co-no", "Changed*", "Tests columns by position, a known bug"),
-    }
 
-    def cell(value: str | None) -> str:
-        if value is None:
-            return '<td class="co-na"><span aria-label="Not implemented">-</span></td>'
-        cls, text, title = marks[value]
-        return f'<td class="{cls}" title="{escape(title)}"><span>{text}</span></td>'
 
-    head = "".join(f'<th scope="col">{escape(p)}</th>' for p in packages)
-    body = "".join(
-        f'<tr><th scope="row">{method}</th>{"".join(cell(v) for v in values)}</tr>'
-        for method, values in rows
-    )
-    return (
-        '<figure class="cm"><div class="cm-scroll"><table class="cm-table">'
-        f"<thead><tr><td></td>{head}</tr></thead><tbody>{body}</tbody></table></div>"
-        "<figcaption>Each package at its defaults, on three small datasets per method, each in "
-        "nine column orders; causal-learn's and Tetrad's BOSS and GRaSP ran without their own "
-        "randomness, so only the order varied. By name: the graph follows the variables' names, "
-        "so it holds when the names move with the columns and can change when they follow the "
-        "positions, as a bare array's do. By run: pgmpy's hill climbing breaks ties in Python's "
-        "hash order, which changes between runs. * causal-learn's GIN also tests columns by "
-        "position, a known bug (py-why/causal-learn#271).</figcaption></figure>\n"
+def fci_tables() -> str:
+    # FCI on six real tables: the orders, of 200 (20 for the full superconductivity table), that
+    # changed the result, with the default and with possible_dsep="fast".
+    pending = "[PENDING]"
+    return table(
+        "Column orders that changed FCI's result (lower is better)",
+        ("Default", 'possible_dsep="fast"'),
+        (
+            (
+                "Real tables",
+                (
+                    ("Sachs protein signaling", "11 variables, 853 rows, 200 orders", (pending, 0)),
+                    ("Wine", "13 variables, 178 rows, 200 orders", (pending, 0)),
+                    ("Diabetes", "10 variables, 442 rows, 200 orders", (pending, 150)),
+                    ("Breast cancer", "30 variables, 569 rows, 200 orders", (pending, 156)),
+                    (
+                        "Superconductivity, 1,000-row sample",
+                        "81 variables, 1,000 rows, 200 orders",
+                        (pending, 129),
+                    ),
+                    ("Superconductivity", "81 variables, 21,263 rows, 20 orders", (pending, 20)),
+                ),
+            ),
+        ),
+        rank=lambda c: c if isinstance(c, int) else -1,
     )
 
 
@@ -384,6 +453,7 @@ def main() -> None:
     (HERE / "generator.html").write_text(generator_figure(), encoding="utf-8")
     (HERE / "reorder.html").write_text(reorder_chart(), encoding="utf-8")
     (HERE / "compare.html").write_text(compare_table(), encoding="utf-8")
+    (HERE / "fci.html").write_text(fci_tables(), encoding="utf-8")
 
 
 if __name__ == "__main__":

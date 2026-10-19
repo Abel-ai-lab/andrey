@@ -797,70 +797,6 @@ ul.ablog-archive {
   line-height: 1.45;
 }
 
-/* The 0.7.0 post's results table (docs/blog/0.7.0/reorder.html): a row per method, a column per
-   build, each row's lowest count in bold on a light accent fill. */
-.rt {
-  margin: 1.5rem 0 2rem;
-}
-
-.rt-scroll {
-  overflow-x: auto;
-  border: 1px solid var(--andrey-line);
-  border-radius: var(--andrey-radius-lg);
-  background: var(--andrey-surface);
-}
-
-.rt-table {
-  width: 100%;
-  margin: 0;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.rt .rt-title {
-  margin: 0 0 0.5rem;
-  color: var(--andrey-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.rt-table th,
-.rt-table td {
-  padding: 0.6rem 0.9rem;
-  border: 0;
-  border-bottom: 1px solid var(--andrey-line);
-  text-align: right;
-  white-space: nowrap;
-}
-
-.rt-table tbody tr:last-child > * {
-  border-bottom: 0;
-}
-
-.rt-table thead th {
-  color: var(--andrey-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.rt-table tbody th {
-  text-align: left;
-  font-weight: 600;
-}
-
-.rt-table .rt-best {
-  background: color-mix(in srgb, var(--andrey-accent) 12%, transparent);
-  color: var(--andrey-ink);
-  font-weight: 700;
-}
-
-.rt-table .rt-na {
-  color: var(--andrey-muted);
-}
-
 @keyframes grow {
   from {
     transform: scaleX(0);
@@ -879,82 +815,118 @@ ul.ablog-archive {
   }
 }
 
-/* The 0.7.0 post's package matrix (docs/blog/0.7.0/compare.html): per method and package, whether
-   a reordering changed the graph. The mark is a word, and its color only repeats it. */
-.cm {
+/* The 0.7.0 post's comparison tables (docs/blog/0.7.0/figures.py, table()): rows grouped under a
+   label set on its side, Andrey's column first and tinted in the accent, and each row's best cell
+   in bold, shaded when it is not Andrey's. */
+.ct {
   margin: 1.5rem 0 2rem;
 }
 
-.cm-scroll {
+.ct .ct-title {
+  margin: 0 0 0.5rem;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ct-scroll {
   overflow-x: auto;
   border: 1px solid var(--andrey-line);
   border-radius: var(--andrey-radius-lg);
   background: var(--andrey-surface);
 }
 
-.cm-table {
+.ct-table {
   width: 100%;
   margin: 0;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.cm-table th,
-.cm-table td {
-  padding: 0.55rem 0.6rem;
+.ct-table th,
+.ct-table td {
+  padding: 0.75rem 0.9rem;
   border: 0;
   border-bottom: 1px solid var(--andrey-line);
   text-align: center;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
-.cm-table tbody tr:last-child > * {
-  border-bottom: 0;
-}
-
-.cm-table thead th {
-  color: var(--andrey-muted);
-  font-size: 0.75rem;
+.ct-table thead th {
+  color: var(--andrey-ink);
+  font-size: 0.8rem;
   font-weight: 600;
+  white-space: normal;
 }
 
-.cm-table thead th:nth-child(2),
-.cm-table tbody td:nth-child(2) {
-  background: var(--andrey-surface-2);
-}
-
-.cm-table tbody th {
+.ct-table tbody th[scope="row"] {
   text-align: left;
   font-weight: 600;
 }
 
-.cm-table td span {
-  display: inline-block;
-  padding: 0.1rem 0.55rem;
-  border-radius: 999px;
+.ct-table tbody th small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* A group's label runs up its side, and a heavier rule separates the groups. */
+.ct-table .ct-group {
+  width: 2.2rem;
+  padding: 0.5rem 0.2rem;
+  border-right: 1px solid var(--andrey-line);
+  color: var(--andrey-ink);
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
-.cm-table .co-yes span {
-  background: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
+.ct-table .ct-group span {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.ct-table tbody tr:has(.ct-group) > * {
+  border-top: 2px solid var(--andrey-line);
+}
+
+.ct-table tbody tr:first-child > * {
+  border-top: 0;
+}
+
+.ct-table tbody tr:last-child > *,
+.ct-table .ct-group {
+  border-bottom: 0;
+}
+
+.ct-table .ct-ours {
+  background: color-mix(in srgb, var(--andrey-accent) 10%, transparent);
   color: var(--andrey-accent);
 }
 
-.cm-table .co-no span {
-  background: color-mix(in srgb, var(--andrey-edge-bidirected) 14%, transparent);
-  color: var(--andrey-edge-bidirected);
+.ct-table thead .ct-ours {
+  color: var(--andrey-accent);
 }
 
-.cm-table .co-name span {
-  border: 1px solid var(--andrey-line);
+.ct-table .ct-best {
+  font-weight: 700;
+}
+
+.ct-table .ct-best:not(.ct-ours) {
+  background: var(--andrey-surface-2);
+}
+
+.ct-table .ct-na {
   color: var(--andrey-muted);
 }
 
-.cm-table .co-na {
-  color: var(--andrey-muted);
-}
-
-.cm figcaption {
+.ct figcaption {
   margin-top: 0.6rem;
   text-align: left;
   color: var(--andrey-muted);
