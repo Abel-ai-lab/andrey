@@ -38,6 +38,18 @@ def _mixed(seed: int = 0, n: int = 400) -> tuple[np.ndarray, np.ndarray]:
     return np.column_stack([a, x, b, y]).astype(np.float64), np.array([True, False, True, False])
 
 
+def _determined(seed: int = 1, n: int = 300) -> tuple[np.ndarray, np.ndarray]:
+    """Columns a (6 categories), b (3 categories) a function of a, x, and c (3 categories), where x
+    and c depend on b. b's indicator columns lie in the span of a's, so the covariance of a's and
+    b's columns is singular."""
+    rng = np.random.default_rng(seed)
+    a = rng.integers(0, 6, n)
+    b = np.array([0, 1, 2, 0, 0, 2])[a]
+    x = rng.standard_normal(n) + b
+    c = np.where(rng.random(n) < 0.7, b, rng.integers(0, 3, n))
+    return np.column_stack([a, b, x, c]).astype(np.float64), np.array([True, True, False, True])
+
+
 def _cells(x: np.ndarray, columns: list[int]) -> list[np.ndarray]:
     """The row indices of each joint category of ``columns`` that occurs."""
     if not columns:
@@ -276,9 +288,20 @@ def test_full_score_batches_are_the_local_scores():
     assert FullScoreDelta(score).score_many_with_base(3, [0], moves) == expected
 
 
-@pytest.mark.parametrize(("node", "parents"), [(0, ()), (0, (1,)), (0, (1, 2)), (3, (0, 2))])
-def test_dg_score_is_a_regression_on_indicator_columns(node, parents):
-    x, mask = _mixed()
+@pytest.mark.parametrize(
+    ("data", "node", "parents"),
+    [
+        (_mixed, 0, ()),
+        (_mixed, 0, (1,)),
+        (_mixed, 0, (1, 2)),
+        (_mixed, 3, (0, 2)),
+        (_determined, 2, (0, 1)),
+        (_determined, 3, (0, 1)),
+    ],
+    ids=["a", "a | x", "a | x, b", "y | a, b", "x | collinear a, b", "c | collinear a, b"],
+)
+def test_dg_score_is_a_regression_on_indicator_columns(data, node, parents):
+    x, mask = data()
     n = len(x)
     target = _embed(x, mask, [node])
     resid = _residuals(target, _embed(x, mask, list(parents)))
@@ -286,6 +309,18 @@ def test_dg_score_is_a_regression_on_indicator_columns(node, parents):
     log_det = _log_det_mle(resid) + target.shape[1] * math.log(n / (n - 1))
     penalty = math.log(n) * target.shape[1] * _embed(x, mask, list(parents)).shape[1]
     assert DGScore(x, mask).score(node, parents) == pytest.approx(n * log_det + penalty, rel=1e-10)
+
+
+def test_dg_score_of_a_node_its_parents_determine_is_inf():
+    x, mask = _determined()
+    assert DGScore(x, mask).score(1, (0,)) == math.inf
+
+
+@pytest.mark.parametrize("search", [ges, hc, boss, grasp])
+def test_a_dg_search_never_selects_a_family_its_parents_determine(search):
+    x, mask = _determined()
+    _, total = search(x, score_func="local_score_degen_gauss", categorical=mask)
+    assert math.isfinite(total)
 
 
 @pytest.mark.parametrize(
