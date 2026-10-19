@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 """Benchmark the categorical tests and scores on CPU: Andrey against causal-learn, bnlearn, pgmpy.
 
-Runs PC with the chi-square and the G-square test, GES with the BDeu score, and hill climbing with
-the BDeu score and the multinomial BIC, on the ``discrete_er`` regime: category codes sampled from a
+Runs PC with the chi-square and the G-square test, GES, BOSS, and GRaSP with the BDeu score, and hill
+climbing with the BDeu score and the multinomial BIC, on the ``discrete_er`` regime: category codes sampled from a
 discrete network with Dirichlet tables on an Erdos-Renyi DAG (:data:`datasets.DISCRETE_SETTINGS`
 gives the categories per node and the concentration). Each pair runs one method with one test or
 score and the same settings, and every solution is serial:
 
-- causal-learn's PC and GES, against Andrey's: ``alpha=0.05`` for PC, BDeu's default priors and at
-  most four parents for GES. Andrey's GES runs on the numpy backend, so no compile lands in a fit.
+- causal-learn's PC, GES, BOSS, and GRaSP, against Andrey's: ``alpha=0.05`` for PC, BDeu's default
+  priors and at most four parents for GES, BDeu's default priors and search seed 0 for BOSS and
+  GRaSP, with GRaSP at depth 3. Andrey's GES runs on the numpy backend, so no compile lands in a
+  fit.
 - bnlearn's ``pc.stable`` and ``hc``, against Andrey's PC and hill climbing; pgmpy's hill climbing,
   against Andrey's. Hill climbing runs BDeu with an equivalent sample size of 1 and a structure
   prior of one expected parent per variable, or the multinomial BIC with the standard penalty, and
@@ -41,12 +43,16 @@ import pandas as pd
 from andrey import GraphStructure
 from andrey_bench import datasets, memcap, rsession, rundir, scoring
 from andrey_bench.adapters import pgmpy_hc
+from andrey_bench.adapters.andrey_boss import AndreyBOSSBDeu
 from andrey_bench.adapters.andrey_ges import andrey_ges_bdeu
+from andrey_bench.adapters.andrey_grasp import AndreyGRaSPBDeu
 from andrey_bench.adapters.andrey_hc import andrey_hc_categorical
 from andrey_bench.adapters.andrey_pc import AndreyPCChisq, AndreyPCGsq
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.bnlearn_discrete import BnlearnHCCategorical, BnlearnPCStableCategorical
+from andrey_bench.adapters.causal_learn_boss import CausalLearnBOSSBDeu
 from andrey_bench.adapters.causal_learn_ges import CausalLearnGESBDeu
+from andrey_bench.adapters.causal_learn_grasp import CausalLearnGRaSPBDeu
 from andrey_bench.adapters.causal_learn_pc import CausalLearnPCChisq, CausalLearnPCGsq
 from andrey_bench.adapters.pgmpy_hc import PgmpyHC
 from andrey_bench.datasets import DatasetKey
@@ -64,7 +70,13 @@ PAIRS = {
     "pc chisq": (_PC_CHISQ, CausalLearnPCChisq()),
     "pc gsq": (_PC_GSQ, CausalLearnPCGsq()),
     "ges bdeu": (andrey_ges_bdeu(), CausalLearnGESBDeu()),
+    "boss bdeu": (AndreyBOSSBDeu(), CausalLearnBOSSBDeu()),
+    "grasp bdeu": (AndreyGRaSPBDeu(), CausalLearnGRaSPBDeu()),
 }
+
+#: The pairs whose two packages return the same graph on the same data. BOSS and GRaSP draw their
+#: orders from each package's own random streams, so their graphs can differ at equal settings.
+SAME_GRAPH_PAIRS = ("pc chisq", "pc gsq", "ges bdeu")
 
 #: Andrey's and a comparator's run of one method with one test or score and the same settings, by
 #: ``"<method> <setting> <package>"``. One Andrey solution is paired with each package that runs

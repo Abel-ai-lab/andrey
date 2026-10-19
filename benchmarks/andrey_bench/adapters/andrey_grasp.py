@@ -80,3 +80,17 @@ class AndreyGRaSP:
         from andrey import GraphStructure
 
         return GraphStructure.from_numpy(native, kind=self.output_type)
+
+
+class AndreyGRaSPBDeu(AndreyGRaSP):
+    """Andrey GRaSP with the BDeu score, on category codes.
+
+    BDeu takes its default priors (equivalent sample size 1, one expected parent per variable) and
+    no penalty weight, so ``params`` names only the score, the depth, and the seed.
+    """
+
+    name: str = "andrey.grasp.bdeu"
+
+    def params(self) -> dict[str, Any]:
+        """The BDeu score at the default depth, on a fixed search seed."""
+        return {"score_func": "local_score_BDeu", "depth": _DEFAULT_DEPTH, "seed": SEARCH_SEED}

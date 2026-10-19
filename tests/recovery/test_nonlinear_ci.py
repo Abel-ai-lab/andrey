@@ -64,6 +64,15 @@ def test_pc_recovers_the_nonmonotone_graph(indep_test):
 
 
 @pytest.mark.parametrize("indep_test", CI_TESTS, indirect=True)
+def test_pc_graph_does_not_depend_on_the_column_order(indep_test):
+    shuffled = andrey.pc(datagen.generate(CASE), indep_test=indep_test).structure
+    unshuffled = andrey.pc(datagen.generate(CASE, shuffle=False), indep_test=indep_test).structure
+    np.testing.assert_array_equal(
+        datagen.to_variables(CASE, shuffled).to_numpy(), unshuffled.to_numpy()
+    )
+
+
+@pytest.mark.parametrize("indep_test", CI_TESTS, indirect=True)
 def test_pc_finds_no_edges_between_independent_columns(indep_test):
     x = np.random.default_rng(0).standard_normal((300, 4))
     fisherz = ci.FisherZ(x)

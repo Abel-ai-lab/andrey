@@ -1,4 +1,4 @@
-"""GRaSP: greedy relaxation of the sparsest permutation over a linear-Gaussian or mixed-data BIC.
+"""GRaSP: greedy relaxation of the sparsest permutation over a BIC, BDeu, or mixed-data score.
 
 A depth-bounded search of tucks (:func:`_dfs`) relaxes a variable order; each variable's parents
 come from its persistent grow-shrink tree (:class:`_GST`). Scores are negated local scores, so the
@@ -447,7 +447,7 @@ def grasp(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     lambda_value : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     depth : int
         Most tucks in one chain of moves, at least ``1``.
     random_state : int
@@ -455,7 +455,8 @@ def grasp(
     score_func : str
         Local score, one of :data:`~andrey.search.boss.PERMUTATION_SCORES`.
     categorical : ndarray of bool or None
-        Marks the categorical columns for a mixed-data score.
+        Marks the categorical columns for a mixed-data score; BDeu reads every column as
+        categorical.
     constraints : Constraints or None
         Background knowledge: each variable's parents exclude the forbidden ones and include the
         required ones, and every order the search visits keeps
