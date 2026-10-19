@@ -42,6 +42,8 @@ DEFERRED_MODULES = {
     "andrey.pc.chisq": "andrey.constraint.pc",
     "andrey.pc.gsq": "andrey.constraint.pc",
     "andrey.ges.bdeu": "andrey.search.ges",
+    "andrey.boss.bdeu": "andrey.search.boss",
+    "andrey.grasp.bdeu": "andrey.search.grasp",
     "andrey.hc.BDeu": "andrey.search.hc",
     "andrey.hc.BIC_categorical": "andrey.search.hc",
 }
@@ -171,7 +173,7 @@ def test_bdeu_is_minus_twice_causal_learns_score() -> None:
 
 
 @pytest.mark.parametrize("seed", [0, 1, 2])
-@pytest.mark.parametrize("method", list(discrete_cpu.PAIRS))
+@pytest.mark.parametrize("method", discrete_cpu.SAME_GRAPH_PAIRS)
 def test_both_packages_return_the_same_graph(method: str, seed: int) -> None:
     """causal-learn's PC orients conflicting colliders in column order, so Andrey's PC runs that
     rule here; its default p-value order can orient them differently. The campaign runs the

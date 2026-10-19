@@ -38,6 +38,8 @@ change names its pull request.
   default. ([#187])
 - `andrey.data.sortability.index_correlation` measures how much a dataset's column order reveals
   of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
+- `boss` and `grasp` take `score_func="local_score_BDeu"` for categorical data, with the BDeu
+  priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
   only 3; smaller depths search less and run faster. ([#190])
 - `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
@@ -386,3 +388,4 @@ First alpha release.
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
 [#208]: https://github.com/Abel-ai-lab/andrey/pull/208
 [#209]: https://github.com/Abel-ai-lab/andrey/pull/209
+[#211]: https://github.com/Abel-ai-lab/andrey/pull/211
