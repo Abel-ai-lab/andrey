@@ -25,6 +25,10 @@ change names its pull request.
   causes, its graphs had more errors than the empty graph at every size measured. ([#187])
 - `cdnod` takes the domain index as `domain_index`, and `andrey run cdnod` as `--domain-index`;
   the names `c_indx` and `--c-indx` are gone. ([#187])
+- On data whose every column is categorical, `boss`, `grasp`, `ges`, `hc`, `tabu`, and
+  `exact_search` score with BDeu by default and warn once with a `DataTypeWarning`; pass
+  `score_func="local_score_BIC_from_cov"` (`"local_score_BIC"` for `ges` and `exact_search`) to
+  keep the linear-Gaussian BIC. Data with a continuous column keeps it without a change. ([#237])
 
 ### Added
 
@@ -424,3 +428,4 @@ First alpha release.
 [#225]: https://github.com/Abel-ai-lab/andrey/pull/225
 [#226]: https://github.com/Abel-ai-lab/andrey/pull/226
 [#228]: https://github.com/Abel-ai-lab/andrey/pull/228
+[#237]: https://github.com/Abel-ai-lab/andrey/pull/237
