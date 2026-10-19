@@ -31,6 +31,12 @@ context node and has no definite collider then sorts it: ``z -> vl`` with a walk
 arrow into ``vk`` puts ``z`` in the deconfounding set ``Z1``; any other qualifying ``z`` with a
 walk that ends in an arrow into ``vk`` or an undirected edge at ``vk`` puts it in the potential
 set ``Z2``.
+
+The step runs on the data columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed
+from each column's own data, so the order in which it visits the pairs, the directions of a pair,
+and the subsets of ``Z2``, and the order of the columns in each kernel, do not depend on the column
+order. Reordering the columns relabels the step's orientations and changes nothing else, unless two
+columns are identical.
 """
 
 from __future__ import annotations
@@ -49,6 +55,7 @@ from andrey.constraint.pc import (
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
+from andrey.search.hc import tie_ranks
 
 _RIDGE = 0.1
 
@@ -73,7 +80,8 @@ def cdnod(
     :func:`~andrey.constraint.pc.pc`. ``dependence_threshold``, when given, runs the
     independent-change step with that threshold on the module dependence measure; ``None`` skips
     it. ``in_column_order`` fires Meek's rules one at a time in column order instead of in
-    order-free rounds (:func:`~andrey.core.orient.meek`). The context is appended as an extra
+    order-free rounds (:func:`~andrey.core.orient.meek`), and runs the independent-change step on
+    the columns as given instead of sorted by their ranks. The context is appended as an extra
     variable, the tests run over the augmented matrix, and the result is projected back to the
     ``n_features`` data variables; with a single domain the context is left out and the search runs
     on ``data`` alone. ``categorical``, a boolean mask of the data's categorical columns, reaches a
@@ -117,6 +125,7 @@ def cdnod(
                 context[:, 0],
                 changing,
                 dependence_threshold,
+                in_column_order=in_column_order,
             )
     completed = _undirect_conflicts(meek(pdag, in_column_order=in_column_order))
     return to_structure(completed[:d, :d], kind="cpdag")
@@ -153,6 +162,8 @@ def _orient_by_independent_changes(
     context: np.ndarray,
     changing: list[int],
     threshold: float,
+    *,
+    in_column_order: bool = False,
 ) -> np.ndarray:
     """Orient undirected edges among the ``changing`` variables by independent module changes.
 
@@ -166,16 +177,27 @@ def _orient_by_independent_changes(
     into it; ``vl -> vk`` is the mirror case. An orientation that would close a directed cycle is
     skipped, since the causal graph is acyclic. After an orientation the pairs are visited again;
     ``n`` grows until no undirected pair has that many candidates. Returns an updated copy.
+
+    The search runs on the data columns sorted by :func:`~andrey.search.hc.tie_ranks`, so a column's
+    index in it is its rank. It visits the pairs, their two directions, and the subsets of ``Z2``
+    in rank order, and each kernel stacks its columns in rank order, so reordering the columns
+    relabels the orientations and changes nothing else, unless two columns are identical. With
+    ``in_column_order``, the search runs on the columns as given and visits them by position.
     """
-    pdag = pdag.copy()
-    measure = _ModuleDependence(data, context)
+    n_features = data.shape[1]
+    by_rank = np.arange(n_features) if in_column_order else np.argsort(tie_ranks(data))
+    nodes = np.concatenate([by_rank, np.arange(n_features, pdag.shape[0])])
+    position = np.argsort(nodes)
+    ranked = pdag[np.ix_(nodes, nodes)]
+    measure = _ModuleDependence(np.ascontiguousarray(data[:, by_rank]), context)
+    visited = sorted(int(position[node]) for node in changing)
     size = 0
     while True:
-        oriented, any_large = _orient_one(pdag, sorted(changing), size, measure, threshold)
+        oriented, any_large = _orient_one(ranked, visited, size, measure, threshold)
         if oriented:
             continue
         if not any_large:
-            return pdag
+            return ranked[np.ix_(position, position)]
         size += 1
 
 
