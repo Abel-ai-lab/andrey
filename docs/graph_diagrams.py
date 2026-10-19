@@ -133,7 +133,7 @@ def comparison() -> str:
             entries.extend(
                 [
                     (
-                        "gCastle DAG",
+                        "Binary DAG",
                         binary,
                         "A: row is the source",
                         "1 records a directed edge; no coefficient.",
@@ -150,7 +150,7 @@ def comparison() -> str:
             entries.extend(
                 [
                     (
-                        "gCastle DAG",
+                        "Binary DAG",
                         None,
                         "Binary directed adjacency",
                         "Needs an extra convention to retain these endpoint marks.",
