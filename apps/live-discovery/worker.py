@@ -31,13 +31,12 @@ def main(package):
     methods = {
         "Andrey": ("PC", "DirectLiNGAM", "GES", "FCI"),
         "causal-learn": ("PC", "DirectLiNGAM", "FCI"),
-        "gCastle": ("PC",),
         "lingam": ("DirectLiNGAM",),
     }[package]
     for method in methods:
         fit, convert = prepare(package, method, warm)
         convert(fit())
-    distribution = {"Andrey": "andrey-core", "gCastle": "gcastle"}.get(package, package)
+    distribution = {"Andrey": "andrey-core"}.get(package, package)
     try:
         version = importlib.metadata.version(distribution)
     except importlib.metadata.PackageNotFoundError:

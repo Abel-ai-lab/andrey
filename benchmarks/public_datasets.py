@@ -43,8 +43,6 @@ from andrey_bench.adapters.causal_learn_ges import CausalLearnGES
 from andrey_bench.adapters.causal_learn_grasp import CausalLearnGRaSP
 from andrey_bench.adapters.causal_learn_ica_lingam import CausalLearnICALiNGAM
 from andrey_bench.adapters.causal_learn_pc import CausalLearnPC
-from andrey_bench.adapters.gcastle_ges import GCastleGES
-from andrey_bench.adapters.gcastle_pc import GCastlePC
 from andrey_bench.adapters.lingam_direct import LingamDirect
 from andrey_bench.runner import run_task
 
@@ -58,7 +56,7 @@ def solutions(method: str, d: int) -> list[tuple[object, dict]]:
     andrey_bic = {"score_func": "local_score_BIC_from_cov", "lambda_value": 1.0, "seed": 0}
     other_bic = {"score_func": "local_score_BIC_from_cov", "lambda_value": 0.5, "seed": 0}
     return {
-        "PC": [(AndreyPC(), fz), (CausalLearnPC(), fz), (GCastlePC(), fz)],
+        "PC": [(AndreyPC(), fz), (CausalLearnPC(), fz)],
         "FCI": [(AndreyFCI(), fz), (CausalLearnFCI(), fz)],
         "GES": [
             (andrey_ges_adapters()[0], {"lambda_value": 1.0, "max_parents": d / 2}),
@@ -66,7 +64,6 @@ def solutions(method: str, d: int) -> list[tuple[object, dict]]:
                 CausalLearnGES(),
                 {"score_func": "local_score_BIC", "lambda_value": 0.5, "max_parents": d / 2},
             ),
-            (GCastleGES(), {"criterion": "bic", "method": "scatter"}),
         ],
         "BOSS": [(AndreyBOSS(), andrey_bic), (CausalLearnBOSS(), other_bic)],
         "GRaSP": [

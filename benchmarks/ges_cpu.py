@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """A comparison of GES speed and accuracy across graph sizes on CPU.
 
-Five solutions run on identical data: serial and parallel Andrey GES, causal-learn, gCastle, and
-an empty-graph baseline. The comparison measures fit time, graph accuracy, and the largest graph
+Four solutions run on identical data: serial and parallel Andrey GES, causal-learn, and an
+empty-graph baseline. The comparison measures fit time, graph accuracy, and the largest graph
 each solution finishes within the resource limits.
 
 ``--cap-mem-mb`` sets a memory cap so the largest completed graph is measured under a declared
@@ -36,14 +36,13 @@ from andrey_bench import datasets, memcap, rundir
 from andrey_bench.adapters.andrey_ges import andrey_ges_adapters
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.causal_learn_ges import CausalLearnGES
-from andrey_bench.adapters.gcastle_ges import GCastleGES
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores
 
 #: ``andrey_ges_adapters()`` supplies serial and parallel GES with the same ``numpy`` backend and
 #: score settings. Every solution runs on every dataset.
-SOLUTIONS = [*andrey_ges_adapters(), CausalLearnGES(), GCastleGES(), BaselineEmpty()]
+SOLUTIONS = [*andrey_ges_adapters(), CausalLearnGES(), BaselineEmpty()]
 
 #: The solutions the work gate reaches: parallel-mode Andrey only. A serial fit is pinned to one
 #: worker and never consults the gate, and no competitor reads it, so declaring it on them would

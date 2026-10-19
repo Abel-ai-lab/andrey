@@ -48,8 +48,6 @@ from andrey_bench.adapters.causal_learn_ges import CausalLearnGES
 from andrey_bench.adapters.causal_learn_grasp import CausalLearnGRaSP
 from andrey_bench.adapters.causal_learn_ica_lingam import CausalLearnICALiNGAM
 from andrey_bench.adapters.causal_learn_pc import CausalLearnPC
-from andrey_bench.adapters.gcastle_ges import GCastleGES
-from andrey_bench.adapters.gcastle_pc import GCastlePC
 from andrey_bench.adapters.lingam_direct import LingamDirect
 from andrey_bench.adapters.pcalg_fci import PcalgFCI
 from andrey_bench.adapters.pcalg_ges import PcalgGES
@@ -92,8 +90,6 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     CausalLearnDirectLiNGAM(),
     CausalLearnICALiNGAM(),
     CausalLearnExactSearch(),
-    GCastleGES(),
-    GCastlePC(),
     LingamDirect(),
     PcalgGES(),
     PcalgGIES(),
@@ -181,7 +177,7 @@ DEFERRED_MODULES = {
 
 
 #: The module each comparator package imports as. Its fit cases skip where it is not installed.
-COMPARATOR_MODULES = {"causal-learn": "causallearn", "gcastle": "castle", "lingam": "lingam"}
+COMPARATOR_MODULES = {"causal-learn": "causallearn", "lingam": "lingam"}
 
 
 def _skip_without_package(adapter: SolutionAdapter) -> None:
@@ -218,11 +214,6 @@ def test_a_parallel_adapter_runs_the_workers_the_runner_pinned(monkeypatch, pinn
     assert andrey_ges._parallel_workers() == workers
 
 
-def test_gcastle_ges_declares_only_the_params_it_honors() -> None:
-    """gCastle GES has no penalty or max-parents setting, so its params carry neither."""
-    assert set(GCastleGES().params()) == {"criterion", "method"}
-
-
 def test_the_cuda_directlingam_variant_pins_andrey_to_cuda() -> None:
     """The device pin is what makes the torch-cuda variant's records GPU runs."""
     (gpu,) = [a for a in andrey_direct_lingam_adapters() if a.backend == "torch-cuda"]
@@ -246,10 +237,8 @@ FIT_CASES = [
     *[_case(a, "linear_gauss_er", "cpdag", _MARKS) for a in andrey_ges_adapters()],
     *[_case(a, "linear_gauss_er", "cpdag", _MARKS) for a in andrey_tabu_adapters()],
     _case(CausalLearnGES(), "linear_gauss_er", "cpdag", _ADJACENCY),
-    _case(GCastleGES(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(AndreyPC(), "linear_gauss_er", "cpdag", _MARKS),
     _case(CausalLearnPC(), "linear_gauss_er", "cpdag", _ADJACENCY),
-    _case(GCastlePC(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(AndreyBOSS(), "linear_gauss_er", "cpdag", _MARKS),
     _case(AndreyGRaSP(), "linear_gauss_er", "cpdag", _MARKS),
     _case(CausalLearnBOSS(), "linear_gauss_er", "cpdag", _ADJACENCY),

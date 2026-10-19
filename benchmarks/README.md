@@ -32,7 +32,6 @@ the quality gate before a release ([reference parity](../qa/README.md#reference-
 Packages:
 
 - [causal-learn](https://github.com/py-why/causal-learn)
-- [gCastle](https://github.com/huawei-noah/trustworthyAI/tree/master/gcastle)
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
@@ -166,13 +165,13 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 
 | method | solutions |
 |---|---|
-| GES | Andrey (numpy/serial, numpy/parallel), causal-learn, gCastle, pcalg |
+| GES | Andrey (numpy/serial, numpy/parallel), causal-learn, pcalg |
 | XGES (GES family) | Andrey and xges, each with and without the extended search |
 | HC | Andrey, bnlearn (`hc`), pgmpy (categorical data) |
 | Tabu | Andrey, bnlearn (`tabu`) |
 | GIES | Andrey, pcalg (`gies`) |
 | Exact search | Andrey, causal-learn (`bic_exact_search`) |
-| PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
+| PC | Andrey, causal-learn, pcalg, bnlearn (`pc.stable`) |
 | PC with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT), tigramite (CMIknn, GPDC), pcalg with RCIT (RCoT) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
 | FCI with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT) |
@@ -1402,8 +1401,7 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `andrey_bench/aggregate.py` - pools a results root and joins each run with its provenance.
 - `andrey_bench/pairing.py` - defines valid comparisons, including run pairing, dataset grouping,
   duration skew, and timeout meaning.
-- `ges_cpu.py` - compares serial and parallel Andrey GES, causal-learn, gCastle, and the baseline
-  on CPU.
+- `ges_cpu.py` - compares serial and parallel Andrey GES, causal-learn, and the baseline on CPU.
 - `boss_grasp_cpu.py` - compares BOSS and GRaSP with causal-learn at matched BIC penalties.
 - `boss_grasp_reach.py` - extends the paired BOSS comparison beyond GRaSP's measured range.
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.

@@ -37,7 +37,6 @@ library output on stdout cannot corrupt them.
 
 PC and DirectLiNGAM use structural SHD. FCI uses endpoint SHD against the latent-projected truth
 PAG. A timing ratio is shown whenever both fits finish; each estimate's SHD is shown beside it.
-gCastle is offered only if its worker imports and warms successfully.
 
 CSV uploads require a UTF-8 header and numeric, finite values: at most 5 MB, 50 columns, and
 20,000 rows, with at least three more rows than columns. Constant, duplicate, and perfectly
