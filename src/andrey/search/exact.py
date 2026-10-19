@@ -12,8 +12,9 @@ mixed-data scores :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.s
 BIC with ``lambda_value=1``. Both searches, A* (``"astar"``) and the subset-lattice dynamic
 program (``"dp"``), run over the order graph, whose nodes are variable subsets: the shortest
 path from the empty set to the full set gives each variable its best parent set among the
-variables before it. The result is the optimal DAG itself, not its CPDAG, and each
-search breaks score ties deterministically.
+variables before it. Every DAG of the optimal DAG's Markov equivalence class has the same score, so
+the search's choice among them follows rounding and column order; :func:`_canonical_member`
+replaces it by one member fixed by the CPDAG and :func:`~andrey.search.hc.tie_ranks`.
 """
 
 from __future__ import annotations
@@ -26,8 +27,17 @@ from collections.abc import Sequence
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
-from andrey.core.orient import to_structure
-from andrey.core.score import ZERO_RESIDUAL, Score, check_columns, make_score
+from andrey.core.mixed import column_mask
+from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
+from andrey.core.score import (
+    DISCRETE_SCORES,
+    MIXED_SCORES,
+    ZERO_RESIDUAL,
+    Score,
+    check_columns,
+    make_score,
+)
+from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`exact_search` accepts.
 EXACT_SCORES: tuple[str, ...] = (
@@ -228,6 +238,20 @@ def _dp_shortest_path(
     return tuple(structures)
 
 
+def _canonical_member(dag: np.ndarray, ranks: np.ndarray) -> np.ndarray:
+    """The DAG of ``dag``'s Markov equivalence class fixed by its CPDAG and ``ranks``.
+
+    Numbers the nodes by ascending rank and takes :func:`~andrey.core.orient.pdag2dag` of the
+    CPDAG, which keeps the compelled edges and orients the reversible ones into the lowest-numbered
+    node that can take them. Every DAG of one class gives the same member, and relabeling the
+    columns relabels it, when the ranks move with the columns.
+    """
+    order = np.argsort(ranks)
+    member = np.empty_like(dag)
+    member[np.ix_(order, order)] = pdag2dag(dag2cpdag(dag)[np.ix_(order, order)])
+    return member
+
+
 def exact_search(
     data: np.ndarray,
     *,
@@ -240,9 +264,14 @@ def exact_search(
     Scores candidates with ``score_func``; the default, the linear-Gaussian BIC (``lambda=1``), on
     mean-centered data.
     Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
-    ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score but may return
-    different score-tied representatives of the same Markov equivalence class. Exponential in the
+    ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score. Exponential in the
     number of variables, so intended for small problems.
+
+    Every DAG of the optimal Markov equivalence class scores the same, so the result is the member
+    :func:`_canonical_member` fixes: the class's reversible edges are oriented by the order of
+    :func:`~andrey.search.hc.tie_ranks`, ranks computed from each column's own data. Both searches
+    return this member, it does not depend on last-bit rounding, and reordering the columns
+    relabels it.
 
     Parameters
     ----------
@@ -259,7 +288,7 @@ def exact_search(
     Returns
     -------
     GraphStructure
-        The score-optimal DAG, edge ``i -> j`` when ``i`` is an optimal parent of ``j``.
+        The score-optimal DAG, edge ``i -> j`` when ``i`` is a parent of ``j``.
     """
     X = np.asarray(data, dtype=np.float64)
     if search_method not in ("astar", "dp"):
@@ -289,4 +318,7 @@ def exact_search(
         for parent in parents:
             adj[parent, child] = TAIL  # tail at the parent
             adj[child, parent] = ARROW  # arrowhead at the child
-    return to_structure(adj, kind="dag")
+    mask = np.full(n_vars, score_func in DISCRETE_SCORES)
+    if score_func in MIXED_SCORES:
+        mask = column_mask(categorical, n_vars)
+    return to_structure(_canonical_member(adj, tie_ranks(X, mask)), kind="dag")

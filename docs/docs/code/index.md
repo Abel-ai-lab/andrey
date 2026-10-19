@@ -22,6 +22,11 @@ experimental; `andrey list` prints the status.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
 least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column names.
+A constant column holds no information about the other variables, so one `ValueError` names every
+constant column and asks you to drop them; resampling or subsetting rows can make a column
+constant. `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` also need at least
+`n_variables + 1` rows in each dataset, the fewest with which their pruning step can estimate the
+edge weights.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
 `"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
 whole numbers in a column of numbers, each distinct value of a column one category. The mixed-data

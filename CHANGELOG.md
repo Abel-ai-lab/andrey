@@ -93,6 +93,13 @@ change names its pull request.
   before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
   reject a series that repeats another at the same step or some steps back, naming its lagged
   value, such as `'a' at lag 1 repeats 'd'`. ([#206])
+- A constant column raises one `ValueError` that names every constant column and says to drop
+  them, `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` say up front that they need
+  at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
+  why a PDAG has no consistent extension, naming a chordless cycle of its undirected edges when it
+  finds one. ([#207])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
+  same graphs and p-values in less time, because each test answers many queries at once. ([#208])
 
 ### Removed
 
@@ -130,6 +137,32 @@ change names its pull request.
   `boss` no longer raises `ValueError` or `StopIteration` and no search picks parents by a wrong or
   minus-infinite score: collinear parents are fit by the columns that span them, and a node its
   parents determine scores `inf`, unavailable as under the BIC. ([#203])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` treat
+  causal-order candidates whose scores differ only by rounding as tied and pick among them by a
+  rank computed from each column's own data, so two interchangeable columns, such as two balanced
+  binary columns, no longer get a different order on another CPU or after reordering the columns.
+  ([#205])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` score
+  one column per group of copies, where a column copies another up to scale when it leaves at
+  most `1e-12` of the other's variance unexplained. The other copies follow it directly in the
+  causal order and each takes a single edge from it, so copies no longer come ahead of their
+  causes and give the same graph on every CPU. ([#205])
+- `exact_search` returns the same DAG of the equivalence class it finds on every CPU, with either
+  `search_method`, and under any column order, because it orients the edges the class leaves
+  reversible by a rank computed from each column's own data, so the DAG can differ from before but
+  its class does not. ([#205])
+- `pcmciplus` runs its tests on one BLAS thread, as `pcmci` and `lpcmci` do, so the host's BLAS
+  thread count cannot change its p-values. ([#205])
+- When several variables can come next in its causal order, `ica_lingam` picks one by a rank
+  computed from each column's own data instead of by column position, so reordering the columns no
+  longer changes that choice, and its order and graph can change. ([#205])
+- `ges`, `gies`, `xges`, `calm`, `gin`, `bottom_up_parce_lingam`, `pcmci`, `pcmciplus`, and `lpcmci`
+  break ties between equal score changes or test results by a rank computed from each column's own
+  data instead of by column position; `calm` also assigns its random draws, and
+  `bottom_up_parce_lingam` its regression predictors, in that rank order; `calm` chooses each
+  Markov-blanket member by its partial correlation where p-values underflow to zero; and `pc` and
+  `cdnod` orient colliders whose p-values agree to nine decimals together, so these choices no
+  longer depend on the column order. ([#205])
 
 ## [0.6.0] - 2026-10-17
 
@@ -348,4 +381,7 @@ First alpha release.
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
+[#205]: https://github.com/Abel-ai-lab/andrey/pull/205
 [#206]: https://github.com/Abel-ai-lab/andrey/pull/206
+[#207]: https://github.com/Abel-ai-lab/andrey/pull/207
+[#208]: https://github.com/Abel-ai-lab/andrey/pull/208

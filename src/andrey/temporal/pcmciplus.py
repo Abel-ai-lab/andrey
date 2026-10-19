@@ -43,13 +43,15 @@ Intelligence (UAI), PMLR 124, 1388-1397. https://proceedings.mlr.press/v124/rung
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 
 import numpy as np
 
+from andrey.core import backend
 from andrey.core.structure import ARROW, NULL, TAIL
+from andrey.search.hc import tie_ranks
 from andrey.temporal.pcmci import INDEP_TESTS, Link, LinkTest, design_test, pc1
 
 COLLIDER_RULES: tuple[str, ...] = ("majority", "conservative", "none")
@@ -113,10 +115,10 @@ class _Recorder:
 
 
 def lagged_parents(
-    test: LinkTest, n_vars: int, tau_max: int, pc_alpha: float
+    test: LinkTest, n_vars: int, tau_max: int, pc_alpha: float, ranks: Sequence[int]
 ) -> tuple[tuple[Link, ...], ...]:
     """Phase 1: the PC1 lagged parents of every variable, strongest first."""
-    return tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
+    return tuple(pc1(test, n_vars, j, tau_max, pc_alpha, ranks) for j in range(n_vars))
 
 
 def _conditions(
@@ -425,15 +427,26 @@ def pcmciplus(
         )
     data = np.asarray(data, dtype=np.float64)
     test = design_test(indep_test, data, tau_max)
-    return run_phases(test, data.shape[1], tau_max, pc_alpha, collider_rule)
+    ranks = tie_ranks(data).tolist()
+    with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
+        return run_phases(test, data.shape[1], tau_max, pc_alpha, collider_rule, ranks)
 
 
 def run_phases(
-    test: LinkTest, n_vars: int, tau_max: int, pc_alpha: float, collider_rule: str
+    test: LinkTest,
+    n_vars: int,
+    tau_max: int,
+    pc_alpha: float,
+    collider_rule: str,
+    ranks: Sequence[int],
 ) -> PCMCIPlusResult:
-    """Run the four phases with ``test`` over the columns of the lagged design."""
+    """Run the four phases with ``test`` over the columns of the lagged design.
+
+    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`, which orders PC1's equal
+    strengths.
+    """
     recorder = _Recorder(test)
-    parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha)
+    parents = lagged_parents(recorder, n_vars, tau_max, pc_alpha, ranks)
     adjacency, p_values, statistics, sepsets = skeleton(test, n_vars, parents, tau_max, pc_alpha)
     for (x, j), (statistic, p_value) in recorder.largest.items():
         lag, i = divmod(x, n_vars)

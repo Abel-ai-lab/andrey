@@ -24,21 +24,21 @@ The method runs Algorithm 1 of the paper:
 3. **Final phase**: the ancestral removal phase, then the non-ancestral removal phase.
 
 The **ancestral removal phase** (Algorithm S2) runs rounds ``p = 0, 1, ...``. Each round tests the
-autodependency links first, then the cross links at lag ``0``, ``1``, ..., ``tau_max``, one group
-at a time. A link ``A - B``, ``A < B``, is tested given ``S`` plus the default conditions
-``S_def``, the parents of ``A`` and ``B``. ``S`` runs over the ``p``-subsets of the adjacencies of
-``B`` that have no arrowhead at themselves (``apds_t``), minus ``S_def``, sorted by the smallest
-absolute test statistic of their link with ``B``, largest first, as it stood when the group
-started, so the tests of one link do not reorder the search of another link in its group and the
-order does not depend on the order of the variables; equal statistics go to the earlier node,
-then the lower index. A same-step link is also tested from ``A``'s side; the earlier end of a
-lagged link is searched with the empty set only. The first p-value above ``alpha`` marks the
-link for removal and adds ``S + S_def`` to its separating sets; marked links leave the graph when
-their group ends. A side with fewer than ``p`` candidates is done, and its letter is added to the
-middle mark (``"?"`` + ``"R"`` = ``"R"``, ``"L"`` + ``"R"`` = ``"!"``). When a round removes a
-link, the rules ``APR, R8', R2', R1', R9', R10'`` orient lagged links and ``p`` restarts at 0.
-The phase ends when every middle mark is ``"!"`` or ``""``, and then applies the full rule list
-``APR, R8', R2', R1', R0'd, R0'c, R3', R4, R9', R10', R0'b, R0'a``.
+autodependency links first, then the cross links at lag ``0``, ``1``, ..., ``tau_max``, one group at
+a time. A link ``A - B``, ``A < B``, is tested given ``S`` plus the default conditions ``S_def``,
+the parents of ``A`` and ``B``. ``S`` runs over the ``p``-subsets of the adjacencies of ``B`` that
+have no arrowhead at themselves (``apds_t``), minus ``S_def``, sorted by the smallest absolute test
+statistic of their link with ``B``, largest first, as it stood when the group started, so the tests
+of one link do not reorder the search of another link in its group and the order does not depend on
+the order of the variables; statistics equal to ``_KEY_DP`` decimals go to the earlier node, then to
+the lower :func:`~andrey.search.hc.tie_ranks` of its variable. A same-step link is also tested from
+``A``'s side; the earlier end of a lagged link is searched with the empty set only. The first
+p-value above ``alpha`` marks the link for removal and adds ``S + S_def`` to its separating sets;
+marked links leave the graph when their group ends. A side with fewer than ``p`` candidates is done,
+and its letter is added to the middle mark (``"?"`` + ``"R"`` = ``"R"``, ``"L"`` + ``"R"`` =
+``"!"``). When a round removes a link, the rules ``APR, R8', R2', R1', R9', R10'`` orient lagged
+links and ``p`` restarts at 0. The phase ends when every middle mark is ``"!"`` or ``""``, and then
+applies the full rule list ``APR, R8', R2', R1', R0'd, R0'c, R3', R4, R9', R10', R0'b, R0'a``.
 
 The **non-ancestral removal phase** (Algorithm S3) tests every link whose middle mark is not
 empty given subsets of ``napds_t``, a superset of the D-Sep set that uses the orientations found
@@ -80,7 +80,7 @@ with latent confounders. Advances in Neural Information Processing Systems 33 (N
 from __future__ import annotations
 
 from collections import Counter, OrderedDict
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations, islice
 
@@ -88,6 +88,8 @@ import numpy as np
 
 from andrey.core import backend
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
+from andrey.search._parallel import _KEY_DP
+from andrey.search.hc import tie_ranks
 from andrey.temporal.pcmci import INDEP_TESTS, LinkTest, design_test
 
 CONFLICT = 4  # an edge mark the rules oriented both as a tail and as an arrowhead
@@ -175,10 +177,16 @@ def _add_middle(current: str, letter: str) -> str:
 
 
 class _Search:
-    """The state of one LPCMCI run: the graph, the test memories, and the separating sets."""
+    """The state of one LPCMCI run: the graph, the test memories, and the separating sets.
 
-    def __init__(self, test: LinkTest, n_vars: int, tau_max: int, alpha: float) -> None:
+    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`.
+    """
+
+    def __init__(
+        self, test: LinkTest, n_vars: int, tau_max: int, alpha: float, ranks: Sequence[int]
+    ) -> None:
         self.test, self.n, self.tau_max, self.alpha = test, n_vars, tau_max, alpha
+        self.ranks = ranks
         self.window = [(v, lag) for lag in range(tau_max + 1) for v in range(n_vars)]
         self.edges: dict[Key, Edge] = {}
         self.neighbors_of: dict[int, set[tuple[int, int]]] = {}
@@ -466,9 +474,16 @@ class _Search:
         return groups
 
     def _sorted(self, nodes: set[Node], anchor: Node, imin: dict[Key, float]) -> list[Node]:
-        """``nodes`` by the smallest statistic of their link with ``anchor``, largest first."""
-        ordered = sorted(nodes, key=_order)
-        return sorted(ordered, key=lambda c: -imin.get(_key(anchor, c)[0], np.inf))
+        """``nodes`` by the smallest statistic of their link with ``anchor``, largest first.
+
+        Statistics equal to ``_KEY_DP`` decimals go to the earlier node, then to the lower rank.
+        """
+
+        def key(c: Node) -> tuple[float, int, int]:
+            statistic = round(float(imin.get(_key(anchor, c)[0], np.inf)), _KEY_DP)
+            return (-statistic, -c[1], self.ranks[c[0]])
+
+        return sorted(nodes, key=key)
 
     def ancestral_phase(self, rules: list[Callable[[], tuple[dict, dict, dict]]]) -> None:
         """Algorithm S2, then the full rule list."""
@@ -1085,15 +1100,24 @@ def lpcmci(
         raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     data = np.asarray(data, dtype=np.float64)
     test = design_test(indep_test, data, tau_max)
+    ranks = tie_ranks(data).tolist()
     with backend.one_blas_thread():
-        return run(test, data.shape[1], tau_max, pc_alpha, n_preliminary_iterations)
+        return run(test, data.shape[1], tau_max, pc_alpha, n_preliminary_iterations, ranks)
 
 
 def run(
-    test: LinkTest, n_vars: int, tau_max: int, alpha: float, n_preliminary_iterations: int
+    test: LinkTest,
+    n_vars: int,
+    tau_max: int,
+    alpha: float,
+    n_preliminary_iterations: int,
+    ranks: Sequence[int],
 ) -> LPCMCIResult:
-    """Run Algorithm 1 with ``test`` over the columns of the lagged design."""
-    search = _Search(test, n_vars, tau_max, alpha)
+    """Run Algorithm 1 with ``test`` over the columns of the lagged design.
+
+    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`.
+    """
+    search = _Search(test, n_vars, tau_max, alpha, ranks)
     search.initialize()
     kept: list[tuple[Key, bool]] = []
     for _ in range(n_preliminary_iterations):

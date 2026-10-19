@@ -30,8 +30,10 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend, score_delta,
 from andrey.core.orient import to_structure
 from andrey.core.score import BICScore, check_columns
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE, stable_key
+from andrey.search._parallel import _EPS_IMPROVE
+from andrey.search._parallel_ges import move_key
 from andrey.search.ges import _reachable, _recompute_objective
+from andrey.search.hc import tie_ranks
 
 
 def intervention_mask(interventions: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
@@ -324,14 +326,13 @@ class _Objective:
 
 
 def _forward_candidates(
-    v: int, adj: np.ndarray, score: InterventionalBICScore, n: int
+    v: int, adj: np.ndarray, score: InterventionalBICScore, n: int, ranks: Sequence[int]
 ) -> list[tuple[tuple, int, set[int]]]:
     """The improving insertions into ``v`` as ``(key, u, C)``, sorted by ``key``, path unchecked.
 
     ``u -> v`` with ``C`` the parents in ``v``'s component (Hauser and Buhlmann 2012, Prop. 25 (i)
-    and (ii)); ``key`` is ``(stable_key(delta, n), u, v, index)``, ``index`` the position of
-    ``C``'s free part among the subsets of ``ne(v)`` without ``u``'s neighbors. Insertions that
-    give ``v`` the same other parents are scored together
+    and (ii)); ``key`` is :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``.
+    Insertions that give ``v`` the same other parents are scored together
     (:meth:`InterventionalBICScore.add_deltas`).
     """
     row = adj[v]
@@ -344,36 +345,35 @@ def _forward_candidates(
         deltas = score.add_deltas(v, pa)[sources]
         better = deltas < -_EPS_IMPROVE
         for u, delta in zip(sources[better].tolist(), deltas[better].tolist(), strict=True):
-            out.append(((stable_key(delta, n), u, v, 0), u, set()))
+            out.append((move_key(delta, n, u, v, (), ranks), u, set()))
     else:
         pa_set = set(pa.tolist())
         ne_list = ne.tolist()
         linked = adj[np.ix_(sources, ne)] != NULL
-        groups: dict[tuple[int, ...], list[tuple[int, int, set[int]]]] = {}
+        groups: dict[tuple[int, ...], list[tuple[int, set[int]]]] = {}
         for u, hits in zip(sources.tolist(), linked.tolist(), strict=True):
             na = {w for w, hit in zip(ne_list, hits, strict=True) if hit}
             t0 = [w for w, hit in zip(ne_list, hits, strict=True) if not hit]
-            for index, T in ops.clique_extensions(adj, na, t0):
+            for _index, T in ops.clique_extensions(adj, na, t0):
                 C = na | set(T)
-                groups.setdefault(tuple(sorted(pa_set | C)), []).append((u, index, C))
+                groups.setdefault(tuple(sorted(pa_set | C)), []).append((u, C))
         for base, moves in groups.items():
             deltas = score.add_deltas(v, base)
-            for u, index, C in moves:
+            for u, C in moves:
                 delta = float(deltas[u])
                 if delta < -_EPS_IMPROVE:
-                    out.append(((stable_key(delta, n), u, v, index), u, C))
+                    out.append((move_key(delta, n, u, v, C, ranks), u, C))
     out.sort(key=lambda move: move[0])
     return out
 
 
 def _backward_candidate(
-    v: int, adj: np.ndarray, score: InterventionalBICScore, n: int
+    v: int, adj: np.ndarray, score: InterventionalBICScore, n: int, ranks: Sequence[int]
 ) -> tuple[tuple, int, set[int]] | None:
     """The best-improving deletion of an edge at ``v`` as ``(key, u, C)``, or None.
 
-    ``C`` is ``v``'s neighbors kept as its parents (Prop. 28); ``key`` is ``(stable_key(delta,
-    n), u, v, index)``, ``index`` the position of the dropped neighbors among the subsets of
-    ``ne(v)`` adjacent to ``u``.
+    ``C`` is ``v``'s neighbors kept as its parents (Prop. 28); ``key`` is
+    :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``.
     """
     row = adj[v]
     pa = set(np.flatnonzero(row == ARROW).tolist())
@@ -382,12 +382,12 @@ def _backward_candidate(
     best: tuple[tuple, int, set[int]] | None = None
     for u in np.flatnonzero((row == ARROW) | lines).tolist():
         h0 = ne[adj[u, ne] != NULL].tolist()
-        for index, H in ops.clique_residuals(adj, h0):
+        for _index, H in ops.clique_residuals(adj, h0):
             C = set(h0) - set(H)
             kept = C | pa
             delta = score.score(v, kept - {u}) - score.score(v, kept | {u})
             if delta < -_EPS_IMPROVE:
-                key = (stable_key(delta, n), u, v, index)
+                key = move_key(delta, n, u, v, C, ranks)
                 if best is None or key < best[0]:
                     best = (key, u, C)
     return best
@@ -429,12 +429,13 @@ def _separated(
 
 
 def _turning_best(
-    adj: np.ndarray, score: InterventionalBICScore, n: int
+    adj: np.ndarray, score: InterventionalBICScore, n: int, ranks: Sequence[int]
 ) -> tuple[int, int, set[int], bool] | None:
     """The best-improving turn as ``(u, v, C, essential)``: ``v -> u`` (or ``v -- u``) becomes
     ``u -> v`` with ``C`` the parents of ``v`` in its component.
 
-    Lines follow Prop. 31 and arrows Prop. 34; the score change is Corollary 32 or 36.
+    Lines follow Prop. 31 and arrows Prop. 34; the score change is Corollary 32 or 36. Turns are
+    compared by :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``.
     """
     pa, nbr, adj_sets = _neighborhoods(adj)
     succ = ops.tail_successor_lists(adj)
@@ -449,7 +450,7 @@ def _turning_best(
     for v in range(n):
         for u in sorted(nbr[v]):  # a line, turned in a DAG where it points v -> u
             N = nbr[v] & adj_sets[u]
-            for index, T in ops.clique_extensions(adj, (), sorted(nbr[v] - {u})):
+            for _index, T in ops.clique_extensions(adj, (), sorted(nbr[v] - {u})):
                 C = set(T)
                 if not C - N or not _separated(nbr, nbr[v], N - C, C - N, C & N):
                     continue
@@ -460,10 +461,10 @@ def _turning_best(
                     - score.score(v, pa[v] | C)
                     - score.score(u, kept | {v})
                 )
-                offer(delta, (stable_key(delta, n), u, v, 0, index), (u, v, C, False))
+                offer(delta, move_key(delta, n, u, v, C, ranks), (u, v, C, False))
         for u in np.nonzero(adj[:, v] == ARROW)[0].tolist():  # an arrow v -> u
             N = nbr[v] & adj_sets[u]
-            for index, T in ops.clique_extensions(adj, N, sorted(nbr[v] - adj_sets[u])):
+            for _index, T in ops.clique_extensions(adj, N, sorted(nbr[v] - adj_sets[u])):
                 C = N | set(T)
                 if _reaches(succ, v, u, C | nbr[u]):
                     continue
@@ -473,7 +474,7 @@ def _turning_best(
                     - score.score(v, pa[v] | C)
                     - score.score(u, pa[u])
                 )
-                offer(delta, (stable_key(delta, n), u, v, 1, index), (u, v, C, True))
+                offer(delta, move_key(delta, n, u, v, C, ranks), (u, v, C, True))
     return best
 
 
@@ -507,9 +508,10 @@ def _turn(
 class _Search:
     """The GIES search state: the essential graph, the cached candidates, and the objective."""
 
-    def __init__(self, score: InterventionalBICScore, n: int) -> None:
+    def __init__(self, score: InterventionalBICScore, n: int, ranks: Sequence[int]) -> None:
         self.score = score
         self.n = n
+        self.ranks = ranks
         self.adj = np.zeros((n, n), dtype=np.int8)
         self.objective = _Objective(score, n)
         self.forward: dict[int, list[tuple[tuple, int, set[int]]]] = {}
@@ -521,16 +523,16 @@ class _Search:
         if _FULL_RESCAN:
             reachable = _reachable(adj)
             valid = (
-                (key, u, C)
+                (key, u, v, C)
                 for v in range(n)
-                for key, u, C in _forward_candidates(v, adj, self.score, n)
+                for key, u, C in _forward_candidates(v, adj, self.score, n, self.ranks)
                 if not reachable(v, u, C)
             )
-            best = min(valid, default=None)
-            return None if best is None else (best[1], best[0][2], best[2])
+            best = min(valid, key=lambda move: move[0], default=None)
+            return None if best is None else best[1:]
         for v in range(n):
             if v not in self.forward:
-                self.forward[v] = _forward_candidates(v, adj, self.score, n)
+                self.forward[v] = _forward_candidates(v, adj, self.score, n, self.ranks)
         heap = [(moves[0][0], v, 0) for v, moves in self.forward.items() if moves]
         if not heap:
             return None
@@ -553,12 +555,13 @@ class _Search:
             self.backward.clear()
         for v in range(n):
             if v not in self.backward:
-                self.backward[v] = _backward_candidate(v, adj, self.score, n)
-        best = min((move for move in self.backward.values() if move is not None), default=None)
+                self.backward[v] = _backward_candidate(v, adj, self.score, n, self.ranks)
+        moves = ((move, v) for v, move in self.backward.items() if move is not None)
+        best = min(moves, key=lambda found: found[0][0], default=None)
         if best is None:
             return None
-        key, u, C = best
-        return u, key[2], C
+        (_key, u, C), v = best
+        return u, v, C
 
     def apply(self, adj: np.ndarray) -> None:
         """Move to ``adj``, the graph after one step; raise unless it lowers the score."""
@@ -584,8 +587,8 @@ def gies(
     Starts from the empty graph and repeats the forward (insert), backward (delete), and turning
     phases, each until it finds no improving step, until a round of backward and turning phases
     changes nothing. Every step takes the move with the lowest score change divided by the
-    variable count and rounded to nine decimal places, ties broken by the vertices and the move's
-    position in the enumeration.
+    variable count and rounded to nine decimal places; equal ones are ordered by the
+    :func:`~andrey.search.hc.tie_ranks` of the move's two vertices, then of its other vertices.
 
     Parameters
     ----------
@@ -611,8 +614,9 @@ def gies(
     n = X.shape[1]
     score = InterventionalBICScore(X, mask, lambda_value=lambda_value)
     cut = np.zeros((n, n), dtype=bool) if mask is None else cut_pairs(mask)
+    ranks = tie_ranks(X).tolist()
     with backend.one_blas_thread():
-        search = _Search(score, n)
+        search = _Search(score, n, ranks)
         while True:
             while (step := search.forward_best()) is not None:
                 search.apply(_insert(search.adj.copy(), *step, cut))
@@ -620,7 +624,7 @@ def gies(
             while (step := search.backward_best()) is not None:
                 search.apply(_delete(search.adj.copy(), *step, cut))
                 changed = True
-            while (turn := _turning_best(search.adj, score, n)) is not None:
+            while (turn := _turning_best(search.adj, score, n, ranks)) is not None:
                 search.apply(_turn(search.adj.copy(), *turn, cut))
                 changed = True
             if not changed:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from itertools import permutations
+
 import numpy as np
 import pytest
 
@@ -129,3 +131,31 @@ def test_ica_lingam_random_state_and_max_iter_accepted():
     assert list(andrey.ica_lingam(X, random_state=123, max_iter=500).ordering) == list(
         other.ordering
     )
+
+
+def _ica_in_original_labels(X: np.ndarray, order: tuple[int, ...]) -> tuple[list[int], np.ndarray]:
+    """Fit ``ica_lingam`` on the columns in ``order``; return its ordering and weights relabeled."""
+    out = andrey.ica_lingam(X[:, order], random_state=0)
+    weights = np.zeros_like(out.weighted_adjacency)
+    weights[np.ix_(order, order)] = out.weighted_adjacency
+    return [order[k] for k in out.ordering], weights
+
+
+def test_ica_lingam_tied_sources_follow_the_columns(monkeypatch):
+    """Two independent sources can both come first; reordering the columns keeps the choice."""
+    rng = np.random.default_rng(0)
+    a, b = rng.uniform(-1, 1, 2000), rng.uniform(-1, 1, 2000)
+    X = np.column_stack([a, b, 0.8 * a + 0.8 * b + rng.uniform(-1, 1, 2000)])
+    orders = list(permutations(range(3)))
+    want = _ica_in_original_labels(X, orders[0])
+    for order in orders[1:]:
+        got = _ica_in_original_labels(X, order)
+        assert got[0] == want[0]
+        np.testing.assert_array_equal(got[1] != 0, want[1] != 0)
+        np.testing.assert_allclose(got[1], want[1], rtol=0, atol=1e-6)
+
+    import andrey.lingam.ica as ica
+
+    monkeypatch.setattr(ica, "tie_ranks", lambda x: np.arange(x.shape[1]))
+    by_position = [_ica_in_original_labels(X, order)[0] for order in orders]
+    assert any(o != by_position[0] for o in by_position[1:])
