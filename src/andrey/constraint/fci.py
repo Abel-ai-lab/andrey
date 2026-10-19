@@ -49,9 +49,9 @@ def fci(
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
     visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
-    ``in_column_order`` takes the column order there too, and applies the orientation rules one
-    firing at a time in column order instead of in order-free rounds (:func:`_fci_orient`). Returns
-    the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
+    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
+    of in order-free rounds (:func:`_fci_orient`). Returns the PAG as a ``GraphStructure`` of kind
+    ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
 
@@ -62,7 +62,7 @@ def fci(
 
     marks = _circle_pag(support)
     _orient_colliders(marks, sepsets)
-    if possible_dsep == "fast" or in_column_order:
+    if possible_dsep == "fast":
         _remove_by_possible_dsep(marks, test, alpha, sepsets)
     else:
         by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)

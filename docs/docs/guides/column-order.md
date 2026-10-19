@@ -36,8 +36,9 @@ bits count as tied and go to the rank.
 What reordering the columns does to each method's result with the default settings. "Relabels"
 means you get the same graph with its nodes in the new order. "Ties follow `tie_break`" marks the
 methods the setting below changes: it replaces the rank that breaks their ties, for `pc` and `cdnod`
-the p-value order of their colliders, and for `pc`, `cdnod`, `fci`, and `gfci` the order-free rounds
-of their orientation rules.
+the p-value order of their colliders, for `pc`, `cdnod`, `fci`, and `gfci` the order-free rounds of
+their orientation rules, and for `fci` and `gfci` the rank order of their possible-d-separation
+step.
 
 ```{include} ../../_generated/column-order.md
 ```
@@ -113,11 +114,16 @@ export ANDREY_TIE_BREAK=position
 `rank` and `position`.
 
 What it trades: ranking reads each column once per fit, so `position` saves little time next to the
-search itself. It is not more or less accurate, since a tie is a choice the data cannot make. Scores
-are still compared at the same rounding, so with a fixed column order you get the same graph on
-every machine where the default does. But reordering the columns can change the graph, and the
-column order can leak into it; `andrey.data.sortability.index_correlation` measures how much a
-dataset's column order reveals of its causal order.
+search itself. The exception is `fci` and `gfci`, where the setting also orders the
+possible-d-separation step. On simulated graphs, a fit with the order-free step took 0.99 to 1.05
+times as long as one in column order at up to 200 variables and 0.78 to 1.42 times as long at 400
+and 800. On some dense graphs from 400 variables, though, the order-free step's visiting order needs
+more tests: one `gfci` dataset with 400 variables took 407 s, against 120 to 336 s in column order
+over five column orders. `position` is not more or less accurate, since a tie is a choice the data
+cannot make. Scores are still compared at the same rounding, so with a fixed column order you get
+the same graph on every machine where the default does. But reordering the columns can change the
+graph, and the column order can leak into it; `andrey.data.sortability.index_correlation` measures
+how much a dataset's column order reveals of its causal order.
 
 For `pc` and `cdnod`, the setting chooses the order in which conflicting colliders are oriented:
 by the p-value that separated each pair under `rank`, in column order under `position`. Their
@@ -129,7 +135,11 @@ and an edge or endpoint two rules decide differently stays undirected or a circl
 order does not enter. Under `position` they fire one at a time in column order, and of two firings
 that conflict the first decides. `gfci` then also records the first subset found as the separating
 set of a pair its GES phase leaves non-adjacent, where `rank` records the union of the smallest
-ones. `fci` and `gfci` still depend on the column order through their possible-d-separation step,
-which the setting does not change; `possible_dsep="order_free"` builds its sets without the order.
+ones.
+
+`fci` and `gfci` take the order of their possible-d-separation step from the setting too: their
+`possible_dsep` argument, when the call gives none, is `"order_free"` under `rank`, which visits the
+step by the rank, and `"fast"` under `position`, which visits it in column order. A `possible_dsep`
+in the call overrides the setting.
 
 The methods in the "No" rows have no rank to replace, and the setting does not change them.

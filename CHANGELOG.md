@@ -65,7 +65,8 @@ change names its pull request.
   or `"position"`, by column position. The new Column order and machines guide lists what each
   method keeps under a new column order and on another machine, and which methods follow the
   setting. Under `"position"`, `pc`, `cdnod`, `fci`, and `gfci` also fire their orientation rules
-  one at a time in column order instead of in rounds. ([#210])
+  one at a time in column order instead of in rounds, and `fci` and `gfci` default to
+  `possible_dsep="fast"`. ([#210])
 
 ### Changed
 

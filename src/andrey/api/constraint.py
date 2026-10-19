@@ -298,7 +298,7 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "order_free",
+    possible_dsep: str | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -343,12 +343,14 @@ def fci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"order_free", "fast"}, default="order_free"
+    possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. See Notes and Limitations.
+        ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
+        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
+        Limitations.
 
     Returns
     -------
@@ -415,7 +417,7 @@ def fci(
     ``"fast"`` the result can depend on the column order through the possible-d-separation step. A
     fixed column order gives reproducible results. Under ``andrey.config(tie_break="position")``,
     the rules instead fire one at a time in column order, and of two firings that conflict the
-    first decides; ``possible_dsep`` then defaults to ``"fast"``. The
+    first decides. ``possible_dsep`` then defaults to ``"fast"``. The
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
 
@@ -489,7 +491,7 @@ def fci(
     'pag'
     """
     from andrey.constraint.fci import fci as _fci
-    from andrey.constraint.pc import resolve_in_column_order
+    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
 
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories
@@ -503,7 +505,7 @@ def fci(
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=mask,
-            possible_dsep=possible_dsep,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
             in_column_order=resolve_in_column_order(),
         )
     return structure_output(
@@ -521,7 +523,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "order_free",
+    possible_dsep: str | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -574,12 +576,14 @@ def gfci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"order_free", "fast"}, default="order_free"
+    possible_dsep : {"order_free", "fast"} or None, default=None
         The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
         search kept, one at a time, so each removal changes what the step tests after it.
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. See Notes and Limitations.
+        ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
+        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
+        Limitations.
 
     Returns
     -------
@@ -627,8 +631,9 @@ def gfci(
     resolves stays a circle. A rule that needs the separating set of a pair GES left non-adjacent
     uses the union of the smallest subsets of the two endpoints' CPDAG neighbors that make the pair
     independent, which does not depend on the column order. Under
-    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order, and such
-    a pair's separating set is the first subset found in column order.
+    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order, such a
+    pair's separating set is the first subset found in column order, and ``possible_dsep`` defaults
+    to ``"fast"``.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
@@ -682,7 +687,7 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    from andrey.constraint.pc import resolve_in_column_order
+    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
     from andrey.search.gfci import gfci as _gfci
 
     # Both phases read the same data, so the score and the test must agree on its type.
@@ -708,7 +713,7 @@ def gfci(
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=mask,
-            possible_dsep=possible_dsep,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
             in_column_order=resolve_in_column_order(),
         )
     return structure_output(

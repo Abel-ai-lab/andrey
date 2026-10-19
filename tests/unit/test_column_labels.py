@@ -103,12 +103,13 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
 
     want = named_marks(fit(COLUMNS))
     assert bool(reads) == spec.tie_break
-    if "collider_order" in {param.name for param in spec.params}:
-        # A collider order given in the call does not consult the setting for the colliders.
-        read_by_default = len(reads)
-        reads.clear()
-        fit(COLUMNS, collider_order="p_value")
-        assert len(reads) == read_by_default - 1
+    for given in ({"collider_order": "p_value"}, {"possible_dsep": "order_free"}):
+        if given.keys() <= {param.name for param in spec.params}:
+            # An order given in the call does not consult the setting for that order.
+            read_by_default = len(reads)
+            reads.clear()
+            fit(COLUMNS, **given)
+            assert len(reads) == read_by_default - 1
     if spec.column_order != "can_change":
         pair = spec.family == "pairwise"
         for order in ([1, 0, 2],) if pair else ([1, 2, 0], [2, 0, 1]):

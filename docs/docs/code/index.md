@@ -104,8 +104,9 @@ The rules run in rounds, each setting together the marks every rule implies on t
 stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
 Their possible-d-separation step visits the pairs and nodes by a rank computed from each column's
-own data, so with the default `possible_dsep="order_free"` their result does not depend on the
-column order unless two columns are identical; `"fast"` visits them in column order.
+own data, so with `possible_dsep="order_free"`, the default, their result does not depend on the
+column order unless two columns are identical; `"fast"` visits them in column order and is the
+default under `andrey.config(tie_break="position")`.
 
 ### Experimental methods
 

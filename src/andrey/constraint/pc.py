@@ -99,6 +99,17 @@ def resolve_in_column_order() -> bool:
     return backend.config.tie_break == "position"
 
 
+def resolve_possible_dsep(possible_dsep: str | None) -> str:
+    """Return ``possible_dsep``, or for ``None`` the order ``andrey.config.tie_break`` selects.
+
+    ``"rank"`` selects ``"order_free"`` and ``"position"`` selects ``"fast"``. An explicit
+    ``possible_dsep`` is returned as given, without reading the setting.
+    """
+    if possible_dsep is not None:
+        return possible_dsep
+    return "fast" if backend.config.tie_break == "position" else "order_free"
+
+
 def check_collider_order(collider_order: str) -> None:
     """Raise ``ValueError`` unless ``collider_order`` is one of :data:`COLLIDER_ORDERS`."""
     if collider_order not in COLLIDER_ORDERS:

@@ -148,11 +148,14 @@ class _Config:
     column's own data (:func:`andrey.search.hc.tie_ranks`), so reordering the columns relabels the
     result. ``"position"`` orders them by column position instead, which skips computing the ranks,
     and the result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
-    ``collider_order`` from it when the call gives none: ``"p_value"`` under ``"rank"``,
-    ``"column"`` under ``"position"``, and ``pc``, ``cdnod``, ``fci``, and ``gfci`` fire their
-    orientation rules one at a time in column order under ``"position"``, where ``"rank"`` runs
-    them in order-free rounds. Each fit reads the setting once, when it starts. The
-    :doc:`column-order guide </docs/guides/column-order>` lists the methods it reaches.
+    ``collider_order``, and ``fci`` and ``gfci`` their ``possible_dsep``, from it when the call
+    gives none: ``"p_value"`` and ``"order_free"`` under ``"rank"``, ``"column"`` and ``"fast"``
+    under ``"position"``. ``pc``, ``cdnod``, ``fci``, and ``gfci`` also fire their orientation
+    rules one at a time in column order under ``"position"``, where ``"rank"`` runs them in
+    order-free rounds. The speed difference is small, except for ``fci`` and ``gfci`` on large
+    dense graphs. Each fit reads the setting once, when it starts. The
+    :doc:`column-order guide </docs/guides/column-order>` gives the numbers and lists the methods
+    it reaches.
     """
 
     _backend: str | None = None

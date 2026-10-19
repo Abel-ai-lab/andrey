@@ -57,9 +57,8 @@ def gfci(
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data score and test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
     visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
-    ``in_column_order`` takes the column order there too, and applies the orientation rules one
-    firing at a time in column order instead of in order-free rounds
-    (:func:`~andrey.constraint.fci._fci_orient`).
+    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
+    of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
     """
     X = np.asarray(data, dtype=np.float64)
 
@@ -76,7 +75,7 @@ def gfci(
 
     marks = _circle_pag(support)
     _orient_colliders_from_pattern(marks, pattern, sepsets)
-    if possible_dsep == "fast" or in_column_order:
+    if possible_dsep == "fast":
         _remove_by_possible_dsep(marks, test, alpha, sepsets)
     else:
         by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)

@@ -279,18 +279,20 @@ def test_cdnod_is_invariant_to_column_order():
         assert np.array_equal(permuted[np.ix_(back, back)], marks)
 
 
-def _invariant_to_column_order(fit, x: np.ndarray, *args) -> bool:
+def _invariant_to_column_order(fit, x: np.ndarray, *args, ordered=None) -> bool:
     """Assert ``fit`` maps back to its own output under seeded column orders; return whether
-    ``fit`` with ``in_column_order`` changes under any of them."""
+    ``fit`` with the keywords ``ordered``, ``in_column_order=True`` by default, changes under any
+    of them."""
+    ordered = ordered or dict(in_column_order=True)
     marks = fit(x, *args).to_numpy()
-    in_order = fit(x, *args, in_column_order=True).to_numpy()
+    in_order = fit(x, *args, **ordered).to_numpy()
     in_order_changed = False
     for seed in range(4):
         order = np.random.default_rng(seed).permutation(x.shape[1])
         back = np.argsort(order)
         permuted = fit(x[:, order], *args).to_numpy()
         assert np.array_equal(permuted[np.ix_(back, back)], marks)
-        permuted = fit(x[:, order], *args, in_column_order=True).to_numpy()
+        permuted = fit(x[:, order], *args, **ordered).to_numpy()
         in_order_changed |= not np.array_equal(permuted[np.ix_(back, back)], in_order)
     return in_order_changed
 
@@ -313,8 +315,10 @@ def _position_draw(name: str) -> tuple[np.ndarray, tuple]:
 def test_tie_break_position_fires_the_orientation_rules_in_column_order(name):
     """``"position"`` reaches the engine as ``in_column_order``, ``"rank"`` as rounds."""
     x, args = _position_draw(name)
-    # Only the rules differ between the two settings, not the order of the colliders.
+    # Only the rules differ between the two settings, not the order of the colliders or of the
+    # possible-d-separation step.
     kwargs = dict(collider_order="p_value") if name in ("pc", "cdnod") else {}
+    kwargs |= dict(possible_dsep="fast") if name in ("fci", "gfci") else {}
     module = "andrey.search.gfci" if name == "gfci" else f"andrey.constraint.{name}"
     engine = getattr(importlib.import_module(module), name)
     facade = getattr(andrey, name)
@@ -462,7 +466,57 @@ def test_possible_dsep_is_invariant_to_column_order(module):
     them in column order."""
     x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1).data
     fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
-    assert _invariant_to_column_order(fit, x)
+    assert _invariant_to_column_order(fit, x, ordered=dict(possible_dsep="fast"))
+
+
+@pytest.mark.parametrize("name", ["fci", "gfci"])
+def test_tie_break_position_gives_the_output_of_possible_dsep_fast(name):
+    """On a draw where the two orders remove different edges, ``"position"`` gives the output of
+    ``possible_dsep="fast"``, and ``"rank"`` that of ``"order_free"``."""
+    x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1).data
+    facade = getattr(andrey, name)
+    modes_differ = False
+    orders = [np.arange(x.shape[1])] + [
+        np.random.default_rng(seed).permutation(x.shape[1]) for seed in range(4)
+    ]
+    for order in orders:
+        columns = x[:, order]
+        order_free = facade(columns, possible_dsep="order_free").structure
+        assert facade(columns).structure == order_free
+        modes_differ |= order_free != facade(columns, possible_dsep="fast").structure
+        with andrey.config(tie_break="position"):
+            assert facade(columns).structure == facade(columns, possible_dsep="fast").structure
+    assert modes_differ
+
+
+@pytest.mark.parametrize("name", ["fci", "gfci"])
+@pytest.mark.parametrize(
+    ("tie_break", "given", "reaches"),
+    [
+        ("rank", None, "order_free"),
+        ("position", None, "fast"),
+        ("rank", "fast", "fast"),
+        ("position", "order_free", "order_free"),
+    ],
+)
+def test_possible_dsep_follows_tie_break_unless_given(monkeypatch, name, tie_break, given, reaches):
+    """The engine gets ``possible_dsep`` from the setting when the call gives none, and the call's
+    value when it gives one."""
+    module = importlib.import_module(
+        "andrey.search.gfci" if name == "gfci" else "andrey.constraint.fci"
+    )
+    engine = getattr(module, name)
+    received = []
+
+    def spy(*args, **kwargs):
+        received.append(kwargs["possible_dsep"])
+        return engine(*args, **kwargs)
+
+    monkeypatch.setattr(module, name, spy)
+    x = data.sample_scm(d=4, n=100, seed=0, density=2.0, latents=1).data
+    with andrey.config(tie_break=tie_break):
+        getattr(andrey, name)(x, **({} if given is None else dict(possible_dsep=given)))
+    assert received == [reaches]
 
 
 def test_fci_output_contract():

@@ -79,11 +79,13 @@ _COLLIDER_RULE = ParamSpec(
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
     type="str",
-    default="order_free",
+    default=None,
     choices=("order_free", "fast"),
     doc="The order of the possible-d-separation step, which removes edges one at a time: "
     "order_free = by a rank computed from each column's own data, so the result does not depend "
-    "on the column order unless two columns are identical; fast = column order.",
+    "on the column order unless two columns are identical; fast = column order. null follows "
+    "ANDREY_TIE_BREAK: order_free under rank, fast under position.",
+    nullable=True,
 )
 _COLLIDER_ORDER = ParamSpec(
     name="collider_order",
@@ -180,12 +182,11 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        column_order="can_change",
+        column_order="relabels",
         tie_break=True,
         order_note=(
-            "The possible-d-separation step visits pairs in column order, and with "
-            '`possible_dsep="fast"` its sets follow that order. The orientation rules do not '
-            'depend on it, but `tie_break="position"` fires them one at a time in column order.'
+            '`tie_break="position"` fires the orientation rules one at a time in column order, and '
+            'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
         ),
         params=(
             _ALPHA,
@@ -219,13 +220,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        column_order="can_change",
+        column_order="relabels",
         tie_break=True,
         order_note=(
-            "The GES phase, the separating sets, and the orientation rules relabel; the "
-            "possible-d-separation step follows the column order as in `fci`. "
-            '`tie_break="position"` fires the rules one at a time in column order and records the '
-            "first separating subset found."
+            '`tie_break="position"` fires the orientation rules one at a time in column order and '
+            'records the first separating subset found, and it or `possible_dsep="fast"` visits '
+            "the possible-d-separation step in column order."
         ),
         params=(
             ParamSpec(
@@ -288,9 +288,7 @@ _add(
         tie_break=True,
         order_note=(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
-            '`collider_order="column"` orients colliders in column order. With '
-            "`dependence_threshold`, the independent-change step orients the first pair its tests "
-            "decide, in column order."
+            '`collider_order="column"` orients colliders in column order.'
         ),
         params=(
             _ALPHA,
