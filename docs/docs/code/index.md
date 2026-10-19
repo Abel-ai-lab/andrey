@@ -278,6 +278,7 @@ name.
 | `alarm` | 37 | 46 | Simulated on the published network (bnlearn) |
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
+| `diabetes` | 413 | 602 | Simulated on the published network (bnlearn) |
 
 A published network's data come from a linear-Gaussian model on its graph, standardized, or, with
 `discrete=True`, from its own conditional probability tables, each column a pandas `category` of the

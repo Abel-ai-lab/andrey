@@ -34,7 +34,7 @@ coefficient `0.8` is an illustration, not an estimate from data.
 |---|---|---|
 | Andrey endpoints | `GraphStructure.to_numpy()` | `1`: tail at `i`; reverse cell is `2`: arrowhead at `j` |
 | causal-learn endpoints | `GeneralGraph.graph` | `-1`: tail at `i`; reverse cell is `1`: arrowhead at `j` |
-| gCastle directed adjacency | `causal_matrix` | `1`: edge from row `i` to column `j` |
+| Binary directed adjacency | `A` | `1`: edge from row `i` to column `j` |
 | lingam coefficients | `adjacency_matrix_` | Effect of column `j` on row `i`; the coefficient for `i -> j` is in `[j, i]` |
 
 A binary directed adjacency matrix needs extra conventions to distinguish an undirected edge,
@@ -198,19 +198,14 @@ def from_binary_dag(A):
 
 - **causal-learn** - `G.graph[i, j]` is also the mark at `i`, so `from_signed(G.graph, kind)`
   needs no transpose. Its wildcard and compound codes (3 and above) have no Andrey equivalent.
-- **gCastle DAG estimators** - `causal_matrix` sets `A[i, j] = 1` for `i -> j`; use
-  `from_binary_dag` for a directed acyclic result.
 - **lingam** - pass `adjacency_matrix_.T` to `from_binary_dag`. Some estimators write `NaN` for
   an unobserved common cause; decide how to encode those pairs first.
 
 ## References
 
 - [causal-learn graph implementation][signed-graph]: signed endpoint marks.
-- [gCastle NOTEARS implementation][notears]: binary directed adjacency and separate weights.
 - [LiNGAM model definition](https://lingam.readthedocs.io/en/latest/tutorial/lingam.html):
   the coefficient convention in $x = Bx + e$.
 
 [signed-graph]:
   https://github.com/py-why/causal-learn/blob/main/causallearn/graph/GeneralGraph.py
-[notears]:
-  https://gcastle.readthedocs.io/en/latest/_modules/castle/algorithms/gradient/notears/linear.html

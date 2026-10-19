@@ -165,18 +165,18 @@ def test_race_shows_a_ratio_whenever_both_fits_finish_whatever_the_shd(results):
     rows = [
         race_row("Andrey", 0.01, 3),
         race_row("causal-learn", 2.0, 16),  # SHD equal to the empty graph's
-        race_row("gCastle", 1.0, 2),
+        race_row("lingam", 1.0, 2),
     ]
-    html = results.results_html(rows, "PC")
+    html = results.results_html(rows, "DirectLiNGAM")
     assert all(f"<strong>{r['package']}</strong>" in html for r in rows)
     cells = html.split("<tr")[3:]  # header, Andrey, then causal-learn
     assert "200x" in cells[0] and "speed claim" not in html
     assert "100x" in cells[1]
     # Andrey's graph no better than the empty graph still gets its speed ratio.
-    loser = [race_row("Andrey", 0.01, 16), race_row("gCastle", 1.0, 2)]
-    assert "100x" in results.results_html(loser, "PC")
-    timeout = [race_row("Andrey", 0.01, 3), dict(race_row("gCastle", 1.0, 2), status="timeout")]
-    assert "100x" not in results.results_html(timeout, "PC")
+    loser = [race_row("Andrey", 0.01, 16), race_row("lingam", 1.0, 2)]
+    assert "100x" in results.results_html(loser, "DirectLiNGAM")
+    timeout = [race_row("Andrey", 0.01, 3), dict(race_row("lingam", 1.0, 2), status="timeout")]
+    assert "100x" not in results.results_html(timeout, "DirectLiNGAM")
 
 
 def test_estimate_and_truth_share_node_positions():
