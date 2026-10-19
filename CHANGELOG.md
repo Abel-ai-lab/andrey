@@ -36,6 +36,8 @@ change names its pull request.
 - `cdnod` takes `dependence_threshold`, which runs CD-NOD's independent-change step (Huang et al.
   2020) to orient edges between variables that both change with the domain index; it is off by
   default. ([#187])
+- `andrey.data.sortability.index_correlation` measures how much a dataset's column order reveals
+  of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
   only 3; smaller depths search less and run faster. ([#190])
 - `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
@@ -62,9 +64,17 @@ change names its pull request.
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
+- `andrey.data.load_dataset` lists a bnlearn network's columns in an order drawn from the seed,
+  with `feature_names` and the graph's labels in the same order, because the network files list
+  their variables close to causal order; `shuffle=False` keeps the file's order, and Sachs keeps
+  its own. ([#202])
 - Hill climbing and tabu search break exact score ties by a rank computed from each column's own
   data instead of by column position, so reordering the columns no longer changes the graph they
   find, and the same data give the same graph on other machines. ([#168], [#179])
+- BOSS and GRaSP search the columns sorted by the same rank, so their seeded starting and visiting
+  orders and their score ties follow each column's data instead of its position: reordering the
+  columns no longer changes the graph they find, and a seed's graph can differ from 0.6.0's.
+  ([#192])
 - `ges`, `gfci`, and `xges` return the same graphs as 0.4.0 in less time. ([#169])
 - `ANDREY_GES_PARALLEL_MIN_WORK` counts the work a pass redoes and its default stays 10000, so
   measure values calibrated before this change again with `andrey calibrate`. ([#169])
@@ -79,6 +89,10 @@ change names its pull request.
   that names every group of copies by column name and says to keep one column per group and read
   its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
   copies make a test's correlation matrix singular. ([#189])
+- With `indep_test="fisherz"` or `"student_t"`, `pc`, `fci`, and `cdnod` reject copied columns
+  before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
+  reject a series that repeats another at the same step or some steps back, naming its lagged
+  value, such as `'a' at lag 1 repeats 'd'`. ([#206])
 
 ### Removed
 
@@ -112,6 +126,10 @@ change names its pull request.
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
   dropping the edge. ([#187])
+- With the degenerate Gaussian score, on data where one variable's categories determine another's,
+  `boss` no longer raises `ValueError` or `StopIteration` and no search picks parents by a wrong or
+  minus-infinite score: collinear parents are fit by the columns that span them, and a node its
+  parents determine scores `inf`, unavailable as under the BIC. ([#203])
 
 ## [0.6.0] - 2026-10-17
 
@@ -327,3 +345,7 @@ First alpha release.
 [#187]: https://github.com/Abel-ai-lab/andrey/pull/187
 [#189]: https://github.com/Abel-ai-lab/andrey/pull/189
 [#190]: https://github.com/Abel-ai-lab/andrey/pull/190
+[#192]: https://github.com/Abel-ai-lab/andrey/pull/192
+[#202]: https://github.com/Abel-ai-lab/andrey/pull/202
+[#203]: https://github.com/Abel-ai-lab/andrey/pull/203
+[#206]: https://github.com/Abel-ai-lab/andrey/pull/206

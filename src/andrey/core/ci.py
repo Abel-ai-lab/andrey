@@ -63,7 +63,7 @@ from scipy.special import chdtrc, ndtr, stdtr
 
 from . import categorical, stats
 from .mixed import ConditionalGaussian, DegenerateGaussian
-from .score import copies_message, copy_groups
+from .score import copies_error, copies_message, copy_groups
 from .warning_policy import ExperimentalWarning, warn_once
 
 __all__ = [
@@ -203,22 +203,28 @@ class PartialCorrelationTest:
             -_ONE_MINUS_EPS if r < -_ONE_MINUS_EPS else _ONE_MINUS_EPS if r > _ONE_MINUS_EPS else r
         )
 
-    def _invert(self, stack: np.ndarray) -> np.ndarray:
-        """:func:`_invert_nonsingular` of ``stack``; a singular error names the data's copies.
+    def copies(self) -> tuple[tuple[int, ...], ...]:
+        """The groups of data columns that repeat one another up to scale and shift.
 
-        The groups of copies come from the full correlation matrix, found once per test.
+        :func:`~andrey.core.score.copy_groups` of the test's correlation matrix, found once per
+        test; a single column's correlation is a scalar and has none.
         """
+        if not hasattr(self, "_copies"):
+            self._copies = copy_groups(np.atleast_2d(self._corr), self._n)
+        return self._copies
+
+    def _invert(self, stack: np.ndarray) -> np.ndarray:
+        """:func:`_invert_nonsingular` of ``stack``; a singular error names the data's copies."""
         try:
             return _invert_nonsingular(stack)
         except SingularCorrelationError as error:
-            if not hasattr(self, "_copies"):
-                self._copies = copy_groups(self._corr, self._n)
-            if not self._copies:
+            copies = self.copies()
+            if not copies:
                 raise
             named = SingularCorrelationError(
-                f"correlation matrix is singular because {copies_message(self._copies)}"
+                f"correlation matrix is singular because {copies_message(copies)}"
             )
-            named.groups = self._copies
+            named.groups = copies
             raise named from error
 
     def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
@@ -736,7 +742,10 @@ def make_indep_test(
     ``make_indep_test("cmiknn", data, k_cmi=5)``; a setting the test lacks raises ``TypeError``.
     ``categorical``, a boolean mask of the categorical columns, reaches the mixed tests
     (:data:`MIXED_INDEP_TESTS`) only; another test given one raises ``ValueError``. Raises
-    :class:`NotImplementedError` when ``name`` is not registered, listing what is available.
+    :class:`NotImplementedError` when ``name`` is not registered, listing what is available. A
+    :class:`PartialCorrelationTest` raises :class:`~andrey.core.score.CopiedColumnsError`, naming
+    every group of :meth:`~PartialCorrelationTest.copies`, when ``data`` holds columns that repeat
+    others up to scale and shift: its tests cannot tell such columns apart.
     """
     try:
         factory = _CI_REGISTRY[name]
@@ -748,7 +757,10 @@ def make_indep_test(
         return factory(data, categorical, **options)
     if categorical is not None:
         raise ValueError(f"indep_test {name!r} reads no column types; categorical must be None")
-    return factory(data, **options)
+    test = factory(data, **options)
+    if isinstance(test, PartialCorrelationTest) and test.copies():
+        raise copies_error(test.copies())
+    return test
 
 
 def _checked_data(data: np.ndarray, test_name: str, min_rows: int = 0) -> np.ndarray:

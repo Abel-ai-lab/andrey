@@ -19,6 +19,7 @@ from andrey.api._adapt import (
     check_categories,
     checked_data,
     column_labels,
+    column_namer,
     copies_named,
     data_kind,
     open_unit_interval,
@@ -107,9 +108,10 @@ def pc(
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. When
-        copies of a column, up to scale and shift, make that matrix singular, the message names
-        every group of copies and says to keep one column per group.
+        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. With
+        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
+        before any test runs; one message names every group of copies and says to keep one column
+        per group.
 
     Warns
     -----
@@ -352,9 +354,10 @@ def fci(
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
         not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice, or
-        if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. When
-        copies of a column, up to scale and shift, make that matrix singular, the message names
-        every group of copies and says to keep one column per group.
+        if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
+        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
+        before any test runs; one message names every group of copies and says to keep one column
+        per group.
 
     Warns
     -----
@@ -524,8 +527,8 @@ def gfci(
         is not in the recorded separating set of ``x`` and ``y``. ``"majority"`` tests ``x`` and
         ``y`` given every subset of ``x``'s neighbors and every subset of ``y``'s neighbors, and
         makes it a collider when fewer than half of the separating subsets (``p >= alpha``)
-        contain ``z`` [3]_; at exactly half the triple stays unoriented. Majority runs up to
-        ``2**degree`` extra tests per triple.
+        contain ``z`` [3]_; at exactly half the triple stays unoriented. Majority runs
+        ``2**degree(x) + 2**degree(y)`` tests per triple.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and
@@ -578,27 +581,23 @@ def gfci(
     Notes
     -----
     GFCI first runs :func:`~andrey.ges` and keeps its CPDAG. FCI's adjacency search then starts
-    from the CPDAG's adjacencies instead of a complete graph: it removes an edge ``x - y`` when a
-    subset of ``x``'s or ``y``'s neighbors makes the two independent, and records that subset as
-    their separating set. On a triple ``x - z - y`` whose ends are not adjacent, ``z`` is a
-    collider when the CPDAG has ``x -> z <- y``; when the CPDAG had the edge ``x - y``, the
-    separating set decides, as ``collider_rule`` describes. FCI's possible-d-separation step can
-    remove more edges, after which the colliders are decided again. No step adds an edge, so the
-    PAG's adjacencies are a subset of the GES CPDAG's. Zhang's rules R1-R10 [2]_ then orient the
-    endpoints; an endpoint no rule resolves stays a circle. A rule that needs the separating set
-    of a pair GES left non-adjacent uses the first subset, by increasing size, of the two
-    endpoints' CPDAG neighbors that makes the pair independent.
+    from the CPDAG's adjacencies instead of a complete graph: it removes an edge ``x - y`` at the
+    smallest size at which a subset of ``x``'s or ``y``'s neighbors makes the two independent, and
+    records the union of those subsets as their separating set. On a triple ``x - z - y`` whose
+    ends are not adjacent, ``z`` is a collider when the CPDAG has ``x -> z <- y``; when the CPDAG
+    had the edge ``x - y``, the separating set decides, as ``collider_rule`` describes. FCI's
+    possible-d-separation step can remove more edges, after which the colliders are decided again.
+    No step adds an edge, so the PAG's adjacencies are a subset of the GES CPDAG's. Zhang's rules
+    R1-R10 [2]_ then orient the endpoints; an endpoint no rule resolves stays a circle. A rule that
+    needs the separating set of a pair GES left non-adjacent uses the first subset, by increasing
+    size, of the two endpoints' CPDAG neighbors that makes the pair independent.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
     It considers every circle path, up to a fixed search bound, and rule R8 checks each pair of
     endpoints in both orders. GFCI shares FCI's possible-d-separation sets [2]_ [4]_, built as
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
-    both and the reasons for keeping them. With ``possible_dsep="fast"``, GFCI checks each node
-    when the search reaches it, against the nodes it was reached from so far, so the set depends on
-    the order the search visits nodes. With ``"order_free"``, it checks every node once the search
-    ends, against all the nodes it was reached from, so the set does not depend on that order, and
-    it can be larger.
+    both and the reasons for keeping them.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) with one variable in ten hidden, from 20 to 200 variables counting the hidden ones (18
@@ -683,7 +682,7 @@ def cdnod(
     """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
     CDNOD [1]_ adds a domain/context index as an extra causal parent, so distribution shifts
-    across regimes are modeled, then runs PC-style discovery. Use it when samples are pooled across
+    across regimes are modeled, then runs PC-style discovery. It applies to samples pooled across
     domains, regimes, or time blocks. The index is appended as a trailing pseudo-node and removed
     from the result.
 
@@ -726,8 +725,9 @@ def cdnod(
         they may be category codes.
     dependence_threshold : float or None, default=None
         Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
-        dependence measure: two modules whose measure is at most the threshold count as changing
-        independently. ``None`` skips the step. See Notes.
+        dependence measure: two modules, the distributions of a candidate cause and of its effect
+        given it, whose measure is at most the threshold count as changing independently. ``None``
+        skips the step. See Notes.
 
     Returns
     -------
@@ -756,7 +756,10 @@ def cdnod(
         is not in ``(0, 1)``, if ``data`` or ``categorical`` does not suit the test, as for
         :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index`` holds a
         value that is not a whole number. Also if ``collider_order`` is not ``"p_value"`` or
-        ``"column"``.
+        ``"column"``. With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or
+        ``domain_index`` with more than one domain, repeats another up to scale and shift, before
+        any test runs; one message names every group of copies and says to keep one column per
+        group.
 
     Warns
     -----
@@ -776,28 +779,30 @@ def cdnod(
     does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
     undetected, and recoding the domains can change the result. A change in a variable's noise
     variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
-    unchanged, so the index keeps no edge to that variable. The paper uses a kernel test [1]_ that
-    detects such changes; Andrey has no kernel test. ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, and
-    ``"cond_gauss"`` take each index value as a category, so they find a shift in any domain,
-    whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the index is categorical, so
-    every data column may be continuous.
+    unchanged, so the index keeps no edge to that variable. The paper uses a kernel
+    conditional-independence test [1]_ [2]_ that detects such changes; Andrey has none. ``"chisq"``,
+    ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they
+    find a shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the
+    index is categorical, so every data column may be continuous.
 
     With ``dependence_threshold`` set, the independent-change step [1]_ orients undirected edges
     between two variables that both keep an edge to the index. For a candidate direction
-    ``x -> y``, it measures how strongly the change of ``P(x)`` across the index values and the
-    change of ``P(y | x)`` depend on each other, given a set of neighbors that blocks their common
-    causes. ``x -> y`` is oriented when that measure is at most the threshold and the measure for
-    ``y -> x`` is above it; when both are above it, the edge stays undirected. An orientation
-    that would close a directed cycle is skipped, so that edge stays undirected unless Meek's
-    rules orient it. Meek's rules run before and after the step. The measure compares the index
-    values as separate domains, so the step needs many domains, each with many rows: with two
-    domains, the two changes always depend on each other, and nothing is oriented; a per-row
-    index, such as a time step, makes every row its own domain, and the step cannot measure a
-    change. The paper leaves the threshold open. For two modules that change independently, the
-    measure sits near ``1 / (K - 1)`` over ``K`` domains, so the threshold has to rise as the
-    number of domains falls; the 0.06 below is the value the measurements used, not a default.
-    The step is off by default, because with these tests only a variable whose mean follows the
-    index reaches it, and such a shared trend makes the changes depend on each other.
+    ``x -> y``, it measures how strongly the change of ``P(x, Z)`` across the index values and the
+    change of ``P(y | x, Z)`` depend on each other, where ``Z`` is a set of neighbors that blocks
+    their common causes. The measure is the normalized HSIC of the two modules' kernel embeddings
+    at each row's index value, with the Gaussian kernel widths of [2]_. ``x -> y`` is oriented when
+    that measure is at most the threshold and the measure for ``y -> x`` is above it; when both are
+    above it, the edge stays undirected. An orientation that would close a directed cycle is
+    skipped, so that edge stays undirected unless Meek's rules orient it. Meek's rules run before
+    and after the step. The measure compares the index values as separate domains, so the step needs
+    many domains, each with many rows: with two domains, the two changes always depend on each
+    other, and nothing is oriented; a per-row index, such as a time step, makes every row its own
+    domain, and the step cannot measure a change. The paper leaves the threshold open. For two
+    modules that change independently, the measure sits near ``1 / (K - 1)`` over ``K`` domains, so
+    the threshold has to rise as the number of domains falls; the 0.06 below is the value the
+    measurements used, not a default. The step is off by default, because with ``"fisherz"`` or
+    ``"student_t"`` only a variable whose mean follows the index reaches it, and such a shared trend
+    makes the changes depend on each other.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2), with 2,000 rows pooled from four domains of equal size, in which one variable in
@@ -805,29 +810,31 @@ def cdnod(
     median errors (SHD against the CPDAG the domain index makes identifiable) stayed below the empty
     graph's at every size (12 against 50 at 50 variables). The median fit took 0.18 s at 50
     variables, on 4 cores. The independent-change step is not benchmarked yet; its tests run it on
-    at most 4 variables with 600 rows from 20 domains. It runs the PC search with the index as one
+    at most 3 variables with 600 rows from 20 domains. It runs the PC search with the index as one
     more variable, so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
     partial-correlation tests assume linear relations with Gaussian noise and find only a change in
     a variable's mean that is linear in the index: on two variables from two domains with 600 rows,
     a mean shift of the cause oriented the edge on 20 of 20 seeds, and a change of its variance
     alone, or of the weight of the effect on a mean-zero cause alone, on none. Without the
     independent-change step, an edge between two variables that both change with the index stays
-    undirected unless the collider or Meek's rules orient it. The step reaches only variables whose
-    means follow the index. On two variables from 20 domains with 600 rows, both means rising
-    linearly by about 1 across the domains, the cause's noise scale drawn per domain, and the
-    effect's weight on it drawn per domain from (0.5, 2.5), at the threshold 0.06 it oriented the
-    edge on 1 of 20 seeds. Given the true skeleton of ten complete three-variable DAGs from 20
-    domains with 600 rows, no mean trend, and weights in (-2, 2) drawn per domain, it oriented 18 of
-    their 30 edges correctly and 4 against the truth. The paper fits the kernel widths, the index
-    kernel, and the ridge of the step by Gaussian-process likelihood; Andrey fixes them. With a
-    mixed-data test, it is experimental and not benchmarked yet; its tests run it on 5 variables
-    with 3,000 rows.
+    undirected unless the collider or Meek's rules orient it. With ``"fisherz"`` or
+    ``"student_t"``, the step reaches only variables whose means follow the index. On two variables
+    from 20 domains with 600 rows, both means rising linearly by about 1 across the domains, the
+    cause's noise scale drawn per domain, and the effect's weight on it drawn per domain from
+    (0.5, 2.5), at the threshold 0.06 it oriented the edge on 1 of 20 seeds. Given the true skeleton
+    of ten complete three-variable DAGs from 20 domains with 600 rows, no mean trend, and weights in
+    (-2, 2) drawn per domain, it oriented 18 of their 30 edges correctly and 4 against the truth.
+    The paper fits the kernel widths, the index kernel, and the ridge of the step by
+    Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, it is experimental and
+    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
     .. [1] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
        Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
        1-53.
+    .. [2] Zhang, K., Peters, J., Janzing, D., and Scholkopf, B. (2011). Kernel-based conditional
+       independence test and application in causal discovery. UAI, 804-813.
 
     Examples
     --------
@@ -858,7 +865,9 @@ def cdnod(
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
     if dependence_threshold is not None:
         dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
-    with copies_named(labels):
+    # The search appends the index as column d, so a copy of it is named as the index.
+    d, column = X.shape[1], column_namer(labels)
+    with copies_named(labels, lambda j: "domain_index" if j == d else column(j)):
         cpdag = _cdnod(
             X,
             c,

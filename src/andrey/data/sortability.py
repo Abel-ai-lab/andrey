@@ -1,11 +1,13 @@
 """Sortability diagnostics: avoid unexpected leaks from synthetic DGP.
 
-The module implements two sortability metrics:
+The module implements two sortability metrics and a column-order check:
 
 - **varsortability** (Reisach et al. 2021, "Beware of the Simulated DAG!"): the fraction of directed
   paths ordered by increasing marginal *variance*.
 - **r2sortability** (Reisach et al. 2023): the same, by increasing coefficient of determination
   (variance explained by all other variables). It is **scale-invariant**.
+- **index_correlation**: the rank correlation between column index and causal depth, which is near
+  zero when the column order says nothing about the causal order.
 
 The full all-paths estimators use dense adjacency powers (``O(d^3)``), so they are for
 small/moderate ``d``; :func:`varsortability_edges` is the
@@ -140,6 +142,101 @@ def varsortability_edges(x: np.ndarray, edges: np.ndarray, *, tol: float = 1e-9)
     correct = float((ratio > 1 + tol).sum())
     correct += 0.5 * float(((ratio <= 1 + tol) & (ratio > 1 - tol)).sum())
     return correct / edges.shape[0]
+
+
+def causal_depth(edges: np.ndarray, d: int) -> np.ndarray:
+    """Return each node's causal depth: the edge count of the longest directed path into it.
+
+    Roots have depth 0. The depth is a property of the graph, not of how its nodes are numbered, so
+    it ranks the nodes in causal order under any column order.
+
+    Parameters
+    ----------
+    edges : np.ndarray of shape (m, 2)
+        Directed edges ``(parent, child)`` of a DAG over the nodes ``0 .. d-1``.
+    d : int
+        Number of nodes.
+
+    Returns
+    -------
+    np.ndarray of shape (d,)
+        The depth of each node.
+
+    Raises
+    ------
+    ValueError
+        If the edges form a directed cycle.
+    """
+    edges = np.asarray(edges, dtype=np.int64).reshape(-1, 2)
+    waiting = np.bincount(edges[:, 1], minlength=d)
+    children: list[list[int]] = [[] for _ in range(d)]
+    for parent, child in edges.tolist():
+        children[parent].append(child)
+    depth = np.zeros(d, dtype=np.int64)
+    ready = np.flatnonzero(waiting == 0).tolist()
+    done = 0
+    while ready:
+        node = ready.pop()
+        done += 1
+        for child in children[node]:
+            depth[child] = max(depth[child], depth[node] + 1)
+            waiting[child] -= 1
+            if waiting[child] == 0:
+                ready.append(child)
+    if done != d:
+        raise ValueError("the edges form a directed cycle")
+    return depth
+
+
+def index_correlation(edges: np.ndarray, d: int, *, n_observed: int | None = None) -> float:
+    """Spearman's rank correlation between each column's index and its :func:`causal_depth`.
+
+    How much a dataset's column order reveals of its causal order: ``1`` when the columns come in
+    order of depth, ``-1`` in the reverse order, and near ``0`` when the order is unrelated to the
+    graph. Only the first ``n_observed`` nodes are columns; hidden nodes after them count toward
+    the depths.
+
+    Parameters
+    ----------
+    edges : np.ndarray of shape (m, 2)
+        Directed edges ``(parent, child)`` of a DAG over the nodes ``0 .. d-1``.
+    d : int
+        Number of nodes.
+    n_observed : int or None, default=None
+        Number of columns, the first nodes; ``None`` means every node is a column.
+
+    Returns
+    -------
+    float
+        Spearman's rho over the columns, with tied depths given their mean rank; ``nan`` when every
+        column has the same depth.
+
+    Notes
+    -----
+    Under a uniformly random column order, the correlation of one dataset with ``k`` columns has
+    mean 0 and variance exactly ``1 / (k - 1)``, ties included: it is the permutation distribution
+    of a Pearson correlation with a fixed vector. The mean over ``S`` independently shuffled
+    datasets with ``k_1 .. k_S`` columns therefore has standard deviation
+    ``sqrt(sum_s 1 / (k_s - 1)) / S``.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from andrey.data.sortability import index_correlation
+    >>> index_correlation(np.array([[0, 1], [1, 2]]), 3)  # the chain 0 -> 1 -> 2
+    1.0
+    >>> index_correlation(np.array([[2, 1], [1, 0]]), 3)  # the chain 2 -> 1 -> 0
+    -1.0
+    """
+    k = d if n_observed is None else n_observed
+    depth = causal_depth(edges, d)[:k].astype(np.float64)
+    if k < 2 or np.all(depth == depth[0]):
+        return float("nan")
+    values, inverse = np.unique(depth, return_inverse=True)
+    below = np.concatenate([[0], np.cumsum(np.bincount(inverse))])
+    ranks = ((below[:-1] + below[1:] - 1) / 2)[inverse]  # each depth's mean rank
+    index = np.arange(k, dtype=np.float64)
+    return float(np.corrcoef(index, ranks)[0, 1])
 
 
 def standardize(x: np.ndarray) -> np.ndarray:

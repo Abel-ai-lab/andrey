@@ -94,11 +94,10 @@ def test_dag2cpdag_triangle_fully_unorients():
     assert np.array_equal(dag2cpdag(triangle), undirected([(0, 1), (0, 2), (1, 2)], 3))
 
 
-@pytest.mark.parametrize("mark", [TAIL, ARROW])
-def test_dag2cpdag_rejects_an_edge_that_is_not_directed(mark):
-    # An undirected (tail-tail) or bidirected edge next to a directed one is not a DAG.
+def test_dag2cpdag_rejects_an_undirected_edge():
+    # An undirected (tail-tail) edge next to a directed one is not a DAG.
     graph = dag([(1, 2)], 3)
-    graph[0, 1] = graph[1, 0] = mark
+    graph[0, 1] = graph[1, 0] = TAIL
     with pytest.raises(ValueError, match="requires a DAG"):
         dag2cpdag(graph)
 

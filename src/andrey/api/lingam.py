@@ -250,8 +250,8 @@ def multi_group_direct_lingam(
 
     All groups share the same ``d`` variables. The estimator exploits non-Gaussianity across the
     datasets to fix a single shared causal order, then estimates a separate weighted adjacency for
-    each group [1]_. Use it when several datasets share one causal order but may differ in edge
-    weights.
+    each group [1]_. It applies when several datasets share one causal order but may differ in
+    edge weights.
 
     Parameters
     ----------
@@ -317,7 +317,7 @@ def multi_group_direct_lingam(
         widths = [X.shape[1] for X in groups]
         raise ValueError(f"every dataset in data_groups needs the same columns, got {widths}")
     labels = shared_labels(column_labels(X) for X in data_groups)
-    order, adjacency_matrices = _native(groups)  # one shared order + a per-group weighted adjacency
+    order, adjacency_matrices = _native(groups)
     n_groups = len(groups)
     outputs = []
     for k, B in enumerate(adjacency_matrices):

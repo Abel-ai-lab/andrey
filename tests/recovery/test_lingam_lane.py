@@ -54,8 +54,9 @@ def test_multi_group_direct_lingam_recovery(mgdl_fit):
 
 def test_multi_group_recovers_each_groups_planted_weights(mgdl_fit):
     """Each group gets its own planted edges and weights, under one order the planted DAGs allow."""
+    order = datagen.column_order("mgdl_2groups")
     for group, out in zip(datagen.GROUP_CASES["mgdl_2groups"]["groups"], mgdl_fit, strict=True):
-        planted = np.asarray(group["weights"]).T  # planted[i, j] weights i -> j
+        planted = np.asarray(group["weights"]).T[np.ix_(order, order)]  # weights column i -> j
         position = {v: k for k, v in enumerate(out.ordering)}
         assert all(position[i] < position[j] for i, j in zip(*np.nonzero(planted), strict=True))
         estimated = np.asarray(out.weighted_adjacency)

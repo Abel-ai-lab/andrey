@@ -233,6 +233,11 @@ longitudinal LiNGAM simulations, GIN's `latent_measurement`, and the GIES lane's
 an order that carries no information about the graph and take no shuffle step. The summaries
 published up to 0.6.0 were measured on the generated order and stay as recorded.
 
+`public_datasets.py` loads the bnlearn networks with `load_dataset`, which lists their columns in an
+order drawn from the seed rather than the file's order, often a causal one; each record carries
+`shuffle`. Sachs keeps its file's order, which does not follow its network. The public-datasets
+rows published with 0.1.0 were measured on the file's order and stay as recorded.
+
 ### Hidden confounders
 
 `latent_gauss_er` hides one node in ten, at least one, from an Erdos-Renyi linear-Gaussian graph.

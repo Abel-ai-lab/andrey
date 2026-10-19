@@ -284,7 +284,7 @@ def calm(
     temperature. The quadratic-penalty outer loop runs up to ``max_outer`` rounds, each an Adam
     subproblem of at most ``subproblem_iter`` steps at learning rate ``lr``; the penalty ``rho``
     grows from ``rho_init`` by ``rho_mult`` until the acyclicity residual clears ``h_tol`` or
-    ``rho`` exceeds ``rho_max``. A gate is kept when its probability clears ``gate_threshold`` and
+    ``rho`` reaches ``rho_max``. A gate is kept when its probability clears ``gate_threshold`` and
     its weight magnitude clears ``w_threshold``. Set ``standardize`` to z-score the columns first;
     ``seed`` makes the run reproducible. Returns a :class:`CalmResult`.
     """

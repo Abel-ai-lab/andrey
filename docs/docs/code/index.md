@@ -32,10 +32,12 @@ needs whole numbers. Methods that score with BIC also reject a column that repea
 scale and shift or, given more rows than columns, is a linear function of other columns. Copies of
 one variable cannot be told apart, so one `ValueError` names every group of copies, such as `x2`
 and `x7` repeating `x1`, and asks you to keep one column per group and read its edges as the
-group's; no option drops or merges the copies for you. A partial-correlation test in `pc`, `fci`,
-`gfci`, or `cdnod` that meets a singular correlation matrix from copies names the groups the same
-way. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
-column. A single column gives a one-node graph.
+group's; no option drops or merges the copies for you. `pc`, `fci`, `gfci`, and `cdnod` with a
+partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the same way before any test
+runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series that repeats another up
+to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. Other
+data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
+single column gives a one-node graph.
 
 `pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
 `"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and
@@ -271,13 +273,15 @@ name.
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
 
 A published network's data come from a linear-Gaussian model on its graph, standardized, or, with
-`discrete=True`, from its own conditional probability tables, each column a pandas `category` of
-the network's category names; `n` (default 1000) and `seed` (default 0) set the rows. The first load
-downloads the file, checks its SHA-256, and caches it; later loads need no network. The
-cache directory is the `data_home` argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey`
-(`~/.cache/andrey` when `XDG_CACHE_HOME` is unset). Without network access, the error names the
-path to put the file at. [Getting started](../guides/getting-started.md) learns and scores the
-Sachs data end to end.
+`discrete=True`, from its own conditional probability tables, each column a pandas `category` of the
+network's category names; `n` (default 1000) and `seed` (default 0) set the rows. The columns come
+in an order drawn from the seed, since a network file often lists its variables in causal order, and
+`feature_names` and the graph's labels follow it; `shuffle=False` keeps the file's order. Sachs
+keeps its file's order, which does not follow its network. The first load downloads the file, checks
+its SHA-256, and caches it; later loads need no network. The cache directory is the `data_home`
+argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andrey` when
+`XDG_CACHE_HOME` is unset). Without network access, the error names the path to put the file at.
+[Getting started](../guides/getting-started.md) learns and scores the Sachs data end to end.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data

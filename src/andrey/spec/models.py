@@ -39,7 +39,7 @@ class Spec(BaseModel):
 class InputSpec(Spec):
     """One array input to a method (matches the facade parameter name)."""
 
-    name: str  # facade parameter name: "data", "domain_index", "x", "y", "data_groups", "data_list"
+    name: str
     kind: InputKind
     doc: str
     required: bool = True

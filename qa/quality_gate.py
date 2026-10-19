@@ -103,8 +103,8 @@ REGIME_SIZES: dict[str, tuple[tuple[int, int], ...]] = {
     "latent_lingam_er": ((10, 2000), (15, 2000)),
 }
 #: Smaller ``linear_gauss_er`` draws, at ``n = 50d``, for exact search, whose run time at least
-#: doubles with each variable, and CALM, whose fit takes tens of seconds and so runs on the smaller
-#: one and ASIA only.
+#: doubles with each variable, and CALM, whose optimizer step's cost grows with the cube of the
+#: variable count, so it runs on the smaller one and ASIA only.
 SMALL_SIZES: tuple[tuple[int, int], ...] = ((10, 500), (15, 750))
 SEEDS = range(10)
 ASIA_N = 1000
@@ -144,8 +144,8 @@ TARGET_SHARE = 0.4
 #: The published regimes that :mod:`andrey_bench.regime_models` draws, as its model and noise, and
 #: the ``(d, n)`` the gate draws each at: two published sizes, with the published rows. CD-NOD's
 #: rows come from four domains, MultiGroupDirectLiNGAM's from three groups side by side, and in
-#: ``latent_measurement``, ``d`` counts the latents and their three indicators each. GIN's fit at
-#: the published 16 nodes takes about 40 s, so it runs at the two smaller sizes.
+#: ``latent_measurement``, ``d`` counts the latents and their three indicators each. GIN's number
+#: of tests grows combinatorially with the indicator count, so it runs at the two smaller sizes.
 MODEL_REGIMES: dict[str, tuple[str, str]] = {
     "domain_shift_er": ("domain_shift", "gaussian"),
     "multi_group_er": ("multi_group", "uniform"),

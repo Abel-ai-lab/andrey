@@ -93,12 +93,14 @@ def test_an_unknown_collider_order_is_rejected(method):
         getattr(andrey, method)(*args, collider_order="first")
 
 
-def test_cdnod_directs_context_edges_before_ranking_colliders():
-    # Context 3 is adjacent to 0 and 1, which are separated: a collider at the context, ranked
-    # first. Directing 3 -> 0 first skips it, so the collider 2 -> 0 <- 3 is kept.
+@pytest.mark.parametrize("order", ["p_value", "column"])
+def test_cdnod_directs_context_edges_before_ranking_colliders(order):
+    # Context 3 is adjacent to 0 and 1, which are separated: a collider at the context, which
+    # "p_value" ranks first. Directing the context's edges first skips it in either order, so the
+    # collider 2 -> 0 <- 3 is kept.
     skeleton = marks(4, undirected=[(0, 3), (1, 3), (0, 2)])
     sepsets = {(0, 1): (), (2, 3): ()}
     pvalues = {(0, 1): 0.9, (2, 3): 0.5}
-    pdag = _orient_with_context(skeleton, sepsets, pvalues, context=3)
+    pdag = _orient_with_context(skeleton, sepsets, pvalues, context=3, order=order)
     np.testing.assert_array_equal(pdag, marks(4, directed=[(3, 0), (3, 1), (2, 0)]))
     assert np.array_equal(pdag != NULL, skeleton != NULL)

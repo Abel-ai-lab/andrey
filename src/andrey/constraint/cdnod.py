@@ -17,8 +17,8 @@ Eqs. 6 and 12 of the paper give the Gram matrices of the kernel embeddings of th
 each row's index value, and Eq. 15, the normalized HSIC of the two, is the measure (Eqs. 16 and
 17). A measure at most ``dependence_threshold`` counts as independent. The paper leaves several
 choices open, and these are fixed here: every column is standardized; each Gaussian kernel on the
-data has the width ``sigma = 0.8, 0.5, 0.3`` for fewer than 200, fewer than 1,200, and more rows
-(Zhang et al. 2011), times the square root of its column count; the index kernel is 1 for
+data has the width ``sigma`` 0.8 below 200 rows, 0.5 from 200 to 1,199 rows, and 0.3 from 1,200
+rows (Zhang et al. 2011), times the square root of its column count; the index kernel is 1 for
 two rows with the same index value and 0 otherwise, so each value is one domain; and the ridge
 ``lambda`` is 0.1. The paper fits the data kernels, the index kernel, and ``lambda`` by
 Gaussian-process likelihood.

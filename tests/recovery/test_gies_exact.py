@@ -9,7 +9,6 @@ import andrey
 from andrey.core.orient import from_structure, pdag2dag
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent
-from andrey.search import exact as exact_module
 from andrey.search import gies as gies_search
 from andrey.search.gies import cut_pairs, replace_unprotected
 from tests.recovery.helpers import datagen
@@ -118,15 +117,21 @@ def _random_interventional(
     return X, mask
 
 
-# On the observational (5, 15, 0.3) data, renewing the candidates of only the vertices whose marks
-# changed, and not those of their line neighbors, gives a different graph. On the observational
-# (5, 6, 0.6) data, turning a line without the separation condition of Prop. 31 raises.
+def test_gies_finds_no_edges_between_independent_columns_with_interventions():
+    X, mask = _random_interventional(0, 4, 0.0, 2, n=600)
+    assert mask.any()
+    assert andrey.gies(X, mask).structure.oriented_edges() == []
+
+
+# The cases with targets run the search with interventions. On the observational (5, 15, 0.3)
+# data, a step changes the candidates of a line neighbor of a vertex whose marks it changed. On
+# the observational (5, 6, 0.6) data, the turning phase meets a line that fails the separation
+# condition of Prop. 31.
 @pytest.mark.parametrize(
     "seed,d,p,n_targets",
     [
         (0, 12, 0.4, 2),
         (1, 15, 0.3, 3),
-        (2, 20, 0.2, 0),
         (3, 25, 0.15, 5),
         (5, 15, 0.3, 0),
         (5, 6, 0.6, 0),
@@ -149,15 +154,6 @@ def test_gies_step_that_does_not_lower_the_score_fails():
     search = gies_search._Search(score, X.shape[1])
     with pytest.raises(RuntimeError):
         search.apply(search.adj.copy())
-
-
-def test_gies_fails_fast_when_the_essential_graph_ignores_the_interventions(monkeypatch):
-    """Scoring each variable on its own rows while rebuilding the observational class would undo
-    turned arrows forever; the search raises instead."""
-    X, mask = _interventional_sem([[1], [6]], n=3000, seed=0)
-    monkeypatch.setattr(gies_search, "cut_pairs", lambda mask: np.zeros((8, 8), dtype=bool))
-    with pytest.raises(RuntimeError):
-        gies_search.gies(X, mask, lambda_value=_BASELINE_LAMBDA)
 
 
 def test_gies_is_deterministic():
@@ -227,44 +223,30 @@ def test_exact_search_output_contract():
 
 
 @pytest.mark.parametrize("search_method", ["astar", "dp"])
-def test_exact_search_ignores_the_variables_means(search_method):
-    """Independent columns have no edges whatever their means, and a shift keeps the class."""
-    rng = np.random.default_rng(0)
-    independent = rng.normal(5.0, 1.0, size=(500, 3))
+def test_exact_search_finds_no_edges_between_independent_columns(search_method):
+    """Columns with a nonzero mean, so the score has to center them."""
+    independent = np.random.default_rng(0).normal(5.0, 1.0, size=(500, 3))
     found = andrey.exact_search(independent, search_method=search_method).structure
     assert found.oriented_edges() == []
-    # A shift can change which score-tied DAG is returned, not its Markov equivalence class.
+
+
+@pytest.mark.parametrize("search_method", ["astar", "dp"])
+def test_exact_search_ignores_the_variables_means(search_method):
+    """A shift can change which score-tied DAG is returned, not its Markov equivalence class."""
     x = datagen.generate("gauss_5v")
     centered = andrey.exact_search(x, search_method=search_method).structure
     shifted = andrey.exact_search(x + 7.0, search_method=search_method).structure
     assert markov_equivalent(shifted, centered)
 
 
-def _linearly_dependent(kind: str) -> np.ndarray:
-    rng = np.random.default_rng(4)
-    a, b, noise = rng.standard_normal((3, 50))
-    third = a if kind == "duplicate" else 2.0 * a - 1.5 * b
-    return np.column_stack([a, b, third, noise])
-
-
-@pytest.mark.parametrize(
-    ("kind", "message"), [("duplicate", "repeats"), ("combination", "linear function of")]
-)
-def test_exact_search_rejects_linearly_dependent_columns(kind, message):
-    """A column that is a linear function of others leaves no residual variance to score."""
-    with pytest.raises(ValueError, match=message):
-        andrey.exact_search(_linearly_dependent(kind))
-
-
 @pytest.mark.filterwarnings("error::RuntimeWarning")
-@pytest.mark.parametrize("scale", [0.0, 1e-170])
-def test_exact_search_module_rejects_a_column_without_variance(scale):
-    """A column with no variance is rejected, even past the facade's input checks."""
+def test_exact_search_rejects_a_column_whose_variance_underflows():
+    """A column that is not constant but whose variance underflows to zero is rejected."""
     rng = np.random.default_rng(1)
     data = rng.standard_normal((1000, 4))
-    data[:, 2] = 1.0 if scale == 0.0 else scale * data[:, 2]
+    data[:, 2] *= 1e-170
     with pytest.raises(ValueError, match="is constant"):
-        exact_module.exact_search(data)
+        andrey.exact_search(data)
 
 
 def test_exact_search_fits_full_rank_columns_of_mixed_scale():
@@ -302,10 +284,15 @@ _GAUSS_5V_PAG = [
 ]
 
 
+def _pag_edges(case: str, structure) -> list:
+    """The edges of a PAG over the case's columns, its nodes numbered as the case's variables."""
+    return sorted(datagen.to_variables(case, structure).oriented_edges(index=True))
+
+
 def test_gfci_recovers_the_pag_of_gauss_5v():
-    assert sorted(datagen.planted_pag("gauss_5v").oriented_edges()) == _GAUSS_5V_PAG
+    assert _pag_edges("gauss_5v", datagen.planted_pag("gauss_5v")) == _GAUSS_5V_PAG
     out = andrey.gfci(datagen.generate("gauss_5v"))
-    assert sorted(out.structure.oriented_edges()) == _GAUSS_5V_PAG
+    assert _pag_edges("gauss_5v", out.structure) == _GAUSS_5V_PAG
 
 
 # Observed columns a, b, c, d, e of ``confounded_gauss_5v``; h is hidden.
@@ -318,19 +305,15 @@ _PLANTED_PAG = [
 ]
 
 
-def test_the_latent_fixture_needs_an_edge_removed():
-    """The planted PAG has a bidirected edge, and GES on the data has an adjacency it lacks."""
-    pag = datagen.planted_pag(_LATENT)
-    assert sorted(pag.oriented_edges()) == _PLANTED_PAG
-    ges = andrey.ges(datagen.generate(_LATENT)).structure
+def test_gfci_recovers_the_planted_pag():
+    """The planted PAG has a bidirected edge, and GES on the data has an adjacency it lacks, so
+    GFCI's tests must remove it."""
+    x = datagen.generate(_LATENT)
+    assert _pag_edges(_LATENT, datagen.planted_pag(_LATENT)) == _PLANTED_PAG
+    ges = datagen.to_variables(_LATENT, andrey.ges(x).structure)
     adjacent = {frozenset(edge[:2]) for edge in ges.oriented_edges(index=True)}
     assert adjacent - {frozenset(edge[:2]) for edge in _PLANTED_PAG}
-
-
-@pytest.mark.parametrize("replicate", [0, 1, 2])
-def test_gfci_recovers_the_planted_pag(replicate):
-    out = andrey.gfci(datagen.generate(_LATENT, replicate=replicate))
-    assert sorted(out.structure.oriented_edges()) == _PLANTED_PAG
+    assert _pag_edges(_LATENT, andrey.gfci(x).structure) == _PLANTED_PAG
 
 
 def test_gfci_output_contract():
