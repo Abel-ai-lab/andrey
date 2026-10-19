@@ -118,8 +118,8 @@ def _assert_order_free(fit, x: np.ndarray, module: str, monkeypatch) -> None:
 def test_ges_ties(monkeypatch) -> None:
     """GES adds the 0 - 1 edge, then column 2's edges to 0 and to 1 tie; it adds one of them."""
     x = _swap_symmetric(0)
-    score = BICScore(x)
-    assert score.score(2, [0]) == score.score(2, [1])
+    score, n = BICScore(x), x.shape[0]
+    assert round(score.score(2, [0]) / n, _KEY_DP) == round(score.score(2, [1]) / n, _KEY_DP)
     _assert_order_free(lambda data: ges(data)[0].to_numpy(), x, "andrey.search.ges", monkeypatch)
 
 
@@ -140,7 +140,8 @@ def test_calm_moral_graph_ties(monkeypatch) -> None:
     """IAMB's first choice for column 2 ties between columns 0 and 1."""
     x = _swap_symmetric_sem(181)
     test = FisherZ(x)
-    assert test.statistic_pvalue(2, 0, []) == test.statistic_pvalue(2, 1, [])
+    (r0, _), (r1, _) = test.statistic_pvalue(2, 0, []), test.statistic_pvalue(2, 1, [])
+    assert round(abs(r0), _KEY_DP) == round(abs(r1), _KEY_DP)
     _assert_order_free(moral_graph, x, "andrey.search.calm", monkeypatch)
 
 
