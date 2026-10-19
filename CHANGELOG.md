@@ -111,6 +111,8 @@ change names its pull request.
   `boss` no longer raises `ValueError` or `StopIteration` and no search picks parents by a wrong or
   minus-infinite score: collinear parents are fit by the columns that span them, and a node its
   parents determine scores `inf`, unavailable as under the BIC. ([#203])
+- A DataFrame with reordered columns no longer fails on the torch backend, where torch rejected
+  its array's negative stride. ([#216])
 
 ## [0.6.0] - 2026-10-17
 
@@ -329,3 +331,4 @@ First alpha release.
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
+[#216]: https://github.com/Abel-ai-lab/andrey/pull/216
