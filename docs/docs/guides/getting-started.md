@@ -207,8 +207,10 @@ of a false one, and report how the graph changes with it.
 
 ### The test's assumptions
 
-PC's test, Fisher's z, assumes each variable is a linear function of its causes plus Gaussian
-noise. These measurements are far from Gaussian: most are strongly skewed to the right.
+PC's default test, Fisher's z, assumes each variable is a linear function of its causes plus
+Gaussian noise. (For effects that are not linear, `indep_test` also takes experimental nonlinear
+tests; the [API reference](../code/index.md#conditional-independence-tests) lists them.) These
+measurements are far from Gaussian: most are strongly skewed to the right.
 
 ```{code-cell} ipython3
 sachs.data.skew().round(1)
@@ -301,7 +303,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default), `student_t` | `local_score_BIC` (the default) |
+| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, the experimental `kci`, `rcot`, `cmiknn`, `gpdc` | `local_score_BIC` (the default) |
 | Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
 

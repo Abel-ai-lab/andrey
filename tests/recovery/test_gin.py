@@ -126,6 +126,8 @@ def test_gin_root_is_the_passing_candidate_with_the_highest_p_value(monkeypatch)
 
     monkeypatch.setattr(engine, "_independence_pvalue", pooled)
     clusters = [[0, 1], [2, 3], [4, 5]]
-    ordered, unordered = engine._order_clusters(np.zeros((1, 6)), np.eye(6), clusters, 0.05)
+    ordered, unordered = engine._order_clusters(
+        np.zeros((1, 6)), np.eye(6), clusters, 0.05, list(range(6))
+    )
     assert ordered == [[2, 3]]
     assert unordered == [[0, 1], [4, 5]]

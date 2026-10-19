@@ -83,6 +83,16 @@ benchmarks/start_xges.sh
 export ANDREY_BENCH_XGES_PYTHON=$PWD/benchmarks/.venv-xges/bin/python
 ```
 
+tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests, also
+fits in an environment of its own, so it and its dependencies stay out of bench-env:
+
+```shell
+benchmarks/start_tigramite.sh
+export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
+```
+
+Its adapter calls the package's public API only.
+
 lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports, pins scipy below 1.17.
 lingam's MultiGroupDirectLiNGAM runs in a third environment, on Python 3.12:
 
@@ -163,7 +173,10 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 | GIES | Andrey, pcalg (`gies`) |
 | Exact search | Andrey, causal-learn (`bic_exact_search`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
+| PC with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT), tigramite (CMIknn, GPDC), pcalg with RCIT (RCoT) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
+| FCI with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT) |
+| Nonlinear CI tests, query by query | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT, FastKCI), tigramite (CMIknn, GPDC), RCIT (RCoT, KCIT) |
 | GFCI | Andrey, Tetrad |
 | CALM | Andrey (two optimizer schedules), causal-learn |
 | BOSS | Andrey, causal-learn |
@@ -185,6 +198,27 @@ Include `baseline.empty` to bound the solutions run on the same datasets. Keep o
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
 identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selects CUDA inside
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
+
+`nonlinear_ci_cpu.py` runs PC, or with `--method fci` FCI, with each nonlinear CI test on additive
+nonlinear noise, with rows as an axis of their own. `--regime nonmonotone_er` makes each effect
+`w cos(parent)`, an even function partial correlation does not see. Every reference runs at
+Andrey's defaults under its own names:
+
+| Andrey | causal-learn | tigramite | RCIT (R) |
+|---|---|---|---|
+| `indep_test="kci"` | `indep_test="kci"` | - | `KCIT(Bootstrap = FALSE)` |
+| `indep_test="rcot"` | `indep_test="rcit"`, `rcit=False`, `approx="hbe"` | - | `RCoT(approx = "hbe")` |
+| RCoT `n_features=5`, `n_features_cond=100` | `num_f2=5`, `num_f=100` | - | `num_f2 = 5`, `num_f = 100` |
+| `indep_test="cmiknn"` | - | `CMIknn`, `significance="shuffle_test"`, `sig_blocklength=1` | - |
+| CMIknn `k_cmi=0.1`, `k_perm=5`, `n_permutations=500` | - | `knn=0.1`, `shuffle_neighbors=5`, `sig_samples=500` | - |
+| `indep_test="gpdc"` | - | `GPDC`, `significance="analytic"` | - |
+| `alpha=0.05` | `alpha=0.05` | `pc_alpha=0.05`, `contemp_collider_rule="none"` | pcalg `alpha = 0.05` |
+
+pcalg's PC with RCIT's RCoT (`pcalg.pc.rcot`) needs the R library of `start_r.sh`, which installs
+RCIT from its GitHub repository at a fixed commit. `nonlinear_ci_queries.py` compares the tests
+themselves: every contestant answers the same queries on the same seeded draws, independent and
+dependent, and the summary gives each one's level, power, distance of its p-values to the uniform
+under independence, agreement with Andrey's test, and seconds per query.
 
 The harness does not submit jobs. One file is one job.
 
@@ -1082,7 +1116,8 @@ searches run in the timed fit's process before its clock, so `warmup_s` holds on
 Andrey uses hardcoded thresholds for accelerated paths:
 
 - `ANDREY_GES_PARALLEL_MIN_WORK` selects the worker pool.
-- `ANDREY_COV_GPU_THRESHOLD` and `ANDREY_ENTROPY_GPU_THRESHOLD` select the accelerator.
+- `ANDREY_COV_GPU_THRESHOLD`, `ANDREY_ENTROPY_GPU_THRESHOLD`, `ANDREY_KCI_GPU_THRESHOLD`, and
+  `ANDREY_CMIKNN_GPU_THRESHOLD` select the accelerator.
 
 Three thresholds were calibrated once on one machine. Later measurements found errors of 7x for GES,
 25x for `cov`, and 40x for entropy. Each error kept the faster path disabled.
@@ -1097,8 +1132,9 @@ thresholds**. Recording an unused calibration is worse than no calibration: it r
 that did not control the run.
 
 **Check the unit before setting a threshold.** GES uses candidate evaluations, `cov` uses `n * d`,
-and `entropy` uses batch width `B`. `andrey.spec.environment` lists these units, and
-`andrey --help --json` prints them. A value in the wrong unit silently selects the wrong path.
+`entropy` uses batch width `B`, and KCI and CMIknn use `n * n`. `andrey.spec.environment` lists
+these units, and `andrey --help --json` prints them. A value in the wrong unit silently selects the
+wrong path.
 
 **Backend pins affect the gates differently.** Worker-pool gates run on each search pass and ignore
 the backend. Below the GES threshold, `ges.numpy.parallel` uses the serial path. Device thresholds
@@ -1385,6 +1421,10 @@ Read `params` before comparing solutions because their defaults may optimize dif
   BIC.
 - `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
 - `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
+- `nonlinear_ci_cpu.py` - compares PC and FCI with the nonlinear CI tests with causal-learn,
+  tigramite, and pcalg with RCIT on additive nonlinear noise.
+- `nonlinear_ci_queries.py` - compares the nonlinear CI tests query by query with causal-learn,
+  tigramite, and RCIT. `start_tigramite.sh` builds the environment of tigramite's fits.
 - `discrete_cpu.py` - compares PC with the chi-square and G-square tests, GES with BDeu, and hill
   climbing with BDeu and the multinomial BIC with causal-learn, bnlearn, and pgmpy on categorical
   data. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical tests and

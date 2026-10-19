@@ -75,6 +75,12 @@ def _run_granger(X: np.ndarray, algorithm: str) -> dict:
     return {"coeff": coeff, "adj": (coeff != 0.0).astype(int)}
 
 
+def _run_ci_test(X: np.ndarray, algorithm: str) -> dict:
+    from tests.recovery.helpers.ci_tests import recorded_pvalues
+
+    return recorded_pvalues(algorithm, X, "nonmonotone_4v")
+
+
 def _run_multi_group_direct_lingam(groups: list[np.ndarray], algorithm: str) -> dict:
     import andrey
 
@@ -110,6 +116,10 @@ ALGORITHMS = {
     "PCMCI": (_facade("pcmci", tau_max=2), "var_3v_lag2"),
     "PCMCIplus": (_facade("pcmciplus", tau_max=2), "var_4v_stable"),
     "LPCMCI": (_facade("lpcmci", tau_max=2), "var_6v_hidden"),
+    "KCI": (_run_ci_test, "nonmonotone_4v"),
+    "RCoT": (_run_ci_test, "nonmonotone_4v"),
+    "CMIknn": (_run_ci_test, "nonmonotone_4v"),
+    "GPDC": (_run_ci_test, "nonmonotone_4v"),
 }
 
 # Multi-group and panel methods take a list of matrices (runner receives

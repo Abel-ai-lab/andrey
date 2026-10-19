@@ -7,19 +7,45 @@ is available.
 
 For each operation, the report shows the measured crossover next to this device's shipped default,
 so the user can decide whether to set a cutoff. It also validates the disk-cache round trip and
-confirms that the device runtime is live.
+confirms that the device runtime is live. KCI and CMIknn have no runtime calibration: their
+crossovers set `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`, both in rows squared.
 """
 
 from __future__ import annotations
 
+import math
 import os
 import tempfile
 import time
 
-from andrey.core import backend, stats
+import numpy as np
+
+from andrey.core import backend, ci_cmiknn, ci_kernel, stats
 
 # Past this factor from the shipped default, the report suggests setting a cutoff for this machine.
 _TOLERANCE = 4.0
+
+
+def _ci_probe(metric: int) -> np.ndarray:
+    """Columns ``x, y, z1, z2`` on ``isqrt(metric)`` rows: ``x`` and ``y`` nonlinear in ``z``."""
+    rng = np.random.default_rng(0)
+    z = rng.standard_normal((math.isqrt(metric), 2))
+    s = z.sum(axis=1)
+    noise = rng.standard_normal((z.shape[0], 2))
+    return np.column_stack([np.tanh(s) + 0.4 * noise[:, 0], s**2 + 0.4 * noise[:, 1], z])
+
+
+def _kci_probe(metric: int) -> ci_kernel.KCI:
+    return ci_kernel.KCI(_ci_probe(metric))
+
+
+def _cmiknn_probe(metric: int) -> ci_cmiknn.CMIknn:
+    # 100 shuffles keep a probe short; the per-shuffle work, which sets the crossover, is the same.
+    return ci_cmiknn.CMIknn(_ci_probe(metric), n_permutations=100)
+
+
+def _query(test) -> float:
+    return test(0, 1, [2, 3])
 
 
 def _device() -> str | None:
@@ -89,6 +115,13 @@ def main() -> None:
         stats._COV_PROBE_START,
         stats._COV_GPU_THRESHOLDS[device],
     )
+
+    if device == "cuda":  # KCI and CMIknn have no mps backend
+        for op, make, default in (
+            ("kci", _kci_probe, ci_kernel._KCI_GPU_THRESHOLDS["cuda"]),
+            ("cmiknn", _cmiknn_probe, ci_cmiknn._CMIKNN_GPU_THRESHOLDS["cuda"]),
+        ):
+            ok &= _report(op, device, make, _query, 250_000, default)
 
     # Use an isolated cache to exercise measure, persist, clear, and reload without affecting the
     # user's calibration data.

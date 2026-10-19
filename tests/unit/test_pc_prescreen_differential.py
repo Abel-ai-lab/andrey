@@ -18,6 +18,8 @@ both PC and FCI condition on either endpoint's snapshot neighborhood and union t
 size and apply removals only after the size completes.
 
 The toggle and serial-vs-parallel checks compare each fast path with the same search's scalar path.
+The last section runs the reference against the chi-square, G-square, and conditional Gaussian
+tests, whose batched, marginal, and first-order paths the searches take the same way.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ from andrey.constraint.fci import _fast_adjacency_search
 from andrey.constraint.pc import _discover_skeleton
 from andrey.core import NULL, TAIL
 from andrey.core.ci import make_indep_test
+from andrey.data import sample_discrete, sample_mixed
 
 # Adjacency, separating sets, and, from PC's search, the largest separating p-value per pair.
 Skeleton = (
@@ -79,7 +82,12 @@ _CASE_IDS = [f"seed{s}-d{d}-n{n}-p{p}" for (s, d, n, p) in _CASES]
 
 
 def _reference_skeleton(
-    X: np.ndarray, alpha: float, *, mode: str, indep_test: str = "fisherz"
+    X: np.ndarray,
+    alpha: float,
+    *,
+    mode: str,
+    indep_test: str = "fisherz",
+    categorical: np.ndarray | None = None,
 ) -> Skeleton:
     """A naive scalar adjacency search -- the semantic oracle the fast paths must reproduce.
 
@@ -89,7 +97,7 @@ def _reference_skeleton(
     Every conditioning set is scored with the scalar test call directly -- no batching, no
     vectorization -- so this path shares nothing with the production search but the oracle itself.
     """
-    test = make_indep_test(indep_test, X)
+    test = make_indep_test(indep_test, X, categorical=categorical)
     d = X.shape[1]
     adj = np.full((d, d), TAIL, dtype=np.int8)
     np.fill_diagonal(adj, NULL)
@@ -337,3 +345,39 @@ def test_student_t_serial_matches_parallel(seed: int, d: int, n: int, p: float) 
     fci_serial = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, workers=1)
     fci_parallel = _fast_adjacency_search(x, make_indep_test("student_t", x), 0.05, workers=3)
     _assert_same(fci_serial, fci_parallel, f"FCI {label}")
+
+
+# ---- the categorical and conditional Gaussian tests ---------------------------------------------
+#
+# The chi-square, G-square, and conditional Gaussian tests expose the same batched, marginal, and
+# first-order paths, so PC and FCI take the prescreen and the batched scan on categorical and mixed
+# data too; both searches must still reproduce the scalar reference.
+
+_CATEGORICAL_CASES = [
+    ("chisq", "categorical", 300),
+    ("gsq", "categorical", 300),
+    ("gsq", "categorical", 40),
+    ("cond_gauss", "mixed", 300),
+]
+
+
+@pytest.mark.parametrize(("indep_test", "kind", "n"), _CATEGORICAL_CASES)
+def test_categorical_and_mixed_skeletons_match_scalar_reference(
+    indep_test: str, kind: str, n: int
+) -> None:
+    if kind == "categorical":
+        data = sample_discrete(d=10, n=n, seed=0, density=3.0, categories=(2, 4))
+        x, mask = data.data.astype(np.float64), None
+    else:
+        data = sample_mixed(d=10, n=n, seed=0, density=3.0)
+        x, mask = data.data, np.isnan(data.params.noise_scales)
+    label = f"{indep_test} n={n}"
+    reference = partial(_reference_skeleton, x, 0.05, indep_test=indep_test, categorical=mask)
+    pc = _discover_skeleton(x, 0.05, indep_test, categorical=mask)
+    assert any(len(s) >= 2 for s in pc[1].values()), "no pair separated at size 2 or more"
+    _assert_same(pc, reference(mode="pc"), f"PC {label}")
+    _assert_same(
+        pc, _discover_skeleton(x, 0.05, indep_test, categorical=mask, prescreen=False), label
+    )
+    test = make_indep_test(indep_test, x, categorical=mask)
+    _assert_same(_fast_adjacency_search(x, test, 0.05), reference(mode="fci"), f"FCI {label}")

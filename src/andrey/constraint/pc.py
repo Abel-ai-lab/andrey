@@ -10,7 +10,6 @@ from collections.abc import Iterable, Mapping
 from contextlib import nullcontext
 from itertools import combinations, groupby
 from math import comb
-from operator import itemgetter
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -31,6 +30,7 @@ from andrey.core.ci import make_indep_test, pins_blas
 from andrey.core.knowledge import KnowledgeError, _has_cycle, orient
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
+from andrey.search._parallel import _KEY_DP
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -163,13 +163,13 @@ def _orient_colliders(
 
     With ``order="p_value"``, the collider's rank is ``pvalues[(x, z)]``, keyed with the lower index
     first: the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders
-    are oriented from the highest rank to the lowest. Colliders of exactly equal rank are each
-    checked against the marks set before their rank, then all set: an edge two of them dispute ends
-    bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's rules. The result
-    depends on the ranks, not on the column order. With ``order="column"``, ``pvalues`` is not read
-    (it may be empty): the triples are visited by middle node ``y``, then by endpoint pair
-    ``(x, z)``, in ascending column order, each decided against the marks set before it, so no edge
-    ends bidirected and the result depends on the column order.
+    are oriented from the highest rank to the lowest. Colliders whose ranks agree to ``_KEY_DP``
+    decimals are each checked against the marks set before their rank, then all set: an edge two of
+    them dispute ends bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's
+    rules. The result depends on the ranks, not on the column order. With ``order="column"``,
+    ``pvalues`` is not read (it may be empty): the triples are visited by middle node ``y``, then by
+    endpoint pair ``(x, z)``, in ascending column order, each decided against the marks set before
+    it, so no edge ends bidirected and the result depends on the column order.
 
     The private ``_trace`` sink records every unshielded triple in the order decided:
     ``step="collider"``, the ``triple`` ``(x, y, z)``, the pair's ``sepset`` and rank ``p``
@@ -185,8 +185,12 @@ def _orient_colliders(
             if pdag[x, z] == NULL and ((x, z) in sepsets or (z, x) in sepsets):
                 triples.append((pvalues[(x, z)] if ranked else None, x, y, z))
     if ranked:
-        triples.sort(key=itemgetter(0), reverse=True)
-        groups = [list(tied) for _, tied in groupby(triples, key=itemgetter(0))]
+
+        def rank(triple: tuple) -> float:
+            return round(triple[0], _KEY_DP)
+
+        triples.sort(key=rank, reverse=True)
+        groups = [list(tied) for _, tied in groupby(triples, key=rank)]
     else:
         groups = [[triple] for triple in triples]
     for group in groups:
@@ -280,10 +284,10 @@ def _discover_skeleton(
     (:func:`~andrey.constraint._skeleton.separate_apart`), so colliders over it are oriented as
     usual; a pair no conditioning set separates gets neither.
 
-    When ``prescreen`` is set and the test exposes the vectorized closed forms, the size-0 and
-    size-1 passes read the correlation matrix directly (all-pairs marginal threshold, then one
-    first-order read per surviving pair) in place of the dense scalar scan -- same removals, same
-    separating sets, same p-values. With ``workers > 1`` the ``|S| >= 2`` scan fans out across
+    When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
+    the size-0 and size-1 passes take them (all-pairs marginal threshold, then one first-order
+    batch per surviving pair) in place of the dense scalar scan -- same removals, same separating
+    sets, same p-values. With ``workers > 1`` the ``|S| >= 2`` scan fans out across
     worker processes; the reduce is a plain union of per-chunk removals, so the result is identical
     to the serial scan whatever the partition.
 
@@ -291,7 +295,8 @@ def _discover_skeleton(
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
 
     The private ``_trace`` sink records every test in the order it runs: ``step="test"``,
-    ``depth``, the pair ``x < y``, the conditioning set ``S``, the p-value ``p``, and ``removed``
+    ``depth``, the pair ``x < y``, the conditioning set ``S``, the p-value ``p`` (for CMIknn, which
+    stops its shuffles once the side of ``alpha`` is certain, a bound on that side), and ``removed``
     (``p > alpha``: the test separates the pair, so the edge is removed when its depth ends). A
     trace needs every p-value in this process, so tracing scans serially.
     """

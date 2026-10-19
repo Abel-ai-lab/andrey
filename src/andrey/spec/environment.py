@@ -81,14 +81,36 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         group="backend",
     ),
     EnvVarSpec(
+        name="ANDREY_KCI_GPU_THRESHOLD",
+        values="integer (elements: rows squared)",
+        default="cuda 31250, mps never",
+        effect=(
+            "Smallest kernel matrix (rows squared) at which `auto` runs a KCI query with a "
+            "conditioning set on a CUDA GPU, in float64. A set value replaces the `cuda` default; "
+            "KCI never runs on `mps`."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_CMIKNN_GPU_THRESHOLD",
+        values="integer (elements: rows squared)",
+        default="cuda 1024, mps never",
+        effect=(
+            "Smallest distance matrix (rows squared) at which `auto` runs a CMIknn query on a CUDA "
+            "GPU. A set value replaces the `cuda` default; CMIknn never runs on `mps`."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
         name="ANDREY_GPU_CALIBRATE",
         values="1/true/yes/on or 0/false/no/off",
         default="off",
         effect=(
-            "Opt-in auto-tuning for `cuda`. The first `auto` use of each operation measures the "
-            "local numpy-to-`cuda` crossover, caches it by operation and machine fingerprint, and "
-            "logs the cutoff at INFO. A manual `*_GPU_THRESHOLD` takes precedence. `auto` never "
-            "selects `mps`, so calibration never measures it."
+            "Opt-in auto-tuning for `cuda`. The first `auto` use of covariance, correlation, or "
+            "entropy measures the local numpy-to-`cuda` crossover, caches it by operation and "
+            "machine fingerprint, and logs the cutoff at INFO. A manual `*_GPU_THRESHOLD` takes "
+            "precedence. `auto` never selects `mps`, so calibration never measures it. KCI and "
+            "CMIknn are not calibrated."
         ),
         group="backend",
     ),

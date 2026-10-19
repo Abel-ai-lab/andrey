@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -26,7 +26,8 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
 
     Raises ``ValueError``, naming ``name``, when the values are not numeric, the array is not 2-D,
     it has fewer than ``min_rows`` rows, it holds ``NaN`` or ``inf``, or a column is constant: no
-    method can estimate a variance or a dependence from such data.
+    method can estimate a variance or a dependence from such data. The message names every
+    constant column.
     """
     try:
         X = np.asarray(data, dtype=np.float64)
@@ -47,10 +48,17 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
             f"{name} holds NaN or inf in {cells} at row {row}, column {col}; drop or impute "
             "them before the fit"
         )
-    constant = np.flatnonzero(np.ptp(X, axis=0) == 0)
-    if constant.size:
-        column = _column_name(data, int(constant[0]))
-        raise ValueError(f"{name} column {column} is constant; drop it before the fit")
+    constant = [_column_name(data, int(j)) for j in np.flatnonzero(np.ptp(X, axis=0) == 0)]
+    if constant:
+        if len(constant) == 1:
+            columns, verb, pronoun = f"column {constant[0]}", "is", "it"
+        else:
+            columns = f"columns {', '.join(constant[:-1])} and {constant[-1]}"
+            verb, pronoun = "are", "them"
+        raise ValueError(
+            f"{name} {columns} {verb} constant; a constant column holds no information about "
+            f"the other variables, so drop {pronoun} before the fit"
+        )
     return X
 
 
@@ -501,23 +509,35 @@ def column_labels(data: object) -> tuple[str, ...] | None:
     return None if names == list(range(len(names))) else node_labels(names)
 
 
+def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
+    """Name a column position by its label in ``labels``, quoted, or by its number.
+
+    A position past the labels, such as a column a method adds to the data, and every position
+    without ``labels`` keep their number.
+    """
+    if labels is None:
+        return str
+    return lambda j: repr(labels[j]) if j < len(labels) else str(j)
+
+
 @contextlib.contextmanager
-def copies_named(labels: tuple[str, ...] | None) -> Generator[None]:
-    """Name the columns of a copies error raised in the block by ``labels``.
+def copies_named(
+    labels: tuple[str, ...] | None, name: Callable[[int], str] | None = None
+) -> Generator[None]:
+    """Name the columns of a copies error raised in the block by ``labels``, or by ``name``.
 
     A :class:`~andrey.core.score.CopiedColumnsError`, or a
     :class:`~andrey.core.ci.SingularCorrelationError` that found copies, names columns by position;
-    with ``labels``, the message names them by label instead. A position past the labels, such as a
-    column a method adds to the data, keeps its number.
+    the message names them by :func:`column_namer` of ``labels`` instead, or by ``name`` when it is
+    given.
     """
     try:
         yield
     except (CopiedColumnsError, SingularCorrelationError) as error:
-        if labels is not None and error.groups:
-            named = copies_message(
-                error.groups, lambda j: repr(labels[j]) if j < len(labels) else str(j)
-            )
-            error.args = (str(error).replace(copies_message(error.groups), named),)
+        if error.groups and (labels is not None or name is not None):
+            raised = error.column_name if isinstance(error, CopiedColumnsError) else str
+            named = copies_message(error.groups, name or column_namer(labels))
+            error.args = (str(error).replace(copies_message(error.groups, raised), named),)
         raise
 
 

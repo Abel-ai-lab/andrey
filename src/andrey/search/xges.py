@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import heapq
 from collections import OrderedDict, defaultdict, deque
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from itertools import chain, count
 
 import numpy as np
@@ -43,8 +43,9 @@ from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import add_deltas
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE
+from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 from andrey.search.ges import _reachable, _recompute_objective, _reform_cpdag, required_dag
+from andrey.search.hc import tie_ranks
 
 # The extended search keeps a branch when it lowers the deviance by more than this times the sample
 # count (1e-7 times the sample count in log-likelihood units).
@@ -58,6 +59,20 @@ _ADD_UNDIRECTED, _ADD_DIRECTED, _DROP_UNDIRECTED, _ORIENT, _DROP_DIRECTED, _UNOR
 )
 
 PathMap = defaultdict[tuple[int, int], set[tuple[int, int]]]
+
+
+def _move_key(
+    delta: float, n: int, x: int, y: int, subset: Collection[int], ranks: list[int]
+) -> tuple:
+    """The order of a move of edge ``x``-``y`` with ``subset`` (``T`` or ``C``); lower goes first.
+
+    ``(round(delta / n, _KEY_DP), ranks[x], ranks[y], sorted ranks of subset)`` for ``n``
+    samples and ``ranks`` from :func:`~andrey.search.hc.tie_ranks`: moves whose score changes per
+    sample agree to :data:`~andrey.search._parallel._KEY_DP` decimals are ordered by ranks that
+    follow the columns.
+    """
+    ordered = tuple(sorted([ranks[v] for v in subset])) if subset else ()
+    return (round(delta / n, _KEY_DP), ranks[x], ranks[y], ordered)
 
 
 def _is_directed(state: int) -> bool:
@@ -497,17 +512,24 @@ class _AddDeltas:
 class _Search:
     """XGES over a :class:`_Graph`, with a priority queue per operator type.
 
-    Queue entries are ``(delta, seq, x, y, subset, E[, Pa(x)])``: ``seq`` breaks ties in the order
-    the operators were found, ``subset`` is an Insert's or Reverse's ``T`` and a Delete's ``C``,
-    and ``E`` the target's parent set the delta was scored with.
+    Queue entries are ``(delta, seq, x, y, subset, E[, Pa(x)])``: ``seq`` orders entries of one
+    operator found more than once, ``subset`` is an Insert's or Reverse's ``T`` and a Delete's
+    ``C``, and ``E`` the target's parent set the delta was scored with. :meth:`tied` takes entries
+    in :func:`_move_key` order, ranking only the entries whose rounded deltas tie; ``ranks`` holds
+    each column's :func:`~andrey.search.hc.tie_ranks`.
 
     With ``constraints``, no operator adds a forbidden edge or removes or reverses a required one,
     and a move whose class holds no DAG that satisfies them is undone.
     """
 
-    def __init__(self, score: BICScore, d: int, constraints: Constraints | None = None) -> None:
+    def __init__(
+        self, score: BICScore, d: int, ranks: list[int], constraints: Constraints | None = None
+    ) -> None:
         self.add_deltas = _AddDeltas(score, d)
         self.d = d
+        self.n_samples = score.n
+        self.tie_gap = score.n * 10.0**-_KEY_DP
+        self.ranks = ranks
         self.constraints = constraints
         # Per target, the nodes forbidden into it; None without knowledge.
         self.into = (
@@ -527,6 +549,7 @@ class _Search:
         """A copy of the graph and path records, with empty queues and the same score cache."""
         out = _Search.__new__(_Search)
         out.add_deltas, out.d, out.seq = self.add_deltas, self.d, self.seq
+        out.n_samples, out.tie_gap, out.ranks = self.n_samples, self.tie_gap, self.ranks
         out.constraints, out.into = self.constraints, self.into
         out.g = self.g.copy()
         out.paths = defaultdict(set, {k: set(v) for k, v in self.paths.items()})
@@ -535,6 +558,30 @@ class _Search:
         return out
 
     # -- finding operators ----------------------------------------------------------------------
+
+    def tied(self, heap: list[tuple], entry: tuple) -> tuple:
+        """The entry to take after popping ``entry`` from ``heap``, in :func:`_move_key` order.
+
+        The heap orders entries by raw delta, and the caller has checked that the next delta lies
+        within ``tie_gap`` of ``entry``'s. The entries whose deltas per sample round to ``entry``'s
+        at ``_KEY_DP`` decimals are ranked by ``ranks[x]``, ``ranks[y]``, and the sorted ranks of
+        the subset, then by ``seq``; the others go back on the heap. Entries of one operator alone
+        keep the heap's order: at most one of them matches the current parents.
+        """
+        n, gap, ranks = self.n_samples, self.tie_gap, self.ranks
+        lowest = round(entry[0] / n, _KEY_DP)
+        tied = [entry]
+        while heap and heap[0][0] - entry[0] < gap and round(heap[0][0] / n, _KEY_DP) == lowest:
+            tied.append(heapq.heappop(heap))
+        if any(other[2:5] != entry[2:5] for other in tied[1:]):
+
+            def rank(e: tuple) -> tuple:
+                return (ranks[e[2]], ranks[e[3]], sorted(ranks[v] for v in e[4]), e[1])
+
+            tied.sort(key=rank)
+        for other in tied[1:]:
+            heapq.heappush(heap, other)
+        return tied[0]
 
     def subsets(
         self, t0: list[int], na: set[int], E: frozenset[int]
@@ -619,10 +666,11 @@ class _Search:
             if pinned:
                 C = C | pinned
             delta = self.drop_delta(y, E, x)
+            entry = (delta, next(self.seq), x, y, C, E)
             if out is not None:
-                heapq.heappush(out, (delta, next(self.seq), x, y, C, E))
+                heapq.heappush(out, entry)
             elif delta < -_EPS_IMPROVE:
-                heapq.heappush(self.deletes, (delta, next(self.seq), x, y, C, E))
+                heapq.heappush(self.deletes, entry)
 
     def find_reverse(self, y: int, x: int) -> None:
         """Queue each improving Reverse of ``y -> x``."""
@@ -638,7 +686,8 @@ class _Search:
         for delta, _x, _y, T, E in inserts:
             delta += drop
             if delta < -_EPS_IMPROVE:
-                heapq.heappush(self.reverses, (delta, next(self.seq), x, y, T, E, pa_x))
+                entry = (delta, next(self.seq), x, y, T, E, pa_x)
+                heapq.heappush(self.reverses, entry)
 
     def seed(self, adj: np.ndarray) -> None:
         """Start from the CPDAG ``adj``, the class of the required edges, and queue every Insert.
@@ -829,20 +878,25 @@ class _Search:
         g, paths = self.g, self.paths
         moves: list[_Changes] = []
         visits = {self.fingerprint: [0]}  # fingerprint -> len(moves) at each graph with it
+        pop, gap = heapq.heappop, self.tie_gap
         while self.deletes or self.reverses or self.inserts:
             log = _Changes()
-            if self.deletes:
-                _, _, x, y, C, E = heapq.heappop(self.deletes)
+            heap = self.deletes or self.reverses or self.inserts
+            entry = pop(heap)
+            if heap and heap[0][0] - entry[0] < gap:
+                entry = self.tied(heap, entry)
+            if heap is self.deletes:
+                _, _, x, y, C, E = entry
                 if not _delete_valid(g, x, y, C, E, self.constraints):
                     continue
                 _apply_delete(g, x, y, C, log)
-            elif self.reverses:
-                _, _, x, y, T, E, pa_x = heapq.heappop(self.reverses)
+            elif heap is self.reverses:
+                _, _, x, y, T, E, pa_x = entry
                 if g.pa[x] != pa_x or not _insert_valid(g, x, y, T, E, paths, reverse=True):
                     continue
                 _apply_reverse(g, x, y, T, log)
             else:
-                _, _, x, y, T, E = heapq.heappop(self.inserts)
+                _, _, x, y, T, E = entry
                 if not _insert_valid(g, x, y, T, E, paths):
                     continue
                 _apply_insert(g, x, y, T, log)
@@ -886,7 +940,10 @@ class _Search:
                 if not pending:
                     return total
                 fresh = True
-            _, _, x, y, C, E = heapq.heappop(pending)
+            entry = heapq.heappop(pending)
+            if pending and pending[0][0] - entry[0] < self.tie_gap:
+                entry = self.tied(pending, entry)
+            _, _, x, y, C, E = entry
             if not _delete_valid(self.g, x, y, C, E, self.constraints):
                 continue
             trial = self.branch()
@@ -1019,9 +1076,14 @@ def _all_reverses(
     return out
 
 
-def _improving(candidates: list[tuple]) -> list[tuple]:
-    """The improving candidates, lowest delta first (in the order found among equals)."""
-    return sorted((c for c in candidates if c[0] < -_EPS_IMPROVE), key=lambda c: c[0])
+def _ordered(candidates: Iterable[tuple], n: int, ranks: list[int]) -> list[tuple]:
+    """``(delta, x, y, subset, ...)`` candidates by :func:`_move_key`, for ``n`` samples."""
+    return sorted(candidates, key=lambda c: _move_key(c[0], n, c[1], c[2], c[3], ranks))
+
+
+def _improving(candidates: list[tuple], n: int, ranks: list[int]) -> list[tuple]:
+    """The improving candidates in :func:`_ordered` order."""
+    return _ordered((c for c in candidates if c[0] < -_EPS_IMPROVE), n, ranks)
 
 
 def _delete_marks(adj: np.ndarray, x: int, y: int, C: frozenset[int]) -> np.ndarray:
@@ -1044,17 +1106,19 @@ def _rescan_moves(
     adj: np.ndarray,
     score: BICScore,
     forbidden: set[tuple[int, int]],
+    ranks: list[int],
     constraints: Constraints | None = None,
 ) -> Iterable[np.ndarray]:
     """The graphs reached by improving base-search moves on ``adj``, in search order."""
-    for _, x, y, C, _E in _improving(_all_deletes(adj, score, constraints)):
+    for _, x, y, C, _E in _improving(_all_deletes(adj, score, constraints), score.n, ranks):
         yield _delete_marks(adj, x, y, C)
-    for _, x, y, T in _improving(_all_reverses(adj, score, forbidden, constraints)):
+    reverses = _all_reverses(adj, score, forbidden, constraints)
+    for _, x, y, T in _improving(reverses, score.n, ranks):
         cut = adj.copy()
         cut[x, y] = cut[y, x] = NULL
         yield _insert_marks(cut, x, y, T)
     inserts = _all_inserts(adj, score, forbidden, _reachable(adj), constraints)
-    for _, x, y, T in _improving(inserts):
+    for _, x, y, T in _improving(inserts, score.n, ranks):
         yield _insert_marks(adj, x, y, T)
 
 
@@ -1062,13 +1126,14 @@ def _rescan_base_search(
     adj: np.ndarray,
     score: BICScore,
     forbidden: set[tuple[int, int]],
+    ranks: list[int],
     constraints: Constraints | None = None,
 ) -> np.ndarray:
     """The base search with every operator rescanned after each move, skipping visited graphs and,
     with ``constraints``, graphs whose class holds no DAG that satisfies them."""
     seen = {adj.tobytes()}
     while True:
-        for moved in _rescan_moves(adj, score, forbidden, constraints):
+        for moved in _rescan_moves(adj, score, forbidden, ranks, constraints):
             if constraints is not None and not admits(moved, constraints):
                 continue
             if moved.tobytes() not in seen:
@@ -1088,13 +1153,17 @@ def _marks_total(adj: np.ndarray, score: BICScore) -> float:
 
 
 def _rescan_search(
-    score: BICScore, d: int, extended: bool, constraints: Constraints | None = None
+    score: BICScore,
+    d: int,
+    extended: bool,
+    ranks: list[int],
+    constraints: Constraints | None = None,
 ) -> np.ndarray:
     """XGES with every operator rescanned and the CPDAG re-formed globally after each move."""
     start = np.zeros((d, d), dtype=np.int8)
     if constraints is not None and constraints.required.any():
         start = _reform_cpdag(required_dag(constraints))
-    adj = _rescan_base_search(start, score, set(), constraints)
+    adj = _rescan_base_search(start, score, set(), ranks, constraints)
     if not extended:
         return adj
     tolerance = _ACCEPT_PER_SAMPLE * score.n
@@ -1104,7 +1173,7 @@ def _rescan_search(
     fresh = False
     while pending or not fresh:
         if not pending:
-            pending = sorted(_all_deletes(adj, score, constraints), key=lambda c: c[0])
+            pending = _ordered(_all_deletes(adj, score, constraints), score.n, ranks)
             if not pending:
                 break
             fresh = True
@@ -1120,7 +1189,7 @@ def _rescan_search(
         if constraints is not None and not admits(deleted, constraints):
             continue
         trial_forbidden = forbidden | {(x, y)}
-        trial = _rescan_base_search(deleted, score, trial_forbidden, constraints)
+        trial = _rescan_base_search(deleted, score, trial_forbidden, ranks, constraints)
         trial_total = _marks_total(trial, score)
         if trial_total < total - tolerance:
             adj, total, forbidden = trial, trial_total, trial_forbidden
@@ -1167,12 +1236,13 @@ def xges(
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
     score = BICScore(X, lambda_value=lambda_value)
+    ranks = tie_ranks(X).tolist()
     # One BLAS thread for reproducible scores and move ties.
     with backend.one_blas_thread():
         if _rescan:
-            adj = _rescan_search(score, d, extended_search, constraints)
+            adj = _rescan_search(score, d, extended_search, ranks, constraints)
         else:
-            search = _Search(score, d, constraints)
+            search = _Search(score, d, ranks, constraints)
             if constraints is None:
                 search.inserts_on_empty_graph()
             else:

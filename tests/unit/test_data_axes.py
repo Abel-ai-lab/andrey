@@ -84,7 +84,8 @@ def test_hub_has_high_degree_hubs():
 
 
 @pytest.mark.parametrize(
-    "functional_fn", [data.functional.additive_noise, data.functional.post_nonlinear]
+    "functional_fn",
+    [data.functional.additive_noise, data.functional.post_nonlinear, data.functional.nonmonotone],
 )
 def test_nonlinear_functionals_finite(functional_fn):
     scm = data.SCM(
@@ -96,6 +97,24 @@ def test_nonlinear_functionals_finite(functional_fn):
     assert np.all(np.isfinite(ds.data))
     assert ds.data.shape == (500, 30)
     _valid_dag(ds)
+
+
+def test_nonmonotone_child_is_uncorrelated_with_a_symmetric_parent():
+    """A child of one Gaussian source is ``w cos(parent) + noise``: uncorrelated with the parent,
+    exactly determined by it up to the noise."""
+    ds = data.sample_scm(
+        graph="erdos_renyi", functional="nonmonotone", d=12, n=20_000, seed=0, density=2.0
+    )
+    parents = {c: [] for c in range(12)}
+    for parent, child, _ in ds.graph.oriented_edges(index=True):
+        parents[child].append(parent)
+    pairs = [(p[0], c) for c, p in parents.items() if len(p) == 1 and not parents[p[0]]]
+    assert pairs
+    for parent, child in pairs:
+        x, y = ds.data[:, parent], ds.data[:, child]
+        weight = np.cov(np.cos(x), y)[0, 1] / np.var(np.cos(x), ddof=1)
+        assert abs(np.corrcoef(x, y)[0, 1]) < 0.03
+        assert np.std(y - weight * np.cos(x)) == pytest.approx(1.0, rel=0.05)
 
 
 @pytest.mark.parametrize("noise_name", ["uniform", "laplace", "exponential", "gumbel"])

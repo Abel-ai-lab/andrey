@@ -9,6 +9,7 @@ import andrey
 from andrey.core.orient import from_structure, pdag2dag
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent
+from andrey.search import exact as exact_module
 from andrey.search import gies as gies_search
 from andrey.search.gies import cut_pairs, replace_unprotected
 from tests.recovery.helpers import datagen
@@ -151,7 +152,7 @@ def test_gies_keeps_the_full_scan_result(monkeypatch, seed, d, p, n_targets):
 def test_gies_step_that_does_not_lower_the_score_fails():
     X, mask = _interventional_sem([[1], [6]], n=600, seed=0)
     score = gies_search.InterventionalBICScore(X, mask)
-    search = gies_search._Search(score, X.shape[1])
+    search = gies_search._Search(score, X.shape[1], range(X.shape[1]))
     with pytest.raises(RuntimeError):
         search.apply(search.adj.copy())
 
@@ -239,6 +240,70 @@ def test_exact_search_ignores_the_variables_means(search_method):
     assert markov_equivalent(shifted, centered)
 
 
+def _symmetric_chain() -> np.ndarray:
+    """Chain ``x -> y -> z`` data whose rows also hold ``(z, y, x)`` and both negated.
+
+    Small whole numbers make every sum exact, so the class's three DAGs tie to the last bit and
+    ``x``, ``z`` play exactly symmetric roles.
+    """
+    rng = np.random.default_rng(0)
+    x, e1, e2 = rng.integers(-3, 4, size=(3, 100)).astype(np.float64)
+    half = np.column_stack([x, x + e1, x + e1 + e2])
+    return np.vstack([half, half[:, ::-1], -half, -half[:, ::-1]])
+
+
+@pytest.mark.parametrize("search_method", ["astar", "dp"])
+def test_exact_search_reports_one_dag_under_any_column_order(search_method):
+    """Exactly tied DAGs of one class resolve the same way whatever the column order."""
+    data = _symmetric_chain()
+    expected = exact_module.exact_search(data, search_method=search_method).to_numpy()
+    for seed in range(6):
+        perm = np.random.default_rng(seed).permutation(3)
+        found = exact_module.exact_search(data[:, perm], search_method=search_method).to_numpy()
+        relabeled = np.empty_like(found)
+        relabeled[np.ix_(perm, perm)] = found
+        np.testing.assert_array_equal(relabeled, expected)
+    other = "dp" if search_method == "astar" else "astar"
+    np.testing.assert_array_equal(
+        exact_module.exact_search(data, search_method=other).to_numpy(), expected
+    )
+
+
+def test_exact_search_holds_its_dag_when_the_data_move_one_ulp():
+    """Moving every entry by one unit in the last place keeps the reported DAG."""
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal(500)
+    y = 0.8 * x + rng.standard_normal(500)
+    data = np.column_stack([x, y, 0.8 * y + rng.standard_normal(500)])
+    found = exact_module.exact_search(data).to_numpy()
+    moved = exact_module.exact_search(np.nextafter(data, np.inf)).to_numpy()
+    np.testing.assert_array_equal(moved, found)
+
+
+def test_exact_search_returns_the_only_dag_of_a_collider_class():
+    """A class with a single DAG, the collider ``x -> z <- y``, is returned as that DAG."""
+    rng = np.random.default_rng(2)
+    x, y, e = rng.standard_normal((3, 1000))
+    found = exact_module.exact_search(np.column_stack([x, y, 0.8 * x + 0.8 * y + e]))
+    np.testing.assert_array_equal(found.to_numpy(), [[0, 0, 1], [0, 0, 1], [2, 2, 0]])
+
+
+def _linearly_dependent(kind: str) -> np.ndarray:
+    rng = np.random.default_rng(4)
+    a, b, noise = rng.standard_normal((3, 50))
+    third = a if kind == "duplicate" else 2.0 * a - 1.5 * b
+    return np.column_stack([a, b, third, noise])
+
+
+@pytest.mark.parametrize(
+    ("kind", "message"), [("duplicate", "repeats"), ("combination", "linear function of")]
+)
+def test_exact_search_rejects_linearly_dependent_columns(kind, message):
+    """A column that is a linear function of others leaves no residual variance to score."""
+    with pytest.raises(ValueError, match=message):
+        andrey.exact_search(_linearly_dependent(kind))
+
+
 @pytest.mark.filterwarnings("error::RuntimeWarning")
 def test_exact_search_rejects_a_column_whose_variance_underflows():
     """A column that is not constant but whose variance underflows to zero is rejected."""
@@ -320,6 +385,6 @@ def test_gfci_output_contract():
     assert andrey.gfci(datagen.generate("gauss_5v")).structure.kind == "pag"
 
 
-def test_gfci_rejects_non_fisherz():
+def test_gfci_rejects_unknown_indep_test():
     with pytest.raises(NotImplementedError):
-        andrey.gfci(datagen.generate("gauss_5v"), indep_test="kci")
+        andrey.gfci(datagen.generate("gauss_5v"), indep_test="no_such_test")

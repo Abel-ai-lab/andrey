@@ -15,6 +15,8 @@ import numpy as np
 
 from ._adapt import (
     column_labels,
+    column_namer,
+    copies_named,
     data_matrix,
     int_in_range,
     open_unit_interval,
@@ -307,7 +309,10 @@ def pcmci(
         If ``tau_max`` is below 1, if ``pc_alpha`` or ``alpha_level`` is not in ``(0, 1)``, if
         ``indep_test`` is neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is not a usable
         2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the length at which
-        every test keeps a degree of freedom.
+        every test keeps a degree of freedom. Also if a variable repeats another up to scale and
+        shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
+        message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
+        one column per group.
 
     Notes
     -----
@@ -325,7 +330,9 @@ def pcmci(
     which reach back ``k + tau_max`` steps. PC1 runs in rounds ``p = 0, 1, ...``: each round tests
     every remaining candidate given the ``p`` strongest other candidates, one conditioning set per
     candidate, then drops those that test independent. A candidate's strength is the smallest
-    absolute partial correlation it has had so far.
+    absolute partial correlation it has had so far. Equal strengths are ordered by each variable's
+    rank, as in :func:`~andrey.hc`, so reordering the columns reorders the variables of the result
+    and changes nothing else, unless two columns are identical.
 
     **Limitations.** Measured on simulated linear-Gaussian series with an autodependency in every
     variable and one cross-link per variable at lag 1 or 2, from 10 to 160 variables with 500 to
@@ -357,6 +364,7 @@ def pcmci(
     >>> out.structure.lag(2).oriented_edges()
     []
     """
+    from andrey.temporal.pcmci import design_column_name
     from andrey.temporal.pcmci import pcmci as _native
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
@@ -371,10 +379,12 @@ def pcmci(
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
-    result = _native(
-        X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level, indep_test=indep_test
-    )
-    return with_labels(_adapt_pcmci(result), column_labels(data))
+    labels = column_labels(data)
+    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+        result = _native(
+            X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level, indep_test=indep_test
+        )
+    return with_labels(_adapt_pcmci(result), labels)
 
 
 def pcmciplus(
@@ -446,24 +456,27 @@ def pcmciplus(
         If ``tau_max`` is below 1, if ``pc_alpha`` is not in ``(0, 1)``, if ``collider_rule`` or
         ``indep_test`` is not one of its choices, or if ``data`` is not a usable 2-D matrix with
         at least ``2 * tau_max * (n_variables + 1) + n_variables + 1`` rows, the length at which
-        every test keeps a degree of freedom.
+        every test keeps a degree of freedom. Also if a variable repeats another up to scale and
+        shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
+        message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
+        one column per group.
 
     Notes
     -----
     The method runs in four phases. The lagged phase selects the lagged parents of each variable
-    as PCMCI's PC1 step does. The skeleton phase starts from those lagged links and from a link
-    between every two variables at the same step. Round ``p = 0, 1, ...`` tests each linked pair
-    given each subset of ``p`` same-step neighbors of the later end, with the lagged parents of
-    both ends added, and removes the link at the first p-value above ``pc_alpha``. A same-step
-    pair is tested from both ends, first given the neighbors of its higher-numbered variable, and
-    the neighbor sets stay fixed during a round, so the links found do not depend on the order of
-    the variables. The collider phase orients the
-    unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules R1 to R3 to
-    the same-step links until none applies. Each collider or rule pass collects its orientations
-    before applying them, and marks a link that gets both orientations as a conflict. With the
-    ``"majority"`` or ``"conservative"`` rule the orientations do not depend on the order of the
-    variables either; ``"none"`` reads the one separating set the skeleton phase stored, which
-    can change with the order.
+    as PCMCI's PC1 step does, with equal strengths ordered by each variable's rank. The skeleton
+    phase starts from those lagged links and from a link between every two variables at the same
+    step. Round ``p = 0, 1, ...`` tests each linked pair given each subset of ``p`` same-step
+    neighbors of the later end, with the lagged parents of both ends added, and removes the link
+    at the first p-value above ``pc_alpha``. A same-step pair is tested from both ends, first
+    given the neighbors of its higher-numbered variable, and the neighbor sets stay fixed during a
+    round, so the links found do not depend on the order of the variables. The collider phase
+    orients the unshielded triples by ``collider_rule``, and the rule phase applies Meek's rules
+    R1 to R3 to the same-step links until none applies. Each collider or rule pass collects its
+    orientations before applying them, and marks a link that gets both orientations as a
+    conflict. With the ``"majority"`` or ``"conservative"`` rule the orientations do not depend on
+    the order of the variables either; ``"none"`` reads the one separating set the skeleton phase
+    stored, which can change with the order.
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``. The default test,
     ``"student_t"``, takes the p-value from the Student-t distribution with ``n - |S| - 2``
@@ -502,6 +515,7 @@ def pcmciplus(
     >>> out.structure.lag(1).oriented_edges()
     [(1, 2, 'directed')]
     """
+    from andrey.temporal.pcmci import design_column_name
     from andrey.temporal.pcmciplus import pcmciplus as _native
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
@@ -515,14 +529,16 @@ def pcmciplus(
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
-    result = _native(
-        X,
-        tau_max=tau_max,
-        pc_alpha=pc_alpha,
-        collider_rule=collider_rule,
-        indep_test=indep_test,
-    )
-    return with_labels(_adapt_pcmciplus(result), column_labels(data))
+    labels = column_labels(data)
+    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+        result = _native(
+            X,
+            tau_max=tau_max,
+            pc_alpha=pc_alpha,
+            collider_rule=collider_rule,
+            indep_test=indep_test,
+        )
+    return with_labels(_adapt_pcmciplus(result), labels)
 
 
 def lpcmci(
@@ -592,7 +608,10 @@ def lpcmci(
         If ``tau_max`` is below 1, ``n_preliminary_iterations`` below 0, ``pc_alpha`` not in
         ``(0, 1)``, ``indep_test`` neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is
         not a usable 2-D matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1``
-        rows, the length at which every test keeps a degree of freedom.
+        rows, the length at which every test keeps a degree of freedom. Also if a variable repeats
+        another up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart,
+        before any test runs; one message names every group of copies, a lagged value as
+        ``'x' at lag k``, and says to keep one column per group.
 
     Notes
     -----
@@ -613,11 +632,12 @@ def lpcmci(
     Whether a node lies outside the separating set of two others is a majority vote over the
     distinct separating sets stored and found among the neighbors of the two. A mark that rules
     orient both ways is a conflict. The candidates of a step are ordered by statistics frozen when
-    its group of links starts, so the order in which a group's links are tested changes nothing
-    and, apart from exact ties, the order of the variables changes nothing either. The collider
-    rule stores every separating set its tests find, each made weakly minimal by dropping first
-    the node whose removal leaves the largest p-value, so the stored sets do not depend on the
-    order of the variables.
+    its group of links starts, so the order in which a group's links are tested changes nothing.
+    Equal statistics are ordered by each variable's rank, as in :func:`~andrey.hc`, so their order
+    does not depend on the order of the variables either, unless two columns are identical. The
+    collider rule stores every separating set its tests find, each made weakly minimal by dropping
+    first the node whose removal leaves the largest p-value, so the stored sets do not depend on
+    the order of the variables.
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``, and every node a test
     conditions on lies within ``tau_max`` steps of the later end. A test's partial correlation is
@@ -660,6 +680,7 @@ def lpcmci(
     [(0, 0, 'directed'), (1, 1, 'directed')]
     """
     from andrey.temporal.lpcmci import lpcmci as _native
+    from andrey.temporal.pcmci import design_column_name
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
     n_preliminary_iterations = int_in_range(n_preliminary_iterations, "n_preliminary_iterations", 0)
@@ -673,14 +694,16 @@ def lpcmci(
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
-    result = _native(
-        X,
-        tau_max=tau_max,
-        pc_alpha=pc_alpha,
-        n_preliminary_iterations=n_preliminary_iterations,
-        indep_test=indep_test,
-    )
-    return with_labels(_adapt_lpcmci(result), column_labels(data))
+    labels = column_labels(data)
+    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+        result = _native(
+            X,
+            tau_max=tau_max,
+            pc_alpha=pc_alpha,
+            n_preliminary_iterations=n_preliminary_iterations,
+            indep_test=indep_test,
+        )
+    return with_labels(_adapt_lpcmci(result), labels)
 
 
 def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOutput:

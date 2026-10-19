@@ -12,9 +12,11 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
+from andrey.core.mixed import column_mask
 from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
-from andrey.core.score import Score, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, Score, make_score
 from andrey.search import operators as ops
+from andrey.search.hc import tie_ranks
 
 
 def _reform_cpdag(adj: np.ndarray) -> np.ndarray:
@@ -134,6 +136,10 @@ def ges(
     # Pin BLAS to one thread for the score-diff loops (the covariance above is already computed):
     # multi-thread BLAS reduction order is not bit-stable, so pinning makes the score host- and
     # thread-count-reproducible and equal to the (1-thread) parallel workers.
+    mask = np.full(n, score_func in DISCRETE_SCORES)
+    if score_func in MIXED_SCORES:
+        mask = column_mask(categorical, n)
+    ranks = tie_ranks(X, mask).tolist()
     with backend.one_blas_thread():
         workers = backend.worker_count() if n > 1 else 1
         adj = _parallel_ges.run_ges(
@@ -142,6 +148,7 @@ def ges(
             n,
             max_parents,
             workers=workers,
+            ranks=ranks,
             full_scores=_full_scores,
             constraints=constraints,
         )

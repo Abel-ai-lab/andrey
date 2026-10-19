@@ -353,6 +353,18 @@ def test_no_rule_orients_through_a_kept_apart_pair_the_data_join(name):
     assert marks[y, z] == TAIL and marks[z, y] == TAIL
 
 
+@pytest.mark.parametrize("name", METHODS)
+@pytest.mark.parametrize("edge", [("a", "b"), ("b", "a")])
+def test_a_required_edge_keeps_its_direction_where_the_data_allow_both(name, edge):
+    # Two dependent variables: either direction fits the data equally well.
+    rng = np.random.default_rng(0)
+    a = rng.uniform(-1.0, 1.0, 1000)
+    data = pd.DataFrame({"a": a, "b": 0.8 * a + rng.uniform(-1.0, 1.0, 1000)})
+    marks, labels = _marks(_fit(name, data, knowledge=Knowledge(required=[edge])))
+    cause, effect = (labels.index(v) for v in edge)
+    assert marks[cause, effect] == TAIL and marks[effect, cause] == ARROW
+
+
 def test_a_skeleton_as_knowledge_keeps_the_colliders():
     data = _collider()
     plain = andrey.pc(data).structure.oriented_edges()

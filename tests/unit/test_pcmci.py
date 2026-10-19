@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 from scipy import stats
 
+import andrey
 from andrey.core.ci import SingularCorrelationError, StudentT
 from andrey.temporal.pcmci import (
     INDEP_TESTS,
@@ -66,7 +67,7 @@ def test_pc1_conditions_on_the_strongest_others_and_drops_after_each_round():
             (A, (B,)): (0.35, 0.01),  # A's strength stays 0.2, its smallest so far
         }
     )
-    parents = pc1(test, n_vars=3, target=0, tau_max=1, pc_alpha=0.05)
+    parents = pc1(test, n_vars=3, target=0, tau_max=1, pc_alpha=0.05, ranks=range(3))
     assert parents == ((2, 1), (0, 1))  # C (0.3) before A (0.2)
     assert test.queries == [
         (A, 0, ()),
@@ -80,7 +81,7 @@ def test_pc1_conditions_on_the_strongest_others_and_drops_after_each_round():
 
 def test_pc1_keeps_a_candidate_whose_p_value_equals_pc_alpha():
     test = Scripted({(1, ()): (0.5, 0.05)})
-    assert pc1(test, n_vars=1, target=0, tau_max=1, pc_alpha=0.05) == ((0, 1),)
+    assert pc1(test, n_vars=1, target=0, tau_max=1, pc_alpha=0.05, ranks=[0]) == ((0, 1),)
 
 
 def test_mci_conditions_on_both_ends_parents_with_the_cause_shifted_by_the_lag():
@@ -248,7 +249,8 @@ _EQUIVALENCE_CASES = [
 def test_batched_pc1_and_mci_equal_the_scalar_loops_exactly(indep_test, data, tau_max, pc_alpha):
     n_vars = data.shape[1]
     test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
-    parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
+    ranks = range(n_vars)
+    parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha, ranks) for j in range(n_vars))
     assert parents == tuple(
         _pc1_by_scalar_loop(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars)
     )
@@ -305,3 +307,15 @@ def test_a_design_test_answers_a_singular_query_from_the_residuals():
     )
     alone = test.statistic_pvalues(np.array([1]), np.array([5]), np.array([[4, 6]]))
     assert mixed[0][1] == alone[0][0] and mixed[1][1] == alone[1][0]
+
+
+@pytest.mark.parametrize("method", ["pcmci", "pcmciplus", "lpcmci"])
+def test_a_series_that_repeats_another_some_steps_back_is_named_with_its_lag(method):
+    pd = pytest.importorskip("pandas")
+    # d is a scaled and shifted copy of a one step back: the raw columns are no copies, but design
+    # column (a, lag 1) repeats (d, lag 0).
+    x = _repeated_series()[:, :3]
+    d = np.r_[0.0, -2.0 * x[:-1, 0]] + 4.0
+    frame = pd.DataFrame(np.column_stack([x, d]), columns=["a", "b", "c", "d"])
+    with pytest.raises(ValueError, match=r"'a' at lag 1 repeats 'd'\. .*keep one column"):
+        getattr(andrey, method)(frame, tau_max=2)

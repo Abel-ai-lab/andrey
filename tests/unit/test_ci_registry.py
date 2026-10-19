@@ -98,6 +98,7 @@ def test_fisherz_default_matches_explicit():
     assert np.array_equal(default, explicit)
 
 
+@pytest.mark.filterwarnings("ignore::andrey.ExperimentalWarning")
 def test_registry_surface(clean_registry):
     """``register`` / ``make`` / ``available`` behave as documented; every shipped name builds."""
     assert set(ci.SHIPPED_INDEP_TESTS) <= set(ci.available_indep_tests())

@@ -361,6 +361,23 @@ def test_cg_test_on_categorical_columns_is_the_g_square_test():
         assert cg(a, b, given) == pytest.approx(gsq(a, b, given), rel=1e-9, abs=1e-300)
 
 
+@pytest.mark.parametrize("rare", [False, True], ids=["common categories", "a two-row category"])
+def test_cg_fast_paths_return_the_scalar_p_values(rare):
+    """The batched, first-order, and all-pairs marginal paths of the conditional Gaussian test equal
+    its scalar call bit for bit, each on a fresh test so no memoized value is shared."""
+    x, mask = _mixed()
+    x = _with_rare_category(x) if rare else x
+    scalar = CGTest(x, mask)
+    marginal = CGTest(x, mask).marginal_pvalues()
+    for a, b in [(0, 1), (0, 3), (1, 2), (2, 3)]:
+        assert marginal[a, b] == marginal[b, a] == scalar(a, b)
+        others = [c for c in range(4) if c not in (a, b)]
+        sets = [(), (others[1],), (others[0],), tuple(others[::-1])]
+        assert CGTest(x, mask).batched_call(b, a, sets) == [scalar(a, b, s) for s in sets]
+        first = CGTest(x, mask).first_order_pvalues(b, a, others)
+        assert first.tolist() == [scalar(a, b, (c,)) for c in others]
+
+
 @pytest.mark.parametrize("make", [DGTest, CGTest])
 def test_a_test_is_symmetric_in_its_pair_and_its_conditioning_order(make):
     x, mask = _mixed()

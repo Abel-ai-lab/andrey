@@ -268,14 +268,14 @@ def test_a_singular_submatrix_without_copies_names_no_group():
     assert error.value.groups == ()
 
 
-def test_pc_names_copies_by_column_name_when_a_test_meets_them():
+def test_pc_names_copies_by_column_name_before_a_test_meets_them():
     pd = pytest.importorskip("pandas")
     rng = np.random.default_rng(0)
     x = rng.standard_normal(1000)
     b = x + rng.standard_normal(1000)
     y = x + b + rng.standard_normal(1000)
     frame = pd.DataFrame({"x": x, "b": b, "y": y, "b2": 2.0 * b + 1.0})
-    with pytest.raises(ci.SingularCorrelationError, match=r"'b2' repeats 'b'"):
+    with pytest.raises(ValueError, match=r"'b2' repeats 'b'"):
         andrey.pc(frame)
 
 

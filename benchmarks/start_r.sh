@@ -46,7 +46,9 @@ export R_LIBS_USER="$R_LIBS"
 echo ">> R library: $R_LIBS"
 
 # `pcalg` uses two Bioconductor graph packages, installed by `BiocManager`; the rest come from CRAN.
-# `update = FALSE` prevents rebuilding packages used in earlier campaign measurements.
+# `update = FALSE` prevents rebuilding packages used in earlier campaign measurements. RCIT, the
+# reference RCoT, is not on CRAN: it is installed from its GitHub repository at a fixed commit, after
+# `momentchi2`, the CRAN package it depends on.
 Rscript --vanilla -e '
     lib <- Sys.getenv("R_LIBS_USER")
     .libPaths(lib)
@@ -55,9 +57,12 @@ Rscript --vanilla -e '
     if (need("BiocManager")) install.packages("BiocManager", lib = lib)
     bioc <- Filter(need, c("graph", "RBGL"))
     if (length(bioc)) BiocManager::install(bioc, lib = lib, ask = FALSE, update = FALSE)
-    cran <- Filter(need, c("pcalg", "bnlearn"))
+    cran <- Filter(need, c("pcalg", "bnlearn", "momentchi2"))
     if (length(cran)) install.packages(cran, lib = lib)
-    for (p in c("pcalg", "bnlearn")) {
+    rcit <- paste0("https://github.com/ericstrobl/RCIT/archive/",
+                   "7a7fb2be17ca6d8c657c750d435032824d1111a9.tar.gz")
+    if (need("RCIT")) install.packages(rcit, lib = lib, repos = NULL, type = "source")
+    for (p in c("pcalg", "bnlearn", "RCIT")) {
         cat(p, as.character(packageVersion(p)), "\n")
     }
 '

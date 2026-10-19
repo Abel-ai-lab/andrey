@@ -11,10 +11,14 @@ from sklearn.decomposition import FastICA
 
 from andrey.core.seeding import resolve_seed
 from andrey.lingam.adjacency import estimate
+from andrey.search.hc import tie_ranks
 
 
-def _search_causal_order(matrix: np.ndarray) -> list[int] | None:
-    """Strict causal order of a matrix by repeatedly peeling off all-zero rows, or ``None``."""
+def _search_causal_order(matrix: np.ndarray, ranks: np.ndarray) -> list[int] | None:
+    """Strict causal order of a matrix by repeatedly peeling off all-zero rows, or ``None``.
+
+    When several rows are all zero, the one with the lowest ``ranks`` entry goes first.
+    """
     causal_order: list[int] = []
     row_num = matrix.shape[0]
     original_index = np.arange(row_num)
@@ -23,7 +27,7 @@ def _search_causal_order(matrix: np.ndarray) -> list[int] | None:
         row_index_list = np.where(np.sum(np.abs(matrix), axis=1) == 0)[0]
         if len(row_index_list) == 0:
             break
-        target_index = row_index_list[0]
+        target_index = row_index_list[np.argmin(ranks[original_index[row_index_list]])]
         causal_order.append(int(original_index[target_index]))
         original_index = np.delete(original_index, target_index, axis=0)
         mask = np.delete(np.arange(len(matrix)), target_index, axis=0)
@@ -34,7 +38,7 @@ def _search_causal_order(matrix: np.ndarray) -> list[int] | None:
     return causal_order
 
 
-def _estimate_causal_order(matrix: np.ndarray) -> list[int] | None:
+def _estimate_causal_order(matrix: np.ndarray, ranks: np.ndarray) -> list[int] | None:
     """Approximate a lower-triangular order: zero smallest entries until a strict order appears."""
     matrix = matrix.copy()
     pos_list = np.argsort(np.abs(matrix), axis=None)
@@ -47,7 +51,7 @@ def _estimate_causal_order(matrix: np.ndarray) -> list[int] | None:
     causal_order = None
     for i, j in pos_list[initial_zero_num:]:
         matrix[i, j] = 0
-        causal_order = _search_causal_order(matrix)
+        causal_order = _search_causal_order(matrix, ranks)
         if causal_order is not None:
             break
     return causal_order
@@ -61,7 +65,9 @@ def ica_lingam(
     FastICA gives an unmixing matrix. A Hungarian assignment on ``1 / |W|`` permutes its rows so
     the diagonal is largest, and each row is divided by its diagonal. The causal order is the
     permutation that makes ``I - W`` closest to lower-triangular, found by zeroing its smallest
-    entries until a strict order appears. The weights are then re-estimated from that order with
+    entries until a strict order appears. When several rows could come next, the one with the
+    lowest :func:`~andrey.search.hc.tie_ranks` rank does, so the choice moves with its column when
+    the columns are reordered. The weights are then re-estimated from that order with
     adaptive Lasso, as DirectLiNGAM does, so they depend only on the order and the data.
 
     ``random_state`` resolves through :func:`andrey.core.seeding.resolve_seed` (default seed ``0``)
@@ -84,7 +90,7 @@ def ica_lingam(
     w_estimate = pw_ica / diag
     b_estimate = np.eye(len(w_estimate)) - w_estimate
 
-    causal_order = _estimate_causal_order(b_estimate)
+    causal_order = _estimate_causal_order(b_estimate, tie_ranks(X))
     if causal_order is None:
         raise RuntimeError("ICA-LiNGAM failed to find a causal order (no nilpotent permutation)")
 
