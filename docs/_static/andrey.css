@@ -647,8 +647,8 @@ html:not(:has(.andrey-home)) .bd-header::before {
   display: none;
 }
 
-/* ---------- the documentation's footer ---------- */
-/* The documentation footer (`_templates/docs-footer.html`), modeled on craft.do's: a rounded navy
+/* ---------- the footer ---------- */
+/* The footer on every page (`_templates/docs-footer.html`), modeled on craft.do's: a rounded navy
    card inset from the page's edges, with the wordmark beside three link columns under small
    capitals and a hairline, and the copyright and Abel's mark at the bottom. The theme's footer
    row is disabled. */
