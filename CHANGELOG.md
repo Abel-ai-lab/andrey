@@ -78,6 +78,8 @@ change names its pull request.
   before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
   reject a series that repeats another at the same step or some steps back, naming its lagged
   value, such as `'a' at lag 1 repeats 'd'`. ([#206])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
+  same graphs and p-values in less time, because each test answers many queries at once. ([#208])
 
 ### Removed
 
@@ -334,3 +336,4 @@ First alpha release.
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
 [#206]: https://github.com/Abel-ai-lab/andrey/pull/206
+[#208]: https://github.com/Abel-ai-lab/andrey/pull/208
