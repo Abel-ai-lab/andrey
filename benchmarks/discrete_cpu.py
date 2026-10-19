@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """Benchmark the categorical tests and scores on CPU: Andrey against causal-learn, bnlearn, pgmpy.
 
-Runs PC with the chi-square and the G-square test, GES, BOSS, and GRaSP with the BDeu score, and hill
-climbing with the BDeu score and the multinomial BIC, on the ``discrete_er`` regime: category codes sampled from a
-discrete network with Dirichlet tables on an Erdos-Renyi DAG (:data:`datasets.DISCRETE_SETTINGS`
-gives the categories per node and the concentration). Each pair runs one method with one test or
-score and the same settings, and every solution is serial:
+Runs PC with the chi-square and the G-square test, GES with the BDeu score, and BOSS, GRaSP, and
+hill climbing with the BDeu score and the multinomial BIC, on the ``discrete_er`` regime: category
+codes sampled from a discrete network with Dirichlet tables on an Erdos-Renyi DAG
+(:data:`datasets.DISCRETE_SETTINGS` gives the categories per node and the concentration). Each pair
+runs one method with one test or score and the same settings, and every solution is serial:
 
 - causal-learn's PC, GES, BOSS, and GRaSP, against Andrey's: ``alpha=0.05`` for PC, BDeu's default
   priors and at most four parents for GES, BDeu's default priors and search seed 0 for BOSS and
@@ -15,6 +15,8 @@ score and the same settings, and every solution is serial:
   against Andrey's. Hill climbing runs BDeu with an equivalent sample size of 1 and a structure
   prior of one expected parent per variable, or the multinomial BIC with the standard penalty, and
   no parent cap. ``bnlearn_discrete.py`` and ``pgmpy_hc.py`` document each setting.
+- Andrey's BOSS and GRaSP with the multinomial BIC at the standard penalty and search seed 0, with
+  GRaSP at depth 3, run alone: no package here runs them with that score.
 
 The empty graph is the quality baseline. Every estimate is scored against the true DAG's CPDAG
 (``shd`` and the skeleton and arrowhead columns), and a DAG's comparable columns are ``mec_shd`` and
@@ -43,9 +45,9 @@ import pandas as pd
 from andrey import GraphStructure
 from andrey_bench import datasets, memcap, rsession, rundir, scoring
 from andrey_bench.adapters import pgmpy_hc
-from andrey_bench.adapters.andrey_boss import AndreyBOSSBDeu
+from andrey_bench.adapters.andrey_boss import AndreyBOSSBDeu, AndreyBOSSCategoricalBIC
 from andrey_bench.adapters.andrey_ges import andrey_ges_bdeu
-from andrey_bench.adapters.andrey_grasp import AndreyGRaSPBDeu
+from andrey_bench.adapters.andrey_grasp import AndreyGRaSPBDeu, AndreyGRaSPCategoricalBIC
 from andrey_bench.adapters.andrey_hc import andrey_hc_categorical
 from andrey_bench.adapters.andrey_pc import AndreyPCChisq, AndreyPCGsq
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
@@ -91,10 +93,15 @@ COMPARATOR_PAIRS = {
 }
 
 
-#: The solutions: the causal-learn pairs, then the comparators', each solution once, then the empty
-#: graph.
+#: Andrey solutions no package here runs with the same score: BOSS and GRaSP with the multinomial
+#: BIC, which causal-learn's BOSS and GRaSP do not take.
+ANDREY_ONLY = (AndreyBOSSCategoricalBIC(), AndreyGRaSPCategoricalBIC())
+
+#: The solutions: the causal-learn pairs, then the comparators', each solution once, then the
+#: Andrey-only solutions and the empty graph.
 SOLUTIONS = [
     *{a.name: a for pair in (*PAIRS.values(), *COMPARATOR_PAIRS.values()) for a in pair}.values(),
+    *ANDREY_ONLY,
     BaselineEmpty(),
 ]
 

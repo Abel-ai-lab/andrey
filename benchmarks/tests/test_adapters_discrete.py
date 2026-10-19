@@ -44,6 +44,8 @@ DEFERRED_MODULES = {
     "andrey.ges.bdeu": "andrey.search.ges",
     "andrey.boss.bdeu": "andrey.search.boss",
     "andrey.grasp.bdeu": "andrey.search.grasp",
+    "andrey.boss.bic_categorical": "andrey.search.boss",
+    "andrey.grasp.bic_categorical": "andrey.search.grasp",
     "andrey.hc.BDeu": "andrey.search.hc",
     "andrey.hc.BIC_categorical": "andrey.search.hc",
 }
