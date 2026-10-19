@@ -78,7 +78,7 @@ change names its pull request.
   them, `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` say up front that they need
   at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
   why a PDAG has no consistent extension, naming a chordless cycle of its undirected edges when it
-  finds one. ([#TBD])
+  finds one. ([#207])
 
 ### Removed
 
@@ -334,3 +334,4 @@ First alpha release.
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
+[#207]: https://github.com/Abel-ai-lab/andrey/pull/207
