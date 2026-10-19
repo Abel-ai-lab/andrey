@@ -178,6 +178,9 @@ change names its pull request.
   shuffles, by a rank computed from each column's own data instead of by column position, so
   reordering the columns no longer changes their p-values or the graphs built from them.
   ([#213])
+- `pc`, `fci`, `gfci`, `ges`, `gies`, `xges`, `hc`, and `tabu` accept a DataFrame whose columns
+  were reversed (`df[df.columns[::-1]]`) when a torch backend computes the covariance, where torch
+  rejected its negative strides with a `ValueError`. ([#214])
 
 ## [0.6.0] - 2026-10-17
 
