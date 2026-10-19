@@ -3,9 +3,9 @@
 ``boss`` and ``grasp`` are native -- they run a permutation/score search on the :mod:`andrey.core`
 compute substrate and return a CPDAG ``GraphStructure`` with its objective score. Both score
 candidate parent additions through the batched Schur delta-BIC surface over the linear-Gaussian BIC
-(:class:`andrey.core.score.BICScore`), or by full local scores over a mixed-data BIC. Their search
-order is drawn from a private RNG seeded by ``seed`` (or the global ``ANDREY_SEED``), so a run is
-reproducible.
+(:class:`andrey.core.score.BICScore`), or by full local scores over BDeu or a mixed-data BIC. Their
+search order is drawn from a private RNG seeded by ``seed`` (or the global ``ANDREY_SEED``), so a
+run is reproducible.
 """
 
 from __future__ import annotations
@@ -52,14 +52,15 @@ def boss(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov", "local_score_degen_gauss", "local_score_cond_gauss"}
+    score_func : str, default="local_score_BIC_from_cov"
         Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
-        linear-Gaussian BIC; ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the
+        linear-Gaussian BIC; ``"local_score_BDeu"`` is the BDeu score for categorical data coded by
+        whole numbers, and ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the
         degenerate and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
-        be finite and non-negative.
+        be finite and non-negative. BDeu ignores it.
     seed : int or None, default=None
         Seed for the random order in which the search visits variables. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
@@ -81,7 +82,8 @@ def boss(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"BOSS"`` and ``metadata["score"]`` the score of the DAG read off the final order; for the
         BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
+        n_parents``, and for BDeu, ``-2`` times the log of the structure prior times the marginal
+        likelihood; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
         position.
@@ -119,7 +121,8 @@ def boss(
     -----
     **When to use it.** BOSS suits the same data as :func:`~andrey.ges`: continuous data with linear
     effects, Gaussian noise, and no unmeasured common causes. It was designed for hundreds of highly
-    connected variables [1]_.
+    connected variables [1]_. For categorical data, use ``"local_score_BDeu"``, and for mixed data
+    ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -145,6 +148,12 @@ def boss(
     :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
     column order and on another machine.
 
+    **Categorical data.** ``"local_score_BDeu"`` reads every column as categorical, each distinct
+    value one category, and scores a variable given its parents with the BDeu score of
+    :func:`~andrey.ges`: a Dirichlet prior with an equivalent sample size of 1 and a structure prior
+    of one expected parent per variable, on the scale of the BIC. Each candidate parent set is
+    scored by full local scores.
+
     **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
     data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
     categorical columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full
@@ -158,8 +167,11 @@ def boss(
     passed the empty graph's (506 against 338). With fewer rows than columns the BIC score is
     unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
     search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. The mixed-data scores are experimental and not benchmarked
-    yet; their tests run BOSS on 5 variables with 3,000 rows.
+    most ``1e-12`` times its variance. Against :func:`~andrey.exact_search` with BDeu on simulated
+    categorical networks of 4 to 8 variables, BOSS stopped at a DAG that scores worse than the
+    optimum on some draws; comparing a few seeds shows whether a result depends on the seed. BDeu is
+    not benchmarked with BOSS yet. The mixed-data scores are experimental and not benchmarked yet;
+    their tests run BOSS on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -228,14 +240,15 @@ def grasp(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC_from_cov", "local_score_degen_gauss", "local_score_cond_gauss"}
+    score_func : str, default="local_score_BIC_from_cov"
         Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
-        linear-Gaussian BIC; ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the
+        linear-Gaussian BIC; ``"local_score_BDeu"`` is the BDeu score for categorical data coded by
+        whole numbers, and ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the
         degenerate and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
-        be finite and non-negative.
+        be finite and non-negative. BDeu ignores it.
     depth : int, default=3
         Maximum number of tucks in one chain of moves, at least ``1``. The depth-first search
         follows a chain of tucks that leave the score unchanged until one improves it or the chain
@@ -262,7 +275,8 @@ def grasp(
         Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"GRaSP"`` and ``metadata["score"]`` the score of the DAG read off the final order; for the
         BIC, the sum over variables of ``n * log(residual variance) + lambda_value * log(n) *
-        n_parents``; lower is better. Directed marks (``->``) are oriented edges, undirected
+        n_parents``, and for BDeu, ``-2`` times the log of the structure prior times the marginal
+        likelihood; lower is better. Directed marks (``->``) are oriented edges, undirected
         (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
         ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
         position.
@@ -300,7 +314,8 @@ def grasp(
     -----
     **When to use it.** GRaSP suits the same data as :func:`~andrey.ges`: continuous data with
     linear effects, Gaussian noise, and no unmeasured common causes. Its authors report accurate
-    search even on dense graphs [1]_.
+    search even on dense graphs [1]_. For categorical data, use ``"local_score_BDeu"``, and for
+    mixed data ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -331,6 +346,12 @@ def grasp(
     :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
     column order and on another machine.
 
+    **Categorical data.** ``"local_score_BDeu"`` reads every column as categorical, each distinct
+    value one category, and scores a variable given its parents with the BDeu score of
+    :func:`~andrey.ges`: a Dirichlet prior with an equivalent sample size of 1 and a structure prior
+    of one expected parent per variable, on the scale of the BIC. Each candidate parent set is
+    scored by full local scores.
+
     **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
     data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
     categorical columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full
@@ -344,9 +365,12 @@ def grasp(
     rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338).
     With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
     more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. The mixed-data
-    scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables with
-    3,000 rows.
+    leaves its child a residual variance of at most ``1e-12`` times its variance. Against
+    :func:`~andrey.exact_search` with BDeu on simulated categorical networks of 4 to 8 variables,
+    GRaSP stopped at a DAG that scores worse than the optimum on some draws; comparing a few seeds
+    shows whether a result depends on the seed. BDeu is not benchmarked with GRaSP yet. The
+    mixed-data scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables
+    with 3,000 rows.
 
     References
     ----------

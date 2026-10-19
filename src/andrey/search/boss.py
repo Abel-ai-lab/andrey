@@ -1,8 +1,9 @@
-"""Best-Order Score Search (BOSS) over a linear-Gaussian or mixed-data BIC score.
+"""Best-Order Score Search (BOSS) over a linear-Gaussian BIC, BDeu, or mixed-data BIC score.
 
 Each variable owns a grow-shrink tree; sweeps slide variables to their best order position
 (:func:`_better_mutation`) until no move improves the total. Scores are negated local scores, so
-the search maximizes; BIC moves take the Schur update, the mixed-data scores two full scores. The
+the search maximizes; BIC moves take the Schur update, BDeu and the mixed-data scores two full
+scores. The
 search runs on the columns sorted by tie rank (:func:`ranked_score`), so a variable's index is its
 tie rank. The algorithm and its reference are described on :func:`andrey.boss`.
 """
@@ -18,18 +19,19 @@ import numpy.typing as npt
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import MIXED_SCORES, BICScore, LocalScore, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, BICScore, LocalScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
 PERMUTATION_SCORES: tuple[str, ...] = (
     "local_score_BIC_from_cov",
+    "local_score_BDeu",
     "local_score_degen_gauss",
     "local_score_cond_gauss",
 )
 
-# Fixed absolute BIC-score tolerance for numerical ties.
+# Fixed absolute score tolerance for numerical ties.
 _SCORE_EPS = 1e-6
 
 
@@ -43,16 +45,20 @@ def ranked_score(
     its ties between candidate parents and between order moves. The sorted data are C-contiguous
     whatever the layout of ``x``, so every column order of the same data gives the same score, bit
     for bit, and reordering the columns of ``x`` reorders the learned graph's nodes and changes
-    nothing else, unless two columns are identical. Under a mixed-data score the categorical
-    columns rank by which rows share a category, and the mask is sorted with them; the BIC score
-    ranks every column as continuous.
+    nothing else, unless two columns are identical. Under BDeu every column ranks by which rows
+    share a category, and under a mixed-data score the categorical columns do, with the mask sorted
+    with them; the BIC score ranks every column as continuous.
 
     Returns the score and ``ranks``: column ``i`` of ``x`` is variable ``ranks[i]`` of the score,
     so a matrix ``m`` over the score's variables maps back to the columns of ``x`` as
     ``m[np.ix_(ranks, ranks)]``. A ``ValueError`` from the score, such as one naming linearly
     dependent columns, names the columns of ``x``.
     """
-    mask = column_mask(categorical, x.shape[1]) if score_func in MIXED_SCORES else None
+    mixed = score_func in MIXED_SCORES
+    if mixed:
+        mask = column_mask(categorical, x.shape[1])
+    else:
+        mask = np.full(x.shape[1], score_func in DISCRETE_SCORES)
     ranks = tie_ranks(x, mask)
     by_rank = np.argsort(ranks)
     try:
@@ -60,7 +66,7 @@ def ranked_score(
             score_func,
             np.ascontiguousarray(x[:, by_rank]),
             lambda_value=lambda_value,
-            categorical=None if mask is None else mask[by_rank],
+            categorical=mask[by_rank] if mixed else None,
         )
     except ValueError:
         # The error names positions in the sorted data; the same check on ``x`` names its columns.
@@ -281,14 +287,16 @@ def boss(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     lambda_value : float
-        Weight on the BIC complexity term of the deviance the search minimizes.
+        Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     random_state : int
         Seed for the sweep-order RNG.
     score_func : str
-        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC or a mixed-data
-        BIC (:class:`~andrey.core.score.DGScore`, :class:`~andrey.core.score.CGScore`).
+        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC, BDeu on category
+        codes (:class:`~andrey.core.score.BDeuScore`), or a mixed-data BIC
+        (:class:`~andrey.core.score.DGScore`, :class:`~andrey.core.score.CGScore`).
     categorical : ndarray of bool or None
-        Marks the categorical columns for a mixed-data score.
+        Marks the categorical columns for a mixed-data score; BDeu reads every column as
+        categorical.
 
     Returns
     -------

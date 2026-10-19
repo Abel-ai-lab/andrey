@@ -246,8 +246,10 @@ def test_cmiknn_statistic_equals_the_whole_matrix_estimate(n):
     data = _common_cause(seed=11, n=n, n_cond=2, shared=0.3)
     data[:, 3] = np.round(data[:, 3], 1)  # ties
     test = CMIknn(data, k_cmi=5)
+    rank = test._tie_rank  # the test holds data column j at index rank[j]
     for x, y, cond in [(0, 1, ()), (0, 1, (2,)), (0, 3, (1, 2)), (1, 3, ())]:
-        expected = _full_matrix_estimate(test._ranks, x, y, cond, 5)
+        first, second = sorted((rank[x], rank[y]))
+        expected = _full_matrix_estimate(test._ranks, first, second, [rank[c] for c in cond], 5)
         assert test.statistic(x, y, cond) == expected == test.statistic(y, x, cond[::-1])
 
 
@@ -453,6 +455,30 @@ def test_is_symmetric_and_deterministic(name):
     p = _build(name, data)(0, 1, (2, 3))
     assert _build(name, data)(1, 0, (3, 2)) == p
     assert _build(name, data)(0, 1, [3, 2, 3]) == p
+
+
+@pytest.mark.parametrize("name", TESTS)
+def test_pvalues_follow_the_variables_under_any_column_order(name, monkeypatch):
+    """Reordering the columns, which also changes the memory layout, gives every query the same
+    p-value to the bit. Ranking the columns by position instead of by ``tie_ranks`` changes a
+    p-value under at least one order, so the orders exercise the ranks."""
+    data = _common_cause(seed=2, n=120, n_cond=3)
+    data[:, 4] = np.round(data[:, 4])  # ties, which CMIknn and GPDC break at random
+    queries = [(0, 1, (2, 3, 4)), (1, 0, (4, 2)), (2, 4, ()), (3, 4, (1,))]
+    orders = [[4, 3, 2, 1, 0], [2, 0, 4, 1, 3], [1, 4, 3, 0, 2]]
+
+    def pvalues(order):
+        column = np.argsort(order)  # the column that holds each variable
+        test = _build(name, data[:, order])
+        return [test(column[x], column[y], [column[c] for c in cond]) for x, y, cond in queries]
+
+    want = pvalues(range(5))
+    for order in orders:
+        assert pvalues(order) == want
+    module = sys.modules[TESTS[name][0].__module__]
+    monkeypatch.setattr(module, "tie_ranks", lambda x: np.arange(x.shape[1]))
+    by_position = pvalues(range(5))
+    assert any(pvalues(order) != by_position for order in orders)
 
 
 @pytest.mark.parametrize("name", ["rcot", "cmiknn", "gpdc"])

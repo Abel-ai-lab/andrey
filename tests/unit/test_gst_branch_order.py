@@ -19,7 +19,7 @@ import pytest
 import andrey
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
-from andrey.data import sample_mixed
+from andrey.data import sample_discrete, sample_mixed
 from andrey.search import boss as boss_mod
 from andrey.search import grasp as grasp_mod
 from andrey.search.boss import boss, ranked_score
@@ -149,9 +149,15 @@ def _mixed() -> tuple[np.ndarray, dict]:
     return ds.data, {"score_func": "local_score_degen_gauss", "categorical": mask}
 
 
+def _categorical() -> tuple[np.ndarray, dict]:
+    """A discrete network of 10 columns, with the BDeu score."""
+    return sample_discrete(d=10, n=1000, seed=2).data, {"score_func": "local_score_BDeu"}
+
+
 _ORDER_CASES = {
     **{f"linear-{seed}": lambda seed=seed: (_linear(seed), {}) for seed in (1, 2, 5)},
     "mixed": _mixed,
+    "bdeu": _categorical,
 }
 
 

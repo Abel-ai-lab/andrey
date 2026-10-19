@@ -74,3 +74,17 @@ class AndreyBOSS:
         from andrey import GraphStructure
 
         return GraphStructure.from_numpy(native, kind=self.output_type)
+
+
+class AndreyBOSSBDeu(AndreyBOSS):
+    """Andrey BOSS with the BDeu score, on category codes.
+
+    BDeu takes its default priors (equivalent sample size 1, one expected parent per variable) and
+    no penalty weight, so ``params`` names only the score and the seed.
+    """
+
+    name: str = "andrey.boss.bdeu"
+
+    def params(self) -> dict[str, Any]:
+        """The BDeu score on a fixed search seed."""
+        return {"score_func": "local_score_BDeu", "seed": SEARCH_SEED}
