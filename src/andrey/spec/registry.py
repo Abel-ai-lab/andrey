@@ -572,6 +572,7 @@ _BOSS_SCORE = ParamSpec(
     type="str",
     default="local_score_BIC_from_cov",
     doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+    "local_score_BDeu = BDeu, for categorical data coded by whole numbers; "
     "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional Gaussian BIC, "
     "for mixed data (experimental).",
     choices=PERMUTATION_SCORES,
@@ -581,8 +582,9 @@ _add(
         name="boss",
         family="permutation",
         summary="Best-order score search: a permutation search over the linear-Gaussian BIC, fast "
-        "and accurate on linear-Gaussian data; score_func=local_score_degen_gauss or "
-        "local_score_cond_gauss for mixed data. Returns a CPDAG + score.",
+        "and accurate on linear-Gaussian data; score_func=local_score_BDeu for categorical data, "
+        "local_score_degen_gauss or local_score_cond_gauss for mixed data. Returns a CPDAG + "
+        "score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -604,8 +606,8 @@ _add(
         family="permutation",
         summary="Greedy relaxation of the sparsest permutation: a permutation search over the "
         "linear-Gaussian BIC, like BOSS with a different move (tucks); "
-        "score_func=local_score_degen_gauss or local_score_cond_gauss for mixed data. Returns a "
-        "CPDAG + score.",
+        "score_func=local_score_BDeu for categorical data, local_score_degen_gauss or "
+        "local_score_cond_gauss for mixed data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",

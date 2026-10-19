@@ -87,3 +87,17 @@ class CausalLearnBOSS:
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+class CausalLearnBOSSBDeu(CausalLearnBOSS):
+    """causal-learn BOSS with its BDeu score, for categorical data.
+
+    causal-learn builds BDeu with its default priors (sample prior 1, structure prior 1) whatever
+    ``parameters`` holds, so the params carry no ``lambda_value``.
+    """
+
+    name: str = "causal-learn.boss.bdeu"
+
+    def params(self) -> dict[str, Any]:
+        """The BDeu score on a fixed search seed."""
+        return {"score_func": "local_score_BDeu", "seed": SEARCH_SEED}
