@@ -23,7 +23,14 @@ if TYPE_CHECKING:
     from .output import StructureOutput
     from .structure import GraphStructure
 
-__all__ = ["Knowledge", "Constraints", "KnowledgePart", "KNOWLEDGE_PARTS", "resolve"]
+__all__ = [
+    "Knowledge",
+    "KnowledgeError",
+    "Constraints",
+    "KnowledgePart",
+    "KNOWLEDGE_PARTS",
+    "resolve",
+]
 
 #: A node, by column label or 0-based position.
 Node = str | int
@@ -55,6 +62,14 @@ def _edges(values: Iterable | None, what: str) -> tuple[tuple[Node, Node], ...]:
             raise ValueError(f"{what} lists the self-loop ({a!r}, {b!r})")
         edges.append((a, b))
     return tuple(edges)
+
+
+class KnowledgeError(ValueError):
+    """Background knowledge that names a column the data lacks or that no graph can satisfy.
+
+    A ``ValueError``; the command line reports it as a usage error, since the fix is to the
+    knowledge, not the data.
+    """
 
 
 @dataclass(frozen=True, init=False)
@@ -91,6 +106,9 @@ class Knowledge:
         If an edge is a self-loop or a node is in two tiers. A method raises ``ValueError`` when the
         knowledge names a column the data lacks, or contradicts itself: a required edge that is
         forbidden, directly, by the tiers, or by ``allowed``, or required edges forming a cycle.
+        ``boss``, ``grasp``, and ``direct_lingam`` also raise it when the required edges and the
+        tiers admit no causal order, through a column in no tier; ``pc``, ``cdnod``, and ``fci``
+        when the edges the knowledge directs close a cycle over the edges the data keep.
 
     Notes
     -----
@@ -239,14 +257,14 @@ class Constraints:
         """``[i, j]``: ``i`` comes before ``j`` in every causal order an order search visits.
 
         Holds the required edges and every pair of tiered columns in tier order. Raises
-        ``ValueError`` when they form a cycle, so that no order satisfies them.
+        :class:`KnowledgeError` when they form a cycle, so that no order satisfies them.
         """
         tiered = self.tier >= 0
         before = self.required | (
             tiered[:, None] & tiered[None, :] & (self.tier[:, None] < self.tier[None, :])
         )
         if _has_cycle(before):
-            raise ValueError(
+            raise KnowledgeError(
                 "the required edges and the tiers admit no causal order: following them leads "
                 "from a column back to itself through an untiered column"
             )
@@ -297,7 +315,8 @@ def resolve(
 
     ``method`` names the caller in messages; ``honors`` lists the parts it supports, and a part it
     does not list raises ``NotImplementedError``. Raises ``TypeError`` when ``knowledge`` is not a
-    :class:`Knowledge`, and ``ValueError`` when it names a missing column or contradicts itself.
+    :class:`Knowledge`, and :class:`KnowledgeError` when it names a missing column or contradicts
+    itself.
     """
     if knowledge is None:
         return None
@@ -316,18 +335,18 @@ def resolve(
     def position(node: Node, what: str) -> int:
         if isinstance(node, str):
             if names is None:
-                raise ValueError(
+                raise KnowledgeError(
                     f"knowledge {what} names column {node!r}, but data has no column names; give a "
                     "DataFrame or the column's 0-based position"
                 )
             if node not in names:
-                raise ValueError(
+                raise KnowledgeError(
                     f"knowledge {what} names column {node!r}, which data does not have; its "
                     f"columns are {names}"
                 )
             return names.index(node)
         if not 0 <= node < d:
-            raise ValueError(f"knowledge {what} lists column {node}, but data has {d} columns")
+            raise KnowledgeError(f"knowledge {what} lists column {node}, but data has {d} columns")
         return node
 
     def label(i: int) -> str:
@@ -342,7 +361,7 @@ def resolve(
         for v in nodes:
             i = position(v, "tiers")
             if tier[i] >= 0:
-                raise ValueError(f"knowledge tiers list column {label(i)} more than once")
+                raise KnowledgeError(f"knowledge tiers list column {label(i)} more than once")
             tier[i] = k
     tiered = tier >= 0
     forbidden |= tiered[:, None] & tiered[None, :] & (tier[:, None] > tier[None, :])
@@ -356,13 +375,13 @@ def resolve(
     for a, b in knowledge.required:
         i, j = position(a, "required"), position(b, "required")
         if forbidden[i, j]:
-            raise ValueError(
+            raise KnowledgeError(
                 f"knowledge requires the edge {label(i)} -> {label(j)}, which it also forbids "
                 "(directly, by the tiers, or by leaving the pair out of allowed)"
             )
         required[i, j] = True
     if (required & required.T).any() or _has_cycle(required):
-        raise ValueError("knowledge requires edges that form a directed cycle")
+        raise KnowledgeError("knowledge requires edges that form a directed cycle")
     forbidden |= required.T
     return Constraints(forbidden, required, tier)
 

@@ -77,7 +77,8 @@ def direct_lingam(
         Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and tiers, all honored. The causal order puts the cause of each
         required edge, and each earlier tier, first; the regression on that order drops the
-        forbidden parents and does not penalize the required ones.
+        forbidden parents and does not penalize the required ones. A variable with a required parent
+        takes least-squares weights on the parents it keeps; the others keep the adaptive Lasso's.
 
     Returns
     -------

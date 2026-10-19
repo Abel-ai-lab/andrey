@@ -31,6 +31,7 @@ from andrey.api._adapt import node_labels, shared_labels, with_labels
 from andrey.core import LATENT, GraphStructure
 from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
+from andrey.core.knowledge import KnowledgeError
 from andrey.core.structure import SUMMARY_EDGES
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.generate import (
@@ -468,8 +469,11 @@ def _coerce(raw: str, param: ParamSpec) -> object:
 
 
 def _knowledge_value(raw: str, name: str) -> dict | None:
-    """Read a `knowledge=` value: inline JSON (`{...}`), `null`, or the path of a JSON file."""
+    """Read a `knowledge=` value: inline JSON (`{...}`), `null`, or the path of a JSON file, bare
+    or in one pair of single or double quotes."""
     text = raw.strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "'\"":
+        text = text[1:-1].strip()
     if text.lower() == "null":
         return None
     if not text.startswith("{"):
@@ -532,6 +536,8 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
             return None
         raise CliError("bad_value", f"{param.name} may not be null", EXIT_USAGE)
     if param.type == "knowledge":
+        if isinstance(value, str):  # a path or inline JSON, as on the command line
+            return _knowledge_value(value, param.name)
         return _knowledge_object(value, param.name)
     ok = {
         "bool": isinstance(value, bool),
@@ -784,6 +790,8 @@ def execute_run(
         ) from exc
     except NotImplementedError as exc:  # a documented parameter limit -> fix the call
         raise CliError("unsupported_value", str(exc), EXIT_USAGE) from exc
+    except KnowledgeError as exc:  # knowledge the data's columns or the search cannot satisfy
+        raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
     except TypeError as exc:  # an unknown passthrough knob reaches the facade as a bad kwarg
         raise CliError("unsupported_value", f"{exc}", EXIT_USAGE) from exc
     except (ValueError, ArithmeticError) as exc:  # bad shape / NaN / singular / numeric breakdown

@@ -58,8 +58,9 @@ def _best_subset(
     """Lowest-score parent set whose members all lie within ``target_bits``.
 
     ``parent_graph`` is sorted by ascending score, so the first entry that is a subset of the
-    available variables is the optimal parent choice among them. The empty set is always present and
-    is a subset of everything, so a match always exists.
+    available variables is the optimal parent choice among them. Without required parents the empty
+    set is present and is a subset of everything, so a match always exists; with them, a target that
+    lacks one has no match and gives ``((), inf)``.
     """
     for parents, score, bits in parent_graph:
         if bits & target_bits == bits:

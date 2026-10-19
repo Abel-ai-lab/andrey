@@ -290,9 +290,10 @@ then search inside the pairs that survived: `Knowledge.from_skeleton(pc(data, ma
 The result honors every part: a required edge is there and directed, a forbidden one is not, and
 the edges the knowledge decides are directed, with the directions they imply. Knowledge that
 contradicts itself, such as a required edge into an earlier tier, raises a `ValueError` before
-the search runs. Labels stay attached to their columns, so the same knowledge fits the table in
-any column order. On the command line, give a JSON object inline or as a file:
-`andrey run pc --data data.csv knowledge=knowledge.json`.
+the search runs. In PC, CD-NOD, and FCI, knowledge whose directions close a cycle over the edges
+the data keep raises one after the skeleton search. Labels stay attached to their columns, so the
+same knowledge fits the table in any column order. On the command line, give a JSON object inline
+or as a file: `andrey run pc --data data.csv knowledge=knowledge.json`.
 
 ## Data types
 

@@ -28,7 +28,7 @@ from andrey.constraint._skeleton import (
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test, pins_blas
-from andrey.core.knowledge import _has_cycle, orient
+from andrey.core.knowledge import KnowledgeError, _has_cycle, orient
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
 
@@ -107,7 +107,8 @@ def check_collider_order(collider_order: str) -> None:
 
 
 def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) -> None:
-    """Raise ``ValueError`` when the edges background knowledge directs close a cycle.
+    """Raise :class:`~andrey.core.knowledge.KnowledgeError` when the edges background knowledge
+    directs close a cycle.
 
     The cycle follows edges ``paths[i, j]`` (``i -> j``) from a node ``y`` to a node ``x`` and
     closes with ``closing[x, y]``; ``closing`` defaults to ``paths``, so any directed cycle of
@@ -130,7 +131,7 @@ def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) 
                 while cycle[-1] != y:
                     cycle.append(previous[cycle[-1]])
                 path = " -> ".join(str(v) for v in [*cycle[::-1], y])
-                raise ValueError(
+                raise KnowledgeError(
                     f"the knowledge directs the edges {path} that the data keep into a cycle; "
                     "forbid or allow one of them"
                 )

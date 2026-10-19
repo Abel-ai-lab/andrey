@@ -283,8 +283,15 @@ def test_cli_reads_knowledge_from_a_file_and_inline(tmp_path, capsys, data):
     data.to_csv(path, index=False)
     spec = tmp_path / "knowledge.json"
     spec.write_text(json.dumps({"required": [["b", "f"]], "tiers": [EARLY, LATE]}))
-    for value in (str(spec), spec.read_text()):
-        code = main(["run", "pc", "--data", str(path), f"knowledge={value}", "--json"])
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"knowledge": str(spec)}))
+    for args in (
+        [f"knowledge={spec}"],
+        [f"knowledge='{spec}'"],
+        [f"knowledge={spec.read_text()}"],
+        ["--config", str(config)],
+    ):
+        code = main(["run", "pc", "--data", str(path), *args, "--json"])
         out, _ = capsys.readouterr()
         assert code == 0
         env = json.loads(out)
@@ -297,6 +304,9 @@ def test_cli_reads_knowledge_from_a_file_and_inline(tmp_path, capsys, data):
     code = main(["run", "pc", "--data", str(path), 'knowledge={"must": []}', "--json"])
     _, err = capsys.readouterr()
     assert code == 2 and "keys" in err
+    code = main(["run", "pc", "--data", str(path), 'knowledge={"tiers": [["g"]]}', "--json"])
+    _, err = capsys.readouterr()
+    assert code == 2 and "'g'" in err
 
 
 def test_schema_lists_the_parts_each_method_honors():

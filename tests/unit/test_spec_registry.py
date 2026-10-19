@@ -19,8 +19,8 @@ import warnings
 import pytest
 
 import andrey
-from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.api import __all__ as API_ALL
+from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
 from andrey.spec.models import Status
 
