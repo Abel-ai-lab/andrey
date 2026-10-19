@@ -326,10 +326,67 @@ def reorder_chart() -> str:
     )
 
 
+def compare_table() -> str:
+    # Whether a reordering of the columns changed each package's graph, at its defaults: three
+    # small datasets per method, each in nine column orders. "same": no reordering changed it;
+    # "changed": one did; "name": it follows the variables' names, so it holds when the names move
+    # with the columns and changes when they follow the positions, as a bare array's do;
+    # "partial" and "runs" carry a note; None: the package does not implement the method.
+    packages = (
+        "Andrey 0.7.0",
+        "causal-learn 0.1.4.8",
+        "pcalg 2.7-12",
+        "bnlearn 5.2.1",
+        "pgmpy 1.1.2",
+        "Tetrad 7.6.10",
+    )
+    rows = (
+        ("PC", ("partial", "changed", "changed", "changed", "name", "name")),
+        ("Hill climbing", ("same", None, None, "changed", "runs", None)),
+        ("Tabu search", ("same", None, None, "changed", None, None)),
+        ("BOSS", ("same", "changed", None, None, None, "changed")),
+        ("GRaSP", ("same", "changed", None, None, None, "changed")),
+        ("GIN", ("same", "changed", None, None, None, "changed")),
+    )
+    marks = {
+        "same": ("co-yes", "Same graph", "Same graph under every reordering"),
+        "changed": ("co-no", "Changed", "A reordering changed the graph"),
+        "name": ("co-name", "By name", "Sorts by name: same graph if the names move"),
+        "partial": (
+            "co-yes",
+            "Same colliders",
+            "Order-free colliders; Meek's rules changed 1 of 3",
+        ),
+        "runs": ("co-name", "By run", "Varies between runs, not with the order"),
+    }
+
+    def cell(value: str | None) -> str:
+        if value is None:
+            return '<td class="co-na"><span aria-label="Not implemented">-</span></td>'
+        cls, text, title = marks[value]
+        return f'<td class="{cls}" title="{escape(title)}"><span>{text}</span></td>'
+
+    head = "".join(f'<th scope="col">{escape(p)}</th>' for p in packages)
+    body = "".join(
+        f'<tr><th scope="row">{method}</th>{"".join(cell(v) for v in values)}</tr>'
+        for method, values in rows
+    )
+    return (
+        '<figure class="cm"><div class="cm-scroll"><table class="cm-table">'
+        f"<thead><tr><td></td>{head}</tr></thead><tbody>{body}</tbody></table></div>"
+        "<figcaption>Each package at its defaults, on three small datasets per method, each in "
+        "nine column orders. By name: the graph follows the variables' names, so it holds when "
+        "the names move with the columns and can change when they follow the positions, as a "
+        "bare array's do. By run: pgmpy's hill climbing breaks ties in Python's hash order, which "
+        "changes between runs.</figcaption></figure>\n"
+    )
+
+
 def main() -> None:
     (HERE / "order.html").write_text(order_figure(), encoding="utf-8")
     (HERE / "generator.html").write_text(generator_figure(), encoding="utf-8")
     (HERE / "reorder.html").write_text(reorder_chart(), encoding="utf-8")
+    (HERE / "compare.html").write_text(compare_table(), encoding="utf-8")
 
 
 if __name__ == "__main__":

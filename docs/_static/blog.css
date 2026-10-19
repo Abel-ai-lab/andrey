@@ -901,3 +901,86 @@ ul.ablog-archive {
     animation: none;
   }
 }
+
+/* The 0.7.0 post's package matrix (docs/blog/0.7.0/compare.html): per method and package, whether
+   a reordering changed the graph. The mark is a word, and its color only repeats it. */
+.cm {
+  margin: 1.5rem 0 2rem;
+}
+
+.cm-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
+}
+
+.cm-table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.cm-table th,
+.cm-table td {
+  padding: 0.55rem 0.6rem;
+  border: 0;
+  border-bottom: 1px solid var(--andrey-line);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cm-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.cm-table thead th {
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.cm-table thead th:nth-child(2),
+.cm-table tbody td:nth-child(2) {
+  background: var(--andrey-surface-2);
+}
+
+.cm-table tbody th {
+  text-align: left;
+  font-weight: 600;
+}
+
+.cm-table td span {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.cm-table .co-yes span {
+  background: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
+  color: var(--andrey-accent);
+}
+
+.cm-table .co-no span {
+  background: color-mix(in srgb, var(--andrey-edge-bidirected) 14%, transparent);
+  color: var(--andrey-edge-bidirected);
+}
+
+.cm-table .co-name span {
+  border: 1px solid var(--andrey-line);
+  color: var(--andrey-muted);
+}
+
+.cm-table .co-na {
+  color: var(--andrey-muted);
+}
+
+.cm figcaption {
+  margin-top: 0.6rem;
+  text-align: left;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
