@@ -74,6 +74,11 @@ change names its pull request.
   that names every group of copies by column name and says to keep one column per group and read
   its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
   copies make a test's correlation matrix singular. ([#189])
+- A constant column raises one `ValueError` that names every constant column and says to drop
+  them, `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` say up front that they need
+  at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
+  why a PDAG has no consistent extension, naming a chordless cycle of its undirected edges when it
+  finds one. ([#TBD])
 
 ### Removed
 

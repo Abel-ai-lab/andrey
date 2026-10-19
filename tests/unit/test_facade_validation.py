@@ -100,6 +100,31 @@ def test_unusable_data_raises_a_value_error_naming_it(method, case):
         SINGLE[method](make(_data()))
 
 
+# One method from each family, plus a mixed-data setting, which reads its data on its own path.
+FAMILIES = {
+    "pc": andrey.pc,
+    "pc mixed": partial(andrey.pc, indep_test="degen_gauss", categorical=["a"]),
+    "ges": andrey.ges,
+    "boss": andrey.boss,
+    "direct_lingam": andrey.direct_lingam,
+    "pcmci": andrey.pcmci,
+    "gin": andrey.gin,
+    "rcd": andrey.rcd,
+}
+
+
+@pytest.mark.parametrize("method", list(FAMILIES))
+def test_every_constant_column_is_named_with_the_fix(method):
+    pd = pytest.importorskip("pandas")
+    x = _data(200, 5)
+    x[:, 0] = np.arange(200) % 3
+    x[:, 1] = 3.0
+    x[:, 3] = -1.0
+    frame = pd.DataFrame(x, columns=["a", "b", "c", "d", "e"])
+    with pytest.raises(ValueError, match=r"data columns 'b' and 'd' are constant; .*drop them"):
+        FAMILIES[method](frame)
+
+
 def test_a_dataframe_error_names_the_constant_column():
     pd = pytest.importorskip("pandas")
     frame = pd.DataFrame(_with(_data(), (slice(None), 1), 3.0), columns=["a", "b", "c"])
@@ -232,6 +257,23 @@ def test_granger_needs_a_time_step_in_every_fold():
     with pytest.raises(ValueError, match="data needs at least 8 rows"):
         andrey.granger(_data()[:7], maxlag=3, cv=5)
     assert andrey.granger(_data()[:8], maxlag=3, cv=5).structure.lags == (1, 2, 3)
+
+
+LINGAM_PRUNED = {
+    "direct_lingam": andrey.direct_lingam,
+    "ica_lingam": partial(andrey.ica_lingam, random_state=0),
+    "multi_group_direct_lingam": lambda x: andrey.multi_group_direct_lingam([x, x]),
+}
+
+
+@pytest.mark.parametrize("method", list(LINGAM_PRUNED))
+def test_lingam_methods_need_one_more_row_than_variables(method):
+    # The pruning step fits the last variable of the order on the other 5 with an intercept.
+    with pytest.raises(
+        ValueError, match=r"needs at least 7 rows \(samples\) over 6 variables, got 6"
+    ):
+        LINGAM_PRUNED[method](_data(6, 6))
+    assert LINGAM_PRUNED[method](_data(7, 6)) is not None
 
 
 @pytest.mark.parametrize("fit", PAIRWISE, ids=lambda f: f.__name__)
