@@ -167,7 +167,7 @@ change names its pull request.
   shuffles, and tie-breaks, and choose the variable KCI joins to the conditioning set and CMIknn
   shuffles, by a rank computed from each column's own data instead of by column position, so
   reordering the columns no longer changes their p-values or the graphs built from them.
-  ([#TBD])
+  ([#213])
 
 ## [0.6.0] - 2026-10-17
 
@@ -391,3 +391,4 @@ First alpha release.
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
 [#208]: https://github.com/Abel-ai-lab/andrey/pull/208
 [#209]: https://github.com/Abel-ai-lab/andrey/pull/209
+[#213]: https://github.com/Abel-ai-lab/andrey/pull/213
