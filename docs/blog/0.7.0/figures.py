@@ -329,7 +329,7 @@ def compare_table() -> str:
     # small datasets per method, each in nine column orders. "same": no reordering changed it;
     # "changed": one did; "name": it follows the variables' names, so it holds when the names move
     # with the columns and changes when they follow the positions, as a bare array's do;
-    # "partial" and "runs" carry a note; None: the package does not implement the method.
+    # "runs" carries a note; None: the package does not implement the method.
     packages = (
         "Andrey 0.7.0",
         "causal-learn 0.1.4.8",
@@ -339,7 +339,7 @@ def compare_table() -> str:
         "Tetrad 7.6.10",
     )
     rows = (
-        ("PC", ("partial", "changed", "changed", "changed", "name", "name")),
+        ("PC", ("same", "changed", "changed", "changed", "name", "name")),
         ("Hill climbing", ("same", None, None, "changed", "runs", None)),
         ("Tabu search", ("same", None, None, "changed", None, None)),
         ("BOSS", ("same", "changed", None, None, None, "changed")),
@@ -350,11 +350,6 @@ def compare_table() -> str:
         "same": ("co-yes", "Same graph", "Same graph under every reordering"),
         "changed": ("co-no", "Changed", "A reordering changed the graph"),
         "name": ("co-name", "By name", "Sorts by name: same graph if the names move"),
-        "partial": (
-            "co-yes",
-            "Same colliders",
-            "Order-free colliders; Meek's rules changed 1 of 3",
-        ),
         "runs": ("co-name", "By run", "Varies between runs, not with the order"),
         "bug": ("co-no", "Changed*", "Tests columns by position, a known bug"),
     }
