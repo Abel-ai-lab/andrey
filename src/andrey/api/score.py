@@ -773,9 +773,10 @@ def exact_search(
 ) -> StructureOutput:
     """Learn the globally optimal DAG for a decomposable score by exact search.
 
-    The optimum is identified up to its Markov equivalence class. A* (``search_method="astar"``)
-    [1]_ and dynamic programming (``"dp"``) [2]_ may return different representatives. Runtime is
-    exponential in the variable count, so keep the problem small (roughly <= 20 variables).
+    The optimum is identified up to its Markov equivalence class, and A*
+    (``search_method="astar"``) [1]_ and dynamic programming (``"dp"``) [2]_ return the same DAG of
+    that class. Runtime is exponential in the variable count, so keep the problem small (roughly
+    <= 20 variables).
 
     Parameters
     ----------
@@ -804,8 +805,8 @@ def exact_search(
     Returns
     -------
     StructureOutput
-        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` (one representative of the optimal
-        equivalence class); ``metadata["algorithm"]`` is ``"ExactSearch"``. Under a mixed-data
+        Wraps a ``dag`` :class:`~andrey.core.GraphStructure` (one DAG of the optimal equivalence
+        class); ``metadata["algorithm"]`` is ``"ExactSearch"``. Under a mixed-data
         setting, ``metadata["categorical"]`` lists the categorical columns it read, by name or
         0-based position.
 
@@ -837,6 +838,15 @@ def exact_search(
     Gaussian noise; the categorical and mixed-data scores below make theirs. It suits a few
     variables, where it returns a graph with the best score rather than a greedy search's local
     optimum.
+
+    **Tied DAGs.** Every DAG of the optimal equivalence class has the same score, so the search's
+    own pick among them would follow last-bit rounding and the column order. Exact search instead
+    reports one fixed member of the class it found: it keeps the edges every DAG of the class
+    shares and orients the others by a rank computed from each column's own data, as
+    :func:`~andrey.hc` ranks tied moves. The rank moves with the column, so reordering the columns
+    reorders the graph's nodes and changes nothing else, unless two columns are identical. The
+    rank is arbitrary with respect to causal structure. Rounding differences, such as another CPU's
+    BLAS kernel makes, leave the reported DAG unchanged whenever they leave the class unchanged.
 
     **Categorical data.** ``"local_score_BDeu"`` [5]_ and ``"local_score_BIC_categorical"`` [6]_
     read each distinct value of a column as one category and score a variable by its counts in

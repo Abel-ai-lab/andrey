@@ -121,6 +121,10 @@ change names its pull request.
   most `1e-12` of the other's variance unexplained. The other copies follow it directly in the
   causal order and each takes a single edge from it, so copies no longer come ahead of their
   causes and give the same graph on every CPU. ([#TBD])
+- `exact_search` returns the same DAG of the equivalence class it finds on every CPU, with either
+  `search_method`, and under any column order, because it orients the edges the class leaves
+  reversible by a rank computed from each column's own data, so the DAG can differ from before but
+  its class does not. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 
