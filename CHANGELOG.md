@@ -37,9 +37,6 @@ change names its pull request.
 
 ### Added
 
-- `fci` and `gfci` take `possible_dsep`: `"fast"`, the default, builds each possible-d-separation
-  set as before, in the order the search visits nodes, and `"order_free"` builds sets that do not
-  depend on that order, at the cost of more tests on some graphs. ([#168])
 - `gies` learns from data that mixes observation with interventions: `interventions`
   (`--interventions` in the CLI) marks the variables set by an intervention in each row. ([#187])
 - `cdnod` takes `dependence_threshold`, which runs CD-NOD's independent-change step (Huang et al.
@@ -55,6 +52,10 @@ change names its pull request.
 - `pc` and `cdnod` orient conflicting colliders by the p-value that separated each collider's pair,
   highest first, so their colliders no longer depend on the column order and their default output
   can change, and `collider_order="column"` keeps the column-order rule. ([#168], [#187])
+- `fci` and `gfci` run their possible-d-separation step in the order of a rank computed from each
+  column's own data, so reordering the columns no longer changes their PAG unless two columns are
+  identical and their default output can change, and the new `possible_dsep="fast"` keeps the
+  column order. ([#168], [#238])
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
@@ -360,3 +361,4 @@ First alpha release.
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
 [#229]: https://github.com/Abel-ai-lab/andrey/pull/229
 [#233]: https://github.com/Abel-ai-lab/andrey/pull/233
+[#238]: https://github.com/Abel-ai-lab/andrey/pull/238
