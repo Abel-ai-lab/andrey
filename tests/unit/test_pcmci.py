@@ -66,7 +66,7 @@ def test_pc1_conditions_on_the_strongest_others_and_drops_after_each_round():
             (A, (B,)): (0.35, 0.01),  # A's strength stays 0.2, its smallest so far
         }
     )
-    parents = pc1(test, n_vars=3, target=0, tau_max=1, pc_alpha=0.05)
+    parents = pc1(test, n_vars=3, target=0, tau_max=1, pc_alpha=0.05, ranks=range(3))
     assert parents == ((2, 1), (0, 1))  # C (0.3) before A (0.2)
     assert test.queries == [
         (A, 0, ()),
@@ -80,7 +80,7 @@ def test_pc1_conditions_on_the_strongest_others_and_drops_after_each_round():
 
 def test_pc1_keeps_a_candidate_whose_p_value_equals_pc_alpha():
     test = Scripted({(1, ()): (0.5, 0.05)})
-    assert pc1(test, n_vars=1, target=0, tau_max=1, pc_alpha=0.05) == ((0, 1),)
+    assert pc1(test, n_vars=1, target=0, tau_max=1, pc_alpha=0.05, ranks=[0]) == ((0, 1),)
 
 
 def test_mci_conditions_on_both_ends_parents_with_the_cause_shifted_by_the_lag():
@@ -248,7 +248,8 @@ _EQUIVALENCE_CASES = [
 def test_batched_pc1_and_mci_equal_the_scalar_loops_exactly(indep_test, data, tau_max, pc_alpha):
     n_vars = data.shape[1]
     test = INDEP_TESTS[indep_test](lagged_design(data, tau_max))
-    parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
+    ranks = range(n_vars)
+    parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha, ranks) for j in range(n_vars))
     assert parents == tuple(
         _pc1_by_scalar_loop(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars)
     )

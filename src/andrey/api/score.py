@@ -139,7 +139,9 @@ def ges(
     continuous data on graphs of up to a million variables [2]_.
 
     **How it works.** In the forward phase, a variable with more than ``n_variables / 2`` parents
-    gets no new edges. The backward phase has no cap.
+    gets no new edges. The backward phase has no cap. Moves whose score changes are equal after
+    rounding are chosen by each column's rank, as in :func:`~andrey.hc`, so reordering the columns
+    reorders the graph's nodes and changes nothing else, unless two columns are identical.
 
     **Categorical data.** ``"local_score_BDeu"`` takes each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -320,7 +322,9 @@ def gies(
     round of removing and turning changes nothing. No setting caps a variable's parent count. Each
     step takes its phase's move that improves the score most, from one equivalence class to a
     neighboring one; the classes are those of the interventional setting: two graphs are equivalent
-    when they agree on the data from every observed combination of intervened variables.
+    when they agree on the data from every observed combination of intervened variables. Steps whose
+    score changes are equal after rounding are chosen by each column's rank, as in
+    :func:`~andrey.hc`.
 
     **Limitations.** Measured on simulated linear-Gaussian data that mixes observation with
     interventions, from sparse random graphs (mean degree 2), from 10 to 200 variables with ten
@@ -427,7 +431,10 @@ def xges(
     else addition; the search stops when no move improves the score [1]_. The extended search then
     deletes each edge of that graph, best score first, forbids adding it back in that direction, and
     reruns the search. It keeps a result whose score is lower by more than ``2e-7 * n_samples``, and
-    stops once a fresh pass over the edges keeps nothing. No variable has a parent limit.
+    stops once a fresh pass over the edges keeps nothing. No variable has a parent limit. Moves
+    whose score changes are equal after rounding are taken in the order of each column's rank, as
+    in :func:`~andrey.hc`, so reordering the columns reorders the graph's nodes and changes nothing
+    else, unless two columns are identical.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) and denser ones (mean degree 4), from 25 to 1,000 variables with ten rows per
@@ -933,6 +940,8 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         Seed for the optimizer's torch random number generator. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so every call is seeded
         and repeated calls return the same graph on one machine with the same torch version.
+        The draws go to the columns in order of each column's rank, as in :func:`~andrey.hc`, so
+        reordering the columns reorders the graph's nodes and changes nothing else.
         ``metadata["seed"]`` records the seed used.
     **params : Any
         Optimizer settings passed to the solver; a name not listed here raises ``TypeError``.
@@ -974,8 +983,10 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     -----
     CALM first estimates the moral graph with IAMB [2]_: for each variable it adds, one at a time,
     the variable most dependent on it given those already added (Fisher-Z at level ``alpha``),
-    then drops any member the others make independent of it. A pair is a candidate edge, in
-    either direction, when each is in the other's set.
+    then drops any member the others make independent of it. The most dependent variable has the
+    largest absolute partial correlation; equal ones are chosen by each column's rank, as in
+    :func:`~andrey.hc`, so reordering the columns does not change the choice. A pair is a
+    candidate edge, in either direction, when each is in the other's set.
 
     Each candidate edge ``i -> j`` has a weight and a gate. During the fit a gate is a
     Gumbel-Softmax sample [3]_, ``sigmoid((logit + noise) / tau)``, so ``lambda1`` times the sum

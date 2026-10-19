@@ -14,6 +14,7 @@ from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search import _parallel_ges as pg
 from andrey.search.ges import _recompute_objective, ges
+from andrey.search.hc import tie_ranks
 
 # Random linear-Gaussian datasets spanning sparse/dense and small/large graphs (the test_pc_ges
 # sweep): the general-input regime a single fixed baseline cannot reach.
@@ -43,8 +44,8 @@ def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None = None):
     """Full GES via the in-process N-chunk decomposition, mirroring ``ges()``'s serial setup.
 
     Drives the PURE Schur delta engine through ``forward_chunk_best`` / ``backward_chunk_best`` and
-    the ``(stable_key, x, y, index)`` reduce, then recomputes the objective from the final CPDAG
-    exactly as ``ges()`` does.
+    the :func:`~andrey.search._parallel_ges.move_key` reduce, then recomputes the objective from the
+    final CPDAG exactly as ``ges()`` does.
     """
     X = np.asarray(x, dtype=np.float64)
     n = X.shape[1]
@@ -54,8 +55,9 @@ def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None = None):
     adj = np.zeros((n, n), dtype=np.int8)
     # Match ges()'s BLAS pin so the in-process vs serial comparison is thread-count-invariant.
     with threadpool_limits(limits=1):
-        adj = pg._forward_inprocess(adj, engine, n, max_parents, n_chunks)
-        adj = pg._backward_inprocess(adj, engine, n, n_chunks)
+        ranks = tie_ranks(X).tolist()
+        adj = pg._forward_inprocess(adj, engine, n, max_parents, n_chunks, ranks)
+        adj = pg._backward_inprocess(adj, engine, n, n_chunks, ranks)
         total = _recompute_objective(adj, score, n)
     return to_structure(adj, kind="cpdag"), total
 
@@ -121,8 +123,8 @@ def _move_sequence(x: np.ndarray, n_chunks: int):
     try:
         adj = np.zeros((n, n), dtype=np.int8)
         with threadpool_limits(limits=1):
-            adj = pg._forward_inprocess(adj, engine, n, n / 2, n_chunks)
-            pg._backward_inprocess(adj, engine, n, n_chunks)
+            adj = pg._forward_inprocess(adj, engine, n, n / 2, n_chunks, range(n))
+            pg._backward_inprocess(adj, engine, n, n_chunks, range(n))
     finally:
         pg.ops.apply_insert, pg.ops.apply_delete = orig_ins, orig_del
     return seq
@@ -236,7 +238,9 @@ def test_run_token_guards_pool_reuse():
     x = _gaussian_sem(0, 600, 8, 0.4)
     score = BICScore(x, lambda_value=1.0)
     n = x.shape[1]
-    wset = pg._create_pool(score.cov, score.n, n, score.lambda_value, "token-A", workers=2)
+    wset = pg._create_pool(
+        score.cov, score.n, n, score.lambda_value, "token-A", workers=2, ranks=list(range(n))
+    )
     try:
         adj = np.zeros((n, n), dtype=np.int8)
         # Reach one worker directly with a mismatched token (each worker is its own 1-process pool).
@@ -441,7 +445,7 @@ def test_forward_scan_rescores_group_with_mixed_bounds():
     """
     x = _gaussian_sem(0, 200, 4, 0.5)
     engine = DeltaBICScore(BICScore(x, lambda_value=1.0))
-    scan = pg._ForwardScan([0], engine, 4, None)
+    scan = pg._ForwardScan([0], engine, 4, None, range(4))
     screening = {1: 1.0, 2: 2.0, 3: 3.0}  # not deltas, so a returned screening value shows
     scan.groups[0] = {(): (0, 0b1110, frozenset({1, 2, 3}), screening, {1: 0.0, 2: 0.5, 3: 0.5})}
     scan.exact[0] = {}
@@ -518,7 +522,9 @@ def test_workers_are_live_at_construction(d):
     """Each pool has a live worker before dispatch, including with a large boot payload."""
     x = _gaussian_sem(0, 200, d, 0.3 if d < 10 else 0.02)
     score = BICScore(x, lambda_value=1.0)
-    wset = pg._create_pool(score.cov, score.n, d, score.lambda_value, "tok", workers=3)
+    wset = pg._create_pool(
+        score.cov, score.n, d, score.lambda_value, "tok", workers=3, ranks=list(range(d))
+    )
     try:
         assert len(wset._pools) == 3
         for pool in wset._pools:

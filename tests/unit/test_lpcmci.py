@@ -75,7 +75,8 @@ def _links(result: LPCMCIResult) -> set[str]:
 
 
 def _run(n: int, links: Links, tau_max: int, observed: list[int]) -> LPCMCIResult:
-    return run(Oracle(n, links, tau_max, observed), len(observed), tau_max, 0.01, 1)
+    oracle = Oracle(n, links, tau_max, observed)
+    return run(oracle, len(observed), tau_max, 0.01, 1, range(len(observed)))
 
 
 # Variable 2 is hidden white noise driving X0 and X1 within one step; X0 and X1 have memory.
@@ -222,7 +223,7 @@ def _data_search(test_wrapper=lambda test: test) -> engine._Search:
     """A search over four variables of white noise, ``tau_max=1``, with the Student-t test."""
     data = np.random.default_rng(0).standard_normal((300, 4))
     test = INDEP_TESTS["student_t"](lagged_design(data, 1))
-    return engine._Search(test_wrapper(test), 4, 1, 0.05)
+    return engine._Search(test_wrapper(test), 4, 1, 0.05, range(4))
 
 
 # The pair X0_{t-1}, X0_t and the 15 two-node sets of the other window nodes.
@@ -263,10 +264,10 @@ class HashTest:
 
 
 def test_a_split_search_finds_the_same_separating_set(monkeypatch):
-    unbounded = engine._Search(HashTest(), 4, 1, 0.85)
+    unbounded = engine._Search(HashTest(), 4, 1, 0.85, range(4))
     expected = unbounded.separating(*PAIR, iter(SETS))
     monkeypatch.setattr(engine, "BATCH", 2)
-    split = engine._Search(HashTest(), 4, 1, 0.85)
+    split = engine._Search(HashTest(), 4, 1, 0.85, range(4))
     assert split.separating(*PAIR, iter(SETS)) == expected
     assert SETS.index(expected) >= 2  # found after the first batch
     assert (split.imin, split.best) == (unbounded.imin, unbounded.best)
@@ -306,7 +307,7 @@ def _shares(search: engine._Search, listed: bool) -> list[float]:
 
 
 def test_the_counted_vote_matches_the_listed_vote_before_and_after_a_change():
-    search = engine._Search(HashTest(), 4, 1, 0.5)
+    search = engine._Search(HashTest(), 4, 1, 0.5, range(4))
     search.initialize()
     for a, c in OUTER[::2]:
         search.remove(engine._key(a, c)[0])
@@ -367,7 +368,7 @@ def test_rule_r0a_stores_the_separating_set_of_every_triple(relabel):
     # X0 - X1 - X2 and X0 - X1 - X3 are unshielded; X0 and X1 are separated given the stored set
     # of either outer pair, {X3} for (X0, X2) and {X2} for (X0, X3), and not given nothing.
     table = {frozenset({3}): 0.5, frozenset({2}): 0.4}
-    search = engine._Search(TableTest(table, relabel), 4, 0, 0.05)
+    search = engine._Search(TableTest(table, relabel), 4, 0, 0.05, range(4))
     search.initialize()
     for outer, sepset in (((0, 2, 0), {(3, 0)}), ((0, 3, 0), {(2, 0)})):
         i, j, _ = outer
@@ -384,7 +385,7 @@ def test_weakly_minimal_drops_the_node_that_leaves_the_largest_p_value(relabel):
     # {X2, X3} separates X0 and X1; dropping X2 leaves p = 0.6, dropping X3 leaves p = 0.3, and
     # dropping both leaves a dependence, so X2 goes whatever the variables are called.
     table = {frozenset({2, 3}): 0.9, frozenset({3}): 0.6, frozenset({2}): 0.3}
-    search = engine._Search(TableTest(table, relabel), 4, 0, 0.05)
+    search = engine._Search(TableTest(table, relabel), 4, 0, 0.05, range(4))
     search.initialize()
     found = search.weakly_minimal((0, 0), (1, 0), frozenset({(2, 0), (3, 0)}))
     assert _relabeled([found], relabel) == {frozenset({(3, 0)})}

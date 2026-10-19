@@ -22,6 +22,8 @@ from scipy.special import gammainc
 
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.lingam import adjacency
+from andrey.search._parallel import _KEY_DP
+from andrey.search.hc import tie_ranks
 
 _Gram = tuple[np.ndarray, float]
 
@@ -43,7 +45,7 @@ class BottomUpParceLiNGAMResult:
 
 
 def _fisher_hsic_test(
-    predictor_grams: list[_Gram], residual: np.ndarray, n: int, best_stat: float
+    predictor_grams: list[_Gram], residual: np.ndarray, n: int, bound: float
 ) -> tuple[float, float]:
     """Aggregate the per-predictor LiNGAM HSIC tests of ``residual`` by Fisher's method.
 
@@ -54,11 +56,12 @@ def _fisher_hsic_test(
     ``fisher_stat = sum_k -2 log(p_k)`` and ``fisher_p`` is its upper chi-squared tail on
     ``2 * n_predictors`` degrees of freedom (a zero HSIC p-value sends ``fisher_stat`` to infinity).
 
-    ``best_stat`` is the smallest Fisher statistic seen so far in the current sink search. Because
-    the running sum only grows (each ``-2 log(p_k) >= 0``), once it passes ``best_stat`` this
-    candidate can no longer be the most-sink one, so the remaining predictor tests are skipped. The
-    partial ``fisher_stat`` and its ``fisher_p`` then miss the incumbent and never win the
-    comparison in :func:`_find_sink`, leaving the selected sink and its p-value unchanged.
+    ``bound`` is the smallest Fisher statistic seen so far in the current sink search, rounded to
+    ``_KEY_DP`` decimals. Because the running sum only grows (each ``-2 log(p_k) >= 0``), once it
+    rounds above ``bound`` this candidate can neither be the most-sink one nor tie with it, so the
+    remaining predictor tests are skipped. The partial ``fisher_stat`` and its ``fisher_p`` then
+    miss the incumbent and never win the comparison in :func:`_find_sink`, leaving the selected
+    sink and its p-value unchanged.
     """
     residual_gram = gamma_gram(residual)
     if len(predictor_grams) == 1:
@@ -69,7 +72,7 @@ def _fisher_hsic_test(
     for gram in predictor_grams:
         _, p_value = hsic_gamma_from_grams(gram, residual_gram, n)
         fisher_stat += np.inf if p_value == 0 else -2 * np.log(p_value)
-        if fisher_stat > best_stat:
+        if round(fisher_stat, _KEY_DP) > bound:
             break
     fisher_p = 1 - gammainc(len(predictor_grams), 0.5 * fisher_stat)
     return float(fisher_p), float(fisher_stat)
@@ -88,29 +91,33 @@ def _residual(X: np.ndarray, cov: np.ndarray, predictors: np.ndarray, target: in
 
 
 def _find_sink(
-    X: np.ndarray, cov: np.ndarray, U: np.ndarray, col_grams: list[_Gram], n: int
+    X: np.ndarray,
+    cov: np.ndarray,
+    U: np.ndarray,
+    col_grams: list[_Gram],
+    n: int,
+    ranks: list[int],
 ) -> tuple[int, float]:
     """Return the most-sink variable in ``U`` and its Fisher p-value.
 
     Each candidate is regressed on the others; the candidate whose residual is most independent of
-    the others (smallest Fisher statistic) is the sink. Ties resolve to the smaller statistic, which
-    is equivalent to the larger p-value under the monotone gamma / chi-squared tail. ``col_grams``
-    holds each variable's cached HSIC gram (keyed by variable index).
+    the others (smallest Fisher statistic, so largest p-value under the monotone gamma /
+    chi-squared tail) is the sink. Statistics equal to ``_KEY_DP`` decimals go to the lower of
+    ``ranks``, each variable's :func:`~andrey.search.hc.tie_ranks`. ``col_grams`` holds each
+    variable's cached HSIC gram (keyed by variable index).
     """
-    best_stat = np.inf
-    best_p = -np.inf
-    sink_predictors = np.array([], dtype=np.int64)
+    best: tuple[float, int] | None = None
+    sink, best_p = int(U[0]), -np.inf
     for j in range(len(U)):
         predictors = np.setdiff1d(U, U[j])
         residual = _residual(X, cov, predictors, int(U[j]))
+        bound = np.inf if best is None else best[0]
         fisher_p, fisher_stat = _fisher_hsic_test(
-            [col_grams[p] for p in predictors], residual, n, best_stat
+            [col_grams[p] for p in predictors], residual, n, bound
         )
-        if fisher_stat < best_stat or fisher_p > best_p:
-            sink_predictors = predictors
-            best_stat = fisher_stat
-            best_p = fisher_p
-    sink = int(np.setdiff1d(U, sink_predictors)[0])
+        key = (round(fisher_stat, _KEY_DP), ranks[int(U[j])])
+        if best is None or key < best:
+            best, sink, best_p = key, int(U[j]), fisher_p
     return sink, best_p
 
 
@@ -126,13 +133,14 @@ def find_causal_order(X: np.ndarray, *, alpha: float = 0.1) -> list:
     n = X.shape[0]
     cov = np.cov(X, rowvar=False)
     col_grams = [gamma_gram(X[:, [j]]) for j in range(d)]  # per-variable HSIC gram, cached once
+    ranks = tie_ranks(X).tolist()
     U = np.arange(d)
     resolved_sinks: list[int] = []  # most-sink first
 
     if d > 1:
         threshold = alpha / (d - 1)
         while len(U) > 1:
-            sink, fisher_p = _find_sink(X, cov, U, col_grams, n)
+            sink, fisher_p = _find_sink(X, cov, U, col_grams, n, ranks)
             if fisher_p < threshold:
                 break
             resolved_sinks.append(sink)
@@ -164,12 +172,15 @@ def estimate_adjacency(X: np.ndarray, order: list) -> np.ndarray:
 
     ``B[i, j]`` weights edge ``j -> i``, fitted by adaptive Lasso; an order-unknown block adds no
     directed edges and every pair inside it is set to ``NaN`` at both ``B[i, j]`` and ``B[j, i]``.
+    Each fit lists its predictors by :func:`~andrey.search.hc.tie_ranks`, so the weights follow the
+    columns when they are reordered.
     """
     d = X.shape[1]
+    ranks = tie_ranks(X).tolist()
     B = np.zeros((d, d), dtype=np.float64)
     for position in range(1, len(order)):
         target = order[position]
-        predictors = _flatten(order[:position])
+        predictors = sorted(_flatten(order[:position]), key=ranks.__getitem__)
         if not predictors:
             continue
         B[target, predictors] = adjacency.predict_adaptive_lasso(X, predictors, target)
