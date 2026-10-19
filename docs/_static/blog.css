@@ -259,3 +259,728 @@ ul.ablog-archive {
 .ablog__postcard i.fa {
   display: none;
 }
+
+/* The 0.7.0 post's column-order figure (docs/blog/0.7.0/order.html): the data's true graph, the
+   column-order rule's board, a column per data column with each collider under the column it points
+   into, and the p-value rule's list, each beside the graph it returns. docs/_static/column-order.js
+   shuffles the board; without script, it shows the original order. */
+.co {
+  margin: 2rem 0;
+  padding: 1rem 1.1rem 0.9rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
+}
+.co .co-title,
+.cg .co-title,
+.rc .co-title {
+  margin: 0;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.co-rule {
+  margin: 0.2rem 0 0.7rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.co-rule b {
+  font-weight: 600;
+}
+
+/* The data: the true DAG beside the setup, in one line each. */
+.co-setup {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 0.2rem 1.2rem;
+  align-items: center;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--andrey-line);
+}
+.co-setup .co-graph {
+  grid-row: 1 / span 2;
+}
+.co-setup p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Each rule's lane: a head row, its rule, then the board or list beside the graph. */
+.co-lane {
+  padding-top: 0.9rem;
+}
+.co-lane + .co-lane {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--andrey-line);
+}
+.co-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+}
+.co-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.co-actions button {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: var(--andrey-paper);
+  color: var(--andrey-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.co-actions .co-shuffle {
+  border-color: var(--andrey-accent);
+  background: var(--andrey-accent);
+  color: var(--andrey-paper);
+}
+.co button:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+.co-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 0.6rem 1.4rem;
+  align-items: start;
+}
+.co-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.co-graph svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.co-note {
+  margin: 0;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.co-note b {
+  color: var(--andrey-ink);
+  font-weight: 600;
+}
+
+/* The board: one column per data column, in the current order; each collider waits under the
+   column it points into. */
+.co-board {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.co-col {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  margin: 0;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.co-chip {
+  display: grid;
+  place-items: center;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-sm);
+  background: var(--andrey-surface-2);
+  color: var(--andrey-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.co-chip:hover {
+  border-color: var(--andrey-accent);
+}
+.co-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-height: 2.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.co-cards:empty::before {
+  content: "no collider";
+  display: block;
+  padding-top: 0.5rem;
+  color: var(--andrey-muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+/* A collider card, on the board or in the ranked list. */
+.co-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "triple n" "p p" "v v";
+  align-items: center;
+  gap: 0.1rem 0.3rem;
+  margin: 0;
+  padding: 0.3rem 0.4rem 0.35rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-sm);
+  background: var(--andrey-paper);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.co-card.is-false {
+  border-style: dashed;
+}
+.co-step {
+  grid-area: n;
+  justify-self: start;
+  color: var(--andrey-muted);
+  font-variant-numeric: tabular-nums;
+}
+.co-triple {
+  display: inline-flex;
+  grid-area: triple;
+  align-items: center;
+  gap: 0.12rem;
+  font-family: var(--andrey-font-mono);
+  white-space: nowrap;
+}
+.co-node {
+  display: inline-grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 1.5px solid var(--andrey-ink);
+  border-radius: 50%;
+  background: var(--andrey-surface);
+  font-family: var(--andrey-font-sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.co-middle {
+  border-color: var(--andrey-accent);
+  color: var(--andrey-accent);
+}
+.co-arrow {
+  color: var(--andrey-edge-directed);
+  font-size: 0.68rem;
+  letter-spacing: -0.04em;
+}
+.co-p {
+  grid-area: p;
+  color: var(--andrey-muted);
+  font-variant-numeric: tabular-nums;
+}
+.co-verdict {
+  grid-area: v;
+  font-weight: 600;
+  color: var(--andrey-accent);
+}
+.co-card.is-skipped .co-verdict {
+  color: var(--andrey-muted);
+  font-weight: 500;
+}
+.co-card.is-skipped .co-triple,
+.co-card.is-skipped .co-p {
+  opacity: 0.55;
+}
+.co-verdict code {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: var(--andrey-font-mono);
+  font-size: 0.95em;
+}
+.co-verdict small {
+  display: block;
+  font-size: 1em;
+}
+
+/* The ranked list: the same cards, one per row, each with a bar as long as its p-value, and
+   an axis row on the same grid under them. */
+.co-rank {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.co-rank .co-card {
+  grid-template-columns: 0.9rem auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "n triple bar p v";
+  gap: 0.3rem 0.55rem;
+  padding: 0.25rem 0.5rem;
+}
+.co-rank .co-verdict small {
+  display: inline;
+}
+.co-rank .co-axis-row {
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
+  background: none;
+}
+.co-rank .co-axis-row > :not(.co-axis) {
+  visibility: hidden;
+}
+.co-bar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.co-track {
+  position: relative;
+  flex: 1 1 0;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--andrey-surface-2);
+  overflow: visible;
+}
+.co-track::after {
+  /* The significance level, 0.05, as a tick through the track. */
+  content: "";
+  position: absolute;
+  top: -0.25rem;
+  bottom: -0.25rem;
+  left: 5%;
+  border-left: 1.5px dashed var(--andrey-ink);
+}
+.co-fill {
+  display: block;
+  width: var(--w);
+  height: 100%;
+  border-radius: 999px;
+  background: var(--andrey-accent);
+}
+.is-skipped .co-fill {
+  background: var(--andrey-muted);
+}
+.co-rank .co-p {
+  text-align: right;
+}
+.co-axis {
+  grid-area: bar;
+  position: relative;
+  height: 1.1rem;
+  color: var(--andrey-muted);
+  font-size: 0.7rem;
+}
+.co-axis span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.co-axis .at-alpha {
+  left: 5%;
+}
+.co-axis .at-one {
+  left: 100%;
+  transform: translateX(-100%);
+}
+.co-axis .at-zero {
+  left: 0;
+  transform: none;
+}
+
+.co figcaption {
+  margin-top: 0.9rem;
+  text-align: left;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.co-hint {
+  color: var(--andrey-muted);
+}
+
+/* A wrong arrowhead's glow (andrey.viz.draw's highlight) breathes, so the eye finds it. */
+.co .highlight {
+  animation: co-glow 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes co-glow {
+  from {
+    stroke-opacity: 0.12;
+  }
+
+  to {
+    stroke-opacity: 0.4;
+  }
+}
+
+@keyframes co-in {
+  from { opacity: 0.2; }
+}
+.co-old .co-graph svg {
+  animation: co-in 320ms ease-out;
+}
+
+/* Phone: the board turns on its side, so column order reads top to bottom. */
+@media (max-width: 700px) {
+  .co {
+    padding: 0.9rem 0.8rem 0.8rem;
+  }
+  .co-setup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .co-setup .co-graph {
+    grid-row: auto;
+    max-width: 220px;
+  }
+  .co-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .co-side {
+    max-width: 260px;
+  }
+  .co-board {
+    flex-direction: column;
+  }
+  .co-col {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+  .co-chip {
+    flex: 0 0 2rem;
+    width: 2rem;
+  }
+  .co-cards {
+    flex: 1 1 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-height: 2rem;
+  }
+  .co-cards:empty::before {
+    padding-top: 0.45rem;
+    text-align: left;
+  }
+  .co-board .co-card {
+    flex: 1 1 8.5rem;
+  }
+  .co-rank .co-card {
+    grid-template-columns: 0.9rem auto minmax(0, 1fr) auto;
+    grid-template-areas: "n triple bar p" "v v v v";
+    gap: 0.15rem 0.5rem;
+  }
+  .co-actions {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .co .highlight {
+    animation: none;
+  }
+
+  .co-col,
+  .co-card {
+    transition: none;
+  }
+  .co-old .co-graph svg {
+    animation: none;
+  }
+}
+
+/* The 0.7.0 post's data-generator figure (docs/blog/0.7.0/generator.html): the same graph numbered
+   by column before and after the shuffle, and a diverging bar per significance level. */
+.cg {
+  margin: 2rem 0;
+  padding: 1rem 1.1rem 0.9rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
+}
+
+.cg-panels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.cg-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.cg-chart {
+  gap: 0.7rem;
+}
+
+.cg .cg-name {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cg-pair {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.cg-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 1.3rem;
+  background: linear-gradient(var(--andrey-line), var(--andrey-line)) center / 1px 100% no-repeat;
+}
+
+.cg-bar {
+  position: absolute;
+  top: 0.2rem;
+  bottom: 0.2rem;
+  width: var(--cg-w);
+  border-radius: 3px;
+  animation: grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.cg-bar.is-worse {
+  left: 50%;
+  background: var(--andrey-edge-bidirected);
+  transform-origin: left;
+}
+
+.cg-bar.is-better {
+  right: 50%;
+  background: var(--andrey-accent);
+  transform-origin: right;
+}
+
+.cg .cg-v {
+  position: absolute;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cg-bar.is-worse + .cg-v {
+  right: 0;
+}
+
+.cg-bar.is-better + .cg-v {
+  left: 0;
+}
+
+.cg .cg-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+}
+
+.cg figcaption,
+.rc figcaption {
+  margin-top: 0.8rem;
+  text-align: left;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+/* The 0.7.0 post's results chart (docs/blog/0.7.0/reorder.html): per method, a bar per build. */
+.rc {
+  margin: 1.5rem 0 2rem;
+  padding: 1rem 1.1rem 0.9rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
+}
+
+.rc-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.6rem;
+  margin-top: 0.7rem;
+}
+
+.rc .rc-method {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.rc-row {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr) 4.6rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.rc-series {
+  color: var(--andrey-muted);
+}
+
+.rc-track {
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--andrey-surface-2);
+}
+
+.rc-bar {
+  display: block;
+  width: var(--rc-w);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--andrey-edge-directed);
+  transform-origin: left;
+  animation: grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.rc-cl .rc-bar {
+  background: var(--andrey-categorical-2);
+}
+
+.rc-first .rc-bar {
+  background: var(--andrey-muted);
+}
+
+.rc-new .rc-series,
+.rc-new .rc-count {
+  color: var(--andrey-accent);
+  font-weight: 600;
+}
+
+.rc-count {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--andrey-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rc-count b {
+  color: var(--andrey-ink);
+}
+
+.rc-new .rc-count b {
+  color: inherit;
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .cg-panels,
+  .rc-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rc-row {
+    grid-template-columns: 7.5rem minmax(0, 1fr) 4.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cg-bar,
+  .rc-bar {
+    animation: none;
+  }
+}
+
+/* The 0.7.0 post's package matrix (docs/blog/0.7.0/compare.html): per method and package, whether
+   a reordering changed the graph. The mark is a word, and its color only repeats it. */
+.cm {
+  margin: 1.5rem 0 2rem;
+}
+
+.cm-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
+}
+
+.cm-table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.cm-table th,
+.cm-table td {
+  padding: 0.55rem 0.6rem;
+  border: 0;
+  border-bottom: 1px solid var(--andrey-line);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cm-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.cm-table thead th {
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.cm-table thead th:nth-child(2),
+.cm-table tbody td:nth-child(2) {
+  background: var(--andrey-surface-2);
+}
+
+.cm-table tbody th {
+  text-align: left;
+  font-weight: 600;
+}
+
+.cm-table td span {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.cm-table .co-yes span {
+  background: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
+  color: var(--andrey-accent);
+}
+
+.cm-table .co-no span {
+  background: color-mix(in srgb, var(--andrey-edge-bidirected) 14%, transparent);
+  color: var(--andrey-edge-bidirected);
+}
+
+.cm-table .co-name span {
+  border: 1px solid var(--andrey-line);
+  color: var(--andrey-muted);
+}
+
+.cm-table .co-na {
+  color: var(--andrey-muted);
+}
+
+.cm figcaption {
+  margin-top: 0.6rem;
+  text-align: left;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}

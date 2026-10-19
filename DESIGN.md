@@ -73,8 +73,8 @@ A figure is a drawn graph, a chart, or a diagram in the docs.
    partial mark).
 2. **Marks by shape, not by color.** An endpoint is an arrowhead, a hollow circle, or a plain tail,
    so a graph reads without color and in grayscale.
-3. **Cobalt is the accent, not a fill.** It marks a highlighted endpoint, and links and selection on
-   the website. Nodes stay neutral.
+3. **Cobalt is the accent, not a fill.** It lights a highlighted endpoint, and marks links and
+   selection on the website. Nodes stay neutral.
 4. **Light and dark are equal.** Every color has a light and a dark value.
 
 ### Colors
@@ -114,4 +114,6 @@ A figure is a drawn graph, a chart, or a diagram in the docs.
   is directed.
 - Labels sit inside the nodes when every label has at most two characters, and below them
   otherwise, the same for the whole figure.
-- A highlighted endpoint gets an accent ring.
+- A highlighted endpoint lights up: its mark and its half of the edge turn accent, a little
+  heavier, over a soft accent glow. The highlight is drawn in strokes, so it keeps its proportions
+  at any size.

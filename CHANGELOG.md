@@ -76,6 +76,9 @@ change names its pull request.
   that names every group of copies by column name and says to keep one column per group and read
   its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
   copies make a test's correlation matrix singular. ([#189])
+- `andrey.viz.draw` lights a highlighted endpoint instead of ringing it: the mark and its half of
+  the edge take the accent color over a soft accent glow, which keeps its proportions at any size
+  and carries the class `highlight`. ([#229])
 
 ### Removed
 
@@ -339,3 +342,4 @@ First alpha release.
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
+[#229]: https://github.com/Abel-ai-lab/andrey/pull/229
