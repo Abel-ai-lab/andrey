@@ -74,6 +74,10 @@ change names its pull request.
   that names every group of copies by column name and says to keep one column per group and read
   its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
   copies make a test's correlation matrix singular. ([#189])
+- With `indep_test="fisherz"` or `"student_t"`, `pc`, `fci`, and `cdnod` reject copied columns
+  before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
+  reject a series that repeats another at the same step or some steps back, naming its lagged
+  value, such as `'a' at lag 1 repeats 'd'`. ([#206])
 - A constant column raises one `ValueError` that names every constant column and says to drop
   them, `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` say up front that they need
   at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
@@ -334,4 +338,5 @@ First alpha release.
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
+[#206]: https://github.com/Abel-ai-lab/andrey/pull/206
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
