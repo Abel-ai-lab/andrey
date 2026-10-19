@@ -74,6 +74,10 @@ change names its pull request.
   that names every group of copies by column name and says to keep one column per group and read
   its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
   copies make a test's correlation matrix singular. ([#189])
+- With `indep_test="fisherz"` or `"student_t"`, `pc`, `fci`, and `cdnod` reject copied columns
+  before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
+  reject a series that repeats another at the same step or some steps back, naming its lagged
+  value, such as `'a' at lag 1 repeats 'd'`. ([#206])
 
 ### Removed
 
@@ -356,3 +360,4 @@ First alpha release.
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
 [#205]: https://github.com/Abel-ai-lab/andrey/pull/205
+[#206]: https://github.com/Abel-ai-lab/andrey/pull/206

@@ -15,6 +15,8 @@ import numpy as np
 
 from ._adapt import (
     column_labels,
+    column_namer,
+    copies_named,
     data_matrix,
     int_in_range,
     open_unit_interval,
@@ -307,7 +309,10 @@ def pcmci(
         If ``tau_max`` is below 1, if ``pc_alpha`` or ``alpha_level`` is not in ``(0, 1)``, if
         ``indep_test`` is neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is not a usable
         2-D matrix with at least ``2 * tau_max * (n_variables + 1) + 3`` rows, the length at which
-        every test keeps a degree of freedom.
+        every test keeps a degree of freedom. Also if a variable repeats another up to scale and
+        shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
+        message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
+        one column per group.
 
     Notes
     -----
@@ -359,6 +364,7 @@ def pcmci(
     >>> out.structure.lag(2).oriented_edges()
     []
     """
+    from andrey.temporal.pcmci import design_column_name
     from andrey.temporal.pcmci import pcmci as _native
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
@@ -373,10 +379,12 @@ def pcmci(
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
-    result = _native(
-        X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level, indep_test=indep_test
-    )
-    return with_labels(_adapt_pcmci(result), column_labels(data))
+    labels = column_labels(data)
+    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+        result = _native(
+            X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level, indep_test=indep_test
+        )
+    return with_labels(_adapt_pcmci(result), labels)
 
 
 def pcmciplus(
@@ -448,7 +456,10 @@ def pcmciplus(
         If ``tau_max`` is below 1, if ``pc_alpha`` is not in ``(0, 1)``, if ``collider_rule`` or
         ``indep_test`` is not one of its choices, or if ``data`` is not a usable 2-D matrix with
         at least ``2 * tau_max * (n_variables + 1) + n_variables + 1`` rows, the length at which
-        every test keeps a degree of freedom.
+        every test keeps a degree of freedom. Also if a variable repeats another up to scale and
+        shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
+        message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
+        one column per group.
 
     Notes
     -----
@@ -504,6 +515,7 @@ def pcmciplus(
     >>> out.structure.lag(1).oriented_edges()
     [(1, 2, 'directed')]
     """
+    from andrey.temporal.pcmci import design_column_name
     from andrey.temporal.pcmciplus import pcmciplus as _native
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
@@ -517,14 +529,16 @@ def pcmciplus(
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
-    result = _native(
-        X,
-        tau_max=tau_max,
-        pc_alpha=pc_alpha,
-        collider_rule=collider_rule,
-        indep_test=indep_test,
-    )
-    return with_labels(_adapt_pcmciplus(result), column_labels(data))
+    labels = column_labels(data)
+    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+        result = _native(
+            X,
+            tau_max=tau_max,
+            pc_alpha=pc_alpha,
+            collider_rule=collider_rule,
+            indep_test=indep_test,
+        )
+    return with_labels(_adapt_pcmciplus(result), labels)
 
 
 def lpcmci(
@@ -594,7 +608,10 @@ def lpcmci(
         If ``tau_max`` is below 1, ``n_preliminary_iterations`` below 0, ``pc_alpha`` not in
         ``(0, 1)``, ``indep_test`` neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is
         not a usable 2-D matrix with at least ``n_variables * (tau_max + 1) + 2 * tau_max + 1``
-        rows, the length at which every test keeps a degree of freedom.
+        rows, the length at which every test keeps a degree of freedom. Also if a variable repeats
+        another up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart,
+        before any test runs; one message names every group of copies, a lagged value as
+        ``'x' at lag k``, and says to keep one column per group.
 
     Notes
     -----
@@ -663,6 +680,7 @@ def lpcmci(
     [(0, 0, 'directed'), (1, 1, 'directed')]
     """
     from andrey.temporal.lpcmci import lpcmci as _native
+    from andrey.temporal.pcmci import design_column_name
 
     tau_max = int_in_range(tau_max, "tau_max", 1)
     n_preliminary_iterations = int_in_range(n_preliminary_iterations, "n_preliminary_iterations", 0)
@@ -676,14 +694,16 @@ def lpcmci(
             f"data needs at least {min_rows} rows (time steps) for tau_max={tau_max} over "
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
-    result = _native(
-        X,
-        tau_max=tau_max,
-        pc_alpha=pc_alpha,
-        n_preliminary_iterations=n_preliminary_iterations,
-        indep_test=indep_test,
-    )
-    return with_labels(_adapt_lpcmci(result), column_labels(data))
+    labels = column_labels(data)
+    with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
+        result = _native(
+            X,
+            tau_max=tau_max,
+            pc_alpha=pc_alpha,
+            n_preliminary_iterations=n_preliminary_iterations,
+            indep_test=indep_test,
+        )
+    return with_labels(_adapt_lpcmci(result), labels)
 
 
 def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOutput:

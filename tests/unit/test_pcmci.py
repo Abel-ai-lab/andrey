@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 from scipy import stats
 
+import andrey
 from andrey.core.ci import SingularCorrelationError, StudentT
 from andrey.temporal.pcmci import (
     INDEP_TESTS,
@@ -306,3 +307,15 @@ def test_a_design_test_answers_a_singular_query_from_the_residuals():
     )
     alone = test.statistic_pvalues(np.array([1]), np.array([5]), np.array([[4, 6]]))
     assert mixed[0][1] == alone[0][0] and mixed[1][1] == alone[1][0]
+
+
+@pytest.mark.parametrize("method", ["pcmci", "pcmciplus", "lpcmci"])
+def test_a_series_that_repeats_another_some_steps_back_is_named_with_its_lag(method):
+    pd = pytest.importorskip("pandas")
+    # d is a scaled and shifted copy of a one step back: the raw columns are no copies, but design
+    # column (a, lag 1) repeats (d, lag 0).
+    x = _repeated_series()[:, :3]
+    d = np.r_[0.0, -2.0 * x[:-1, 0]] + 4.0
+    frame = pd.DataFrame(np.column_stack([x, d]), columns=["a", "b", "c", "d"])
+    with pytest.raises(ValueError, match=r"'a' at lag 1 repeats 'd'\. .*keep one column"):
+        getattr(andrey, method)(frame, tau_max=2)
