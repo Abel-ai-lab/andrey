@@ -6,7 +6,7 @@ The algorithm, its settings, and its references are described on :func:`andrey.f
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import cache
 from itertools import combinations, islice, permutations
@@ -611,7 +611,7 @@ def _fci_orient(
     conflict the first decides; sweeps repeat until no endpoint changes.
     """
     if not in_column_order:
-        test = cache(test)  # R4 repeats its tests in every round
+        test = _memoized(test)  # R4 repeats its tests in every round
         while True:
             implied = _Implied()
             _rule_r1r2_cycle(marks, False, ambiguous, out=implied)
@@ -638,6 +638,16 @@ def _fci_orient(
         change = _rule_r8(marks, change)
         change = _rule_r9(marks, change, ambiguous)
         change = _rule_r10(marks, change, ambiguous)
+
+
+def _memoized(test: CITest) -> CITest:
+    """``test``, answering a query it has answered before from memory."""
+    answered = cache(lambda x, y, condition_set: test(x, y, condition_set))
+
+    def memoized(x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        return answered(x, y, tuple(condition_set))
+
+    return memoized
 
 
 def _rule_r1(
