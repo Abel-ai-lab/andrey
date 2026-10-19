@@ -86,12 +86,14 @@ _POSSIBLE_DSEP = ParamSpec(
 _COLLIDER_ORDER = ParamSpec(
     name="collider_order",
     type="str",
-    default="p_value",
+    default=None,
     choices=COLLIDER_ORDERS,
     doc="The order in which colliders are oriented, which decides between two that would orient "
     "one edge in opposite directions: p_value = the collider whose endpoints were separated with "
     "the largest p-value first, independent of the column order; column = in column order, the "
-    "first of two conflicting colliders kept.",
+    "first of two conflicting colliders kept. null follows ANDREY_TIE_BREAK: p_value under rank, "
+    "column under position.",
+    nullable=True,
 )
 _LAMBDA_VALUE = ParamSpec(
     name="lambda_value",
@@ -146,9 +148,11 @@ _add(
         accel="numpy",
         status="supported",
         column_order="can_change",
+        tie_break=True,
         order_note=(
             "Conflicting Meek-rule orientations go to the first in column order; "
-            '`collider_order="column"` also orients colliders in column order.'
+            '`tie_break="position"`, or `collider_order="column"`, also orients colliders in '
+            "column order."
         ),
         params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
         references=(
@@ -273,9 +277,11 @@ _add(
         accel="numpy",
         status="supported",
         column_order="can_change",
+        tie_break=True,
         order_note=(
             "Conflicting Meek-rule orientations go to the first in column order; "
-            '`collider_order="column"` also orients colliders in column order.'
+            '`tie_break="position"`, or `collider_order="column"`, also orients colliders in '
+            "column order."
         ),
         params=(
             _ALPHA,

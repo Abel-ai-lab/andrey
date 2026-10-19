@@ -95,12 +95,18 @@ def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
     resolve = backend._resolve_tie_break
     monkeypatch.setattr(backend, "_resolve_tie_break", lambda: reads.append(1) or resolve())
 
-    def fit(columns: list[str]):
+    def fit(columns: list[str], **given):
         frames = [frame(seed)[columns] for seed in range(3)]
-        return getattr(andrey, spec.name)(*inputs(spec, frames), **SHORT.get(spec.name, {}))
+        return getattr(andrey, spec.name)(
+            *inputs(spec, frames), **SHORT.get(spec.name, {}), **given
+        )
 
     want = named_marks(fit(COLUMNS))
     assert bool(reads) == spec.tie_break
+    if "collider_order" in {param.name for param in spec.params}:
+        reads.clear()
+        fit(COLUMNS, collider_order="p_value")
+        assert not reads  # a collider order given in the call does not consult the setting
     if spec.column_order != "can_change":
         pair = spec.family == "pairwise"
         for order in ([1, 0, 2],) if pair else ([1, 2, 0], [2, 0, 1]):

@@ -233,6 +233,15 @@ def test_cdnod_passes_the_collider_order_on():
     assert column != andrey.cdnod(x, context).structure
 
 
+def test_cdnod_collider_order_follows_tie_break_unless_given():
+    x, context = shifted_domains()
+    default = andrey.cdnod(x, context).structure
+    column = andrey.cdnod(x, context, collider_order="column").structure
+    with andrey.config(tie_break="position"):
+        assert andrey.cdnod(x, context).structure == column
+        assert andrey.cdnod(x, context, collider_order="p_value").structure == default
+
+
 def test_cdnod_is_invariant_to_column_order():
     x, context = shifted_domains()
     augmented = np.column_stack([x, context])

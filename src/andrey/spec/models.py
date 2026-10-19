@@ -101,7 +101,7 @@ class MethodSpec(Spec):
     accel: Accel
     status: Status
     column_order: ColumnOrder
-    tie_break: bool = False  # orders tied choices by andrey.config.tie_break (tie_ranks)
+    tie_break: bool = False  # follows andrey.config.tie_break (tie_ranks; collider_order)
     order_note: str = ""  # the column-order guide's note: what still follows the column order
     params: tuple[ParamSpec, ...] = ()
     seeded: bool = False  # honors a seed / random_state (and so ANDREY_SEED)

@@ -75,6 +75,17 @@ def pc(
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 
 
+def resolve_collider_order(collider_order: str | None) -> str:
+    """Return ``collider_order``, or for ``None`` the order ``andrey.config.tie_break`` selects.
+
+    ``"rank"`` selects ``"p_value"`` and ``"position"`` selects ``"column"``. An explicit
+    ``collider_order`` is returned as given, without reading the setting.
+    """
+    if collider_order is not None:
+        return collider_order
+    return "column" if backend.config.tie_break == "position" else "p_value"
+
+
 def check_collider_order(collider_order: str) -> None:
     """Raise ``ValueError`` unless ``collider_order`` is one of :data:`COLLIDER_ORDERS`."""
     if collider_order not in COLLIDER_ORDERS:

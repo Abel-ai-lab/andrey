@@ -39,7 +39,7 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    collider_order: str = "p_value",
+    collider_order: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
@@ -70,12 +70,13 @@ def pc(
         random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional mutual
         information test, and ``"gpdc"`` Gaussian-process regression with a distance correlation
         test. See Notes.
-    collider_order : {"p_value", "column"}, default="p_value"
+    collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
         endpoints were separated with the largest p-value, so the colliders do not depend on the
         column order. ``"column"`` orients them in column order and keeps the first of two that
-        conflict. See Notes.
+        conflict. ``None`` follows ``andrey.config.tie_break``: ``"p_value"`` under ``"rank"``,
+        ``"column"`` under ``"position"``. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -152,10 +153,10 @@ def pc(
     it. Two colliders conflict when they would orient one edge in opposite directions, so the order
     in which they are oriented can change the result [3]_. A collider is skipped when it would give
     an edge an arrowhead at both ends, so of two conflicting colliders the one oriented first is
-    kept. With the default ``collider_order="p_value"``, each collider ``x -> y <- z`` ranks by the
-    largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders are
-    oriented from the highest rank to the lowest. When two conflicting colliders rank equal to nine
-    decimals, the edge they dispute stays undirected, and Meek's rules do not orient it. The
+    kept. With ``collider_order="p_value"`` (the default), each collider ``x -> y <- z`` ranks by
+    the largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders
+    are oriented from the highest rank to the lowest. When two conflicting colliders rank equal to
+    nine decimals, the edge they dispute stays undirected, and Meek's rules do not orient it. The
     colliders therefore do not depend on the column order. This adapts the conflict rule of Ramsey
     [10]_, which ranks a collider by separating sets that additional tests choose; Andrey ranks it
     by the tests that removed the edge, so orienting runs no new test. With
@@ -261,6 +262,7 @@ def pc(
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.constraint.pc import pc as _pc
+    from andrey.constraint.pc import resolve_collider_order
 
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories
@@ -269,7 +271,11 @@ def pc(
     labels = column_labels(data)
     with copies_named(labels):
         cpdag = _pc(
-            X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_order=resolve_collider_order(collider_order),
+            categorical=mask,
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
@@ -676,7 +682,7 @@ def cdnod(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    collider_order: str = "p_value",
+    collider_order: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
@@ -709,11 +715,12 @@ def cdnod(
         ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
         data, at a far higher cost per test. Each as for :func:`~andrey.pc`; see Notes for the
         index.
-    collider_order : {"p_value", "column"}, default="p_value"
+    collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
-        the column order, and ``"column"`` in column order. Under either order, the edges out of
-        the index are directed first, and no collider puts an arrowhead at the index.
+        the column order, and ``"column"`` in column order. ``None`` follows
+        ``andrey.config.tie_break``. Under either order, the edges out of the index are directed
+        first, and no collider puts an arrowhead at the index.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -850,6 +857,7 @@ def cdnod(
     [(0, 1, 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
+    from andrey.constraint.pc import resolve_collider_order
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask = checked_data(
@@ -875,7 +883,7 @@ def cdnod(
             c,
             alpha=alpha,
             indep_test=indep_test,
-            collider_order=collider_order,
+            collider_order=resolve_collider_order(collider_order),
             categorical=mask,
             dependence_threshold=dependence_threshold,
         )

@@ -147,8 +147,10 @@ class _Config:
     equal rounded score changes. ``"rank"`` (the default) orders them by a rank computed from each
     column's own data (:func:`andrey.search.hc.tie_ranks`), so reordering the columns relabels the
     result. ``"position"`` orders them by column position instead, which skips computing the ranks,
-    and the result can then depend on the column order. Each fit reads the setting once, when it
-    starts. The :doc:`column-order guide </docs/guides/column-order>` lists the methods it reaches.
+    and the result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
+    ``collider_order`` from it when the call gives none: ``"p_value"`` under ``"rank"``,
+    ``"column"`` under ``"position"``. Each fit reads the setting once, when it starts. The
+    :doc:`column-order guide </docs/guides/column-order>` lists the methods it reaches.
     """
 
     _backend: str | None = None

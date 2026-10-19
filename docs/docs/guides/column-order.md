@@ -35,7 +35,8 @@ bits count as tied and go to the rank.
 
 What reordering the columns does to each method's result with the default settings. "Relabels"
 means you get the same graph with its nodes in the new order. "Ties follow `tie_break`" marks the
-methods that break ties by the rank, which the setting below replaces.
+methods the setting below changes: it replaces the rank that breaks their ties and, for `pc` and
+`cdnod`, the p-value order of their colliders.
 
 ```{include} ../../_generated/column-order.md
 ```
@@ -111,6 +112,9 @@ every machine where the default does. But reordering the columns can change the 
 column order can leak into it; `andrey.data.sortability.index_correlation` measures how much a
 dataset's column order reveals of its causal order.
 
-The methods in the "No" rows have no rank to replace, and the setting does not change them. `pc` and
-`cdnod` take `collider_order="column"` for their own column-order rule, and `fci` and `gfci` build
-their possible-d-separation sets with `possible_dsep="fast"` or `"order_free"`.
+For `pc` and `cdnod`, the setting chooses the order in which conflicting colliders are oriented:
+by the p-value that separated each pair under `rank`, in column order under `position`. Their
+`collider_order` argument, `"p_value"` or `"column"`, overrides it for one call.
+
+The methods in the "No" rows have no rank to replace, and the setting does not change them. `fci`
+and `gfci` build their possible-d-separation sets with `possible_dsep="fast"` or `"order_free"`.
