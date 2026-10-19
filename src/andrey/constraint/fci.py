@@ -91,9 +91,9 @@ def _fast_adjacency_search(
     Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
     it lives and the skeleton does not depend on how the caller ordered the columns.
 
-    When ``prescreen`` is set and the test exposes the vectorized closed forms, the size-0 and
-    size-1 passes read the correlation matrix directly instead of the dense scalar scan -- same
-    removals and separating sets. With ``workers > 1`` the ``|S| >= 2`` scan fans out across worker
+    When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
+    the size-0 and size-1 passes take them instead of the dense scalar scan -- same removals and
+    separating sets. With ``workers > 1`` the ``|S| >= 2`` scan fans out across worker
     processes, reducing per-chunk removals by union, so the skeleton stays identical to the serial
     scan.
     """

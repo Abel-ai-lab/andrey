@@ -21,11 +21,15 @@ freedom become a p-value. :class:`FisherZ` applies the normal distribution to Fi
 of ``r``; :class:`StudentT` applies the Student-t distribution to ``t = r * sqrt(df / (1 - r**2))``.
 
 :class:`ChiSquare` implements the Pearson chi-square and G-square tests on category codes: one
-contingency table of ``x`` and ``y`` per observed configuration of the conditioning set.
+contingency table of ``x`` and ``y`` per observed configuration of the conditioning set. Its
+batched path, all-pairs marginal path, and first-order path count many queries' tables together
+and return the scalar p-values exactly.
 
 :class:`DGTest` and :class:`CGTest` test mixed data, continuous and categorical columns marked by a
 mask, by the likelihood ratio of the degenerate Gaussian and the conditional Gaussian models of
-:mod:`andrey.core.mixed`.
+:mod:`andrey.core.mixed`. :class:`CGTest` has the same three many-query paths, fitting their
+queries' sets together, with the scalar p-values exactly; :class:`DGTest` answers one query at a
+time.
 
 References
 ----------
@@ -423,6 +427,12 @@ class StudentT(PartialCorrelationTest):
 # A joint table of at most this many cells is counted densely; a larger one counts only the cells
 # that occur, so memory stays proportional to the rows whatever the cardinalities.
 _DENSE_CELLS = 1 << 20
+# The batched chi-square paths count a test's table over every configuration of its conditioning
+# set when it has at most max(_TABLE_ROWS * n, _TABLE_MIN) cells, and take the scalar path above.
+_TABLE_ROWS = 4
+_TABLE_MIN = 1 << 16
+# The most row indices, table cells, or Gram-matrix entries one batched count holds.
+_BATCH_CELLS = 1 << 22
 
 
 class ChiSquare:
@@ -442,6 +452,15 @@ class ChiSquare:
     ``1``; otherwise it is the chi-square survival function of the statistic.
 
     Queries are canonicalized as :class:`FisherZ`'s are, and nothing is memoized.
+
+    :meth:`batched_call`, :meth:`first_order_pvalues`, and :meth:`marginal_pvalues` answer many
+    queries at once and return the p-values of :meth:`__call__` exactly. They count the tables of
+    many queries together, one ``bincount`` over the queries' cell indices, or, for the marginal
+    tables of all pairs, one product of the category-indicator matrix with itself, whose integer
+    counts are exact in float64. Every step after the counting is elementwise on the tables,
+    except the sum of a query's statistic over its cells, which is ``np.sum`` over that query's
+    cells in the order :meth:`__call__` sums them, so the sum, and a decision on the p-value, does
+    not depend on how the queries are batched.
 
     Parameters
     ----------
@@ -468,6 +487,9 @@ class ChiSquare:
             raise ValueError("data contains NaN or Inf; cannot run a chi-square test")
         self._n: int = arr.shape[0]
         self._codes, self._cardinalities = categorical.encode(arr)
+        # Each column's codes as one contiguous row, for the batched counts; int32 halves the
+        # memory those counts stream through.
+        self._rows = self._codes.T.astype(np.int32 if self._n < 2**31 else np.int64, order="C")
         self._g_square = bool(g_square)
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
@@ -506,6 +528,189 @@ class ChiSquare:
         if dof == 0:
             return 1.0
         return float(chdtrc(dof, max(statistic, 0.0)))
+
+    def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
+        """Return p-values for one ``(x, y)`` pair over many conditioning sets.
+
+        The result list matches the order of ``condition_sets``, and each p-value equals
+        :meth:`__call__`'s. A conditioning set is canonicalized as in :meth:`__call__`. The tables
+        of the sets are counted together (see :class:`ChiSquare`); a set with more than
+        ``max(4 * n, 65536)`` possible cells, and a single-set batch, take the scalar path.
+        """
+        condition_sets = list(condition_sets)
+        if len(condition_sets) <= 1:
+            return [self(x, y, condition_set) for condition_set in condition_sets]
+        x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
+        conds = [_canonical(x_int, y_int, condition_set)[2] for condition_set in condition_sets]
+        return self._pvalues(x_int, y_int, conds).tolist()
+
+    def first_order_pvalues(self, x: int, y: int, zs: Iterable[int]) -> np.ndarray:
+        """First-order (``|S| == 1``) p-values for pair ``(x, y)`` over single conditioners ``zs``.
+
+        Entry ``i`` equals ``self(x, y, (zs[i],))``; ``zs`` must exclude ``x`` and ``y``.
+        """
+        x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
+        return self._pvalues(x_int, y_int, [[int(z)] for z in zs])
+
+    def marginal_pvalues(self) -> np.ndarray:
+        """All-pairs marginal (``|S| == 0``) p-values as a symmetric ``(d, d)`` matrix.
+
+        Entry ``[x, y]`` equals ``self(x, y, ())``; the diagonal is ``0``. With the categories of
+        all columns stacked, column ``v``'s category ``c`` at ``offsets[v] + c``, the Gram matrix of
+        the rows' category indicators holds every pair's table: entry ``[i, j]`` counts the rows in
+        categories ``i`` and ``j``. Its rows are computed for a few columns ``x`` at a time,
+        accumulated over blocks of rows. The counts are integers below ``2**53``, so the float64
+        products and sums are exact in any order. A column whose rows of the Gram matrix alone
+        exceed the block size takes the scalar path.
+        """
+        d = self._codes.shape[1]
+        out = np.zeros((d, d))
+        cards = self._cardinalities
+        offsets = np.cumsum(cards) - cards
+        total = int(cards.sum())
+        x = 0
+        while x < d - 1:
+            if self._n == 0 or int(cards[x]) * total > _BATCH_CELLS:
+                out[x, x + 1 :] = [self(x, y) for y in range(x + 1, d)]
+                x += 1
+                continue
+            stop = x + 1
+            while stop < d - 1 and int(cards[x : stop + 1].sum()) * total <= _BATCH_CELLS:
+                stop += 1
+            self._marginal_block(out, x, stop, offsets, total)
+            x = stop
+        return out + out.T
+
+    def _marginal_block(
+        self, out: np.ndarray, start: int, stop: int, offsets: np.ndarray, total: int
+    ) -> None:
+        """Fill ``out[x, y]`` for the columns ``start <= x < stop`` and every ``y > x``."""
+        n, d = self._codes.shape
+        cards = self._cardinalities
+        first = int(offsets[start])
+        gram = np.zeros((int(offsets[stop - 1] + cards[stop - 1]) - first, total))
+        step = max(1, _BATCH_CELLS // total)
+        for row in range(0, n, step):
+            codes = self._codes[row : row + step]
+            indicators = np.zeros((len(codes), total))
+            indicators[np.arange(len(codes))[:, None], codes + offsets] = 1.0
+            gram += indicators[:, first : first + len(gram)].T @ indicators
+        xs, ys = np.triu_indices(d, 1)
+        keep = (xs >= start) & (xs < stop)
+        xs, ys = xs[keep], ys[keep]
+        shapes = cards[xs] * (int(cards.max()) + 1) + cards[ys]
+        for shape in np.unique(shapes):
+            pairs = np.flatnonzero(shapes == shape)
+            kx, ky = int(cards[xs[pairs[0]]]), int(cards[ys[pairs[0]]])
+            for at in range(0, pairs.size, max(1, _BATCH_CELLS // (kx * ky))):
+                part = pairs[at : at + max(1, _BATCH_CELLS // (kx * ky))]
+                rows = offsets[xs[part], None, None] - first + np.arange(kx)[:, None]
+                cols = offsets[ys[part], None, None] + np.arange(ky)
+                tables = gram[rows, cols].astype(np.int64)
+                out[xs[part], ys[part]] = self._table_pvalues(tables, np.arange(part.size + 1))
+
+    def _pvalues(self, x: int, y: int, conds: list[list[int]]) -> np.ndarray:
+        """P-values of the pair ``x < y`` given each canonical conditioning set in ``conds``.
+
+        The sets whose tables have at most ``max(4 * n, 65536)`` possible cells are counted in
+        blocks, grouped by size, one ``bincount`` per block; the others take :meth:`__call__`.
+        """
+        out = np.empty(len(conds))
+        n = self._n
+        cards = self._cardinalities
+        kx, ky = int(cards[x]), int(cards[y])
+        cells = kx * ky
+        limit = max(_TABLE_ROWS * n, _TABLE_MIN)
+        by_size: dict[int, list[int]] = {}
+        configurations = [math.prod(int(cards[c]) for c in cond) for cond in conds]
+        for i, cond in enumerate(conds):
+            if n == 0 or configurations[i] * cells > limit:
+                out[i] = self(x, y, cond)
+            else:
+                by_size.setdefault(len(cond), []).append(i)
+        if not by_size:
+            return out
+        target = self._rows[x] * ky + self._rows[y]  # each row's (x, y) cell
+        rows_per_block = max(1, _BATCH_CELLS // n)
+        for size, members in by_size.items():
+            start = 0
+            while start < len(members):
+                stop, held = start + 1, configurations[members[start]] * cells
+                while stop < len(members) and stop - start < rows_per_block:
+                    held += configurations[members[stop]] * cells
+                    if held > _BATCH_CELLS:
+                        break
+                    stop += 1
+                block = members[start:stop]
+                out[block] = self._block_pvalues(
+                    target, cells, kx, ky, [conds[i] for i in block], size
+                )
+                start = stop
+        return out
+
+    def _block_pvalues(
+        self, target: np.ndarray, cells: int, kx: int, ky: int, conds: list[list[int]], size: int
+    ) -> np.ndarray:
+        """P-values of one block of conditioning sets of equal ``size``, counted in one bincount.
+
+        Row ``r`` of set ``i`` falls in cell ``target[r]`` of configuration ``offset[i] + code``,
+        with ``code`` the mixed-radix code of its conditioning categories, the first column most
+        significant: the order :func:`~andrey.core.categorical.configurations` numbers them in.
+        The configurations that do not occur are then dropped.
+        """
+        sets = np.array(conds, dtype=np.intp).reshape(len(conds), size)
+        radix = self._cardinalities[sets]
+        q = radix.prod(axis=1)
+        offset = np.cumsum(q) - q
+        total = int(q.sum())
+        dtype = self._rows.dtype if total * cells < 2**31 else np.dtype(np.int64)
+        if size:
+            index = self._rows[sets[:, 0]].astype(dtype, copy=False)
+            for j in range(1, size):
+                index *= radix[:, j, None].astype(dtype)
+                index += self._rows[sets[:, j]]
+            index += offset[:, None].astype(dtype)
+        else:
+            index = np.repeat(offset[:, None].astype(dtype), self._n, axis=1)
+        index *= dtype.type(cells)
+        index += target
+        tables = np.bincount(index.ravel(), minlength=total * cells).reshape(total, kx, ky)
+        occurs = tables.reshape(total, cells).any(axis=1)
+        held = np.add.reduceat(occurs.astype(np.int64), offset)
+        bounds = np.concatenate(([0], np.cumsum(held)))
+        return self._table_pvalues(tables[occurs], bounds)
+
+    def _table_pvalues(self, tables: np.ndarray, bounds: np.ndarray) -> np.ndarray:
+        """P-values of the tests whose ``(kx, ky)`` tables are stacked in ``tables``.
+
+        Test ``i`` owns ``tables[bounds[i]:bounds[i + 1]]``, one table per configuration that
+        occurs, in :meth:`__call__`'s order. Each step repeats :meth:`__call__`'s arithmetic on the
+        same integer counts, and each test's statistic is ``np.sum`` over its own cells in the order
+        :meth:`__call__` visits them, so every p-value equals :meth:`__call__`'s.
+        """
+        m, kx, ky = tables.shape
+        n_sx = tables.sum(axis=2)
+        n_sy = tables.sum(axis=1)
+        n_s = n_sx.sum(axis=1)
+        flat = tables.reshape(-1)
+        occupied = np.flatnonzero(flat)
+        observed = flat[occupied]
+        s, rest = np.divmod(occupied, kx * ky)
+        sx, sy = np.divmod(rest, ky)
+        expected = n_sx[s, sx] * n_sy[s, sy] / n_s[s]
+        if self._g_square:
+            values = observed * np.log(observed / expected)
+        else:
+            values = observed * (observed / expected)
+        cuts = np.searchsorted(occupied, bounds * (kx * ky)).tolist()
+        sums = np.array([np.sum(values[a:b]) for a, b in zip(cuts[:-1], cuts[1:])])
+        statistic = 2.0 * sums if self._g_square else sums - float(self._n)
+        per_table = ((n_sx > 0).sum(axis=1) - 1) * ((n_sy > 0).sum(axis=1) - 1)
+        dof = np.add.reduceat(per_table, bounds[:-1])
+        out = np.ones(len(dof))
+        live = dof != 0
+        out[live] = chdtrc(dof[live], np.maximum(statistic[live], 0.0))
+        return out
 
 
 # A conditional covariance's eigenvalue, on the scale of unit-variance columns, at or below this
@@ -589,6 +794,10 @@ def _whitener(cov: np.ndarray) -> np.ndarray:
     return u[:, keep] / np.sqrt(w[keep])
 
 
+# The most pairs one marginal pass of the conditional Gaussian test fits together.
+_CG_PAIRS = 4096
+
+
 class CGTest:
     """Conditional Gaussian likelihood-ratio test of conditional independence on mixed data.
 
@@ -609,6 +818,9 @@ class CGTest:
     freedom.
 
     Log-likelihoods are memoized by set, and queries are canonicalized as :class:`FisherZ`'s are.
+    :meth:`batched_call`, :meth:`first_order_pvalues`, and :meth:`marginal_pvalues` fit the sets of
+    many queries in one :meth:`~andrey.core.mixed.ConditionalGaussian.loglik_many` call and return
+    :meth:`__call__`'s p-values exactly.
 
     Parameters
     ----------
@@ -626,6 +838,7 @@ class CGTest:
 
     def __init__(self, data: np.ndarray, categorical: npt.ArrayLike | None = None) -> None:
         self._cg = ConditionalGaussian(data, categorical)
+        self._d: int = np.shape(data)[1]
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the p-value for ``x`` independent of ``y`` given ``condition_set``.
@@ -641,6 +854,52 @@ class CGTest:
         statistic = 2.0 * (ll[0] - ll[1] - ll[2] + ll[3])
         dof = k[0] - k[1] - k[2] + k[3]
         return float(chdtrc(dof, max(statistic, 0.0)))
+
+    def batched_call(self, x: int, y: int, condition_sets: Iterable[Iterable[int]]) -> list[float]:
+        """Return p-values for one ``(x, y)`` pair over many conditioning sets.
+
+        The result list matches the order of ``condition_sets``, and each p-value equals
+        :meth:`__call__`'s: the four sets of every query are fit in one
+        :meth:`~andrey.core.mixed.ConditionalGaussian.loglik_many` call, which gives each set the
+        value it gets alone.
+        """
+        x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
+        queries = [(x_int, y_int, _canonical(x_int, y_int, s)[2]) for s in condition_sets]
+        return self._pvalues(queries).tolist()
+
+    def first_order_pvalues(self, x: int, y: int, zs: Iterable[int]) -> np.ndarray:
+        """First-order (``|S| == 1``) p-values for pair ``(x, y)`` over single conditioners ``zs``.
+
+        Entry ``i`` equals ``self(x, y, (zs[i],))``; ``zs`` must exclude ``x`` and ``y``.
+        """
+        return np.asarray(self.batched_call(x, y, [(int(z),) for z in zs]), dtype=np.float64)
+
+    def marginal_pvalues(self) -> np.ndarray:
+        """All-pairs marginal (``|S| == 0``) p-values as a symmetric ``(d, d)`` matrix.
+
+        Entry ``[x, y]`` equals ``self(x, y, ())``; the diagonal is ``0``. The pairs are fit
+        together, a few thousand per :meth:`~andrey.core.mixed.ConditionalGaussian.loglik_many`
+        call.
+        """
+        d = self._d
+        out = np.zeros((d, d))
+        xs, ys = np.triu_indices(d, 1)
+        for at in range(0, xs.size, _CG_PAIRS):
+            part = slice(at, at + _CG_PAIRS)
+            queries = [(x, y, []) for x, y in zip(xs[part].tolist(), ys[part].tolist())]
+            out[xs[part], ys[part]] = self._pvalues(queries)
+        return out + out.T
+
+    def _pvalues(self, queries: list[tuple[int, int, list[int]]]) -> np.ndarray:
+        """P-values of canonical ``(x, y, conditioning set)`` queries, their sets fit together."""
+        cg = self._cg
+        sets = [s for x, y, c in queries for s in ([x, y, *c], [y, *c], [x, *c], c)]
+        ll = cg.loglik_many(sets)
+        k = [cg.dof(s) for s in sets]
+        quads = range(0, len(sets), 4)
+        statistic = [2.0 * (ll[i] - ll[i + 1] - ll[i + 2] + ll[i + 3]) for i in quads]
+        dof = [k[i] - k[i + 1] - k[i + 2] + k[i + 3] for i in quads]
+        return np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
 
 
 # The indep_test registry: a name maps to a factory building a :class:`CITest` over the data. The

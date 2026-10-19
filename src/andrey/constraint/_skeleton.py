@@ -1,11 +1,12 @@
 """Batched conditional-independence scanning for the PC and FCI skeleton searches.
 
 :func:`scan_conditioning_sets` tests one adjacent pair against every size-``k`` subset of a
-candidate neighborhood. It uses the test's vectorized ``batched_call`` when there is one, one
-stacked ``np.linalg.inv`` per chunk in place of thousands of scalar calls, and the scalar loop
-otherwise, so a test that implements only :class:`~andrey.core.ci.CITest` still works.
-:meth:`~andrey.core.ci.PartialCorrelationTest.batched_call` returns the scalar p-values exactly, so
-the skeleton is the same either way. Subsets are consumed in fixed-size chunks, so the scan holds
+candidate neighborhood. It uses the test's vectorized ``batched_call`` when there is one (one
+stacked ``np.linalg.inv`` per chunk for the partial-correlation tests, one count of every chunk's
+contingency tables for the chi-square tests) in place of thousands of scalar calls, and the scalar
+loop otherwise, so a test that implements only :class:`~andrey.core.ci.CITest` still works. Every
+shipped ``batched_call`` returns the scalar p-values exactly, so the skeleton is the same either
+way. Subsets are consumed in fixed-size chunks, so the scan holds
 one chunk in memory however many subsets it visits.
 """
 
@@ -22,9 +23,9 @@ from andrey.core.ci import CITest
 #: p-value is ``None`` when the scan does not record it.
 Removal = tuple[int, int, tuple[int, ...], float | None]
 
-# One batched_call inverts a stack of (k+2, k+2) correlation submatrices; cap how many subsets that
-# stack holds at once so a huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one
-# array. Each row's inverse is computed independently, so the chunk boundary never changes a result.
+# One batched_call evaluates a chunk of subsets together; cap how many subsets a chunk holds so a
+# huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
+# is computed independently, so the chunk boundary never changes a result.
 _CHUNK = 4096
 
 
@@ -111,19 +112,20 @@ def record_tests(
 
 # ---- vectorized size-0/1 prescreen ---------------------------------------------------------------
 #
-# The marginal (|S| = 0) and first-order (|S| = 1) partial-correlation tests are closed forms over
-# the sample correlation matrix -- no inversion. A CI test that exposes those closed forms
-# vectorized (:meth:`PartialCorrelationTest.marginal_pvalues` and
-# :meth:`~PartialCorrelationTest.first_order_pvalues`) lets the size-0 pass run as a single
-# all-pairs matrix threshold and the size-1 pass as one vectorized read per surviving pair, in
-# place of the dense per-pair scalar loop. The decisions (p > alpha) and separating sets are
-# identical to the scalar scan (the p-values match exactly), so the recovered skeleton is
-# unchanged.
+# A CI test that exposes vectorized marginal (|S| = 0) and first-order (|S| = 1) p-values
+# (``marginal_pvalues`` and ``first_order_pvalues``: the partial-correlation closed forms over the
+# correlation matrix, the chi-square tables counted together, the conditional Gaussian sets fit
+# together) lets the size-0 pass run as a single all-pairs matrix threshold and the size-1 pass as
+# one vectorized read per surviving pair, in place of the dense per-pair scalar loop. The decisions
+# (p > alpha) and separating sets are identical to the scalar scan (the p-values match exactly), so
+# the recovered skeleton is unchanged.
 
 
 def prescreen_capable(test: CITest) -> bool:
-    """Whether ``test`` exposes the vectorized size-0/1 prescreen primitives (Fisher-Z and
-    Student-t do)."""
+    """Whether ``test`` exposes the vectorized size-0/1 prescreen primitives.
+
+    The partial-correlation, chi-square, and conditional Gaussian tests do.
+    """
     return callable(getattr(test, "marginal_pvalues", None)) and callable(
         getattr(test, "first_order_pvalues", None)
     )
@@ -138,8 +140,8 @@ def marginal_removals(
 ) -> list[tuple[int, int, float | None]]:
     """(size 0) The still-adjacent pairs the marginal test separates, as ``(x, y, p)``, ``x < y``.
 
-    ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized read
-    of the correlation matrix flags every pair with marginal ``p > alpha``; the return is those in
+    ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized
+    all-pairs evaluation flags every pair with marginal ``p > alpha``; the return is those in
     row-major order (matching the serial loop's visitation), each with its p-value, or ``None``
     when ``record_pvalues`` is false; each pair's separating set is empty. With ``trace`` given,
     every adjacent pair's test is recorded.
