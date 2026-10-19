@@ -41,7 +41,7 @@ change names its pull request.
 - `boss` and `grasp` take `score_func="local_score_BDeu"` for categorical data, with the BDeu
   priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
 - `boss` and `grasp` take `score_func="local_score_BIC_categorical"`, the multinomial BIC that
-  `ges`, `hc`, `tabu`, and `exact_search` take for categorical data. ([#TBD])
+  `ges`, `hc`, `tabu`, and `exact_search` take for categorical data. ([#220])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
   only 3; smaller depths search less and run faster. ([#190])
 - `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
@@ -407,3 +407,4 @@ First alpha release.
 [#213]: https://github.com/Abel-ai-lab/andrey/pull/213
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
+[#220]: https://github.com/Abel-ai-lab/andrey/pull/220
