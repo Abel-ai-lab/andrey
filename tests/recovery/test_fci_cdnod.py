@@ -276,26 +276,26 @@ def _invariant_to_column_order(fit, x: np.ndarray, *args) -> bool:
     return in_order_changed
 
 
-def _position_draw(name: str) -> tuple[np.ndarray, tuple, dict]:
-    """A draw, the arguments after it, and the keywords of ``name``'s facade and engine alike, on
-    which firing the orientation rules one at a time differs from rounds under some column order."""
+def _position_draw(name: str) -> tuple[np.ndarray, tuple]:
+    """A draw and the arguments after it, for ``name``'s facade and engine alike, on which firing
+    the orientation rules one at a time differs from rounds under some column order."""
     if name == "pc":
-        return data.sample_scm(d=10, n=100, seed=9, density=4.0).data, (), {}
+        return data.sample_scm(d=10, n=100, seed=9, density=4.0).data, ()
     if name == "cdnod":
         x = data.sample_scm(d=5, n=200, seed=17, density=3.0, scale="standardize").data
         context = np.repeat([0.0, 1.0], 100)
         x[context == 1, 0] += 1.5
-        return x, (context,), {}
+        return x, (context,)
     n, seed = (3000, 9) if name == "fci" else (300, 0)
-    return data.sample_scm(d=6, n=n, seed=seed, density=3.0, latents=1).data, (), {}
+    return data.sample_scm(d=6, n=n, seed=seed, density=3.0, latents=1).data, ()
 
 
 @pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "gfci"])
 def test_tie_break_position_fires_the_orientation_rules_in_column_order(name):
     """``"position"`` reaches the engine as ``in_column_order``, ``"rank"`` as rounds."""
-    x, args, kwargs = _position_draw(name)
-    if name in ("pc", "cdnod"):
-        kwargs = dict(collider_order="p_value")  # only the rules differ between the two settings
+    x, args = _position_draw(name)
+    # Only the rules differ between the two settings, not the order of the colliders.
+    kwargs = dict(collider_order="p_value") if name in ("pc", "cdnod") else {}
     module = "andrey.search.gfci" if name == "gfci" else f"andrey.constraint.{name}"
     engine = getattr(importlib.import_module(module), name)
     facade = getattr(andrey, name)
