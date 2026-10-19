@@ -1269,8 +1269,8 @@ and guidance in [Reading a result](#reading-a-result).
 | `STATUS.json` | job, node, and units done against expected. `complete` stays false until the |
 | | table assembles, so an interrupted run still shows how far it got |
 | `records/` | one parquet per (dataset, solution), written as each finishes |
-| `provenance.json` | package versions and BLAS of the bench venv, CPU, GPU, git sha. Captured |
-| | once, so a resume keeps the recorded build |
+| `provenance.json` | package versions and BLAS of the bench venv (`$ANDREY_BENCH_PYTHON`'s when |
+| | set), CPU, GPU, git sha. Captured once, so a resume keeps the recorded build |
 | `run_meta.json` | flags and literals, written before the first fit |
 | `data/registry.json` | each dataset's generator call and column order; under |
 | | `$ANDREY_BENCH_DATA` when set |

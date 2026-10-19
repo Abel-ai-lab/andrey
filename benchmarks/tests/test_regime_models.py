@@ -182,12 +182,21 @@ def _cl_gin_case(case: int) -> tuple[np.ndarray, list[list[int]]]:
     return (x - x.mean(0)) / x.std(0), clusters
 
 
+def _patched_gin() -> type:
+    """Return the causal-learn GIN adapter, skipping where the reference lacks its patch."""
+    pytest.importorskip("causallearn")
+    from andrey_bench.adapters.causal_learn_gin import CausalLearnGIN, _gin_fixed
+
+    if not _gin_fixed():
+        pytest.skip(
+            "causal-learn GIN lacks the column-index fix: run benchmarks/patch_causal_learn.sh"
+        )
+    return CausalLearnGIN
+
+
 @pytest.mark.parametrize("case", [1, 2])
 def test_causal_learn_gin_recovers_its_own_test_cases(case: int) -> None:
-    pytest.importorskip("causallearn")
-    from andrey_bench.adapters.causal_learn_gin import CausalLearnGIN
-
-    adapter = CausalLearnGIN()
+    adapter = _patched_gin()()
     adapter.setup()
     x, clusters = _cl_gin_case(case)
     truth = latent_dag(encode_clusters(clusters, [], x.shape[1]))
@@ -198,15 +207,13 @@ def test_causal_learn_gin_recovers_its_own_test_cases(case: int) -> None:
 
 
 def test_causal_learn_gin_recovers_a_lane_dataset() -> None:
-    pytest.importorskip("causallearn")
-    from andrey_bench.adapters.causal_learn_gin import CausalLearnGIN
-
+    gin = _patched_gin()
     key = _key("latent_measurement", 8, 1000)
     x, marks, kind, _ = datasets.generate_one(key)
     truth = GraphStructure.from_numpy(
         marks, kind=kind, node_types=datasets.latent_node_types(len(marks), key.latents)
     )
-    adapter = CausalLearnGIN()
+    adapter = gin()
     adapter.setup()
     scores = measurement_scores(adapter.to_structure(adapter.fit(x, adapter.params())), truth)
     assert scores["measurement_cluster_ari"] == 1.0
