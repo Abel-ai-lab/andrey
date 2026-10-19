@@ -9,7 +9,6 @@ from collections.abc import Iterable, Mapping
 from contextlib import nullcontext
 from itertools import combinations, groupby
 from math import comb
-from operator import itemgetter
 
 import numpy as np
 
@@ -26,6 +25,7 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test, pins_blas
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
+from andrey.search._parallel import _KEY_DP
 
 _EXPENSIVE_PASS_TESTS = 10_000_000
 COLLIDER_ORDERS = ("p_value", "column")
@@ -100,13 +100,13 @@ def _orient_colliders(
 
     With ``order="p_value"``, the collider's rank is ``pvalues[(x, z)]``, keyed with the lower index
     first: the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders
-    are oriented from the highest rank to the lowest. Colliders of exactly equal rank are each
-    checked against the marks set before their rank, then all set: an edge two of them dispute ends
-    bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's rules. The result
-    depends on the ranks, not on the column order. With ``order="column"``, ``pvalues`` is not read
-    (it may be empty): the triples are visited by middle node ``y``, then by endpoint pair
-    ``(x, z)``, in ascending column order, each decided against the marks set before it, so no edge
-    ends bidirected and the result depends on the column order.
+    are oriented from the highest rank to the lowest. Colliders whose ranks agree to ``_KEY_DP``
+    decimals are each checked against the marks set before their rank, then all set: an edge two of
+    them dispute ends bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's
+    rules. The result depends on the ranks, not on the column order. With ``order="column"``,
+    ``pvalues`` is not read (it may be empty): the triples are visited by middle node ``y``, then by
+    endpoint pair ``(x, z)``, in ascending column order, each decided against the marks set before
+    it, so no edge ends bidirected and the result depends on the column order.
 
     The private ``_trace`` sink records every unshielded triple in the order decided:
     ``step="collider"``, the ``triple`` ``(x, y, z)``, the pair's ``sepset`` and rank ``p``
@@ -122,8 +122,12 @@ def _orient_colliders(
             if pdag[x, z] == NULL:
                 triples.append((pvalues[(x, z)] if ranked else None, x, y, z))
     if ranked:
-        triples.sort(key=itemgetter(0), reverse=True)
-        groups = [list(tied) for _, tied in groupby(triples, key=itemgetter(0))]
+
+        def rank(triple: tuple) -> float:
+            return round(triple[0], _KEY_DP)
+
+        triples.sort(key=rank, reverse=True)
+        groups = [list(tied) for _, tied in groupby(triples, key=rank)]
     else:
         groups = [[triple] for triple in triples]
     for group in groups:

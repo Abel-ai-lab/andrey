@@ -147,15 +147,15 @@ def pc(
     an edge an arrowhead at both ends, so of two conflicting colliders the one oriented first is
     kept. With the default ``collider_order="p_value"``, each collider ``x -> y <- z`` ranks by the
     largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders are
-    oriented from the highest rank to the lowest. When two conflicting colliders rank exactly
-    equal, the edge they dispute stays undirected, and Meek's rules do not orient it. The colliders
-    therefore do not depend on the column order. This adapts the conflict rule of Ramsey [10]_,
-    which ranks a collider by separating sets that additional tests choose; Andrey ranks it by the
-    tests that removed the edge, so orienting runs no new test. With ``collider_order="column"``,
-    colliders are oriented by middle node, then by endpoint pair, in column order, so the result
-    can depend on the column order. Meek's rules can still depend on the column order: when two
-    rule firings would orient one edge in opposite directions, the one reached first in column
-    order decides.
+    oriented from the highest rank to the lowest. When two conflicting colliders rank equal to nine
+    decimals, the edge they dispute stays undirected, and Meek's rules do not orient it. The
+    colliders therefore do not depend on the column order. This adapts the conflict rule of Ramsey
+    [10]_, which ranks a collider by separating sets that additional tests choose; Andrey ranks it
+    by the tests that removed the edge, so orienting runs no new test. With
+    ``collider_order="column"``, colliders are oriented by middle node, then by endpoint pair, in
+    column order, so the result can depend on the column order. Meek's rules can still depend on the
+    column order: when two rule firings would orient one edge in opposite directions, the one
+    reached first in column order decides.
 
     **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
     default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
