@@ -333,15 +333,20 @@ def test_positions_must_place_every_node_in_the_unit_square(positions) -> None:
 
 
 @pytest.mark.parametrize("marks", [(TAIL, ARROW), (CIRCLE, CIRCLE), (TAIL, TAIL)])
-def test_highlight_rings_the_named_endpoint(marks) -> None:
+def test_highlight_lights_the_named_endpoints_half_of_the_edge(marks) -> None:
     s = _from({(0, 1): marks}, 2, "pag")
     document = minidom.parseString(viz.draw(s, highlight=[(1, 0)]))
-    rings = [c for c in document.getElementsByTagName("circle") if c.getAttribute("class")]
-    assert [r.getAttribute("class") for r in rings] == ["highlight"]
-    ring = (float(rings[0].getAttribute("cx")), float(rings[0].getAttribute("cy")))
+    (glow,) = [e for e in document.getElementsByTagName("line") if e.getAttribute("class")]
+    assert glow.getAttribute("class") == "highlight"
+    assert glow.getAttribute("stroke") == viz.LIGHT.accent
+    end, middle = (
+        (float(glow.getAttribute(f"x{k}")), float(glow.getAttribute(f"y{k}"))) for k in (1, 2)
+    )
     near, far = _centers(document)[1], _centers(document)[0]
-    assert np.hypot(*np.subtract(ring, near)) < np.hypot(*np.subtract(ring, far))
-    assert rings[0].getAttribute("stroke") == viz.LIGHT.accent
+    # The glow runs from the named node's end to the middle of the edge.
+    assert np.hypot(*np.subtract(end, near)) < np.hypot(*np.subtract(end, far))
+    assert np.allclose(middle, np.add(near, far) / 2, atol=1.0)
+    assert not [c for c in document.getElementsByTagName("circle") if c.getAttribute("class")]
     assert "highlight" not in viz.draw(s)
 
 

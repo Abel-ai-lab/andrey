@@ -64,7 +64,7 @@ def test_all_meek_examples_have_real_firings():
         assert any(s["rule"] == rule for s in trace)
 
 
-def test_meek_frames_keep_one_layout_and_ring_each_changed_endpoint():
+def test_meek_frames_keep_one_layout_and_light_each_changed_endpoint():
     frames = learn.meek_frames()
     assert {f["replay"] for f in frames} == set(learn.MEEK_INPUTS)
     layouts, previous = {}, {}
@@ -88,17 +88,18 @@ def test_meek_frames_keep_one_layout_and_ring_each_changed_endpoint():
                 t = np.clip(np.dot(node - a, b - a) / np.dot(b - a, b - a), 0, 1)
                 assert k in ends or np.hypot(*(a + t * (b - a) - node)) > 13
         assert "<path" not in frame["svg"]
-        rings = [c for c in circles if c.getAttribute("class") == "highlight"]
+        lines = document.getElementsByTagName("line")
+        glows = [e for e in lines if e.getAttribute("class") == "highlight"]
         before = previous.get(frame["replay"])
         previous[frame["replay"]] = frame["marks"]
         if before is None:
-            assert not rings
+            assert not glows
             continue
         ((head, tail),) = np.argwhere(frame["marks"] != before)
         assert frame["marks"][head, tail] == 2  # the arrowhead sits at ``head``
-        (ring,) = rings
-        center = np.array([float(ring.getAttribute(k)) for k in ("cx", "cy")])
-        assert int(np.argmin(np.hypot(*(nodes - center).T))) == head
+        (glow,) = glows
+        end = np.array([float(glow.getAttribute(k)) for k in ("x1", "y1")])
+        assert int(np.argmin(np.hypot(*(nodes - end).T))) == head
 
 
 def final_marks(payload):
