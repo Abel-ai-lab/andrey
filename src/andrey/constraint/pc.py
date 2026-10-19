@@ -24,6 +24,7 @@ from andrey.constraint._skeleton import (
     prescreen_capable,
     scan_pairs,
     separate_apart,
+    unseparated_triples,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test, pins_blas
@@ -59,8 +60,10 @@ def pc(
     skeleton search. With ``constraints``, the skeleton search starts from the pairs they allow,
     never tests a required pair, and gives a pair they keep apart a separating set when one exists
     (:func:`_discover_skeleton`); every edge they decide is directed before the colliders, and
-    Meek's rules run with R4, so the result is the class narrowed by the knowledge. Edges they
-    decide that close a directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`).
+    Meek's rules run with R4, so the result is the class narrowed by the knowledge. A triple over a
+    kept-apart pair that no set separates is neither a collider nor a non-collider to any rule
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`). Edges they decide that close a
+    directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`).
     Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
@@ -83,14 +86,16 @@ def pc(
         _trace=_trace,
     )
     rule4 = constraints is not None
+    ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
     if constraints is not None:
         skeleton = orient(skeleton, constraints)
         check_knowledge_cycle((skeleton == TAIL) & (skeleton.T == ARROW))
     pdag = _orient_colliders(skeleton, sepsets, pvalues, order=collider_order, _trace=_trace)
     if _trace is None:
-        return to_structure(_undirect_conflicts(meek(pdag, rule4=rule4)), kind="cpdag")
+        cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous)
+        return to_structure(_undirect_conflicts(cpdag), kind="cpdag")
     firings: list[dict] = []
-    cpdag = meek(pdag, rule4=rule4, _trace=firings)
+    cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous, _trace=firings)
     _trace.extend(dict(step="meek", **firing) for firing in firings)
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 

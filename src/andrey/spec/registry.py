@@ -1273,7 +1273,7 @@ _add(
 _SKELETON_RULE = (
     "The search starts from the allowed pairs and never removes a required pair; a pair the "
     "knowledge keeps apart is tested for a separating set, so colliders over it are oriented as "
-    "usual. "
+    "usual; when no set separates it, no rule orients through its triples. "
 )
 _PAG_MARKS = "In the PAG, a forbidden a -> b puts an arrowhead at a, and a required one is a -> b. "
 _CLASS_RULE = (

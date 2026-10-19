@@ -21,6 +21,7 @@ from andrey.constraint._skeleton import (
     prescreen_capable,
     scan_pairs,
     separate_apart,
+    unseparated_triples,
 )
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
@@ -58,7 +59,8 @@ def fci(
     a required pair, a pair they keep apart gets a separating set when one exists
     (:func:`_fast_adjacency_search`), and :func:`_knowledge_marks` sets their endpoints before the
     orientation rules, which change circles only. A triple over a kept-apart pair that no set
-    separates is neither a collider nor a non-collider to any rule (:func:`_unseparated_triples`).
+    separates is neither a collider nor a non-collider to any rule
+    (:func:`~andrey.constraint._skeleton.unseparated_triples`).
     An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
     ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
     Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
@@ -93,7 +95,7 @@ def fci(
     _knowledge_marks(marks, constraints)
     if constraints is not None:
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
-    ambiguous = _unseparated_triples(marks, sepsets, apart)
+    ambiguous = unseparated_triples(marks != NULL, sepsets, constraints)
     if collider_rule == "majority":
         ambiguous |= _majority_sepsets(
             marks, test, alpha, sepsets, max_depth=max_depth, skip=ambiguous
@@ -382,26 +384,6 @@ def _majority_sepsets(
                 else:
                     sepsets[pair] = tuple(node for node in recorded if node != b)
     return frozenset(ambiguous)
-
-
-def _unseparated_triples(
-    marks: np.ndarray,
-    sepsets: Mapping[tuple[int, int], tuple[int, ...]],
-    apart: np.ndarray | None,
-) -> frozenset[tuple[int, int, int]]:
-    """The unshielded triples over a pair in the boolean ``apart`` that has no separating set.
-
-    The data find such a pair dependent although background knowledge keeps it apart, so the
-    triple is ambiguous: no rule reads it as a collider or a non-collider. ``None`` gives none.
-    """
-    if apart is None:
-        return frozenset()
-    triples = set()
-    for b in range(marks.shape[0]):
-        for a, c in combinations(_adjacent_nodes(marks, b), 2):
-            if apart[a, c] and _sepset(sepsets, a, c) is None:
-                triples.add(_triple(a, b, c))
-    return frozenset(triples)
 
 
 def _orient_colliders(

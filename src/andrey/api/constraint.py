@@ -91,8 +91,8 @@ def pc(
         allowed to be adjacent, and tiers, all honored. The search starts from the allowed pairs and
         never removes a required pair; a pair the knowledge keeps apart is tested for a separating
         set, so colliders over it are oriented as usual. When no set separates the pair, which means
-        the data find the two dependent, no collider is oriented over it and Meek's rules treat its
-        triples as non-colliders. The result directs every edge the knowledge decides, then Meek's
+        the data find the two dependent, no rule reads its triples as colliders or non-colliders, so
+        none orients through them. The result directs every edge the knowledge decides, then Meek's
         rules direct the edges that follow; knowledge that directs the edges the data keep into a
         cycle raises ``ValueError``.
 
@@ -777,8 +777,8 @@ def cdnod(
         allowed to be adjacent, and tiers, all honored. The search starts from the allowed pairs and
         never removes a required pair; a pair the knowledge keeps apart is tested for a separating
         set, so colliders over it are oriented as usual. When no set separates the pair, which means
-        the data find the two dependent, no collider is oriented over it and Meek's rules treat its
-        triples as non-colliders. The result directs every edge the knowledge decides, then Meek's
+        the data find the two dependent, no rule reads its triples as colliders or non-colliders, so
+        none orients through them. The result directs every edge the knowledge decides, then Meek's
         rules direct the edges that follow; knowledge that directs the edges the data keep into a
         cycle raises ``ValueError``. The domain index is unconstrained.
 

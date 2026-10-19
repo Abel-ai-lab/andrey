@@ -11,14 +11,18 @@ one chunk in memory however many subsets it visits.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from contextlib import nullcontext
 from itertools import combinations, islice
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from andrey.core import backend
 from andrey.core.ci import CITest, pins_blas
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 #: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
 #: p-value is ``None`` when the scan does not record it.
@@ -267,6 +271,30 @@ def separate_apart(
             ]
             size += 1
     return found
+
+
+def unseparated_triples(
+    adjacency: np.ndarray,
+    sepsets: Mapping[tuple[int, int], object],
+    constraints: Constraints | None,
+) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples ``(a, b, c)``, ``a < c``, over a kept-apart pair no set separates.
+
+    ``adjacency`` is the boolean skeleton and ``sepsets`` the separating sets, keyed in either
+    order. The data find a pair ``constraints`` keep apart that ``sepsets`` leaves out dependent,
+    although no edge joins it, so whether ``b`` is a collider is unknown: no rule reads the triple
+    as a collider or a non-collider. Without constraints the search tested every pair it left
+    non-adjacent, and there are none.
+    """
+    if constraints is None:
+        return frozenset()
+    apart = ~constraints.support()
+    triples = set()
+    for b, row in enumerate(adjacency):
+        for a, c in combinations(np.flatnonzero(row).tolist(), 2):
+            if apart[a, c] and (a, c) not in sepsets and (c, a) not in sepsets:
+                triples.add((a, b, c))
+    return frozenset(triples)
 
 
 def adjacent_pairs(adjacency: np.ndarray) -> list[tuple[int, int]]:

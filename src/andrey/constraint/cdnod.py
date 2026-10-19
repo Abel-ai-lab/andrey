@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.constraint._skeleton import unseparated_triples
 from andrey.constraint.pc import (
     _discover_skeleton,
     _orient_colliders,
@@ -117,6 +118,7 @@ def cdnod(
             max_depth=max_depth,
             constraints=constraints,
         )
+        ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
         pdag = _orient_with_context(
             skeleton,
             sepsets,
@@ -138,15 +140,20 @@ def cdnod(
             max_depth=max_depth,
             constraints=padded,
         )
+        ambiguous = unseparated_triples(skeleton != NULL, sepsets, padded)
         pdag = _orient_with_context(
             skeleton, sepsets, pvalues, context=d, order=collider_order, constraints=padded
         )
         if dependence_threshold is not None:
             changing = np.nonzero(skeleton[d] != NULL)[0].tolist()
             pdag = _orient_by_independent_changes(
-                meek(pdag, rule4=rule4), X, context[:, 0], changing, dependence_threshold
+                meek(pdag, rule4=rule4, ambiguous=ambiguous),
+                X,
+                context[:, 0],
+                changing,
+                dependence_threshold,
             )
-    completed = _undirect_conflicts(meek(pdag, rule4=rule4))
+    completed = _undirect_conflicts(meek(pdag, rule4=rule4, ambiguous=ambiguous))
     return to_structure(completed[:d, :d], kind="cpdag")
 
 

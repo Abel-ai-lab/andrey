@@ -26,7 +26,7 @@ https://arxiv.org/abs/1302.4972
 from __future__ import annotations
 
 import heapq
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 
 import numpy as np
 
@@ -158,7 +158,13 @@ def from_structure(structure: GraphStructure) -> np.ndarray:
 # ---- Meek completion ----------------------------------------------------------------------------
 
 
-def meek(pdag: np.ndarray, *, rule4: bool = False, _trace: list[dict] | None = None) -> np.ndarray:
+def meek(
+    pdag: np.ndarray,
+    *,
+    rule4: bool = False,
+    ambiguous: Collection[tuple[int, int, int]] = frozenset(),
+    _trace: list[dict] | None = None,
+) -> np.ndarray:
     """Complete a PDAG to a CPDAG by applying Meek's rules R1-R3 to a fixed point.
 
     Returns a new endpoint-mark matrix. Each rule directs an undirected edge only when doing so
@@ -171,6 +177,11 @@ def meek(pdag: np.ndarray, *, rule4: bool = False, _trace: list[dict] | None = N
     ``i -- j``, ``i -- k``, ``k -> m -> j`` with ``i`` adjacent to ``m`` and ``k``, ``j``
     non-adjacent, it orients ``i -> j``.
 
+    R1, R3, and R4 each read an unshielded triple whose middle node is not a collider. A triple
+    ``(a, b, c)`` in ``ambiguous``, middle node ``b`` and endpoints in either order, has an unknown
+    collider status, such as a triple over a pair the data find dependent although no edge joins
+    it; no rule reads it, so no rule orients through it.
+
     The completion is defined for a collider-consistent PDAG (as produced by
     :func:`orient_colliders`); on an inconsistent PDAG the fixed point can depend on rule-firing
     order. R1 visits the directed edges ``i -> j`` by ``i``, then ``j``, so when two of them demand
@@ -180,6 +191,7 @@ def meek(pdag: np.ndarray, *, rule4: bool = False, _trace: list[dict] | None = N
     before/after endpoint matrices. Matrices are copied only when a trace is requested.
     """
     adj = _validate_adjacency(pdag)
+    ambiguous = frozenset((min(a, c), b, max(a, c)) for a, b, c in ambiguous)
     changed = True
     while changed:
         changed = False
@@ -187,7 +199,7 @@ def meek(pdag: np.ndarray, *, rule4: bool = False, _trace: list[dict] | None = N
         directed = np.argwhere((adj == TAIL) & (adj.T == ARROW))  # rows (i, j): i -> j
         for i, j in directed.tolist():
             for k in np.nonzero((adj[j] == TAIL) & (adj[:, j] == TAIL))[0].tolist():
-                if k == i or _is_adjacent(adj, i, k):
+                if k == i or _is_adjacent(adj, i, k) or _is_ambiguous(ambiguous, i, j, k):
                     continue
                 if not _reaches_directed(adj, k, j):
                     if _trace is not None:
@@ -229,7 +241,9 @@ def meek(pdag: np.ndarray, *, rule4: bool = False, _trace: list[dict] | None = N
             found = False
             for a in range(len(cand)):
                 for b in range(a + 1, len(cand)):
-                    if not _is_adjacent(adj, cand[a], cand[b]):
+                    if not _is_adjacent(adj, cand[a], cand[b]) and not _is_ambiguous(
+                        ambiguous, cand[a], i, cand[b]
+                    ):
                         found = True
                         break
                 if found:
@@ -248,14 +262,22 @@ def meek(pdag: np.ndarray, *, rule4: bool = False, _trace: list[dict] | None = N
                         )
                     )
                 changed = True
-        if rule4 and _rule4(adj, _trace):
+        if rule4 and _rule4(adj, ambiguous, _trace):
             changed = True
     return adj
 
 
-def _rule4(adj: np.ndarray, _trace: list[dict] | None) -> bool:
+def _is_ambiguous(ambiguous: frozenset[tuple[int, int, int]], a: int, b: int, c: int) -> bool:
+    """Whether the triple ``a - b - c`` is in ``ambiguous``, keyed ``(min(a, c), b, max(a, c))``."""
+    return bool(ambiguous) and (min(a, c), b, max(a, c)) in ambiguous
+
+
+def _rule4(
+    adj: np.ndarray, ambiguous: frozenset[tuple[int, int, int]], _trace: list[dict] | None
+) -> bool:
     """Meek's R4 over every undirected edge, in place: ``i -- j``, ``i -- k``, ``k -> m -> j``,
-    ``i`` adjacent to ``m``, and ``k``, ``j`` non-adjacent  =>  ``i -> j``."""
+    ``i`` adjacent to ``m``, and ``k``, ``j`` non-adjacent  =>  ``i -> j``; a triple ``k - i - j``
+    in ``ambiguous`` does not count."""
     changed = False
     for i, j in np.argwhere((adj == TAIL) & (adj.T == TAIL)).tolist():
         if not _is_undirected(adj, i, j):
@@ -267,7 +289,12 @@ def _rule4(adj: np.ndarray, _trace: list[dict] | None) -> bool:
             for k in np.nonzero((adj[:, mid] == TAIL) & (adj[mid] == ARROW))[
                 0
             ].tolist():  # k -> mid
-                if k not in (i, j) and _is_undirected(adj, i, k) and not _is_adjacent(adj, k, j):
+                if (
+                    k not in (i, j)
+                    and _is_undirected(adj, i, k)
+                    and not _is_adjacent(adj, k, j)
+                    and not _is_ambiguous(ambiguous, k, i, j)
+                ):
                     hit = (i, k, mid, j)
                     break
             if hit:

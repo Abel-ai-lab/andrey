@@ -234,6 +234,38 @@ def test_meek_rule4_orients_what_knowledge_implies():
     assert meek(pdag)[i, j] == TAIL and meek(pdag)[j, i] == TAIL
     out = meek(pdag, rule4=True)
     assert out[i, j] == TAIL and out[j, i] == ARROW
+    out = meek(pdag, rule4=True, ambiguous={(k, i, j)})
+    assert out[i, j] == TAIL and out[j, i] == TAIL
+
+
+def _pdag(d: int, undirected=(), directed=()) -> np.ndarray:
+    pdag = np.zeros((d, d), dtype=np.int8)
+    for a, b in undirected:
+        pdag[a, b] = pdag[b, a] = TAIL
+    for a, b in directed:
+        pdag[a, b], pdag[b, a] = TAIL, ARROW
+    return pdag
+
+
+@pytest.mark.parametrize(
+    ("pdag", "edge", "triple"),
+    [
+        # R1: i -> j -- k  =>  j -> k, unless the triple i - j - k is ambiguous.
+        (_pdag(3, undirected=[(1, 2)], directed=[(0, 1)]), (1, 2), (2, 1, 0)),
+        # R3: i -- j, i -- k, j -> t <- k, i -- t  =>  i -> t, unless j - i - k is ambiguous.
+        (
+            _pdag(4, undirected=[(0, 1), (0, 2), (0, 3)], directed=[(1, 3), (2, 3)]),
+            (0, 3),
+            (1, 0, 2),
+        ),
+    ],
+)
+def test_meek_does_not_orient_through_an_ambiguous_triple(pdag, edge, triple):
+    a, b = edge
+    out = meek(pdag)
+    assert out[a, b] == TAIL and out[b, a] == ARROW
+    out = meek(pdag, ambiguous={triple})
+    assert out[a, b] == TAIL and out[b, a] == TAIL
 
 
 def test_admits_rejects_a_class_the_knowledge_contradicts():
@@ -291,6 +323,24 @@ def test_a_pair_kept_apart_keeps_its_collider(name):
     assert marks[y, x] == ARROW and marks[y, z] == ARROW
     if name not in PAGS:
         assert marks[x, y] == TAIL and marks[z, y] == TAIL
+
+
+def _joined(seed: int = 0, n: int = 1000) -> pd.DataFrame:
+    # x -> z, x -> y <- z: no set separates x and z.
+    rng = np.random.default_rng(seed)
+    x, y, z = rng.uniform(-1.0, 1.0, (3, n))
+    z = 0.8 * x + z
+    return pd.DataFrame({"x": x, "y": 0.8 * x + 0.8 * z + y, "z": z})
+
+
+@pytest.mark.parametrize("name", ["pc", "cdnod"])
+def test_no_rule_orients_through_a_kept_apart_pair_the_data_join(name):
+    # x -> y and x, z kept apart: R1 would read x -> y -- z as a non-collider and direct y -> z.
+    knowledge = Knowledge(required=[("x", "y")], forbidden=[("x", "z"), ("z", "x")])
+    marks, labels = _marks(_fit(name, _joined(), knowledge=knowledge))
+    x, y, z = (labels.index(v) for v in "xyz")
+    assert marks[x, y] == TAIL and marks[y, x] == ARROW
+    assert marks[y, z] == TAIL and marks[z, y] == TAIL
 
 
 def test_a_skeleton_as_knowledge_keeps_the_colliders():

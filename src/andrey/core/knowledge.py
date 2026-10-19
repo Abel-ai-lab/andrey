@@ -96,8 +96,9 @@ class Knowledge:
     -----
     The constraint-based methods start from the allowed pairs in place of the complete graph and
     never test a required pair, so neither is removed; a pair the knowledge keeps apart is tested
-    for a separating set, so colliders over it are oriented as usual, and knowledge that directs the
-    edges the data keep into a cycle raises ``ValueError``. A method whose result is an equivalence
+    for a separating set, so colliders over it are oriented as usual (when no set separates it, no
+    rule orients through its triples), and knowledge that directs the edges the data keep into a
+    cycle raises ``ValueError``. A method whose result is an equivalence
     class (a CPDAG) directs every edge the knowledge decides and then applies Meek's rules [1]_,
     including the fourth, which background knowledge needs; the result is the class of graphs that
     agree with both the data and the knowledge, still tagged ``cpdag``. In a PAG, a forbidden
