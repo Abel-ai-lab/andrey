@@ -287,7 +287,7 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "fast",
+    possible_dsep: str = "order_free",
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -332,14 +332,12 @@ def fci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"fast", "order_free"}, default="fast"
-        How FCI builds each possible-d-separation set [2]_ [3]_, the nodes it conditions on to
-        remove edges the first step kept. ``"fast"`` checks each node when the search reaches it,
-        so the set depends on the order the search visits nodes, and visits the pairs in column
-        order, each removal changing the sets of the pairs after it. ``"order_free"`` checks every
-        node once the search ends and tests every pair on the graph as the step starts, so
-        neither the sets nor the removals depend on the column order; its sets can be larger, so
-        it can run more tests. See Notes.
+    possible_dsep : {"order_free", "fast"}, default="order_free"
+        The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
+        kept, one at a time, so each removal changes what the step tests after it.
+        ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
+        so the result does not depend on the column order unless two columns are identical.
+        ``"fast"`` visits them in column order. Both take about the same time. See Notes.
 
     Returns
     -------
@@ -401,9 +399,9 @@ def fci(
     stands and sets them together, except that an endpoint two of them would mark one as an
     arrowhead and one as a tail stays a circle. The rounds repeat until no mark changes. Rule R4
     decides an endpoint by every shortest discriminating path, so paths whose tests disagree leave
-    it a circle. The orientation rules therefore do not depend on the column order. With
-    ``possible_dsep="order_free"`` neither does the result; with ``"fast"`` it can, through the
-    possible-d-separation step. A fixed column order gives reproducible results.
+    it a circle. The orientation rules therefore do not depend on the column order, and with
+    ``possible_dsep="order_free"`` neither does the result, unless two columns are identical. With
+    ``"fast"`` the result can depend on the column order through the possible-d-separation step.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
@@ -414,21 +412,18 @@ def fci(
     **Possible-d-separation set.** FCI builds each possible-d-separation set [2]_ [3]_ with a search
     that walks out from one endpoint of the pair and keeps a node when a node it was reached from
     has a possibly directed path, one with no arrowhead pointing back along it, to the endpoint or
-    to the node. With ``possible_dsep="fast"``, FCI checks a node when the search reaches it,
-    against the nodes it was reached from so far, so the set depends on the order the search visits
-    nodes. With ``"order_free"``, it checks every node once the search ends, against all the nodes
-    it was reached from, so the set does not depend on that order; it holds every node of the
-    ``"fast"`` set and sometimes more. Either set can be smaller than the published definition of
-    the set [2]_, so FCI can keep an edge that the published set would remove, even with exact
-    tests. FCI keeps this search because the published set grows quickly with the graph, the
-    search's set is the one FCI has been measured with, and on simulated data the published set did
-    not give more accurate PAGs. FCI tests every subset of the set, except the empty set and the
-    subsets of either endpoint's neighbors, which the first step already tested. With ``"fast"``,
-    FCI visits the pairs in column order, removes a pair as soon as a subset separates it, and
-    records that subset, so each removal changes the sets of the pairs after it. With
-    ``"order_free"``, it tests every pair on the graph as the step starts and removes the pairs
-    found independent together [4]_, recording the union of the separating subsets of the smallest
-    size from either endpoint's set.
+    to the node. FCI checks a node when the search reaches it, against the nodes it was reached
+    from so far, so the set depends on the order the search visits nodes. The set can be smaller
+    than the published definition of the set [2]_, so FCI can keep an edge that the published set
+    would remove, even with exact tests. FCI keeps this search because the published set grows
+    quickly with the graph, the search's set is the one FCI has been measured with, and on
+    simulated data the published set did not give more accurate PAGs. FCI tests every subset of the
+    set, except the empty set and the subsets of either endpoint's neighbors, which the first step
+    already tested. It visits the pairs one at a time, removes a pair as soon as a subset separates
+    it, and records that subset, so each removal changes the sets of the pairs after it. With
+    ``possible_dsep="order_free"``, the pairs, the nodes of each search, and the subsets follow the
+    rank :func:`~andrey.search.hc.tie_ranks` computes from each column's data, which moves with its
+    column when the columns are reordered; with ``"fast"``, they follow the column order.
 
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union
@@ -499,7 +494,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "fast",
+    possible_dsep: str = "order_free",
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -552,13 +547,12 @@ def gfci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"fast", "order_free"}, default="fast"
-        How GFCI builds each possible-d-separation set [2]_ [4]_, the nodes it conditions on to
-        remove edges the adjacency search kept. ``"fast"`` checks each node when the search reaches
-        it, so the set depends on the order the search visits nodes, and visits the pairs in column
-        order. ``"order_free"`` checks every node once the search ends and tests every pair on the
-        graph as the step starts, so neither the sets nor the removals depend on the column order;
-        its sets can be larger, so it can run more tests. See Notes.
+    possible_dsep : {"order_free", "fast"}, default="order_free"
+        The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
+        search kept, one at a time, so each removal changes what the step tests after it.
+        ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
+        so the result does not depend on the column order unless two columns are identical.
+        ``"fast"`` visits them in column order. Both take about the same time. See Notes.
 
     Returns
     -------
@@ -610,7 +604,7 @@ def gfci(
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
     It considers every circle path, up to a fixed search bound, and rule R8 checks each pair of
-    endpoints in both orders. GFCI shares FCI's possible-d-separation sets [2]_ [4]_, built as
+    endpoints in both orders. GFCI shares FCI's possible-d-separation step [2]_ [4]_, in the order
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 

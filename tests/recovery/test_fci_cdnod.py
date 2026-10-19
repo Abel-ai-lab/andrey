@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-from functools import partial
 
 import numpy as np
 import pytest
@@ -407,12 +406,12 @@ def test_pag_orientations_are_invariant_to_column_order(module, draw):
 
 
 @pytest.mark.parametrize("module", ["andrey.constraint.fci", "andrey.search.gfci"])
-def test_order_free_possible_dsep_is_invariant_to_column_order(module):
+def test_possible_dsep_is_invariant_to_column_order(module):
     """A draw on which the possible-d-separation step removes different edges when it visits
     them in column order."""
     x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1).data
     fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
-    assert _invariant_to_column_order(partial(fit, possible_dsep="order_free"), x)
+    assert _invariant_to_column_order(fit, x)
 
 
 def test_fci_output_contract():
