@@ -21,7 +21,7 @@ so no color is transcribed here.
 - **`blog.css`** - the blog's post list and post card, and a post's cover and figures.
   Loaded on blog pages only.
 - **`column-order.js`** - shuffles the columns of the 0.7.0 post's column-order figure, which
-  `docs/blog/0.7.0/order.py` generates. Loaded on that post only.
+  `docs/blog/0.7.0/figures.py` generates. Loaded on that post only.
 - **`examples.css`** - the Examples gallery's cards and the frame an interactive example fills.
   Loaded on the gallery and the example pages only.
 - **`benchmarks.css`** - the Release cards page: the latest release's cover beside its TL;DR, and

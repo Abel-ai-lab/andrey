@@ -346,7 +346,7 @@ def compare_table() -> str:
         ("Tabu search", ("same", None, None, "changed", None, None)),
         ("BOSS", ("same", "changed", None, None, None, "changed")),
         ("GRaSP", ("same", "changed", None, None, None, "changed")),
-        ("GIN", ("same", "changed", None, None, None, "changed")),
+        ("GIN", ("same", "bug", None, None, None, "changed")),
     )
     marks = {
         "same": ("co-yes", "Same graph", "Same graph under every reordering"),
@@ -358,6 +358,7 @@ def compare_table() -> str:
             "Order-free colliders; Meek's rules changed 1 of 3",
         ),
         "runs": ("co-name", "By run", "Varies between runs, not with the order"),
+        "bug": ("co-no", "Changed*", "Tests columns by position, a known bug"),
     }
 
     def cell(value: str | None) -> str:
@@ -375,10 +376,12 @@ def compare_table() -> str:
         '<figure class="cm"><div class="cm-scroll"><table class="cm-table">'
         f"<thead><tr><td></td>{head}</tr></thead><tbody>{body}</tbody></table></div>"
         "<figcaption>Each package at its defaults, on three small datasets per method, each in "
-        "nine column orders. By name: the graph follows the variables' names, so it holds when "
-        "the names move with the columns and can change when they follow the positions, as a "
-        "bare array's do. By run: pgmpy's hill climbing breaks ties in Python's hash order, which "
-        "changes between runs.</figcaption></figure>\n"
+        "nine column orders; causal-learn's and Tetrad's BOSS and GRaSP ran without their own "
+        "randomness, so only the order varied. By name: the graph follows the variables' names, "
+        "so it holds when the names move with the columns and can change when they follow the "
+        "positions, as a bare array's do. By run: pgmpy's hill climbing breaks ties in Python's "
+        "hash order, which changes between runs. * causal-learn's GIN also tests columns by "
+        "position, a known bug (py-why/causal-learn#271).</figcaption></figure>\n"
     )
 
 
