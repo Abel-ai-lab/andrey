@@ -38,6 +38,7 @@ eaau4996. https://doi.org/10.1126/sciadv.aau4996
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -45,6 +46,7 @@ import numpy as np
 
 from andrey.core import backend
 from andrey.core.ci import FisherZ, PartialCorrelationTest, SingularCorrelationError, StudentT
+from andrey.core.score import copies_error
 
 # A lagged variable ``(i, lag)``: variable ``i`` at time ``t - lag``.
 Link = tuple[int, int]
@@ -129,12 +131,31 @@ class DesignTest:
 def design_test(indep_test: str, data: np.ndarray, tau_max: int) -> DesignTest:
     """The ``indep_test`` partial-correlation test over the lagged design of ``data``.
 
-    Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
+    Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`, and
+    :class:`~andrey.core.score.CopiedColumnsError` when design columns repeat others up to scale
+    and shift: a variable that copies another, at the same step or some lags apart. A copy at one
+    step repeats at every lag of the design, so the error names each group that holds a lag-0
+    column, by :func:`design_column_name`.
     """
     if indep_test not in INDEP_TESTS:
         raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     design = lagged_design(data, tau_max)
-    return DesignTest(INDEP_TESTS[indep_test](design), design)
+    test = INDEP_TESTS[indep_test](design)
+    n_vars = data.shape[1]
+    groups = [group for group in test.copies() if group[0] < n_vars]
+    if groups:
+        raise copies_error(groups, design_column_name(n_vars))
+    return DesignTest(test, design)
+
+
+def design_column_name(n_vars: int, name: Callable[[int], str] = str) -> Callable[[int], str]:
+    """Name design column ``lag * n_vars + i`` as ``name(i)``, with ``at lag {lag}`` from lag 1."""
+
+    def column(j: int) -> str:
+        lag, i = divmod(j, n_vars)
+        return name(i) if lag == 0 else f"{name(i)} at lag {lag}"
+
+    return column
 
 
 def lagged_design(data: np.ndarray, tau_max: int) -> np.ndarray:
