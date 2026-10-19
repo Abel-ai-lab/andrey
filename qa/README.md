@@ -15,12 +15,14 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 
 ## FCI column order
 
-FCI and GFCI depend on column order. `column_order.py` measures how much, for the column-order
-sentence in the 0.1.0 benchmark report. It fits both methods on 237 latent-confounded models
-(Erdos-Renyi and scale-free graphs with one hidden confounder, 6-12 nodes, 500-5000 samples, seeds
-0-9), refits each on three seeded column orders, maps the answers back, and counts the relabelings
-that change any endpoint mark. It is a measurement with no passing threshold: permutation equality
-is not a requirement for these methods.
+`column_order.py` measures how often reordering the columns changes FCI's and GFCI's endpoint
+marks, for the column-order sentence in the 0.1.0 benchmark report. It fits both methods on 237
+latent-confounded models (Erdos-Renyi and scale-free graphs with one hidden confounder, 6-12 nodes,
+500-5000 samples, seeds 0-9), refits each on three seeded column orders, maps the answers back, and
+counts the relabelings that change any endpoint mark. With the default
+`possible_dsep="order_free"`, a reordering relabels the marks and changes nothing else, unless two
+columns are identical; with `"fast"`, the possible-d-separation step can change them. It is a
+measurement with no passing threshold.
 
 ```shell
 uv run python -m qa.column_order

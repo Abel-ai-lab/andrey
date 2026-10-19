@@ -10,6 +10,7 @@ from andrey import data
 from andrey.constraint.pc import _discover_skeleton, _orient_colliders
 from andrey.core import TAIL, GraphStructure
 from andrey.core.orient import meek, pdag2dag
+from andrey.search.hc import tie_ranks
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -65,15 +66,33 @@ def test_cdnod_finds_no_edge_between_independent_columns():
     assert andrey.cdnod(x, domain).structure.oriented_edges() == []
 
 
-def _stub_measure(independent: set[tuple[int, int, tuple[int, ...]]]) -> type:
-    """A module measure that is 0.01 for the listed ``(cause, effect, Z)`` and 0.5 otherwise."""
+def _stub_measure(
+    independent: set[tuple[int, int, tuple[int, ...]]], columns: np.ndarray | None = None
+) -> type:
+    """A module measure that is 0.01 for the listed ``(cause, effect, Z)`` and 0.5 otherwise.
+
+    The step runs on its data sorted by rank, so the stub reads its indices as positions in
+    ``columns``, the data a fit was given, and finds each of its own columns there by value; with
+    no ``columns`` it reads them as they are.
+    """
 
     class Stub:
         def __init__(self, data: np.ndarray, context: np.ndarray) -> None:
             self.n_features = data.shape[1]
+            self.label = list(range(self.n_features))
+            if columns is not None:
+                self.label = [
+                    next(j for j, col in enumerate(columns.T) if np.array_equal(col, own))
+                    for own in data.T
+                ]
 
         def __call__(self, cause: int, effect: int, cond: list[int]) -> float:
-            return 0.01 if (cause, effect, tuple(sorted(cond))) in independent else 0.5
+            key = (
+                self.label[cause],
+                self.label[effect],
+                tuple(sorted(self.label[z] for z in cond)),
+            )
+            return 0.01 if key in independent else 0.5
 
     return Stub
 
@@ -190,18 +209,18 @@ def test_cdnod_runs_the_independent_change_step_on_variables_that_change(monkeyp
     seen: list[list[int]] = []
     step = engine._orient_by_independent_changes
 
-    def spy(pdag, data, context, changing, threshold):
+    def spy(pdag, data, context, changing, threshold, **kwargs):
         seen.append(list(changing))
-        return step(pdag, data, context, changing, threshold)
+        return step(pdag, data, context, changing, threshold, **kwargs)
 
     monkeypatch.setattr(engine, "_orient_by_independent_changes", spy)
-    monkeypatch.setattr(engine, "_ModuleDependence", _stub_measure({(0, 1, ())}))
     rng = np.random.default_rng(0)
     domain = np.repeat(np.arange(4.0), 200)
     x = 1.0 * domain + rng.standard_normal(800)
     y = x + 0.5 * domain + rng.standard_normal(800)
     z = rng.standard_normal(800)
     data = np.column_stack([x, y, z])
+    monkeypatch.setattr(engine, "_ModuleDependence", _stub_measure({(0, 1, ())}, data))
     assert andrey.cdnod(data, domain).structure.oriented_edges() == [(0, 1, "undirected")]
     assert seen == []
     out = andrey.cdnod(data, domain, dependence_threshold=0.05)
@@ -327,6 +346,102 @@ def test_cdnod_orientations_are_invariant_to_column_order():
     assert _invariant_to_column_order(cdnod, x, context)
 
 
+def _changing_domains(d: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """600 rows from 20 domains of a random linear DAG over ``d`` variables, columns shuffled.
+
+    Each edge weight and each variable's noise scale are drawn once per domain; 70% of the
+    variables also shift their mean per domain, so the index keeps an edge to each of them under a
+    mixed-data test. Returns ``(data, domain_index)``.
+    """
+    rng = np.random.default_rng(seed)
+    n, n_domains = 600, 20
+    edge = np.triu(rng.random((d, d)) < 2.0 / (d - 1), 1)
+    weight = rng.choice([-1, 1], (d, d)) * rng.uniform(0.6, 1.2, (d, d))
+    domain = np.repeat(np.arange(n_domains), n // n_domains)
+    shifts = rng.random(d) < 0.7
+    x = np.zeros((n, d))
+    for j in range(d):
+        for i in np.flatnonzero(edge[:, j]):
+            x[:, j] += weight[i, j] * rng.uniform(0.4, 1.6, n_domains)[domain] * x[:, i]
+        x[:, j] += rng.uniform(0.5, 2.0, n_domains)[domain] * rng.standard_normal(n)
+        if shifts[j]:
+            x[:, j] += rng.uniform(-3.0, 3.0, n_domains)[domain]
+    return x[:, rng.permutation(d)], domain.astype(float)
+
+
+@pytest.mark.parametrize(("d", "seed"), [(5, 34), (6, 0)])
+def test_cdnod_independent_change_step_is_invariant_to_column_order(d, seed):
+    """Draws on which the step orients edges, and visiting them in column order depends on it."""
+    x, domain = _changing_domains(d, seed)
+    engine = importlib.import_module("andrey.constraint.cdnod")
+    categorical = np.zeros(d, dtype=bool)
+
+    def fit(x, domain, **kwargs):
+        return engine.cdnod(
+            x,
+            domain,
+            indep_test="cond_gauss",
+            categorical=categorical,
+            dependence_threshold=0.1,
+            **kwargs,
+        )
+
+    skipped = engine.cdnod(x, domain, indep_test="cond_gauss", categorical=categorical)
+    assert not np.array_equal(fit(x, domain).to_numpy(), skipped.to_numpy())
+    assert _invariant_to_column_order(fit, x, domain)
+
+
+@pytest.mark.parametrize(("d", "seed"), [(5, 34), (6, 0)])
+def test_cdnod_independent_change_step_visits_columns_by_rank(monkeypatch, d, seed):
+    """On the step's own input, relabeling the nodes relabels its orientations; with
+    ``in_column_order`` the columns are visited by position, so it does not, and on columns
+    already sorted by rank it gives the default's orientations."""
+    engine = importlib.import_module("andrey.constraint.cdnod")
+    step = engine._orient_by_independent_changes
+    calls: list[tuple] = []
+
+    def spy(*args, **kwargs):
+        calls.append(args)
+        return step(*args, **kwargs)
+
+    monkeypatch.setattr(engine, "_orient_by_independent_changes", spy)
+    x, domain = _changing_domains(d, seed)
+    engine.cdnod(
+        x,
+        domain,
+        indep_test="cond_gauss",
+        categorical=np.zeros(d, dtype=bool),
+        dependence_threshold=0.1,
+    )
+    ((pdag, columns, context, changing, threshold),) = calls
+
+    def relabeled(order: np.ndarray, **kwargs) -> np.ndarray:
+        """The step on ``order``'s columns and nodes, its orientations mapped back."""
+        nodes = np.append(order, np.arange(d, len(pdag)))
+        back = np.argsort(nodes)
+        marks = step(
+            pdag[np.ix_(nodes, nodes)],
+            columns[:, order],
+            context,
+            [int(back[c]) for c in changing],
+            threshold,
+            **kwargs,
+        )
+        return marks[np.ix_(back, back)]
+
+    marks = step(pdag, columns, context, changing, threshold)
+    assert not np.array_equal(marks, pdag)
+    in_order = step(pdag, columns, context, changing, threshold, in_column_order=True)
+    in_order_changed = False
+    for seed in range(4):
+        order = np.random.default_rng(seed).permutation(d)
+        assert np.array_equal(relabeled(order), marks)
+        in_order_changed |= not np.array_equal(relabeled(order, in_column_order=True), in_order)
+    assert in_order_changed
+    by_rank = np.argsort(tie_ranks(columns))
+    assert np.array_equal(relabeled(by_rank, in_column_order=True), marks)
+
+
 @pytest.mark.parametrize(
     ("module", "draw"),
     [
@@ -337,6 +452,15 @@ def test_cdnod_orientations_are_invariant_to_column_order():
 def test_pag_orientations_are_invariant_to_column_order(module, draw):
     """Seeds on which FCI's rules mark one endpoint both ways."""
     x = data.sample_scm(d=6, density=3.0, latents=1, **draw).data
+    fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
+    assert _invariant_to_column_order(fit, x)
+
+
+@pytest.mark.parametrize("module", ["andrey.constraint.fci", "andrey.search.gfci"])
+def test_possible_dsep_is_invariant_to_column_order(module):
+    """A draw on which the possible-d-separation step removes different edges when it visits
+    them in column order."""
+    x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1).data
     fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
     assert _invariant_to_column_order(fit, x)
 
