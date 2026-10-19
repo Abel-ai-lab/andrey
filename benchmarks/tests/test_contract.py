@@ -68,7 +68,7 @@ def test_the_campaign_a_user_runs_produces_what_the_readme_promises(tmp_path):
 
     Every other test reaches `run_batch` directly, so nothing covers argument parsing, the
     output layout, or completion. It skips without a bench-env for the fits, or without
-    causal-learn or gCastle, which `benchmark.py` rosters.
+    causal-learn, which `benchmark.py` rosters.
     """
     from andrey_bench import runner
 
@@ -76,8 +76,7 @@ def test_the_campaign_a_user_runs_produces_what_the_readme_promises(tmp_path):
         runner._bench_python()
     except FileNotFoundError as exc:
         pytest.skip(f"no bench-env for the fits: {exc}")
-    for module, package in (("causallearn", "causal-learn"), ("castle", "gcastle")):
-        pytest.importorskip(module, reason=f"{package} is not installed")
+    pytest.importorskip("causallearn", reason="causal-learn is not installed")
     bench = __import__("pathlib").Path(__file__).resolve().parents[1]
     out = tmp_path / "run"
     done = subprocess.run(
@@ -104,10 +103,11 @@ def test_the_campaign_a_user_runs_produces_what_the_readme_promises(tmp_path):
     for promised in ("runs.parquet", "provenance.json", "run_meta.json", "data/registry.json"):
         assert (out / promised).exists(), f"README promises {promised}; the run did not write it"
 
+    import benchmark
     import pandas as pd
 
     rows = pd.read_parquet(out / "runs.parquet")
-    assert len(rows) == 4, f"one fit per rostered solution; got {len(rows)}"
+    assert len(rows) == len(benchmark.SOLUTIONS), f"one fit per rostered solution; got {len(rows)}"
     assert set(rows["status"]) == {"ok"}, dict(rows["status"].value_counts())
 
     # The empty graph is the floor: it scores the truth's edge count, so nothing should be worse.

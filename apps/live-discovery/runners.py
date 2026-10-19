@@ -7,7 +7,7 @@ import numpy as np
 from andrey import GraphStructure
 
 PACKAGES = {
-    "PC": ("Andrey", "causal-learn", "gCastle"),
+    "PC": ("Andrey", "causal-learn"),
     "DirectLiNGAM": ("Andrey", "causal-learn", "lingam"),
     "FCI": ("Andrey", "causal-learn"),
 }
@@ -65,11 +65,6 @@ def prepare(package, method, data):
             lambda: fci(data, independence_test_method="fisherz", alpha=0.05, show_progress=False),
             lambda result: signed_marks(result[0].graph),
         )
-    if package == "gCastle" and method == "PC":
-        from castle.algorithms import PC
-
-        model = PC(alpha=0.05, ci_test="fisherz", variant="stable")
-        return lambda: model.learn(data), lambda _: adjacency_marks(model.causal_matrix)
     if method == "DirectLiNGAM":
         if package == "causal-learn":
             from causallearn.search.FCMBased.lingam import DirectLiNGAM
