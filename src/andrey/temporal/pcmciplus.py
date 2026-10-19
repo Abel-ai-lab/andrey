@@ -49,6 +49,7 @@ from itertools import combinations
 
 import numpy as np
 
+from andrey.core import backend
 from andrey.core.structure import ARROW, NULL, TAIL
 from andrey.temporal.pcmci import INDEP_TESTS, Link, LinkTest, design_test, pc1
 
@@ -425,7 +426,8 @@ def pcmciplus(
         )
     data = np.asarray(data, dtype=np.float64)
     test = design_test(indep_test, data, tau_max)
-    return run_phases(test, data.shape[1], tau_max, pc_alpha, collider_rule)
+    with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
+        return run_phases(test, data.shape[1], tau_max, pc_alpha, collider_rule)
 
 
 def run_phases(

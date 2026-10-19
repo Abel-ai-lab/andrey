@@ -125,6 +125,8 @@ change names its pull request.
   `search_method`, and under any column order, because it orients the edges the class leaves
   reversible by a rank computed from each column's own data, so the DAG can differ from before but
   its class does not. ([#TBD])
+- `pcmciplus` runs its tests on one BLAS thread, as `pcmci` and `lpcmci` do, so the host's BLAS
+  thread count cannot change its p-values. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 

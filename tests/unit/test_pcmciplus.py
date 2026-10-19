@@ -11,8 +11,9 @@ import numpy as np
 import pytest
 from scipy.linalg import solve_discrete_lyapunov
 
+import andrey.temporal.pcmciplus as pcmciplus_module
 from andrey.api._temporal import _adapt_pcmciplus
-from andrey.core import ARROW, NULL, TAIL
+from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.temporal.pcmciplus import (
     COLLIDER_RULES,
     PCMCIPlusResult,
@@ -226,3 +227,21 @@ def test_unknown_names_raise_naming_the_choices():
         pcmciplus(_chain_series(100), indep_test="spearman")
     with pytest.raises(ValueError, match=r"collider_rule must be one of \['majority', "):
         pcmciplus(_chain_series(100), collider_rule="vote")
+
+
+def test_pcmciplus_runs_its_phases_on_one_blas_thread(monkeypatch):
+    from threadpoolctl import threadpool_info, threadpool_limits
+
+    if not threadpool_info():
+        pytest.skip("no thread pool that threadpoolctl can control")
+    counts = []
+
+    def recording_run_phases(*args):
+        counts.append({lib["num_threads"] for lib in threadpool_info()})
+        return run_phases(*args)
+
+    monkeypatch.setattr(pcmciplus_module, "run_phases", recording_run_phases)
+    backend._thread_pools.cache_clear()  # pools loaded by earlier tests are found again
+    with threadpool_limits(limits=2):  # a count other than 1, set after the pools were found
+        pcmciplus(_chain_series(100))
+    assert counts == [{1}]
