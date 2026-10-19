@@ -9,6 +9,7 @@ import andrey
 from andrey.core.orient import from_structure, pdag2dag
 from andrey.core.score import BICScore
 from andrey.metrics import markov_equivalent
+from andrey.search import exact as exact_module
 from andrey.search import gies as gies_search
 from andrey.search.gies import cut_pairs, replace_unprotected
 from tests.recovery.helpers import datagen
