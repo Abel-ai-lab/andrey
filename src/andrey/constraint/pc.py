@@ -222,7 +222,8 @@ def _discover_skeleton(
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
 
     The private ``_trace`` sink records every test in the order it runs: ``step="test"``,
-    ``depth``, the pair ``x < y``, the conditioning set ``S``, the p-value ``p``, and ``removed``
+    ``depth``, the pair ``x < y``, the conditioning set ``S``, the p-value ``p`` (for CMIknn, which
+    stops its shuffles once the side of ``alpha`` is certain, a bound on that side), and ``removed``
     (``p > alpha``: the test separates the pair, so the edge is removed when its depth ends). A
     trace needs every p-value in this process, so tracing scans serially.
     """

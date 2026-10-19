@@ -72,6 +72,7 @@ FUNCTIONAL_TO_ANDREY = {
     "linear": "linear",
     "anm": "additive_noise",
     "pnl": "post_nonlinear",
+    "nonmonotone": "nonmonotone",
     "var": "var",
 }
 STANDARDIZE_TO_SCALE = {
@@ -105,6 +106,11 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # PNL is identifiable. The inner transform is linear and the outer one nonlinear and invertible.
     # At ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "pnl_pair": ("er", "pnl", "laplace", "standardized"),
+    # Nonlinear additive noise without hidden nodes: PC with the nonlinear CI tests.
+    "anm_er": ("er", "anm", "gaussian", "standardized"),
+    # Additive noise through cos, an even function: a child is uncorrelated with a symmetric
+    # parent, so partial correlation misses edges the nonlinear CI tests find.
+    "nonmonotone_er": ("er", "nonmonotone", "gaussian", "standardized"),
     # Categorical data from a discrete network, Dirichlet tables on an ER DAG: the chi-square and
     # G-square tests and the BDeu score. Codes are categories, so they are never rescaled.
     "discrete_er": ("er", "categorical", "dirichlet", "raw"),

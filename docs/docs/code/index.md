@@ -8,7 +8,8 @@ meta:
 # API reference
 
 The public API of Andrey - everything exported by `andrey`, `andrey.metrics`, and `andrey.viz`,
-and the dataset loaders and simulators of `andrey.data` - generated from the source docstrings.
+the dataset loaders and simulators of `andrey.data`, and the conditional-independence tests of
+`andrey.core` - generated from the source docstrings.
 `andrey.__version__` gives the installed version.
 
 ## Structure-learning methods
@@ -44,8 +45,9 @@ data raises a `ValueError` that names the argument and, for a bad cell, its row 
 single column gives a one-node graph.
 
 `pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
-`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`
-and `"cond_gauss"` for mixed data.
+`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and
+`"cond_gauss"` for mixed data, and the experimental nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`,
+and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
 
 ### Supported methods
 
@@ -117,6 +119,69 @@ has:
 
 `tests/unit/test_spec_registry.py` checks each criterion for every supported method.
 
+### Conditional-independence tests
+
+PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_test`:
+
+| `indep_test` | Test | Status |
+|---|---|---|
+| `"fisherz"` | Partial correlation with Fisher's z-transform: linear effects, Gaussian noise | Supported |
+| `"student_t"` | Partial correlation with a Student-t p-value, exact for Gaussian data at any size | Supported |
+| `"chisq"`, `"gsq"` | Pearson's chi-square and G-square on category codes | Supported |
+| `"degen_gauss"`, `"cond_gauss"` | Degenerate and conditional Gaussian likelihood ratios on mixed data | Experimental |
+| `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Experimental |
+| `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Experimental |
+| `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Experimental |
+| `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Experimental |
+
+The experimental tests detect nonlinear dependence that partial correlation misses, at a far
+higher cost per test, and have no published benchmark yet. Each warns with
+{py:class}`~andrey.ExperimentalWarning` the first time a process builds it. Inside the search,
+KCI uses every BLAS thread from 2,000 rows and the other tests use one. On every thread,
+a p-value repeats for a fixed thread count and can differ in the last digits between thread counts.
+By name, a test runs with its default settings.
+{py:func}`~andrey.core.ci.make_indep_test` passes keyword settings to the test it builds; to run
+other settings in a search, register a variant with {py:func}`~andrey.core.ci.register_indep_test`
+and select it by its new name:
+
+```python
+from functools import partial
+
+import andrey
+from andrey.core.ci import make_indep_test, register_indep_test
+
+test = make_indep_test("cmiknn", data, k_cmi=5)  # five neighbors
+p = test(0, 1, [2])
+cmi = test.statistic(0, 1, [2])  # the estimate itself, in nats
+
+register_indep_test("cmiknn_k5", partial(make_indep_test, "cmiknn", k_cmi=5))
+andrey.pc(data, indep_test="cmiknn_k5")
+```
+
+{py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
+mutual information estimate the test's p-value is built on, a dependence measure of its own.
+
+```{eval-rst}
+.. currentmodule:: andrey.core
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+
+   ci.FisherZ
+   ci.StudentT
+   ci_kernel.KCI
+   ci_kernel.RCoT
+   ci_cmiknn.CMIknn
+   ci_gpdc.GPDC
+   ci.CITest
+   ci.register_indep_test
+   ci.available_indep_tests
+   ci.make_indep_test
+
+.. currentmodule:: andrey
+```
+
 ## Graph structures
 
 ```{eval-rst}
@@ -160,6 +225,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.PerformanceWarning` | A call that will run correctly but slowly: a PC conditioning pass of at least ten million CI tests. |
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
+| {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
 | {py:class}`~andrey.DataTypeWarning` | A mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
@@ -195,6 +261,7 @@ name.
    PerformanceWarning
    BackendFallbackWarning
    SearchLimitWarning
+   SampleSizeWarning
    DataTypeWarning
 ```
 

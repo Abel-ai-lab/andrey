@@ -260,15 +260,15 @@ def test_cdnod_output_contract():
     assert out.structure.kind == "cpdag"
 
 
-def test_fci_rejects_non_fisherz():
+def test_fci_rejects_unknown_indep_test():
     with pytest.raises(NotImplementedError):
-        andrey.fci(datagen.generate("gauss_5v"), indep_test="kci")
+        andrey.fci(datagen.generate("gauss_5v"), indep_test="no_such_test")
 
 
-def test_cdnod_rejects_non_fisherz():
+def test_cdnod_rejects_unknown_indep_test():
     x, c = datagen.generate("gauss_5v"), datagen.domain_index("gauss_5v")
     with pytest.raises(NotImplementedError):
-        andrey.cdnod(x, c, indep_test="kci")
+        andrey.cdnod(x, c, indep_test="no_such_test")
 
 
 def test_cdnod_rejects_mismatched_context():

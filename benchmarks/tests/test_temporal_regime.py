@@ -93,6 +93,8 @@ def test_the_datasets_measured_before_the_lagged_regime_keep_their_identity():
         "latent_lingam_er": ("424a811a2462", "a04ce0fceceb"),
         "anm_pair": ("3fc95594c2c1", "a200dd78d80c"),
         "pnl_pair": ("dae8d1a6f304", "d015f7add4b2"),
+        "anm_er": ("3fc95594c2c1", "a200dd78d80c"),
+        "nonmonotone_er": ("ff3373b815bf", "94b3f4a7f493"),
         "discrete_er": ("389cde24484c", "1cff12e9af03"),
         "mixed_er": ("7fb1f31c503f", "cb7595f71def"),
     }

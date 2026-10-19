@@ -385,6 +385,6 @@ def test_gfci_output_contract():
     assert andrey.gfci(datagen.generate("gauss_5v")).structure.kind == "pag"
 
 
-def test_gfci_rejects_non_fisherz():
+def test_gfci_rejects_unknown_indep_test():
     with pytest.raises(NotImplementedError):
-        andrey.gfci(datagen.generate("gauss_5v"), indep_test="kci")
+        andrey.gfci(datagen.generate("gauss_5v"), indep_test="no_such_test")

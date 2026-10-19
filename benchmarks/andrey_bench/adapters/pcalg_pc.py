@@ -63,3 +63,43 @@ class PcalgPC(RAdapter):
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+_R_SOURCE_RCOT = """
+andrey_pcalg_pc_rcot <- function(X, alpha) {
+    # RCIT's RCoT at Andrey's RCoT settings: 5 features for x and y, 100 for the conditioning set,
+    # the Hall-Buckley-Eagleson p-value, and a fixed seed for each query's features.
+    rcot <- function(x, y, S, suffStat) {
+        z <- if (length(S)) suffStat$X[, S, drop = FALSE] else NULL
+        RCIT::RCoT(suffStat$X[, x], suffStat$X[, y], z, approx = "hbe", num_f = 100, num_f2 = 5,
+                   seed = 0)$p
+    }
+    fit <- pcalg::pc(list(X = X), indepTest = rcot, alpha = alpha, labels = colnames(X))
+    t(as(fit, "amat")) * 1
+}
+"""
+
+
+class PcalgPCRCoT(PcalgPC):
+    """pcalg's PC with RCIT's RCoT, the R reference for Andrey's PC with ``indep_test="rcot"``.
+
+    RCIT (Strobl, GitHub ``ericstrobl/RCIT``) is the implementation RCoT was published with; its
+    ``RCoT`` runs at Andrey's settings (see the R source); with an empty conditioning set it calls
+    ``RIT``, the same test without the regression. ``package_version`` names both packages.
+    """
+
+    name: str = "pcalg.pc.rcot"
+    package: str = "pcalg+RCIT"
+    package_version: str = (
+        f"pcalg {rsession.package_version('pcalg')}; RCIT {rsession.package_version('RCIT')}"
+    )
+    r_source: str = _R_SOURCE_RCOT
+    r_function: str = "andrey_pcalg_pc_rcot"
+
+    def setup(self) -> None:
+        """Start R, load pcalg and RCIT, and define the entry point. Untimed; see `rsession`."""
+        rsession.start("pcalg", "RCIT").define(self.r_source)
+
+    def params(self) -> dict[str, Any]:
+        """RCoT at `alpha=0.05`, in Andrey's names."""
+        return {"alpha": _DEFAULT_ALPHA, "indep_test": "rcot"}

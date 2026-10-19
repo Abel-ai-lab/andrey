@@ -34,8 +34,9 @@ The backend and the worker count can also be set in code. The most specific sett
 - `ANDREY_DEVICE`: another name for `ANDREY_BACKEND`; if you set both, `ANDREY_BACKEND` takes
   precedence, but both values must be valid.
 
-A GPU speeds up covariance, correlation, and entropy. GES, hill climbing, and the other searches run
-on the CPU. An operation without the requested backend uses `auto`, without a warning.
+A GPU speeds up covariance, correlation, entropy, and the KCI and CMIknn tests. GES, hill climbing,
+and the other searches run on the CPU. An operation without the requested backend uses `auto`,
+without a warning.
 
 ## Parallel search
 
@@ -53,8 +54,14 @@ The cutoff matters only with more than one worker. `andrey calibrate` measures i
   elements (rows times columns). The default is `90000`.
 - `ANDREY_ENTROPY_GPU_THRESHOLD`: the same for the entropy terms of DirectLiNGAM and the methods
   built on it. The default is `6250`.
-- `ANDREY_GPU_CALIBRATE`: when on, the first `auto` use of each operation measures where `cuda`
-  starts to beat NumPy on this machine, and keeps the result in
+- `ANDREY_KCI_GPU_THRESHOLD`: under `auto`, a KCI query with a conditioning set runs on `cuda`, in
+  float64, from this many kernel-matrix elements (rows squared). The default is `31250`, about 177
+  rows.
+- `ANDREY_CMIKNN_GPU_THRESHOLD`: the same for a CMIknn query, from this many distance-matrix
+  elements (rows squared). The default is `1024`, 32 rows. Its p-values on `cuda` equal those on
+  the CPU.
+- `ANDREY_GPU_CALIBRATE`: when on, the first `auto` use of covariance, correlation, or entropy
+  measures where `cuda` starts to beat NumPy on this machine, and keeps the result in
   `$XDG_CACHE_HOME/andrey/gpu_calibration.json`, else `~/.cache/andrey/gpu_calibration.json`. Off
   by default. A threshold you set wins.
 

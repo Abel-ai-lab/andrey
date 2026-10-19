@@ -2,7 +2,9 @@
 
 Both configurations use Fisher-Z at ``alpha=0.05`` on numpy with serial execution. The majority
 configuration has its own solution name and records ``collider_rule`` in the measured parameters.
-Fits return PAG endpoint marks, preserving circles and arrowheads for endpoint-aware scoring.
+``AndreyFCI(indep_test="kci")`` and the other nonlinear tests are separate solutions, named
+``andrey.fci.<indep_test>.numpy``, each at the test's default settings. Fits return PAG endpoint
+marks, preserving circles and arrowheads for endpoint-aware scoring.
 """
 
 from __future__ import annotations
@@ -10,6 +12,8 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 import numpy as np
+
+from andrey_bench.adapters.andrey_pc import NONLINEAR_TEST_MODULES
 
 # Equalized constraint+latent-lane pins (Fisher-Z CI test at alpha=0.05); runner params override them.
 _DEFAULT_ALPHA = 0.05
@@ -39,12 +43,21 @@ class AndreyFCI:
     algorithm: str = "fci"
     output_type: str = "pag"
 
-    def __init__(self, collider_rule: str = "sepsets") -> None:
+    def __init__(
+        self, collider_rule: str = "sepsets", indep_test: str = _DEFAULT_INDEP_TEST
+    ) -> None:
         if collider_rule not in ("sepsets", "majority"):
             raise ValueError(f"Unsupported collider_rule: {collider_rule!r}")
+        if indep_test != _DEFAULT_INDEP_TEST and indep_test not in NONLINEAR_TEST_MODULES:
+            raise ValueError(f"Unsupported indep_test: {indep_test!r}")
         self.collider_rule = collider_rule
+        self.indep_test = indep_test
+        parts = ["andrey.fci"]
         if collider_rule == "majority":
-            self.name = "andrey.fci.majority.numpy"
+            parts.append("majority")
+        if indep_test != _DEFAULT_INDEP_TEST:
+            parts.append(indep_test)
+        self.name = ".".join([*parts, "numpy"])
 
     def setup(self) -> None:
         """Import Andrey and its FCI implementation before timing.
@@ -53,14 +66,19 @@ class AndreyFCI:
         that import from `fit`, including the first timed fit at `--warmup 0`.
         See `contracts.SetupAdapter`.
         """
+        import importlib
+
         import andrey  # noqa: F401
         from andrey.constraint.fci import fci  # noqa: F401
+
+        if self.indep_test in NONLINEAR_TEST_MODULES:
+            importlib.import_module(NONLINEAR_TEST_MODULES[self.indep_test])
 
     def params(self) -> dict[str, Any]:
         """Return the CI settings and the selected collider rule."""
         return {
             "alpha": _DEFAULT_ALPHA,
-            "indep_test": _DEFAULT_INDEP_TEST,
+            "indep_test": self.indep_test,
             "collider_rule": self.collider_rule,
         }
 
@@ -70,14 +88,18 @@ class AndreyFCI:
         Runner parameters override the adapter's CI settings and collider rule. The returned
         matrix uses ``NULL=0``, ``TAIL=1``, ``ARROW=2``, and ``CIRCLE=3``.
         """
+        import warnings
+
         import andrey
 
         alpha = float(params.get("alpha", _DEFAULT_ALPHA))
-        indep_test = params.get("indep_test", _DEFAULT_INDEP_TEST)
+        indep_test = params.get("indep_test", self.indep_test)
         collider_rule = params.get("collider_rule", self.collider_rule)
 
         X = np.asarray(data, dtype=np.float64)
-        out = andrey.fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+            out = andrey.fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule)
         return np.asarray(out.structure.to_numpy())
 
     def to_structure(self, native: np.ndarray) -> Any:

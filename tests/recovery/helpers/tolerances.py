@@ -162,4 +162,9 @@ SPEC: dict[str, dict] = {
         "structural": ["graph", "causal_order"],
         "numeric": {"weighted_adjacency": {"atol": 1e-6, "rtol": 1e-5}},
     },
+    # --- Nonlinear conditional-independence tests: the p-values of the case's queries.
+    "KCI": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "RCoT": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "CMIknn": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
+    "GPDC": {"structural": [], "numeric": {"pvalues": {"atol": 1e-6, "rtol": 1e-5}}},
 }

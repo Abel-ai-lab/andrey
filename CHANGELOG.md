@@ -40,6 +40,21 @@ change names its pull request.
   of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
   only 3; smaller depths search less and run faster. ([#190])
+- `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
+  detect nonlinear dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#209])
+- The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
+  and have reference pages; `make_indep_test` passes settings to them, a variant registered with
+  `register_indep_test` is selected by name, `CMIknn(k_cmi=...)` takes a neighbor count or a
+  fraction of the rows, and `CMIknn.statistic` returns its conditional mutual information
+  estimate. ([#209])
+- `SampleSizeWarning`: RCoT warns when it conditions on fewer than 500 rows, the smallest sample
+  size its reference evaluates. ([#209])
+- `KCI(rank=...)`, a low-rank KCI for many rows: each kernel becomes an incomplete Cholesky
+  factor of at most `rank` columns. ([#209])
+- `andrey.data.sample_scm(functional="nonmonotone")`, additive noise through `cos`, whose effects
+  partial correlation does not see. ([#209])
+- KCI and CMIknn run on a CUDA GPU, KCI in float64 and CMIknn with the CPU's p-values, from the
+  cutoffs `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`. ([#209])
 
 ### Changed
 
@@ -370,3 +385,4 @@ First alpha release.
 [#206]: https://github.com/Abel-ai-lab/andrey/pull/206
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
 [#208]: https://github.com/Abel-ai-lab/andrey/pull/208
+[#209]: https://github.com/Abel-ai-lab/andrey/pull/209
