@@ -13,9 +13,11 @@ import pytest
 import andrey
 from andrey import Knowledge
 from andrey.cli import main
+from andrey.constraint.fci import _fci_orient
 from andrey.core import ARROW, TAIL
 from andrey.core.knowledge import admits, resolve
 from andrey.core.orient import dag2cpdag, from_structure, meek
+from andrey.core.structure import CIRCLE
 from andrey.spec import REGISTRY
 
 METHODS = [name for name, spec in REGISTRY.items() if spec.knowledge]
@@ -63,16 +65,13 @@ def _marks(out) -> tuple[np.ndarray, list[str]]:
     return from_structure(structure), list(structure.labels)
 
 
-@pytest.mark.parametrize("name", METHODS)
-def test_required_forbidden_and_tiers_hold(name, data):
-    out = _fit(name, data, knowledge=KNOWLEDGE)
-    marks, labels = _marks(out)
+def _assert_required_forbidden_and_tiers_hold(name: str, marks: np.ndarray, labels: list[str]):
     at = labels.index
 
     def directed(x, y):
         return marks[at(x), at(y)] == TAIL and marks[at(y), at(x)] == ARROW
 
-    assert directed("b", "f"), out.structure.oriented_edges()
+    assert directed("b", "f"), marks
     assert not directed("c", "d") and not directed("e", "d")
     for early in EARLY:
         for late in LATE:
@@ -84,6 +83,29 @@ def test_required_forbidden_and_tiers_hold(name, data):
                     assert directed(early, late), (early, late)
     if name not in PAGS and marks[at("c"), at("d")]:
         assert directed("d", "c")
+
+
+@pytest.mark.parametrize("name", METHODS)
+def test_required_forbidden_and_tiers_hold(name, data):
+    marks, labels = _marks(_fit(name, data, knowledge=KNOWLEDGE))
+    _assert_required_forbidden_and_tiers_hold(name, marks, labels)
+
+
+@pytest.mark.parametrize("in_column_order", [False, True])
+@pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "gfci"])
+def test_knowledge_holds_whether_the_rules_run_in_rounds_or_one_at_a_time(
+    name, in_column_order, data
+):
+    constraints = resolve(KNOWLEDGE, len(LABELS), LABELS, method=name)
+    X = data.to_numpy()
+    kwargs = dict(constraints=constraints, in_column_order=in_column_order)
+    if name == "cdnod":
+        domain = np.repeat([0.0, 1.0], len(X) // 2)
+        structure = importlib.import_module("andrey.constraint.cdnod").cdnod(X, domain, **kwargs)
+    else:
+        module = "andrey.search.gfci" if name == "gfci" else f"andrey.constraint.{name}"
+        structure = getattr(importlib.import_module(module), name)(X, **kwargs)
+    _assert_required_forbidden_and_tiers_hold(name, from_structure(structure), LABELS)
 
 
 @pytest.mark.parametrize("name", METHODS)
@@ -181,6 +203,28 @@ def test_max_depth_caps_the_conditioning_sets(name, monkeypatch):
     assert max(largest) <= 1
 
 
+@pytest.mark.parametrize("in_column_order", [False, True])
+def test_max_depth_caps_the_conditioning_sets_of_rule_r4(in_column_order):
+    # 0 *-> 1 <-* 2 o-o 3 with 1 -> 3 and 0, 3 non-adjacent: R4 tests 0 and 3 given {1, 2} and {1}.
+    marks = np.zeros((4, 4), dtype=np.int8)
+    for u, v in [(0, 1), (1, 2), (2, 3), (1, 3)]:
+        marks[u, v] = marks[v, u] = CIRCLE
+    marks[1, 0] = marks[1, 2] = marks[3, 1] = ARROW
+    marks[1, 3] = TAIL
+    sizes: list[int] = []
+
+    def test(x, y, condition_set):
+        sizes.append(len(condition_set))
+        return 0.0
+
+    for max_depth, largest in [(None, 2), (1, 1), (0, 0)]:
+        sizes.clear()
+        _fci_orient(
+            marks.copy(), test, 0.05, {}, max_depth=max_depth, in_column_order=in_column_order
+        )
+        assert max(sizes, default=0) == largest
+
+
 def test_knowledge_checks_its_shape():
     with pytest.raises(TypeError, match="pairs"):
         Knowledge(required=["ab"])
@@ -242,7 +286,8 @@ def test_from_skeleton_takes_a_result_or_a_matrix(data):
     assert Knowledge.from_skeleton(np.array([[0, 1], [0, 0]])).allowed == ((0, 1),)
 
 
-def test_meek_rule4_orients_what_knowledge_implies():
+@pytest.mark.parametrize("in_column_order", [False, True])
+def test_meek_rule4_orients_what_knowledge_implies(in_column_order):
     # i -- j, i -- k, i -- m, k -> m -> j, k and j non-adjacent  =>  i -> j.
     i, j, k, m = range(4)
     pdag = np.zeros((4, 4), dtype=np.int8)
@@ -250,10 +295,11 @@ def test_meek_rule4_orients_what_knowledge_implies():
         pdag[a, b] = pdag[b, a] = TAIL
     for a, b in ((k, m), (m, j)):
         pdag[a, b], pdag[b, a] = TAIL, ARROW
-    assert meek(pdag)[i, j] == TAIL and meek(pdag)[j, i] == TAIL
-    out = meek(pdag, rule4=True)
+    order = dict(in_column_order=in_column_order)
+    assert meek(pdag, **order)[i, j] == TAIL and meek(pdag, **order)[j, i] == TAIL
+    out = meek(pdag, rule4=True, **order)
     assert out[i, j] == TAIL and out[j, i] == ARROW
-    out = meek(pdag, rule4=True, ambiguous={(k, i, j)})
+    out = meek(pdag, rule4=True, ambiguous={(k, i, j)}, **order)
     assert out[i, j] == TAIL and out[j, i] == TAIL
 
 
@@ -279,12 +325,25 @@ def _pdag(d: int, undirected=(), directed=()) -> np.ndarray:
         ),
     ],
 )
-def test_meek_does_not_orient_through_an_ambiguous_triple(pdag, edge, triple):
+@pytest.mark.parametrize("in_column_order", [False, True])
+def test_meek_does_not_orient_through_an_ambiguous_triple(pdag, edge, triple, in_column_order):
     a, b = edge
-    out = meek(pdag)
+    out = meek(pdag, in_column_order=in_column_order)
     assert out[a, b] == TAIL and out[b, a] == ARROW
-    out = meek(pdag, ambiguous={triple})
+    out = meek(pdag, ambiguous={triple}, in_column_order=in_column_order)
     assert out[a, b] == TAIL and out[b, a] == TAIL
+
+
+def test_meek_rounds_read_only_the_triples_that_are_not_ambiguous():
+    # 3 -> 0 -- 2 -> 1 -- 3: R1 gives 0 -> 2 and 1 -> 3 (2 and 3 are non-adjacent), which close the
+    # cycle 0 -> 2 -> 1 -> 3 -> 0 together, so a round leaves both edges undirected.
+    pdag = _pdag(4, undirected=[(0, 2), (1, 3)], directed=[(2, 1), (3, 0)])
+    out = meek(pdag)
+    assert out[0, 2] == TAIL and out[2, 0] == TAIL and out[1, 3] == TAIL and out[3, 1] == TAIL
+    # With the triple 2 - 1 - 3 ambiguous, 1 -> 3 is not implied, so 0 -> 2 closes no cycle.
+    out = meek(pdag, ambiguous={(2, 1, 3)})
+    assert out[0, 2] == TAIL and out[2, 0] == ARROW
+    assert out[1, 3] == TAIL and out[3, 1] == TAIL
 
 
 def test_admits_rejects_a_class_the_knowledge_contradicts():
