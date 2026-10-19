@@ -102,6 +102,21 @@ def direct_lingam(
     number of variables. With the ``torch`` extra and a CUDA GPU, entropy computations move to the
     GPU once they are large enough.
 
+    **Ties.** Two candidates that are interchangeable in the sample, such as two binary columns
+    with the same number of ones, have equal scores up to rounding, which differs between CPUs.
+    Each step treats candidates as tied when the square roots of their negated scores lie within
+    ``1e-10`` of the best one, and picks among them by a rank computed from each column's own data,
+    as :func:`~andrey.hc` does. The rank moves with the column, so reordering the columns reorders
+    the causal order and changes nothing else, unless two columns are identical, and the same data
+    give the same order on other machines.
+
+    **Copies.** Two columns are copies when one leaves at most ``1e-12`` of the other's variance
+    unexplained, as for a column and a rescaled or rank-reversed copy of it. Each step scores one
+    column per group of copies, the one that ranks first by the same rank, and when it is picked
+    the other copies follow it directly in the order. Each of them gets a single edge from it,
+    weighted by the scale between the two, and no edges to later columns, which take their edges
+    from the column it copies.
+
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
     stayed below the empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20
@@ -280,6 +295,11 @@ def multi_group_direct_lingam(
 
     Notes
     -----
+    **Ties.** Each step sums the groups' scores and breaks ties as :func:`~andrey.direct_lingam`
+    does, ranking each column by its data stacked over the groups. Columns that are copies in any
+    group are handled as copies are in :func:`~andrey.direct_lingam`; a copy gets its single edge
+    only in the groups where it is one.
+
     **Limitations.** Measured on three groups of 1,000 rows over the same variables, from one
     sparse random graph (mean degree 2) with linear effects, uniform noise, and weights drawn for
     each group, from 5 to 20 variables. Its median errors (SHD summed over the groups) were 0 at 5

@@ -111,6 +111,16 @@ change names its pull request.
   `boss` no longer raises `ValueError` or `StopIteration` and no search picks parents by a wrong or
   minus-infinite score: collinear parents are fit by the columns that span them, and a node its
   parents determine scores `inf`, unavailable as under the BIC. ([#203])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` treat
+  causal-order candidates whose scores differ only by rounding as tied and pick among them by a
+  rank computed from each column's own data, so two interchangeable columns, such as two balanced
+  binary columns, no longer get a different order on another CPU or after reordering the columns.
+  ([#TBD])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` score
+  one column per group of copies, where a column copies another up to scale when it leaves at
+  most `1e-12` of the other's variance unexplained. The other copies follow it directly in the
+  causal order and each takes a single edge from it, so copies no longer come ahead of their
+  causes and give the same graph on every CPU. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 
