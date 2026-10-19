@@ -9,11 +9,20 @@ change names its pull request.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-31
+
 ### Highlights
 
+- Permutation invariance: hill climbing, tabu search, BOSS, GRaSP, and GIN return the same graph,
+  up to relabeling its nodes, however the columns are ordered, PC's skeleton and colliders no
+  longer depend on the order, and the data generators and the published networks shuffle their
+  columns, so column order no longer reveals the causal order. The 0.7.0 post gives the
+  measurements. ([#168], [#179], [#192], [#202], [#215])
 - Seven more methods are supported: `gfci`, `cdnod`, `gies`, `exact_search`, `calm`,
   `multi_group_direct_lingam`, and `gin` have published benchmarks in the 0.7.0 release card and
   checks in the release quality gate, and no longer warn with `ExperimentalWarning`. ([#184])
+- Faster GES: `ges` runs more than 60x faster than causal-learn at 50 to 150 variables, with the
+  same graph on every dataset at those sizes. ([#169])
 
 ### Breaking
 
@@ -304,7 +313,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...v0.4.1
