@@ -300,24 +300,19 @@ def reorder_chart() -> str:
         ("Tabu search, BIC", 150, (0, 118, None)),
         ("BOSS", 150, (0, 146, 137)),
         ("GRaSP", 150, (0, 149, 150)),
-        ("GIN", 15, (0, "11*", None)),  # *: see the caption
+        ("GIN", 15, (0, 11, None)),
     )
 
-    def cell(value: int | str | None, total: int, best: int) -> str:
+    def cell(value: int | None, total: int, best: int) -> str:
         if value is None:
             return '<td class="rt-na">-</td>'
-        count = int(str(value).rstrip("*"))
-        cls = ' class="rt-best"' if count == best else ""
-        mark = "*" if str(value).endswith("*") else ""
-        return f"<td{cls}>{count} / {total}{mark}</td>"
+        cls = ' class="rt-best"' if value == best else ""
+        return f"<td{cls}>{value} / {total}</td>"
 
     head = "".join(f'<th scope="col">{b}</th>' for b in builds)
     body = "".join(
         f'<tr><th scope="row">{method}</th>'
-        + "".join(
-            cell(v, total, min(int(str(x).rstrip("*")) for x in values if x is not None))
-            for v in values
-        )
+        + "".join(cell(v, total, min(x for x in values if x is not None)) for v in values)
         + "</tr>"
         for method, total, values in rows
     )
@@ -325,9 +320,7 @@ def reorder_chart() -> str:
         '<figure class="rt"><p class="rt-title">Datasets where reordering the columns changed the '
         'graph (lower is better)</p><div class="rt-scroll"><table class="rt-table">'
         f"<thead><tr><td></td>{head}</tr></thead><tbody>{body}</tbody></table></div>"
-        "<figcaption>Each dataset fit in its own column order and five reorderings, ten for GIN. "
-        "* GIN before 0.7.0's fix, its root test using each cluster's first column."
-        "</figcaption></figure>\n"
+        "</figure>\n"
     )
 
 

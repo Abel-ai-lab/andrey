@@ -861,14 +861,6 @@ ul.ablog-archive {
   color: var(--andrey-muted);
 }
 
-.rt figcaption {
-  margin-top: 0.6rem;
-  text-align: left;
-  color: var(--andrey-muted);
-  font-size: 0.85rem;
-  line-height: 1.45;
-}
-
 @keyframes grow {
   from {
     transform: scaleX(0);
