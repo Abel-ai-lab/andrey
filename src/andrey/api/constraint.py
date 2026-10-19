@@ -151,9 +151,13 @@ def pc(
     which ranks a collider by separating sets that additional tests choose; Andrey ranks it by the
     tests that removed the edge, so orienting runs no new test. With ``collider_order="column"``,
     colliders are oriented by middle node, then by endpoint pair, in column order, so the result
-    can depend on the column order. Meek's rules can still depend on the column order: when two
-    rule firings would orient one edge in opposite directions, the one reached first in column
-    order decides.
+    can depend on the column order. After the colliders, Meek's rules run in rounds: each round
+    collects every orientation they imply on the graph as it stands and applies them together,
+    except that an edge two of them would direct both ways stays undirected, and so do
+    orientations that would together close a directed cycle. The rounds repeat until one orients
+    nothing, so Meek's rules do not depend on the column order. Such conflicts arise only when no
+    DAG on the skeleton has exactly the colliders found, as test errors can cause; otherwise the
+    rounds give the CPDAG that firing the rules one at a time gives.
 
     **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
     default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
@@ -377,10 +381,14 @@ def fci(
     applies Zhang's orientation rules R1-R10 [3]_ until no mark changes. An endpoint no rule
     resolves stays a circle.
 
-    The result can depend on the column order, for example, through the order in which the
-    possible-d-separation step visits pairs and conditioning sets, and with
-    ``possible_dsep="fast"`` through the sets themselves. A fixed column order gives reproducible
-    results.
+    The rules run in rounds: each round collects the marks every rule implies on the graph as it
+    stands and sets them together, except that an endpoint two of them would mark one as an
+    arrowhead and one as a tail stays a circle. The rounds repeat until no mark changes. Rule R4
+    decides an endpoint by every shortest discriminating path, so paths whose tests disagree leave
+    it a circle. The orientation rules therefore do not depend on the column order, but the result
+    can, through the order in which the possible-d-separation step visits pairs and conditioning
+    sets, and with ``possible_dsep="fast"`` through the sets themselves. A fixed column order gives
+    reproducible results.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
@@ -572,9 +580,10 @@ def gfci(
     had the edge ``x - y``, the separating set decides, as ``collider_rule`` describes. FCI's
     possible-d-separation step can remove more edges, after which the colliders are decided again.
     No step adds an edge, so the PAG's adjacencies are a subset of the GES CPDAG's. Zhang's rules
-    R1-R10 [2]_ then orient the endpoints; an endpoint no rule resolves stays a circle. A rule that
-    needs the separating set of a pair GES left non-adjacent uses the first subset, by increasing
-    size, of the two endpoints' CPDAG neighbors that makes the pair independent.
+    R1-R10 [2]_ then orient the endpoints, in rounds as in :func:`~andrey.fci`; an endpoint no rule
+    resolves stays a circle. A rule that needs the separating set of a pair GES left non-adjacent
+    uses the union of the smallest subsets of the two endpoints' CPDAG neighbors that make the pair
+    independent, which does not depend on the column order.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
