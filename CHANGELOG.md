@@ -77,7 +77,7 @@ change names its pull request.
 - With `indep_test="fisherz"` or `"student_t"`, `pc`, `fci`, and `cdnod` reject copied columns
   before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
   reject a series that repeats another at the same step or some steps back, naming its lagged
-  value, such as `'a' at lag 1 repeats 'd'`. ([#TBD])
+  value, such as `'a' at lag 1 repeats 'd'`. ([#206])
 
 ### Removed
 
@@ -333,3 +333,4 @@ First alpha release.
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
+[#206]: https://github.com/Abel-ai-lab/andrey/pull/206
