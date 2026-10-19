@@ -28,8 +28,8 @@ rows share a category. A tie goes to the candidate whose columns rank first. The
 its column, so reordering the columns relabels the result and changes nothing else. The rank is
 arbitrary with respect to the causal structure.
 
-Scores are compared at a fixed rounding, so candidates whose scores differ only in their last bits
-count as tied and go to the rank.
+Scores are compared at a fixed precision, so candidates whose scores differ only in their last
+bits count as tied and go to the rank.
 
 ## Each method
 
@@ -41,10 +41,10 @@ methods that break ties by the rank, which the setting below replaces.
 ```
 
 Identical columns are the exception for every method: they rank the same, so position decides which
-comes first, and the graph is the same up to swapping them. The score-based searches and the
-partial-correlation tests reject columns that copy another up to scale and shift, with a
-`ValueError` that names each group of copies; the LiNGAM causal-order search keeps one column per
-group and places the other copies right after it.
+comes first, and the graph is the same up to swapping them. The score-based searches with the BIC
+score, and `pc`, `fci`, and `cdnod` with the partial-correlation tests, reject columns that copy
+another up to scale and shift, with a `ValueError` that names each group of copies; the LiNGAM
+causal-order search keeps one column per group and places the other copies right after it.
 
 ## Across machines
 
