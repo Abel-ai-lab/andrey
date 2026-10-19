@@ -132,8 +132,9 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         effect=(
             "How the searches order tied candidates. `rank` orders them by a rank computed from "
             "each column's own data, so reordering the columns relabels the result. `position` "
-            "orders them by column position, which skips computing the ranks; the result can then "
-            "depend on the column order. Also `andrey.config(tie_break=...)`."
+            "orders them by column position, which skips computing the ranks, and fires the "
+            "orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order; "
+            "the result can then depend on the column order. Also `andrey.config(tie_break=...)`."
         ),
         group="reproducibility",
     ),

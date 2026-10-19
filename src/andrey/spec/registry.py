@@ -149,12 +149,11 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        column_order="can_change",
+        column_order="relabels",
         tie_break=True,
         order_note=(
-            "Conflicting Meek-rule orientations go to the first in column order; "
-            '`tie_break="position"`, or `collider_order="column"`, also orients colliders in '
-            "column order."
+            '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
+            '`collider_order="column"` orients colliders in column order.'
         ),
         params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
         references=(
@@ -182,9 +181,11 @@ _add(
         accel="numpy",
         status="supported",
         column_order="can_change",
+        tie_break=True,
         order_note=(
             "The possible-d-separation step visits pairs in column order, and with "
-            '`possible_dsep="fast"` its sets follow that order.'
+            '`possible_dsep="fast"` its sets follow that order. The orientation rules do not '
+            'depend on it, but `tie_break="position"` fires them one at a time in column order.'
         ),
         params=(
             _ALPHA,
@@ -220,7 +221,12 @@ _add(
         status="supported",
         column_order="can_change",
         tie_break=True,
-        order_note="The GES phase relabels; the FCI steps follow the column order as in `fci`.",
+        order_note=(
+            "The GES phase, the separating sets, and the orientation rules relabel; the "
+            "possible-d-separation step follows the column order as in `fci`. "
+            '`tie_break="position"` fires the rules one at a time in column order and records the '
+            "first separating subset found."
+        ),
         params=(
             ParamSpec(
                 name="score_func",
@@ -278,12 +284,13 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
-        column_order="can_change",
+        column_order="relabels",
         tie_break=True,
         order_note=(
-            "Conflicting Meek-rule orientations go to the first in column order; "
-            '`tie_break="position"`, or `collider_order="column"`, also orients colliders in '
-            "column order."
+            '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
+            '`collider_order="column"` orients colliders in column order. With '
+            "`dependence_threshold`, the independent-change step orients the first pair its tests "
+            "decide, in column order."
         ),
         params=(
             _ALPHA,

@@ -35,8 +35,9 @@ bits count as tied and go to the rank.
 
 What reordering the columns does to each method's result with the default settings. "Relabels"
 means you get the same graph with its nodes in the new order. "Ties follow `tie_break`" marks the
-methods the setting below changes: it replaces the rank that breaks their ties and, for `pc` and
-`cdnod`, the p-value order of their colliders.
+methods the setting below changes: it replaces the rank that breaks their ties, for `pc` and `cdnod`
+the p-value order of their colliders, and for `pc`, `cdnod`, `fci`, and `gfci` the order-free rounds
+of their orientation rules.
 
 ```{include} ../../_generated/column-order.md
 ```
@@ -122,5 +123,13 @@ For `pc` and `cdnod`, the setting chooses the order in which conflicting collide
 by the p-value that separated each pair under `rank`, in column order under `position`. Their
 `collider_order` argument, `"p_value"` or `"column"`, overrides it for one call.
 
-The methods in the "No" rows have no rank to replace, and the setting does not change them. `fci`
-and `gfci` build their possible-d-separation sets with `possible_dsep="fast"` or `"order_free"`.
+The orientation rules of `pc`, `cdnod`, `fci`, and `gfci`, Meek's rules and FCI's R1-R10, run in
+rounds under `rank`: each round sets together everything the rules imply on the graph as it stands,
+and an edge or endpoint two rules decide differently stays undirected or a circle, so the column
+order does not enter. Under `position` they fire one at a time in column order, and of two firings
+that conflict the first decides. `gfci` then also records the first subset found as the separating
+set of a pair its GES phase leaves non-adjacent, where `rank` records the union of the smallest
+ones. `fci` and `gfci` still depend on the column order through their possible-d-separation step,
+which the setting does not change; `possible_dsep="order_free"` builds its sets without the order.
+
+The methods in the "No" rows have no rank to replace, and the setting does not change them.

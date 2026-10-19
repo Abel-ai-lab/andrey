@@ -167,7 +167,9 @@ def pc(
     undirected, and so do orientations that would together close a directed cycle. The rounds
     repeat until one orients nothing, so Meek's rules do not depend on the column order. Such
     conflicts arise only when no DAG on the skeleton has exactly the colliders found, as test errors
-    can cause; otherwise the rounds give the CPDAG that firing the rules one at a time gives. The
+    can cause; otherwise the rounds give the CPDAG that firing the rules one at a time gives. Under
+    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order instead,
+    and of two firings that would orient one edge in opposite directions the first decides. The
     :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
     each method.
 
@@ -267,7 +269,7 @@ def pc(
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.constraint.pc import pc as _pc
-    from andrey.constraint.pc import resolve_collider_order
+    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories
@@ -281,6 +283,7 @@ def pc(
             indep_test=indep_test,
             collider_order=resolve_collider_order(collider_order),
             categorical=mask,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
@@ -410,8 +413,10 @@ def fci(
     it a circle. The orientation rules therefore do not depend on the column order, but the result
     can, through the order in which the possible-d-separation step visits pairs and conditioning
     sets, and with ``possible_dsep="fast"`` through the sets themselves. A fixed column order gives
-    reproducible results; the :doc:`column-order guide </docs/guides/column-order>` lists what
-    reordering the columns does to each method.
+    reproducible results. Under ``andrey.config(tie_break="position")``, the rules instead fire one
+    at a time in column order, and of two firings that conflict the first decides. The
+    :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
+    each method.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
@@ -473,6 +478,7 @@ def fci(
     'pag'
     """
     from andrey.constraint.fci import fci as _fci
+    from andrey.constraint.pc import resolve_in_column_order
 
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories
@@ -487,6 +493,7 @@ def fci(
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=possible_dsep,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
@@ -608,7 +615,9 @@ def gfci(
     R1-R10 [2]_ then orient the endpoints, in rounds as in :func:`~andrey.fci`; an endpoint no rule
     resolves stays a circle. A rule that needs the separating set of a pair GES left non-adjacent
     uses the union of the smallest subsets of the two endpoints' CPDAG neighbors that make the pair
-    independent, which does not depend on the column order.
+    independent, which does not depend on the column order. Under
+    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order, and such
+    a pair's separating set is the first subset found in column order.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
@@ -654,6 +663,7 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
+    from andrey.constraint.pc import resolve_in_column_order
     from andrey.search.gfci import gfci as _gfci
 
     # Both phases read the same data, so the score and the test must agree on its type.
@@ -680,6 +690,7 @@ def gfci(
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=possible_dsep,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
@@ -729,8 +740,9 @@ def cdnod(
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
         the column order, and ``"column"`` in column order. ``None`` follows
-        ``andrey.config.tie_break``. Under either order, the edges out of the index are directed
-        first, and no collider puts an arrowhead at the index.
+        ``andrey.config.tie_break``, which also sets whether Meek's rules run in order-free rounds
+        or fire one at a time in column order, as for :func:`~andrey.pc`. Under either order, the
+        edges out of the index are directed first, and no collider puts an arrowhead at the index.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -867,7 +879,7 @@ def cdnod(
     [(0, 1, 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
-    from andrey.constraint.pc import resolve_collider_order
+    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask = checked_data(
@@ -896,6 +908,7 @@ def cdnod(
             collider_order=resolve_collider_order(collider_order),
             categorical=mask,
             dependence_threshold=dependence_threshold,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}

@@ -90,6 +90,15 @@ def resolve_collider_order(collider_order: str | None) -> str:
     return "column" if backend.config.tie_break == "position" else "p_value"
 
 
+def resolve_in_column_order() -> bool:
+    """Whether ``andrey.config.tie_break`` is ``"position"``, which fires the orientation rules.
+
+    Under ``"position"``, Meek's rules and FCI's rules R1-R10 fire one at a time in column order
+    (``in_column_order``); under ``"rank"``, they run in order-free rounds.
+    """
+    return backend.config.tie_break == "position"
+
+
 def check_collider_order(collider_order: str) -> None:
     """Raise ``ValueError`` unless ``collider_order`` is one of :data:`COLLIDER_ORDERS`."""
     if collider_order not in COLLIDER_ORDERS:

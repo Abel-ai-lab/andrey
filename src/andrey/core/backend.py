@@ -149,7 +149,9 @@ class _Config:
     result. ``"position"`` orders them by column position instead, which skips computing the ranks,
     and the result can then depend on the column order. ``pc`` and ``cdnod`` take their colliders'
     ``collider_order`` from it when the call gives none: ``"p_value"`` under ``"rank"``,
-    ``"column"`` under ``"position"``. Each fit reads the setting once, when it starts. The
+    ``"column"`` under ``"position"``, and ``pc``, ``cdnod``, ``fci``, and ``gfci`` fire their
+    orientation rules one at a time in column order under ``"position"``, where ``"rank"`` runs
+    them in order-free rounds. Each fit reads the setting once, when it starts. The
     :doc:`column-order guide </docs/guides/column-order>` lists the methods it reaches.
     """
 

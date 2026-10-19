@@ -276,6 +276,48 @@ def _invariant_to_column_order(fit, x: np.ndarray, *args) -> bool:
     return in_order_changed
 
 
+def _position_draw(name: str) -> tuple[np.ndarray, tuple, dict]:
+    """A draw, the arguments after it, and the keywords of ``name``'s facade and engine alike, on
+    which firing the orientation rules one at a time differs from rounds under some column order."""
+    if name == "pc":
+        return data.sample_scm(d=10, n=100, seed=9, density=4.0).data, (), {}
+    if name == "cdnod":
+        x = data.sample_scm(d=5, n=200, seed=17, density=3.0, scale="standardize").data
+        context = np.repeat([0.0, 1.0], 100)
+        x[context == 1, 0] += 1.5
+        return x, (context,), {}
+    n, seed = (3000, 9) if name == "fci" else (300, 0)
+    return data.sample_scm(d=6, n=n, seed=seed, density=3.0, latents=1).data, (), {}
+
+
+@pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "gfci"])
+def test_tie_break_position_fires_the_orientation_rules_in_column_order(name):
+    """``"position"`` reaches the engine as ``in_column_order``, ``"rank"`` as rounds."""
+    x, args, kwargs = _position_draw(name)
+    if name in ("pc", "cdnod"):
+        kwargs = dict(collider_order="p_value")  # only the rules differ between the two settings
+    module = "andrey.search.gfci" if name == "gfci" else f"andrey.constraint.{name}"
+    engine = getattr(importlib.import_module(module), name)
+    facade = getattr(andrey, name)
+    differs = False
+    orders = [np.arange(x.shape[1])] + [
+        np.random.default_rng(seed).permutation(x.shape[1]) for seed in range(4)
+    ]
+    for order in orders:
+        columns = x[:, order]
+        rounds = facade(columns, *args, **kwargs).structure.to_numpy()
+        np.testing.assert_array_equal(
+            rounds, engine(columns, *args, **kwargs, in_column_order=False).to_numpy()
+        )
+        with andrey.config(tie_break="position"):
+            one_at_a_time = facade(columns, *args, **kwargs).structure.to_numpy()
+        np.testing.assert_array_equal(
+            one_at_a_time, engine(columns, *args, **kwargs, in_column_order=True).to_numpy()
+        )
+        differs |= not np.array_equal(rounds, one_at_a_time)
+    assert differs
+
+
 def test_cdnod_orientations_are_invariant_to_column_order():
     """A seed on which Meek's rules direct an edge both ways."""
     x = data.sample_scm(d=5, n=200, seed=17, density=3.0, scale="standardize").data
