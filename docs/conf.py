@@ -764,7 +764,7 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     elif pagename == "docs/guides/graph-representation":
         js = ["graph-guides.js"]
     # The 0.7.0 post's column-order figure (docs/blog/0.7.0/order.html).
-    if pagename == "blog/20261031-andrey-0-7-0":
+    if pagename == "blog/20261019-andrey-0-7-0":
         js = [*js, "column-order.js"]
     # The "Why Andrey is fast" scenes, on top of the page's own files: Motion, then its script.
     if pagename in WHY_FAST_PAGES:
