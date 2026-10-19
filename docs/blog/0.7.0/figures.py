@@ -342,7 +342,11 @@ def table(title: str, columns: tuple[str, ...], groups: tuple, rank=None, note: 
 
 
 def reorder_chart() -> str:
-    # Datasets where a reordering of the columns changed the graph: the counts the post reports.
+    # The share of datasets where a reordering of the columns changed the graph: the post's counts
+    # (of 150 datasets, 15 for GIN) as percentages.
+    def rate(count: int | None, total: int = 150) -> str | None:
+        return None if count is None else f"{round(100 * count / total)}%"
+
     return table(
         "Datasets where reordering the columns changed the graph (lower is better)",
         ("Andrey 0.7.0", "Andrey 0.6.0", "causal-learn"),
@@ -350,21 +354,22 @@ def reorder_chart() -> str:
             (
                 "Score-based",
                 (
-                    ("Hill climbing, BDeu", "150 datasets", (0, 145, None)),
-                    ("Hill climbing, BIC", "150 datasets", (0, 147, None)),
-                    ("Tabu search, BDeu", "150 datasets", (0, 112, None)),
-                    ("Tabu search, BIC", "150 datasets", (0, 118, None)),
+                    ("Hill climbing, BDeu", "", (rate(0), rate(145), None)),
+                    ("Hill climbing, BIC", "", (rate(0), rate(147), None)),
+                    ("Tabu search, BDeu", "", (rate(0), rate(112), None)),
+                    ("Tabu search, BIC", "", (rate(0), rate(118), None)),
                 ),
             ),
             (
                 "Permutation",
                 (
-                    ("BOSS", "150 datasets", (0, 146, 137)),
-                    ("GRaSP", "150 datasets", (0, 149, 150)),
+                    ("BOSS", "", (rate(0), rate(146), rate(137))),
+                    ("GRaSP", "", (rate(0), rate(149), rate(150))),
                 ),
             ),
-            ("Hidden causes", (("GIN", "15 datasets", (0, 11, None)),)),
+            ("Hidden causes", (("GIN", "", (rate(0, 15), rate(11, 15), None)),)),
         ),
+        rank=lambda cell: float(cell.rstrip("%")),
     )
 
 
@@ -421,30 +426,30 @@ def compare_table() -> str:
 
 
 def fci_tables() -> str:
-    # FCI on six real tables: the orders, of 200 (20 for the full superconductivity table), that
-    # changed the result, with the default and with possible_dsep="fast".
-    pending = "[PENDING]"
+    # FCI on six real tables: the share of column orders, of 200 (20 for the full
+    # superconductivity table), that changed the result, with the default and with
+    # possible_dsep="fast".
+    rows = (
+        ("Sachs protein signaling", "11 variables, 853 rows", 0, 0, 200),
+        ("Wine", "13 variables, 178 rows", 0, 0, 200),
+        ("Diabetes", "10 variables, 442 rows", 0, 150, 200),
+        ("Breast cancer", "30 variables, 569 rows", 0, 156, 200),
+        ("Superconductivity, 1,000-row sample", "81 variables, 1,000 rows", 0, 129, 200),
+        ("Superconductivity", "81 variables, 21,263 rows", 0, 20, 20),
+    )
     return table(
         "Column orders that changed FCI's result (lower is better)",
         ("Default", 'possible_dsep="fast"'),
         (
             (
                 "Real tables",
-                (
-                    ("Sachs protein signaling", "11 variables, 853 rows, 200 orders", (pending, 0)),
-                    ("Wine", "13 variables, 178 rows, 200 orders", (pending, 0)),
-                    ("Diabetes", "10 variables, 442 rows, 200 orders", (pending, 150)),
-                    ("Breast cancer", "30 variables, 569 rows, 200 orders", (pending, 156)),
-                    (
-                        "Superconductivity, 1,000-row sample",
-                        "81 variables, 1,000 rows, 200 orders",
-                        (pending, 129),
-                    ),
-                    ("Superconductivity", "81 variables, 21,263 rows, 20 orders", (pending, 20)),
+                tuple(
+                    (name, detail, tuple(f"{round(100 * c / n)}%" for c in (ours, fast)))
+                    for name, detail, ours, fast, n in rows
                 ),
             ),
         ),
-        rank=lambda c: c if isinstance(c, int) else -1,
+        rank=lambda cell: float(cell.rstrip("%")),
     )
 
 

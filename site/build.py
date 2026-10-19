@@ -925,9 +925,10 @@ def speed_table(summary: dict, *, notes: bool = True) -> str:
     With ``notes=False`` the exceptions and the source line are left out.
     """
     head = (
-        "<tr><th scope='col'>d</th><th scope='col'>Datasets</th><th scope='col'>Andrey</th>"
+        "<tr><th scope='col'>d</th><th scope='col'>Datasets</th>"
+        "<th scope='col' class='ct-ours'>Andrey</th>"
         "<th scope='col'>Other package</th><th scope='col'>Speedup</th>"
-        "<th scope='col'>Andrey errors</th><th scope='col'>Other errors</th>"
+        "<th scope='col' class='ct-ours'>Andrey errors</th><th scope='col'>Other errors</th>"
         "<th scope='col'>Empty-graph errors</th></tr>"
     )
     body = []
@@ -951,7 +952,22 @@ def speed_table(summary: dict, *, notes: bool = True) -> str:
                 number_text(r[theirs]),
                 "-" if empty is None else number_text(r[empty]),
             ]
-            body.append("<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>")
+            # Andrey's columns are tinted, and the lower time and the fewer errors are bold, as in
+            # every comparison table on the site.
+            classes = [[] for _ in cells]
+            for k in (2, 5):
+                classes[k].append("ct-ours")
+            for k, (a, b) in ((2, (r["andrey_s"], r["comparator_s"])), (5, (r[ours], r[theirs]))):
+                if a is not None and b is not None and a != b:
+                    classes[k if a < b else k + 1].append("ct-best")
+            body.append(
+                "<tr>"
+                + "".join(
+                    f'<td class="{" ".join(c)}">{v}</td>' if c else f"<td>{v}</td>"
+                    for v, c in zip(cells, classes)
+                )
+                + "</tr>"
+            )
     listed_notes = notes_list(exceptions(summary)) if notes else ""
     source = f'<p class="generated">{speed_source(summary)}</p>' if notes else ""
     return (
@@ -2074,7 +2090,10 @@ def comparison_table() -> str:
     Each partial mark keeps its note as text for screen readers and as a tooltip.
     """
     notes = {(f, p): note for f, p, _, note in comparison_notes()}
-    head = "".join(f'<th scope="col">{escape(p)}</th>' for p in PEERS)
+    head = "".join(
+        f'<th scope="col"{" class=ct-ours" if p == "Andrey" else ""}>{escape(p)}</th>'
+        for p in PEERS
+    )
     rows, group = [], None
     for section, feature, marks, _ in COMPARISON:
         if section != group:
@@ -2089,8 +2108,9 @@ def comparison_table() -> str:
             note = notes.get((feature, package))
             said = f"{word}: {escape(note)}" if note else word
             tip = f' title="{escape(note)}"' if note else ""
+            ours = " ct-ours" if package == "Andrey" else ""
             cells.append(
-                f'<td class="mark mark--{mark}"{tip}>{glyph(icon)}'
+                f'<td class="mark mark--{mark}{ours}"{tip}>{glyph(icon)}'
                 f'<span class="visually-hidden">{said}</span></td>'
             )
         # Where only Andrey has it, its mark is the row's one amber.

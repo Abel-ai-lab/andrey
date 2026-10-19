@@ -2499,3 +2499,12 @@
   }
 }
 
+
+/* Andrey's column in the features table is tinted in the accent, as in every comparison table. */
+.andrey-home .compare .ct-ours {
+  background: color-mix(in srgb, var(--andrey-accent) 10%, var(--andrey-surface));
+}
+
+.andrey-home .compare thead .ct-ours {
+  color: var(--andrey-accent);
+}

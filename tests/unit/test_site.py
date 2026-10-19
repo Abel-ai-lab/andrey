@@ -866,7 +866,7 @@ def test_the_comparison_table_has_three_groups_with_a_mark_for_every_package():
     assert table.count('<tr class="compare-group">') == len(groups)
     for _, feature, marks, _ in build.COMPARISON:
         assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
-    assert table.count('<th scope="col">') == len(build.PEERS)
+    assert len(re.findall(r'<th scope="col"[ >]', table)) == len(build.PEERS)
 
 
 def test_interface_example_returns_every_kind_of_graph():

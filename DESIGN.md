@@ -101,6 +101,21 @@ A figure is a drawn graph, a chart, or a diagram in the docs.
 - `andrey.viz.mpl` applies both to matplotlib: `mpl.use()` or `mpl.context()` for the style,
   `mpl.cycle()` for the series colors, and `mpl.cmap()` for the ramp.
 
+### Tables
+
+A table that compares Andrey with other packages or builds reads one way everywhere:
+
+- Andrey's column comes first and is tinted in the accent, its values in the accent color.
+- In each row, the best value of each measure (the lower time, the fewer errors, the higher F1) is
+  bold, and shaded neutral when another column holds it. The empty graph is a reference, never the
+  best.
+- Rows group by method family, the family's label set on the table's side.
+- A share is a percentage, its denominator in the text or the row's label, not in every cell.
+
+The 0.7.0 post's tables come from `table()` in `docs/blog/0.7.0/figures.py`; a Markdown table on a
+post or a release card gets the tint and the bold at build time (`_comparison_tables`,
+`docs/conf.py`).
+
 ### Drawing a graph
 
 `andrey.viz.draw` follows these rules for every kind of graph (DAG, CPDAG, PAG, digraph):
