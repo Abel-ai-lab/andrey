@@ -131,56 +131,119 @@ def order_figure() -> str:
     counts = [sum(v.startswith(f"{k}|") for v in states.values()) for k in range(len(graphs))]
     right = sum(c for k, c in enumerate(counts) if np.array_equal(graphs[k], cpdag))
     print(f"order.html: {len(graphs)} graphs from 120 orders, the true one from {right}")
-    start = states["".join(LABELS)]
-    first = int(start.split("|")[0])
+    causal = "".join(LABELS)
+    first = int(states[causal].split("|")[0])
 
-    def lane(steps: list[tuple[str, bool]]) -> str:
-        return "".join(
-            f'<li data-collider="{key}" class="{"" if oriented else "is-skipped"}">'
-            f'<span class="co-triple">{draw_collider(key)}</span>'
+    def is_true(key: str) -> bool:
+        x, y, z = (LABELS.index(c) for c in key.split())
+        return truth[y, x] == ARROW and truth[y, z] == ARROW
+
+    def verdicts(steps: list[tuple[str, bool]]) -> list[tuple[str, bool, list[str]]]:
+        """Each collider, whether it was oriented, and the edges an earlier one had claimed."""
+        heads: set[tuple[str, str]] = set()
+        out = []
+        for key, oriented in steps:
+            x, y, z = key.split()
+            taken = ["-".join(sorted((a, y))) for a in (x, z) if (y, a) in heads]
+            if oriented:
+                heads.update({(x, y), (z, y)})
+            out.append((key, oriented, taken))
+        return out
+
+    def card(key: str, step: int, oriented: bool, taken: list[str], bar: str = "") -> str:
+        x, y, z = key.split()
+        verdict = "orients" if oriented else f"skipped: <code>{', '.join(taken)}</code> taken"
+        return (
+            f'<li class="co-card{"" if is_true(key) else " is-false"}'
+            f'{"" if oriented else " is-skipped"}" data-collider="{key}">'
+            f'<span class="co-step">{step}</span><span class="co-triple">'
+            f'<span class="co-node">{x}</span><span class="co-arrow" aria-label="causes">-&gt;'
+            f'</span><span class="co-node co-middle">{y}</span><span class="co-arrow" '
+            f'aria-label="is caused by">&lt;-</span><span class="co-node">{z}</span></span>{bar}'
             f'<span class="co-p">p = {pvalue[key]:.3f}</span>'
-            f'<span class="co-mark">{"oriented" if oriented else "skipped"}</span></li>'
-            for key, oriented in steps
+            f'<span class="co-verdict">{verdict}</span></li>'
         )
 
-    old_steps = [(c[:-1], c[-1] == "+") for c in start.split("|")[1].split(",")]
+    # The column-order rule's board: a column per data column, each collider under its middle.
+    old = verdicts([(c[:-1], c[-1] == "+") for c in states[causal].split("|")[1].split(",")])
+    step_of = {key: n for n, (key, _, _) in enumerate(old, 1)}
+    board = "".join(
+        f'<li class="co-col" data-column="{c}"><button type="button" class="co-chip" '
+        f'aria-label="Move column {c} first">{c}</button><ol class="co-cards">'
+        + "".join(card(k, step_of[k], o, t) for k, o, t in old if k.split()[1] == c)
+        + "</ol></li>"
+        for c in LABELS
+    )
+
+    def why(order: str) -> str:
+        """Why an order gives its graph: which of C and D sit left of E."""
+        c, d = (order.index(v) < order.index("E") for v in "CD")
+        if c and d:
+            return "C and D sit left of E, so their false colliders take C-E and D-E first."
+        if c:
+            return "C sits left of E, so its false collider takes C-E first. D-E is right."
+        if d:
+            return "D sits left of E, so its false collider takes D-E first. C-E is right."
+        return "E sits left of C and D, so its true colliders take both edges first."
 
     def wrong(g: np.ndarray) -> list[tuple[int, int]]:
         """The arrowheads of ``g`` that the true graph does not have."""
         return [tuple(map(int, p)) for p in np.argwhere((g == ARROW) & (cpdag != ARROW))]
 
+    example = {int(v.split("|")[0]): order for order, v in states.items()}
     variants = "".join(
-        f'<div class="co-graph" data-graph="{k}" data-count="{counts[k]}"'
-        f"{'' if k == first else ' hidden'}>{draw_one(g, 'cpdag', wrong(g))}</div>"
+        f'<div class="co-graph" data-graph="{k}" data-count="{counts[k]}" '
+        f'data-why="{escape(why(example[k]))}"{"" if k == first else " hidden"}>'
+        f"{draw_one(g, 'cpdag', wrong(g))}</div>"
         for k, g in enumerate(graphs)
     )
-    chips = "".join(f'<li data-column="{c}">{c}</li>' for c in LABELS)
-    caption = "PC on the same 300 rows. Rings mark arrowheads the true graph does not have."
+    # The p-value rule's list, with a bar as long as each p-value and the significance level.
+    rank = "".join(
+        card(
+            k,
+            n,
+            o,
+            t,
+            f'<span class="co-bar"><span class="co-track"><span class="co-fill" '
+            f'style="--w: {pvalue[k] * 100:.1f}%"></span></span></span>',
+        )
+        for n, (k, o, t) in enumerate(verdicts(ranked), 1)
+    )
+    axis = (
+        '<li class="co-card co-axis-row" aria-hidden="true"><span class="co-step"></span>'
+        '<span class="co-triple"></span><span class="co-axis"><span class="at-alpha">0.05</span>'
+        '<span class="at-one">p = 1</span></span><span class="co-p"></span>'
+        '<span class="co-verdict"></span></li>'
+    )
+    caption = "PC on the same 300 rows. A dashed card is a collider the true graph does not have."
     states_json = escape(json.dumps(states, separators=(",", ":")))
     return (
         f'<figure class="co" data-states="{states_json}">'
-        '<div class="co-bar"><p class="co-label">Column order</p>'
-        f'<ol class="co-columns" aria-label="Column order">{chips}</ol>'
-        '<div class="co-actions"><button type="button" class="co-shuffle" hidden>'
-        'Shuffle the columns</button><button type="button" class="co-reset" hidden>'
-        "Causal order</button></div></div>"
-        '<div class="co-lanes">'
-        '<div class="co-lane co-old"><p class="co-title">0.6.0: column-order rule</p>'
-        '<p class="co-rule">Visits each collider by its middle column, left to right. The '
-        "first to claim an edge keeps it.</p>"
-        f'<ol class="co-queue">{lane(old_steps)}</ol>{variants}'
-        '<p class="co-note" aria-live="polite">This graph comes from <b class="co-count">'
-        f'{counts[first]}</b> of 120 orders. Graphs seen: <b class="co-seen">1</b>.</p></div>'
-        '<div class="co-lane co-new"><p class="co-title">0.7.0: p-value rule</p>'
-        '<p class="co-rule">Visits the colliders whose pair was most clearly separated, the '
-        "highest p-value, first. Column order plays no part.</p>"
-        f'<ol class="co-queue">{lane(ranked)}</ol>'
-        f'<div class="co-graph">{draw_one(cpdag, "cpdag", [])}</div>'
-        '<p class="co-note">The true graph, from all 120 orders.</p></div>'
-        '<div class="co-lane co-truth"><p class="co-title">How the data were made</p>'
-        f'<div class="co-graph">{draw_one(truth, "dag", [])}</div>'
-        '<p class="co-note">A causes B, C, and D, and each of them causes E. 300 rows.</p></div>'
-        f"</div><figcaption>{escape(caption)}</figcaption></figure>\n"
+        '<div class="co-setup"><div class="co-graph">'
+        f'{draw_one(truth, "dag", [])}</div><p class="co-note"><b>The data.</b> A causes B, '
+        "C, and D, and each of them causes E. PC proposes five colliders; two are false.</p></div>"
+        '<section class="co-lane co-old"><div class="co-head">'
+        '<p class="co-title">0.6.0: column-order rule</p><div class="co-actions">'
+        '<button type="button" class="co-shuffle" hidden>Shuffle the columns</button>'
+        '<button type="button" class="co-reset" hidden>Original order</button></div></div>'
+        '<p class="co-rule">Visits the colliders <b>column by column</b>, left to right: each '
+        'waits under the column it points into. <span class="co-hint" hidden>Click a column to '
+        "move it first.</span></p>"
+        f'<div class="co-body"><ol class="co-board" aria-label="Column order">{board}</ol>'
+        f'<div class="co-side">{variants}'
+        f'<p class="co-note co-why" aria-live="polite">{escape(why(causal))}</p>'
+        '<p class="co-note">This graph comes from <b class="co-count">'
+        f'{counts[first]}</b> of 120 orders. Graphs seen: <b class="co-seen">1</b> of '
+        f"{len(graphs)}.</p></div></div></section>"
+        '<section class="co-lane co-new"><div class="co-head">'
+        '<p class="co-title">0.7.0: p-value rule</p></div>'
+        '<p class="co-rule">Visits the colliders <b>by p-value, highest first</b>: the most '
+        "clearly separated pair goes first, wherever its columns sit.</p>"
+        f'<div class="co-body"><ol class="co-rank" aria-label="Colliders by p-value">{rank}'
+        f'{axis}</ol><div class="co-side"><div class="co-graph">'
+        f"{draw_one(cpdag, 'cpdag', [])}</div>"
+        '<p class="co-note">The true graph, from all 120 orders.</p></div></div></section>'
+        f"<figcaption>{escape(caption)}</figcaption></figure>\n"
     )
 
 
@@ -219,7 +282,8 @@ def generator_figure() -> str:
         f"{draw_numbered(np.arange(10))}</div>"
         '<div class="cg-panel"><p class="co-title">0.7.0: columns shuffled</p>'
         f"{draw_numbered(shuffled)}</div>"
-        '<div class="cg-panel cg-chart"><p class="co-title">New PC rule minus old, errors</p>'
+        '<div class="cg-panel cg-chart"><p class="co-title">p-value rule minus column-order rule, '
+        "endpoint errors</p>"
         f'{bars}<p class="cg-axis"><span>fewer errors</span><span>more errors</span></p></div>'
         f"</div><figcaption>{escape(caption)}</figcaption></figure>\n"
     )
