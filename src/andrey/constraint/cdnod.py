@@ -178,11 +178,11 @@ def _orient_by_independent_changes(
     skipped, since the causal graph is acyclic. After an orientation the pairs are visited again;
     ``n`` grows until no undirected pair has that many candidates. Returns an updated copy.
 
-    The pairs, their two directions, and the subsets of ``Z2`` are visited in the order of the data
-    columns' :func:`~andrey.search.hc.tie_ranks`, which orients the edges that compete for a pair
-    or a cycle the same way under every column order. The search runs on the columns sorted by that
-    rank, so a column's index there is its rank and every kernel stacks its columns in rank order.
-    With ``in_column_order``, it runs on the columns as given and visits them by position.
+    The search runs on the data columns sorted by :func:`~andrey.search.hc.tie_ranks`, so a column's
+    index in it is its rank. It visits the pairs, their two directions, and the subsets of ``Z2``
+    in rank order, and each kernel stacks its columns in rank order, so reordering the columns
+    relabels the orientations and changes nothing else, unless two columns are identical. With
+    ``in_column_order``, the search runs on the columns as given and visits them by position.
     """
     n_features = data.shape[1]
     by_rank = np.arange(n_features) if in_column_order else np.argsort(tie_ranks(data))
