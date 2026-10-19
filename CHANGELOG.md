@@ -180,6 +180,13 @@ change names its pull request.
   shuffles, by a rank computed from each column's own data instead of by column position, so
   reordering the columns no longer changes their p-values or the graphs built from them.
   ([#213])
+- `pc`, `cdnod`, `fci`, and `gfci` apply their orientation rules, Meek's rules and FCI's R1-R10,
+  in rounds that set together everything the rules imply on the graph as it stands and leave an
+  edge or endpoint two rules decide differently undirected or a circle, where the rule reached
+  first in column order used to decide; `gfci` also keeps the union of the smallest separating sets
+  of a pair GES leaves non-adjacent instead of the first one found. Reordering the columns no
+  longer changes their orientations, and on data where the rules conflict their graphs can change.
+  ([#226])
 
 ## [0.6.0] - 2026-10-17
 
@@ -408,3 +415,4 @@ First alpha release.
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
 [#220]: https://github.com/Abel-ai-lab/andrey/pull/220
+[#226]: https://github.com/Abel-ai-lab/andrey/pull/226
