@@ -15,8 +15,10 @@ from scipy.linalg import cho_factor, cho_solve
 from scipy.spatial.distance import pdist, squareform
 from scipy.special import gammaincc
 
+from andrey.search.hc import tie_ranks
+
 from . import backend, env
-from .ci import _canonical, _checked_data
+from .ci import _canonical_ranked, _checked_data
 from .independence import hsic_test
 from .seeding import resolve_seed
 from .warning_policy import SampleSizeWarning, warn_once
@@ -143,9 +145,11 @@ class KCI:
     conditioning set, ``w`` is 0.8 below 200 rows, 0.5 below 1,200, and 0.3 beyond. With ``k``
     conditioning variables, the kernels of ``xs``, ``y``, and ``S`` share
     ``w = c sqrt(k)``, ``c`` 1.2 below 200 rows, 0.7 below 1,200, and 0.4 beyond, and ``S``
-    enters ``xs`` at half scale. ``x`` joins the conditioning set and ``y`` does not, so a query
-    is ordered (lower index first) before it runs: the p-value does not depend on argument
-    order.
+    enters ``xs`` at half scale. ``x`` joins the conditioning set and ``y`` does not, so of the
+    two variables the one with the lower :func:`~andrey.search.hc.tie_ranks` rank, a rank
+    computed from each column's own data, takes the role of ``x``, and the conditioning set's
+    columns enter its kernels in rank order: the p-value depends on neither the argument order
+    nor the column order.
 
     With ``rank``, each kernel of a conditional query is a pivoted incomplete Cholesky factor
     ``L`` with ``K ~ L L'`` [2]_, centered, and ``R = I - Ls (Ls' Ls + ridge I)^-1 Ls'``, so
@@ -185,7 +189,10 @@ class KCI:
         if rank is not None and rank < 1:
             raise ValueError(f"rank must be at least 1, got {rank}")
         arr = _checked_data(data, "KCI", min_rows=2)
-        self._data = _standardize(arr)
+        # The test holds data column j at index _tie_rank[j], in C order, so a query reads the
+        # same values in the same order whatever the column order or memory layout.
+        self._tie_rank = tie_ranks(arr).tolist()
+        self._data = _standardize(np.ascontiguousarray(arr[:, np.argsort(self._tie_rank)]))
         self._n = arr.shape[0]
         self._ridge = float(ridge)
         self._rank = None if rank is None else int(rank)
@@ -196,7 +203,7 @@ class KCI:
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the KCI p-value for ``x`` independent of ``y`` given ``condition_set``."""
-        x_int, y_int, cond = _canonical(x, y, condition_set)
+        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         data, n = self._data, self._n
         if not (np.ptp(data[:, x_int]) > 0.0 and np.ptp(data[:, y_int]) > 0.0):
             return 1.0  # a constant variable: no variation to depend on
@@ -400,9 +407,11 @@ class RCoT:
     ``B``, centered.
 
     The features of a variable, and those of a conditioning set, are drawn from a generator seeded
-    by ``seed`` and its columns, so every query on the same variable or conditioning set uses the
-    same features, and the test object keeps them, and the residuals, for later queries. A p-value
-    does not depend on the order of queries or of the arguments, and the same seed reproduces it.
+    by ``seed`` and the :func:`~andrey.search.hc.tie_ranks` rank of each of its columns, a rank
+    computed from each column's own data, so every query on the same variable or conditioning set
+    uses the same features, and the test object keeps them, and the residuals, for later queries.
+    A p-value does not depend on the order of the queries, of the arguments, or of the columns, and
+    the same seed reproduces it.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. Measured on columns independent of each other, its rate of rejecting a true
@@ -447,7 +456,10 @@ class RCoT:
                 f"feature counts must be at least 1, got {n_features} and {n_features_cond}"
             )
         arr = _checked_data(data, "RCoT", min_rows=2)
-        self._data = _standardize(arr)
+        # The test holds data column j at index _tie_rank[j], in C order, so a query reads the
+        # same values in the same order whatever the column order or memory layout.
+        self._tie_rank = tie_ranks(arr).tolist()
+        self._data = _standardize(np.ascontiguousarray(arr[:, np.argsort(self._tie_rank)]))
         self._n = arr.shape[0]
         self._n_features = int(n_features)
         self._n_features_cond = int(n_features_cond)
@@ -462,7 +474,7 @@ class RCoT:
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the RCoT p-value for ``x`` independent of ``y`` given ``condition_set``."""
-        x_int, y_int, cond = _canonical(x, y, condition_set)
+        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         if cond and self._n < _RCOT_MIN_ROWS:
             warn_once(
                 f"RCoT on fewer than {_RCOT_MIN_ROWS} rows may reject a true conditional "

@@ -14,8 +14,10 @@ from numbers import Integral
 import numpy as np
 from scipy.special import digamma
 
+from andrey.search.hc import tie_ranks
+
 from . import backend, env
-from .ci import _canonical, _checked_data
+from .ci import _canonical_ranked, _checked_data
 from .seeding import resolve_seed
 
 __all__ = ["CMIknn"]
@@ -207,10 +209,13 @@ class CMIknn:
     and 0.26 below given one more variable. The p-value compares ``I`` with shuffled copies, which
     share the bias.
 
-    The tie-breaking is drawn once, from ``seed``, when the test is built. The shuffles come from a
-    generator seeded by ``seed`` and the conditioning set, so every query with the same
-    conditioning set uses the same shuffles, and the test object keeps them for later queries. A
-    p-value does not depend on the order of queries or of the arguments.
+    Of ``x`` and ``y``, the one with the lower :func:`~andrey.search.hc.tie_ranks` rank, a rank
+    computed from each column's own data, is shuffled. The tie-breaking is drawn once, from
+    ``seed``, when the test is built, and each column takes its keys by that rank. The shuffles
+    come from a generator seeded by ``seed`` and the ranks of the conditioning set, so every query
+    with the same conditioning set uses the same shuffles, and the test object keeps them for later
+    queries. A p-value does not depend on the order of the queries, of the arguments, or of the
+    columns.
 
     The distances and neighbor counts run on a CUDA GPU under the ``cuda`` backend, or under
     ``auto`` from ``ANDREY_CMIKNN_GPU_THRESHOLD`` rows squared, a batch of shuffles at a time. The
@@ -256,6 +261,10 @@ class CMIknn:
                 f"k_perm and n_permutations must be at least 1, got {k_perm} and {n_permutations}"
             )
         arr = _checked_data(data, "CMIknn", min_rows=2)
+        # The test holds data column j at index _tie_rank[j], which picks its tie-breaking keys
+        # and seeds the shuffles of the conditioning sets that hold it.
+        self._tie_rank = tie_ranks(arr).tolist()
+        arr = arr[:, np.argsort(self._tie_rank)]
         self._seed = resolve_seed(seed)
         n = arr.shape[0]
         if count and k_cmi >= n:
@@ -293,7 +302,7 @@ class CMIknn:
         decided as with every shuffle. With ``exact_above``, only the second stop applies, so a
         p-value above ``alpha`` is the full one: the scans that rank colliders by p-value pass it.
         """
-        x_int, y_int, cond = _canonical(x, y, condition_set)
+        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         cond = tuple(cond)
         dev = _cmiknn_backend(self._n)
         if dev == "numpy":
@@ -319,7 +328,7 @@ class CMIknn:
         with an empty ``condition_set``, the mutual information estimate. It does not depend on
         the order of the arguments.
         """
-        x_int, y_int, cond = _canonical(x, y, condition_set)
+        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         return _cmi_given_yz(self._ranks[:, x_int], self._yz_space(y_int, tuple(cond)), self._k)
 
     def _hits(self, x: int, y: int, cond: tuple[int, ...]) -> Iterator[bool]:

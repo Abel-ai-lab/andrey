@@ -57,7 +57,7 @@ from __future__ import annotations
 
 import importlib
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
@@ -1108,3 +1108,10 @@ def _canonical(x: int, y: int, condition_set: Iterable[int]) -> tuple[int, int, 
     x_int, y_int = (int(x), int(y)) if x < y else (int(y), int(x))
     assert x_int not in cond and y_int not in cond, "x, y cannot be in condition_set."
     return x_int, y_int, cond
+
+
+def _canonical_ranked(
+    x: int, y: int, condition_set: Iterable[int], rank: Sequence[int]
+) -> tuple[int, int, list[int]]:
+    """:func:`_canonical` of a query to a test that holds data column ``j`` at index ``rank[j]``."""
+    return _canonical(rank[x], rank[y], [rank[c] for c in condition_set])

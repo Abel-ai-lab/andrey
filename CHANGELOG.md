@@ -163,6 +163,11 @@ change names its pull request.
   Markov-blanket member by its partial correlation where p-values underflow to zero; and `pc` and
   `cdnod` orient colliders whose p-values agree to nine decimals together, so these choices no
   longer depend on the column order. ([#205])
+- The nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` seed their random features,
+  shuffles, and tie-breaks, and choose the variable KCI joins to the conditioning set and CMIknn
+  shuffles, by a rank computed from each column's own data instead of by column position, so
+  reordering the columns no longer changes their p-values or the graphs built from them.
+  ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 
