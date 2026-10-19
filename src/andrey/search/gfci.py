@@ -72,7 +72,14 @@ def gfci(
 
     marks = _circle_pag(support)
     _orient_colliders_from_pattern(marks, pattern, sepsets)
-    _remove_by_possible_dsep(marks, test, alpha, sepsets, order_free=possible_dsep == "order_free")
+    _remove_by_possible_dsep(
+        marks,
+        test,
+        alpha,
+        sepsets,
+        order_free=possible_dsep == "order_free",
+        in_column_order=in_column_order,
+    )
     marks = _circle_pag(marks != NULL)
     ambiguous = (
         frozenset(

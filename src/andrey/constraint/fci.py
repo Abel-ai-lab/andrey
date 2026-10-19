@@ -9,7 +9,7 @@ from collections import deque
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import cache
-from itertools import combinations, islice, permutations
+from itertools import chain, combinations, islice, permutations
 
 import numpy as np
 
@@ -60,7 +60,14 @@ def fci(
 
     marks = _circle_pag(support)
     _orient_colliders(marks, sepsets)
-    _remove_by_possible_dsep(marks, test, alpha, sepsets, order_free=possible_dsep == "order_free")
+    _remove_by_possible_dsep(
+        marks,
+        test,
+        alpha,
+        sepsets,
+        order_free=possible_dsep == "order_free",
+        in_column_order=in_column_order,
+    )
     marks = _circle_pag(marks != NULL)
     ambiguous = (
         _majority_sepsets(marks, test, alpha, sepsets)
@@ -487,11 +494,13 @@ def _iter_dsep_choices(
     and left the pair dependent. Testing it again cannot remove the edge.
     """
 
-    def outside(values: tuple[int, ...]) -> bool:
-        return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
-
     for size in range(1, len(dsep) + 1):
-        yield from filter(outside, combinations(dsep, size))
+        yield from (c for c in combinations(dsep, size) if _outside(c, adj_a, adj_b))
+
+
+def _outside(values: tuple[int, ...], adj_a: set[int], adj_b: set[int]) -> bool:
+    """``values`` lie inside neither endpoint's adjacency."""
+    return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
 
 
 def _try_remove_by_dsep(
@@ -535,13 +544,23 @@ def _remove_by_possible_dsep(
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     order_free: bool = False,
+    *,
+    in_column_order: bool = False,
 ) -> None:
     """Prune edges the plain skeleton kept but a possible-d-sep conditioning set separates.
 
     Search each endpoint's possible-d-sep set (built as ``order_free`` selects) for a conditioning
-    subset outside either endpoint's adjacency. Store a successful subset under the endpoint order
-    returned by ``_edge_order``.
+    subset outside either endpoint's adjacency. With ``order_free`` (and not ``in_column_order``),
+    every edge is tested on the graph as it stands when the step starts, the edges found
+    independent are removed together, and each records, both ways, the union of the separating
+    subsets of the smallest size from either endpoint's set, so neither the removals nor the
+    separating sets depend on the column order [Colombo and Maathuis, 2014]. Otherwise the edges
+    are visited in column order, each removal changes the sets of the edges after it, and the first
+    subset found is stored under the endpoint order returned by ``_edge_order``.
     """
+    if order_free and not in_column_order:
+        _remove_by_possible_dsep_at_once(marks, test, alpha, sepsets)
+        return
     n = marks.shape[0]
     edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
     for na, nb in edges:
@@ -554,6 +573,44 @@ def _remove_by_possible_dsep(
             _try_remove_by_dsep(
                 marks, nb, na, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free
             )
+
+
+def _remove_by_possible_dsep_at_once(
+    marks: np.ndarray,
+    test: CITest,
+    alpha: float,
+    sepsets: dict[tuple[int, int], tuple[int, ...]],
+) -> None:
+    """:func:`_remove_by_possible_dsep` with ``order_free``: every edge read from one snapshot."""
+    snapshot = marks.copy()
+    n = snapshot.shape[0]
+    adjacent = [set(_adjacent_nodes(snapshot, v)) for v in range(n)]
+    removed: dict[tuple[int, int], tuple[int, ...]] = {}
+    for x, y in combinations(range(n), 2):
+        if not _adjacent(snapshot, x, y):
+            continue
+        from_x = sorted(_possible_dsep(snapshot, x, y, True))
+        from_y = sorted(_possible_dsep(snapshot, y, x, True))
+        in_x = set(from_x)
+        for size in range(1, max(len(from_x), len(from_y)) + 1):
+            # A subset of both sets is tested once, from ``x``'s.
+            choices = chain(
+                combinations(from_x, size),
+                (c for c in combinations(from_y, size) if not in_x.issuperset(c)),
+            )
+            found = [
+                cond
+                for cond in choices
+                if _outside(cond, adjacent[x], adjacent[y]) and test(x, y, cond) > alpha
+            ]
+            if found:
+                removed[(x, y)] = tuple(sorted(set().union(*found)))
+                break
+    for (x, y), union in removed.items():
+        marks[x, y] = NULL
+        marks[y, x] = NULL
+        sepsets[(x, y)] = union
+        sepsets[(y, x)] = union
 
 
 # ---- FCI orientation rules ----------------------------------------------------------------------
