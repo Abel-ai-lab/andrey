@@ -584,6 +584,8 @@ def as_tensor(data: np.ndarray, dev: str):
     """A torch tensor of ``data`` on ``dev`` -- float32 on ``mps``, else float64."""
     t = torch()
     dtype = t.float32 if dev == "mps" else t.float64
+    if any(stride < 0 for stride in data.strides):  # torch rejects negative strides
+        data = np.ascontiguousarray(data)
     return t.as_tensor(data, dtype=dtype, device=dev)
 
 

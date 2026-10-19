@@ -73,10 +73,9 @@ relationships are linear and the noise is not Gaussian; it returns a DAG with ed
 
 Not always. In the release cards, which use sparse simulated graphs with ten samples per variable,
 FCI at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
-causal-learn, so there the limit is the algorithm's, not the software's. PC's graphs in gCastle are
-worse than the empty graph at 200 and 400 variables, while PC in Andrey and causal-learn stays below
-it. The 0.1.0 release card's [large graphs](benchmarks/0.1.0.md#large-graphs) section lists every
-case, including Andrey's GES at 200 variables with the default penalty.
+causal-learn, so there the limit is the algorithm's, not the software's. The 0.1.0 release card's
+[large graphs](benchmarks/0.1.0.md#large-graphs) section lists every case, including Andrey's GES
+at 200 variables with the default penalty.
 
 ### Why does a result differ from another package's?
 
@@ -88,8 +87,8 @@ package on the same true graphs, so compare accuracy there rather than edge by e
 
 ### How does it compare with other packages?
 
-The [release cards](benchmarks.md) show Andrey side by side with causal-learn, gCastle, and lingam
-on the same data and machines: fit time, error counts, and where Andrey is not faster. The
+The [release cards](benchmarks.md) show Andrey side by side with causal-learn, lingam, and other
+packages on the same data and machines: fit time, error counts, and where Andrey is not faster. The
 [homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and
 speed support.
 
@@ -136,15 +135,15 @@ row names the nodes) or a `.npy` file.
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
 text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
-data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, and exact
-search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`, and BOSS
-and GRaSP with `"local_score_BDeu"`. Mixed data,
-with continuous and categorical columns, is experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing,
-BOSS, GRaSP, and exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
-`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`. They infer which columns are
-categorical unless you name them with `categorical`, and warn about what they inferred. We have not
-benchmarked them yet. [Data types](guides/getting-started.md#data-types) explains the settings, the
-inference rule, and how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
+data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS,
+GRaSP, and exact search score it with `score_func="local_score_BDeu"` or
+`"local_score_BIC_categorical"`. Mixed data, with continuous and categorical columns, is
+experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and exact search take
+`indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
+`"local_score_cond_gauss"`. They infer which columns are categorical unless you name them with
+`categorical`, and warn about what they inferred. We have not benchmarked them yet.
+[Data types](guides/getting-started.md#data-types) explains the settings, the inference rule, and
+how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 

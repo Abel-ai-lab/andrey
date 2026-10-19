@@ -40,7 +40,15 @@ def _lingam_sf(d: int, n: int) -> np.ndarray:
 
 @pytest.mark.parametrize("andrey_adapter, cl_adapter", PAIRS, ids=lambda a: a.name)
 def test_causal_learn_returns_the_andrey_graph(andrey_adapter, cl_adapter) -> None:
+    """Compare on columns sorted by tie rank.
+
+    Andrey breaks a tie between candidate variables by `tie_ranks`; causal-learn takes the lower
+    column index. With the columns in tie-rank order the two rules pick the same variable.
+    """
+    from andrey.search.hc import tie_ranks
+
     data = _lingam_sf(20, 200)
+    data = data[:, np.argsort(tie_ranks(data))]
     ours = andrey_adapter.to_structure(andrey_adapter.fit(data, andrey_adapter.params()))
     theirs = cl_adapter.to_structure(cl_adapter.fit(data, cl_adapter.params()))
     assert structure_hash(ours) == structure_hash(theirs)

@@ -128,6 +128,20 @@ def test_reversed_columns_give_the_same_named_edges():
     assert sorted(forward) == sorted(reverse) == [("x", "y", "directed"), ("y", "z", "directed")]
 
 
+def test_reversed_columns_give_the_same_named_edges_on_torch(monkeypatch):
+    # A reversed frame's numpy array is a view with a negative stride, which torch rejects.
+    pytest.importorskip("torch")
+    monkeypatch.setenv("ANDREY_DEVICE", "cpu")  # a pinned device runs even a small fit on torch
+    noise = np.random.default_rng(0).standard_normal((N, 3))
+    collider = noise[:, 0] + noise[:, 1] + noise[:, 2]
+    df = pd.DataFrame(np.column_stack([noise[:, 0], collider, noise[:, 1]]), columns=COLUMNS)
+    forward = andrey.pc(df).structure
+    reverse = andrey.pc(df[COLUMNS[::-1]]).structure
+    assert reverse.labels == tuple(COLUMNS[::-1])
+    assert sorted(reverse.oriented_edges()) == sorted(forward.oriented_edges())
+    assert sorted(forward.oriented_edges()) == [("x", "y", "directed"), ("z", "y", "directed")]
+
+
 def test_gin_explicit_labels_beat_columns():
     out = andrey.gin(frame(), labels=("a", "b", "c"))
     assert out.structure.labels[:3] == ("a", "b", "c")

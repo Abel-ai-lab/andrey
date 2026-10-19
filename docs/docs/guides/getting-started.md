@@ -278,10 +278,9 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
 
-`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, and `exact_search` take
-every score, `tabu` the continuous and categorical ones, and `boss` and `grasp` the continuous and
-mixed ones and, of the categorical ones, `local_score_BDeu`. `gfci` takes a score and a test
-that read the same kind of data, such as
+`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, `boss`, `grasp`, and
+`exact_search` take every score, and `tabu` the continuous and categorical ones. `gfci` takes a
+score and a test that read the same kind of data, such as
 `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole
@@ -354,8 +353,9 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-FCI and GFCI depend on column order: `possible_dsep="order_free"` builds possible-d-separation sets
-that do not, but on sampled data the result can still change with the column order. GES was more
+FCI and GFCI depend on column order through their possible-d-separation step:
+`possible_dsep="order_free"` builds possible-d-separation sets that do not, but on sampled data the
+result can still change with the column order. GES was more
 accurate with a stronger penalty on the large sparse benchmark graphs. PC is practical to roughly
 1,000 variables; FCI's errors passed the empty graph's at 800
 ([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API page states the

@@ -20,7 +20,7 @@ from andrey.core.ci import FisherZ
 from andrey.core.independence import gamma_gram
 from andrey.core.score import BICScore
 from andrey.irregular.bottom_up_parce import _fisher_hsic_test, _residual
-from andrey.latent.gin import _independence_pvalue, gin
+from andrey.latent.gin import _root_pvalue, gin
 from andrey.search._parallel import _KEY_DP
 from andrey.search.calm import moral_graph
 from andrey.search.ges import ges
@@ -235,8 +235,7 @@ def test_gin_ties() -> None:
     """Two clusters of two indicators each pass as the root with the same lowest p-value.
 
     Every row is followed by a copy with the clusters swapped, so each leading block of rows, which
-    the HSIC bandwidth reads, is symmetric too. The orders keep each cluster's members in order,
-    because the surrogate reads the first member of each cluster.
+    the HSIC bandwidth reads, is symmetric too.
     """
     rng = np.random.default_rng(15)
     latent = rng.uniform(-1, 1, (400, 2)) ** 3
@@ -245,7 +244,8 @@ def test_gin_ties() -> None:
     x = np.empty((800, 4))
     x[0::2], x[1::2] = z, z[:, [2, 3, 0, 1]]
     cov = np.cov(x, rowvar=False)
-    lowest = [_independence_pvalue(x, cov, [a, b], [a + 1]) for a, b in ((0, 2), (2, 0))]
+    grams = [gamma_gram(x[:, j]) for j in range(4)]
+    lowest = [_root_pvalue(x, cov, grams, [a, a + 1], [b, b + 1], []) for a, b in ((0, 2), (2, 0))]
     assert round(lowest[0], _KEY_DP) == round(lowest[1], _KEY_DP)
     orders = [np.arange(4), np.array([2, 3, 0, 1])]
 

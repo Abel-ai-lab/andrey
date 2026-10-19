@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import atexit
 import json
-import logging
 import os
 import select
 import signal
@@ -180,15 +179,8 @@ class Workers:
         """Warm each package sequentially and fail startup if a required one is absent."""
         with self.lock:
             self.available = []
-            for package in ("Andrey", "causal-learn", "lingam", "gCastle"):
-                worker = self.workers.setdefault(package, Worker(package))
-                try:
-                    worker.start()
-                except Exception as error:
-                    if package == "gCastle":
-                        logging.warning("gCastle is unavailable: %s", error)
-                        continue
-                    raise
+            for package in ("Andrey", "causal-learn", "lingam"):
+                self.workers.setdefault(package, Worker(package)).start()
                 self.available.append(package)
 
     def run(self, package, method, data, timeout=FIT_TIMEOUT):

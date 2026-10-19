@@ -84,6 +84,26 @@ def test_pc_is_invariant_to_column_order():
         assert np.array_equal(permuted[np.ix_(back, back)], marks)
 
 
+def conflicting_orientations() -> np.ndarray:
+    """A seed on which Meek's rule R1 directs one edge both ways."""
+    return data.sample_scm(d=10, n=100, seed=9, density=4.0).data
+
+
+def test_pc_orientations_are_invariant_to_column_order():
+    x = conflicting_orientations()
+    marks = andrey.pc(x).structure.to_numpy()
+    in_order = pc_engine(x, in_column_order=True).to_numpy()
+    in_order_changed = False
+    for seed in range(4):
+        order = np.random.default_rng(seed).permutation(x.shape[1])
+        back = np.argsort(order)
+        permuted = andrey.pc(x[:, order]).structure.to_numpy()
+        assert np.array_equal(permuted[np.ix_(back, back)], marks)
+        permuted = pc_engine(x[:, order], in_column_order=True).to_numpy()
+        in_order_changed |= not np.array_equal(permuted[np.ix_(back, back)], in_order)
+    assert in_order_changed
+
+
 def test_ges_recovery():
     assert_recorded_output(
         andrey.ges(datagen.generate("gauss_5v"), lambda_value=_BASELINE_LAMBDA),

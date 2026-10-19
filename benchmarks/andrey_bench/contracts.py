@@ -100,9 +100,9 @@ class SolutionAdapter(Protocol):
     and data loading, as a Python package's excludes interpreter start and imports.
     """
 
-    name: str  # "andrey.ges.numpy.serial" | "causal-learn.ges" | "gcastle.pc"
+    name: str  # "andrey.ges.numpy.serial" | "causal-learn.ges" | "lingam.direct_lingam"
     algorithm: str  # ges | pc | fci | lingam | ica_lingam | baseline; explicitly declared
-    package: str  # andrey | causal-learn | gcastle | lingam
+    package: str  # andrey | causal-learn | lingam
     package_version: str
     backend: str  # numpy | numba | torch-cpu | torch-cuda | native
     mode: str  # serial | parallel
