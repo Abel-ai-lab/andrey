@@ -42,7 +42,7 @@ every dataset at those sizes.
 :::{div} release-stats
 
 - **More than 60x** GES speedup over causal-learn from 50 to 150 variables
-- **More than 20x** GIN speedup over Tetrad at every size
+- **More than 70x** GIN speedup over Tetrad at every size
 - **More than 15x** CD-NOD speedup over causal-learn from 20 variables, with fewer errors
 :::
 

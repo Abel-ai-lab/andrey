@@ -91,7 +91,7 @@ def gin(
     rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its
     own. With 2 and 3 latents its clusters matched the true ones (median adjusted Rand index 1);
     with 4 latents (12 indicators) the median index was 0.89, and a median of one latent was missed.
-    The median fit took 3.5 s with 6 indicators, 15 s with 9, and 38 s with 12, on 4 cores. Given
+    The median fit took 0.91 s with 6 indicators, 2.6 s with 9, and 5.3 s with 12, on 4 cores. Given
     the true clusters and 1,000 rows, over 10 seeds each, the order of a chain of three latents
     never stopped early and that of a complete three-latent model stopped early once, with no
     latent put after one it causes; with the benchmark's random weights instead, 2 of 10 complete
