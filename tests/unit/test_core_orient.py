@@ -170,6 +170,69 @@ def test_meek_is_a_fixed_point_of_cpdags(d: int):
         assert np.array_equal(meek(cpdag), cpdag)
 
 
+def relabel(adj: np.ndarray, order: np.ndarray) -> np.ndarray:
+    """``adj`` with node ``order[k]`` renamed ``k``."""
+    return adj[np.ix_(order, order)]
+
+
+def random_pdag(rng: np.random.Generator, d: int) -> np.ndarray:
+    """A PDAG whose edges are each undirected or directed either way at random."""
+    a = np.zeros((d, d), dtype=np.int8)
+    for i in range(d):
+        for j in range(i + 1, d):
+            if rng.random() < 0.5:
+                a[i, j], a[j, i] = [(TAIL, TAIL), (TAIL, ARROW), (ARROW, TAIL)][rng.integers(3)]
+    return a
+
+
+def test_meek_leaves_an_edge_two_firings_direct_both_ways_undirected():
+    # R1 directs 1 -> 2 from 0 -> 1 and 2 -> 1 from 3 -> 2.
+    pdag = dag([(0, 1), (3, 2)], 4) + undirected([(1, 2)], 4)
+    assert np.array_equal(meek(pdag), pdag)
+    # One firing at a time, the directed edge with the lower tail decides.
+    assert np.array_equal(meek(pdag, in_column_order=True), dag([(0, 1), (3, 2), (1, 2)], 4))
+
+
+def test_meek_leaves_out_orientations_that_close_a_cycle_together():
+    # R1 directs 1 -> 3 from 2 -> 1, and 0 -> 2 from 3 -> 0: together they close the cycle
+    # 0 -> 2 -> 1 -> 3 -> 0.
+    pdag = dag([(2, 1), (3, 0)], 4) + undirected([(1, 3), (0, 2)], 4)
+    assert np.array_equal(meek(pdag), pdag)
+    assert np.count_nonzero(meek(pdag, in_column_order=True) != pdag) == 1
+
+
+@pytest.mark.parametrize("d", range(5, 9))
+def test_meek_ignores_node_labels(d: int):
+    # Relabeling the nodes relabels the completion, on PDAGs whose orientations conflict too; one
+    # firing at a time, some relabeling changes it.
+    rng = np.random.default_rng(300 + d)
+    in_order_changed = False
+    for _ in range(40):
+        pdag = random_pdag(rng, d)
+        completed, in_order = meek(pdag), meek(pdag, in_column_order=True)
+        for _ in range(4):
+            order = rng.permutation(d)
+            assert np.array_equal(meek(relabel(pdag, order)), relabel(completed, order))
+            in_order_changed |= not np.array_equal(
+                meek(relabel(pdag, order), in_column_order=True), relabel(in_order, order)
+            )
+    assert in_order_changed
+
+
+@pytest.mark.parametrize("d", range(4, 9))
+def test_meek_fires_as_one_at_a_time_when_a_dag_extends_the_pdag(d: int):
+    # The colliders of a DAG's skeleton, with some of the DAG's other edges directed as background
+    # knowledge: no orientations conflict, so the rounds complete it as single firings do.
+    rng = np.random.default_rng(400 + d)
+    for _ in range(40):
+        adj = random_dag(rng, d)
+        skeleton = np.where(adj != NULL, np.int8(TAIL), np.int8(NULL))
+        pdag = orient_colliders(skeleton, true_sepsets(adj))
+        known = (rng.random((d, d)) < 0.2) & (adj == ARROW)  # known[j, i]: the edge i -> j
+        pdag[known] = ARROW
+        assert np.array_equal(meek(pdag), meek(pdag, in_column_order=True))
+
+
 # ---- PDAG extension ------------------------------------------------------------------------------
 
 

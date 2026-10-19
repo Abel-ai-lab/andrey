@@ -38,6 +38,7 @@ def pc(
     indep_test: str = "fisherz",
     collider_order: str = "p_value",
     categorical: np.ndarray | None = None,
+    in_column_order: bool = False,
     _trace: list[dict] | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from ``data`` with the PC algorithm and the ``indep_test`` CI test.
@@ -46,8 +47,9 @@ def pc(
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
     ``indep_test`` selects the conditional-independence test from the registry, ``collider_order``
     the order of :func:`_orient_colliders`, and ``categorical``, a boolean mask of the categorical
-    columns, reaches a mixed-data test. Returns the CPDAG as a ``GraphStructure`` of kind
-    ``"cpdag"``.
+    columns, reaches a mixed-data test. ``in_column_order`` fires Meek's rules one at a time in
+    column order instead of in order-free rounds (:func:`~andrey.core.orient.meek`). Returns the
+    CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -68,9 +70,11 @@ def pc(
     )
     pdag = _orient_colliders(skeleton, sepsets, pvalues, order=collider_order, _trace=_trace)
     if _trace is None:
-        return to_structure(_undirect_conflicts(meek(pdag)), kind="cpdag")
+        return to_structure(
+            _undirect_conflicts(meek(pdag, in_column_order=in_column_order)), kind="cpdag"
+        )
     firings: list[dict] = []
-    cpdag = meek(pdag, _trace=firings)
+    cpdag = meek(pdag, in_column_order=in_column_order, _trace=firings)
     _trace.extend(dict(step="meek", **firing) for firing in firings)
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 

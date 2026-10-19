@@ -251,6 +251,45 @@ def test_cdnod_is_invariant_to_column_order():
         assert np.array_equal(permuted[np.ix_(back, back)], marks)
 
 
+def _invariant_to_column_order(fit, x: np.ndarray, *args) -> bool:
+    """Assert ``fit`` maps back to its own output under seeded column orders; return whether
+    ``fit`` with ``in_column_order`` changes under any of them."""
+    marks = fit(x, *args).to_numpy()
+    in_order = fit(x, *args, in_column_order=True).to_numpy()
+    in_order_changed = False
+    for seed in range(4):
+        order = np.random.default_rng(seed).permutation(x.shape[1])
+        back = np.argsort(order)
+        permuted = fit(x[:, order], *args).to_numpy()
+        assert np.array_equal(permuted[np.ix_(back, back)], marks)
+        permuted = fit(x[:, order], *args, in_column_order=True).to_numpy()
+        in_order_changed |= not np.array_equal(permuted[np.ix_(back, back)], in_order)
+    return in_order_changed
+
+
+def test_cdnod_orientations_are_invariant_to_column_order():
+    """A seed on which Meek's rules direct an edge both ways."""
+    x = data.sample_scm(d=5, n=200, seed=17, density=3.0, scale="standardize").data
+    context = np.repeat([0.0, 1.0], 100)
+    x[context == 1, 0] += 1.5
+    cdnod = importlib.import_module("andrey.constraint.cdnod").cdnod
+    assert _invariant_to_column_order(cdnod, x, context)
+
+
+@pytest.mark.parametrize(
+    ("module", "draw"),
+    [
+        ("andrey.constraint.fci", dict(n=3000, seed=9)),
+        ("andrey.search.gfci", dict(n=300, seed=0)),
+    ],
+)
+def test_pag_orientations_are_invariant_to_column_order(module, draw):
+    """Seeds on which FCI's rules mark one endpoint both ways."""
+    x = data.sample_scm(d=6, density=3.0, latents=1, **draw).data
+    fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
+    assert _invariant_to_column_order(fit, x)
+
+
 def test_fci_output_contract():
     assert andrey.fci(datagen.generate("gauss_5v")).structure.kind == "pag"
 

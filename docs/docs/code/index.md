@@ -100,6 +100,8 @@ does from 20 series at 1,000 time steps, and GES does at 200 variables with ten 
 FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
 apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
 bound. R8 checks each pair of endpoints in both orders, so it does not depend on the node labels.
+The rules run in rounds, each setting together the marks every rule implies on the graph as it
+stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
 With `possible_dsep="order_free"`, FCI and GFCI build possible-d-separation sets that do not depend
 on the order their search visits nodes; the default, `"fast"`, builds them in that order.
