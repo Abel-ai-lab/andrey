@@ -18,6 +18,11 @@ runs one method with one test or score and the same settings, and every solution
 - Andrey's BOSS and GRaSP with the multinomial BIC at the standard penalty and search seed 0, with
   GRaSP at depth 3, run alone: no package here runs them with that score.
 
+``--network`` samples each dataset from a published network's own conditional probability tables
+instead (an ``andrey.data.load_dataset`` name, such as ``diabetes``), with its columns in an order
+drawn from the seed; ``--ladder`` is then unused. There the solutions also include Andrey's BOSS
+and GRaSP with the degenerate Gaussian score, every column named categorical.
+
 The empty graph is the quality baseline. Every estimate is scored against the true DAG's CPDAG
 (``shd`` and the skeleton and arrowhead columns), and a DAG's comparable columns are ``mec_shd`` and
 ``mec_arrowhead_f1``; ``--rescore`` recomputes those columns from the stored estimates. A timeout is
@@ -45,9 +50,17 @@ import pandas as pd
 from andrey import GraphStructure
 from andrey_bench import datasets, memcap, rsession, rundir, scoring
 from andrey_bench.adapters import pgmpy_hc
-from andrey_bench.adapters.andrey_boss import AndreyBOSSBDeu, AndreyBOSSCategoricalBIC
+from andrey_bench.adapters.andrey_boss import (
+    AndreyBOSSBDeu,
+    AndreyBOSSCategoricalBIC,
+    AndreyBOSSDegenGauss,
+)
 from andrey_bench.adapters.andrey_ges import andrey_ges_bdeu
-from andrey_bench.adapters.andrey_grasp import AndreyGRaSPBDeu, AndreyGRaSPCategoricalBIC
+from andrey_bench.adapters.andrey_grasp import (
+    AndreyGRaSPBDeu,
+    AndreyGRaSPCategoricalBIC,
+    AndreyGRaSPDegenGauss,
+)
 from andrey_bench.adapters.andrey_hc import andrey_hc_categorical
 from andrey_bench.adapters.andrey_pc import AndreyPCChisq, AndreyPCGsq
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
@@ -105,6 +118,9 @@ SOLUTIONS = [
     BaselineEmpty(),
 ]
 
+#: The solutions a ``--network`` run adds: Andrey's BOSS and GRaSP with the mixed-data score.
+NETWORK_SOLUTIONS = [AndreyBOSSDegenGauss(), AndreyGRaSPDegenGauss()]
+
 #: Smallest run that touches every solution: one tiny dataset.
 SMOKE = {"ladder": [5], "seeds": 1, "n": 500, "cap_wall_s": 300.0}
 
@@ -130,6 +146,14 @@ def ladder_keys(ladder: list[int], seeds: int, n: int) -> list[DatasetKey]:
     return [
         DatasetKey(**regime_slice(), d=d, n=n, seed=seed) for d in ladder for seed in range(seeds)
     ]
+
+
+def rungs(args: argparse.Namespace) -> dict[int, list[DatasetKey]]:
+    """Return each rung's datasets by ``d``: the ladder's, or one rung of ``--network`` keys."""
+    if args.network is None:
+        return {d: ladder_keys([d], args.seeds, args.n) for d in args.ladder}
+    keys = [datasets.network_key(args.network, args.n, seed) for seed in range(args.seeds)]
+    return {keys[0].d: keys}
 
 
 def _log(msg: str = "") -> None:
@@ -210,6 +234,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--ladder", type=int, nargs="+", default=[10, 20, 40], help="d sizes (default: 10 20 40)"
     )
+    p.add_argument(
+        "--network",
+        default=None,
+        help="sample from this published network's own tables (an andrey.data.load_dataset name) "
+        "instead of the discrete_er ladder",
+    )
     p.add_argument("--seeds", type=int, default=5, help="datasets per rung (default: 5)")
     p.add_argument("--n", type=int, default=2000, help="rows per dataset (default: 2000)")
     p.add_argument(
@@ -260,24 +290,25 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     if args.smoke:
         vars(args).update(SMOKE)
-    solutions = SOLUTIONS
+    solutions = SOLUTIONS if args.network is None else [*SOLUTIONS, *NETWORK_SOLUTIONS]
     if args.solutions is not None:
-        unknown = sorted(set(args.solutions) - {a.name for a in SOLUTIONS})
+        unknown = sorted(set(args.solutions) - {a.name for a in solutions})
         # A typo would otherwise run fewer solutions, and the missing rows would read as failures.
         if unknown:
-            raise SystemExit(f"unknown solutions {unknown}; known: {[a.name for a in SOLUTIONS]}")
-        solutions = [a for a in SOLUTIONS if a.name in args.solutions]
+            raise SystemExit(f"unknown solutions {unknown}; known: {[a.name for a in solutions]}")
+        solutions = [a for a in solutions if a.name in args.solutions]
 
     out = Path(args.out)
-    keys = {key.digest: key for key in ladder_keys(args.ladder, args.seeds, args.n)}
+    by_rung = rungs(args)
+    keys = {key.digest: key for rung in by_rung.values() for key in rung}
 
     # Written before the first fit, so an interrupted benchmark still says what it was asked for.
     run_meta = {
         "driver": Path(__file__).name,
         "solution list": [a.name for a in solutions],
-        "slice": regime_slice(),
-        "generator settings": datasets.DISCRETE_SETTINGS,
-        "ladder": args.ladder,
+        "slice": regime_slice() if args.network is None else {"network": args.network},
+        "generator settings": datasets.DISCRETE_SETTINGS if args.network is None else None,
+        "ladder": list(by_rung),
         "n": args.n,
         "seeds": args.seeds,
         "repeats": args.repeats,
@@ -319,12 +350,12 @@ def main(argv: list[str] | None = None) -> int:
     skipped = 0
     start = time.perf_counter()
 
-    for d in args.ladder:
+    for d, rung in by_rung.items():
         # One rung at a time, so a rung's data is materialized only when the ladder reaches it.
         result = run_batch(
             datasets.store_dir(out),
             solutions,
-            ladder_keys([d], args.seeds, args.n),
+            rung,
             machine_id=args.machine_id,
             cap_wall_s=args.cap_wall_s,
             cap_mem_mb=args.cap_mem_mb,
