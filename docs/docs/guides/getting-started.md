@@ -266,6 +266,34 @@ intervened on in each row, and `multi_group_direct_lingam` and `longitudinal_lin
 datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph each one
 returns.
 
+## Background knowledge
+
+What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,
+naming columns by their labels:
+
+```python
+from andrey import Knowledge, pc
+
+knowledge = Knowledge(
+    required=[("smoking", "tar")],          # edges the graph must have
+    forbidden=[("cancer", "smoking")],      # edges it must not have
+    tiers=[["age", "sex"], ["smoking"], ["tar", "cancer"]],  # no edge into an earlier tier
+)
+result = pc(data, knowledge=knowledge)
+```
+
+`allowed` lists the only pairs that may be adjacent. A short list makes the search faster, and for
+PC, FCI, GFCI, and CD-NOD it is the skeleton the search starts from, so you can screen first and
+then search inside the pairs that survived: `Knowledge.from_skeleton(pc(data, max_depth=1))`.
+`max_depth` caps the conditioning sets of those four methods' tests.
+
+The result honors every part: a required edge is there and directed, a forbidden one is not, and
+the edges the knowledge decides are directed, with the directions they imply. Knowledge that
+contradicts itself, such as a required edge into an earlier tier, raises a `ValueError` before
+the search runs. Labels stay attached to their columns, so the same knowledge fits the table in
+any column order. On the command line, give a JSON object inline or as a file:
+`andrey run pc --data data.csv knowledge=knowledge.json`.
+
 ## Data types
 
 Each test and score reads the columns as one kind of data:

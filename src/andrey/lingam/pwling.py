@@ -88,12 +88,15 @@ def find_causal_order(
     X: np.ndarray,
     *,
     scores: Callable[[np.ndarray, list[int]], np.ndarray] = score_candidates,
+    precedence: np.ndarray | None = None,
 ) -> list[int]:
     """Peel exogenous variables (``argmax`` of ``scores``) one at a time, residualizing the rest.
 
     ``scores(X, U) -> array aligned with U`` is injectable. Single-dataset; MultiGroupDirectLiNGAM
     runs its own group loop (per-group residualization), reusing :func:`score_candidates` and
-    :func:`compute_residual` directly.
+    :func:`compute_residual` directly. With ``precedence`` (``precedence[a, b]``: ``a`` comes
+    before ``b``, acyclic), every remaining variable is still scored, but the pick is the best
+    one that no remaining variable must precede.
     """
     remaining = list(range(X.shape[1]))
     order: list[int] = []
@@ -102,8 +105,12 @@ def find_causal_order(
         # The last variable needs no scoring (and one candidate has no pair to score).
         if len(remaining) == 1:
             m = remaining[0]
-        else:
+        elif precedence is None:
             m = remaining[int(np.argmax(scores(residualized, remaining)))]
+        else:
+            eligible = ~precedence[np.ix_(remaining, remaining)].any(axis=0)
+            values = np.where(eligible, scores(residualized, remaining), -np.inf)
+            m = remaining[int(np.argmax(values))]
         for i in remaining:
             if i != m:
                 residualized[:, i] = compute_residual(residualized[:, i], residualized[:, m])

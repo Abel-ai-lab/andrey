@@ -20,9 +20,11 @@ from andrey.api._adapt import (
     column_labels,
     copies_named,
     data_kind,
+    int_in_range,
     open_unit_interval,
     structure_output,
 )
+from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -40,6 +42,8 @@ def pc(
     collider_order: str = "p_value",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with the PC algorithm.
 
@@ -79,6 +83,15 @@ def pc(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    max_depth : int or None, default=None
+        The largest conditioning set a test uses, at least ``0``. Smaller values run fewer tests and
+        keep more edges; ``None`` tests sets of every size.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and tiers, all honored. The search starts from the allowed pairs and
+        never removes a required pair; a pair the knowledge keeps apart has no separating set, so no
+        collider is oriented over it. The result directs every edge the knowledge decides, then
+        Meek's rules direct the edges that follow.
 
     Returns
     -------
@@ -257,9 +270,17 @@ def pc(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="pc")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         cpdag = _pc(
-            X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_order=collider_order,
+            categorical=mask,
+            max_depth=max_depth,
+            constraints=constraints,
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
@@ -275,6 +296,8 @@ def fci(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     possible_dsep: str = "fast",
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -321,6 +344,14 @@ def fci(
         so the set depends on the order the search visits nodes. ``"order_free"`` checks every
         node once the search ends, so the set does not depend on that order; its sets can be
         larger, so it can run more tests. See Notes.
+    max_depth : int or None, default=None
+        The largest conditioning set a test uses, at least ``0``. Smaller values run fewer tests and
+        keep more edges; ``None`` tests sets of every size.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and tiers, all honored. The search starts from the allowed pairs and
+        never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
+        an arrowhead at ``a``, and a required one is ``a -> b``.
 
     Returns
     -------
@@ -448,6 +479,8 @@ def fci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="fci")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         pag = _fci(
             X,
@@ -456,6 +489,8 @@ def fci(
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=possible_dsep,
+            max_depth=max_depth,
+            constraints=constraints,
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
@@ -473,6 +508,8 @@ def gfci(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     possible_dsep: str = "fast",
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -529,6 +566,15 @@ def gfci(
         it, so the set depends on the order the search visits nodes. ``"order_free"`` checks every
         node once the search ends, so the set does not depend on that order; its sets can be
         larger, so it can run more tests. See Notes.
+    max_depth : int or None, default=None
+        The largest conditioning set a test uses, at least ``0``. Smaller values run fewer tests and
+        keep more edges; ``None`` tests sets of every size.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and tiers, all honored. The GES phase honors it as
+        :func:`~andrey.ges` does, and the test phase never removes a required pair. In the PAG, a
+        forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a``, and a required one is
+        ``a -> b``.
 
     Returns
     -------
@@ -636,6 +682,8 @@ def gfci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         pag = _gfci(
             X,
@@ -646,6 +694,8 @@ def gfci(
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=possible_dsep,
+            max_depth=max_depth,
+            constraints=constraints,
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
@@ -662,6 +712,8 @@ def cdnod(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
@@ -710,6 +762,15 @@ def cdnod(
         dependence measure: two modules, the distributions of a candidate cause and of its effect
         given it, whose measure is at most the threshold count as changing independently. ``None``
         skips the step. See Notes.
+    max_depth : int or None, default=None
+        The largest conditioning set a test uses, at least ``0``. Smaller values run fewer tests and
+        keep more edges; ``None`` tests sets of every size.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and tiers, all honored. The search starts from the allowed pairs and
+        never removes a required pair; a pair the knowledge keeps apart has no separating set, so no
+        collider is oriented over it. The result directs every edge the knowledge decides, then
+        Meek's rules direct the edges that follow. The domain index is unconstrained.
 
     Returns
     -------
@@ -839,6 +900,8 @@ def cdnod(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     c = np.asarray(domain_index, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
@@ -853,6 +916,8 @@ def cdnod(
             collider_order=collider_order,
             categorical=mask,
             dependence_threshold=dependence_threshold,
+            max_depth=max_depth,
+            constraints=constraints,
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}

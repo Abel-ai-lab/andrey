@@ -26,6 +26,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core.knowledge import Constraints
 from andrey.core.orient import to_structure
 from andrey.core.score import ZERO_RESIDUAL, Score, check_columns, make_score
 
@@ -109,13 +110,20 @@ def _solve_normal_equations(a: np.ndarray, b: np.ndarray) -> np.ndarray:
         return np.linalg.pinv(a) @ b
 
 
-def _generate_parent_graph(score: Score, node: int, n_vars: int) -> list[_ParentEntry]:
+def _generate_parent_graph(
+    score: Score, node: int, n_vars: int, constraints: Constraints | None = None
+) -> list[_ParentEntry]:
     """Build a variable's parent graph: the maximal-candidate parent sets, sorted by score.
 
     Enumerates candidate parent sets by increasing size and keeps only *maximal candidates* -- a set
     is dropped when a subset scores at least as low, since it can then never be the optimal choice
     for any available-variable set. The retained entries stay sorted by ascending score so
     :func:`_best_subset` returns the optimum in one forward scan.
+
+    With ``constraints``, every set holds the node's required parents and adds parents that are
+    neither forbidden nor required, and a set is compared only with its subsets that still hold
+    the required parents. :func:`_best_subset` then finds no set until the required parents are
+    available, and its ``inf`` score keeps the order searches off that path.
     """
     parent_graph: list[_ParentEntry] = []
     scores: list[float] = []
@@ -125,14 +133,21 @@ def _generate_parent_graph(score: Score, node: int, n_vars: int) -> list[_Parent
         parent_graph.insert(index, (parents, value, bits))
         scores.insert(index, value)
 
-    insert((), score.score(node, ()), 0)
-    candidates = [c for c in range(n_vars) if c != node]
+    if constraints is None:
+        required: tuple[int, ...] = ()
+        candidates = [c for c in range(n_vars) if c != node]
+    else:
+        required = tuple(np.flatnonzero(constraints.required[:, node]).tolist())
+        legal = ~constraints.forbidden[:, node] & ~constraints.required[:, node]
+        candidates = [c for c in np.flatnonzero(legal).tolist() if c != node]
+    insert(required, score.score(node, required), _structure_bits(required))
     for size in range(1, len(candidates) + 1):
-        for combo in itertools.combinations(candidates, size):
+        for extra in itertools.combinations(candidates, size):
+            combo = tuple(sorted(required + extra)) if required else extra
             bits = _structure_bits(combo)
             value = score.score(node, list(combo))
             maximal = True
-            for v in combo:
+            for v in extra:  # dropping a required parent leaves no legal subset
                 _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))
                 if sub_value < value:  # a subset already scores lower -- combo is dominated
                     maximal = False
@@ -234,6 +249,7 @@ def exact_search(
     search_method: str = "astar",
     score_func: str = "local_score_BIC",
     categorical: np.ndarray | None = None,
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
@@ -255,6 +271,9 @@ def exact_search(
         a mixed-data BIC.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
+    constraints : Constraints or None
+        Background knowledge: each variable's parent sets hold its required parents and no
+        forbidden one, so the DAG is the score-optimal one among those that satisfy the knowledge.
 
     Returns
     -------
@@ -277,7 +296,7 @@ def exact_search(
         if score_func == "local_score_BIC"
         else make_score(score_func, X, categorical=categorical)
     )
-    parent_graphs = [_generate_parent_graph(score, i, n_vars) for i in range(n_vars)]
+    parent_graphs = [_generate_parent_graph(score, i, n_vars, constraints) for i in range(n_vars)]
 
     if search_method == "astar":
         structures = _astar_shortest_path(parent_graphs, n_vars)

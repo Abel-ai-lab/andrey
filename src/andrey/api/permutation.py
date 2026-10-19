@@ -22,6 +22,7 @@ from andrey.api._adapt import (
     json_safe,
     structure_output,
 )
+from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
@@ -40,6 +41,7 @@ def boss(
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG with BOSS (Best Order Score Search).
 
@@ -74,6 +76,12 @@ def boss(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and tiers, all honored. Each variable's parents exclude the
+        forbidden ones and include the required ones, and every causal order the search visits puts
+        the cause of each required edge, and each earlier tier, first. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow.
 
     Returns
     -------
@@ -194,6 +202,7 @@ def boss(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="boss")
     with copies_named(labels):
         cpdag, score = _boss(
             X,
@@ -201,6 +210,7 @@ def boss(
             random_state=resolve_seed(seed),
             score_func=score_func,
             categorical=mask,
+            constraints=constraints,
         )
     metadata = {"algorithm": "BOSS", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -215,6 +225,7 @@ def grasp(
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG with GRaSP (Greedy Relaxation of the Sparsest Permutation).
 
@@ -255,6 +266,12 @@ def grasp(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and tiers, all honored. Each variable's parents exclude the
+        forbidden ones and include the required ones, and every causal order the search visits puts
+        the cause of each required edge, and each earlier tier, first. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow.
 
     Returns
     -------
@@ -382,6 +399,7 @@ def grasp(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="grasp")
     with copies_named(labels):
         cpdag, score = _grasp(
             X,
@@ -390,6 +408,7 @@ def grasp(
             random_state=resolve_seed(seed),
             score_func=score_func,
             categorical=mask,
+            constraints=constraints,
         )
     metadata = {"algorithm": "GRaSP", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)

@@ -21,6 +21,7 @@ import platform
 import re
 import sys
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import typer
@@ -406,6 +407,8 @@ def _check_choice(value: str, param: ParamSpec) -> str:
 
 def _coerce(raw: str, param: ParamSpec) -> object:
     """Coerce a raw CLI string against a ParamSpec type -- the spec drives the parse (no sniff)."""
+    if param.type == "knowledge":
+        return _knowledge_value(raw, param.name)
     value, quoted = _unquote(raw)
     if quoted:  # a quoted value is a literal string -- only a str param can accept one
         if param.type != "str":
@@ -464,6 +467,41 @@ def _coerce(raw: str, param: ParamSpec) -> object:
     return _check_choice(value, param)
 
 
+def _knowledge_value(raw: str, name: str) -> dict | None:
+    """Read a `knowledge=` value: inline JSON (`{...}`), `null`, or the path of a JSON file."""
+    text = raw.strip()
+    if text.lower() == "null":
+        return None
+    if not text.startswith("{"):
+        try:
+            text = Path(text).read_text()
+        except OSError as exc:
+            raise CliError(
+                "bad_value",
+                f"{name} expects a JSON object or the path of a JSON file; cannot read {raw!r}: "
+                f"{exc.strerror}",
+                EXIT_USAGE,
+            ) from None
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise CliError("bad_value", f"{name} is not valid JSON: {exc}", EXIT_USAGE) from None
+    return _knowledge_object(value, name)
+
+
+def _knowledge_object(value: object, name: str) -> dict:
+    """Check a knowledge object's keys; the facade checks its contents."""
+    keys = ("required", "forbidden", "allowed", "tiers")
+    if not isinstance(value, dict) or set(value) - set(keys):
+        raise CliError(
+            "bad_value",
+            f"{name} must be an object with the keys {', '.join(keys)}",
+            EXIT_USAGE,
+            valid_options=list(keys),
+        )
+    return value
+
+
 def _coerce_passthrough(raw: str) -> object:
     """Sniff an open passthrough value (only where there is no spec, such as CALM): quoted -> str,
     then null, true/false, int, float, [list], else str."""
@@ -493,6 +531,8 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
         if param.nullable:
             return None
         raise CliError("bad_value", f"{param.name} may not be null", EXIT_USAGE)
+    if param.type == "knowledge":
+        return _knowledge_object(value, param.name)
     ok = {
         "bool": isinstance(value, bool),
         "int": isinstance(value, int) and not isinstance(value, bool),
@@ -719,9 +759,14 @@ def execute_run(
         labels = None
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
-    if labels is not None and any(p.name == "categorical" for p in spec.params):
+    if fkwargs.get("knowledge") is not None:
+        try:
+            fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
+        except (TypeError, ValueError) as exc:
+            raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
+    if labels is not None and any(p.name in ("categorical", "knowledge") for p in spec.params):
         # A method that reads column types names the header's columns in its warnings and in
-        # metadata["categorical"].
+        # metadata["categorical"]; knowledge names them too.
         import pandas as pd
 
         positional = [pd.DataFrame(positional[0], columns=list(labels)), *positional[1:]]

@@ -16,6 +16,7 @@ import numpy as np
 import numpy.typing as npt
 
 from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import MIXED_SCORES, BICScore, LocalScore, make_score
@@ -69,6 +70,27 @@ def ranked_score(
     return score, ranks
 
 
+def precedence_sort(order: Sequence[int], before: np.ndarray) -> list[int]:
+    """``order`` rearranged so that ``a`` precedes ``b`` wherever ``before[a, b]`` (acyclic).
+
+    Each step places the first variable of ``order`` whose predecessors are all placed, so an order
+    that already keeps ``before`` is returned unchanged.
+    """
+    pending = list(order)
+    placed: list[int] = []
+    while pending:
+        k = next(k for k, v in enumerate(pending) if not before[pending, v].any())
+        placed.append(pending.pop(k))
+    return placed
+
+
+def parent_knowledge(constraints: Constraints, v: int) -> tuple[list[int], list[int]]:
+    """Variable ``v``'s candidate parents (neither forbidden nor required) and required parents."""
+    forbidden, required = constraints.forbidden[:, v], constraints.required[:, v]
+    candidates = np.flatnonzero(~forbidden & ~required).tolist()
+    return [u for u in candidates if u != v], np.flatnonzero(required).tolist()
+
+
 class _GSTNode:
     """One node of a grow-shrink tree: a parent set reached along a grow path from the root.
 
@@ -118,23 +140,25 @@ class _GSTNode:
                 self.branches.append(_GSTNode(self.tree, add, -value))
             start = end
 
-    def _shrink(self, parents: list[int]) -> None:
+    def _shrink(self, parents: list[int], required: Sequence[int] = ()) -> None:
         """Remove parents while the score improves by more than ``_SCORE_EPS``.
 
         Each step selects the lowest-index parent among improving removals within ``_SCORE_EPS``
         of the best score. Record the removal order and cache the final score in ``shrink_score``.
+        A ``required`` parent is never removed.
         """
         self.remove = []
         vertex = self.tree.vertex
         while True:
             current = list(parents)
-            if not current:
+            removable = [u for u in current if u not in required] if required else current
+            if not removable:
                 break
-            deltas = [("remove", int(u)) for u in current]
+            deltas = [("remove", int(u)) for u in removable]
             values = self.tree.delta.score_many_with_base(vertex, current, deltas)
             candidates = [
                 (u, -float(value))
-                for u, value in zip(current, values)
+                for u, value in zip(removable, values)
                 if -float(value) > self.shrink_score + _SCORE_EPS
             ]
             if not candidates:
@@ -164,7 +188,7 @@ class _GSTNode:
                 parents.append(add)
                 return branch.trace(available, parents, prefix_set)
         if self.remove is None:
-            self._shrink(parents)
+            self._shrink(parents, self.tree.required)
             return self.shrink_score
         for remove in self.remove:
             parents.remove(remove)
@@ -177,9 +201,22 @@ class _GrowShrinkTree:
     :meth:`trace` returns ``vertex``'s best-scoring parent set drawn from ``prefix`` (writing it
     into the caller's list) and its negated local score. Repeated traces reuse the grow/shrink work
     cached in the shared node tree.
+
+    ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
+    ``required`` parents are in every parent set: the root scores them, grow adds to them, and
+    shrink never removes them. The caller keeps each required parent in ``prefix``.
     """
 
-    __slots__ = ("vertex", "score", "delta", "n_features", "empty_score", "root")
+    __slots__ = (
+        "vertex",
+        "score",
+        "delta",
+        "n_features",
+        "empty_score",
+        "root",
+        "candidates",
+        "required",
+    )
 
     def __init__(
         self,
@@ -187,16 +224,23 @@ class _GrowShrinkTree:
         score: LocalScore,
         delta: DeltaBICScore | FullScoreDelta,
         n_features: int,
+        *,
+        candidates: list[int] | None = None,
+        required: list[int] | None = None,
     ) -> None:
         self.vertex = vertex
         self.score = score
         self.delta = delta
         self.n_features = n_features
-        self.empty_score = -score.score(vertex, [])
+        self.candidates = candidates
+        self.required = [] if required is None else required
+        self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
 
     def _available(self) -> list[int]:
-        """Every variable that may parent ``vertex`` -- all others."""
+        """Every variable that may parent ``vertex`` -- all others, or the ``candidates``."""
+        if self.candidates is not None:
+            return list(self.candidates)
         vertex = self.vertex
         return [i for i in range(self.n_features) if i != vertex]
 
@@ -204,11 +248,16 @@ class _GrowShrinkTree:
         """Return ``vertex``'s best score for parents drawn from ``prefix``; fill ``parents``."""
         if parents is None:
             parents = []
+        parents.extend(self.required)
         return self.root.trace(self._available(), parents, set(prefix))
 
 
 def _better_mutation(
-    v: int, order: list[int], gsts: list[_GrowShrinkTree], positions: dict[int, int]
+    v: int,
+    order: list[int],
+    gsts: list[_GrowShrinkTree],
+    positions: dict[int, int],
+    before: np.ndarray | None = None,
 ) -> bool:
     """Move ``v`` to the order position that most improves the total score; report whether it moved.
 
@@ -216,7 +265,9 @@ def _better_mutation(
     and backward with ``v`` reinserted, so each candidate position costs one GST trace per variable.
     Only positions that improve the total by more than ``_SCORE_EPS`` are eligible. Selects the
     leftmost eligible position within ``_SCORE_EPS`` of the highest score. Refreshes ``positions``
-    after a move; returns ``False`` when no position improves by more than the tolerance.
+    after a move; returns ``False`` when no position improves by more than the tolerance. With
+    ``before`` (``before[a, b]``: ``a`` precedes ``b``), only positions after every predecessor of
+    ``v`` and before every successor are eligible.
     """
     i = positions[v]
     p = len(order)
@@ -251,6 +302,10 @@ def _better_mutation(
         acc += gsts[w].trace(prefix)
         scores[j] += acc
 
+    if before is not None:  # scores[j] places v just before order[j]
+        lo = max((positions[w] + 1 for w in np.flatnonzero(before[:, v]).tolist()), default=0)
+        hi = min((positions[w] for w in np.flatnonzero(before[v]).tolist()), default=p)
+        scores = [s if lo <= j <= hi else -np.inf for j, s in enumerate(scores)]
     best_score = max(scores)
     if best_score <= scores[i] + _SCORE_EPS:
         return False
@@ -273,6 +328,7 @@ def boss(
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",
     categorical: np.ndarray | None = None,
+    constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
     """Learn a CPDAG from ``data`` by best-order score search and return it with its total score.
 
@@ -289,6 +345,12 @@ def boss(
         BIC (:class:`~andrey.core.score.DGScore`, :class:`~andrey.core.score.CGScore`).
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
+    constraints : Constraints or None
+        Background knowledge: each variable's parents exclude the forbidden ones and include the
+        required ones, and every order the search visits keeps
+        :meth:`~andrey.core.knowledge.Constraints.precedence`, starting from the tie-rank order
+        rearranged as little as possible. The CPDAG is then narrowed by the knowledge
+        (:func:`~andrey.core.knowledge.mpdag`).
 
     Returns
     -------
@@ -318,7 +380,19 @@ def boss(
     rng = random.Random(random_state)
 
     order = list(range(p))
-    gsts = [_GrowShrinkTree(v, score, delta, p) for v in order]
+    before = None
+    if constraints is None:
+        gsts = [_GrowShrinkTree(v, score, delta, p) for v in order]
+    else:
+        ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
+        before = ranked.precedence()
+        gsts = []
+        for v in order:
+            candidates, required = parent_knowledge(ranked, v)
+            gsts.append(
+                _GrowShrinkTree(v, score, delta, p, candidates=candidates, required=required)
+            )
+        order = precedence_sort(order, before)
     positions = {v: idx for idx, v in enumerate(order)}
     variables = list(order)
 
@@ -326,7 +400,7 @@ def boss(
         improved = False
         rng.shuffle(variables)
         for v in variables:
-            improved |= _better_mutation(v, order, gsts, positions)
+            improved |= _better_mutation(v, order, gsts, positions, before)
         if not improved:
             break
 
@@ -346,4 +420,6 @@ def boss(
             adj[child, parent] = ARROW
 
     cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
     return to_structure(cpdag, kind="cpdag"), float(total)

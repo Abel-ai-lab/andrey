@@ -15,10 +15,16 @@ from collections.abc import Sequence
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
+from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
-from andrey.search.boss import PERMUTATION_SCORES, ranked_score
+from andrey.search.boss import (
+    PERMUTATION_SCORES,
+    parent_knowledge,
+    precedence_sort,
+    ranked_score,
+)
 
 # DFS accepts a tuck when the total negated BIC increases by more than this tolerance;
 # changes in (-tolerance, tolerance] are explored as ties. Grow recomputes full BIC scores
@@ -89,11 +95,12 @@ class _GSTNode:
         # search path. Sort the original candidate order so exact ties retain that order.
         self.branches.sort(reverse=True)
 
-    def shrink(self, parents: list[int]) -> None:
+    def shrink(self, parents: list[int], required: Sequence[int] = ()) -> None:
         """Record in ``remove`` the parents whose deletion improves the score, greedily.
 
         Repeatedly removes the single parent that most improves ``shrink_score`` until none does,
         mutating ``parents`` to the shrunk set and appending each removed parent to ``remove``.
+        A ``required`` parent is never removed.
         """
         self.remove = []
         vertex = self.tree.vertex
@@ -102,7 +109,8 @@ class _GSTNode:
         self.shrink_score = -score_fn.score(vertex, parents)
         while True:
             best: int | None = None
-            for candidate in list(parents):
+            removable = [u for u in parents if u not in required] if required else list(parents)
+            for candidate in removable:
                 parents.remove(candidate)
                 candidate_score = -score_fn.score(vertex, parents)
                 parents.append(candidate)
@@ -139,7 +147,7 @@ class _GSTNode:
                 parents.append(add)
                 return branch.trace(available, parents, prefix_set)
         if self.remove is None:
-            self.shrink(parents)
+            self.shrink(parents, self.tree.required)
             return self.shrink_score
         for removed in self.remove:
             parents.remove(removed)
@@ -152,9 +160,22 @@ class _GST:
     Holds the root node and the empty-parent-set score, both reused across every permutation the
     search visits. :meth:`trace` grows/shrinks the target's parents from the variables that precede
     it (``prefix``), reusing any cached path the tree already holds.
+
+    ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
+    ``required`` parents are in every parent set: the root scores them, grow adds to them, and
+    shrink never removes them. The caller keeps each required parent in ``prefix``.
     """
 
-    __slots__ = ("vertex", "score", "delta", "n_features", "empty_score", "root")
+    __slots__ = (
+        "vertex",
+        "score",
+        "delta",
+        "n_features",
+        "empty_score",
+        "root",
+        "candidates",
+        "required",
+    )
 
     def __init__(
         self,
@@ -162,21 +183,31 @@ class _GST:
         score: LocalScore,
         delta: DeltaBICScore | FullScoreDelta,
         n_features: int,
+        *,
+        candidates: list[int] | None = None,
+        required: list[int] | None = None,
     ) -> None:
         self.vertex = vertex
         self.score = score
         self.delta = delta
         self.n_features = n_features
-        self.empty_score = -score.score(vertex, [])
+        self.candidates = candidates
+        self.required = [] if required is None else required
+        self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
 
     def trace(self, prefix: Sequence[int], parents: list[int]) -> float:
         """Grow-shrink the target's parents from the allowed predecessors ``prefix``.
 
-        ``parents`` (mutated in place) receives the chosen parent set; the return is its
-        higher-is-better local score. ``available`` is every variable except the target.
+        ``parents`` (mutated in place) receives the chosen parent set, required parents included;
+        the return is its higher-is-better local score. ``available`` is every variable except the
+        target, or the ``candidates``.
         """
-        available = [i for i in range(self.n_features) if i != self.vertex]
+        if self.candidates is None:
+            available = [i for i in range(self.n_features) if i != self.vertex]
+        else:
+            available = list(self.candidates)
+        parents.extend(self.required)
         return self.root.trace(available, parents, set(prefix))
 
 
@@ -186,11 +217,19 @@ class _Order:
     ``order`` is the permutation; ``parents``/``local_scores`` map a variable to its grow-shrink
     parent set and that set's higher-is-better local score; ``edges`` tracks the running edge total
     the DFS reports. Positions (variable -> index) are cached and rebuilt lazily after a mutation.
+    The seeded shuffle starts the order; with ``before`` (``before[a, b]``: ``a`` precedes ``b``) it
+    is then rearranged as little as possible to keep ``before``.
     """
 
     __slots__ = ("order", "parents", "local_scores", "edges", "_positions", "_positions_dirty")
 
-    def __init__(self, n_features: int, rng: random.Random, gsts: list[_GST]) -> None:
+    def __init__(
+        self,
+        n_features: int,
+        rng: random.Random,
+        gsts: list[_GST],
+        before: np.ndarray | None = None,
+    ) -> None:
         self.order = list(range(n_features))
         self.parents: dict[int, list[int]] = {}
         self.local_scores: dict[int, float] = {}
@@ -199,6 +238,8 @@ class _Order:
         self._positions_dirty = False
 
         rng.shuffle(self.order)
+        if before is not None:
+            self.order = precedence_sort(self.order, before)
         self._rebuild_positions()
         for y in self.order:
             self.parents[y] = []
@@ -328,13 +369,15 @@ def _dfs(
     gsts: list[_GST],
     rng: random.Random,
     history_keys: set[frozenset[tuple[int, int]]] | None = None,
+    before: np.ndarray | None = None,
 ) -> bool:
     """Search covered tucks for a score-improving move; return ``True`` when one is applied.
 
     Visits variables and their parents in shuffled order. Each covered tuck is applied and the span
     re-scored: a strictly-improving move is kept (returns ``True``); a score-preserving move is
     recursed through (bounded by ``depth``, de-duplicated by the set of flipped edge pairs) before
-    the tuck is rolled back. Returns ``False`` when no move improves the score.
+    the tuck is rolled back. A tuck that puts ``b`` before ``a`` where ``before[a, b]`` is rolled
+    back unscored. Returns ``False`` when no move improves the score.
     """
     if history_keys is None:
         history_keys = {frozenset(item) for item in history}
@@ -353,6 +396,11 @@ def _dfs(
             j = order.index(x)
             cache = _snapshot(order, j, i)
             _tuck(i, j, order)
+            if before is not None:  # a tuck reorders the span [j, i] only
+                span = order.order[j : i + 1]
+                if np.tril(before[np.ix_(span, span)], -1).any():
+                    _restore(order, j, cache)
+                    continue
             edge_bump, score_bump = _update(i, j, order, gsts)
             if score_bump > _SCORE_EPS:
                 order.bump_edges(edge_bump)
@@ -365,7 +413,7 @@ def _dfs(
                         history.append(flipped)
                         history_keys.add(flipped_key)
                         if depth > 0 and _dfs(
-                            depth - 1, flipped, history, order, gsts, rng, history_keys
+                            depth - 1, flipped, history, order, gsts, rng, history_keys, before
                         ):
                             return True
                         del history[-1]
@@ -382,6 +430,7 @@ def grasp(
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",
     categorical: np.ndarray | None = None,
+    constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
     """Learn a CPDAG from ``data`` by GRaSP over a linear-Gaussian or mixed-data BIC score.
 
@@ -407,6 +456,12 @@ def grasp(
         Local score, one of :data:`~andrey.search.boss.PERMUTATION_SCORES`.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
+    constraints : Constraints or None
+        Background knowledge: each variable's parents exclude the forbidden ones and include the
+        required ones, and every order the search visits keeps
+        :meth:`~andrey.core.knowledge.Constraints.precedence`: the seeded starting order is
+        rearranged as little as possible to keep it, and a tuck that breaks it is not taken. The
+        CPDAG is then narrowed by the knowledge (:func:`~andrey.core.knowledge.mpdag`).
 
     Returns
     -------
@@ -427,9 +482,18 @@ def grasp(
     score, ranks = ranked_score(X, score_func, lambda_value, categorical)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
-    gsts = [_GST(v, score, delta, n_features) for v in range(n_features)]
+    before = None
+    if constraints is None:
+        gsts = [_GST(v, score, delta, n_features) for v in range(n_features)]
+    else:
+        ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
+        before = ranked.precedence()
+        gsts = []
+        for v in range(n_features):
+            candidates, required = parent_knowledge(ranked, v)
+            gsts.append(_GST(v, score, delta, n_features, candidates=candidates, required=required))
 
-    order = _Order(n_features, rng, gsts)
+    order = _Order(n_features, rng, gsts, before)
     for i in range(n_features):
         y = order.get(i)
         y_parents = order.get_parents(y)
@@ -437,7 +501,7 @@ def grasp(
         order.set_local_score(y, local_score)
         order.bump_edges(len(y_parents))
 
-    while _dfs(depth - 1, set(), [], order, gsts, rng):
+    while _dfs(depth - 1, set(), [], order, gsts, rng, before=before):
         pass
 
     adj = np.zeros((n_features, n_features), dtype=np.int8)
@@ -450,4 +514,6 @@ def grasp(
             adj[y, x] = ARROW
 
     cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
     return to_structure(cpdag, kind="cpdag"), float(total_bic)

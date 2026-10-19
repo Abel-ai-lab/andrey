@@ -9,6 +9,7 @@ from collections import deque
 from collections.abc import Iterator, Mapping
 from contextlib import nullcontext
 from itertools import combinations, islice, permutations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -23,6 +24,9 @@ from andrey.constraint._skeleton import (
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
+
 # Bound discriminating and possible-d-sep paths by this finite cap.
 _UNBOUNDED_PATH = 1000
 _R5_PARTIAL_PATHS = 10_000
@@ -36,6 +40,8 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
     possible_dsep: str = "fast",
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
 
@@ -44,26 +50,47 @@ def fci(
     the optional majority collider rule also counts equality as a separating vote.
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
     ``possible_dsep`` (``"fast"`` or ``"order_free"``) selects how each possible-d-sep set is built.
-    Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
+    ``max_depth`` caps the size of every conditioning set a test uses: the adjacency search, the
+    possible-d-sep subsets, the majority votes, and the discriminating-path tests. With
+    ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
+    a required pair, and :func:`_knowledge_marks` sets their endpoints before the orientation
+    rules, which change circles only. Returns the PAG as a ``GraphStructure`` of kind ``"pag"``
+    (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
 
     _validate_collider_rule(collider_rule)
     _validate_possible_dsep(possible_dsep)
     test = make_indep_test(indep_test, X, categorical=categorical)
-    support, sepsets = _fast_adjacency_search(X, test, alpha)
+    allowed = keep = None
+    if constraints is not None:
+        allowed = constraints.support()
+        keep = constraints.required | constraints.required.T
+    support, sepsets = _fast_adjacency_search(
+        X, test, alpha, support=allowed, keep=keep, max_depth=max_depth
+    )
 
     marks = _circle_pag(support)
+    _knowledge_marks(marks, constraints)
     _orient_colliders(marks, sepsets)
-    _remove_by_possible_dsep(marks, test, alpha, sepsets, order_free=possible_dsep == "order_free")
+    _remove_by_possible_dsep(
+        marks,
+        test,
+        alpha,
+        sepsets,
+        order_free=possible_dsep == "order_free",
+        keep=keep,
+        max_depth=max_depth,
+    )
     marks = _circle_pag(marks != NULL)
+    _knowledge_marks(marks, constraints)
     ambiguous = (
-        _majority_sepsets(marks, test, alpha, sepsets)
+        _majority_sepsets(marks, test, alpha, sepsets, max_depth=max_depth, support=allowed)
         if collider_rule == "majority"
         else frozenset()
     )
     _orient_colliders(marks, sepsets, ambiguous)
-    _fci_orient(marks, test, alpha, sepsets, ambiguous)
+    _fci_orient(marks, test, alpha, sepsets, ambiguous, max_depth=max_depth)
 
     return GraphStructure.from_numpy(marks, kind="pag")
 
@@ -79,13 +106,17 @@ def _fast_adjacency_search(
     prescreen: bool = True,
     workers: int = 1,
     support: np.ndarray | None = None,
+    keep: np.ndarray | None = None,
+    max_depth: int | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]:
     """Learn the undirected skeleton and every removed pair's separating set (stable, FAS-style).
 
-    Grows the conditioning size from zero over a complete graph, or over the boolean adjacency
-    ``support`` when one is given; at each size, every still-adjacent pair ``(x, y)`` is tested
-    against subsets of a start-of-size snapshot of *either* endpoint's neighborhood, and pairs
-    found independent are removed together after the size completes.
+    Grows the conditioning size from zero, up to ``max_depth`` when one is given, over a complete
+    graph, or over the boolean adjacency ``support`` when one is given; at each size, every
+    still-adjacent pair ``(x, y)`` is tested against subsets of a start-of-size snapshot of *either*
+    endpoint's neighborhood, and pairs found independent are removed together after the size
+    completes. A pair marked in the boolean ``keep`` (the required edges, both ways) is never
+    tested, so it stays; it still conditions the tests of other pairs.
     A removed pair's separating set is the union of every conditioning set that made it independent.
 
     Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
@@ -113,16 +144,19 @@ def _fast_adjacency_search(
             if int(degrees.max(initial=0)) - 1 <= size:
                 break
             size += 1
+            if max_depth is not None and size > max_depth:
+                break
             neighbors = [np.flatnonzero(support[i]) for i in range(d)]
+            testable = support if keep is None else support & ~keep
             remove: list[tuple[int, int]] = []
             if can_prescreen and size == 0:
-                upper = np.triu(support, 1)
+                upper = np.triu(testable, 1)
                 for x, y, _ in marginal_removals(test, upper, alpha, record_pvalues=False):
                     remove.append((x, y))
                     sepsets[(x, y)] = ()
                     sepsets[(y, x)] = ()  # skeleton separations are recorded both ways
             elif can_prescreen and size == 1:
-                for x, y in adjacent_pairs(support):
+                for x, y in adjacent_pairs(testable):
                     candidates = sorted(
                         (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
@@ -135,7 +169,7 @@ def _fast_adjacency_search(
                         sepsets[(x, y)] = key
                         sepsets[(y, x)] = key
             else:
-                pairs = adjacent_pairs(support)
+                pairs = adjacent_pairs(testable)
                 if pool is not None:
                     removals = pool.scan(pairs, support.copy(), size, alpha, record_pvalues=False)
                 else:
@@ -169,6 +203,20 @@ def _circle_pag(support: np.ndarray) -> np.ndarray:
     marks = np.where(support != NULL, np.int8(CIRCLE), np.int8(NULL))
     np.fill_diagonal(marks, np.int8(NULL))
     return marks
+
+
+def _knowledge_marks(marks: np.ndarray, constraints: Constraints | None) -> None:
+    """Set the endpoints ``constraints`` decide on the adjacent pairs, in place.
+
+    A forbidden ``i -> j`` whose reverse is not forbidden puts an arrowhead at ``i`` (the MAG has no
+    ``i -> j``), and a required ``i -> j`` is ``i -> j``: a tail at ``i`` and, as its reverse is
+    forbidden, an arrowhead at ``j``. ``None`` leaves ``marks`` as they are.
+    """
+    if constraints is None:
+        return
+    adjacent = marks != NULL
+    marks[adjacent & constraints.forbidden & ~constraints.forbidden.T] = ARROW
+    marks[adjacent & constraints.required] = TAIL
 
 
 def _adjacent(marks: np.ndarray, a: int, b: int) -> bool:
@@ -223,6 +271,16 @@ def _sepset(
     return frozenset(int(v) for v in value)
 
 
+def _largest_size(candidates: int, max_depth: int | None) -> int:
+    """The largest conditioning-set size drawn from ``candidates`` nodes under ``max_depth``."""
+    return candidates if max_depth is None else min(candidates, max_depth)
+
+
+def _fits(cond: list[int], max_depth: int | None) -> bool:
+    """Whether ``cond`` has at most ``max_depth`` members (always, when ``max_depth`` is None)."""
+    return max_depth is None or len(cond) <= max_depth
+
+
 # ---- R0: unshielded colliders -------------------------------------------------------------------
 
 
@@ -251,6 +309,9 @@ def _majority_sepsets(
     test: CITest,
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
+    *,
+    max_depth: int | None = None,
+    support: np.ndarray | None = None,
 ) -> frozenset[tuple[int, int, int]]:
     """Rewrite separating sets by majority vote on the final skeleton; return ambiguous triples.
 
@@ -259,20 +320,22 @@ def _majority_sepsets(
     vote. A missing key direction inherits the reverse entry before membership is rewritten.
     Fewer than half containing the middle node (or no separating subset) makes a collider;
     more than half makes a noncollider. An exact half leaves both recorded sets unchanged.
-    Cost grows exponentially with endpoint degree; conditioning sets have no size cap. Subsets are
-    tested in chunks of ``_MAJORITY_CHUNK``, so memory per triple stays bounded.
+    Cost grows exponentially with endpoint degree; the subsets are capped at ``max_depth`` members
+    when one is given, and have no size cap otherwise. A pair outside the boolean ``support`` (the
+    pairs background knowledge allows) holds no vote and keeps no separating set. Subsets are tested
+    in chunks of ``_MAJORITY_CHUNK``, so memory per triple stays bounded.
     """
     neighbors = [_adjacent_nodes(marks, node) for node in range(len(marks))]
     ambiguous = set()
     batched = getattr(test, "batched_call", None)
     for b, adjacent in enumerate(neighbors):
         for a, c in combinations(adjacent, 2):
-            if _adjacent(marks, a, c):
+            if _adjacent(marks, a, c) or (support is not None and not support[a, c]):
                 continue
             subsets = (
                 subset
                 for endpoint in (a, c)
-                for size in range(len(neighbors[endpoint]) + 1)
+                for size in range(_largest_size(len(neighbors[endpoint]), max_depth) + 1)
                 for subset in combinations(neighbors[endpoint], size)
             )
             separating = containing = 0
@@ -472,9 +535,10 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int, order_free: bool = False) 
 
 
 def _iter_dsep_choices(
-    dsep: list[int], adj_a: set[int], adj_b: set[int]
+    dsep: list[int], adj_a: set[int], adj_b: set[int], max_depth: int | None = None
 ) -> Iterator[tuple[int, ...]]:
-    """Every non-empty subset of ``dsep`` that lies inside neither endpoint's adjacency.
+    """Every non-empty subset of ``dsep``, of at most ``max_depth`` members when one is given, that
+    lies inside neither endpoint's adjacency.
 
     Subsets come by increasing size, each size in ``combinations`` order, one at a time. The
     adjacency search already tested the empty set and every subset of either endpoint's
@@ -485,7 +549,7 @@ def _iter_dsep_choices(
     def outside(values: tuple[int, ...]) -> bool:
         return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
 
-    for size in range(1, len(dsep) + 1):
+    for size in range(1, _largest_size(len(dsep), max_depth) + 1):
         yield from filter(outside, combinations(dsep, size))
 
 
@@ -501,10 +565,12 @@ def _try_remove_by_dsep(
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     order_free: bool,
+    max_depth: int | None = None,
 ) -> bool:
-    """Remove edge ``x-y`` if some possible-d-sep subset makes ``x`` and ``y`` independent."""
+    """Remove edge ``x-y`` if some possible-d-sep subset, of at most ``max_depth`` members when one
+    is given, makes ``x`` and ``y`` independent."""
     dsep = _possible_dsep(marks, a, b, order_free)
-    for cond in _iter_dsep_choices(dsep, adj_a, adj_b):
+    for cond in _iter_dsep_choices(dsep, adj_a, adj_b, max_depth):
         if test(x, y, cond) > alpha:
             marks[x, y] = NULL
             marks[y, x] = NULL
@@ -530,24 +596,30 @@ def _remove_by_possible_dsep(
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     order_free: bool = False,
+    *,
+    keep: np.ndarray | None = None,
+    max_depth: int | None = None,
 ) -> None:
     """Prune edges the plain skeleton kept but a possible-d-sep conditioning set separates.
 
     Search each endpoint's possible-d-sep set (built as ``order_free`` selects) for a conditioning
-    subset outside either endpoint's adjacency. Store a successful subset under the endpoint order
-    returned by ``_edge_order``.
+    subset outside either endpoint's adjacency, of at most ``max_depth`` members when one is given.
+    Store a successful subset under the endpoint order returned by ``_edge_order``. A pair marked in
+    the boolean ``keep`` (the required edges, both ways) is never tested.
     """
     n = marks.shape[0]
     edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
     for na, nb in edges:
-        if not _adjacent(marks, na, nb):
+        if not _adjacent(marks, na, nb) or (keep is not None and keep[na, nb]):
             continue
         adj_a = set(_adjacent_nodes(marks, na))
         adj_b = set(_adjacent_nodes(marks, nb))
-        _try_remove_by_dsep(marks, na, nb, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free)
+        _try_remove_by_dsep(
+            marks, na, nb, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free, max_depth
+        )
         if _adjacent(marks, na, nb):
             _try_remove_by_dsep(
-                marks, nb, na, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free
+                marks, nb, na, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free, max_depth
             )
 
 
@@ -560,12 +632,16 @@ def _fci_orient(
     alpha: float,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    max_depth: int | None = None,
 ) -> None:
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
     Each sweep runs the arrowhead rules (R1/R2 cycle, R3, and the R4 discriminating-path rule)
     followed by the tail and possibly-directed-path rules R5-R10; sweeps repeat until no endpoint
-    changes. Circles become tails or arrowheads only where the current marks force it.
+    changes. Circles become tails or arrowheads only where the current marks force it; a tail or
+    arrowhead present when the rules start, such as one :func:`_knowledge_marks` set, is never
+    changed. ``max_depth`` caps the conditioning sets of R4's tests (:func:`_do_ddp`).
     """
     change = True
     while change:
@@ -573,7 +649,7 @@ def _fci_orient(
         change = _rule_r1r2_cycle(marks, change, ambiguous)
         change = _rule_r3(marks, sepsets, change, ambiguous)
         # R4 runs every sweep because a discriminating path can orient an otherwise unchanged graph.
-        change = _rule_r4(marks, test, alpha, sepsets, change)
+        change = _rule_r4(marks, test, alpha, sepsets, change, max_depth=max_depth)
         change = _rule_r5(marks, change, ambiguous)
         change = _rule_r6(marks, change)
         change = _rule_r7(marks, change, ambiguous)
@@ -668,6 +744,8 @@ def _rule_r4(
     alpha: float,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     change: bool,
+    *,
+    max_depth: int | None = None,
 ) -> bool:
     """R4: orient the endpoints closing a definite discriminating path into ``b``."""
     n = marks.shape[0]
@@ -680,7 +758,9 @@ def _rule_r4(
                     continue
                 if marks[c, b] != ARROW:
                     continue
-                change = _ddp_orient(marks, a, b, c, test, alpha, sepsets, change)
+                change = _ddp_orient(
+                    marks, a, b, c, test, alpha, sepsets, change, max_depth=max_depth
+                )
     return change
 
 
@@ -703,6 +783,8 @@ def _ddp_orient(
     alpha: float,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     change: bool,
+    *,
+    max_depth: int | None = None,
 ) -> bool:
     """Search back from ``a`` for a definite discriminating path ending at ``c`` and orient it."""
     queue: deque[int] = deque([a])
@@ -728,7 +810,7 @@ def _ddp_orient(
                 continue
             if not _adjacent(marks, d, c) and d != c:
                 oriented, change = _do_ddp(
-                    marks, d, a, b, c, previous, test, alpha, sepsets, change
+                    marks, d, a, b, c, previous, test, alpha, sepsets, change, max_depth=max_depth
                 )
                 if oriented:
                     return change
@@ -749,12 +831,19 @@ def _do_ddp(
     alpha: float,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     change: bool,
+    *,
+    max_depth: int | None = None,
 ) -> tuple[bool, bool]:
-    """Resolve the discriminating-path endpoint at ``b``: tail if ``b`` separates ``d``/``c``."""
+    """Resolve the discriminating-path endpoint at ``b``: tail if ``b`` separates ``d``/``c``.
+
+    ``d`` and ``c`` are tested given the path's inner nodes, with and without ``b``; a set larger
+    than ``max_depth`` is not tested and counts as dependent. When neither test separates them, the
+    recorded separating set decides.
+    """
     path = _get_path(d, previous)
-    ind = test(d, c, tuple(path)) > alpha
+    ind = _fits(path, max_depth) and test(d, c, tuple(path)) > alpha
     path2 = [p for p in path if p != b]
-    ind2 = test(d, c, tuple(path2)) > alpha
+    ind2 = _fits(path2, max_depth) and test(d, c, tuple(path2)) > alpha
 
     if not ind and not ind2:
         sep = _sepset(sepsets, d, c)

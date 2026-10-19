@@ -40,6 +40,20 @@ column. A single column gives a one-node graph.
 `"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`
 and `"cond_gauss"` for mixed data.
 
+`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
+`exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
+and forbidden edges, the pairs allowed to be adjacent, and tiers; each method's `knowledge`
+parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take `max_depth`, the
+largest conditioning set a test uses.
+[Background knowledge](../guides/getting-started.md#background-knowledge) shows them in use.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: generated
+
+   Knowledge
+```
+
 ### Supported methods
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks

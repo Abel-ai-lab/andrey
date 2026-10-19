@@ -10,6 +10,7 @@ from contextlib import nullcontext
 from itertools import combinations, groupby
 from math import comb
 from operator import itemgetter
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -24,8 +25,12 @@ from andrey.constraint._skeleton import (
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test, pins_blas
+from andrey.core.knowledge import orient
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 _EXPENSIVE_PASS_TESTS = 10_000_000
 COLLIDER_ORDERS = ("p_value", "column")
@@ -38,6 +43,8 @@ def pc(
     indep_test: str = "fisherz",
     collider_order: str = "p_value",
     categorical: np.ndarray | None = None,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
     _trace: list[dict] | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from ``data`` with the PC algorithm and the ``indep_test`` CI test.
@@ -46,8 +53,11 @@ def pc(
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
     ``indep_test`` selects the conditional-independence test from the registry, ``collider_order``
     the order of :func:`_orient_colliders`, and ``categorical``, a boolean mask of the categorical
-    columns, reaches a mixed-data test. Returns the CPDAG as a ``GraphStructure`` of kind
-    ``"cpdag"``.
+    columns, reaches a mixed-data test. ``max_depth`` caps the conditioning-set size of the
+    skeleton search. With ``constraints``, the skeleton search starts from the pairs they allow and
+    never tests a required pair (:func:`_discover_skeleton`), every edge they decide is directed
+    before the colliders, and Meek's rules run with R4, so the result is the class narrowed by the
+    knowledge. Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -64,13 +74,18 @@ def pc(
         categorical=categorical,
         record_pvalues=collider_order == "p_value",
         warn_expensive=True,
+        max_depth=max_depth,
+        constraints=constraints,
         _trace=_trace,
     )
+    rule4 = constraints is not None
+    if constraints is not None:
+        skeleton = orient(skeleton, constraints)
     pdag = _orient_colliders(skeleton, sepsets, pvalues, order=collider_order, _trace=_trace)
     if _trace is None:
-        return to_structure(_undirect_conflicts(meek(pdag)), kind="cpdag")
+        return to_structure(_undirect_conflicts(meek(pdag, rule4=rule4)), kind="cpdag")
     firings: list[dict] = []
-    cpdag = meek(pdag, _trace=firings)
+    cpdag = meek(pdag, rule4=rule4, _trace=firings)
     _trace.extend(dict(step="meek", **firing) for firing in firings)
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 
@@ -92,11 +107,14 @@ def _orient_colliders(
     """Orient the unshielded colliders in ``order``, by default most clearly separated pair first.
 
     ``pdag`` holds the skeleton's endpoint marks, every edge undirected or some already directed
-    (CDNOD directs the context's edges first); the result is a new matrix. An unshielded triple
-    ``x - y - z`` (``x`` and ``z`` both adjacent to ``y`` but not to each other) is a collider
-    ``x -> y <- z`` iff ``y`` is not in the separating set of ``x`` and ``z``. A collider is skipped
-    when an edge it would orient already has an arrowhead at ``x`` or ``z``, which it would make
-    bidirected; so of two conflicting colliders, the one oriented first is kept.
+    (CDNOD directs the context's edges first, and background knowledge the edges it decides); the
+    result is a new matrix. An unshielded triple ``x - y - z`` (``x`` and ``z`` both adjacent to
+    ``y`` but not to each other) is a collider ``x -> y <- z`` iff ``y`` is not in the separating
+    set of ``x`` and ``z``; a triple whose endpoints have no recorded separating set, a pair the
+    knowledge keeps apart, is skipped. A collider is skipped when an edge it would orient already
+    has an arrowhead at ``x`` or ``z``, which it would make bidirected; so of two conflicting
+    colliders, the one oriented first is kept, and an edge directed before the colliders is never
+    reversed or made bidirected.
 
     With ``order="p_value"``, the collider's rank is ``pvalues[(x, z)]``, keyed with the lower index
     first: the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders
@@ -119,7 +137,7 @@ def _orient_colliders(
     for y in range(pdag.shape[0]):
         nbrs = np.flatnonzero(pdag[y] != NULL).tolist()
         for x, z in combinations(nbrs, 2):
-            if pdag[x, z] == NULL:
+            if pdag[x, z] == NULL and ((x, z) in sepsets or (z, x) in sepsets):
                 triples.append((pvalues[(x, z)] if ranked else None, x, y, z))
     if ranked:
         triples.sort(key=itemgetter(0), reverse=True)
@@ -193,13 +211,18 @@ def _discover_skeleton(
     prescreen: bool = True,
     workers: int = 1,
     warn_expensive: bool = False,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
     _trace: list[dict] | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
     """Learn the undirected skeleton and, for every removed pair, its separating set and p-value.
 
-    Grows the conditioning size from zero; at each size, every currently adjacent pair is tested
-    against subsets of a start-of-size neighborhood snapshot (in both directions, as PC does), and
-    edges found independent are removed together after the size completes. A removed pair's
+    Grows the conditioning size from zero, up to ``max_depth`` when one is given, over the complete
+    graph, or over the pairs ``constraints`` allow when given; a pair they keep apart has no
+    separating set or p-value, and a pair joined by a required edge is never tested, so it stays.
+    At each size, every currently adjacent pair is tested against subsets of a start-of-size
+    neighborhood snapshot (in both directions, as PC does), and edges found independent are
+    removed together after the size completes. A removed pair's
     separating set is the union of every conditioning set that made it independent, and its p-value
     the largest among those sets' tests; both are keyed ``(x, y)`` with ``x < y``. ``indep_test``
     selects the CI test (shared by PC and CDNOD, which pass the augmented matrix); ``categorical``
@@ -226,6 +249,10 @@ def _discover_skeleton(
     test = make_indep_test(indep_test, X, categorical=categorical)
     adj = np.full((d, d), TAIL, dtype=np.int8)
     np.fill_diagonal(adj, NULL)
+    keep = None
+    if constraints is not None:
+        adj[~constraints.support()] = NULL
+        keep = constraints.required | constraints.required.T
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     pvalues: dict[tuple[int, int], float] = {}
 
@@ -238,15 +265,16 @@ def _discover_skeleton(
         while True:
             neighbors = [np.flatnonzero(adj[i] != NULL) for i in range(d)]
             max_degree = max((nb.size for nb in neighbors), default=0)
-            if size > max_degree - 1:
+            if size > max_degree - 1 or (max_depth is not None and size > max_depth):
                 break
+            testable = adj if keep is None else (adj != NULL) & ~keep
             removals: list[Removal] = []
             if can_prescreen and size == 0:
-                upper = np.triu(adj != NULL, 1)
+                upper = np.triu(testable != NULL, 1)
                 for x, y, p in marginal_removals(test, upper, alpha, _trace, record_pvalues):
                     removals.append((x, y, (), p))
             elif can_prescreen and size == 1:
-                for x, y in adjacent_pairs(adj):
+                for x, y in adjacent_pairs(testable):
                     candidates = sorted(
                         (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
@@ -256,7 +284,7 @@ def _discover_skeleton(
                     if separating:
                         removals.append((x, y, tuple(separating), p))
             else:
-                pairs = adjacent_pairs(adj)
+                pairs = adjacent_pairs(testable)
                 if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbors, size):
                     warn_once(
                         f"PC conditioning size {size} requires at least "

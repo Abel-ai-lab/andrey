@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
 from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
 from andrey.search.ges import GES_SCORES
@@ -1266,6 +1267,69 @@ _add(
         references=("Tashiro et al. 2014",),
     )
 )
+
+# --- background knowledge and the conditioning-set cap ------------------------------------------
+
+_SKELETON_RULE = (
+    "The search starts from the allowed pairs and never removes a required pair; a pair the "
+    "knowledge keeps apart gets no collider. "
+)
+_PAG_MARKS = "In the PAG, a forbidden a -> b puts an arrowhead at a, and a required one is a -> b. "
+_CLASS_RULE = (
+    "The result directs every edge the knowledge decides, then Meek's rules direct the edges that "
+    "follow."
+)
+_MOVE_RULE = (
+    "No move adds a forbidden edge or removes a required one; the search starts from them. "
+)
+_PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
+_ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
+_KNOWLEDGE_HOW: dict[str, str] = {
+    "pc": _SKELETON_RULE + _CLASS_RULE,
+    "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
+    "fci": _SKELETON_RULE + _PAG_MARKS,
+    "gfci": "The GES phase moves as ges does; the test phase never removes a required pair. "
+    + _PAG_MARKS,
+    "ges": _MOVE_RULE + _CLASS_RULE,
+    "gies": _MOVE_RULE + _CLASS_RULE,
+    "xges": _MOVE_RULE + _CLASS_RULE,
+    "hc": _MOVE_RULE + _CLASS_RULE,
+    "tabu": _MOVE_RULE + _CLASS_RULE,
+    "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
+    "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
+    "exact_search": _PARENT_RULE,
+    "direct_lingam": _ORDER_RULE + "The regression drops forbidden parents and does not penalize "
+    "required ones.",
+}
+#: The Knowledge parts each method honors (every part, for every method that takes knowledge).
+_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
+    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
+)
+_MAX_DEPTH = ParamSpec(
+    name="max_depth",
+    type="int",
+    default=None,
+    doc="The largest conditioning set a test uses, at least 0. Smaller values run fewer tests and "
+    "keep more edges. null tests sets of every size.",
+    nullable=True,
+)
+
+for _name, _how in _KNOWLEDGE_HOW.items():
+    _knowledge = ParamSpec(
+        name="knowledge",
+        type="knowledge",
+        default=None,
+        doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
+        f"adjacent, and tiers in time order. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
+        nullable=True,
+    )
+    _depth = (_MAX_DEPTH,) if _name in ("pc", "cdnod", "fci", "gfci") else ()
+    REGISTRY[_name] = REGISTRY[_name].model_copy(
+        update={
+            "params": (*REGISTRY[_name].params, *_depth, _knowledge),
+            "knowledge": _KNOWLEDGE_PARTS[_name],
+        }
+    )
 
 
 def get_spec(name: str) -> MethodSpec:

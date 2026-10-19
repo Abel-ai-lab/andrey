@@ -28,6 +28,7 @@ from andrey.api._adapt import (
     shared_labels,
     structure_output,
 )
+from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -48,7 +49,11 @@ def _canonical_weights(B: npt.ArrayLike) -> np.ndarray:
 
 
 def direct_lingam(
-    data: npt.ArrayLike, *, random_state: int | None = None, measure: str = "pwling"
+    data: npt.ArrayLike,
+    *,
+    random_state: int | None = None,
+    measure: str = "pwling",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a fully oriented DAG with DirectLiNGAM (linear, non-Gaussian noise).
 
@@ -68,6 +73,11 @@ def direct_lingam(
     measure : {"pwling"}, default="pwling"
         How the order search picks the most exogenous remaining variable at each step. Only
         ``"pwling"``, the pairwise likelihood-ratio measure [2]_, is supported.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and tiers, all honored. The causal order puts the cause of each
+        required edge, and each earlier tier, first; the regression on that order drops the
+        forbidden parents and does not penalize the required ones.
 
     Returns
     -------
@@ -132,7 +142,8 @@ def direct_lingam(
 
     X = data_matrix(data)
     labels = column_labels(data)
-    order, B = _native(X, measure=measure)
+    constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
+    order, B = _native(X, measure=measure, constraints=constraints)
     weighted = _canonical_weights(B)
     return structure_output(
         dag_from_adjacency(weighted),

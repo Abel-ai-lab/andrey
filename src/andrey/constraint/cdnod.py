@@ -37,6 +37,7 @@ from __future__ import annotations
 
 from collections import deque
 from itertools import combinations
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -48,7 +49,11 @@ from andrey.constraint.pc import (
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
 from andrey.core.independence import _center_kernel, _gaussian_kernel
+from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 _RIDGE = 0.1
 
@@ -62,6 +67,8 @@ def cdnod(
     collider_order: str = "p_value",
     categorical: np.ndarray | None = None,
     dependence_threshold: float | None = None,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
@@ -75,8 +82,12 @@ def cdnod(
     the result is projected back to the ``n_features`` data variables; with a single domain the
     context is left out and the search runs on ``data`` alone. ``categorical``, a boolean mask of
     the data's categorical columns, reaches a mixed-data test, which also takes the context as
-    categorical. Returns a ``GraphStructure`` tagged ``"cpdag"``: its directions include those the
-    index identifies, so it is not an observational CPDAG.
+    categorical. ``max_depth`` caps the conditioning-set size of the skeleton search.
+    ``constraints``, over the data's columns, constrain the skeleton search and the orientations as
+    in :func:`~andrey.constraint.pc.pc`; the context is unconstrained. Every edge they decide is
+    directed before the independent-change step, which orients only undirected edges, so it never
+    orients against them. Returns a ``GraphStructure`` tagged ``"cpdag"``: its directions include
+    those the index identifies, so it is not an observational CPDAG.
     """
     check_collider_order(collider_order)
     X = np.asarray(data, dtype=np.float64)
@@ -92,26 +103,49 @@ def cdnod(
     context = context.reshape(-1, 1)
     d = X.shape[1]
     ranked = collider_order == "p_value"
+    rule4 = constraints is not None
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
         skeleton, sepsets, pvalues = _discover_skeleton(
-            X, alpha, indep_test, categorical=categorical, record_pvalues=ranked
+            X,
+            alpha,
+            indep_test,
+            categorical=categorical,
+            record_pvalues=ranked,
+            max_depth=max_depth,
+            constraints=constraints,
         )
-        pdag = _orient_with_context(skeleton, sepsets, pvalues, context=None, order=collider_order)
+        pdag = _orient_with_context(
+            skeleton,
+            sepsets,
+            pvalues,
+            context=None,
+            order=collider_order,
+            constraints=constraints,
+        )
     else:
         augmented = np.concatenate([X, context], axis=1)
         mask = None if categorical is None else np.append(np.asarray(categorical, bool), True)
+        padded = None if constraints is None else constraints.padded(d + 1)
         skeleton, sepsets, pvalues = _discover_skeleton(
-            augmented, alpha, indep_test, categorical=mask, record_pvalues=ranked
+            augmented,
+            alpha,
+            indep_test,
+            categorical=mask,
+            record_pvalues=ranked,
+            max_depth=max_depth,
+            constraints=padded,
         )
-        pdag = _orient_with_context(skeleton, sepsets, pvalues, context=d, order=collider_order)
+        pdag = _orient_with_context(
+            skeleton, sepsets, pvalues, context=d, order=collider_order, constraints=padded
+        )
         if dependence_threshold is not None:
             changing = np.nonzero(skeleton[d] != NULL)[0].tolist()
             pdag = _orient_by_independent_changes(
-                meek(pdag), X, context[:, 0], changing, dependence_threshold
+                meek(pdag, rule4=rule4), X, context[:, 0], changing, dependence_threshold
             )
-    completed = _undirect_conflicts(meek(pdag))
+    completed = _undirect_conflicts(meek(pdag, rule4=rule4))
     return to_structure(completed[:d, :d], kind="cpdag")
 
 
@@ -122,21 +156,25 @@ def _orient_with_context(
     *,
     context: int | None,
     order: str = "p_value",
+    constraints: Constraints | None = None,
 ) -> np.ndarray:
     """Orient the augmented skeleton: context edges outward, then unshielded colliders.
 
     Every edge the ``context`` node keeps becomes ``context -> neighbor`` first, so the context is
-    a source in every triple it touches. Colliders are then oriented as PC orients them, in
-    ``order`` (:func:`~andrey.constraint.pc._orient_colliders`), which skips a collider when an edge
-    it would orient already has an arrowhead at the other end; so none puts an arrowhead at the
-    context.
-    ``context=None`` orients colliders only, for a skeleton without a context node.
+    a source in every triple it touches, and every edge ``constraints`` decide is directed with it.
+    Colliders are then oriented as PC orients them, in ``order``
+    (:func:`~andrey.constraint.pc._orient_colliders`), which skips a collider when an edge it would
+    orient already has an arrowhead at the other end; so none puts an arrowhead at the context or
+    reverses a decided edge. With ``context=None``, for a skeleton without a context node, only the
+    decided edges and the colliders are oriented.
     """
     pdag = skeleton.copy()
     if context is not None:
         neighbors = np.flatnonzero(skeleton[context] != NULL)
         pdag[context, neighbors] = TAIL
         pdag[neighbors, context] = ARROW
+    if constraints is not None:
+        pdag = orient(pdag, constraints)
     return _orient_colliders(pdag, sepsets, pvalues, order=order)
 
 

@@ -158,7 +158,7 @@ def from_structure(structure: GraphStructure) -> np.ndarray:
 # ---- Meek completion ----------------------------------------------------------------------------
 
 
-def meek(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
+def meek(pdag: np.ndarray, *, rule4: bool = False, _trace: list[dict] | None = None) -> np.ndarray:
     """Complete a PDAG to a CPDAG by applying Meek's rules R1-R3 to a fixed point.
 
     Returns a new endpoint-mark matrix. Each rule directs an undirected edge only when doing so
@@ -166,7 +166,10 @@ def meek(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
     shared child (R3); an orientation that would close a directed cycle is skipped. Adjacency (which
     pairs share an edge) is never changed -- only tails become arrowheads. A bidirected edge counts
     as an adjacency only: no rule reads it as directed or undirected, or orients it. R4 is not
-    required to complete a v-structure pattern in the absence of background knowledge.
+    required to complete a v-structure pattern in the absence of background knowledge; with
+    ``rule4`` set, for a PDAG that also carries background knowledge, R4 runs after R3: for
+    ``i -- j``, ``i -- k``, ``k -> m -> j`` with ``i`` adjacent to ``m`` and ``k``, ``j``
+    non-adjacent, it orients ``i -> j``.
 
     The completion is defined for a collider-consistent PDAG (as produced by
     :func:`orient_colliders`); on an inconsistent PDAG the fixed point can depend on rule-firing
@@ -245,7 +248,37 @@ def meek(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
                         )
                     )
                 changed = True
+        if rule4 and _rule4(adj, _trace):
+            changed = True
     return adj
+
+
+def _rule4(adj: np.ndarray, _trace: list[dict] | None) -> bool:
+    """Meek's R4 over every undirected edge, in place: ``i -- j``, ``i -- k``, ``k -> m -> j``,
+    ``i`` adjacent to ``m``, and ``k``, ``j`` non-adjacent  =>  ``i -> j``."""
+    changed = False
+    for i, j in np.argwhere((adj == TAIL) & (adj.T == TAIL)).tolist():
+        if not _is_undirected(adj, i, j):
+            continue
+        hit = None
+        for mid in np.nonzero((adj[:, j] == TAIL) & (adj[j] == ARROW))[0].tolist():  # mid -> j
+            if mid == i or not _is_adjacent(adj, i, mid):
+                continue
+            for k in np.nonzero((adj[:, mid] == TAIL) & (adj[mid] == ARROW))[
+                0
+            ].tolist():  # k -> mid
+                if k not in (i, j) and _is_undirected(adj, i, k) and not _is_adjacent(adj, k, j):
+                    hit = (i, k, mid, j)
+                    break
+            if hit:
+                break
+        if hit and not _reaches_directed(adj, j, i):
+            before = adj.copy() if _trace is not None else None
+            _orient(adj, i, j)
+            if _trace is not None:
+                _trace.append(dict(rule="R4", triple=hit, before=before, after=adj.copy()))
+            changed = True
+    return changed
 
 
 # ---- PDAG to DAG --------------------------------------------------------------------------------

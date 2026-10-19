@@ -19,6 +19,7 @@ import warnings
 import pytest
 
 import andrey
+from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.api import __all__ as API_ALL
 from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
 from andrey.spec.models import Status
@@ -95,7 +96,23 @@ def _type_matches(ptype: str, default: object) -> bool:
         return isinstance(default, tuple) and all(isinstance(x, int) for x in default)
     if ptype == "str_list":
         return isinstance(default, (tuple, list))
+    if ptype == "knowledge":
+        return isinstance(default, dict)
     return False
+
+
+@pytest.mark.parametrize("name", list(REGISTRY))
+def test_knowledge_parts_match_the_facade(name):
+    """A method takes ``knowledge`` exactly when its spec lists the parts it honors, and its
+    docstring names them."""
+    spec = get_spec(name)
+    takes = "knowledge" in inspect.signature(getattr(andrey, name)).parameters
+    assert takes is bool(spec.knowledge)
+    if takes:
+        doc = inspect.getdoc(getattr(andrey, name)) or ""
+        entry = doc.split("knowledge : Knowledge or None", 1)[1].split("\n\n", 1)[0]
+        named = "all honored" if spec.knowledge == KNOWLEDGE_PARTS else ", ".join(spec.knowledge)
+        assert named in " ".join(entry.split())
 
 
 def test_param_type_is_consistent_with_default():
