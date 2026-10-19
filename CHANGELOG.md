@@ -40,6 +40,11 @@ change names its pull request.
   of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
   only 3; smaller depths search less and run faster. ([#190])
+- `andrey.config.tie_break`, `andrey.config(tie_break=...)`, and `ANDREY_TIE_BREAK` choose how
+  the searches break ties: `"rank"`, the default, by a rank computed from each column's own data,
+  or `"position"`, by column position. The new Column order and machines guide lists what each
+  method keeps under a new column order and on another machine, and which methods follow the
+  setting. ([#210])
 
 ### Changed
 
@@ -370,3 +375,4 @@ First alpha release.
 [#206]: https://github.com/Abel-ai-lab/andrey/pull/206
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
 [#208]: https://github.com/Abel-ai-lab/andrey/pull/208
+[#210]: https://github.com/Abel-ai-lab/andrey/pull/210
