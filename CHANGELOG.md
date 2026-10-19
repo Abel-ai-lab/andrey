@@ -131,6 +131,12 @@ change names its pull request.
   parents determine scores `inf`, unavailable as under the BIC. ([#203])
 - A DataFrame with reordered columns no longer fails on the torch backend, where torch rejected
   its array's negative stride. ([#216])
+- `pc`, `cdnod`, `fci`, and `gfci` apply Meek's rules and FCI's R1-R10 in rounds that set
+  together everything the rules imply on the graph as it stands, leaving an edge or endpoint two
+  rules decide differently undirected or a circle where the rule reached first in column order used
+  to decide, and `gfci` keeps the union of the smallest separating sets of a pair GES leaves
+  non-adjacent instead of the first one found, so reordering the columns no longer changes what
+  these rules orient, and on data where the rules conflict the graphs can change. ([#233])
 
 ## [0.6.0] - 2026-10-17
 
@@ -353,3 +359,4 @@ First alpha release.
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
 [#229]: https://github.com/Abel-ai-lab/andrey/pull/229
+[#233]: https://github.com/Abel-ai-lab/andrey/pull/233
