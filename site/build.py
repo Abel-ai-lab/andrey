@@ -2231,6 +2231,5 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "compare_source": comparison_source(),
         "comparison": comparison,
         "docs_grid": docs_grid(),
-        "abel_mark": abel_mark(),
         "style": homepage_code_css(),
     }

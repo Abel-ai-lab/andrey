@@ -967,15 +967,10 @@ def test_the_homepage_shows_the_whole_agent_session(placeholder_page):
     assert "grid-column: 3" in replay[: replay.index("}")]
 
 
-def test_the_footer_credits_abel_with_its_mark_and_name(placeholder_page):
-    start = placeholder_page.index('<footer class="site-footer')
-    footer = placeholder_page[start : placeholder_page.index("</footer>", start)]
-    link = footer[footer.index('<a class="footer-abel" href="https://abel.ai/">') :]
-    link = link[: link.index("</a>")]
-    # One link holds the mark and the name; the mark is drawn in the text's color.
-    assert link.endswith("Abel AI Lab") and "Built by" not in footer
-    assert '<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true"' in link
-    assert 'fill="currentColor"' in link and "white" not in link
+def test_abels_mark_takes_the_text_color():
+    mark = build.abel_mark()
+    assert mark.startswith('<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true"')
+    assert 'fill="currentColor"' in mark and "white" not in mark
 
 
 def test_the_agent_session_wraps_long_lines_inside_the_terminal(placeholder_page):

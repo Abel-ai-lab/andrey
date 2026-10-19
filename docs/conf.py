@@ -244,7 +244,8 @@ html_theme_options = {
     "navigation_with_keys": True,
     "show_prev_next": False,
     "icon_links": [{"name": "GitHub", "url": REPO_URL, "icon": "fa-brands fa-github"}],
-    # The documentation footer (`_templates/docs-footer.html`); the theme's three areas are empty.
+    # One footer on every page, the homepage's too (`_templates/docs-footer.html`); the theme's
+    # other two areas are empty.
     "footer_start": ["docs-footer"],
     "footer_center": [],
     "footer_end": [],
@@ -263,7 +264,7 @@ html_context = {
     "report_bug_url": f"{REPO_URL}/issues/new",
     "repo_url": REPO_URL,
     "pypi_url": PYPI_URL,
-    # Abel's mark uses the text color in the documentation footer.
+    # Abel's mark uses the text color in the footer.
     "abel_mark": site.abel_mark(),
 }
 # A post's author and date sit under its title (_post_byline); the blog index links the archive.
