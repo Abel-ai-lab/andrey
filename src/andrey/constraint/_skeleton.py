@@ -12,11 +12,13 @@ one chunk in memory however many subsets it visits.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from contextlib import nullcontext
 from itertools import combinations, islice
 
 import numpy as np
 
-from andrey.core.ci import CITest
+from andrey.core import backend
+from andrey.core.ci import CITest, pins_blas
 
 #: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
 #: p-value is ``None`` when the scan does not record it.
@@ -224,6 +226,47 @@ def scan_pairs(
         if found:
             removals.append((x, y, tuple(sorted(separating)), max(largest) if largest else None))
     return removals
+
+
+def separate_apart(
+    test: CITest,
+    adjacency: np.ndarray,
+    apart: np.ndarray,
+    alpha: float,
+    *,
+    max_depth: int | None = None,
+    trace: list[dict] | None = None,
+    record_pvalues: bool = True,
+) -> list[Removal]:
+    """Separating sets for the pairs background knowledge keeps apart, over the final skeleton.
+
+    ``adjacency`` is the boolean skeleton the search ends with and ``apart`` the boolean pairs the
+    knowledge keeps apart, which the search never tested. Every such pair that shares a neighbor,
+    and so forms an unshielded triple, is tested as the search tests a pair it removes: against
+    subsets of either endpoint's neighbors by increasing size, up to ``max_depth`` when one is
+    given, with :func:`scan_pairs`. Returns ``(x, y, separating, p)``, ``x < y``, for every pair
+    some size separates: the union of the separating subsets at the first size that separates it
+    and their largest p-value (``None`` when ``record_pvalues`` is false). A pair no subset
+    separates, which the data find dependent although the knowledge keeps it apart, is left out.
+    With ``trace`` given, every test is recorded as :func:`scan_pairs` records it.
+    """
+    common = adjacency.astype(np.float32) @ adjacency.astype(np.float32) > 0
+    pairs = adjacent_pairs(np.triu(apart & common, 1))
+    neighbors = [np.flatnonzero(row) for row in adjacency]
+    found: list[Removal] = []
+    size = 0
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        while pairs and (max_depth is None or size <= max_depth):
+            removals = scan_pairs(test, pairs, neighbors, size, alpha, trace, record_pvalues)
+            found.extend(removals)
+            separated = {(x, y) for x, y, _, _ in removals}
+            pairs = [
+                (x, y)
+                for x, y in pairs
+                if (x, y) not in separated and max(neighbors[x].size, neighbors[y].size) > size
+            ]
+            size += 1
+    return found
 
 
 def adjacent_pairs(adjacency: np.ndarray) -> list[tuple[int, int]]:

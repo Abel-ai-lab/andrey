@@ -20,7 +20,9 @@ from andrey.constraint._skeleton import (
     marginal_removals,
     prescreen_capable,
     scan_pairs,
+    separate_apart,
 )
+from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 
@@ -53,21 +55,26 @@ def fci(
     ``max_depth`` caps the size of every conditioning set a test uses: the adjacency search, the
     possible-d-sep subsets, the majority votes, and the discriminating-path tests. With
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
-    a required pair, and :func:`_knowledge_marks` sets their endpoints before the orientation
-    rules, which change circles only. Returns the PAG as a ``GraphStructure`` of kind ``"pag"``
-    (circle marks and all).
+    a required pair, a pair they keep apart gets a separating set when one exists
+    (:func:`_fast_adjacency_search`), and :func:`_knowledge_marks` sets their endpoints before the
+    orientation rules, which change circles only. A triple over a kept-apart pair that no set
+    separates is neither a collider nor a non-collider to any rule (:func:`_unseparated_triples`).
+    An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
+    ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
+    Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
 
     _validate_collider_rule(collider_rule)
     _validate_possible_dsep(possible_dsep)
     test = make_indep_test(indep_test, X, categorical=categorical)
-    allowed = keep = None
+    allowed = keep = apart = None
     if constraints is not None:
         allowed = constraints.support()
         keep = constraints.required | constraints.required.T
+        apart = ~allowed
     support, sepsets = _fast_adjacency_search(
-        X, test, alpha, support=allowed, keep=keep, max_depth=max_depth
+        X, test, alpha, support=allowed, keep=keep, apart=apart, max_depth=max_depth
     )
 
     marks = _circle_pag(support)
@@ -84,11 +91,13 @@ def fci(
     )
     marks = _circle_pag(marks != NULL)
     _knowledge_marks(marks, constraints)
-    ambiguous = (
-        _majority_sepsets(marks, test, alpha, sepsets, max_depth=max_depth, support=allowed)
-        if collider_rule == "majority"
-        else frozenset()
-    )
+    if constraints is not None:
+        check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
+    ambiguous = _unseparated_triples(marks, sepsets, apart)
+    if collider_rule == "majority":
+        ambiguous |= _majority_sepsets(
+            marks, test, alpha, sepsets, max_depth=max_depth, skip=ambiguous
+        )
     _orient_colliders(marks, sepsets, ambiguous)
     _fci_orient(marks, test, alpha, sepsets, ambiguous, max_depth=max_depth)
 
@@ -107,6 +116,7 @@ def _fast_adjacency_search(
     workers: int = 1,
     support: np.ndarray | None = None,
     keep: np.ndarray | None = None,
+    apart: np.ndarray | None = None,
     max_depth: int | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]:
     """Learn the undirected skeleton and every removed pair's separating set (stable, FAS-style).
@@ -118,6 +128,10 @@ def _fast_adjacency_search(
     completes. A pair marked in the boolean ``keep`` (the required edges, both ways) is never
     tested, so it stays; it still conditions the tests of other pairs.
     A removed pair's separating set is the union of every conditioning set that made it independent.
+    After the last size, a pair marked in the boolean ``apart`` (the pairs background knowledge
+    keeps apart, outside ``support``) that shares a neighbor gets its separating set the same way,
+    from the final neighborhoods (:func:`~andrey.constraint._skeleton.separate_apart`); a pair no
+    conditioning set separates gets none.
 
     Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
     it lives and the skeleton does not depend on how the caller ordered the columns.
@@ -191,6 +205,12 @@ def _fast_adjacency_search(
         if pool is not None:
             pool.close()
 
+    if apart is not None:
+        for x, y, separating, _ in separate_apart(
+            test, support, apart, alpha, max_depth=max_depth, record_pvalues=False
+        ):
+            sepsets[(x, y)] = separating
+            sepsets[(y, x)] = separating
     return support, sepsets
 
 
@@ -311,7 +331,7 @@ def _majority_sepsets(
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     *,
     max_depth: int | None = None,
-    support: np.ndarray | None = None,
+    skip: frozenset[tuple[int, int, int]] = frozenset(),
 ) -> frozenset[tuple[int, int, int]]:
     """Rewrite separating sets by majority vote on the final skeleton; return ambiguous triples.
 
@@ -321,16 +341,16 @@ def _majority_sepsets(
     Fewer than half containing the middle node (or no separating subset) makes a collider;
     more than half makes a noncollider. An exact half leaves both recorded sets unchanged.
     Cost grows exponentially with endpoint degree; the subsets are capped at ``max_depth`` members
-    when one is given, and have no size cap otherwise. A pair outside the boolean ``support`` (the
-    pairs background knowledge allows) holds no vote and keeps no separating set. Subsets are tested
-    in chunks of ``_MAJORITY_CHUNK``, so memory per triple stays bounded.
+    when one is given, and have no size cap otherwise. A triple in ``skip`` holds no vote and keeps
+    its recorded sets. Subsets are tested in chunks of ``_MAJORITY_CHUNK``, so memory per triple
+    stays bounded.
     """
     neighbors = [_adjacent_nodes(marks, node) for node in range(len(marks))]
     ambiguous = set()
     batched = getattr(test, "batched_call", None)
     for b, adjacent in enumerate(neighbors):
         for a, c in combinations(adjacent, 2):
-            if _adjacent(marks, a, c) or (support is not None and not support[a, c]):
+            if _adjacent(marks, a, c) or _triple(a, b, c) in skip:
                 continue
             subsets = (
                 subset
@@ -362,6 +382,26 @@ def _majority_sepsets(
                 else:
                     sepsets[pair] = tuple(node for node in recorded if node != b)
     return frozenset(ambiguous)
+
+
+def _unseparated_triples(
+    marks: np.ndarray,
+    sepsets: Mapping[tuple[int, int], tuple[int, ...]],
+    apart: np.ndarray | None,
+) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples over a pair in the boolean ``apart`` that has no separating set.
+
+    The data find such a pair dependent although background knowledge keeps it apart, so the
+    triple is ambiguous: no rule reads it as a collider or a non-collider. ``None`` gives none.
+    """
+    if apart is None:
+        return frozenset()
+    triples = set()
+    for b in range(marks.shape[0]):
+        for a, c in combinations(_adjacent_nodes(marks, b), 2):
+            if apart[a, c] and _sepset(sepsets, a, c) is None:
+                triples.add(_triple(a, b, c))
+    return frozenset(triples)
 
 
 def _orient_colliders(

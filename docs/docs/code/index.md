@@ -48,6 +48,8 @@ largest conditioning set a test uses.
 [Background knowledge](../guides/getting-started.md#background-knowledge) shows them in use.
 
 ```{eval-rst}
+.. currentmodule:: andrey
+
 .. autosummary::
    :toctree: generated
 

@@ -89,9 +89,12 @@ def pc(
     knowledge : Knowledge or None, default=None
         Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and tiers, all honored. The search starts from the allowed pairs and
-        never removes a required pair; a pair the knowledge keeps apart has no separating set, so no
-        collider is oriented over it. The result directs every edge the knowledge decides, then
-        Meek's rules direct the edges that follow.
+        never removes a required pair; a pair the knowledge keeps apart is tested for a separating
+        set, so colliders over it are oriented as usual. When no set separates the pair, which means
+        the data find the two dependent, no collider is oriented over it and Meek's rules treat its
+        triples as non-colliders. The result directs every edge the knowledge decides, then Meek's
+        rules direct the edges that follow; knowledge that directs the edges the data keep into a
+        cycle raises ``ValueError``.
 
     Returns
     -------
@@ -350,8 +353,12 @@ def fci(
     knowledge : Knowledge or None, default=None
         Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and tiers, all honored. The search starts from the allowed pairs and
-        never removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts
-        an arrowhead at ``a``, and a required one is ``a -> b``.
+        never removes a required pair; a pair the knowledge keeps apart is tested for a separating
+        set, so colliders over it are oriented as usual. When no set separates the pair, which means
+        the data find the two dependent, no rule reads its triples as colliders or non-colliders. In
+        the PAG, a forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a``, and a
+        required one is ``a -> b``; knowledge that puts an arrowhead at ``a`` on an edge ``a - b``
+        while its required edges lead from ``a`` to ``b`` raises ``ValueError``.
 
     Returns
     -------
@@ -768,9 +775,12 @@ def cdnod(
     knowledge : Knowledge or None, default=None
         Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and tiers, all honored. The search starts from the allowed pairs and
-        never removes a required pair; a pair the knowledge keeps apart has no separating set, so no
-        collider is oriented over it. The result directs every edge the knowledge decides, then
-        Meek's rules direct the edges that follow. The domain index is unconstrained.
+        never removes a required pair; a pair the knowledge keeps apart is tested for a separating
+        set, so colliders over it are oriented as usual. When no set separates the pair, which means
+        the data find the two dependent, no collider is oriented over it and Meek's rules treat its
+        triples as non-colliders. The result directs every edge the knowledge decides, then Meek's
+        rules direct the edges that follow; knowledge that directs the edges the data keep into a
+        cycle raises ``ValueError``. The domain index is unconstrained.
 
     Returns
     -------

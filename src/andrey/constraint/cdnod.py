@@ -46,6 +46,7 @@ from andrey.constraint.pc import (
     _orient_colliders,
     _undirect_conflicts,
     check_collider_order,
+    check_knowledge_cycle,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure
 from andrey.core.independence import _center_kernel, _gaussian_kernel
@@ -161,7 +162,9 @@ def _orient_with_context(
     """Orient the augmented skeleton: context edges outward, then unshielded colliders.
 
     Every edge the ``context`` node keeps becomes ``context -> neighbor`` first, so the context is
-    a source in every triple it touches, and every edge ``constraints`` decide is directed with it.
+    a source in every triple it touches, and every edge ``constraints`` decide is directed with it;
+    decided edges that close a directed cycle raise ``ValueError``
+    (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
     Colliders are then oriented as PC orients them, in ``order``
     (:func:`~andrey.constraint.pc._orient_colliders`), which skips a collider when an edge it would
     orient already has an arrowhead at the other end; so none puts an arrowhead at the context or
@@ -175,6 +178,7 @@ def _orient_with_context(
         pdag[neighbors, context] = ARROW
     if constraints is not None:
         pdag = orient(pdag, constraints)
+        check_knowledge_cycle((pdag == TAIL) & (pdag.T == ARROW))
     return _orient_colliders(pdag, sepsets, pvalues, order=order)
 
 

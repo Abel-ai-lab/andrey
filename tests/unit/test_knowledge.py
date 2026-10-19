@@ -274,3 +274,58 @@ def test_schema_lists_the_parts_each_method_honors():
         schema = to_json_schema(REGISTRY[name])
         assert schema["knowledge"] == list(REGISTRY[name].knowledge)
         assert schema["params"]["properties"]["knowledge"]["type"] == ["object", "null"]
+
+
+def _collider(seed: int = 0, n: int = 1000) -> pd.DataFrame:
+    # x -> y <- z; w is independent of the three.
+    rng = np.random.default_rng(seed)
+    x, z, w, noise = rng.uniform(-1.0, 1.0, (4, n))
+    return pd.DataFrame({"x": x, "y": 0.8 * x + 0.8 * z + noise, "z": z, "w": w})
+
+
+@pytest.mark.parametrize("name", ["pc", "cdnod", "fci"])
+def test_a_pair_kept_apart_keeps_its_collider(name):
+    knowledge = Knowledge(required=[("x", "y")], forbidden=[("x", "z"), ("z", "x")])
+    marks, labels = _marks(_fit(name, _collider(), knowledge=knowledge))
+    x, y, z = (labels.index(v) for v in "xyz")
+    assert marks[y, x] == ARROW and marks[y, z] == ARROW
+    if name not in PAGS:
+        assert marks[x, y] == TAIL and marks[z, y] == TAIL
+
+
+def test_a_skeleton_as_knowledge_keeps_the_colliders():
+    data = _collider()
+    plain = andrey.pc(data).structure.oriented_edges()
+    assert ("z", "y", "directed") in plain
+    screened = andrey.pc(data, knowledge=Knowledge.from_skeleton(andrey.pc(data)))
+    assert screened.structure.oriented_edges() == plain
+
+
+def _triangle() -> pd.DataFrame:
+    # a -> b, a -> c, b -> c: every pair adjacent.
+    rng = np.random.default_rng(1)
+    a, b, c = rng.uniform(-1.0, 1.0, (3, 1000))
+    b = 0.7 * a + b
+    return pd.DataFrame({"a": a, "b": b, "c": a + b + c})
+
+
+# The forbidden edges direct a -> b -> c -> a.
+CYCLE = Knowledge(forbidden=[("b", "a"), ("c", "b"), ("a", "c")])
+# c -> b -> a makes c an ancestor of a, and the tiers forbid c -> a.
+ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
+
+
+@pytest.mark.parametrize(
+    ("name", "knowledge"),
+    [("pc", CYCLE), ("cdnod", CYCLE), ("pc", ANCESTOR), ("cdnod", ANCESTOR), ("fci", ANCESTOR)],
+)
+def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
+    with pytest.raises(ValueError, match="into a cycle"):
+        _fit(name, _triangle(), knowledge=knowledge)
+
+
+def test_fci_reads_a_cycle_of_arrowheads_as_a_pag():
+    # An arrowhead at each end of a cycle fits three bidirected edges.
+    marks, labels = _marks(_fit("fci", _triangle(), knowledge=CYCLE))
+    a, b, c = (labels.index(v) for v in "abc")
+    assert marks[b, a] == ARROW and marks[c, b] == ARROW and marks[a, c] == ARROW

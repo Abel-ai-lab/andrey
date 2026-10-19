@@ -64,8 +64,9 @@ def gfci(
     ``max_depth`` caps the size of every conditioning set a test uses, as in
     :func:`~andrey.constraint.fci.fci`, and of the separating sets :func:`_derive_sepsets` searches.
     ``constraints`` reach the GES phase, and the test phase honors them as FCI does: no step tests
-    or removes a required pair, a pair they keep apart gets no separating set, and their endpoints
-    are set before the orientation rules.
+    or removes a required pair, and their endpoints are set before the orientation rules. GES never
+    joins a pair they keep apart, so its colliders over that pair come from the pattern, and its
+    separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
     """
     X = np.asarray(data, dtype=np.float64)
 
@@ -81,14 +82,11 @@ def gfci(
     pattern = from_structure(cpdag_structure)
 
     test = make_indep_test(indep_test, X, categorical=categorical)
-    allowed = keep = None
-    if constraints is not None:
-        allowed = constraints.support()
-        keep = constraints.required | constraints.required.T
+    keep = None if constraints is None else constraints.required | constraints.required.T
     support, sepsets = _fast_adjacency_search(
         X, test, alpha, support=pattern != NULL, keep=keep, max_depth=max_depth
     )
-    sepsets.update(_derive_sepsets(pattern, test, alpha, max_depth=max_depth, support=allowed))
+    sepsets.update(_derive_sepsets(pattern, test, alpha, max_depth=max_depth))
 
     marks = _circle_pag(support)
     _knowledge_marks(marks, constraints)
@@ -107,9 +105,7 @@ def gfci(
     ambiguous = (
         frozenset(
             triple
-            for triple in _majority_sepsets(
-                marks, test, alpha, sepsets, max_depth=max_depth, support=allowed
-            )
+            for triple in _majority_sepsets(marks, test, alpha, sepsets, max_depth=max_depth)
             if _adjacent(pattern, triple[0], triple[2])
         )
         if collider_rule == "majority"
@@ -163,20 +159,18 @@ def _derive_sepsets(
     alpha: float,
     *,
     max_depth: int | None = None,
-    support: np.ndarray | None = None,
 ) -> dict[tuple[int, int], tuple[int, ...]]:
     """Separating sets for every non-adjacent CPDAG pair, from the pooled two-endpoint adjacency.
 
     For each non-adjacent ``(x, y)`` (``x < y``), searches subsets of ``adj(x) | adj(y) - {x, y}``,
     of at most ``max_depth`` members when one is given, by increasing size and keeps the first one
-    found independent, recorded both ways; a pair with no such subset gets no entry, and neither
-    does a pair outside the boolean ``support`` (the pairs background knowledge allows). The
+    found independent, recorded both ways; a pair with no such subset gets no entry. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
     """
     n = cpdag.shape[0]
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     for x, y in combinations(range(n), 2):
-        if _adjacent(cpdag, x, y) or (support is not None and not support[x, y]):
+        if _adjacent(cpdag, x, y):
             continue
         pool = sorted((set(_adjacent_nodes(cpdag, x)) | set(_adjacent_nodes(cpdag, y))) - {x, y})
         for size in range(_largest_size(len(pool), max_depth) + 1):

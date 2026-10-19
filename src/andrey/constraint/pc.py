@@ -5,6 +5,7 @@ The algorithm, its settings, and its references are described on :func:`andrey.p
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterable, Mapping
 from contextlib import nullcontext
 from itertools import combinations, groupby
@@ -22,10 +23,11 @@ from andrey.constraint._skeleton import (
     marginal_removals,
     prescreen_capable,
     scan_pairs,
+    separate_apart,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test, pins_blas
-from andrey.core.knowledge import orient
+from andrey.core.knowledge import _has_cycle, orient
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
 
@@ -54,10 +56,12 @@ def pc(
     ``indep_test`` selects the conditional-independence test from the registry, ``collider_order``
     the order of :func:`_orient_colliders`, and ``categorical``, a boolean mask of the categorical
     columns, reaches a mixed-data test. ``max_depth`` caps the conditioning-set size of the
-    skeleton search. With ``constraints``, the skeleton search starts from the pairs they allow and
-    never tests a required pair (:func:`_discover_skeleton`), every edge they decide is directed
-    before the colliders, and Meek's rules run with R4, so the result is the class narrowed by the
-    knowledge. Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
+    skeleton search. With ``constraints``, the skeleton search starts from the pairs they allow,
+    never tests a required pair, and gives a pair they keep apart a separating set when one exists
+    (:func:`_discover_skeleton`); every edge they decide is directed before the colliders, and
+    Meek's rules run with R4, so the result is the class narrowed by the knowledge. Edges they
+    decide that close a directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`).
+    Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -81,6 +85,7 @@ def pc(
     rule4 = constraints is not None
     if constraints is not None:
         skeleton = orient(skeleton, constraints)
+        check_knowledge_cycle((skeleton == TAIL) & (skeleton.T == ARROW))
     pdag = _orient_colliders(skeleton, sepsets, pvalues, order=collider_order, _trace=_trace)
     if _trace is None:
         return to_structure(_undirect_conflicts(meek(pdag, rule4=rule4)), kind="cpdag")
@@ -94,6 +99,40 @@ def check_collider_order(collider_order: str) -> None:
     """Raise ``ValueError`` unless ``collider_order`` is one of :data:`COLLIDER_ORDERS`."""
     if collider_order not in COLLIDER_ORDERS:
         raise ValueError(f"collider_order must be 'p_value' or 'column', got {collider_order!r}")
+
+
+def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) -> None:
+    """Raise ``ValueError`` when the edges background knowledge directs close a cycle.
+
+    The cycle follows edges ``paths[i, j]`` (``i -> j``) from a node ``y`` to a node ``x`` and
+    closes with ``closing[x, y]``; ``closing`` defaults to ``paths``, so any directed cycle of
+    ``paths`` counts. PC and CD-NOD pass the edges the knowledge directs. FCI passes its required
+    edges as ``paths`` and its arrowheads as ``closing``: a required path from ``y`` to ``x`` makes
+    ``y`` an ancestor of ``x``, which an arrowhead at ``y`` on the edge ``x - y`` denies, while a
+    cycle of arrowheads alone fits bidirected edges. The message names the cycle by column position.
+    """
+    closing = paths if closing is None else closing
+    if not _has_cycle(paths | closing):
+        return
+    successors = [np.flatnonzero(row).tolist() for row in paths]
+    for y in np.flatnonzero(closing.any(axis=0)).tolist():
+        previous = {y: y}
+        queue = deque([y])
+        while queue:
+            x = queue.popleft()
+            if closing[x, y]:
+                cycle = [x]
+                while cycle[-1] != y:
+                    cycle.append(previous[cycle[-1]])
+                path = " -> ".join(str(v) for v in [*cycle[::-1], y])
+                raise ValueError(
+                    f"the knowledge directs the edges {path} that the data keep into a cycle; "
+                    "forbid or allow one of them"
+                )
+            for z in successors[x]:
+                if z not in previous:
+                    previous[z] = x
+                    queue.append(z)
 
 
 def _orient_colliders(
@@ -111,10 +150,10 @@ def _orient_colliders(
     result is a new matrix. An unshielded triple ``x - y - z`` (``x`` and ``z`` both adjacent to
     ``y`` but not to each other) is a collider ``x -> y <- z`` iff ``y`` is not in the separating
     set of ``x`` and ``z``; a triple whose endpoints have no recorded separating set, a pair the
-    knowledge keeps apart, is skipped. A collider is skipped when an edge it would orient already
-    has an arrowhead at ``x`` or ``z``, which it would make bidirected; so of two conflicting
-    colliders, the one oriented first is kept, and an edge directed before the colliders is never
-    reversed or made bidirected.
+    knowledge keeps apart that no conditioning set separates, is skipped. A collider is skipped
+    when an edge it would orient already has an arrowhead at ``x`` or ``z``, which it would make
+    bidirected; so of two conflicting colliders, the one oriented first is kept, and an edge
+    directed before the colliders is never reversed or made bidirected.
 
     With ``order="p_value"``, the collider's rank is ``pvalues[(x, z)]``, keyed with the lower index
     first: the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders
@@ -218,8 +257,8 @@ def _discover_skeleton(
     """Learn the undirected skeleton and, for every removed pair, its separating set and p-value.
 
     Grows the conditioning size from zero, up to ``max_depth`` when one is given, over the complete
-    graph, or over the pairs ``constraints`` allow when given; a pair they keep apart has no
-    separating set or p-value, and a pair joined by a required edge is never tested, so it stays.
+    graph, or over the pairs ``constraints`` allow when given; a pair joined by a required edge is
+    never tested, so it stays.
     At each size, every currently adjacent pair is tested against subsets of a start-of-size
     neighborhood snapshot (in both directions, as PC does), and edges found independent are
     removed together after the size completes. A removed pair's
@@ -229,6 +268,11 @@ def _discover_skeleton(
     marks the categorical columns for a mixed-data test. With ``record_pvalues`` false, as for the
     column collider order, which ranks nothing, no p-value is compared or kept and the returned
     p-value dict is empty; the skeleton and the separating sets are the same.
+
+    After the last size, a pair ``constraints`` keep apart that shares a neighbor gets its
+    separating set and p-value the same way, from the final neighborhoods
+    (:func:`~andrey.constraint._skeleton.separate_apart`), so colliders over it are oriented as
+    usual; a pair no conditioning set separates gets neither.
 
     When ``prescreen`` is set and the test exposes the vectorized closed forms, the size-0 and
     size-1 passes read the correlation matrix directly (all-pairs marginal threshold, then one
@@ -315,6 +359,20 @@ def _discover_skeleton(
         if pool is not None:
             pool.close()
 
+    if constraints is not None:
+        removals = separate_apart(
+            test,
+            adj != NULL,
+            ~constraints.support(),
+            alpha,
+            max_depth=max_depth,
+            trace=_trace,
+            record_pvalues=record_pvalues,
+        )
+        for x, y, separating, p in removals:
+            sepsets[(x, y)] = separating
+            if p is not None:
+                pvalues[(x, y)] = p
     return adj, sepsets, pvalues
 
 
