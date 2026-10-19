@@ -1,4 +1,4 @@
-"""FCI's ``possible_dsep``: ``"fast"`` keeps its recorded PAGs, and unknown values raise.
+"""FCI's ``possible_dsep``: both modes keep their recorded PAGs, and unknown values raise.
 
 ``test_fci_oracle`` and the recovery tests check that the default does not depend on the column
 order.
@@ -12,8 +12,8 @@ import pytest
 import andrey
 from andrey.data import sample_scm
 
-# ``"fast"``'s recorded PAGs. Row i holds ``to_numpy()``'s marks at node i: 0 none, 1 tail,
-# 2 arrowhead, 3 circle.
+# Recorded PAGs, the same for both modes on these draws. Row i holds ``to_numpy()``'s marks at
+# node i: 0 none, 1 tail, 2 arrowhead, 3 circle.
 RECORDED = {
     "fci": (
         {"d": 15, "n": 750, "density": 4.0, "seed": 3},
@@ -29,18 +29,19 @@ RECORDED = {
 }
 
 
+@pytest.mark.parametrize("possible_dsep", ["order_free", "fast"])
 @pytest.mark.parametrize("method", sorted(RECORDED))
-def test_fast_keeps_the_recorded_pag(method):
+def test_keeps_the_recorded_pag(method, possible_dsep):
     draw, rows = RECORDED[method]
     x = sample_scm(graph="erdos_renyi", latents=1, scale="standardize", **draw).data
     recorded = np.array([[int(mark) for mark in row] for row in rows])
-    fast = getattr(andrey, method)(x, possible_dsep="fast")
-    np.testing.assert_array_equal(fast.structure.to_numpy(), recorded)
+    fit = getattr(andrey, method)(x, possible_dsep=possible_dsep)
+    np.testing.assert_array_equal(fit.structure.to_numpy(), recorded)
 
 
 @pytest.mark.parametrize(("method", "value"), [("fci", "order-free"), ("gfci", "FAST")])
 def test_unknown_possible_dsep_raises(method, value):
-    with pytest.raises(ValueError, match="possible_dsep must be 'fast' or 'order_free'"):
+    with pytest.raises(ValueError, match="possible_dsep must be 'order_free' or 'fast'"):
         getattr(andrey, method)(
             np.random.default_rng(0).standard_normal((50, 3)), possible_dsep=value
         )

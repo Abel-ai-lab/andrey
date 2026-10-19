@@ -243,8 +243,8 @@ def _validate_collider_rule(collider_rule: str) -> None:
 
 
 def _validate_possible_dsep(possible_dsep: str) -> None:
-    if possible_dsep not in ("fast", "order_free"):
-        raise ValueError(f"possible_dsep must be 'fast' or 'order_free', got {possible_dsep!r}")
+    if possible_dsep not in ("order_free", "fast"):
+        raise ValueError(f"possible_dsep must be 'order_free' or 'fast', got {possible_dsep!r}")
 
 
 def _triple(a: int, b: int, c: int) -> tuple[int, int, int]:

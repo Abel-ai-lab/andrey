@@ -81,8 +81,7 @@ _POSSIBLE_DSEP = ParamSpec(
     choices=("order_free", "fast"),
     doc="The order of the possible-d-separation step, which removes edges one at a time: "
     "order_free = by a rank computed from each column's own data, so the result does not depend "
-    "on the column order unless two columns are identical; fast = column order. Both take about "
-    "the same time.",
+    "on the column order unless two columns are identical; fast = column order.",
 )
 _COLLIDER_ORDER = ParamSpec(
     name="collider_order",

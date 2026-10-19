@@ -337,7 +337,7 @@ def fci(
         kept, one at a time, so each removal changes what the step tests after it.
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. Both take about the same time. See Notes.
+        ``"fast"`` visits them in column order. See Notes and Limitations.
 
     Returns
     -------
@@ -421,8 +421,8 @@ def fci(
     set, except the empty set and the subsets of either endpoint's neighbors, which the first step
     already tested. It visits the pairs one at a time, removes a pair as soon as a subset separates
     it, and records that subset, so each removal changes the sets of the pairs after it. With
-    ``possible_dsep="order_free"``, the pairs, the nodes of each search, and the subsets follow the
-    rank :func:`~andrey.search.hc.tie_ranks` computes from each column's data, which moves with its
+    ``possible_dsep="order_free"``, the pairs, the nodes of each search, and the subsets follow a
+    tie rank computed from each column's own data, as for :func:`~andrey.hc`, which moves with its
     column when the columns are reordered; with ``"fast"``, they follow the column order.
 
     **Separating sets.** When several conditioning sets of the same size make a pair independent
@@ -430,16 +430,25 @@ def fci(
     because it does not depend on the order of the tests, and on simulated data it gave more
     accurate PAGs than the first set found.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2) with one variable in ten hidden, from 20 to 800 variables counting the hidden ones,
-    with ten rows per variable. Its median endpoint errors, each mismatched tail, arrowhead, or
-    circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at
-    800 (2,579 against 1,772). The median fit took 0.061 s at 20 variables and 72 s at 800, on 16
-    cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
-    passed the empty graph's (696 against 676). Rule R5 stops searching a pair after a fixed number
-    of partial paths and leaves its circles, so on graphs with many circle-circle edges it can miss
-    an undirected cycle. With the mixed-data tests, it is
-    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
+    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
+    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
+    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's at
+    every size with mean degree 4, and up to 400 variables with mean degree 2, where they passed it
+    at 800 (2,582 against 1,738 with one variable in ten hidden and ten rows per variable). With
+    those settings the median fit took 0.0064 s at 20 variables and 114 s at 800; with one variable
+    in five hidden and 50 rows per variable it took 78 s at 400 and 4,829 s at 800, where two of
+    five fits ran past 7,200 s. The default, ``"order_free"``, took 0.99 to 1.05 times as long as
+    ``"fast"`` up to 200 variables and 0.78 to 1.42 times at 400 and 800, and its median endpoint
+    errors were within 2% of ``"fast"``'s. On some graphs from 400 variables its order needs more
+    tests than the column order: on one with 400 variables, mean degree 4, one variable in five
+    hidden, and 50 rows per variable, it took 34 s against 23 to 29 s for ``"fast"`` over five
+    column orders. ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES
+    network with 1,000 simulated rows, its median endpoint errors passed the empty graph's (696
+    against 676). Rule R5 stops searching a pair after a fixed number of partial paths and leaves
+    its circles, so on graphs with many circle-circle edges it can miss an undirected cycle. With
+    the mixed-data tests, it is experimental and not benchmarked yet; its tests run it on 5
+    variables with 3,000 rows.
 
     References
     ----------
@@ -552,7 +561,7 @@ def gfci(
         search kept, one at a time, so each removal changes what the step tests after it.
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. Both take about the same time. See Notes.
+        ``"fast"`` visits them in column order. See Notes and Limitations.
 
     Returns
     -------
@@ -608,19 +617,28 @@ def gfci(
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2) with one variable in ten hidden, from 20 to 200 variables counting the hidden ones (18
-    to 180 observed), with ten rows per variable. Its median endpoint errors, each mismatched tail,
-    arrowhead, or circle, stayed below the empty graph's at every size (197 against 444 at 180
-    observed variables). The median fit took 0.54 s at 90 observed variables and 2.6 s at 180, on 4
-    cores. It runs a full :func:`~andrey.ges` search before any test,
-    so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
-    linear relations with Gaussian noise. With fewer rows than columns the BIC score is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    GES search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. Rule R5 has the search bound described under
-    :func:`~andrey.fci`. With the mixed-data score and test, it is
-    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
+    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
+    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
+    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's
+    wherever its fits finished (197 against 444 at 200 variables with mean degree 2, one variable in
+    ten hidden, and ten rows per variable). With those settings the median fit took 0.53 s at 100
+    variables, 2.6 s at 200, and 132 s at 800. Every fit at 800 variables finished within 7,200 s in
+    four of the eight settings; with mean degree 4, one variable in five hidden, and 50 rows per
+    variable, none did, and three of five fits at 400 ran past 3,600 s. The default,
+    ``"order_free"``, took 1.00 to 1.02 times as long as ``"fast"`` up to 200 variables and 0.87 to
+    1.03 times at 400 and 800, and its median endpoint errors were within 2% of ``"fast"``'s. On
+    some graphs from 400 variables its order needs more tests than the column order: on one with 400
+    variables, mean degree 2, one variable in five hidden, and 50 rows per variable, it took 407 s
+    against 120 to 336 s for ``"fast"`` over five column orders. ``possible_dsep="fast"`` gives the
+    column-order mode. It runs a full :func:`~andrey.ges` search before any test, so it takes at
+    least as long as GES on the same data. Its BIC score and Fisher-Z tests assume linear relations
+    with Gaussian noise. With fewer rows than columns the BIC score is unreliable. A parent set of
+    ``n_samples - 1`` or more variables fits its child exactly, so the GES search never selects one,
+    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. Rule R5 has the search bound described under :func:`~andrey.fci`. With the mixed-data
+    score and test, it is experimental and not benchmarked yet; its tests run it on 5 variables with
+    3,000 rows.
 
     References
     ----------
