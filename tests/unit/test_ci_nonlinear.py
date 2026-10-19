@@ -341,17 +341,18 @@ def test_gpdc_fits_each_variable_and_conditioning_set_once(monkeypatch):
 
 
 def test_kci_decomposes_each_conditioning_set_once(monkeypatch):
-    """Queries with the same conditioning set share its eigendecomposition, and the p-values equal
-    those of a test that computes every query afresh."""
+    """On the numpy path, queries with the same conditioning set share its eigendecomposition, and
+    the p-values equal those of a test that computes every query afresh."""
     calls = []
     eigh = np.linalg.eigh
     monkeypatch.setattr(np.linalg, "eigh", lambda a: calls.append(1) or eigh(a))
     data = _common_cause(seed=3, n=120, n_cond=2)
     queries = [(0, 1, (2,)), (0, 3, (2,)), (1, 3, (2,)), (3, 0, (2,)), (0, 1, (2, 3))]
     test = KCI(data)
-    pvalues = [test(*query) for query in queries]
-    assert len(calls) == 2  # sets {2}, {2, 3}
-    assert [KCI(data)(*query) for query in queries] == pvalues
+    with andrey.config(backend="numpy"):
+        pvalues = [test(*query) for query in queries]
+        assert len(calls) == 2  # sets {2}, {2, 3}
+        assert [KCI(data)(*query) for query in queries] == pvalues
 
 
 def test_rcot_draws_the_features_of_each_column_set_once(monkeypatch):
@@ -692,7 +693,11 @@ def test_torch_paths_match_numpy(n_cond):
     x = _common_cause(seed=3, n=150, n_cond=max(n_cond, 1), shared=0.3)
     kci, cmiknn = KCI(x), CMIknn(x, n_permutations=60)
     cond = list(range(2, 2 + n_cond))
-    expected = (kci(0, 1, cond), [cmiknn._bounded_pvalue(0, 1, cond, a) for a in (None, 0.05)])
+    with andrey.config(backend="numpy"):
+        expected = (
+            kci(0, 1, cond),
+            [cmiknn._bounded_pvalue(0, 1, cond, a) for a in (None, 0.05)],
+        )
     with andrey.config(backend="cpu"):
         got = (kci(0, 1, cond), [cmiknn._bounded_pvalue(0, 1, cond, a) for a in (None, 0.05)])
     assert got[0] == pytest.approx(expected[0], abs=1e-9)
