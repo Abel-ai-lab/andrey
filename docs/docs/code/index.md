@@ -116,6 +116,8 @@ does from 20 series at 1,000 time steps, and GES does at 200 variables with ten 
 FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
 apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
 bound. R8 checks each pair of endpoints in both orders, so it does not depend on the node labels.
+The rules run in rounds, each setting together the marks every rule implies on the graph as it
+stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
 With `possible_dsep="order_free"`, FCI and GFCI build possible-d-separation sets that do not depend
 on the order their search visits nodes; the default, `"fast"`, builds them in that order.
@@ -292,6 +294,7 @@ name.
 | `alarm` | 37 | 46 | Simulated on the published network (bnlearn) |
 | `hepar2` | 70 | 123 | Simulated on the published network (bnlearn) |
 | `andes` | 223 | 338 | Simulated on the published network (bnlearn) |
+| `diabetes` | 413 | 602 | Simulated on the published network (bnlearn) |
 
 A published network's data come from a linear-Gaussian model on its graph, standardized, or, with
 `discrete=True`, from its own conditional probability tables, each column a pandas `category` of the

@@ -59,6 +59,12 @@ def test_torch_takes_an_array_with_negative_strides(monkeypatch):
     )
 
 
+def test_as_tensor_accepts_negative_strides():
+    pytest.importorskip("torch")
+    data = np.arange(12.0).reshape(4, 3)[:, ::-1]  # torch.as_tensor alone rejects this view
+    assert np.array_equal(backend.to_numpy(backend.as_tensor(data, "cpu")), data)
+
+
 def test_importing_core_does_not_import_torch():
     # Holds even when the [torch] extra is installed: torch loads lazily inside backend.
     import os

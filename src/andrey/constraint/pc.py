@@ -48,6 +48,7 @@ def pc(
     categorical: np.ndarray | None = None,
     max_depth: int | None = None,
     constraints: Constraints | None = None,
+    in_column_order: bool = False,
     _trace: list[dict] | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from ``data`` with the PC algorithm and the ``indep_test`` CI test.
@@ -63,8 +64,10 @@ def pc(
     Meek's rules run with R4, so the result is the class narrowed by the knowledge. A triple over a
     kept-apart pair that no set separates is neither a collider nor a non-collider to any rule
     (:func:`~andrey.constraint._skeleton.unseparated_triples`). Edges they decide that close a
-    directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`).
-    Returns the CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
+    directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`). ``in_column_order`` fires
+    Meek's rules one at a time in column order instead of in order-free rounds
+    (:func:`~andrey.core.orient.meek`). Returns the CPDAG as a ``GraphStructure`` of kind
+    ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -92,10 +95,12 @@ def pc(
         check_knowledge_cycle((skeleton == TAIL) & (skeleton.T == ARROW))
     pdag = _orient_colliders(skeleton, sepsets, pvalues, order=collider_order, _trace=_trace)
     if _trace is None:
-        cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous)
+        cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
         return to_structure(_undirect_conflicts(cpdag), kind="cpdag")
     firings: list[dict] = []
-    cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous, _trace=firings)
+    cpdag = meek(
+        pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order, _trace=firings
+    )
     _trace.extend(dict(step="meek", **firing) for firing in firings)
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 

@@ -162,7 +162,17 @@ def test_materialize_refuses_a_registry_of_another_schema(tmp_path):
 # --------------------------------------------------------------------------------------------------
 
 
+def test_the_shared_venv_is_the_one_andrey_bench_python_names(monkeypatch, tmp_path):
+    """Provenance describes the environment the shared fits run in, not the in-tree default."""
+    monkeypatch.setenv("ANDREY_BENCH_PYTHON", str(tmp_path / "other" / "bin" / "python"))
+    assert provenance.shared_venv() == tmp_path / "other"
+    monkeypatch.delenv("ANDREY_BENCH_PYTHON")
+    assert provenance.shared_venv() == provenance._BENCH_VENV
+
+
 def test_provenance_capture_writes_expected_keys(tmp_path):
+    if not (provenance.shared_venv() / "bin" / "python").exists():
+        pytest.skip("no bench-env: run benchmarks/start.sh or set $ANDREY_BENCH_PYTHON")
     ts = "2026-07-19T00:00:00Z"
     prov = provenance.capture(tmp_path, timestamp=ts)
 

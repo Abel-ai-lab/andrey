@@ -71,6 +71,7 @@ def cdnod(
     dependence_threshold: float | None = None,
     max_depth: int | None = None,
     constraints: Constraints | None = None,
+    in_column_order: bool = False,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
@@ -80,16 +81,18 @@ def cdnod(
     ``indep_test`` selects the CI test. ``collider_order`` orders the colliders as in
     :func:`~andrey.constraint.pc.pc`. ``dependence_threshold``, when given, runs the
     independent-change step with that threshold on the module dependence measure; ``None`` skips
-    it. The context is appended as an extra variable, the tests run over the augmented matrix, and
-    the result is projected back to the ``n_features`` data variables; with a single domain the
-    context is left out and the search runs on ``data`` alone. ``categorical``, a boolean mask of
-    the data's categorical columns, reaches a mixed-data test, which also takes the context as
-    categorical. ``max_depth`` caps the conditioning-set size of the skeleton search.
-    ``constraints``, over the data's columns, constrain the skeleton search and the orientations as
-    in :func:`~andrey.constraint.pc.pc`; the context is unconstrained. Every edge they decide is
-    directed before the independent-change step, which orients only undirected edges, so it never
-    orients against them. Returns a ``GraphStructure`` tagged ``"cpdag"``: its directions include
-    those the index identifies, so it is not an observational CPDAG.
+    it. ``in_column_order`` fires Meek's rules one at a time in column order instead of in
+    order-free rounds (:func:`~andrey.core.orient.meek`). The context is appended as an extra
+    variable, the tests run over the augmented matrix, and the result is projected back to the
+    ``n_features`` data variables; with a single domain the context is left out and the search runs
+    on ``data`` alone. ``categorical``, a boolean mask of the data's categorical columns, reaches a
+    mixed-data test, which also takes the context as categorical. ``max_depth`` caps the
+    conditioning-set size of the skeleton search. ``constraints``, over the data's columns,
+    constrain the skeleton search and the orientations as in :func:`~andrey.constraint.pc.pc`; the
+    context is unconstrained. Every edge they decide is directed before the independent-change
+    step, which orients only undirected edges, so it never orients against them. Returns a
+    ``GraphStructure`` tagged ``"cpdag"``: its directions include those the index identifies, so it
+    is not an observational CPDAG.
     """
     check_collider_order(collider_order)
     X = np.asarray(data, dtype=np.float64)
@@ -147,13 +150,15 @@ def cdnod(
         if dependence_threshold is not None:
             changing = np.nonzero(skeleton[d] != NULL)[0].tolist()
             pdag = _orient_by_independent_changes(
-                meek(pdag, rule4=rule4, ambiguous=ambiguous),
+                meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order),
                 X,
                 context[:, 0],
                 changing,
                 dependence_threshold,
             )
-    completed = _undirect_conflicts(meek(pdag, rule4=rule4, ambiguous=ambiguous))
+    completed = _undirect_conflicts(
+        meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
+    )
     return to_structure(completed[:d, :d], kind="cpdag")
 
 

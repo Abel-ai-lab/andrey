@@ -38,8 +38,12 @@ change names its pull request.
   default. ([#187])
 - `andrey.data.sortability.index_correlation` measures how much a dataset's column order reveals
   of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
+- `andrey.data.load_dataset("diabetes")`, the bnlearn diabetes network: 413 variables and 602
+  arcs. ([#225])
 - `boss` and `grasp` take `score_func="local_score_BDeu"` for categorical data, with the BDeu
   priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
+- `boss` and `grasp` take `score_func="local_score_BIC_categorical"`, the multinomial BIC that
+  `ges`, `hc`, `tabu`, and `exact_search` take for categorical data. ([#220])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
   only 3; smaller depths search less and run faster. ([#190])
 - `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
@@ -93,6 +97,8 @@ change names its pull request.
 - `gin` orders a latent only when its cluster passes the root test at `alpha`, and leaves the
   remaining latents unordered, listed in `metadata["unordered"]`, when no candidate passes.
   ([#187])
+- `gin` builds each column's HSIC kernel matrix once per fit instead of once per test, so a fit
+  on 1,000 rows runs more than 4x faster, and holds one such matrix per variable. ([#215])
 - The `calm` reference explains each step of the fit, how to run the paper's longer schedule, and
   where the fit can stop at a local optimum. ([#187])
 - When columns repeat others up to scale and shift, the score-based searches raise one `ValueError`
@@ -139,6 +145,10 @@ change names its pull request.
   chain of three or more latents is no longer misordered. ([#187])
 - `gin` pools its independence tests without capping any one p-value, so a strongly dependent
   group with many variables outside it is no longer accepted as a cluster. ([#187])
+- `gin` runs each root test once per member of the clusters it compares, and searches the columns
+  sorted by the rank hill climbing breaks ties by, so the latent order no longer depends on which
+  indicator comes first, and reordering the columns no longer changes the clusters or the order.
+  ([#215])
 - `calm` raises `ValueError` when its loss stops being finite instead of returning NaN weights, and
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
@@ -147,6 +157,8 @@ change names its pull request.
   `boss` no longer raises `ValueError` or `StopIteration` and no search picks parents by a wrong or
   minus-infinite score: collinear parents are fit by the columns that span them, and a node its
   parents determine scores `inf`, unavailable as under the BIC. ([#203])
+- A DataFrame with reordered columns no longer fails on the torch backend, where torch rejected
+  its array's negative stride. ([#216])
 - `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` treat
   causal-order candidates whose scores differ only by rounding as tied and pick among them by a
   rank computed from each column's own data, so two interchangeable columns, such as two balanced
@@ -178,9 +190,13 @@ change names its pull request.
   shuffles, by a rank computed from each column's own data instead of by column position, so
   reordering the columns no longer changes their p-values or the graphs built from them.
   ([#213])
-- `pc`, `fci`, `gfci`, `ges`, `gies`, `xges`, `hc`, and `tabu` accept a DataFrame whose columns
-  were reversed (`df[df.columns[::-1]]`) when a torch backend computes the covariance, where torch
-  rejected its negative strides with a `ValueError`. ([#214])
+- `pc`, `cdnod`, `fci`, and `gfci` apply their orientation rules, Meek's rules and FCI's R1-R10,
+  in rounds that set together everything the rules imply on the graph as it stands and leave an
+  edge or endpoint two rules decide differently undirected or a circle, where the rule reached
+  first in column order used to decide; `gfci` also keeps the union of the smallest separating sets
+  of a pair GES leaves non-adjacent instead of the first one found. Reordering the columns no
+  longer changes their orientations, and on data where the rules conflict their graphs can change.
+  ([#226])
 
 ## [0.6.0] - 2026-10-17
 
@@ -407,3 +423,8 @@ First alpha release.
 [#211]: https://github.com/Abel-ai-lab/andrey/pull/211
 [#213]: https://github.com/Abel-ai-lab/andrey/pull/213
 [#214]: https://github.com/Abel-ai-lab/andrey/pull/214
+[#215]: https://github.com/Abel-ai-lab/andrey/pull/215
+[#216]: https://github.com/Abel-ai-lab/andrey/pull/216
+[#220]: https://github.com/Abel-ai-lab/andrey/pull/220
+[#225]: https://github.com/Abel-ai-lab/andrey/pull/225
+[#226]: https://github.com/Abel-ai-lab/andrey/pull/226

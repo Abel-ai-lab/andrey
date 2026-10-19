@@ -57,6 +57,7 @@ def gfci(
     possible_dsep: str = "fast",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
+    in_column_order: bool = False,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
 
@@ -67,6 +68,8 @@ def gfci(
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
     joins a pair they keep apart, so its colliders over that pair come from the pattern, and its
     separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
+    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
+    of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
     """
     X = np.asarray(data, dtype=np.float64)
 
@@ -86,7 +89,9 @@ def gfci(
     support, sepsets = _fast_adjacency_search(
         X, test, alpha, support=pattern != NULL, keep=keep, max_depth=max_depth
     )
-    sepsets.update(_derive_sepsets(pattern, test, alpha, max_depth=max_depth))
+    sepsets.update(
+        _derive_sepsets(pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order)
+    )
 
     marks = _circle_pag(support)
     _knowledge_marks(marks, constraints)
@@ -112,7 +117,9 @@ def gfci(
         else frozenset()
     )
     _orient_colliders_from_pattern(marks, pattern, sepsets, ambiguous)
-    _fci_orient(marks, test, alpha, sepsets, ambiguous, max_depth=max_depth)
+    _fci_orient(
+        marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
+    )
 
     return GraphStructure.from_numpy(marks, kind="pag")
 
@@ -159,12 +166,16 @@ def _derive_sepsets(
     alpha: float,
     *,
     max_depth: int | None = None,
+    in_column_order: bool = False,
 ) -> dict[tuple[int, int], tuple[int, ...]]:
     """Separating sets for every non-adjacent CPDAG pair, from the pooled two-endpoint adjacency.
 
     For each non-adjacent ``(x, y)`` (``x < y``), searches subsets of ``adj(x) | adj(y) - {x, y}``,
-    of at most ``max_depth`` members when one is given, by increasing size and keeps the first one
-    found independent, recorded both ways; a pair with no such subset gets no entry. The
+    of at most ``max_depth`` members when one is given, by increasing size and records, both ways,
+    the union of every subset of the first size that makes the pair independent, as the adjacency
+    search records its sets; a pair with no such subset gets no entry. The union does not depend on
+    the order of the tests. With ``in_column_order``, the first subset found in column order is
+    recorded instead. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
     """
     n = cpdag.shape[0]
@@ -174,13 +185,15 @@ def _derive_sepsets(
             continue
         pool = sorted((set(_adjacent_nodes(cpdag, x)) | set(_adjacent_nodes(cpdag, y))) - {x, y})
         for size in range(_largest_size(len(pool), max_depth) + 1):
-            found = False
-            for cond in combinations(pool, size):
-                if test(x, y, cond) > alpha:
-                    sepsets[(x, y)] = cond
-                    sepsets[(y, x)] = cond
-                    found = True
-                    break
+            separating = (cond for cond in combinations(pool, size) if test(x, y, cond) > alpha)
+            if in_column_order:
+                first = next(separating, None)
+                found = [] if first is None else [first]
+            else:
+                found = list(separating)
             if found:
+                union = tuple(sorted(set().union(*found)))
+                sepsets[(x, y)] = union
+                sepsets[(y, x)] = union
                 break
     return sepsets

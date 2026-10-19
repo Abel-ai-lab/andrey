@@ -155,7 +155,7 @@ def test_lpcmci_with_an_exact_test_returns_the_true_pag(links, n, lags):
 
     truth = _truth(links, n=n, latents=1, lags=lags)
     pag = true_window_pag(truth, tau_max=2)
-    found = run(DesignOracle(truth, tau_max=2, past=12), n - 1, 2, 0.05, 1)
+    found = run(DesignOracle(truth, tau_max=2, past=12), n - 1, 2, 0.05, 1, range(n - 1))
     assert np.array_equal(found.start_marks, pag.marks)
 
 

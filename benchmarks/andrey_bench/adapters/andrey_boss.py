@@ -88,3 +88,43 @@ class AndreyBOSSBDeu(AndreyBOSS):
     def params(self) -> dict[str, Any]:
         """The BDeu score on a fixed search seed."""
         return {"score_func": "local_score_BDeu", "seed": SEARCH_SEED}
+
+
+class AndreyBOSSCategoricalBIC(AndreyBOSS):
+    """Andrey BOSS with the multinomial BIC, on category codes, at the standard penalty."""
+
+    name: str = "andrey.boss.bic_categorical"
+
+    def params(self) -> dict[str, Any]:
+        """The multinomial BIC at ``lambda_value=1``, on a fixed search seed."""
+        return {
+            "score_func": "local_score_BIC_categorical",
+            "lambda_value": 1.0,
+            "seed": SEARCH_SEED,
+        }
+
+
+class AndreyBOSSDegenGauss(AndreyBOSS):
+    """Andrey BOSS with the degenerate Gaussian score at the standard penalty, every column named
+    categorical: the mixed-data score on category codes."""
+
+    name: str = "andrey.boss.degen_gauss"
+
+    def params(self) -> dict[str, Any]:
+        """The degenerate Gaussian score at ``lambda_value=1``, on a fixed search seed."""
+        return {"score_func": "local_score_degen_gauss", "lambda_value": 1.0, "seed": SEARCH_SEED}
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Run BOSS with every column named categorical and return CPDAG endpoint marks."""
+        import andrey
+
+        X = np.asarray(data, dtype=np.float64)
+        with andrey.config(backend=self.backend, num_workers=1):
+            out = andrey.boss(
+                X,
+                score_func=str(params["score_func"]),
+                lambda_value=float(params["lambda_value"]),
+                seed=int(params["seed"]),
+                categorical=list(range(X.shape[1])),
+            )
+        return np.asarray(out.structure.to_numpy())

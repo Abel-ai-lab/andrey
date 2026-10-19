@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 from andrey_bench.adapters.andrey_ges import andrey_ges_adapters
+from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.causal_learn_ges import CausalLearnGES
-from andrey_bench.adapters.gcastle_ges import GCastleGES
 from andrey_bench.scoring import structure_hash
 
 
@@ -32,11 +32,12 @@ def _fit_hash(adapter, x: np.ndarray) -> str:
 @pytest.mark.parametrize("d", [10, 20])
 def test_andrey_and_causal_learn_ges_return_the_same_graph(d: int, seed: int):
     """At the matched penalty the two engines return the same graph."""
+    pytest.importorskip("causallearn", reason="causal-learn is not installed")
     x = _linear_gaussian(d, 1000, seed)
     assert _fit_hash(andrey_ges_adapters()[0], x) == _fit_hash(CausalLearnGES(), x)
 
 
-def test_the_hash_still_separates_a_package_that_disagrees():
+def test_the_hash_still_separates_a_solution_that_disagrees():
     """A hash that collapsed everything to one value would pass the test above for the wrong reason."""
     x = _linear_gaussian(10, 1000, 0)
-    assert _fit_hash(GCastleGES(), x) != _fit_hash(andrey_ges_adapters()[0], x)
+    assert _fit_hash(BaselineEmpty(), x) != _fit_hash(andrey_ges_adapters()[0], x)

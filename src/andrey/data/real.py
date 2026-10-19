@@ -5,14 +5,14 @@ it in a cache directory, so later loads need no network. The cache directory is 
 when given, else ``ANDREY_DATA_DIR``, else ``$XDG_CACHE_HOME/andrey`` (``~/.cache/andrey`` when
 ``XDG_CACHE_HOME`` is unset). Without network access, put the file at the path the error names.
 
-``sachs`` is measured data. ``asia``, ``alarm``, ``hepar2``, and ``andes`` are published
-Bayesian-network structures from the bnlearn repository; their data are simulated on the graph by
-a seeded linear-Gaussian model or, with ``discrete=True``, sampled from the networks' own
+``sachs`` is measured data. ``asia``, ``alarm``, ``hepar2``, ``andes``, and ``diabetes`` are
+published Bayesian-network structures from the bnlearn repository; their data are simulated on the
+graph by a seeded linear-Gaussian model or, with ``discrete=True``, sampled from the networks' own
 conditional probability tables, and their columns come in an order drawn from the seed.
 
 >>> from andrey.data import list_datasets
 >>> list_datasets()
-('sachs', 'asia', 'alarm', 'hepar2', 'andes')
+('sachs', 'asia', 'alarm', 'hepar2', 'andes', 'diabetes')
 """
 
 from __future__ import annotations
@@ -365,6 +365,15 @@ DATASETS: dict[str, Remote] = {
         "coached problem solving using Bayesian networks. Proceedings of the 6th International "
         "Conference on User Modeling, 231-242, 1997.",
     ),
+    "diabetes": _bnlearn(
+        "diabetes",
+        "2100374d7be11024e708a50cac537102ef9f9b693aba4cc0e6918a60e4599d59",
+        "DIABETES (Andreassen et al., 1991): a model for adjusting insulin doses; 413 variables "
+        "and 602 arcs.",
+        "S. Andreassen, R. Hovorka, J. Benn, K. G. Olesen, E. R. Carson. A model-based approach to "
+        "insulin adjustment. Proceedings of the 3rd Conference on Artificial Intelligence in "
+        "Medicine, 239-248, 1991.",
+    ),
 }
 
 
@@ -381,7 +390,7 @@ def list_datasets() -> tuple[str, ...]:
     --------
     >>> from andrey.data import list_datasets
     >>> list_datasets()
-    ('sachs', 'asia', 'alarm', 'hepar2', 'andes')
+    ('sachs', 'asia', 'alarm', 'hepar2', 'andes', 'diabetes')
     """
     return tuple(DATASETS)
 
@@ -458,11 +467,11 @@ def load_dataset(
         - ``"sachs"``: the protein-signaling measurements of Sachs et al. (2005) [1]_, 853
           observational cells by 11 proteins and phospholipids, with the 17-arc consensus
           network.
-        - ``"asia"`` (8 variables, 8 arcs), ``"alarm"`` (37, 46), ``"hepar2"`` (70, 123), and
-          ``"andes"`` (223, 338): published Bayesian networks [2]_. The graph is the network's
-          structure; the data are simulated on it by a linear-Gaussian structural causal model,
-          standardized, or, with ``discrete=True``, sampled from the network's own conditional
-          probability tables.
+        - ``"asia"`` (8 variables, 8 arcs), ``"alarm"`` (37, 46), ``"hepar2"`` (70, 123),
+          ``"andes"`` (223, 338), and ``"diabetes"`` (413, 602): published Bayesian networks
+          [2]_. The graph is the network's structure; the data are simulated on it by a
+          linear-Gaussian structural causal model, standardized, or, with ``discrete=True``,
+          sampled from the network's own conditional probability tables.
     n : int or None, default=None
         Rows to simulate on a published network; ``None`` gives 1000. Measured data such as
         ``"sachs"`` take no ``n``.

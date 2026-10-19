@@ -6,8 +6,9 @@ The algorithm, its settings, and its references are described on :func:`andrey.f
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import nullcontext
+from functools import cache
 from itertools import combinations, islice, permutations
 from typing import TYPE_CHECKING
 
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
 _UNBOUNDED_PATH = 1000
+_R4_PARTIAL_PATHS = 10_000
 _R5_PARTIAL_PATHS = 10_000
 
 
@@ -45,6 +47,7 @@ def fci(
     possible_dsep: str = "fast",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
+    in_column_order: bool = False,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
 
@@ -63,7 +66,9 @@ def fci(
     (:func:`~andrey.constraint._skeleton.unseparated_triples`).
     An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
     ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
-    Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
+    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
+    of in order-free rounds (:func:`_fci_orient`). Returns the PAG as a ``GraphStructure`` of kind
+    ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
 
@@ -101,7 +106,9 @@ def fci(
             marks, test, alpha, sepsets, max_depth=max_depth, skip=ambiguous
         )
     _orient_colliders(marks, sepsets, ambiguous)
-    _fci_orient(marks, test, alpha, sepsets, ambiguous, max_depth=max_depth)
+    _fci_orient(
+        marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
+    )
 
     return GraphStructure.from_numpy(marks, kind="pag")
 
@@ -648,6 +655,29 @@ def _remove_by_possible_dsep(
 # ---- FCI orientation rules ----------------------------------------------------------------------
 
 
+class _Implied:
+    """The endpoint marks the orientation rules imply in one round, without changing ``marks``.
+
+    A rule records ``out[i, j] = mark``, the mark at ``i`` on edge ``i-j``, as it would set it on
+    the mark matrix itself; :meth:`apply` then sets the marks.
+    """
+
+    def __init__(self) -> None:
+        self.marks: dict[tuple[int, int], set[int]] = {}
+
+    def __setitem__(self, endpoint: tuple[int, int], mark: int) -> None:
+        self.marks.setdefault(endpoint, set()).add(int(mark))
+
+    def apply(self, marks: np.ndarray) -> bool:
+        """Set each circle implied one mark alone to that mark; return whether any changed."""
+        changed = False
+        for endpoint, implied in self.marks.items():
+            if marks[endpoint] == CIRCLE and len(implied) == 1:
+                marks[endpoint] = implied.pop()
+                changed = True
+        return changed
+
+
 def _fci_orient(
     marks: np.ndarray,
     test: CITest,
@@ -656,15 +686,44 @@ def _fci_orient(
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
     *,
     max_depth: int | None = None,
+    in_column_order: bool = False,
 ) -> None:
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
-    Each sweep runs the arrowhead rules (R1/R2 cycle, R3, and the R4 discriminating-path rule)
-    followed by the tail and possibly-directed-path rules R5-R10; sweeps repeat until no endpoint
-    changes. Circles become tails or arrowheads only where the current marks force it; a tail or
-    arrowhead present when the rules start, such as one :func:`_knowledge_marks` set, is never
-    changed. ``max_depth`` caps the conditioning sets of R4's tests (:func:`_do_ddp`).
+    Circles become tails or arrowheads only where the current marks force it; no rule changes a
+    tail or an arrowhead, so one present when the rules start, such as one :func:`_knowledge_marks`
+    set, stays. ``max_depth`` caps the conditioning sets of R4's tests (:func:`_do_ddp`). The rules
+    run in rounds. In a round, every rule reads the marks as they stand when the round starts and
+    records the marks it implies (:class:`_Implied`). A circle then takes the mark the rules imply
+    for it when they imply only that one; a circle they imply both an arrowhead and a tail for stays
+    a circle in that round. The rounds repeat until one changes no endpoint, and stop because each
+    endpoint changes at most once. R4 decides by every
+    shortest discriminating path, not the first one found (:func:`_rule_r4`), and R5 orients every
+    edge of each uncovered circle cycle it finds, which the same round also finds from each of that
+    cycle's edges. A round reads only the marks, never a node's position, so relabeling the nodes
+    relabels its marks: the result does not depend on the order in which the rules visit the
+    nodes, nor on the column order, except where R4's or R5's path search stops at its bound.
+
+    With ``in_column_order``, each sweep instead runs the arrowhead rules (R1/R2 cycle, R3, and the
+    R4 discriminating-path rule) followed by the tail and possibly-directed-path rules R5-R10, each
+    rule setting its marks at once and visiting the nodes in column order, so of two firings that
+    conflict the first decides; sweeps repeat until no endpoint changes.
     """
+    if not in_column_order:
+        test = _memoized(test)  # R4 repeats its tests in every round
+        while True:
+            implied = _Implied()
+            _rule_r1r2_cycle(marks, False, ambiguous, out=implied)
+            _rule_r3(marks, sepsets, False, ambiguous, out=implied)
+            _rule_r4(marks, test, alpha, sepsets, False, max_depth=max_depth, out=implied)
+            _rule_r5(marks, False, ambiguous, out=implied)
+            _rule_r6(marks, False, out=implied)
+            _rule_r7(marks, False, ambiguous, out=implied)
+            _rule_r8(marks, False, out=implied)
+            _rule_r9(marks, False, ambiguous, out=implied)
+            _rule_r10(marks, False, ambiguous, out=implied)
+            if not implied.apply(marks):
+                return
     change = True
     while change:
         change = False
@@ -680,36 +739,60 @@ def _fci_orient(
         change = _rule_r10(marks, change, ambiguous)
 
 
+def _memoized(test: CITest) -> CITest:
+    """``test``, answering a query it has answered before from memory."""
+    answered = cache(lambda x, y, condition_set: test(x, y, condition_set))
+
+    def memoized(x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        return answered(x, y, tuple(condition_set))
+
+    return memoized
+
+
 def _rule_r1(
     marks: np.ndarray,
     a: int,
     b: int,
     c: int,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
-    """R1: ``a *-> b o-* c`` with ``a``, ``c`` non-adjacent  =>  ``b -> c``."""
+    """R1: ``a *-> b o-* c`` with ``a``, ``c`` non-adjacent  =>  ``b -> c``.
+
+    Every rule reads ``marks`` and sets its marks in ``out``: ``marks`` itself when ``out`` is
+    ``None``, or an :class:`_Implied` that records them.
+    """
+    out = marks if out is None else out
     if _adjacent(marks, a, c) or _triple(a, b, c) in ambiguous:
         return False
     if marks[b, a] == ARROW and marks[b, c] == CIRCLE and _arrow_allowed(marks, b, c):
-        marks[c, b] = ARROW
-        marks[b, c] = TAIL
+        out[c, b] = ARROW
+        out[b, c] = TAIL
         return True
     return False
 
 
-def _rule_r2(marks: np.ndarray, a: int, b: int, c: int) -> bool:
+def _rule_r2(
+    marks: np.ndarray, a: int, b: int, c: int, *, out: np.ndarray | _Implied | None = None
+) -> bool:
     """R2: ``a -> b *-> c`` or ``a *-> b -> c`` with ``a o-* c``  =>  arrowhead at ``c``."""
+    out = marks if out is None else out
     if not (_adjacent(marks, a, c) and marks[c, a] == CIRCLE):
         return False
     directed = marks[b, a] == ARROW and marks[c, b] == ARROW
     if directed and (marks[a, b] == TAIL or marks[b, c] == TAIL) and _arrow_allowed(marks, a, c):
-        marks[c, a] = ARROW
+        out[c, a] = ARROW
         return True
     return False
 
 
 def _rule_r1r2_cycle(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """Sweep R1 and R2 over every node ``b`` and each ordered pair of its neighbors."""
     n = marks.shape[0]
@@ -718,10 +801,10 @@ def _rule_r1r2_cycle(
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
-                change = _rule_r1(marks, a, b, c, ambiguous) or change
-                change = _rule_r1(marks, c, b, a, ambiguous) or change
-                change = _rule_r2(marks, a, b, c) or change
-                change = _rule_r2(marks, c, b, a) or change
+                change = _rule_r1(marks, a, b, c, ambiguous, out=out) or change
+                change = _rule_r1(marks, c, b, a, ambiguous, out=out) or change
+                change = _rule_r2(marks, a, b, c, out=out) or change
+                change = _rule_r2(marks, c, b, a, out=out) or change
     return change
 
 
@@ -730,8 +813,11 @@ def _rule_r3(
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     change: bool,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R3 (double triangle): a shared circle child of two colliders gets an arrowhead."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for b in range(n):
         into_arrows = _into(marks, b, ARROW)
@@ -755,7 +841,7 @@ def _rule_r3(
                         continue
                     if not _arrow_allowed(marks, d, b):
                         continue
-                    marks[b, d] = ARROW
+                    out[b, d] = ARROW
                     change = True
     return change
 
@@ -768,8 +854,15 @@ def _rule_r4(
     change: bool,
     *,
     max_depth: int | None = None,
+    out: _Implied | None = None,
 ) -> bool:
-    """R4: orient the endpoints closing a definite discriminating path into ``b``."""
+    """R4: orient the endpoints closing a definite discriminating path into ``b``.
+
+    Without ``out``, the first discriminating path found that decides (:func:`_ddp_orient`) sets
+    the marks in ``marks``. With ``out``, every shortest discriminating path that decides records
+    its marks in ``out`` (:func:`_discriminating_paths`), so paths that decide differently leave
+    the endpoint at ``b`` a circle.
+    """
     n = marks.shape[0]
     for b in range(n):
         poss_a = [a for a in range(n) if marks[a, b] == ARROW]  # b *-> a
@@ -780,10 +873,63 @@ def _rule_r4(
                     continue
                 if marks[c, b] != ARROW:
                     continue
-                change = _ddp_orient(
-                    marks, a, b, c, test, alpha, sepsets, change, max_depth=max_depth
-                )
+                if out is None:
+                    change = _ddp_orient(
+                        marks, a, b, c, test, alpha, sepsets, change, max_depth=max_depth
+                    )
+                    continue
+                for paths in _discriminating_paths(marks, a, b, c):
+                    decided = False
+                    for path in paths:
+                        previous = dict(zip(path, path[1:]))
+                        oriented, _ = _do_ddp(
+                            marks,
+                            path[0],
+                            a,
+                            b,
+                            c,
+                            previous,
+                            test,
+                            alpha,
+                            sepsets,
+                            False,
+                            max_depth=max_depth,
+                            out=out,
+                        )
+                        decided = oriented or decided
+                    if decided:
+                        change = True
+                        break
     return change
+
+
+def _discriminating_paths(marks: np.ndarray, a: int, b: int, c: int) -> Iterator[list[list[int]]]:
+    """The discriminating paths ``d, ..., a, b`` for ``b`` toward ``c``, shortest first.
+
+    The paths grow backward from ``a`` one node at a time, every inner node a collider on the path
+    and a parent of ``c``, as :func:`_ddp_orient` grows them, and end at a node ``d`` non-adjacent
+    to ``c``. Each yield lists every path of one length, from ``d`` to ``b``. The search stops at
+    ``_UNBOUNDED_PATH`` nodes, or when one length holds more than ``_R4_PARTIAL_PATHS`` partial
+    paths.
+    """
+    c_parents = _parents(marks, c)
+    layer = [[b, a]]  # each partial path read from b backward
+    for _ in range(_UNBOUNDED_PATH):
+        found, extended = [], []
+        for path in layer:
+            t, p = path[-1], path[-2]
+            for d in _into(marks, t, ARROW):  # d *-> t
+                if d in path or d == c or not _is_def_collider(marks, d, t, p):
+                    continue
+                if not _adjacent(marks, d, c):
+                    found.append([*path, d][::-1])
+                elif d in c_parents:
+                    extended.append([*path, d])
+        if found:
+            yield found
+        if not extended or len(extended) > _R4_PARTIAL_PATHS:
+            return
+        layer = extended
 
 
 def _get_path(node: int, previous: Mapping[int, int]) -> list[int]:
@@ -855,6 +1001,7 @@ def _do_ddp(
     change: bool,
     *,
     max_depth: int | None = None,
+    out: np.ndarray | _Implied | None = None,
 ) -> tuple[bool, bool]:
     """Resolve the discriminating-path endpoint at ``b``: tail if ``b`` separates ``d``/``c``.
 
@@ -862,6 +1009,7 @@ def _do_ddp(
     than ``max_depth`` is not tested and counts as dependent. When neither test separates them, the
     recorded separating set decides.
     """
+    out = marks if out is None else out
     path = _get_path(d, previous)
     ind = _fits(path, max_depth) and test(d, c, tuple(path)) > alpha
     path2 = [p for p in path if p != b]
@@ -874,12 +1022,12 @@ def _do_ddp(
         ind = b in sep
 
     if ind:
-        marks[b, c] = TAIL
+        out[b, c] = TAIL
         return True, True
     if not _arrow_allowed(marks, a, b) or not _arrow_allowed(marks, c, b):
         return False, change
-    marks[b, a] = ARROW
-    marks[b, c] = ARROW
+    out[b, a] = ARROW
+    out[b, c] = ARROW
     return True, True
 
 
@@ -997,7 +1145,11 @@ def _uncovered_circle_cycle(
 
 
 def _rule_r5(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R5: orient an uncovered circle cycle to tails when every cycle triple is unambiguous.
 
@@ -1014,12 +1166,12 @@ def _rule_r5(
                 continue
             path = _uncovered_circle_cycle(marks, a, b, ambiguous)
             if path is not None:
-                _orient_tails(marks, a, b, path)
+                _orient_tails(marks if out is None else out, a, b, path)
                 change = True
     return change
 
 
-def _orient_tails(marks: np.ndarray, a: int, b: int, path: list[int]) -> None:
+def _orient_tails(marks: np.ndarray | _Implied, a: int, b: int, path: list[int]) -> None:
     """Set every endpoint on ``a - path - b`` to a tail (the R5 double-tail orientation)."""
     marks[a, b] = TAIL
     marks[b, a] = TAIL
@@ -1032,22 +1184,28 @@ def _orient_tails(marks: np.ndarray, a: int, b: int, path: list[int]) -> None:
         marks[path[i + 1], path[i]] = TAIL
 
 
-def _rule_r6(marks: np.ndarray, change: bool) -> bool:
+def _rule_r6(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | None = None) -> bool:
     """R6: ``a --- b o-* c``  =>  tail at ``b`` on edge ``b-c``."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for b in range(n):
         if not any(marks[b, a] == TAIL and marks[a, b] == TAIL for a in range(n)):
             continue
         for c in _into(marks, b, CIRCLE):
-            marks[b, c] = TAIL
+            out[b, c] = TAIL
             change = True
     return change
 
 
 def _rule_r7(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R7: ``a --o b o-* c`` with ``a``, ``c`` non-adjacent  =>  tail at ``b`` on edge ``b-c``."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for b in range(n):
         into_circles = _into(marks, b, CIRCLE)
@@ -1056,13 +1214,14 @@ def _rule_r7(
             for a in tail_side:
                 if a == c or _adjacent(marks, a, c) or _triple(a, b, c) in ambiguous:
                     continue
-                marks[b, c] = TAIL
+                out[b, c] = TAIL
                 change = True
     return change
 
 
-def _rule_r8(marks: np.ndarray, change: bool) -> bool:
+def _rule_r8(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | None = None) -> bool:
     """R8: ``a -> b -> c`` (or ``a --o b -> c``) with ``a o-> c``  =>  ``a -> c``."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for b in range(n):
         # Both orders of each neighbor pair, so the rule does not depend on node labels.
@@ -1072,8 +1231,8 @@ def _rule_r8(marks: np.ndarray, change: bool) -> bool:
             x_to_b_circle = marks[b, x] == CIRCLE and marks[x, b] == TAIL
             x_o_arrow_z = _adjacent(marks, x, z) and marks[z, x] == ARROW and marks[x, z] == CIRCLE
             if (x_to_b_directed or x_to_b_circle) and b_to_z and x_o_arrow_z:
-                marks[x, z] = TAIL
-                marks[z, x] = ARROW
+                out[x, z] = TAIL
+                out[z, x] = ARROW
                 change = True
     return change
 
@@ -1139,9 +1298,14 @@ def _exists_uncovered_pd_path(
 
 
 def _rule_r9(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R9: ``a o-> c`` with an uncovered possibly-directed path ``a .. b .. c``  =>  ``a -> c``."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for c in range(n):
         for a in _into(marks, c, ARROW):
@@ -1154,8 +1318,8 @@ def _rule_r9(
                 if _adjacent(marks, b, c):
                     continue
                 if _exists_uncovered_pd_path(marks, a, b, c, ambiguous):
-                    marks[a, c] = TAIL
-                    marks[c, a] = ARROW
+                    out[a, c] = TAIL
+                    out[c, a] = ARROW
                     change = True
                     break
     return change
@@ -1169,12 +1333,17 @@ def _is_possible_child(marks: np.ndarray, parent: int, child: int) -> bool:
 
 
 def _rule_r10(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R10: complete ``a o-> c`` via two uncovered possibly-directed paths into ``b -> c <- d``.
 
     The paths reach the tails ``b`` and ``d`` from two non-adjacent possible children of ``a``.
     """
+    out = marks if out is None else out
     n = marks.shape[0]
     for c in range(n):
         into_arrows = _into(marks, c, ARROW)
@@ -1193,8 +1362,8 @@ def _rule_r10(
                     if marks[b, c] != TAIL or marks[d, c] != TAIL:  # need b -> c <- d
                         continue
                     if _r10_connects(marks, children, b, d, a, ambiguous):
-                        marks[a, c] = TAIL
-                        marks[c, a] = ARROW
+                        out[a, c] = TAIL
+                        out[c, a] = ARROW
                         change = True
     return change
 
