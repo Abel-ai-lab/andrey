@@ -40,6 +40,8 @@ change names its pull request.
   of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
 - `boss` and `grasp` take `score_func="local_score_BDeu"` for categorical data, with the BDeu
   priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
+- `boss` and `grasp` take `score_func="local_score_BIC_categorical"`, the multinomial BIC that
+  `ges`, `hc`, `tabu`, and `exact_search` take for categorical data. ([#TBD])
 - `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
   only 3; smaller depths search less and run faster. ([#190])
 - `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that

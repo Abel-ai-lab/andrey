@@ -148,15 +148,16 @@ def _mixed() -> tuple[np.ndarray, dict]:
     return ds.data, {"score_func": "local_score_degen_gauss", "categorical": mask}
 
 
-def _categorical() -> tuple[np.ndarray, dict]:
-    """A discrete network of 10 columns, with the BDeu score."""
-    return sample_discrete(d=10, n=1000, seed=2).data, {"score_func": "local_score_BDeu"}
+def _categorical(score_func: str, seed: int) -> tuple[np.ndarray, dict]:
+    """A discrete network of 10 columns, with a categorical score."""
+    return sample_discrete(d=10, n=1000, seed=seed).data, {"score_func": score_func}
 
 
 _ORDER_CASES = {
     **{f"linear-{seed}": lambda seed=seed: (_linear(seed), {}) for seed in (1, 2, 5)},
     "mixed": _mixed,
-    "bdeu": _categorical,
+    "bdeu": partial(_categorical, "local_score_BDeu", 2),
+    "categorical-bic": partial(_categorical, "local_score_BIC_categorical", 4),
 }
 
 
