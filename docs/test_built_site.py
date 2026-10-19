@@ -516,11 +516,14 @@ def test_every_page_ends_on_the_same_footer(html):
     for page, text in _pages(html):
         footer = text[text.index('<footer class="bd-footer">') :]
         assert 'class="docs-footer"' in footer, page
-        assert re.findall(r'<p class="docs-footer__heading">([^<]+)</p>', footer) == [
+        # Each heading is its icon, then its name.
+        headings = re.findall(r'<p class="docs-footer__heading">(.*?)</p>', footer, re.S)
+        assert [re.sub(r"<[^>]+>", "", h).strip() for h in headings] == [
             "Documentation",
             "Learn",
             "Project",
         ], page
+        assert all('<svg class="nav-icon' in h for h in headings), page
         assert "Created using" not in footer and "PyData Sphinx Theme" not in footer, page
         abel = footer[footer.index('<a class="docs-footer__abel" href="https://abel.ai/">') :]
         abel = abel[: abel.index("</a>")]
