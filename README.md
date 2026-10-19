@@ -32,7 +32,10 @@ Andrey is a causal discovery package for Python.
 uv add andrey-core
 ```
 
-- **With pip**: `pip install andrey-core`
+```shell
+pip install andrey-core
+```
+
 - **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
   layouts
 - **Development version**: `uv add git+https://github.com/Abel-ai-lab/andrey`

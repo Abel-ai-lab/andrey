@@ -20,6 +20,10 @@ including where Andrey is not faster.
 uv add andrey-core
 ```
 
+```shell
+pip install andrey-core
+```
+
 ```{literalinclude} ../../site/example.py
 :language: python
 ```

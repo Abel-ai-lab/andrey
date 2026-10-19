@@ -349,16 +349,9 @@
   letter-spacing: -0.055em;
 }
 
-/* The words: amber and slanted, lit as soft neon to match the art's light: a core a little paler
-   than the amber inside a wide, low halo, so their edges glow rather than cut. */
-.andrey-home .hero .word {
-  display: inline-block;
-  color: var(--andrey-ground-amber);
-  transform: skewX(-11deg);
-}
-
+/* The words: amber, lit as soft neon to match the art's light: a core a little paler than the
+   amber inside a wide, low halo, so their edges glow rather than cut. */
 .andrey-home .hero h1 .word {
-  display: inline;
   color: color-mix(in oklab, var(--andrey-ground-amber), var(--andrey-ground-ink) 16%);
   text-shadow:
     0 0 0.02em color-mix(in srgb, var(--andrey-ground-amber) 90%, transparent),
