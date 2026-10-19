@@ -137,7 +137,8 @@ Discrete data, yes: code each category as a whole number, or pass a DataFrame wh
 text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
 data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS,
 GRaSP, and exact search score it with `score_func="local_score_BDeu"` or
-`"local_score_BIC_categorical"`. Mixed data, with continuous and categorical columns, is
+`"local_score_BIC_categorical"`; all but GFCI pick BDeu by default when every column is
+categorical. Mixed data, with continuous and categorical columns, is
 experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and exact search take
 `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
 `"local_score_cond_gauss"`. They infer which columns are categorical unless you name them with

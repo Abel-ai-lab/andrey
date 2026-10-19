@@ -18,6 +18,7 @@ from andrey.api._adapt import (
     checked_data,
     column_labels,
     copies_named,
+    default_score,
     int_in_range,
     json_safe,
     structure_output,
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 def boss(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str | None = None,
     lambda_value: float = 1.0,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -52,12 +53,16 @@ def boss(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : str, default="local_score_BIC_from_cov"
-        Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
-        linear-Gaussian BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the
-        BDeu score and the multinomial BIC for categorical data coded by whole numbers, and
+    score_func : str or None, default=None
+        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
+        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
+        multinomial BIC for categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` picks
+        ``"local_score_BDeu"`` when every column is categorical by the rule ``categorical=None``
+        infers with, and warns with a ``DataTypeWarning``; otherwise, or with ``categorical`` given,
+        it picks ``"local_score_BIC_from_cov"``. Pass ``"local_score_BIC_from_cov"`` to read whole
+        numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
@@ -108,9 +113,10 @@ def boss(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When ``score_func`` is ``None`` and every column is categorical, so the search scores with
+        BDeu; when a mixed-data score infers the categorical columns, or finds none and so runs as
+        the linear-Gaussian form; or when a continuous setting meets columns that look like
+        category codes. Each message warns once per process.
 
     See Also
     --------
@@ -124,9 +130,9 @@ def boss(
     -----
     **When to use it.** BOSS suits the same data as :func:`~andrey.ges`: continuous data with linear
     effects, Gaussian noise, and no unmeasured common causes. It was designed for hundreds of highly
-    connected variables [1]_. For categorical data, use ``"local_score_BDeu"`` or
-    ``"local_score_BIC_categorical"``, and for mixed data ``"local_score_degen_gauss"`` or
-    ``"local_score_cond_gauss"``.
+    connected variables [1]_. When every column is categorical, the default score is
+    ``"local_score_BDeu"``; ``"local_score_BIC_categorical"`` also scores categorical data, and for
+    mixed data use ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -208,6 +214,13 @@ def boss(
     from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.boss import boss as _boss
 
+    score_func = default_score(
+        data,
+        score_func,
+        "local_score_BIC_from_cov",
+        categorical=categorical,
+        max_categories=max_categories,
+    )
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(f"BOSS supports {PERMUTATION_SCORES}, not {score_func!r}")
     X, mask = checked_data(
@@ -229,7 +242,7 @@ def boss(
 def grasp(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str | None = None,
     lambda_value: float = 1.0,
     depth: int = 3,
     seed: int | None = None,
@@ -248,12 +261,16 @@ def grasp(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : str, default="local_score_BIC_from_cov"
-        Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
-        linear-Gaussian BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the
-        BDeu score and the multinomial BIC for categorical data coded by whole numbers, and
+    score_func : str or None, default=None
+        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
+        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
+        multinomial BIC for categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` picks
+        ``"local_score_BDeu"`` when every column is categorical by the rule ``categorical=None``
+        infers with, and warns with a ``DataTypeWarning``; otherwise, or with ``categorical`` given,
+        it picks ``"local_score_BIC_from_cov"``. Pass ``"local_score_BIC_from_cov"`` to read whole
+        numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
@@ -309,9 +326,10 @@ def grasp(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When ``score_func`` is ``None`` and every column is categorical, so the search scores with
+        BDeu; when a mixed-data score infers the categorical columns, or finds none and so runs as
+        the linear-Gaussian form; or when a continuous setting meets columns that look like
+        category codes. Each message warns once per process.
 
     See Also
     --------
@@ -325,9 +343,9 @@ def grasp(
     -----
     **When to use it.** GRaSP suits the same data as :func:`~andrey.ges`: continuous data with
     linear effects, Gaussian noise, and no unmeasured common causes. Its authors report accurate
-    search even on dense graphs [1]_. For categorical data, use ``"local_score_BDeu"`` or
-    ``"local_score_BIC_categorical"``, and for mixed data ``"local_score_degen_gauss"`` or
-    ``"local_score_cond_gauss"``.
+    search even on dense graphs [1]_. When every column is categorical, the default score is
+    ``"local_score_BDeu"``; ``"local_score_BIC_categorical"`` also scores categorical data, and for
+    mixed data use ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -416,6 +434,13 @@ def grasp(
     from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.grasp import grasp as _grasp
 
+    score_func = default_score(
+        data,
+        score_func,
+        "local_score_BIC_from_cov",
+        categorical=categorical,
+        max_categories=max_categories,
+    )
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(f"GRaSP supports {PERMUTATION_SCORES}, not {score_func!r}")
     depth = int_in_range(depth, "depth", 1)

@@ -109,6 +109,63 @@ def data_kind(name: str) -> str:
 MAX_CATEGORIES = 10
 
 
+def default_score(
+    data: npt.ArrayLike,
+    score_func: str | None,
+    linear: str,
+    *,
+    categorical: object = None,
+    max_categories: int = MAX_CATEGORIES,
+) -> str:
+    """Return ``score_func``, or for ``None`` the default score of a score search on ``data``.
+
+    The default is ``"local_score_BDeu"`` when every column is categorical by the rule
+    :func:`mixed_matrix` infers with: a DataFrame's ``category``, ``bool``, ``object``, and
+    ``string`` columns, and every column of at most ``max_categories`` distinct whole numbers. It
+    warns once with a :class:`~andrey.DataTypeWarning` naming ``linear``, the linear-Gaussian BIC
+    the search uses otherwise, since columns of counts or ratings meet the rule too. A given
+    ``categorical`` keeps ``linear``, as does data that is not a finite numeric table apart from its
+    typed columns, so that :func:`checked_data` reports it.
+
+    Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2.
+    """
+    if score_func is not None:
+        return score_func
+    max_categories = int_in_range(max_categories, "max_categories", 2)
+    if categorical is not None or not _all_categorical(data, max_categories):
+        return linear
+    warn_once(
+        "every column of data is categorical (a category, bool, or text type, or at most "
+        f"max_categories={max_categories} distinct whole numbers), so the score defaults to "
+        "score_func='local_score_BDeu'; if the columns are counts or ratings to read as numbers, "
+        f"pass score_func={linear!r}, the linear-Gaussian BIC (see Data types in the "
+        "getting-started guide)",
+        DataTypeWarning,
+    )
+    return "local_score_BDeu"
+
+
+def _all_categorical(data: npt.ArrayLike, max_categories: int) -> bool:
+    """Whether every column of ``data`` is categorical by :func:`default_score`'s rule.
+
+    ``False`` when ``data`` has no columns, or its untyped columns are not a finite numeric table.
+    """
+    if getattr(data, "columns", None) is None:
+        numeric, typed = data, 0
+    else:
+        import pandas as pd
+
+        mask = _categorical_dtypes(data)
+        numeric, typed = pd.DataFrame(data).iloc[:, ~mask], int(mask.sum())
+    try:
+        X = np.asarray(numeric, dtype=np.float64)
+    except (TypeError, ValueError):
+        return False
+    if X.ndim != 2 or X.shape[1] + typed == 0 or not np.isfinite(X).all():
+        return False
+    return bool((_category_counts(X, max_categories) > 0).all())
+
+
 def checked_data(
     data: npt.ArrayLike,
     categorical: object,

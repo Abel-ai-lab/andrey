@@ -6,6 +6,7 @@ Direct Python calls (not the CLI, which validates inputs of its own) must not le
 
 from __future__ import annotations
 
+import importlib
 import re
 import warnings
 from functools import partial
@@ -784,6 +785,140 @@ def test_a_continuous_setting_hints_at_columns_that_look_like_codes(fit):
     with pytest.warns(andrey.DataTypeWarning, match="columns 0, 2 hold at most 10 distinct whole"):
         out = fit(_mixed_data())
     assert "categorical" not in out.metadata
+
+
+#: The score searches whose ``score_func=None`` picks BDeu on all-categorical data: each one's
+#: facade, the module and name of the search it calls, and the linear-Gaussian BIC it picks
+#: otherwise.
+SCORE_SEARCHES = {
+    "ges": (andrey.ges, "andrey.search.ges", "ges", "local_score_BIC"),
+    "hc": (andrey.hc, "andrey.search.hc", "hc", "local_score_BIC_from_cov"),
+    "tabu": (andrey.tabu, "andrey.search.tabu", "tabu", "local_score_BIC_from_cov"),
+    "exact_search": (andrey.exact_search, "andrey.search.exact", "exact_search", "local_score_BIC"),
+    "boss": (andrey.boss, "andrey.search.boss", "boss", "local_score_BIC_from_cov"),
+    "grasp": (andrey.grasp, "andrey.search.grasp", "grasp", "local_score_BIC_from_cov"),
+}
+
+
+def _scores_used(monkeypatch, name):
+    """Record the ``score_func`` each call of ``name`` passes to its search."""
+    _, module, attribute, _ = SCORE_SEARCHES[name]
+    search = importlib.import_module(module)
+    run = getattr(search, attribute)
+    used = []
+
+    def record(*args, **kwargs):
+        used.append(kwargs["score_func"])
+        return run(*args, **kwargs)
+
+    monkeypatch.setattr(search, attribute, record)
+    return used
+
+
+def _categorical_data(n=500):
+    """Columns: 2 categories, 3 categories, and 3 categories that depend on the first two."""
+    rng = np.random.default_rng(0)
+    a, b = rng.integers(0, 2, n), rng.integers(0, 3, n)
+    c = np.where(rng.random(n) < 0.8, (a + b) % 3, rng.integers(0, 3, n))
+    return np.column_stack([a, b, c]).astype(np.float64)
+
+
+def _categorical_frame():
+    """The columns of :func:`_categorical_data` as bool, category, and text columns."""
+    pd = pytest.importorskip("pandas")
+    x = _categorical_data().astype(int)
+    return pd.DataFrame(
+        {
+            "a": x[:, 0].astype(bool),
+            "b": pd.Categorical(x[:, 1]),
+            "c": np.array(list("pqr"))[x[:, 2]],
+        }
+    )
+
+
+def _same_fit(a, b):
+    """Whether two results hold the same graph and the same metadata, the score included."""
+    return (
+        np.array_equal(a.structure.to_numpy(), b.structure.to_numpy()) and a.metadata == b.metadata
+    )
+
+
+def _switch_warnings(caught):
+    return [w for w in caught if "local_score_BDeu" in str(w.message)]
+
+
+@pytest.mark.parametrize("data", [_categorical_data, _categorical_frame], ids=["codes", "frame"])
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
+def test_all_categorical_data_defaults_to_bdeu_with_one_warning(name, data, monkeypatch):
+    fit, _, _, linear = SCORE_SEARCHES[name]
+    x = data()
+    used = _scores_used(monkeypatch, name)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        out = fit(x)
+        fit(x)
+    assert used == ["local_score_BDeu"] * 2
+    assert [w.category for w in caught] == [andrey.DataTypeWarning]
+    assert linear in str(caught[0].message)
+    assert _same_fit(out, fit(x, score_func="local_score_BDeu"))
+
+
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
+def test_an_explicit_score_func_wins_on_categorical_data(name, monkeypatch):
+    fit, _, _, linear = SCORE_SEARCHES[name]
+    used = _scores_used(monkeypatch, name)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        fit(_categorical_data(), score_func=linear)
+        fit(_categorical_data(), score_func="local_score_BIC_categorical")
+    assert used == [linear, "local_score_BIC_categorical"]
+    assert _switch_warnings(caught) == []
+
+
+@pytest.mark.parametrize("data", ["mixed", "continuous"])
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
+def test_data_with_a_continuous_column_keeps_the_linear_bic(name, data, monkeypatch):
+    fit, _, _, linear = SCORE_SEARCHES[name]
+    x = _mixed_data() if data == "mixed" else np.random.default_rng(1).standard_normal((200, 3))
+    used = _scores_used(monkeypatch, name)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        out = fit(x)
+        explicit = fit(x, score_func=linear)
+    assert used == [linear, linear]
+    assert _same_fit(out, explicit)
+    assert _switch_warnings(caught) == []
+
+
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
+def test_the_default_score_and_graph_follow_the_columns_in_any_order(name, monkeypatch):
+    fit, _, _, linear = SCORE_SEARCHES[name]
+    order = [2, 0, 1]
+    used = _scores_used(monkeypatch, name)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.DataTypeWarning)
+        for x in (_mixed_data(), _categorical_data()):
+            out, moved = fit(x), fit(x[:, order])
+            assert np.array_equal(
+                moved.structure.to_numpy(), out.structure.to_numpy()[order][:, order]
+            )
+    assert used == [linear, linear, "local_score_BDeu", "local_score_BDeu"]
+
+
+def test_whole_number_counts_read_as_categories_and_the_warning_names_the_bic(monkeypatch):
+    """Counts of at most ``max_categories`` values meet the rule, so the warning names the BIC."""
+    rng = np.random.default_rng(0)
+    x = rng.binomial(4, 0.5, 500)
+    y = x + rng.binomial(3, 0.5, 500)
+    counts = np.column_stack([x, y, y + rng.binomial(2, 0.5, 500)]).astype(np.float64)
+    assert np.unique(counts[:, 2]).size == 10
+    used = _scores_used(monkeypatch, "hc")
+    with pytest.warns(andrey.DataTypeWarning) as caught:
+        andrey.hc(counts)
+        andrey.hc(counts, score_func="local_score_BIC_from_cov")
+        andrey.hc(counts, max_categories=9)
+    assert "local_score_BIC_from_cov" in str(caught[0].message)
+    assert used == ["local_score_BDeu", "local_score_BIC_from_cov", "local_score_BIC_from_cov"]
 
 
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)

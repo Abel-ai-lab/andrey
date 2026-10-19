@@ -274,8 +274,8 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, the experimental `kci`, `rcot`, `cmiknn`, `gpdc` | `local_score_BIC` (the default) |
-| Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
+| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, the experimental `kci`, `rcot`, `cmiknn`, `gpdc` | `local_score_BIC` (the default unless every column is categorical) |
+| Categorical | `chisq`, `gsq` | `local_score_BDeu` (the default when every column is categorical), `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
 
 `pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, `boss`, `grasp`, and
@@ -285,6 +285,16 @@ score and a test that read the same kind of data, such as
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole
 numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
+
+**The default score.** When every column is categorical, a DataFrame's `category`, `bool`, or text
+column or a column of at most `max_categories` distinct whole numbers (10 by default), `ges`, `hc`,
+`tabu`, `boss`, `grasp`, and `exact_search` score with `local_score_BDeu` and say so with a
+one-time `DataTypeWarning`. A column of counts or ratings with that few values counts as
+categorical too; to read such columns as numbers, pass the linear-Gaussian BIC:
+`score_func="local_score_BIC"` to `ges` and `exact_search`, or
+`score_func="local_score_BIC_from_cov"` to the others. A `score_func` you pass is always the one
+used, and data with a continuous column keeps the linear-Gaussian BIC. The tests do not switch:
+`pc`, `fci`, `gfci`, and `cdnod` take `indep_test="chisq"` or `"gsq"` for categorical data.
 
 **Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
 `andrey.pc(data, indep_test="cond_gauss")` or
@@ -310,10 +320,10 @@ for none. The result's `metadata["categorical"]` lists the categorical columns i
 form of the partial-correlation test, close to `fisherz`, and the degenerate Gaussian score becomes
 the BIC.
 
-**Integer-coded columns.** The default test and score read a column of codes such as 0, 1, 2 as
-numbers, which assumes the categories are ordered and evenly spaced. When columns of at most
-`max_categories` distinct whole numbers reach them, a one-time `DataTypeWarning` names those
-columns; if they are categories, choose a mixed-data setting.
+**Integer-coded columns.** The default test, and the default score on data with a continuous
+column, read a column of codes such as 0, 1, 2 as numbers, which assumes the categories are ordered
+and evenly spaced. When columns of at most `max_categories` distinct whole numbers reach them, a
+one-time `DataTypeWarning` names those columns; if they are categories, choose a mixed-data setting.
 
 From the command line, the same settings are `key=value` arguments, such as
 `andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
