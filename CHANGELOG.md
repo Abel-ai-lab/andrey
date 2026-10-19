@@ -78,6 +78,11 @@ change names its pull request.
   before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
   reject a series that repeats another at the same step or some steps back, naming its lagged
   value, such as `'a' at lag 1 repeats 'd'`. ([#206])
+- A constant column raises one `ValueError` that names every constant column and says to drop
+  them, `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` say up front that they need
+  at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
+  why a PDAG has no consistent extension, naming a chordless cycle of its undirected edges when it
+  finds one. ([#207])
 
 ### Removed
 
@@ -334,3 +339,4 @@ First alpha release.
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
 [#206]: https://github.com/Abel-ai-lab/andrey/pull/206
+[#207]: https://github.com/Abel-ai-lab/andrey/pull/207

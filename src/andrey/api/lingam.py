@@ -47,6 +47,25 @@ def _canonical_weights(B: npt.ArrayLike) -> np.ndarray:
     return np.ascontiguousarray(np.asarray(B, dtype=np.float64).T)
 
 
+def _pruning_rows(X: np.ndarray, name: str = "data") -> np.ndarray:
+    """Return ``X``, checked to have the rows the adaptive-Lasso pruning step needs.
+
+    The step regresses the last variable of the causal order on the other ``d - 1`` with a
+    BIC-tuned Lasso, whose noise variance comes from a least-squares fit with an intercept. That fit
+    needs more rows than its ``d`` coefficients, so ``X`` needs at least ``d + 1`` rows. Raises
+    ``ValueError``, naming ``name``, with fewer.
+    """
+    n, d = X.shape
+    if n <= d:
+        raise ValueError(
+            f"{name} needs at least {d + 1} rows (samples) over {d} variables, got {n}: the "
+            f"pruning step regresses the last variable of the causal order on the other {d - 1} "
+            "and estimates the noise variance from that least-squares fit, which needs more rows "
+            "than coefficients"
+        )
+    return X
+
+
 def direct_lingam(
     data: npt.ArrayLike, *, random_state: int | None = None, measure: str = "pwling"
 ) -> StructureOutput:
@@ -81,6 +100,10 @@ def direct_lingam(
     ------
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
+    ValueError
+        If ``data`` is not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a
+        constant column, named in the message. Also if it has fewer than ``n_variables + 1`` rows,
+        the fewest with which the pruning step can estimate the edge weights.
 
     See Also
     --------
@@ -130,7 +153,7 @@ def direct_lingam(
     """
     from andrey.lingam.direct import direct_lingam as _native
 
-    X = data_matrix(data)
+    X = _pruning_rows(data_matrix(data))
     labels = column_labels(data)
     order, B = _native(X, measure=measure)
     weighted = _canonical_weights(B)
@@ -180,8 +203,9 @@ def ica_lingam(
     TypeError
         If ``max_iter`` is not an int.
     ValueError
-        If ``max_iter`` is less than ``1``, or if ``random_state`` is outside ``0`` to
-        ``2**32 - 1``.
+        If ``max_iter`` is less than ``1``, if ``random_state`` is outside ``0`` to
+        ``2**32 - 1``, or if ``data`` has fewer than ``n_variables + 1`` rows, the fewest with which
+        the pruning step can estimate the edge weights.
 
     Warns
     -----
@@ -229,7 +253,7 @@ def ica_lingam(
     """
     from andrey.lingam.ica import ica_lingam as _native
 
-    X = data_matrix(data)
+    X = _pruning_rows(data_matrix(data))
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     order, B = _native(X, random_state=random_state, max_iter=max_iter)
@@ -275,8 +299,10 @@ def multi_group_direct_lingam(
     Raises
     ------
     ValueError
-        If fewer than two groups are given, or if the groups disagree on the variable count or on
-        their column names.
+        If fewer than two groups are given, if the groups disagree on the variable count or on
+        their column names, or if a group is not a usable 2-D matrix or has fewer than
+        ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the edge
+        weights.
 
     Notes
     -----
@@ -310,7 +336,10 @@ def multi_group_direct_lingam(
     """
     from andrey.lingam.multi_group import multi_group_direct_lingam as _native
 
-    groups = [data_matrix(X, name=f"data_groups[{k}]") for k, X in enumerate(data_groups)]
+    groups = [
+        _pruning_rows(data_matrix(X, name=f"data_groups[{k}]"), name=f"data_groups[{k}]")
+        for k, X in enumerate(data_groups)
+    ]
     if len(groups) < 2:
         raise ValueError(f"data_groups must hold at least two datasets, got {len(groups)}")
     if len({X.shape[1] for X in groups}) > 1:
