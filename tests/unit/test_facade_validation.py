@@ -56,7 +56,7 @@ SINGLE = {
     "pc": andrey.pc,
     "fci": andrey.fci,
     "gfci": andrey.gfci,
-    "cdnod": lambda data: andrey.cdnod(data, domain_index=np.arange(len(data)) % 2),
+    "cdnod": lambda data, **kw: andrey.cdnod(data, domain_index=np.arange(len(data)) % 2, **kw),
     "ges": andrey.ges,
     "gies": andrey.gies,
     "xges": andrey.xges,
@@ -165,14 +165,38 @@ def _two_groups_of_copies():
     return pd.DataFrame(x, columns=[f"x{j}" for j in range(8)])
 
 
-@pytest.mark.parametrize("method", BIC)
-def test_bic_searches_name_every_group_of_copies_by_column_name(method):
+# The searches that reject copies before the fit: the BIC searches, the partial-correlation
+# constraint searches, and the lagged partial-correlation searches.
+COPY_CHECKED = [*BIC, "pc", "fci", "cdnod", "pcmci", "pcmciplus", "lpcmci"]
+
+
+@pytest.mark.parametrize("method", COPY_CHECKED)
+def test_copy_checked_searches_name_every_group_of_copies_by_column_name(method):
     with pytest.raises(ValueError) as error:
         SINGLE[method](_two_groups_of_copies())
     message = str(error.value)
     assert re.search(r"'x2' and 'x7' repeat 'x1'", message)
     assert re.search(r"'x5' repeats 'x3'", message)
     assert "keep one column" in message
+
+
+@pytest.mark.parametrize("indep_test", ["fisherz", "student_t"])
+@pytest.mark.parametrize("method", ["pc", "fci", "cdnod"])
+def test_constraint_searches_reject_copies_no_test_meets(method, indep_test):
+    # The copy is unrelated to every other column, so no test conditions on it with its original.
+    x = _data(200, 4)
+    x[:, 3] = 5.0 - 2.0 * x[:, 0]
+    with pytest.raises(ValueError, match=r"\b3 repeats 0\b"):
+        SINGLE[method](x, indep_test=indep_test)
+
+
+def test_cdnod_names_a_column_that_repeats_the_domain_index():
+    pd = pytest.importorskip("pandas")
+    x = _data(200, 3)
+    index = np.arange(200) % 2
+    frame = pd.DataFrame(np.column_stack([x, 0.5 * index + 0.25]), columns=["a", "b", "c", "d"])
+    with pytest.raises(ValueError, match=r"domain_index repeats 'd'"):
+        andrey.cdnod(frame, domain_index=index)
 
 
 @pytest.mark.parametrize("method", [m for m in BIC if m != "exact_search"])

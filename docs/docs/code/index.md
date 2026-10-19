@@ -31,10 +31,12 @@ needs whole numbers. Methods that score with BIC also reject a column that repea
 scale and shift or, given more rows than columns, is a linear function of other columns. Copies of
 one variable cannot be told apart, so one `ValueError` names every group of copies, such as `x2`
 and `x7` repeating `x1`, and asks you to keep one column per group and read its edges as the
-group's; no option drops or merges the copies for you. A partial-correlation test in `pc`, `fci`,
-`gfci`, or `cdnod` that meets a singular correlation matrix from copies names the groups the same
-way. Other data raises a `ValueError` that names the argument and, for a bad cell, its row and
-column. A single column gives a one-node graph.
+group's; no option drops or merges the copies for you. `pc`, `fci`, `gfci`, and `cdnod` with a
+partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the same way before any test
+runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series that repeats another up
+to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. Other
+data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
+single column gives a one-node graph.
 
 `pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
 `"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, and `"degen_gauss"`
