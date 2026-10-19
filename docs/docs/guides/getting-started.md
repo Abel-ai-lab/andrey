@@ -280,7 +280,7 @@ Each test and score reads the columns as one kind of data:
 
 `pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, and `exact_search` take
 every score, `tabu` the continuous and categorical ones, and `boss` and `grasp` the continuous and
-mixed ones. `gfci` takes a score and a test
+mixed ones and `local_score_BDeu`. `gfci` takes a score and a test
 that read the same kind of data, such as
 `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
 

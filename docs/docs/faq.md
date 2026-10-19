@@ -137,7 +137,8 @@ row names the nodes) or a `.npy` file.
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
 text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
 data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, and exact
-search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`. Mixed data,
+search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`, and BOSS
+and GRaSP with `"local_score_BDeu"`. Mixed data,
 with continuous and categorical columns, is experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing,
 BOSS, GRaSP, and exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
 `score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`. They infer which columns are
