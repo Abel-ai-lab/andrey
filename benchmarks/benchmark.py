@@ -29,7 +29,7 @@ from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores
 
-#: The solutions: three PC implementations plus the empty graph, which runs as an ordinary solution
+#: The solutions: two PC implementations plus the empty graph, which runs as an ordinary solution
 #: so the correctness floor is measured on the same datasets. Every one runs on every dataset.
 SOLUTIONS = [AndreyPC(), CausalLearnPC(), BaselineEmpty()]
 
