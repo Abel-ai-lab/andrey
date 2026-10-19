@@ -55,7 +55,7 @@ change names its pull request.
 - `fci` and `gfci` run their possible-d-separation step in the order of a rank computed from each
   column's own data, so reordering the columns no longer changes their PAG unless two columns are
   identical and their default output can change, and the new `possible_dsep="fast"` keeps the
-  column order. ([#168], [#238])
+  column order. ([#168], [#239])
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
@@ -361,4 +361,4 @@ First alpha release.
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
 [#229]: https://github.com/Abel-ai-lab/andrey/pull/229
 [#233]: https://github.com/Abel-ai-lab/andrey/pull/233
-[#238]: https://github.com/Abel-ai-lab/andrey/pull/238
+[#239]: https://github.com/Abel-ai-lab/andrey/pull/239
