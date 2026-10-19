@@ -127,6 +127,9 @@ change names its pull request.
   its class does not. ([#TBD])
 - `pcmciplus` runs its tests on one BLAS thread, as `pcmci` and `lpcmci` do, so the host's BLAS
   thread count cannot change its p-values. ([#TBD])
+- When several variables can come next in its causal order, `ica_lingam` picks one by a rank
+  computed from each column's own data instead of by column position, so reordering the columns no
+  longer changes that choice, and its order and graph can change. ([#TBD])
 
 ## [0.6.0] - 2026-10-17
 
