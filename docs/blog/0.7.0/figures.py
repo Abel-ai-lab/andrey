@@ -290,39 +290,44 @@ def generator_figure() -> str:
 
 
 def reorder_chart() -> str:
-    # Datasets where a reordering of the columns changed the graph: (method, denominator,
-    # [(series, count)]), the counts the post's tables report.
-    groups = (
-        ("Hill climbing, BDeu", 150, (("old", 145), ("new", 0))),
-        ("Hill climbing, BIC", 150, (("old", 147), ("new", 0))),
-        ("Tabu search, BDeu", 150, (("old", 112), ("new", 0))),
-        ("Tabu search, BIC", 150, (("old", 118), ("new", 0))),
-        ("BOSS", 150, (("cl", 137), ("old", 146), ("new", 0))),
-        ("GRaSP", 150, (("cl", 150), ("old", 149), ("new", 0))),
-        ("GIN", 15, (("first", 11), ("new", 0))),
+    # Datasets where a reordering of the columns changed the graph, out of each row's datasets:
+    # the counts the post's tables report, per build. None: not measured.
+    builds = ("Andrey 0.7.0", "Andrey 0.6.0", "causal-learn")
+    rows = (
+        ("Hill climbing, BDeu", 150, (0, 145, None)),
+        ("Hill climbing, BIC", 150, (0, 147, None)),
+        ("Tabu search, BDeu", 150, (0, 112, None)),
+        ("Tabu search, BIC", 150, (0, 118, None)),
+        ("BOSS", 150, (0, 146, 137)),
+        ("GRaSP", 150, (0, 149, 150)),
+        ("GIN", 15, (0, "11*", None)),  # *: see the caption
     )
-    names = {
-        "cl": "causal-learn",
-        "old": "Andrey 0.6.0",
-        "first": "first-column root test",
-        "new": "Andrey 0.7.0",
-    }
-    rows = "".join(
-        f'<div class="rc-group"><p class="rc-method">{method}</p>'
+
+    def cell(value: int | str | None, total: int, best: int) -> str:
+        if value is None:
+            return '<td class="rt-na">-</td>'
+        count = int(str(value).rstrip("*"))
+        cls = ' class="rt-best"' if count == best else ""
+        mark = "*" if str(value).endswith("*") else ""
+        return f"<td{cls}>{count} / {total}{mark}</td>"
+
+    head = "".join(f'<th scope="col">{b}</th>' for b in builds)
+    body = "".join(
+        f'<tr><th scope="row">{method}</th>'
         + "".join(
-            f'<div class="rc-row rc-{key}"><span class="rc-series">{names[key]}</span>'
-            f'<span class="rc-track"><span class="rc-bar" '
-            f'style="--rc-w: {count / total * 100:.1f}%"></span></span>'
-            f'<span class="rc-count"><b>{count}</b> of {total}</span></div>'
-            for key, count in series
+            cell(v, total, min(int(str(x).rstrip("*")) for x in values if x is not None))
+            for v in values
         )
-        + "</div>"
-        for method, total, series in groups
+        + "</tr>"
+        for method, total, values in rows
     )
     return (
-        '<figure class="rc"><p class="co-title">Datasets where reordering the columns changed the '
-        f'graph</p><div class="rc-groups">{rows}</div><figcaption>Each dataset fit in its own '
-        "column order and five reorderings, ten for GIN.</figcaption></figure>\n"
+        '<figure class="rt"><p class="rt-title">Datasets where reordering the columns changed the '
+        'graph (lower is better)</p><div class="rt-scroll"><table class="rt-table">'
+        f"<thead><tr><td></td>{head}</tr></thead><tbody>{body}</tbody></table></div>"
+        "<figcaption>Each dataset fit in its own column order and five reorderings, ten for GIN. "
+        "* GIN before 0.7.0's fix, its root test using each cluster's first column."
+        "</figcaption></figure>\n"
     )
 
 
