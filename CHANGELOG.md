@@ -115,28 +115,28 @@ change names its pull request.
   causal-order candidates whose scores differ only by rounding as tied and pick among them by a
   rank computed from each column's own data, so two interchangeable columns, such as two balanced
   binary columns, no longer get a different order on another CPU or after reordering the columns.
-  ([#TBD])
+  ([#205])
 - `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` score
   one column per group of copies, where a column copies another up to scale when it leaves at
   most `1e-12` of the other's variance unexplained. The other copies follow it directly in the
   causal order and each takes a single edge from it, so copies no longer come ahead of their
-  causes and give the same graph on every CPU. ([#TBD])
+  causes and give the same graph on every CPU. ([#205])
 - `exact_search` returns the same DAG of the equivalence class it finds on every CPU, with either
   `search_method`, and under any column order, because it orients the edges the class leaves
   reversible by a rank computed from each column's own data, so the DAG can differ from before but
-  its class does not. ([#TBD])
+  its class does not. ([#205])
 - `pcmciplus` runs its tests on one BLAS thread, as `pcmci` and `lpcmci` do, so the host's BLAS
-  thread count cannot change its p-values. ([#TBD])
+  thread count cannot change its p-values. ([#205])
 - When several variables can come next in its causal order, `ica_lingam` picks one by a rank
   computed from each column's own data instead of by column position, so reordering the columns no
-  longer changes that choice, and its order and graph can change. ([#TBD])
+  longer changes that choice, and its order and graph can change. ([#205])
 - `ges`, `gies`, `xges`, `calm`, `gin`, `bottom_up_parce_lingam`, `pcmci`, `pcmciplus`, and `lpcmci`
   break ties between equal score changes or test results by a rank computed from each column's own
   data instead of by column position; `calm` also assigns its random draws, and
   `bottom_up_parce_lingam` its regression predictors, in that rank order; `calm` chooses each
   Markov-blanket member by its partial correlation where p-values underflow to zero; and `pc` and
   `cdnod` orient colliders whose p-values agree to nine decimals together, so these choices no
-  longer depend on the column order. ([#TBD])
+  longer depend on the column order. ([#205])
 
 ## [0.6.0] - 2026-10-17
 
@@ -355,3 +355,4 @@ First alpha release.
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
+[#205]: https://github.com/Abel-ai-lab/andrey/pull/205
