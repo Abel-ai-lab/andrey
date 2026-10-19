@@ -941,7 +941,11 @@ def config_report() -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
         "andrey_version": andrey.__version__,
-        "configuration": {"backend": state["backend"], "num_workers": state["num_workers"]},
+        "configuration": {
+            "backend": state["backend"],
+            "num_workers": state["num_workers"],
+            "tie_break": andrey.config.tie_break,
+        },
         "available_backends": state["available_backends"],
         "system": system_report(state["available_backends"]),
         "environment": environment,
@@ -960,6 +964,7 @@ def render_config(report: dict) -> str:
     lines = [
         f"Backend preference: {settings['backend']}",
         f"Worker setting: {settings['num_workers']}",
+        f"Tie break: {settings['tie_break']}",
         f"Available backends: {available}",
         *[f"  {name}: {why}" for name, why in system["unavailable_backends"].items()],
         "Actual backend selection depends on the operation, input size, and runtime state.",

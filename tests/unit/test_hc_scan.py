@@ -10,12 +10,12 @@ on the column order.
 
 from __future__ import annotations
 
-import importlib
 import math
 
 import numpy as np
 import pytest
 
+import andrey
 from andrey.core.score import BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
@@ -158,7 +158,7 @@ def _graph(search, x, score_func, order):
 
 @pytest.mark.parametrize("search", [hc, tabu])
 @pytest.mark.parametrize("score_func", list(_TIED_DATA))
-def test_exact_ties_break_independently_of_column_order(search, score_func, monkeypatch) -> None:
+def test_exact_ties_break_independently_of_column_order(search, score_func) -> None:
     """Every column order gives the graph of the original order, mapped back.
 
     Under these score-equivalent scores, the first move adds an edge whose opposite direction has
@@ -181,10 +181,9 @@ def test_exact_ties_break_independently_of_column_order(search, score_func, monk
     for order in orders:
         np.testing.assert_array_equal(_graph(search, x, score_func, order), want)
 
-    module = importlib.import_module(search.__module__)
-    monkeypatch.setattr(module, "tie_ranks", lambda x, categorical=None: np.arange(x.shape[1]))
-    by_position = _graph(search, x, score_func, np.arange(d))
-    assert any((_graph(search, x, score_func, o) != by_position).any() for o in orders)
+    with andrey.config(tie_break="position"):
+        by_position = _graph(search, x, score_func, np.arange(d))
+        assert any((_graph(search, x, score_func, o) != by_position).any() for o in orders)
 
 
 def test_tie_ranks_move_with_the_columns() -> None:

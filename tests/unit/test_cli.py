@@ -795,11 +795,16 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     monkeypatch.setattr("andrey.describe", lambda: state)
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "-1")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "90000")
+    monkeypatch.setenv("ANDREY_TIE_BREAK", "Position")
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     code, out, err = _run(["config", "--json"], capsys)
     assert code == 0 and not err
     report = json.loads(out)
-    assert report["configuration"] == {"backend": "auto", "num_workers": -1}
+    assert report["configuration"] == {
+        "backend": "auto",
+        "num_workers": -1,
+        "tie_break": "position",
+    }
     assert report["available_backends"] == {
         "numpy": True,
         "cpu": True,

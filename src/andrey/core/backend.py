@@ -1,7 +1,8 @@
-"""Backend and worker selection for numeric operations.
+"""Backend, worker, and tie-break selection.
 
 ``backend`` sets a preference for NumPy or PyTorch and the device it runs on; ``num_workers``
-controls parallel execution. ``docs/docs/configuration.md`` describes every value. Each operation
+controls parallel execution; ``tie_break`` sets how the searches order tied choices.
+``docs/docs/configuration.md`` describes every value. Each operation
 supports a subset of the backends, including the always-available ``numpy`` reference. A backend
 the operation does not support falls back to automatic selection without a warning
 (:func:`dispatch_stats` records which one ran). A supported backend unavailable on the machine
@@ -9,9 +10,9 @@ warns once and uses automatic selection. PyTorch, provided by the ``torch`` extr
 only when needed.
 
 A setting resolves from the call's argument, then ``with andrey.config(...)``, then the
-:data:`config` object, then ``ANDREY_BACKEND`` / ``ANDREY_NUM_WORKERS`` (read live), then the
-default. ``with`` uses context variables, so its overrides do not reach threads started inside the
-block.
+:data:`config` object, then ``ANDREY_BACKEND`` / ``ANDREY_NUM_WORKERS`` / ``ANDREY_TIE_BREAK``
+(read live), then the default. ``with`` uses context variables, so its overrides do not reach
+threads started inside the block.
 """
 
 from __future__ import annotations
@@ -52,6 +53,9 @@ _backend_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 )
 _num_workers_var: contextvars.ContextVar[int | None] = contextvars.ContextVar(
     "andrey_num_workers", default=None
+)
+_tie_break_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "andrey_tie_break", default=None
 )
 
 
@@ -117,13 +121,14 @@ def _is_live(b: str) -> bool:
 
 
 class _Config:
-    """Process-wide backend and worker settings, also usable as a ``with`` block.
+    """Process-wide backend, worker, and tie-break settings, also usable as a ``with`` block.
 
-    Assigning ``andrey.config.backend`` or ``andrey.config.num_workers`` changes the default for
-    later calls; assigning ``None`` returns to ``ANDREY_BACKEND`` and ``ANDREY_NUM_WORKERS``.
-    ``with andrey.config(backend=..., num_workers=...):`` changes them inside the block only, and
-    does not reach threads started inside it. The order, most specific first: ``with`` block,
-    these attributes, the environment variables, the defaults.
+    Assigning ``andrey.config.backend``, ``andrey.config.num_workers``, or
+    ``andrey.config.tie_break`` changes the default for later calls; assigning ``None`` returns to
+    ``ANDREY_BACKEND``, ``ANDREY_NUM_WORKERS``, and ``ANDREY_TIE_BREAK``.
+    ``with andrey.config(backend=..., num_workers=..., tie_break=...):`` changes them inside the
+    block only, and does not reach threads started inside it. The order, most specific first:
+    ``with`` block, these attributes, the environment variables, the defaults.
 
     ``backend="auto"`` (the default) considers ``"cuda"`` when the operation meets its size and
     runtime-startup requirements and a compatible GPU is available; otherwise it uses ``"numpy"``.
@@ -137,10 +142,18 @@ class _Config:
     ``num_workers`` counts worker processes (threads for ``granger``): ``-1`` uses every usable
     core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values request that many
     workers.
+
+    ``tie_break`` sets how a method chooses between candidates that tie, such as two moves with
+    equal rounded score changes. ``"rank"`` (the default) orders them by a rank computed from each
+    column's own data (:func:`andrey.search.hc.tie_ranks`), so reordering the columns relabels the
+    result. ``"position"`` orders them by column position instead, which skips computing the ranks,
+    and the result can then depend on the column order. Each fit reads the setting once, when it
+    starts. The :doc:`column-order guide </docs/guides/column-order>` lists the methods it reaches.
     """
 
     _backend: str | None = None
     _num_workers: int | None = None
+    _tie_break: str | None = None
 
     @property
     def backend(self) -> str:
@@ -162,8 +175,23 @@ class _Config:
             None if value is None else env.parse_num_workers(value, "config.num_workers")
         )
 
-    def __call__(self, *, backend: str | None = None, num_workers: int | None = None):
-        """Return a context manager that sets ``backend`` and ``num_workers`` for a ``with`` block.
+    @property
+    def tie_break(self) -> str:
+        """The tie-break rule in effect; assigning an unknown name raises ``ValueError``."""
+        return _resolve_tie_break()
+
+    @tie_break.setter
+    def tie_break(self, value: str | None) -> None:
+        self._tie_break = None if value is None else env.parse_tie_break(value, "config.tie_break")
+
+    def __call__(
+        self,
+        *,
+        backend: str | None = None,
+        num_workers: int | None = None,
+        tie_break: str | None = None,
+    ):
+        """Return a context manager that sets the given settings for a ``with`` block.
 
         Parameters
         ----------
@@ -171,6 +199,8 @@ class _Config:
             Backend preference for the block; ``None`` keeps the current one.
         num_workers : int or None, default=None
             Worker count for the block, ``-1`` or more; ``None`` keeps the current one.
+        tie_break : {"rank", "position"} or None, default=None
+            Tie-break rule for the block; ``None`` keeps the current one.
 
         Returns
         -------
@@ -180,21 +210,24 @@ class _Config:
         Raises
         ------
         ValueError
-            On entering the block, if ``backend`` is not a known name or ``num_workers`` is not an
-            integer of at least ``-1``.
+            On entering the block, if ``backend`` or ``tie_break`` is not a known name or
+            ``num_workers`` is not an integer of at least ``-1``; the message lists the accepted
+            values.
         """
-        return _scope(backend, num_workers)
+        return _scope(backend, num_workers, tie_break)
 
 
 config = _Config()
 
 
 @contextlib.contextmanager
-def _scope(backend: str | None, num_workers: int | None):
+def _scope(backend: str | None, num_workers: int | None, tie_break: str | None):
     b = None if backend is None else env.parse_backend(backend, "backend")
     w = None if num_workers is None else env.parse_num_workers(num_workers, "num_workers")
+    r = None if tie_break is None else env.parse_tie_break(tie_break, "tie_break")
     bt = _backend_var.set(b) if b is not None else None
     wt = _num_workers_var.set(w) if w is not None else None
+    rt = _tie_break_var.set(r) if r is not None else None
     try:
         yield
     finally:
@@ -202,6 +235,8 @@ def _scope(backend: str | None, num_workers: int | None):
             _backend_var.reset(bt)
         if wt is not None:
             _num_workers_var.reset(wt)
+        if rt is not None:
+            _tie_break_var.reset(rt)
 
 
 # ---- resolution ---------------------------------------------------------------------------------
@@ -232,6 +267,16 @@ def _resolve_num_workers(kwarg: int | None) -> int:
         return config._num_workers
     n = env.NUM_WORKERS.read()
     return 1 if n is None else n
+
+
+def _resolve_tie_break() -> str:
+    """Resolve the tie-break rule by precedence: context > config > env > ``rank``."""
+    scoped = _tie_break_var.get()
+    if scoped is not None:
+        return scoped
+    if config._tie_break is not None:
+        return config._tie_break
+    return env.TIE_BREAK.read() or "rank"
 
 
 # ---- the dispatch counts: every select() decision, recorded per process -------------------------

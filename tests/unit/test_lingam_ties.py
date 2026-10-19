@@ -14,6 +14,7 @@ import itertools
 import numpy as np
 import pytest
 
+import andrey
 from andrey.data.scm import sample_scm
 from andrey.lingam import direct, multi_group, pwling
 
@@ -47,6 +48,16 @@ def _assert_order_follows_columns(fit, groups: list[np.ndarray]) -> None:
         assert [perm[j] for j in relabeled] == order, perm
 
 
+def _assert_position_follows_order(fit, groups: list[np.ndarray]) -> None:
+    """Under ``tie_break="position"``, some column permutation changes the order, relabeled."""
+    with andrey.config(tie_break="position"):
+        order = fit(groups)
+        assert any(
+            [perm[j] for j in fit([X[:, list(perm)] for X in groups])] != order
+            for perm in itertools.permutations(range(groups[0].shape[1]))
+        )
+
+
 def _direct(groups: list[np.ndarray]) -> list[int]:
     return pwling.find_causal_order(groups[0])
 
@@ -57,6 +68,7 @@ def _shared(groups: list[np.ndarray]) -> list[int]:
 
 def test_swap_symmetric_pair_order_follows_columns() -> None:
     _assert_order_follows_columns(_direct, [_SWAP_PAIR_N8])
+    _assert_position_follows_order(_direct, [_SWAP_PAIR_N8])
 
 
 @pytest.mark.parametrize("seed", [3, 6])
@@ -74,6 +86,7 @@ def test_balanced_binary_pair_order_follows_columns() -> None:
 def test_multi_group_order_follows_columns() -> None:
     groups = [_balanced_binary_pair(0, 600), _balanced_binary_pair(1, 400)]
     _assert_order_follows_columns(_shared, groups)
+    _assert_position_follows_order(_shared, groups)
 
 
 def test_pick_ties_within_the_tolerance_only() -> None:

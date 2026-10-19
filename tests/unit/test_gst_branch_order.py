@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+import andrey
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.data import sample_mixed
@@ -170,7 +171,7 @@ _SEARCHES = {
 
 @pytest.mark.parametrize("search", list(_SEARCHES))
 @pytest.mark.parametrize("case", list(_ORDER_CASES))
-def test_reordering_the_columns_relabels_the_graph(search, case, monkeypatch) -> None:
+def test_reordering_the_columns_relabels_the_graph(search, case) -> None:
     """Every column order gives the graph of the stored order, mapped back.
 
     Ranking the columns by position instead changes the graph under at least one of the orders, so
@@ -185,9 +186,9 @@ def test_reordering_the_columns_relabels_the_graph(search, case, monkeypatch) ->
     for order in orders:
         np.testing.assert_array_equal(_graph(search, x, order, **kwargs), want)
 
-    monkeypatch.setattr(boss_mod, "tie_ranks", lambda x, categorical=None: np.arange(x.shape[1]))
-    by_position = _graph(search, x, np.arange(d), **kwargs)
-    assert any((_graph(search, x, o, **kwargs) != by_position).any() for o in orders)
+    with andrey.config(tie_break="position"):
+        by_position = _graph(search, x, np.arange(d), **kwargs)
+        assert any((_graph(search, x, o, **kwargs) != by_position).any() for o in orders)
 
 
 @pytest.mark.parametrize("case", list(_ORDER_CASES))

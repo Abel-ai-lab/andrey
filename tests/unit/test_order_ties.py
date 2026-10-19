@@ -2,13 +2,12 @@
 
 Each test fits data built so that a method meets a tie, refits under every column order, maps the
 result back to the original labels, and expects the original fit. Where the tie is broken by
-:func:`~andrey.search.hc.tie_ranks`, ranking the columns by position instead changes the result
-under at least one order, so the orders exercise the tie-break.
+:func:`~andrey.search.hc.tie_ranks`, the same fits under ``tie_break="position"`` change under at
+least one order, so the orders exercise the tie-break and the switch reaches the method.
 """
 
 from __future__ import annotations
 
-import importlib
 from itertools import permutations
 
 import numpy as np
@@ -28,10 +27,6 @@ from andrey.search.ges import ges
 from andrey.search.gies import gies
 from andrey.search.xges import xges
 from andrey.temporal.pcmci import design_test
-
-
-def _by_position(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarray:
-    return np.arange(x.shape[1])
 
 
 def _swap_symmetric(seed: int, n: int = 200) -> np.ndarray:
@@ -105,44 +100,41 @@ def _mapped(fit, x: np.ndarray, order: np.ndarray) -> np.ndarray:
     return fit(x[:, order])[..., back[:, None], back]
 
 
-def _assert_order_free(fit, x: np.ndarray, module: str, monkeypatch) -> None:
+def _assert_order_free(fit, x: np.ndarray) -> None:
     orders = [np.array(order) for order in permutations(range(x.shape[1]))]
     want = fit(x)
     for order in orders:
         np.testing.assert_array_equal(_mapped(fit, x, order), want)
-    monkeypatch.setattr(importlib.import_module(module), "tie_ranks", _by_position)
-    by_position = fit(x)
-    assert any((_mapped(fit, x, order) != by_position).any() for order in orders)
+    with andrey.config(tie_break="position"):
+        by_position = fit(x)
+        assert any((_mapped(fit, x, order) != by_position).any() for order in orders)
 
 
-def test_ges_ties(monkeypatch) -> None:
+def test_ges_ties() -> None:
     """GES adds the 0 - 1 edge, then column 2's edges to 0 and to 1 tie; it adds one of them."""
     x = _swap_symmetric(0)
     score, n = BICScore(x), x.shape[0]
     assert round(score.score(2, [0]) / n, _KEY_DP) == round(score.score(2, [1]) / n, _KEY_DP)
-    _assert_order_free(lambda data: ges(data)[0].to_numpy(), x, "andrey.search.ges", monkeypatch)
+    _assert_order_free(lambda data: ges(data)[0].to_numpy(), x)
 
 
-def test_xges_ties(monkeypatch) -> None:
+def test_xges_ties() -> None:
     """XGES meets the tie GES meets: column 2's edges to 0 and to 1."""
     x = _swap_symmetric(0)
     for rescan in (False, True):
         _assert_order_free(
             lambda data: xges(data, _rescan=rescan)[0].to_numpy(),
             x,
-            "andrey.search.xges",
-            monkeypatch,
         )
-        monkeypatch.undo()
 
 
-def test_calm_moral_graph_ties(monkeypatch) -> None:
+def test_calm_moral_graph_ties() -> None:
     """IAMB's first choice for column 2 ties between columns 0 and 1."""
     x = _swap_symmetric_sem(181)
     test = FisherZ(x)
     (r0, _), (r1, _) = test.statistic_pvalue(2, 0, []), test.statistic_pvalue(2, 1, [])
     assert round(abs(r0), _KEY_DP) == round(abs(r1), _KEY_DP)
-    _assert_order_free(moral_graph, x, "andrey.search.calm", monkeypatch)
+    _assert_order_free(moral_graph, x)
 
 
 def test_calm_moral_graph_zero_p_values() -> None:
@@ -163,7 +155,7 @@ def _assert_lag_one_tie(x: np.ndarray) -> None:
     assert statistics[0] == statistics[1]
 
 
-def test_pcmciplus_ties(monkeypatch) -> None:
+def test_pcmciplus_ties() -> None:
     """PC1 meets equal strengths for the lagged links of series 0 and 1 into series 2."""
     x = _swap_symmetric_series(0)
     _assert_lag_one_tie(x)
@@ -172,10 +164,10 @@ def test_pcmciplus_ties(monkeypatch) -> None:
         graph = andrey.pcmciplus(data, tau_max=2, pc_alpha=0.2).structure
         return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
 
-    _assert_order_free(fit, x, "andrey.temporal.pcmciplus", monkeypatch)
+    _assert_order_free(fit, x)
 
 
-def test_pcmci_parents_ties(monkeypatch) -> None:
+def test_pcmci_parents_ties() -> None:
     """PC1's choice of parents for series 2 follows the series when they are reordered."""
     x = _swap_symmetric_series(0)
 
@@ -189,12 +181,12 @@ def test_pcmci_parents_ties(monkeypatch) -> None:
     orders = [np.array(order) for order in permutations(range(3))]
     want = parents(np.arange(3))
     assert all(parents(order) == want for order in orders)
-    monkeypatch.setattr(importlib.import_module("andrey.temporal.pcmci"), "tie_ranks", _by_position)
-    by_position = parents(np.arange(3))
-    assert any(parents(order) != by_position for order in orders)
+    with andrey.config(tie_break="position"):
+        by_position = parents(np.arange(3))
+        assert any(parents(order) != by_position for order in orders)
 
 
-def test_lpcmci_ties(monkeypatch) -> None:
+def test_lpcmci_ties() -> None:
     """The separating-set searches for series 2 meet equal statistics of series 0 and 1."""
     x = _swap_symmetric_series(0, drive=1.0, memory=0.0)
     _assert_lag_one_tie(x)
@@ -203,10 +195,10 @@ def test_lpcmci_ties(monkeypatch) -> None:
         graph = andrey.lpcmci(data, tau_max=2, pc_alpha=0.2).structure
         return np.stack([graph.lag(k).to_numpy() for k in graph.lags])
 
-    _assert_order_free(fit, x, "andrey.temporal.lpcmci", monkeypatch)
+    _assert_order_free(fit, x)
 
 
-def test_bottom_up_parce_lingam_ties(monkeypatch) -> None:
+def test_bottom_up_parce_lingam_ties() -> None:
     """Columns 0 and 1 are children of column 2 and tie as the first sink.
 
     Every row is followed by a copy with columns 0 and 1 swapped, so each leading block of rows,
@@ -234,13 +226,12 @@ def test_bottom_up_parce_lingam_ties(monkeypatch) -> None:
     orders = [np.array(columns) for columns in permutations(range(3))]
     want = order(x, np.arange(3))
     assert all(order(x, columns) == want for columns in orders)
-    module = importlib.import_module("andrey.irregular.bottom_up_parce")
-    monkeypatch.setattr(module, "tie_ranks", _by_position)
-    by_position = order(x, np.arange(3))
-    assert any(order(x, columns) != by_position for columns in orders)
+    with andrey.config(tie_break="position"):
+        by_position = order(x, np.arange(3))
+        assert any(order(x, columns) != by_position for columns in orders)
 
 
-def test_gin_ties(monkeypatch) -> None:
+def test_gin_ties() -> None:
     """Two clusters of two indicators each pass as the root with the same lowest p-value.
 
     Every row is followed by a copy with the clusters swapped, so each leading block of rows, which
@@ -264,9 +255,9 @@ def test_gin_ties(monkeypatch) -> None:
     want = causal_order(orders[0])
     assert len(want) == 2
     assert all(causal_order(columns) == want for columns in orders)
-    monkeypatch.setattr(importlib.import_module("andrey.latent.gin"), "tie_ranks", _by_position)
-    by_position = causal_order(orders[0])
-    assert any(causal_order(columns) != by_position for columns in orders)
+    with andrey.config(tie_break="position"):
+        by_position = causal_order(orders[0])
+        assert any(causal_order(columns) != by_position for columns in orders)
 
 
 def test_pc_collider_ties() -> None:
@@ -294,7 +285,7 @@ def test_pc_collider_ties() -> None:
     assert want[1, 2] == want[2, 1] == TAIL
 
 
-def test_gies_ties(monkeypatch) -> None:
+def test_gies_ties() -> None:
     """GIES meets the tie GES meets, with column 2 set by an intervention in some rows."""
     x = _swap_symmetric(0)
     mask = np.zeros(x.shape, dtype=bool)
@@ -308,11 +299,12 @@ def test_gies_ties(monkeypatch) -> None:
     for order in orders:
         back = np.argsort(order)
         np.testing.assert_array_equal(fit(x[:, order], order)[np.ix_(back, back)], want)
-    monkeypatch.setattr(importlib.import_module("andrey.search.gies"), "tie_ranks", _by_position)
-    by_position = fit(x, np.arange(3))
-    assert any(
-        (fit(x[:, o], o)[np.ix_(np.argsort(o), np.argsort(o))] != by_position).any() for o in orders
-    )
+    with andrey.config(tie_break="position"):
+        by_position = fit(x, np.arange(3))
+        assert any(
+            (fit(x[:, o], o)[np.ix_(np.argsort(o), np.argsort(o))] != by_position).any()
+            for o in orders
+        )
 
 
 def test_bottom_up_parce_lingam_weights() -> None:
