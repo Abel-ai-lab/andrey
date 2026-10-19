@@ -189,6 +189,10 @@ change names its pull request.
   of a pair GES leaves non-adjacent instead of the first one found. Reordering the columns no
   longer changes their orientations, and on data where the rules conflict their graphs can change.
   ([#226])
+- The independent-change step of `cdnod` (`dependence_threshold`) visits the columns by a rank
+  computed from each column's own data instead of by column position, so reordering the columns no
+  longer changes the edges it orients, and on data where its tests compete its graph can change.
+  ([#228])
 
 ## [0.6.0] - 2026-10-17
 
@@ -419,3 +423,4 @@ First alpha release.
 [#220]: https://github.com/Abel-ai-lab/andrey/pull/220
 [#225]: https://github.com/Abel-ai-lab/andrey/pull/225
 [#226]: https://github.com/Abel-ai-lab/andrey/pull/226
+[#228]: https://github.com/Abel-ai-lab/andrey/pull/228
