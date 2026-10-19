@@ -372,8 +372,8 @@ def compare_table() -> str:
     # Whether a reordering of the columns changed each package's graph, at its defaults: three
     # small datasets per method, each in nine column orders. "By name": the graph follows the
     # variables' names; "By run": it varies between runs, not with the order.
-    order = {"Same graph": 0, "By name": 1, "By run": 1, "Changed": 2, "Changed*": 2}
-    same, changed, name = "Same graph", "Changed", "By name"
+    order = {"Same": 0, "By name": 1, "By run": 1, "Changed": 2, "Changed*": 2}
+    same, changed, name = "Same", "Changed", "By name"
     return table(
         "Does reordering the columns change the graph?",
         (

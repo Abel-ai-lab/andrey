@@ -862,6 +862,92 @@ def _short_cells(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event
             entry["classes"].append("nowrap")
 
 
+# A comparison table on a post or a release card reads as the 0.7.0 post's tables do: Andrey's
+# columns tinted in the accent, and in each set of columns that measure one thing for different
+# packages (``Andrey (s)`` and ``causal-learn (s)``, ``Errors, Andrey`` and ``Errors, Tetrad``,
+# ``Andrey ahead`` and ``Tetrad ahead``) the best cell of a row in bold. The empty graph is a
+# reference, never the best, and an earlier Andrey release is a package like any other. Only
+# the presentation changes; every number and word stays as written.
+_PACKAGES = re.compile(
+    r"^(Andrey\b.*|causal-learn|gCastle|pgmpy|bnlearn|pcalg|Tetrad|lingam|tigramite|xges|cdt"
+    r"|[Ee]mpty(?:[- ]graph)?)$"
+)
+# The quantities where more is better; every other one counts errors, gaps, or time.
+_MORE = re.compile(r"F1|[Tt]rue direction|[Aa]ccuracy|AUC|[Pp]recision|[Rr]ecall|ahead")
+
+
+def _metric(header: str) -> tuple[str, str, bool] | None:
+    """A header's measured quantity, its package, and whether more is better, or None when the
+    column is not one package's measurement: ``Andrey (s)``, ``Errors, Tetrad``, ``Andrey
+    ahead``, ``causal-learn SHD``, or a bare package name, which a release card uses for time."""
+    for pattern in (
+        r"^(?P<who>.+?) \((?P<what>s)\)$",
+        r"^(?P<what>.+?), (?P<who>.+)$",
+        r"^(?P<who>.+?) (?P<what>ahead|SHD|speedup)$",
+        r"^(?P<who>.+?)(?P<what>)$",
+    ):
+        match = re.match(pattern, header)
+        if match and _PACKAGES.match(match["who"]):
+            what = match["what"]
+            return what, match["who"], bool(_MORE.search(what))
+    return None
+
+
+def _number(text: str) -> float | None:
+    """The first number in a cell, without its thousands commas, or None."""
+    match = re.search(r"-?\d[\d,]*(?:\.\d+)?", text)
+    return float(match[0].replace(",", "")) if match else None
+
+
+def _comparison_tables(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Tint Andrey's columns and bold each row's best cell in a post's or a card's tables."""
+    if not (docname.startswith("blog/") or docname.startswith("docs/benchmarks/")):
+        return
+    version = str(app.env.metadata.get(docname, {}).get("version") or docname.rsplit("/", 1)[-1])
+
+    def ours(who: str) -> bool:
+        if not who.startswith("Andrey"):
+            return False
+        named = re.match(r"Andrey (\d+\.\d+\.\d+)", who)
+        return named is None or named[1] == version
+
+    for table in doctree.findall(nodes.table):
+        thead = next(table.findall(nodes.thead), None)
+        tbody = next(table.findall(nodes.tbody), None)
+        if thead is None or tbody is None:
+            continue
+        heads = [entry.astext().strip() for entry in next(thead.findall(nodes.row)).children]
+        metrics = [_metric(h) for h in heads]
+        tinted = {
+            k
+            for k, (h, m) in enumerate(zip(heads, metrics))
+            if (m and ours(m[1])) or (m is None and ours(h.split("'")[0]))
+        }
+        groups: dict[str, list[int]] = {}
+        for k, m in enumerate(metrics):
+            if m and not m[1].lower().startswith("empty") and m[0] != "speedup":
+                groups.setdefault(m[0], []).append(k)
+        groups = {key: cols for key, cols in groups.items() if len(cols) > 1}
+        if not tinted:
+            continue
+        table["classes"].append("ct-md")
+        for row in (*thead.findall(nodes.row), *tbody.findall(nodes.row)):
+            for k in tinted & set(range(len(row.children))):
+                row.children[k]["classes"].append("ct-ours")
+        for row in tbody.findall(nodes.row):
+            cells = row.children
+            for key, cols in groups.items():
+                more = metrics[cols[0]][2]
+                values = {k: _number(cells[k].astext()) for k in cols if k < len(cells)}
+                found = [v for v in values.values() if v is not None]
+                if len(found) < 2 or len(set(found)) == 1:
+                    continue
+                best = max(found) if more else min(found)
+                for k, v in values.items():
+                    if v == best:
+                        cells[k]["classes"].append("ct-best")
+
+
 # The API reference's summary tables (autosummary) list a name and its description with no header
 # row; they get one, so their frame shows its label band as every other table does.
 SUMMARY_LABELS = ("Name", "Description")
@@ -1211,6 +1297,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-resolved", _post_byline)
     app.connect("doctree-resolved", _summary_headers)
     app.connect("doctree-resolved", _short_cells)
+    app.connect("doctree-resolved", _comparison_tables)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)
     # Before sphinx_autodoc_typehints, which returns a signature of its own.

@@ -905,23 +905,6 @@ ul.ablog-archive {
   border-bottom: 0;
 }
 
-.ct-table .ct-ours {
-  background: color-mix(in srgb, var(--andrey-accent) 10%, transparent);
-  color: var(--andrey-accent);
-}
-
-.ct-table thead .ct-ours {
-  color: var(--andrey-accent);
-}
-
-.ct-table .ct-best {
-  font-weight: 700;
-}
-
-.ct-table .ct-best:not(.ct-ours) {
-  background: var(--andrey-surface-2);
-}
-
 .ct-table .ct-na {
   color: var(--andrey-muted);
 }

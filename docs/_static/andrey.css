@@ -1646,3 +1646,22 @@ p:has(> a > img[alt="Open in Colab"]) a.download:hover {
   border-color: var(--andrey-accent);
   color: var(--andrey-ink);
 }
+
+/* A comparison table, on a post or a release card: Andrey's columns tinted in the accent, and each
+   row's best cell in bold, shaded when it is not Andrey's (docs/conf.py, _comparison_tables; the
+   0.7.0 post's generated tables, docs/blog/0.7.0/figures.py). */
+.bd-article .ct-ours,
+.bd-article table.table :is(th, td).ct-ours,
+.bd-article table.table tbody tr:hover td.ct-ours {
+  background: color-mix(in srgb, var(--andrey-accent) 10%, var(--andrey-surface));
+  color: var(--andrey-accent);
+}
+
+.bd-article .ct-best {
+  font-weight: 700;
+}
+
+.bd-article .ct-best:not(.ct-ours),
+.bd-article table.table tbody td.ct-best:not(.ct-ours) {
+  background: var(--andrey-surface-2);
+}
