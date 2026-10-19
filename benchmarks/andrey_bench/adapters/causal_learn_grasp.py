@@ -92,3 +92,17 @@ class CausalLearnGRaSP:
         from andrey_bench.contracts import structure_from_adjacency
 
         return structure_from_adjacency(native, kind=self.output_type)
+
+
+class CausalLearnGRaSPBDeu(CausalLearnGRaSP):
+    """causal-learn GRaSP with its BDeu score, for categorical data.
+
+    causal-learn builds BDeu with its default priors (sample prior 1, structure prior 1) whatever
+    ``parameters`` holds, so the params carry no ``lambda_value``.
+    """
+
+    name: str = "causal-learn.grasp.bdeu"
+
+    def params(self) -> dict[str, Any]:
+        """The BDeu score at the default depth, on a fixed search seed."""
+        return {"score_func": "local_score_BDeu", "depth": _DEFAULT_DEPTH, "seed": SEARCH_SEED}
