@@ -69,7 +69,7 @@ change names its pull request.
   remaining latents unordered, listed in `metadata["unordered"]`, when no candidate passes.
   ([#187])
 - `gin` builds each column's HSIC kernel matrix once per fit instead of once per test, so a fit
-  on 1,000 rows runs more than 4x faster, and holds one such matrix per variable. ([#PRNUM])
+  on 1,000 rows runs more than 4x faster, and holds one such matrix per variable. ([#215])
 - The `calm` reference explains each step of the fit, how to run the paper's longer schedule, and
   where the fit can stop at a local optimum. ([#187])
 - When columns repeat others up to scale and shift, the score-based searches raise one `ValueError`
@@ -108,7 +108,7 @@ change names its pull request.
 - `gin` runs each root test once per member of the clusters it compares, and searches the columns
   sorted by the rank hill climbing breaks ties by, so the latent order no longer depends on which
   indicator comes first, and reordering the columns no longer changes the clusters or the order.
-  ([#PRNUM])
+  ([#215])
 - `calm` raises `ValueError` when its loss stops being finite instead of returning NaN weights, and
   leaves the global torch random number generator untouched. ([#187])
 - Converting or scoring a `dag` that holds an undirected edge raises `ValueError` instead of
@@ -330,3 +330,4 @@ First alpha release.
 [#190]: https://github.com/Abel-ai-lab/andrey/pull/190
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
+[#215]: https://github.com/Abel-ai-lab/andrey/pull/215
