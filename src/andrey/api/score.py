@@ -140,8 +140,9 @@ def ges(
 
     **How it works.** In the forward phase, a variable with more than ``n_variables / 2`` parents
     gets no new edges. The backward phase has no cap. Moves whose score changes are equal after
-    rounding are chosen by each column's rank, as in :func:`~andrey.hc`, so reordering the columns
-    reorders the graph's nodes and changes nothing else, unless two columns are identical.
+    rounding are chosen by each column's rank, as in :func:`~andrey.hc`; the
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order and on another machine.
 
     **Categorical data.** ``"local_score_BDeu"`` takes each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -324,7 +325,8 @@ def gies(
     neighboring one; the classes are those of the interventional setting: two graphs are equivalent
     when they agree on the data from every observed combination of intervened variables. Steps whose
     score changes are equal after rounding are chosen by each column's rank, as in
-    :func:`~andrey.hc`.
+    :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
+    keeps.
 
     **Limitations.** Measured on simulated linear-Gaussian data that mixes observation with
     interventions, from sparse random graphs (mean degree 2), from 10 to 200 variables with ten
@@ -432,9 +434,9 @@ def xges(
     deletes each edge of that graph, best score first, forbids adding it back in that direction, and
     reruns the search. It keeps a result whose score is lower by more than ``2e-7 * n_samples``, and
     stops once a fresh pass over the edges keeps nothing. No variable has a parent limit. Moves
-    whose score changes are equal after rounding are taken in the order of each column's rank, as
-    in :func:`~andrey.hc`, so reordering the columns reorders the graph's nodes and changes nothing
-    else, unless two columns are identical.
+    whose score changes are equal after rounding are taken in the order of each column's rank, as in
+    :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
+    keeps.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) and denser ones (mean degree 4), from 25 to 1,000 variables with ten rows per
@@ -572,15 +574,10 @@ def hc(
     Under a score-equivalent score, adding ``x -> y`` or ``y -> x`` from the empty graph gives the
     same score. Such ties recur during search, and choosing one move can change later moves and
     the final CPDAG. Each column gets a rank computed from its own data to choose between tied
-    moves. The rank moves with the column, so reordering the columns reorders the graph's nodes
-    and changes nothing else, unless two columns are identical. The rank is arbitrary with respect
-    to causal structure.
-
-    A continuous column ranks by whether its values rise, fall, or stay equal from row to row,
-    which last-bit differences in the data, such as a BLAS kernel's on another CPU, leave
-    unchanged; a categorical column ranks by which rows share a category, which recoding the
-    categories leaves unchanged. So the same data give the same graph on other machines, unless two
-    tied score changes round to different values.
+    moves, and the rank moves with the column. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order and on another machine, and how ``andrey.config(tie_break="position")`` orders the
+    ties by column position instead.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs, from 10
     to 3,200 variables with ten rows per variable. From 50 variables on, its median errors (SHD)
@@ -850,10 +847,9 @@ def exact_search(
     own pick among them would follow last-bit rounding and the column order. Exact search instead
     reports one fixed member of the class it found: it keeps the edges every DAG of the class
     shares and orients the others by a rank computed from each column's own data, as
-    :func:`~andrey.hc` ranks tied moves. The rank moves with the column, so reordering the columns
-    reorders the graph's nodes and changes nothing else, unless two columns are identical. The
-    rank is arbitrary with respect to causal structure. Rounding differences, such as another CPU's
-    BLAS kernel makes, leave the reported DAG unchanged whenever they leave the class unchanged.
+    :func:`~andrey.hc` ranks tied moves, so the reported DAG does not depend on rounding or on the
+    column order; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
+    keeps.
 
     **Categorical data.** ``"local_score_BDeu"`` [5]_ and ``"local_score_BIC_categorical"`` [6]_
     read each distinct value of a column as one category and score a variable by its counts in
@@ -940,9 +936,9 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
         Seed for the optimizer's torch random number generator. ``None`` uses the
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so every call is seeded
         and repeated calls return the same graph on one machine with the same torch version.
-        The draws go to the columns in order of each column's rank, as in :func:`~andrey.hc`, so
-        reordering the columns reorders the graph's nodes and changes nothing else.
-        ``metadata["seed"]`` records the seed used.
+        The draws go to the columns in order of each column's rank, as in :func:`~andrey.hc` (the
+        :doc:`column-order guide </docs/guides/column-order>`). ``metadata["seed"]`` records the
+        seed used.
     **params : Any
         Optimizer settings passed to the solver; a name not listed here raises ``TypeError``.
 
@@ -985,8 +981,8 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     the variable most dependent on it given those already added (Fisher-Z at level ``alpha``),
     then drops any member the others make independent of it. The most dependent variable has the
     largest absolute partial correlation; equal ones are chosen by each column's rank, as in
-    :func:`~andrey.hc`, so reordering the columns does not change the choice. A pair is a
-    candidate edge, in either direction, when each is in the other's set.
+    :func:`~andrey.hc`. A pair is a candidate edge, in either direction, when each is in the other's
+    set.
 
     Each candidate edge ``i -> j`` has a weight and a gate. During the fit a gate is a
     Gumbel-Softmax sample [3]_, ``sigmoid((logit + noise) / tau)``, so ``lambda1`` times the sum

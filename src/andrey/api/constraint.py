@@ -155,7 +155,8 @@ def pc(
     ``collider_order="column"``, colliders are oriented by middle node, then by endpoint pair, in
     column order, so the result can depend on the column order. Meek's rules can still depend on the
     column order: when two rule firings would orient one edge in opposite directions, the one
-    reached first in column order decides.
+    reached first in column order decides. The :doc:`column-order guide </docs/guides/column-order>`
+    lists what reordering the columns does to each method.
 
     **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
     default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
@@ -383,7 +384,8 @@ def fci(
     The result can depend on the column order, for example, through the order in which the
     possible-d-separation step visits pairs and conditioning sets, and with
     ``possible_dsep="fast"`` through the sets themselves. A fixed column order gives reproducible
-    results.
+    results; the :doc:`column-order guide </docs/guides/column-order>` lists what reordering the
+    columns does to each method.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.

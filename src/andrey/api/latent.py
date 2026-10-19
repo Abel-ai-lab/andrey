@@ -71,8 +71,9 @@ def gin(
     cluster passes the independence test at ``alpha`` paired with each other remaining cluster [1]_.
     When several candidates pass, the one whose lowest p-value is highest is taken, so latents with
     no causal path between them are still ordered, arbitrarily; equal p-values are decided by each
-    column's rank, as in :func:`~andrey.hc`, so reordering whole clusters does not change the
-    choice. When none passes, the ordering stops and the remaining latents stay unordered. A single
+    column's rank, as in :func:`~andrey.hc`; the
+    :doc:`column-order guide </docs/guides/column-order>` says what reordering the columns keeps.
+    When none passes, the ordering stops and the remaining latents stay unordered. A single
     remaining latent is ordered last without a test. Each comparison rejects a true root with
     probability about ``alpha``, the test's nominal size, so a correct model can still leave the
     latents from that step on unordered.
