@@ -22,6 +22,10 @@ from urllib.parse import urlsplit
 import pytest
 
 import andrey
+import andrey.core.ci
+import andrey.core.ci_cmiknn
+import andrey.core.ci_gpdc
+import andrey.core.ci_kernel
 import andrey.data.discrete
 import andrey.data.mixed
 import andrey.data.real
@@ -47,6 +51,10 @@ MATH_UNICODE = set(
 # autosummary pages carry (`andrey.viz.draw.html` -> `viz.draw`).
 PUBLIC_MODULES = (
     (andrey, ""),
+    (andrey.core.ci, "core.ci."),
+    (andrey.core.ci_kernel, "core.ci_kernel."),
+    (andrey.core.ci_cmiknn, "core.ci_cmiknn."),
+    (andrey.core.ci_gpdc, "core.ci_gpdc."),
     (andrey.data.real, "data."),
     (andrey.data.discrete, "data."),
     (andrey.data.mixed, "data."),

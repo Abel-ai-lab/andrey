@@ -13,6 +13,7 @@ one chunk in memory however many subsets it visits.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from functools import partial
 from itertools import combinations, islice
 
 import numpy as np
@@ -56,9 +57,10 @@ def scan_conditioning_sets(
 
     When ``test`` exposes ``batched_call(a, b, condition_sets)`` the subsets are evaluated in
     vectorized, size-bounded chunks; otherwise each is tested with a scalar ``test(a, b, subset)``
-    call. Both paths visit the same subsets in the same order and take the same ``p > alpha``
-    decisions, so the accumulated ``separating``, the largest p-value, and the return value are
-    identical.
+    call, or ``test._bounded_pvalue(a, b, subset, alpha, exact_above)`` where the test has one,
+    with ``exact_above`` true when ``largest`` is given. All paths visit
+    the same subsets in the same order and take the same ``p > alpha`` decisions, so the
+    accumulated ``separating``, the largest p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
     runs once per chunk.
@@ -66,8 +68,14 @@ def scan_conditioning_sets(
     subsets = combinations(candidates, size)
     if skip_within is not None and len(skip_within) >= size:
         subsets = (s for s in subsets if not skip_within.issuperset(s))
+    # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
+    # above alpha that `largest` records comes from every shuffle.
+    bounded = getattr(test, "_bounded_pvalue", None)
+    scalar = (
+        test if bounded is None else partial(bounded, alpha=alpha, exact_above=largest is not None)
+    )
     batched = getattr(test, "batched_call", None) or (
-        lambda a, b, chunk: [test(a, b, subset) for subset in chunk]
+        lambda a, b, chunk: [scalar(a, b, subset) for subset in chunk]
     )
     found = False
     top = 0.0

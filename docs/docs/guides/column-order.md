@@ -55,10 +55,12 @@ consecutive rows, which they rarely change. So a tie goes the same way on every 
 two tied scores round to different values.
 
 The thread count is fixed where it could matter. The skeleton searches of `pc`, `cdnod`, and `fci`
-with the partial-correlation and mixed-data tests, the scores of `ges` (and so of `gfci`'s first
-phase), `gies`, `xges`, `hc`, and `tabu`, and the tests of `pcmci`, `pcmciplus`, and `lpcmci` run on
-one BLAS thread, and so do their worker processes, so the host's thread count cannot change their
-results.
+with the partial-correlation, mixed-data, RCoT, CMIknn, and GPDC tests, and with KCI below 2,000
+rows, the scores of `ges` (and so of `gfci`'s first phase), `gies`, `xges`, `hc`, and `tabu`, and
+the tests of `pcmci`, `pcmciplus`, and `lpcmci` run on one BLAS thread, and so do their worker
+processes, so the host's thread count cannot change their results. From 2,000 rows, KCI runs on
+every BLAS thread, where its kernel products run faster; its p-values then repeat for a fixed
+thread count.
 
 Two methods depend on more than ties. `calm` trains with PyTorch: its results repeat on one machine
 with one torch version, and another platform can give another graph. When the likelihood fit of

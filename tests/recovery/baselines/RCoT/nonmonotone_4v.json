@@ -1,0 +1,29 @@
+{
+  "algorithm": "RCoT",
+  "case": "nonmonotone_4v",
+  "input": {
+    "case": "nonmonotone_4v",
+    "column_order": [
+      2,
+      3,
+      0,
+      1
+    ],
+    "seed": 20261014,
+    "sha256": "1242fad5f9dc6bf9ab2ce6d9b0ce40603bde039838d85e873e9d052e7878b9ee",
+    "shape": [
+      400,
+      4
+    ]
+  },
+  "output": {
+    "pvalues": [
+      0.07021913698842665,
+      1.2854133036769625e-14,
+      5.776314087364254e-23,
+      0.466936065533923,
+      1.605165453810626e-08
+    ]
+  },
+  "schema_version": 3
+}

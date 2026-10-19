@@ -31,6 +31,11 @@ mask, by the likelihood ratio of the degenerate Gaussian and the conditional Gau
 queries' sets together, with the scalar p-values exactly; :class:`DGTest` answers one query at a
 time.
 
+The registry at the end maps each ``indep_test`` name to a factory. The experimental nonlinear
+tests live in their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
+:mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`) and are imported when first
+built.
+
 References
 ----------
 Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search, 2nd ed.
@@ -50,9 +55,11 @@ graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21
 
 from __future__ import annotations
 
+import importlib
 import math
 from collections.abc import Callable, Iterable
-from typing import Protocol, Self, cast, runtime_checkable
+from functools import partial
+from typing import Any, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
@@ -61,6 +68,16 @@ from scipy.special import chdtrc, ndtr, stdtr
 from . import categorical, stats
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
+from .warning_policy import ExperimentalWarning, warn_once
+
+__all__ = [
+    "CITest",
+    "FisherZ",
+    "StudentT",
+    "register_indep_test",
+    "available_indep_tests",
+    "make_indep_test",
+]
 
 # Partial correlations are clamped just inside (-1, 1) so Fisher's z-transform stays finite on
 # deterministic or tiny-sample data.
@@ -908,11 +925,35 @@ class CGTest:
         return np.asarray(chdtrc(dof, np.maximum(statistic, 0.0)), dtype=np.float64).reshape(-1)
 
 
+# The module and class of each nonlinear test. Building one imports only its own module: GPDC's
+# loads scikit-learn, which takes a second or more.
+_NONLINEAR_CLASSES: dict[str, tuple[str, str]] = {
+    "kci": ("ci_kernel", "KCI"),
+    "rcot": ("ci_kernel", "RCoT"),
+    "cmiknn": ("ci_cmiknn", "CMIknn"),
+    "gpdc": ("ci_gpdc", "GPDC"),
+}
+NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(_NONLINEAR_CLASSES)
+
+
+def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
+    """Build the experimental nonlinear test ``name`` with ``options``, warning once per process."""
+    module, cls = _NONLINEAR_CLASSES[name]
+    test = getattr(importlib.import_module(f"{__package__}.{module}"), cls)
+    warn_once(
+        f"indep_test={name!r} is experimental: it has no published benchmark, and its settings "
+        "may change without deprecation.",
+        ExperimentalWarning,
+    )
+    return test(data, **options)
+
+
 # The indep_test registry: a name maps to a factory building a :class:`CITest` over the data. The
 # constraint facades resolve their ``indep_test`` argument through :func:`make_indep_test`, and
 # :func:`register_indep_test` lets a downstream test or plugin add another under the same Protocol.
 # The discrete tests read category codes and the mixed tests a mask of the categorical columns as
-# well; the facades check both before a fit.
+# well; the facades check both before a fit. The nonlinear tests are experimental and warn when
+# built.
 SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     "fisherz",
     "student_t",
@@ -920,6 +961,7 @@ SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     "gsq",
     "degen_gauss",
     "cond_gauss",
+    *NONLINEAR_INDEP_TESTS,
 )
 DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
@@ -927,9 +969,10 @@ _CI_REGISTRY: dict[str, Callable[..., CITest]] = {
     "fisherz": FisherZ,
     "student_t": StudentT,
     "chisq": ChiSquare,
-    "gsq": lambda data: ChiSquare(data, g_square=True),
+    "gsq": partial(ChiSquare, g_square=True),
     "degen_gauss": DGTest,
     "cond_gauss": CGTest,
+    **{name: partial(_nonlinear, name) for name in NONLINEAR_INDEP_TESTS},
 }
 
 
@@ -937,7 +980,9 @@ def register_indep_test(name: str, factory: Callable[[np.ndarray], CITest]) -> N
     """Register a :class:`CITest` factory under ``name`` for selection via ``indep_test``.
 
     ``factory`` maps a ``(n_samples, n_features)`` data matrix to a ``CITest`` (a callable
-    ``test(x, y, condition_set) -> p-value``). Overwrites any existing entry for ``name``.
+    ``test(x, y, condition_set) -> p-value``), and takes the keyword settings
+    :func:`make_indep_test` passes, if any. Overwrites any existing entry for ``name``. A variant
+    of a shipped test with other settings is ``partial(make_indep_test, "cmiknn", k_cmi=5)``.
     """
     _CI_REGISTRY[name] = factory
 
@@ -948,10 +993,12 @@ def available_indep_tests() -> tuple[str, ...]:
 
 
 def make_indep_test(
-    name: str, data: np.ndarray, *, categorical: npt.ArrayLike | None = None
+    name: str, data: np.ndarray, *, categorical: npt.ArrayLike | None = None, **options: Any
 ) -> CITest:
     """Construct the registered ``indep_test`` ``name`` over ``data``.
 
+    ``options`` are keyword settings for the test's class, such as
+    ``make_indep_test("cmiknn", data, k_cmi=5)``; a setting the test lacks raises ``TypeError``.
     ``categorical``, a boolean mask of the categorical columns, reaches the mixed tests
     (:data:`MIXED_INDEP_TESTS`) only; another test given one raises ``ValueError``. Raises
     :class:`NotImplementedError` when ``name`` is not registered, listing what is available. A
@@ -966,22 +1013,41 @@ def make_indep_test(
             f"unknown indep_test {name!r}; registered: {available_indep_tests()}"
         ) from None
     if name in MIXED_INDEP_TESTS:
-        return factory(data, categorical)
+        return factory(data, categorical, **options)
     if categorical is not None:
         raise ValueError(f"indep_test {name!r} reads no column types; categorical must be None")
-    test = factory(data)
+    test = factory(data, **options)
     if isinstance(test, PartialCorrelationTest) and test.copies():
         raise copies_error(test.copies())
     return test
 
 
+def _checked_data(data: np.ndarray, test_name: str, min_rows: int = 0) -> np.ndarray:
+    """``data`` as a float64 ``(n_samples, n_features)`` matrix; raises on NaN or infinity, or on
+    fewer than ``min_rows`` rows."""
+    arr = np.asarray(data, dtype=np.float64)
+    if arr.ndim != 2:
+        raise ValueError(f"data must be a 2-D (n_samples, n_features) array, got ndim={arr.ndim}")
+    if arr.shape[0] < min_rows:
+        raise ValueError(f"{test_name} needs at least {min_rows} rows, got {arr.shape[0]}")
+    if not np.isfinite(arr).all():
+        raise ValueError(f"data contains NaN or Inf; cannot run {test_name} test")
+    return arr
+
+
 def pins_blas(test: CITest) -> bool:
     """Whether a skeleton search runs ``test`` with BLAS pinned to one thread.
 
-    A test whose p-values come from matrix algebra, the partial-correlation and the mixed-data
-    tests, then gives the same bits whatever the host's thread count; the chi-square tests call no
-    BLAS.
+    A test that sets ``pin_blas`` decides for itself. Otherwise a test whose p-values come from
+    matrix algebra, the partial-correlation and the mixed-data tests, is pinned: it then gives the
+    same bits whatever the host's thread count, and the partial-correlation tests match the
+    one-thread parallel skeleton workers; the chi-square tests call no BLAS. The nonlinear tests set
+    it: KCI is unpinned from 2,000 rows, where its kernel products run faster on every BLAS thread
+    and its p-values are reproducible for a fixed thread count; RCoT, CMIknn, and GPDC are pinned.
     """
+    pin = getattr(test, "pin_blas", None)
+    if pin is not None:
+        return bool(pin)
     return callable(getattr(test, "to_seed", None)) or isinstance(test, (DGTest, CGTest))
 
 

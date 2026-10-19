@@ -2,8 +2,9 @@
 
 The underlying searches use :mod:`andrey.core` for the conditional-independence tests (Fisher-Z and
 Student-t on continuous data, chi-square and G-square on categorical data, degenerate and
-conditional Gaussian likelihood ratios on mixed data) and orientation. ``pc`` and ``cdnod`` produce
-CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with a BIC, BDeu, or mixed-data score.
+conditional Gaussian likelihood ratios on mixed data, and the experimental nonlinear tests) and
+orientation. ``pc`` and ``cdnod`` produce CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses
+GES with a BIC, BDeu, or mixed-data score.
 """
 
 from __future__ import annotations
@@ -56,14 +57,19 @@ def pc(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
-        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` and ``"student_t"``
-        test partial correlation, for continuous data: ``"fisherz"`` applies Fisher's z-transform
-        and the normal distribution; ``"student_t"`` applies the Student-t distribution, which is
-        exact for Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and
-        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
+    indep_test : str, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
+        for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal
+        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
+        Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed data, continuous and categorical columns, by a likelihood ratio. See Notes.
+        mixed data, continuous and categorical columns, by a likelihood ratio. The experimental
+        tests also detect nonlinear dependence in continuous data, at a far higher cost per test,
+        and each warns on its first use in a process: ``"kci"`` is the kernel test, ``"rcot"`` its
+        random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional mutual
+        information test, and ``"gpdc"`` Gaussian-process regression with a distance correlation
+        test. See Notes.
     collider_order : {"p_value", "column"}, default="p_value"
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -126,9 +132,10 @@ def pc(
     -----
     **When to use it.** PC suits data with no unmeasured common causes. Its default Fisher-Z test
     assumes continuous data, where each variable depends linearly on its causes with roughly
-    Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, and for mixed data
-    ``"degen_gauss"`` or ``"cond_gauss"``. It is fastest on sparse graphs, where every variable has
-    few neighbors [5]_.
+    Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, for mixed data
+    ``"degen_gauss"`` or ``"cond_gauss"``, and for nonlinear effects in continuous data the
+    experimental ``"kci"``, ``"rcot"``, ``"cmiknn"``, or ``"gpdc"``, at a far higher cost per test.
+    It is fastest on sparse graphs, where every variable has few neighbors [5]_.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -293,14 +300,18 @@ def fci(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
-        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` and ``"student_t"``
-        test partial correlation, for continuous data: ``"fisherz"`` applies Fisher's z-transform
-        and the normal distribution; ``"student_t"`` applies the Student-t distribution, which is
-        exact for Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and
-        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
+    indep_test : str, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
+        for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal
+        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
+        Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed data, continuous and categorical columns. See Notes.
+        mixed data, continuous and categorical columns. The experimental tests also detect
+        nonlinear dependence in continuous data, at a far higher cost per test, and each warns on
+        its first use in a process: ``"kci"`` is the kernel test, ``"rcot"`` its random-feature
+        approximation, ``"cmiknn"`` a nearest-neighbor conditional mutual information test, and
+        ``"gpdc"`` Gaussian-process regression with a distance correlation test. See Notes.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -501,12 +512,14 @@ def gfci(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
         BDeu ignores it.
-    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
-        Conditional-independence test for the FCI phase, by default ``"fisherz"``. ``"fisherz"``
-        (Fisher's z) and ``"student_t"`` (Student-t) test partial correlation, for continuous data.
-        ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test
-        categorical data, coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed
-        data, as for :func:`~andrey.pc`.
+    indep_test : str, default="fisherz"
+        Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
+        ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
+        (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
+        coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. The
+        experimental ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear
+        dependence in continuous data, at a far higher cost per test. Each as for
+        :func:`~andrey.pc`.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
@@ -688,12 +701,14 @@ def cdnod(
         equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
-        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` (Fisher's z) and
-        ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
-        (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
-        coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data, as for
-        :func:`~andrey.pc`; see Notes for the index.
+    indep_test : str, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
+        test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
+        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
+        and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. The experimental ``"kci"``,
+        ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
+        data, at a far higher cost per test. Each as for :func:`~andrey.pc`; see Notes for the
+        index.
     collider_order : {"p_value", "column"}, default="p_value"
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on

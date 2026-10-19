@@ -57,6 +57,7 @@ from andrey_bench.adapters.pcalg_gies import PcalgGIES
 from andrey_bench.adapters.pcalg_pc import PcalgPC
 from andrey_bench.adapters.pcalg_rfci import PcalgRFCI
 from andrey_bench.adapters.tetrad_gfci import TetradGFCI
+from andrey_bench.adapters.tigramite_pc import TigramitePC
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.oracle import OracleGES
 
@@ -65,6 +66,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     *andrey_hc_adapters(),
     *andrey_tabu_adapters(),
     AndreyPC(),
+    *[AndreyPC(test) for test in ("kci", "rcot", "cmiknn", "gpdc")],
     AndreyFCI(),
     AndreyFCI("majority"),
     AndreyGFCI(),
@@ -81,6 +83,8 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyExactSearch(),
     CausalLearnGES(),
     CausalLearnPC(),
+    CausalLearnPC("kci"),
+    CausalLearnPC("rcot"),
     CausalLearnFCI(),
     CausalLearnCALM(),
     CausalLearnBOSS(),
@@ -100,6 +104,8 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     BnlearnHC(),
     BnlearnTabu(),
     BnlearnPCStable(),
+    TigramitePC("cmiknn"),
+    TigramitePC("gpdc"),
     OracleGES(),
     BaselineEmpty(),
 ]
@@ -149,6 +155,10 @@ DEFERRED_MODULES = {
     "andrey.hc.numpy.serial": "andrey.search.hc",
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
+    "andrey.pc.kci.numpy": "andrey.core.ci_kernel",
+    "andrey.pc.rcot.numpy": "andrey.core.ci_kernel",
+    "andrey.pc.cmiknn.numpy": "andrey.core.ci_cmiknn",
+    "andrey.pc.gpdc.numpy": "andrey.core.ci_gpdc",
     "andrey.fci.numpy": "andrey.constraint.fci",
     "andrey.fci.majority.numpy": "andrey.constraint.fci",
     "andrey.gfci.numpy": "andrey.search.gfci",

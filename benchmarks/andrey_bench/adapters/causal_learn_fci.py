@@ -3,7 +3,9 @@
 Calls ``fci(X, independence_test_method="fisherz", alpha=0.05, show_progress=False)``. Mind the
 kwarg name: ``fci`` takes ``independence_test_method`` where causal-learn's ``pc`` takes
 ``indep_test``. Unlike the GES adapter this path needs no ``np.mat`` shim — it never imports
-``ScoreUtils``. The output is a PAG, so :meth:`fit` emits Andrey endpoint marks directly and
+``ScoreUtils``. ``CausalLearnFCI("kci")`` and ``CausalLearnFCI("rcot")``, named
+``causal-learn.fci.<indep_test>``, run the tests and settings the PC adapter maps
+(:data:`~andrey_bench.adapters.causal_learn_pc.CI_TESTS`). The output is a PAG, so :meth:`fit` emits Andrey endpoint marks directly and
 :meth:`to_structure` rebuilds with ``kind="pag"``; ``structure_from_adjacency`` cannot carry a PAG's
 circle endpoints.
 
@@ -26,6 +28,7 @@ from typing import Any, Mapping
 import numpy as np
 
 from andrey_bench.adapters.causal_learn_convert import remap_to_unsigned
+from andrey_bench.adapters.causal_learn_pc import CI_TESTS
 
 # Equalized constraint+latent-lane pins (Fisher-Z CI test at alpha=0.05); runner params override them.
 _DEFAULT_ALPHA = 0.05
@@ -55,6 +58,15 @@ class CausalLearnFCI:
     mode: str = "serial"
     algorithm: str = "fci"
     output_type: str = "pag"
+    #: The CI test this solution runs, in Andrey's names; a variant has its own ``name``.
+    indep_test: str = _DEFAULT_INDEP_TEST
+
+    def __init__(self, indep_test: str = _DEFAULT_INDEP_TEST) -> None:
+        if indep_test not in CI_TESTS:
+            raise ValueError(f"Unsupported indep_test: {indep_test!r}")
+        self.indep_test = indep_test
+        if indep_test != _DEFAULT_INDEP_TEST:
+            self.name = f"causal-learn.fci.{indep_test}"
 
     def setup(self) -> None:
         """Import causal-learn before timing; see `contracts.SetupAdapter`.
@@ -65,22 +77,22 @@ class CausalLearnFCI:
         from causallearn.search.ConstraintBased.FCI import fci  # noqa: F401
 
     def params(self) -> dict[str, Any]:
-        """Fisher-Z at ``alpha=0.05`` — causal-learn's own defaults."""
-        return {"alpha": _DEFAULT_ALPHA, "indep_test": _DEFAULT_INDEP_TEST}
+        """The solution's CI test at ``alpha=0.05``; Fisher-Z by default, causal-learn's own."""
+        return {"alpha": _DEFAULT_ALPHA, "indep_test": self.indep_test}
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
         """Run causal-learn FCI; return Andrey's PAG endpoint-mark array. The timed region.
 
-        ``alpha`` / ``indep_test`` come from ``params``, defaulting to ``0.05`` / ``"fisherz"``;
-        ``indep_test`` is forwarded under causal-learn's own kwarg name
-        ``independence_test_method``. The returned PAG's signed endpoint matrix is remapped to
+        ``alpha`` / ``indep_test`` come from ``params``, defaulting to ``0.05`` and the adapter's
+        test; :data:`CI_TESTS` maps the test to causal-learn's name, forwarded under its kwarg
+        ``independence_test_method``, and settings. The returned PAG's signed endpoint matrix is remapped to
         Andrey's ``NULL/TAIL/ARROW/CIRCLE`` marks via the table in the module docstring — no
         transpose, since the two conventions align.
         """
         from causallearn.search.ConstraintBased.FCI import fci as _fci
 
         alpha = float(params.get("alpha", _DEFAULT_ALPHA))
-        indep_test = params.get("indep_test", _DEFAULT_INDEP_TEST)
+        indep_test, settings = CI_TESTS[params.get("indep_test", self.indep_test)]
 
         X = np.asarray(data, dtype=np.float64)
         pag, _edges = _fci(
@@ -88,6 +100,7 @@ class CausalLearnFCI:
             independence_test_method=indep_test,
             alpha=alpha,
             show_progress=False,
+            **settings,
         )
 
         return remap_to_unsigned(pag.graph).astype(np.uint8)

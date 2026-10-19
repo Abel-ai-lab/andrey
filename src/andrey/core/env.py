@@ -112,6 +112,8 @@ NUM_WORKERS = Setting("ANDREY_NUM_WORKERS", parse_num_workers)
 GES_PARALLEL_MIN_WORK = Setting("ANDREY_GES_PARALLEL_MIN_WORK", parse_int)
 COV_GPU_THRESHOLD = Setting("ANDREY_COV_GPU_THRESHOLD", parse_int)
 ENTROPY_GPU_THRESHOLD = Setting("ANDREY_ENTROPY_GPU_THRESHOLD", parse_int)
+KCI_GPU_THRESHOLD = Setting("ANDREY_KCI_GPU_THRESHOLD", parse_int)
+CMIKNN_GPU_THRESHOLD = Setting("ANDREY_CMIKNN_GPU_THRESHOLD", parse_int)
 GPU_CALIBRATE = Setting("ANDREY_GPU_CALIBRATE", parse_flag)
 SEED = Setting("ANDREY_SEED", parse_seed)
 TIE_BREAK = Setting("ANDREY_TIE_BREAK", parse_tie_break)
@@ -127,6 +129,8 @@ SETTINGS: dict[str, Setting] = {
         GES_PARALLEL_MIN_WORK,
         COV_GPU_THRESHOLD,
         ENTROPY_GPU_THRESHOLD,
+        KCI_GPU_THRESHOLD,
+        CMIKNN_GPU_THRESHOLD,
         GPU_CALIBRATE,
         SEED,
         TIE_BREAK,
