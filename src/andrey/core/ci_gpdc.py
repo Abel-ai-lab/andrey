@@ -15,7 +15,9 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
-from .ci import _canonical, _checked_data
+from andrey.search.hc import tie_ranks
+
+from .ci import _canonical_ranked, _checked_data
 from .seeding import resolve_seed
 
 __all__ = ["GPDC"]
@@ -73,12 +75,14 @@ class GPDC:
     test object and reused by every later query on the same pair of them.
     The residuals are replaced by their ranks, which gives them uniform marginals; tied values
     are ordered by a random key per row and variable, drawn once from ``seed``, so that every
-    ranking stays equally likely under the null. The statistic is their squared distance
-    correlation, from the doubly centered matrices of their pairwise distances [3]_. After
-    ranking, the null is the same statistic between the ranks and a random permutation of them,
-    drawn ``n_null`` times [1]_. With ``b`` of the ``n_null`` draws at least as large as the
-    statistic, the p-value is ``(b + 1) / (n_null + 1)``: the observed statistic counts as one
-    more draw, so the p-value is never zero [4]_.
+    ranking stays equally likely under the null. Each variable takes its keys, and its place among
+    the regressors of a conditioning set, by its :func:`~andrey.search.hc.tie_ranks` rank, a rank
+    computed from each column's own data, so a p-value does not depend on the column order. The
+    statistic is their squared distance correlation, from the doubly centered matrices of their
+    pairwise distances [3]_. After ranking, the null is the same statistic between the ranks and a
+    random permutation of them, drawn ``n_null`` times [1]_. With ``b`` of the ``n_null`` draws at
+    least as large as the statistic, the p-value is ``(b + 1) / (n_null + 1)``: the observed
+    statistic counts as one more draw, so the p-value is never zero [4]_.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. The test assumes ``x`` and ``y`` depend on the conditioning set additively, a
@@ -108,6 +112,10 @@ class GPDC:
         if n_null < 1:
             raise ValueError(f"n_null must be at least 1, got {n_null}")
         arr = _checked_data(data, "GPDC", min_rows=2)
+        # The test holds data column j at index _tie_rank[j], in C order, so a query reads the
+        # same values in the same order whatever the column order or memory layout.
+        self._tie_rank = tie_ranks(arr).tolist()
+        arr = np.ascontiguousarray(arr[:, np.argsort(self._tie_rank)])
         with np.errstate(over="ignore", under="ignore"):  # either one raises below
             std = arr.std(axis=0)
         if not np.isfinite(std).all():
@@ -125,7 +133,7 @@ class GPDC:
 
     def __call__(self, x: int, y: int, condition_set: Iterable[int] = ()) -> float:
         """Return the GPDC p-value for ``x`` independent of ``y`` given ``condition_set``."""
-        x_int, y_int, cond = _canonical(x, y, condition_set)
+        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
         rx, ry = self._residual(x_int, cond), self._residual(y_int, cond)
         if not (np.ptp(rx) > 0.0 and np.ptp(ry) > 0.0):
             return 1.0  # a constant variable: no variation to depend on
