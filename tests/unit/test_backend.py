@@ -49,6 +49,16 @@ def test_pinned_cpu_overrides_threshold(monkeypatch):
     assert backend.resolve(1, 10**9) == "cpu"  # tiny call, still torch-cpu
 
 
+def test_torch_takes_an_array_with_negative_strides(monkeypatch):
+    # A DataFrame with its columns reversed holds such an array.
+    pytest.importorskip("torch")
+    monkeypatch.setenv("ANDREY_DEVICE", "cpu")
+    x = np.random.default_rng(0).normal(size=(50, 4))
+    assert np.allclose(
+        stats.corrcoef(x[:, ::-1], rowvar=False), np.corrcoef(x[:, ::-1], rowvar=False)
+    )
+
+
 def test_importing_core_does_not_import_torch():
     # Holds even when the [torch] extra is installed: torch loads lazily inside backend.
     import os
