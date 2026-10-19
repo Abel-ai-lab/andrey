@@ -26,7 +26,8 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
 
     Raises ``ValueError``, naming ``name``, when the values are not numeric, the array is not 2-D,
     it has fewer than ``min_rows`` rows, it holds ``NaN`` or ``inf``, or a column is constant: no
-    method can estimate a variance or a dependence from such data.
+    method can estimate a variance or a dependence from such data. The message names every
+    constant column.
     """
     try:
         X = np.asarray(data, dtype=np.float64)
@@ -47,10 +48,17 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
             f"{name} holds NaN or inf in {cells} at row {row}, column {col}; drop or impute "
             "them before the fit"
         )
-    constant = np.flatnonzero(np.ptp(X, axis=0) == 0)
-    if constant.size:
-        column = _column_name(data, int(constant[0]))
-        raise ValueError(f"{name} column {column} is constant; drop it before the fit")
+    constant = [_column_name(data, int(j)) for j in np.flatnonzero(np.ptp(X, axis=0) == 0)]
+    if constant:
+        if len(constant) == 1:
+            columns, verb, pronoun = f"column {constant[0]}", "is", "it"
+        else:
+            columns = f"columns {', '.join(constant[:-1])} and {constant[-1]}"
+            verb, pronoun = "are", "them"
+        raise ValueError(
+            f"{name} {columns} {verb} constant; a constant column holds no information about "
+            f"the other variables, so drop {pronoun} before the fit"
+        )
     return X
 
 

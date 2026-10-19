@@ -26,6 +26,7 @@ https://arxiv.org/abs/1302.4972
 from __future__ import annotations
 
 import heapq
+from collections import deque
 from collections.abc import Iterable, Mapping
 
 import numpy as np
@@ -257,7 +258,11 @@ def pdag2dag(pdag: np.ndarray) -> np.ndarray:
     Keeps every directed edge of the PDAG, then repeatedly removes the lowest-numbered node ``x``
     that has no outgoing directed edge and whose undirected neighbors are each adjacent to all
     neighbors of ``x`` (so orienting the remaining undirected edges into ``x`` adds no collider).
-    Raises ``ValueError`` when no such node exists: the PDAG admits no consistent extension.
+    Raises ``ValueError`` when no such node exists: the PDAG admits no consistent extension, a DAG
+    with its skeleton, its v-structures, and its directed edges. When the undirected edges
+    among the nodes left hold a chordless cycle of four or more nodes, the message names it: every
+    orientation of such a cycle adds a v-structure or closes a directed cycle. Otherwise it names
+    the nodes left.
     """
     src = _validate_adjacency(pdag)
     n = src.shape[0]
@@ -292,8 +297,52 @@ def pdag2dag(pdag: np.ndarray) -> np.ndarray:
                 heapq.heappush(ready, v)
                 queued.add(v)
     if active:
-        raise ValueError("PDAG admits no consistent DAG extension")
+        left = sorted(active)
+        cycle = _chordless_cycle([undirected[x] & active for x in range(n)], left)
+        why = (
+            f"its undirected edges form the chordless cycle {' - '.join(map(str, cycle))} - "
+            f"{cycle[0]}, and every orientation of a chordless cycle of four or more nodes adds a "
+            "v-structure or closes a directed cycle"
+            if cycle
+            else f"the undirected edges among nodes {left} cannot be oriented without adding a "
+            "v-structure or closing a directed cycle"
+        )
+        raise ValueError(
+            "PDAG admits no consistent DAG extension: no DAG has its skeleton, its v-structures, "
+            f"and its directed edges, because {why}"
+        )
     return out
+
+
+def _chordless_cycle(neighbors: list[set[int]], candidates: list[int]) -> list[int]:
+    """Return a chordless cycle of four or more nodes through ``candidates``, or ``[]``.
+
+    ``neighbors[x]`` holds the neighbors of node ``x``. For each node ``v`` and each two neighbors
+    ``a < b`` that are not adjacent, a shortest path from ``a`` to ``b`` that avoids ``v`` and its
+    other neighbors has no chord, so with ``v`` it closes a chordless cycle; a graph with none is
+    chordal. The cycle starts at the lowest such ``v``.
+    """
+    for v in candidates:
+        around = sorted(neighbors[v])
+        for k, a in enumerate(around):
+            for b in around[k + 1 :]:
+                if b in neighbors[a]:
+                    continue
+                blocked = (neighbors[v] | {v}) - {a, b}
+                previous = {a: a}
+                frontier = deque([a])
+                while frontier and b not in previous:
+                    x = frontier.popleft()
+                    for y in sorted(neighbors[x] - blocked):
+                        if y not in previous:
+                            previous[y] = x
+                            frontier.append(y)
+                if b in previous:
+                    path = [b]
+                    while path[-1] != a:
+                        path.append(previous[path[-1]])
+                    return [v, *reversed(path)]
+    return []
 
 
 # ---- DAG to CPDAG -------------------------------------------------------------------------------
