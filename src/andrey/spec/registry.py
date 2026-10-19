@@ -42,7 +42,9 @@ _INDEP_TEST = ParamSpec(
     "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
     "data, the experimental tests, each far slower per test: kci = kernel test; rcot = its "
     "random-feature approximation; cmiknn = nearest-neighbor conditional mutual information; "
-    "gpdc = Gaussian-process regression and distance correlation.",
+    "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
+    "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
+    "order.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _CATEGORICAL = ParamSpec(
