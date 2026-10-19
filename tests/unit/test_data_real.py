@@ -25,7 +25,7 @@ def test_sachs_is_the_observational_rows_and_the_consensus_network(offline_datas
     arcs = {(s, t) for s, t, kind in sachs.graph.oriented_edges() if kind == "directed"}
     assert arcs == set(real.SACHS_ARCS) and len(sachs.graph.oriented_edges()) == 17
     assert "Science 308" in sachs.description
-    assert list_datasets() == ("sachs", "asia", "alarm", "hepar2", "andes")
+    assert list_datasets() == ("sachs", "asia", "alarm", "hepar2", "andes", "diabetes")
 
 
 def test_the_array_holds_the_frames_values(offline_datasets):
