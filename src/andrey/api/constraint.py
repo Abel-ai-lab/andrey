@@ -335,9 +335,11 @@ def fci(
     possible_dsep : {"fast", "order_free"}, default="fast"
         How FCI builds each possible-d-separation set [2]_ [3]_, the nodes it conditions on to
         remove edges the first step kept. ``"fast"`` checks each node when the search reaches it,
-        so the set depends on the order the search visits nodes. ``"order_free"`` checks every
-        node once the search ends, so the set does not depend on that order; its sets can be
-        larger, so it can run more tests. See Notes.
+        so the set depends on the order the search visits nodes, and visits the pairs in column
+        order, each removal changing the sets of the pairs after it. ``"order_free"`` checks every
+        node once the search ends and tests every pair on the graph as the step starts, so
+        neither the sets nor the removals depend on the column order; its sets can be larger, so
+        it can run more tests. See Notes.
 
     Returns
     -------
@@ -399,10 +401,9 @@ def fci(
     stands and sets them together, except that an endpoint two of them would mark one as an
     arrowhead and one as a tail stays a circle. The rounds repeat until no mark changes. Rule R4
     decides an endpoint by every shortest discriminating path, so paths whose tests disagree leave
-    it a circle. The orientation rules therefore do not depend on the column order, but the result
-    can, through the order in which the possible-d-separation step visits pairs and conditioning
-    sets, and with ``possible_dsep="fast"`` through the sets themselves. A fixed column order gives
-    reproducible results.
+    it a circle. The orientation rules therefore do not depend on the column order. With
+    ``possible_dsep="order_free"`` neither does the result; with ``"fast"`` it can, through the
+    possible-d-separation step. A fixed column order gives reproducible results.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
@@ -422,7 +423,12 @@ def fci(
     tests. FCI keeps this search because the published set grows quickly with the graph, the
     search's set is the one FCI has been measured with, and on simulated data the published set did
     not give more accurate PAGs. FCI tests every subset of the set, except the empty set and the
-    subsets of either endpoint's neighbors, which the first step already tested.
+    subsets of either endpoint's neighbors, which the first step already tested. With ``"fast"``,
+    FCI visits the pairs in column order, removes a pair as soon as a subset separates it, and
+    records that subset, so each removal changes the sets of the pairs after it. With
+    ``"order_free"``, it tests every pair on the graph as the step starts and removes the pairs
+    found independent together [4]_, recording the union of the separating subsets of the smallest
+    size from either endpoint's set.
 
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union
@@ -437,8 +443,7 @@ def fci(
     cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
     passed the empty graph's (696 against 676). Rule R5 stops searching a pair after a fixed number
     of partial paths and leaves its circles, so on graphs with many circle-circle edges it can miss
-    an undirected cycle. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
-    data the result can still depend on the column order. With the mixed-data tests, it is
+    an undirected cycle. With the mixed-data tests, it is
     experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
@@ -550,9 +555,10 @@ def gfci(
     possible_dsep : {"fast", "order_free"}, default="fast"
         How GFCI builds each possible-d-separation set [2]_ [4]_, the nodes it conditions on to
         remove edges the adjacency search kept. ``"fast"`` checks each node when the search reaches
-        it, so the set depends on the order the search visits nodes. ``"order_free"`` checks every
-        node once the search ends, so the set does not depend on that order; its sets can be
-        larger, so it can run more tests. See Notes.
+        it, so the set depends on the order the search visits nodes, and visits the pairs in column
+        order. ``"order_free"`` checks every node once the search ends and tests every pair on the
+        graph as the step starts, so neither the sets nor the removals depend on the column order;
+        its sets can be larger, so it can run more tests. See Notes.
 
     Returns
     -------
@@ -619,8 +625,7 @@ def gfci(
     unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
     GES search never selects one, nor any parent set that leaves its child a residual variance of at
     most ``1e-12`` times its variance. Rule R5 has the search bound described under
-    :func:`~andrey.fci`. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
-    data the result can still depend on the column order. With the mixed-data score and test, it is
+    :func:`~andrey.fci`. With the mixed-data score and test, it is
     experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
