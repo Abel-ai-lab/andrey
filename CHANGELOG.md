@@ -13,10 +13,10 @@ change names its pull request.
 
 ### Highlights
 
-- Permutation invariance: PC, hill climbing, tabu search, BOSS, GRaSP, and GIN return the same
-  graph, up to relabeling its nodes, however the columns are ordered, the orientation rules of
-  CD-NOD, FCI, and GFCI no longer depend on the order, and the data generators and the published
-  networks shuffle their columns, so column order no longer reveals the causal order. The 0.7.0
+- Permutation invariance: PC, FCI, GFCI, CD-NOD, hill climbing, tabu search, BOSS, GRaSP, and GIN
+  return the same graph, up to relabeling its nodes, however the columns are ordered, and the data
+  generators and the published networks shuffle their columns, so column order no longer reveals
+  the causal order. The 0.7.0
   post gives the measurements. ([#168], [#179], [#192], [#202], [#215], [#233])
 - Seven more methods are supported: `gfci`, `cdnod`, `gies`, `exact_search`, `calm`,
   `multi_group_direct_lingam`, and `gin` have published benchmarks in the 0.7.0 release card and

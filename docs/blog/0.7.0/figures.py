@@ -340,6 +340,7 @@ def compare_table() -> str:
     )
     rows = (
         ("PC", ("same", "changed", "changed", "changed", "name", "name")),
+        ("FCI", ("same", "changed", "changed", None, None, "name")),
         ("Hill climbing", ("same", None, None, "changed", "runs", None)),
         ("Tabu search", ("same", None, None, "changed", None, None)),
         ("BOSS", ("same", "changed", None, None, None, "changed")),
