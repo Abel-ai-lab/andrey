@@ -94,3 +94,18 @@ class AndreyGRaSPBDeu(AndreyGRaSP):
     def params(self) -> dict[str, Any]:
         """The BDeu score at the default depth, on a fixed search seed."""
         return {"score_func": "local_score_BDeu", "depth": _DEFAULT_DEPTH, "seed": SEARCH_SEED}
+
+
+class AndreyGRaSPCategoricalBIC(AndreyGRaSP):
+    """Andrey GRaSP with the multinomial BIC, on category codes, at the standard penalty."""
+
+    name: str = "andrey.grasp.bic_categorical"
+
+    def params(self) -> dict[str, Any]:
+        """The multinomial BIC at ``lambda_value=1`` and the default depth, on a fixed seed."""
+        return {
+            "score_func": "local_score_BIC_categorical",
+            "lambda_value": 1.0,
+            "depth": _DEFAULT_DEPTH,
+            "seed": SEARCH_SEED,
+        }

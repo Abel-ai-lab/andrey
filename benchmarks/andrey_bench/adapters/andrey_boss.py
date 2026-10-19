@@ -88,3 +88,17 @@ class AndreyBOSSBDeu(AndreyBOSS):
     def params(self) -> dict[str, Any]:
         """The BDeu score on a fixed search seed."""
         return {"score_func": "local_score_BDeu", "seed": SEARCH_SEED}
+
+
+class AndreyBOSSCategoricalBIC(AndreyBOSS):
+    """Andrey BOSS with the multinomial BIC, on category codes, at the standard penalty."""
+
+    name: str = "andrey.boss.bic_categorical"
+
+    def params(self) -> dict[str, Any]:
+        """The multinomial BIC at ``lambda_value=1``, on a fixed search seed."""
+        return {
+            "score_func": "local_score_BIC_categorical",
+            "lambda_value": 1.0,
+            "seed": SEARCH_SEED,
+        }

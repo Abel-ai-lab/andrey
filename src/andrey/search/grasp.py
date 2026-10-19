@@ -406,8 +406,8 @@ def grasp(
     score_func : str
         Local score, one of :data:`~andrey.search.boss.PERMUTATION_SCORES`.
     categorical : ndarray of bool or None
-        Marks the categorical columns for a mixed-data score; BDeu reads every column as
-        categorical.
+        Marks the categorical columns for a mixed-data score; BDeu and the multinomial BIC read
+        every column as categorical.
 
     Returns
     -------

@@ -628,11 +628,13 @@ causal-learn's fit takes over a minute at 1000 rows and grows with the rows.
 
 `discrete_cpu.py` compares Andrey's PC with the chi-square and the G-square test, GES, BOSS, and
 GRaSP with the BDeu score, and hill climbing with the BDeu score and the multinomial BIC against the
-same method in causal-learn, bnlearn, and pgmpy, with the empty-graph baseline. It runs on `discrete_er`: category
-codes from a discrete network on an Erdos-Renyi graph, each node with 2 or 3 categories and each row
-of its conditional probability table drawn from a flat Dirichlet (`datasets.DISCRETE_SETTINGS`,
-recorded in each dataset's generator call). The codes are never rescaled. Every solution is serial.
-Andrey's GES runs on the numpy backend; BDeu moves are scored in one process.
+same method in causal-learn, bnlearn, and pgmpy, with the empty-graph baseline. Andrey's BOSS and
+GRaSP with the multinomial BIC run alone, since no package here takes that score for them. It runs
+on `discrete_er`: category codes from a discrete network on an Erdos-Renyi graph, each node with 2
+or 3 categories and each row of its conditional probability table drawn from a flat Dirichlet
+(`datasets.DISCRETE_SETTINGS`, recorded in each dataset's generator call). The codes are never
+rescaled. Every solution is serial. Andrey's GES runs on the numpy backend; BDeu moves are scored
+in one process.
 
 | method | Andrey | causal-learn | bnlearn | pgmpy |
 |---|---|---|---|---|
@@ -641,6 +643,8 @@ Andrey's GES runs on the numpy backend; BDeu moves are scored in one process.
 | GES, BDeu | `andrey.ges.bdeu` | `causal-learn.ges.bdeu` | | |
 | BOSS, BDeu | `andrey.boss.bdeu` | `causal-learn.boss.bdeu` | | |
 | GRaSP, BDeu | `andrey.grasp.bdeu` | `causal-learn.grasp.bdeu` | | |
+| BOSS, BIC | `andrey.boss.bic_categorical` | | | |
+| GRaSP, BIC | `andrey.grasp.bic_categorical` | | | |
 | HC, BDeu | `andrey.hc.BDeu` | | `bnlearn.hc.BDeu` | `pgmpy.hc.BDeu` |
 | HC, BIC | `andrey.hc.BIC_categorical` | | `bnlearn.hc.BIC_categorical` | `pgmpy.hc.BIC_categorical` |
 
@@ -1431,7 +1435,7 @@ Read `params` before comparing solutions because their defaults may optimize dif
   tigramite, and RCIT. `start_tigramite.sh` builds the environment of tigramite's fits.
 - `discrete_cpu.py` - compares PC with the chi-square and G-square tests, GES, BOSS, and GRaSP with
   BDeu, and hill climbing with BDeu and the multinomial BIC with causal-learn, bnlearn, and pgmpy on
-  categorical data. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical
+  categorical data, and runs BOSS and GRaSP with the multinomial BIC. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical
   tests and scores.
 - `mixed_cpu.py` - compares PC, GES, and hill climbing with the degenerate and conditional Gaussian
   tests and scores with Tetrad and bnlearn on mixed data.

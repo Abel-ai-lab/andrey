@@ -1,11 +1,11 @@
-"""Best-Order Score Search (BOSS) over a linear-Gaussian BIC, BDeu, or mixed-data BIC score.
+"""Best-Order Score Search (BOSS) over a linear-Gaussian BIC, a categorical, or a mixed-data score.
 
 Each variable owns a grow-shrink tree; sweeps slide variables to their best order position
 (:func:`_better_mutation`) until no move improves the total. Scores are negated local scores, so
-the search maximizes; BIC moves take the Schur update, BDeu and the mixed-data scores two full
-scores. The
-search runs on the columns sorted by tie rank (:func:`ranked_score`), so a variable's index is its
-tie rank. The algorithm and its reference are described on :func:`andrey.boss`.
+the search maximizes; BIC moves take the Schur update, the categorical and mixed-data scores two
+full scores. The search runs on the columns sorted by tie rank (:func:`ranked_score`), so a
+variable's index is its tie rank. The algorithm and its reference are described on
+:func:`andrey.boss`.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from andrey.search.hc import tie_ranks
 PERMUTATION_SCORES: tuple[str, ...] = (
     "local_score_BIC_from_cov",
     "local_score_BDeu",
+    "local_score_BIC_categorical",
     "local_score_degen_gauss",
     "local_score_cond_gauss",
 )
@@ -45,9 +46,9 @@ def ranked_score(
     its ties between candidate parents and between order moves. The sorted data are C-contiguous
     whatever the layout of ``x``, so every column order of the same data gives the same score, bit
     for bit, and reordering the columns of ``x`` reorders the learned graph's nodes and changes
-    nothing else, unless two columns are identical. Under BDeu every column ranks by which rows
-    share a category, and under a mixed-data score the categorical columns do, with the mask sorted
-    with them; the BIC score ranks every column as continuous.
+    nothing else, unless two columns are identical. Under BDeu or the multinomial BIC every column
+    ranks by which rows share a category, and under a mixed-data score the categorical columns do,
+    with the mask sorted with them; the linear-Gaussian BIC ranks every column as continuous.
 
     Returns the score and ``ranks``: column ``i`` of ``x`` is variable ``ranks[i]`` of the score,
     so a matrix ``m`` over the score's variables maps back to the columns of ``x`` as
@@ -291,12 +292,13 @@ def boss(
     random_state : int
         Seed for the sweep-order RNG.
     score_func : str
-        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC, BDeu on category
-        codes (:class:`~andrey.core.score.BDeuScore`), or a mixed-data BIC
+        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC, BDeu or the
+        multinomial BIC on category codes (:class:`~andrey.core.score.BDeuScore`,
+        :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC
         (:class:`~andrey.core.score.DGScore`, :class:`~andrey.core.score.CGScore`).
     categorical : ndarray of bool or None
-        Marks the categorical columns for a mixed-data score; BDeu reads every column as
-        categorical.
+        Marks the categorical columns for a mixed-data score; BDeu and the multinomial BIC read
+        every column as categorical.
 
     Returns
     -------
