@@ -32,11 +32,13 @@ def _fit_hash(adapter, x: np.ndarray) -> str:
 @pytest.mark.parametrize("d", [10, 20])
 def test_andrey_and_causal_learn_ges_return_the_same_graph(d: int, seed: int):
     """At the matched penalty the two engines return the same graph."""
+    pytest.importorskip("causallearn", reason="causal-learn is not installed")
     x = _linear_gaussian(d, 1000, seed)
     assert _fit_hash(andrey_ges_adapters()[0], x) == _fit_hash(CausalLearnGES(), x)
 
 
 def test_the_hash_still_separates_a_package_that_disagrees():
     """A hash that collapsed everything to one value would pass the test above for the wrong reason."""
+    pytest.importorskip("castle", reason="gcastle is not installed")
     x = _linear_gaussian(10, 1000, 0)
     assert _fit_hash(GCastleGES(), x) != _fit_hash(andrey_ges_adapters()[0], x)

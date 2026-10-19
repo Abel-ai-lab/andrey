@@ -11,6 +11,8 @@ import json
 import subprocess
 import sys
 
+import pytest
+
 from andrey_bench import contracts
 from andrey_bench.contracts import RUN_ENV_FIELDS, RunRecord
 from andrey_bench.datasets import DatasetKey
@@ -65,8 +67,17 @@ def test_the_campaign_a_user_runs_produces_what_the_readme_promises(tmp_path):
     """Run the README entry point end to end without stubs.
 
     Every other test reaches `run_batch` directly, so nothing covers argument parsing, the
-    output layout, or completion.
+    output layout, or completion. It skips without a bench-env for the fits, or without
+    causal-learn or gCastle, which `benchmark.py` rosters.
     """
+    from andrey_bench import runner
+
+    try:
+        runner._bench_python()
+    except FileNotFoundError as exc:
+        pytest.skip(f"no bench-env for the fits: {exc}")
+    for module, package in (("causallearn", "causal-learn"), ("castle", "gcastle")):
+        pytest.importorskip(module, reason=f"{package} is not installed")
     bench = __import__("pathlib").Path(__file__).resolve().parents[1]
     out = tmp_path / "run"
     done = subprocess.run(

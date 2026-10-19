@@ -180,6 +180,16 @@ DEFERRED_MODULES = {
 }
 
 
+#: The module each comparator package imports as. Its fit cases skip where it is not installed.
+COMPARATOR_MODULES = {"causal-learn": "causallearn", "gcastle": "castle", "lingam": "lingam"}
+
+
+def _skip_without_package(adapter: SolutionAdapter) -> None:
+    module = COMPARATOR_MODULES.get(adapter.package)
+    if module is not None:
+        pytest.importorskip(module, reason=f"{adapter.package} is not installed")
+
+
 @pytest.mark.parametrize(
     "adapter",
     [a for a in ALL_ADAPTERS if a.package == "andrey" or a.name in DEFERRED_MODULES],
@@ -188,6 +198,7 @@ DEFERRED_MODULES = {
 def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter) -> None:
     import sys
 
+    _skip_without_package(adapter)
     module = DEFERRED_MODULES[adapter.name]
     sys.modules.pop(module, None)
     adapter.setup()
@@ -267,6 +278,7 @@ def test_a_fit_converts_to_a_valid_graph(
 ) -> None:
     import andrey.data as data
 
+    _skip_without_package(adapter)
     x = np.asarray(data.benchmarks.scm(scm, 6).sample(n=200, seed=0).data, dtype=np.float64)
     d = x.shape[1]
     adapter.setup()
