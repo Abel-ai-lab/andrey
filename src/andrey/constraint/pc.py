@@ -207,10 +207,10 @@ def _discover_skeleton(
     column collider order, which ranks nothing, no p-value is compared or kept and the returned
     p-value dict is empty; the skeleton and the separating sets are the same.
 
-    When ``prescreen`` is set and the test exposes the vectorized closed forms, the size-0 and
-    size-1 passes read the correlation matrix directly (all-pairs marginal threshold, then one
-    first-order read per surviving pair) in place of the dense scalar scan -- same removals, same
-    separating sets, same p-values. With ``workers > 1`` the ``|S| >= 2`` scan fans out across
+    When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
+    the size-0 and size-1 passes take them (all-pairs marginal threshold, then one first-order
+    batch per surviving pair) in place of the dense scalar scan -- same removals, same separating
+    sets, same p-values. With ``workers > 1`` the ``|S| >= 2`` scan fans out across
     worker processes; the reduce is a plain union of per-chunk removals, so the result is identical
     to the serial scan whatever the partition.
 

@@ -83,6 +83,8 @@ change names its pull request.
   at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
   why a PDAG has no consistent extension, naming a chordless cycle of its undirected edges when it
   finds one. ([#207])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
+  same graphs and p-values in less time, because each test answers many queries at once. ([#208])
 
 ### Removed
 
@@ -340,3 +342,4 @@ First alpha release.
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
 [#206]: https://github.com/Abel-ai-lab/andrey/pull/206
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
+[#208]: https://github.com/Abel-ai-lab/andrey/pull/208
