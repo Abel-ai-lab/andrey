@@ -136,9 +136,10 @@ def test_cdnod_chisq_finds_a_shift_in_one_domain_of_three():
     assert andrey.cdnod(x, domain).structure.oriented_edges() == [(0, 1, "undirected")]
 
 
-# A random network: 10 variables, 10 edges, 5000 rows. On this draw every method finds the true
-# CPDAG (SHD 0); the margin allows for a change in tie-breaking without hiding a broken build,
-# which scores near the empty graph's 10.
+# A random network: 10 variables, 10 edges, 5000 rows. On this draw every method listed finds the
+# true CPDAG (SHD 0); the margin allows for a change in tie-breaking without hiding a broken build,
+# which scores near the empty graph's 10. GRaSP with BDeu stops at a worse-scoring DAG on this draw,
+# so it is checked against exact search instead.
 _RANDOM = {"d": 10, "n": 5000, "seed": 5}
 _MARGIN = 2
 
