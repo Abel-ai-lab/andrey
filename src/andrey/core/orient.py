@@ -27,8 +27,10 @@ from __future__ import annotations
 
 import heapq
 from collections.abc import Iterable, Mapping
+from itertools import combinations
 
 import numpy as np
+from scipy.sparse.csgraph import connected_components
 
 from ._bitset import nodes, row_masks
 from .structure import ARROW, NULL, TAIL, GraphStructure, Kind
@@ -158,7 +160,9 @@ def from_structure(structure: GraphStructure) -> np.ndarray:
 # ---- Meek completion ----------------------------------------------------------------------------
 
 
-def meek(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
+def meek(
+    pdag: np.ndarray, *, in_column_order: bool = False, _trace: list[dict] | None = None
+) -> np.ndarray:
     """Complete a PDAG to a CPDAG by applying Meek's rules R1-R3 to a fixed point.
 
     Returns a new endpoint-mark matrix. Each rule directs an undirected edge only when doing so
@@ -168,15 +172,86 @@ def meek(pdag: np.ndarray, *, _trace: list[dict] | None = None) -> np.ndarray:
     as an adjacency only: no rule reads it as directed or undirected, or orients it. R4 is not
     required to complete a v-structure pattern in the absence of background knowledge.
 
-    The completion is defined for a collider-consistent PDAG (as produced by
-    :func:`orient_colliders`); on an inconsistent PDAG the fixed point can depend on rule-firing
-    order. R1 visits the directed edges ``i -> j`` by ``i``, then ``j``, so when two of them demand
-    opposite directions for one undirected edge, the edge with the lower tail index decides.
+    The rules run in rounds. A round reads the graph as it stands when the round starts and
+    collects every orientation R1-R3 imply on it. An edge they would direct both ways stays
+    undirected in that round, and so does every orientation that would close a directed cycle,
+    whether alone or together with other orientations of the round. The round applies the rest
+    together, and the rounds repeat until one orients nothing; orientations are never undone, so
+    the rounds stop. A round reads only the marks, never a node's position, so relabeling the nodes
+    relabels its orientations: the completion does not depend on the order in which the rules visit
+    the nodes, nor on the column order. When some DAG extends the PDAG, keeping its directed edges
+    and adding no unshielded collider, as for the colliders :func:`orient_colliders` finds from a
+    DAG's skeleton and separating sets, every implied orientation holds in each such DAG (Meek
+    1995), so none conflict or close a cycle, and the completion is the one the rules give when
+    they fire one at a time, in any order.
 
-    The private ``_trace`` sink records each firing's rule, participating nodes, and full
-    before/after endpoint matrices. Matrices are copied only when a trace is requested.
+    With ``in_column_order``, the rules instead fire one at a time, each on the graph the previous
+    firing left. On a PDAG a DAG extends the result is the same; on any other it can depend on the
+    firing order. R1 visits the directed edges ``i -> j`` by ``i``, then ``j``,
+    so when two of them demand opposite directions for one undirected edge, the edge with the lower
+    tail index decides.
+
+    The private ``_trace`` sink records each orientation's rule, participating nodes, and full
+    before/after endpoint matrices, one record per oriented edge; a round's orientations are
+    recorded in ascending ``(tail, head)`` order. Matrices are copied only when a trace is
+    requested.
     """
     adj = _validate_adjacency(pdag)
+    if in_column_order:
+        return _meek_in_column_order(adj, _trace)
+    while True:
+        implied = _meek_implied(adj)
+        accepted = {edge: firing for edge, firing in implied.items() if edge[::-1] not in implied}
+        if accepted:
+            directed = (adj == TAIL) & (adj.T == ARROW)
+            tails, heads = zip(*accepted)
+            directed[tails, heads] = True
+            # An orientation lies on a directed cycle iff its two ends share a strong component.
+            _, component = connected_components(directed, directed=True, connection="strong")
+            accepted = {
+                edge: firing
+                for edge, firing in accepted.items()
+                if component[edge[0]] != component[edge[1]]
+            }
+        if not accepted:
+            return adj
+        for (tail, head), (rule, triple) in sorted(accepted.items()):
+            before = None if _trace is None else adj.copy()
+            _orient(adj, tail, head)
+            if _trace is not None:
+                _trace.append(dict(rule=rule, triple=triple, before=before, after=adj.copy()))
+
+
+def _meek_implied(adj: np.ndarray) -> dict[tuple[int, int], tuple[str, tuple[int, ...]]]:
+    """Every orientation R1-R3 imply on ``adj``, keyed ``(tail, head)``, with one firing for each.
+
+    Every rule reads ``adj`` as given, which is left unchanged. A firing is the rule's name and its
+    participating nodes; of several firings that imply one orientation, the first found is kept.
+    """
+    directed = (adj == TAIL) & (adj.T == ARROW)  # directed[i, j]: i -> j
+    undirected = (adj == TAIL) & (adj.T == TAIL)
+    implied: dict[tuple[int, int], tuple[str, tuple[int, ...]]] = {}
+    # R1: i -> j -- k with i, k non-adjacent  =>  j -> k
+    for i, j in np.argwhere(directed).tolist():
+        for k in np.flatnonzero(undirected[j]).tolist():
+            if k != i and not _is_adjacent(adj, i, k):
+                implied.setdefault((j, k), ("R1", (i, j, k)))
+    # R2: i -> l -> k with i -- k  =>  i -> k
+    for i, k in np.argwhere(undirected).tolist():
+        mids = np.flatnonzero(directed[i] & directed[:, k])
+        if mids.size:
+            implied.setdefault((i, k), ("R2", (i, int(mids[0]), k)))
+    # R3: i -- j, i -- k, j -> t, k -> t, i -- t, j and k non-adjacent  =>  i -> t
+    for i, t in np.argwhere(undirected).tolist():
+        cand = np.flatnonzero(undirected[i] & directed[:, t]).tolist()
+        pair = next(((j, k) for j, k in combinations(cand, 2) if not _is_adjacent(adj, j, k)), None)
+        if pair is not None:
+            implied.setdefault((i, t), ("R3", (i, *pair, t)))
+    return implied
+
+
+def _meek_in_column_order(adj: np.ndarray, _trace: list[dict] | None = None) -> np.ndarray:
+    """:func:`meek` with ``in_column_order``: one firing at a time, on ``adj`` in place."""
     changed = True
     while changed:
         changed = False
