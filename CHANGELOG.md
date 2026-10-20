@@ -92,6 +92,11 @@ change names its pull request.
   computed from each column's own data instead of by column position, so reordering the columns no
   longer changes the edges it orients, and on data where its tests compete its graph can change.
   ([#228])
+- `"rcot"` samples the random Fourier features of `x` and `y` for each conditioning set, with
+  frequencies and phases from a scrambled Halton sequence (quasi-Monte Carlo feature maps), so one
+  pair's tests over different conditioning sets no longer share features and reject together, and
+  PC with it keeps fewer false edges, misses slightly more true ones, and makes fewer errors in all
+  on graphs of 10 to 50 variables. ([#248])
 
 ## [0.7.0] - 2026-10-19
 
@@ -457,3 +462,4 @@ First alpha release.
 [#229]: https://github.com/Abel-ai-lab/andrey/pull/229
 [#233]: https://github.com/Abel-ai-lab/andrey/pull/233
 [#239]: https://github.com/Abel-ai-lab/andrey/pull/239
+[#248]: https://github.com/Abel-ai-lab/andrey/pull/248
