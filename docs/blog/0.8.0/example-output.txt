@@ -1,0 +1,5 @@
+fisherz: 3 of 8 true edges, 4 extra
+    kci: 8 of 8 true edges, 0 extra
+   rcot: 7 of 8 true edges, 0 extra
+ cmiknn: 8 of 8 true edges, 0 extra
+   gpdc: 7 of 8 true edges, 0 extra
