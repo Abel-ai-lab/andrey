@@ -27,8 +27,14 @@ uv add "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
 uv add "andrey-core[all]"     # every extra
 ```
 
-With pip, use the same names: `pip install andrey-core`, `pip install "andrey-core[torch]"`, and so
-on.
+With pip:
+
+```shell
+pip install andrey-core            # base (pure NumPy)
+pip install "andrey-core[torch]"   # torch backend: GPU primitives
+pip install "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
+pip install "andrey-core[all]"     # every extra
+```
 
 ### PyTorch for a GPU
 

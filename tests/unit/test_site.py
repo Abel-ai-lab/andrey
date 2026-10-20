@@ -446,8 +446,8 @@ def test_placeholder_numbers_are_refused_wherever_the_file_sits(tmp_path, monkey
 def test_the_headline_is_one_sentence_with_no_number(placeholder_page):
     found = re.search(r'<h1 id="headline">(.*?)</h1>', placeholder_page, re.S)[1]
     text = re.sub(r"<[^>]+>", "", found)
-    assert text == "Causal discovery accelerated, accurate, agentic."
-    assert '<span class="word">accelerated, accurate, agentic.</span>' in found
+    assert text == "Accelerated, accurate, agentic causal discovery."
+    assert '<span class="word">Accelerated, accurate, agentic</span>' in found
 
 
 def test_the_hero_cards_lead_to_the_sections_and_repeat_their_claims(placeholder_page):
@@ -866,7 +866,7 @@ def test_the_comparison_table_has_three_groups_with_a_mark_for_every_package():
     assert table.count('<tr class="compare-group">') == len(groups)
     for _, feature, marks, _ in build.COMPARISON:
         assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
-    assert table.count('<th scope="col">') == len(build.PEERS)
+    assert len(re.findall(r'<th scope="col"[ >]', table)) == len(build.PEERS)
 
 
 def test_interface_example_returns_every_kind_of_graph():

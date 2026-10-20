@@ -272,8 +272,7 @@ ul.ablog-archive {
   background: var(--andrey-surface);
 }
 .co .co-title,
-.cg .co-title,
-.rc .co-title {
+.cg .co-title {
   margin: 0;
   color: var(--andrey-muted);
   font-size: 0.75rem;
@@ -790,92 +789,12 @@ ul.ablog-archive {
   font-size: 0.75rem;
 }
 
-.cg figcaption,
-.rc figcaption {
+.cg figcaption {
   margin-top: 0.8rem;
   text-align: left;
   color: var(--andrey-muted);
   font-size: 0.85rem;
   line-height: 1.45;
-}
-
-/* The 0.7.0 post's results chart (docs/blog/0.7.0/reorder.html): per method, a bar per build. */
-.rc {
-  margin: 1.5rem 0 2rem;
-  padding: 1rem 1.1rem 0.9rem;
-  border: 1px solid var(--andrey-line);
-  border-radius: var(--andrey-radius-lg);
-  background: var(--andrey-surface);
-}
-
-.rc-groups {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem 1.6rem;
-  margin-top: 0.7rem;
-}
-
-.rc .rc-method {
-  margin: 0 0 0.3rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.rc-row {
-  display: grid;
-  grid-template-columns: 9.5rem minmax(0, 1fr) 4.6rem;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-}
-
-.rc-series {
-  color: var(--andrey-muted);
-}
-
-.rc-track {
-  height: 0.65rem;
-  border-radius: 999px;
-  background: var(--andrey-surface-2);
-}
-
-.rc-bar {
-  display: block;
-  width: var(--rc-w);
-  height: 100%;
-  border-radius: inherit;
-  background: var(--andrey-edge-directed);
-  transform-origin: left;
-  animation: grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.rc-cl .rc-bar {
-  background: var(--andrey-categorical-2);
-}
-
-.rc-first .rc-bar {
-  background: var(--andrey-muted);
-}
-
-.rc-new .rc-series,
-.rc-new .rc-count {
-  color: var(--andrey-accent);
-  font-weight: 600;
-}
-
-.rc-count {
-  text-align: right;
-  white-space: nowrap;
-  color: var(--andrey-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.rc-count b {
-  color: var(--andrey-ink);
-}
-
-.rc-new .rc-count b {
-  color: inherit;
 }
 
 @keyframes grow {
@@ -885,99 +804,112 @@ ul.ablog-archive {
 }
 
 @media (max-width: 640px) {
-  .cg-panels,
-  .rc-groups {
+  .cg-panels {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .rc-row {
-    grid-template-columns: 7.5rem minmax(0, 1fr) 4.2rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cg-bar,
-  .rc-bar {
+  .cg-bar {
     animation: none;
   }
 }
 
-/* The 0.7.0 post's package matrix (docs/blog/0.7.0/compare.html): per method and package, whether
-   a reordering changed the graph. The mark is a word, and its color only repeats it. */
-.cm {
+/* The 0.7.0 post's comparison tables (docs/blog/0.7.0/figures.py, table()): rows grouped under a
+   label set on its side, Andrey's column first and tinted in the accent, and each row's best cell
+   in bold, shaded when it is not Andrey's. */
+.ct {
   margin: 1.5rem 0 2rem;
 }
 
-.cm-scroll {
+.ct .ct-title {
+  margin: 0 0 0.5rem;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ct-scroll {
   overflow-x: auto;
   border: 1px solid var(--andrey-line);
   border-radius: var(--andrey-radius-lg);
   background: var(--andrey-surface);
 }
 
-.cm-table {
+.ct-table {
   width: 100%;
   margin: 0;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.cm-table th,
-.cm-table td {
-  padding: 0.55rem 0.6rem;
+.ct-table th,
+.ct-table td {
+  padding: 0.75rem 0.9rem;
   border: 0;
   border-bottom: 1px solid var(--andrey-line);
   text-align: center;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
-.cm-table tbody tr:last-child > * {
-  border-bottom: 0;
-}
-
-.cm-table thead th {
-  color: var(--andrey-muted);
-  font-size: 0.75rem;
+.ct-table thead th {
+  color: var(--andrey-ink);
+  font-size: 0.8rem;
   font-weight: 600;
+  white-space: normal;
 }
 
-.cm-table thead th:nth-child(2),
-.cm-table tbody td:nth-child(2) {
-  background: var(--andrey-surface-2);
-}
-
-.cm-table tbody th {
+.ct-table tbody th[scope="row"] {
   text-align: left;
   font-weight: 600;
 }
 
-.cm-table td span {
-  display: inline-block;
-  padding: 0.1rem 0.55rem;
-  border-radius: 999px;
+.ct-table tbody th small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* A group's label runs up its side, and a heavier rule separates the groups. */
+.ct-table .ct-group {
+  width: 2.2rem;
+  padding: 0.5rem 0.2rem;
+  border-right: 1px solid var(--andrey-line);
+  color: var(--andrey-ink);
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
-.cm-table .co-yes span {
-  background: color-mix(in srgb, var(--andrey-accent) 14%, transparent);
-  color: var(--andrey-accent);
+.ct-table .ct-group span {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
 }
 
-.cm-table .co-no span {
-  background: color-mix(in srgb, var(--andrey-edge-bidirected) 14%, transparent);
-  color: var(--andrey-edge-bidirected);
+.ct-table tbody tr:has(.ct-group) > * {
+  border-top: 2px solid var(--andrey-line);
 }
 
-.cm-table .co-name span {
-  border: 1px solid var(--andrey-line);
+.ct-table tbody tr:first-child > * {
+  border-top: 0;
+}
+
+.ct-table tbody tr:last-child > *,
+.ct-table .ct-group {
+  border-bottom: 0;
+}
+
+.ct-table .ct-na {
   color: var(--andrey-muted);
 }
 
-.cm-table .co-na {
-  color: var(--andrey-muted);
-}
-
-.cm figcaption {
+.ct figcaption {
   margin-top: 0.6rem;
   text-align: left;
   color: var(--andrey-muted);

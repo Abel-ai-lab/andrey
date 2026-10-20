@@ -27,8 +27,12 @@ CI tests 3.11 to 3.14.
 uv add andrey-core
 ```
 
-[Getting started](guides/getting-started.md#install) covers pip, the optional extras, the
-development version, and building from source.
+```shell
+pip install andrey-core
+```
+
+[Getting started](guides/getting-started.md#install) covers the optional extras, the development
+version, and building from source.
 
 ### Which operating systems does it support?
 
