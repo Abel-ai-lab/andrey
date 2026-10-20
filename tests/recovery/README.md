@@ -13,7 +13,8 @@ Ground-truth tests establish whether the recovered structure is correct.
   the variable in each column.
 - `test_quality_gate.py` self-checks the pre-publish gate of `qa/quality_gate.py` without fitting
   a method: the gate covers the supported methods and rejects wrong answers. The gate itself
-  measures method quality and runs with `uv run python -m qa.quality_gate`, not on pull requests.
+  measures method quality and runs with `uv run python -m qa.quality_gate` and on the release pull
+  request into `main`, not on other pull requests.
 
 Structural fields match exactly. Numeric fields use `helpers/tolerances.py`; ExactSearch compares
 CPDAGs because score-equivalent DAG optima can differ in orientation. Ground-truth and independent

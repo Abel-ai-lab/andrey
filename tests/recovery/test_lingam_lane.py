@@ -141,7 +141,7 @@ def _ica_in_original_labels(X: np.ndarray, order: tuple[int, ...]) -> tuple[list
     return [order[k] for k in out.ordering], weights
 
 
-def test_ica_lingam_tied_sources_follow_the_columns(monkeypatch):
+def test_ica_lingam_tied_sources_follow_the_columns():
     """Two independent sources can both come first; reordering the columns keeps the choice."""
     rng = np.random.default_rng(0)
     a, b = rng.uniform(-1, 1, 2000), rng.uniform(-1, 1, 2000)
@@ -154,8 +154,6 @@ def test_ica_lingam_tied_sources_follow_the_columns(monkeypatch):
         np.testing.assert_array_equal(got[1] != 0, want[1] != 0)
         np.testing.assert_allclose(got[1], want[1], rtol=0, atol=1e-6)
 
-    import andrey.lingam.ica as ica
-
-    monkeypatch.setattr(ica, "tie_ranks", lambda x: np.arange(x.shape[1]))
-    by_position = [_ica_in_original_labels(X, order)[0] for order in orders]
+    with andrey.config(tie_break="position"):
+        by_position = [_ica_in_original_labels(X, order)[0] for order in orders]
     assert any(o != by_position[0] for o in by_position[1:])

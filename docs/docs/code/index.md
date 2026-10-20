@@ -53,6 +53,22 @@ single column gives a one-node graph.
 `"cond_gauss"` for mixed data, and the experimental nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`,
 and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
 
+`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
+`exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
+and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
+`knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
+`max_depth`, the maximum conditioning-set size of their conditional-independence tests.
+[Background knowledge](../guides/getting-started.md#background-knowledge) shows them in use.
+
+```{eval-rst}
+.. currentmodule:: andrey
+
+.. autosummary::
+   :toctree: generated
+
+   Knowledge
+```
+
 ### Supported methods
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
@@ -108,8 +124,9 @@ The rules run in rounds, each setting together the marks every rule implies on t
 stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
 Their possible-d-separation step visits the pairs and nodes by a rank computed from each column's
-own data, so with the default `possible_dsep="order_free"` their result does not depend on the
-column order unless two columns are identical; `"fast"` visits them in column order.
+own data, so with `possible_dsep="order_free"`, the default, their result does not depend on the
+column order unless two columns are identical; `"fast"` visits them in column order and is the
+default under `andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
@@ -213,11 +230,12 @@ mutual information estimate the test's p-value is built on, a dependence measure
    seed_all
 ```
 
-`andrey.config` holds the process-wide backend preference and worker count. Assign
-`andrey.config.backend` or `andrey.config.num_workers` to change the default for every later call,
-or use `with andrey.config(backend=..., num_workers=...):` for one block.
-[Configuration](../configuration.md) lists the `ANDREY_*` environment variables and the order in
-which the settings apply.
+`andrey.config` holds the process-wide backend preference, worker count, and tie-break rule. Assign
+`andrey.config.backend`, `andrey.config.num_workers`, or `andrey.config.tie_break` to change the
+default for every later call, or use `with andrey.config(backend=..., num_workers=...,
+tie_break=...):` for one block. [Configuration](../configuration.md) lists the `ANDREY_*`
+environment variables and the order in which the settings apply, and
+[Column order and machines](../guides/column-order.md) describes `tie_break`.
 
 ## Warnings
 

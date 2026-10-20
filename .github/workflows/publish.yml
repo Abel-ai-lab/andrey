@@ -68,13 +68,40 @@ jobs:
           uv pip install dist/${{ matrix.artifact }}
           uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None; import numpy as np, andrey; print(andrey.__version__, andrey.pc(np.random.default_rng(0).standard_normal((500, 4))).structure.to_numpy())"
 
-  # The supported methods against known graphs, on the commit being published (qa/README.md).
+  # The release's quality gate (qa/README.md) runs on the release pull request into main, and a
+  # squash merge keeps its tree. A passing run on the tree being published already checked these
+  # files, so the gate below is skipped; any other tree, or a failed lookup, runs it here.
+  gate-lookup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reuse: ${{ steps.lookup.outputs.reuse }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: A passing quality-gate run on this commit's tree
+        id: lookup
+        # The script reports every failure as reuse=false; an empty output also runs the gate.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/gate_reuse.py
+
   quality-gate:
+    needs: gate-lookup
+    if: ${{ !cancelled() && needs.gate-lookup.outputs.reuse != 'true' }}
     uses: ./.github/workflows/quality-gate.yml
 
   publish-testpypi:
-    needs: [build, install, quality-gate]
-    if: ${{ inputs.index == 'testpypi' }}
+    needs: [build, install, gate-lookup, quality-gate]
+    # A skipped gate counts only when the lookup found a passing run on this tree.
+    if: >-
+      ${{ !cancelled() && inputs.index == 'testpypi'
+      && needs.build.result == 'success' && needs.install.result == 'success'
+      && (needs.quality-gate.result == 'success'
+      || (needs.quality-gate.result == 'skipped' && needs.gate-lookup.outputs.reuse == 'true')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
@@ -92,8 +119,13 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
-    needs: [build, install, quality-gate]
-    if: ${{ inputs.index == 'pypi' }}
+    needs: [build, install, gate-lookup, quality-gate]
+    # A skipped gate counts only when the lookup found a passing run on this tree.
+    if: >-
+      ${{ !cancelled() && inputs.index == 'pypi'
+      && needs.build.result == 'success' && needs.install.result == 'success'
+      && (needs.quality-gate.result == 'success'
+      || (needs.quality-gate.result == 'skipped' && needs.gate-lookup.outputs.reuse == 'true')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:

@@ -85,7 +85,8 @@ def gin(
     tests, the member each run of a root test takes, and the choice between root candidates whose
     lowest p-values agree to nine decimals follow the rank. Reordering the columns therefore
     relabels the clusters and changes nothing else, unless two columns are identical. The rank is
-    arbitrary with respect to causal structure.
+    arbitrary with respect to causal structure. The
+    :doc:`column-order guide </docs/guides/column-order>` says what reordering the columns keeps.
 
     **Limitations.** Measured on simulated linear measurement models with uniform noise and 1,000
     rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its

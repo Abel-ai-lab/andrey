@@ -149,6 +149,7 @@ def find_causal_order(
     X: np.ndarray,
     *,
     scores: Callable[[np.ndarray, list[int]], np.ndarray] = score_candidates,
+    precedence: np.ndarray | None = None,
 ) -> list[int]:
     """Peel exogenous variables (:func:`pick` of ``scores``) one at a time, residualizing the rest.
 
@@ -158,20 +159,30 @@ def find_causal_order(
     columns, which are identical on every machine and keep their ranks when the columns are
     reordered; residualized columns differ in the last bits across machines. Single-dataset;
     MultiGroupDirectLiNGAM runs its own group loop (per-group residualization), reusing
-    :func:`copy_groups`, :func:`score_candidates`, and :func:`pick` directly.
+    :func:`copy_groups`, :func:`score_candidates`, and :func:`pick` directly. With ``precedence``
+    (``precedence[a, b]``: ``a`` comes before ``b``, acyclic), no copy group is formed, since
+    placing one at once could put a column before one that must precede it: every remaining
+    variable is scored, and the pick is the best one that no remaining variable must precede.
     """
     remaining = list(range(X.shape[1]))
     order: list[int] = []
     residualized = np.array(X, dtype=np.float64)  # copy + float64: the write-back must not truncate
     ranks = tie_ranks(residualized)
     while remaining:
-        copies = copy_groups([residualized], remaining, ranks)
+        if precedence is None:
+            copies = copy_groups([residualized], remaining, ranks)
+        else:
+            copies = {u: [] for u in remaining}
         candidates = list(copies)
         # A lone candidate needs no scoring (and has no pair to score).
         if len(candidates) == 1:
             m = candidates[0]
-        else:
+        elif precedence is None:
             m = pick(scores(residualized, candidates), candidates, ranks)
+        else:
+            eligible = ~precedence[np.ix_(candidates, candidates)].any(axis=0)
+            values = scores(residualized, candidates)[eligible]
+            m = pick(values, [c for c, ok in zip(candidates, eligible) if ok], ranks)
         placed = [m, *copies[m]]
         remaining = [u for u in remaining if u not in placed]
         for i in remaining:

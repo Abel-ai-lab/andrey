@@ -21,6 +21,7 @@ import platform
 import re
 import sys
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import typer
@@ -30,6 +31,7 @@ from andrey.api._adapt import node_labels, shared_labels, with_labels
 from andrey.core import LATENT, GraphStructure
 from andrey.core.backend import usable_cpus
 from andrey.core.env import SETTINGS
+from andrey.core.knowledge import KnowledgeError
 from andrey.core.structure import SUMMARY_EDGES
 from andrey.spec import ENV_VARS, REGISTRY, SCHEMA_VERSION, get_spec, help_schema, list_specs
 from andrey.spec.generate import (
@@ -406,6 +408,8 @@ def _check_choice(value: str, param: ParamSpec) -> str:
 
 def _coerce(raw: str, param: ParamSpec) -> object:
     """Coerce a raw CLI string against a ParamSpec type -- the spec drives the parse (no sniff)."""
+    if param.type == "knowledge":
+        return _knowledge_value(raw, param.name)
     value, quoted = _unquote(raw)
     if quoted:  # a quoted value is a literal string -- only a str param can accept one
         if param.type != "str":
@@ -464,6 +468,45 @@ def _coerce(raw: str, param: ParamSpec) -> object:
     return _check_choice(value, param)
 
 
+def _knowledge_value(raw: str, name: str) -> dict | None:
+    """Read a `knowledge=` value: inline JSON (`{...}`), `null`, or the path of a JSON file, bare
+    or in one pair of single or double quotes."""
+    text = raw.strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "'\"":
+        text = text[1:-1].strip()
+    if text.lower() == "null":
+        return None
+    if not text.startswith("{"):
+        try:
+            text = Path(text).read_text()
+        except OSError as exc:
+            raise CliError(
+                "bad_value",
+                f"{name} expects a JSON object or the path of a JSON file; cannot read {raw!r}: "
+                f"{exc.strerror}",
+                EXIT_USAGE,
+            ) from None
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise CliError("bad_value", f"{name} is not valid JSON: {exc}", EXIT_USAGE) from None
+    return _knowledge_object(value, name)
+
+
+def _knowledge_object(value: object, name: str) -> dict:
+    """Check a knowledge object's keys; the facade checks its contents."""
+    keys = ("required", "forbidden", "allowed", "tiers")
+    if not isinstance(value, dict) or set(value) - set(keys):
+        raise CliError(
+            "bad_value",
+            f"{name} must be a JSON object whose keys are among {', '.join(keys)}; each is "
+            "optional",
+            EXIT_USAGE,
+            valid_options=list(keys),
+        )
+    return value
+
+
 def _coerce_passthrough(raw: str) -> object:
     """Sniff an open passthrough value (only where there is no spec, such as CALM): quoted -> str,
     then null, true/false, int, float, [list], else str."""
@@ -493,6 +536,10 @@ def _validate_config_value(value: object, param: ParamSpec) -> object:
         if param.nullable:
             return None
         raise CliError("bad_value", f"{param.name} may not be null", EXIT_USAGE)
+    if param.type == "knowledge":
+        if isinstance(value, str):  # a path or inline JSON, as on the command line
+            return _knowledge_value(value, param.name)
+        return _knowledge_object(value, param.name)
     ok = {
         "bool": isinstance(value, bool),
         "int": isinstance(value, int) and not isinstance(value, bool),
@@ -719,9 +766,14 @@ def execute_run(
         labels = None
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
-    if labels is not None and any(p.name == "categorical" for p in spec.params):
+    if fkwargs.get("knowledge") is not None:
+        try:
+            fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
+        except (TypeError, ValueError) as exc:
+            raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
+    if labels is not None and any(p.name in ("categorical", "knowledge") for p in spec.params):
         # A method that reads column types names the header's columns in its warnings and in
-        # metadata["categorical"].
+        # metadata["categorical"]; knowledge names them too.
         import pandas as pd
 
         positional = [pd.DataFrame(positional[0], columns=list(labels)), *positional[1:]]
@@ -739,6 +791,8 @@ def execute_run(
         ) from exc
     except NotImplementedError as exc:  # a documented parameter limit -> fix the call
         raise CliError("unsupported_value", str(exc), EXIT_USAGE) from exc
+    except KnowledgeError as exc:  # knowledge the data's columns or the search cannot satisfy
+        raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
     except TypeError as exc:  # an unknown passthrough knob reaches the facade as a bad kwarg
         raise CliError("unsupported_value", f"{exc}", EXIT_USAGE) from exc
     except (ValueError, ArithmeticError) as exc:  # bad shape / NaN / singular / numeric breakdown
@@ -941,7 +995,11 @@ def config_report() -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
         "andrey_version": andrey.__version__,
-        "configuration": {"backend": state["backend"], "num_workers": state["num_workers"]},
+        "configuration": {
+            "backend": state["backend"],
+            "num_workers": state["num_workers"],
+            "tie_break": andrey.config.tie_break,
+        },
         "available_backends": state["available_backends"],
         "system": system_report(state["available_backends"]),
         "environment": environment,
@@ -960,6 +1018,7 @@ def render_config(report: dict) -> str:
     lines = [
         f"Backend preference: {settings['backend']}",
         f"Worker setting: {settings['num_workers']}",
+        f"Tie break: {settings['tie_break']}",
         f"Available backends: {available}",
         *[f"  {name}: {why}" for name, why in system["unavailable_backends"].items()],
         "Actual backend selection depends on the operation, input size, and runtime state.",

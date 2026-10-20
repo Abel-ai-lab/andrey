@@ -274,6 +274,40 @@ intervened on in each row, and `multi_group_direct_lingam` and `longitudinal_lin
 datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph each one
 returns.
 
+## Background knowledge
+
+What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,
+naming columns by their labels:
+
+```python
+from andrey import Knowledge, pc
+
+knowledge = Knowledge(
+    required=[("smoking", "tar")],          # edges the graph must have
+    forbidden=[("cancer", "smoking")],      # edges it must not have
+    tiers=[["age", "sex"], ["smoking"], ["tar", "cancer"]],  # no edge into an earlier tier
+)
+result = pc(data, knowledge=knowledge)
+```
+
+`allowed` lists the only pairs that may be adjacent; listing a pair permits an edge but does not
+require one. A short list narrows the search, which can make it faster. PC, FCI, and CD-NOD start
+their adjacency search from the allowed pairs, and GFCI's GES phase searches only inside them, so
+you can screen first and then search inside the pairs that survived:
+`Knowledge.from_skeleton(pc(data, max_depth=1))`. `max_depth` is the maximum conditioning-set size
+of those four methods' tests, the cap pcalg names `m.max` and causal-learn's FCI names `depth`.
+
+The result honors every part: a required edge is there and directed, a forbidden one is not, and a
+pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed
+and Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the
+DAGs of the equivalence class that satisfy the knowledge. In a PAG, a forbidden `a -> b` puts an
+arrowhead at `a` and can leave a circle at `b`. Knowledge that contradicts itself, such as a
+required edge into an earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD,
+and FCI, knowledge whose directions close a cycle over the edges the search kept raises one after
+the adjacency search. Labels stay attached to their columns, so the same knowledge fits the table
+in any column order. On the command line, give a JSON object inline or as a file:
+`andrey run pc --data data.csv knowledge=knowledge.json`.
+
 ## Data types
 
 Each test and score reads the columns as one kind of data:
@@ -386,8 +420,14 @@ data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#kno
 - [Spirtes, Glymour, and Scheines (2000), Causation, Prediction, and Search][pc]: the PC algorithm.
 - [Chickering (2002), Optimal Structure Identification With Greedy Search][ges]: GES.
 - [Shimizu et al. (2006), A Linear Non-Gaussian Acyclic Model for Causal Discovery][lingam].
+- [Meek (1995), Causal Inference and Causal Explanation with Background Knowledge][meek]: Meek's
+  rules with background knowledge.
+- [Perkovic, Kalisch, and Maathuis (2017), Interpreting and Using CPDAGs with Background
+  Knowledge][mpdag]: the MPDAG.
 
 [sachs]: https://doi.org/10.1126/science.1105809
 [pc]: https://doi.org/10.7551/mitpress/1754.001.0001
 [ges]: https://jmlr.org/papers/v3/chickering02b.html
 [lingam]: https://www.jmlr.org/papers/v7/shimizu06a.html
+[meek]: https://arxiv.org/abs/1302.4972
+[mpdag]: https://arxiv.org/abs/1707.02171
