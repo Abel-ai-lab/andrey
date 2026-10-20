@@ -9,6 +9,18 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- Nonlinear independence tests: `pc`, `fci`, `gfci`, and `cdnod` take KCI, RCoT, CMIknn, and
+  GPDC, four experimental tests that detect the nonlinear dependence partial correlation misses,
+  KCI and CMIknn on a CUDA GPU too. The 0.8.0 post and release card give the measurements.
+  ([#209], [#213])
+- The same graph in any column order and on any CPU: DirectLiNGAM, ICA-LiNGAM, exact search, GES,
+  GIES, XGES, CALM, GIN, ParceLiNGAM, the PCMCI methods, and the nonlinear tests break ties by
+  each column's own data instead of its position or rounding. ([#205], [#213], [#228])
+- Faster categorical tests: `pc` with `indep_test="chisq"` or `"gsq"` runs 4-6x faster than in
+  0.7.0, with the same p-values and graphs. ([#208])
+
 ### Added
 
 - `andrey.data.load_dataset("diabetes")`, the bnlearn diabetes network: 413 variables and 602
