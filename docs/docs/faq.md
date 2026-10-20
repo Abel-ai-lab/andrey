@@ -85,8 +85,8 @@ case, including Andrey's GES at 200 variables with the default penalty.
 ### Why does a result differ from another package's?
 
 Methods can break ties in a different order, use different defaults, or treat the column order
-differently; FCI, for one, depends on column order. The [release cards](benchmarks.md) score every
-package on the same true graphs, so compare accuracy there rather than edge by edge.
+differently. The [release cards](benchmarks.md) score every package on the same true graphs, so
+compare accuracy there rather than edge by edge.
 
 ## Speed and hardware
 
