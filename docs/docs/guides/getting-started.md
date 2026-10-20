@@ -296,16 +296,15 @@ numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pan
 from the columns: a DataFrame's `category`, `bool`, or text column, or a column of at most
 `max_categories` distinct whole numbers (10 by default), is categorical. When every column is
 categorical, they score with `local_score_BDeu`; when some are, with `local_score_cond_gauss`, the
-conditional Gaussian score, the default for mixed data in bnlearn and Tetrad. `tabu` has no
-mixed-data score and keeps the linear-Gaussian BIC on mixed data. Either switch says so with a
-one-time `DataTypeWarning`, which names the categorical columns of mixed data. A column of counts or
-ratings with that few values counts as categorical too; to read such columns as numbers, pass the
-linear-Gaussian BIC: `score_func="local_score_BIC"` to `ges` and `exact_search`, or
-`score_func="local_score_BIC_from_cov"` to the others. A `score_func` you pass is always the one
-used; to choose the categorical columns of mixed data, pass `score_func="local_score_cond_gauss"`
-with `categorical=[...]`. Data with no categorical column keep the linear-Gaussian BIC. The tests do
-not switch: `pc`, `fci`, `gfci`, and `cdnod` take `indep_test="chisq"` or `"gsq"` for categorical
-data and a mixed-data test for mixed data.
+conditional Gaussian score. `tabu` has no mixed-data score and keeps the linear-Gaussian BIC on
+mixed data. Either switch says so with a one-time `DataTypeWarning`, which names the categorical
+columns of mixed data. A column of counts or ratings with that few values counts as categorical too;
+to read such columns as numbers, pass the linear-Gaussian BIC: `score_func="local_score_BIC"` to
+`ges` and `exact_search`, or `score_func="local_score_BIC_from_cov"` to the others. A `score_func`
+you pass is always the one used; to choose the categorical columns of mixed data, pass
+`score_func="local_score_cond_gauss"` with `categorical=[...]`. Data with no categorical column keep
+the linear-Gaussian BIC. The tests do not switch: `pc`, `fci`, `gfci`, and `cdnod` take
+`indep_test="chisq"` or `"gsq"` for categorical data and a mixed-data test for mixed data.
 
 **Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
 `andrey.pc(data, indep_test="cond_gauss")` or
