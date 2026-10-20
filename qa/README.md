@@ -50,8 +50,12 @@ One command checks the current commit before a release, and exits 1 if any check
 uv run python -m qa.quality_gate
 ```
 
-The `quality-gate` workflow runs the same command. Every job that publishes to PyPI must need a job
-that calls it; `tests/unit/test_release_gates.py` fails otherwise. Pull requests do not run the
+The `quality-gate` workflow runs the same command once per release, on the head of the release pull
+request into `main`, and `main`'s ruleset requires it. The publish workflow skips its own run when a
+passing run has the tree of the commit it publishes (`scripts/gate_reuse.py`; a squash merge keeps
+the tree), so the published files are the ones the gate passed. A change after the gate, or a lookup
+that fails, runs the gate again. Every job that publishes to PyPI must need a job that calls the
+workflow; `tests/unit/test_release_gates.py` fails otherwise. Other pull requests do not run the
 gate. It checks PC, FCI, GFCI, CD-NOD, GES, GIES, XGES, HC, Tabu, exact search, CALM, BOSS, GRaSP,
 DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI,
 PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and Granger on the datasets whose assumptions each

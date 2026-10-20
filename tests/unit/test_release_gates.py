@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 import re
 import runpy
+import subprocess
 import tarfile
 import zipfile
 from pathlib import Path
@@ -137,6 +139,167 @@ def test_the_publish_guard_flags_a_job_without_the_gate():
     assert ungated_publish_jobs({"jobs": {"a": action, "b": command}}) == ["a", "b"]
     gated = {"gate": {"uses": QUALITY_GATE}, "a": {**action, "needs": ["build", "gate"]}}
     assert ungated_publish_jobs({"jobs": {**gated, "b": {**command, "needs": "gate"}}}) == []
+
+
+def _workflow(name: str) -> dict:
+    # BaseLoader keeps every value a string and the `on` key a string, not `True`.
+    path = ROOT / ".github" / "workflows" / name
+    return yaml.load(path.read_text(), Loader=yaml.BaseLoader)
+
+
+def _evaluate(condition: str, needs: str | list[str], **context: dict) -> bool:
+    """Evaluate a job's ``if`` for the ``results``, ``outputs``, and ``inputs`` given.
+
+    ``!cancelled()`` is true: the run is not cancelled. Every job the condition reads must be in
+    the job's ``needs``, as GitHub resolves ``needs.<job>`` only for those.
+    """
+    needed = {needs} if isinstance(needs, str) else set(needs)
+    read = set(re.findall(r"needs\.([\w-]+)\.", condition))
+    assert read <= needed, read - needed
+    expression = re.sub(r"^\$\{\{|\}\}$", "", condition.strip()).replace("!cancelled()", "True")
+    expression = re.sub(r"needs\.([\w-]+)\.result", r'results["\1"]', expression)
+    expression = re.sub(r"needs\.([\w-]+)\.outputs\.(\w+)", r'outputs["\1.\2"]', expression)
+    expression = re.sub(r"inputs\.(\w+)", r'inputs["\1"]', expression)
+    expression = expression.replace("&&", " and ").replace("||", " or ")
+    return eval(expression, {"__builtins__": {}}, context)
+
+
+def test_the_quality_gate_runs_on_pull_requests_into_main():
+    triggers = _workflow("quality-gate.yml")["on"]
+    assert triggers["pull_request"]["branches"] == ["main"]
+    assert "workflow_call" in triggers
+
+
+def test_the_publish_gate_runs_unless_the_lookup_found_a_run():
+    jobs = _workflow("publish.yml")["jobs"]
+    gate = jobs["quality-gate"]
+    assert gate["uses"] == QUALITY_GATE
+    # A failed or empty lookup is not a reuse, so the gate runs.
+    for reuse, runs in (("true", False), ("false", True), ("", True)):
+        outputs = {"gate-lookup.reuse": reuse}
+        assert _evaluate(gate["if"], gate["needs"], outputs=outputs) is runs, reuse
+    lookup = jobs["gate-lookup"]
+    assert lookup["permissions"]["actions"] == "read"
+    assert lookup["steps"][-1]["continue-on-error"] == "true"
+
+
+@pytest.mark.parametrize(
+    ("job", "index"), [("publish-testpypi", "testpypi"), ("publish-pypi", "pypi")]
+)
+def test_publish_needs_a_gate_that_passed_or_was_reused(job, index):
+    publish = _workflow("publish.yml")["jobs"][job]
+    assert "cancelled()" in publish["if"]  # else GitHub adds success(), which a skipped gate fails
+
+    def publishes(gate, reuse, build="success", install="success", chosen=index):
+        results = {"build": build, "install": install, "quality-gate": gate}
+        outputs = {"gate-lookup.reuse": reuse}
+        inputs = {"index": chosen}
+        return _evaluate(
+            publish["if"], publish["needs"], results=results, outputs=outputs, inputs=inputs
+        )
+
+    assert publishes("success", "")
+    assert publishes("skipped", "true")
+    for gate, reuse in (
+        ("skipped", ""),
+        ("skipped", "false"),
+        ("failure", "true"),
+        ("cancelled", ""),
+    ):
+        assert not publishes(gate, reuse), (gate, reuse)
+    assert not publishes("success", "", build="failure")
+    assert not publishes("success", "", install="skipped")
+    assert not publishes("success", "", chosen="elsewhere")
+
+
+@pytest.fixture(scope="module")
+def gate_reuse():
+    spec = importlib.util.spec_from_file_location("gate_reuse", ROOT / "scripts" / "gate_reuse.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _gate_run(tree: str | None, conclusion: str = "success", run_id: int = 1) -> dict:
+    return {
+        "id": run_id,
+        "conclusion": conclusion,
+        "html_url": f"https://github.com/example/runs/{run_id}",
+        "head_commit": {"tree_id": tree},
+    }
+
+
+def test_a_passing_run_on_the_published_tree_is_reused(gate_reuse):
+    runs = [_gate_run("other", run_id=1), _gate_run("tree", run_id=2), _gate_run("tree", run_id=3)]
+    assert gate_reuse.passing_run(runs, "tree")["id"] == 2
+
+
+@pytest.mark.parametrize(
+    ("runs", "tree"),
+    [
+        ([_gate_run("other")], "tree"),  # a change landed after the gate ran
+        ([_gate_run("tree", "failure"), _gate_run("tree", "cancelled")], "tree"),
+        ([_gate_run("tree", "skipped"), _gate_run("tree", None)], "tree"),
+        (
+            [{"id": 1, "conclusion": "success"}, {"conclusion": "success", "head_commit": None}],
+            "tree",
+        ),
+        ([_gate_run(None)], None),  # no tree to compare is never a match
+        ([_gate_run("")], ""),
+        ([], "tree"),
+    ],
+)
+def test_a_tree_mismatch_or_an_unfinished_run_forces_the_gate(gate_reuse, runs, tree):
+    assert gate_reuse.passing_run(runs, tree) is None
+
+
+def _reuse(gate_reuse, monkeypatch, tmp_path, output) -> str:
+    output_file = tmp_path / "output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output_file))
+    monkeypatch.setenv("GITHUB_REPOSITORY", "example/andrey")
+    monkeypatch.setattr(gate_reuse, "_output", output)
+    assert gate_reuse.main() == 0
+    return output_file.read_text().strip()
+
+
+def _fake_github(tree: str, runs: list[dict]):
+    def output(command: list[str]) -> str:
+        if command[0] == "git":
+            return tree
+        assert command[:2] == ["gh", "api"] and "quality-gate.yml/runs" in command[2]
+        return json.dumps({"workflow_runs": runs})
+
+    return output
+
+
+def test_the_lookup_reuses_the_gate_only_for_the_checked_out_tree(
+    gate_reuse, monkeypatch, tmp_path
+):
+    runs = [_gate_run("tree-a", run_id=1), _gate_run("tree-b", run_id=2)]
+    same = _fake_github("tree-b", runs)
+    assert _reuse(gate_reuse, monkeypatch, tmp_path, same) == "reuse=true"
+    (tmp_path / "output").unlink()
+    changed = _fake_github("tree-c", runs)
+    assert _reuse(gate_reuse, monkeypatch, tmp_path, changed) == "reuse=false"
+
+
+@pytest.mark.parametrize(
+    "failure", [subprocess.CalledProcessError(1, "gh"), OSError("no gh"), ValueError("bad json")]
+)
+def test_a_failed_lookup_runs_the_gate_instead_of_failing(
+    gate_reuse, monkeypatch, tmp_path, failure
+):
+    def output(command):
+        raise failure
+
+    assert _reuse(gate_reuse, monkeypatch, tmp_path, output) == "reuse=false"
+
+
+def test_an_unusable_api_response_runs_the_gate(gate_reuse, monkeypatch, tmp_path):
+    def output(command):
+        return "git-tree" if command[0] == "git" else json.dumps({"message": "Not Found"})
+
+    assert _reuse(gate_reuse, monkeypatch, tmp_path, output) == "reuse=false"
 
 
 @pytest.mark.parametrize("lane", ["preview", "prod"])
