@@ -11,6 +11,7 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
+from andrey.core.knowledge import column_position
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
 from andrey.core.structure import relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
@@ -24,11 +25,12 @@ if TYPE_CHECKING:
 def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -> np.ndarray:
     """Return ``data`` as a float64 ``(n_samples, n_features)`` matrix, checked before a fit.
 
-    Raises ``ValueError``, naming ``name``, when the values are not numeric, the array is not 2-D,
-    it has fewer than ``min_rows`` rows, it holds ``NaN`` or ``inf``, or a column is constant: no
-    method can estimate a variance or a dependence from such data. The message names every
-    constant column.
+    Raises ``ValueError``, naming ``name``, when two columns share a name (:func:`column_labels`),
+    the values are not numeric, the array is not 2-D, it has fewer than ``min_rows`` rows, it holds
+    ``NaN`` or ``inf``, or a column is constant: no method can estimate a variance or a dependence
+    from such data. The message names every constant column.
     """
+    column_labels(data)
     try:
         X = np.asarray(data, dtype=np.float64)
     except (TypeError, ValueError) as error:
@@ -130,8 +132,10 @@ def checked_data(
     mixed. ``index_categorical`` passes to :func:`mixed_matrix`.
 
     Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
-    ``ValueError`` when ``categorical`` is given for a setting that reads no column types.
+    ``ValueError`` when two columns share a name (:func:`column_labels`) or ``categorical`` is given
+    for a setting that reads no column types.
     """
+    column_labels(data)
     setting = f"{option}={value!r}"
     kind = data_kind(value)
     max_categories = int_in_range(max_categories, "max_categories", 2)
@@ -202,9 +206,10 @@ def mixed_matrix(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return mixed data as a float64 matrix and a boolean mask of its categorical columns.
 
-    ``categorical`` lists the categorical columns by DataFrame column name or 0-based position;
-    ``[]`` lists none. ``None`` infers them: a pandas DataFrame's ``category``, ``bool``,
-    ``object``, and ``string`` columns, and every column whose values, over all its rows, are at
+    ``categorical`` lists the categorical columns by label (a string) or 0-based position (an
+    integer), as :func:`~andrey.core.knowledge.column_position` reads them; ``[]`` lists none.
+    ``None`` infers them: a pandas DataFrame's ``category``, ``bool``, ``object``, and ``string``
+    columns, and every column whose values, over all its rows, are at
     most ``max_categories`` distinct whole numbers. A :class:`~andrey.DataTypeWarning` names the
     inferred columns and why. A categorical column that does not hold numbers has its values
     numbered, each distinct value one category; a numeric one must hold whole numbers, as
@@ -220,6 +225,7 @@ def mixed_matrix(
     """
     columns = getattr(data, "columns", None)
     names = None if columns is None else list(columns)
+    labels = column_labels(data)
     if categorical is None:
         typed = np.zeros(0, dtype=bool) if names is None else _categorical_dtypes(data)
         table = data if names is None else _encode_categories(data, typed, setting, name)
@@ -244,7 +250,7 @@ def mixed_matrix(
         X = data_matrix(data, name=name)
         mask = _column_mask(categorical, None, X.shape[1])
     else:
-        mask = _column_mask(categorical, names, len(names))
+        mask = _column_mask(categorical, labels, len(names))
         X = data_matrix(_encode_categories(data, mask, setting, name), name=name)
     check_categories(np.where(mask, X, 0.0), data, setting, name=name)
     if not mask.any() and not index_categorical:
@@ -315,8 +321,8 @@ def _categorical_dtypes(data: object) -> np.ndarray:
     return np.array([categorical(dtype) for dtype in dtypes], dtype=bool)
 
 
-def _column_mask(categorical: object, names: list | None, d: int) -> np.ndarray:
-    """Mark the columns ``categorical`` lists by name or 0-based position."""
+def _column_mask(categorical: object, labels: tuple[str, ...] | None, d: int) -> np.ndarray:
+    """Mark the columns ``categorical`` lists by label or 0-based position."""
     if isinstance(categorical, (str, bytes)) or not isinstance(
         categorical, (list, tuple, np.ndarray)
     ):
@@ -326,22 +332,14 @@ def _column_mask(categorical: object, names: list | None, d: int) -> np.ndarray:
         )
     mask = np.zeros(d, dtype=bool)
     for item in categorical:
-        if isinstance(item, (int, np.integer)) and not isinstance(item, (bool, np.bool_)):
-            if not 0 <= item < d:
-                raise ValueError(f"categorical lists column {item}, but data has {d} columns")
-            mask[int(item)] = True
-        elif isinstance(item, str):
-            if names is None:
-                raise ValueError(
-                    f"categorical names column {item!r}, but data has no column names; give a "
-                    "DataFrame or the column's 0-based position"
+        if isinstance(item, str) or (
+            isinstance(item, (int, np.integer)) and not isinstance(item, (bool, np.bool_))
+        ):
+            mask[
+                column_position(
+                    item if isinstance(item, str) else int(item), labels, d, "categorical"
                 )
-            if item not in names:
-                raise ValueError(
-                    f"categorical names column {item!r}, which data does not have; its columns "
-                    f"are {[str(n) for n in names]}"
-                )
-            mask[names.index(item)] = True
+            ] = True
         else:
             raise TypeError(
                 "categorical must list column names or 0-based positions, got "
@@ -489,18 +487,32 @@ def structure_output(
 
 
 def node_labels(names: Iterable[object]) -> tuple[str, ...]:
-    """Turn column names into node labels: strings, unique so that each names one node."""
+    """Turn column names into node labels: each name as text, ``str(name)``.
+
+    Raises ``ValueError`` naming each label that two columns share, such as ``1`` and ``"1"``,
+    which are both ``"1"`` as text.
+    """
+    names = list(names)
     labels = tuple(str(name) for name in names)
-    if len(set(labels)) != len(labels):
-        raise ValueError(f"column names must be unique to name the nodes, got {list(labels)}")
+    shared = [label for label in dict.fromkeys(labels) if labels.count(label) > 1]
+    if shared:
+        clashes = "; ".join(
+            f"{label!r} names columns {[j for j, other in enumerate(labels) if other == label]}"
+            for label in shared
+        )
+        raise ValueError(
+            f"column names must be unique as text to name the nodes, but {clashes}; rename the "
+            "columns so each has its own name"
+        )
     return labels
 
 
 def column_labels(data: object) -> tuple[str, ...] | None:
-    """Return a DataFrame's column names as node labels; ``None`` for an array.
+    """Return a DataFrame's column names as node labels (:func:`node_labels`); ``None`` for arrays.
 
     Reads any table with a ``columns`` attribute (pandas, polars), so pandas stays optional. Default
-    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array.
+    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Raises
+    ``ValueError`` when two columns share a name.
     """
     columns = getattr(data, "columns", None)
     if columns is None:
