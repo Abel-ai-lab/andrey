@@ -446,8 +446,8 @@ def test_placeholder_numbers_are_refused_wherever_the_file_sits(tmp_path, monkey
 def test_the_headline_is_one_sentence_with_no_number(placeholder_page):
     found = re.search(r'<h1 id="headline">(.*?)</h1>', placeholder_page, re.S)[1]
     text = re.sub(r"<[^>]+>", "", found)
-    assert text == "Causal discovery accelerated, accurate, agentic."
-    assert '<span class="word">accelerated, accurate, agentic.</span>' in found
+    assert text == "Accelerated, accurate, agentic causal discovery."
+    assert '<span class="word">Accelerated, accurate, agentic</span>' in found
 
 
 def test_the_hero_cards_lead_to_the_sections_and_repeat_their_claims(placeholder_page):
@@ -866,7 +866,7 @@ def test_the_comparison_table_has_three_groups_with_a_mark_for_every_package():
     assert table.count('<tr class="compare-group">') == len(groups)
     for _, feature, marks, _ in build.COMPARISON:
         assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
-    assert table.count('<th scope="col">') == len(build.PEERS)
+    assert len(re.findall(r'<th scope="col"[ >]', table)) == len(build.PEERS)
 
 
 def test_interface_example_returns_every_kind_of_graph():
@@ -967,15 +967,10 @@ def test_the_homepage_shows_the_whole_agent_session(placeholder_page):
     assert "grid-column: 3" in replay[: replay.index("}")]
 
 
-def test_the_footer_credits_abel_with_its_mark_and_name(placeholder_page):
-    start = placeholder_page.index('<footer class="site-footer')
-    footer = placeholder_page[start : placeholder_page.index("</footer>", start)]
-    link = footer[footer.index('<a class="footer-abel" href="https://abel.ai/">') :]
-    link = link[: link.index("</a>")]
-    # One link holds the mark and the name; the mark is drawn in the text's color.
-    assert link.endswith("Abel AI Lab") and "Built by" not in footer
-    assert '<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true"' in link
-    assert 'fill="currentColor"' in link and "white" not in link
+def test_abels_mark_takes_the_text_color():
+    mark = build.abel_mark()
+    assert mark.startswith('<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true"')
+    assert 'fill="currentColor"' in mark and "white" not in mark
 
 
 def test_the_agent_session_wraps_long_lines_inside_the_terminal(placeholder_page):

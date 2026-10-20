@@ -1,6 +1,6 @@
 [project]
 name = "andrey-core"       # import root is "andrey" (taken on PyPI)
-version = "0.6.0"         # must equal andrey.__version__ (scripts/check_dist.py)
+version = "0.7.0"         # must equal andrey.__version__ (scripts/check_dist.py)
 description = "Andrey: accelerated, accurate, agentic causal discovery"
 dynamic = ["readme"]  # README.md, its image paths pinned to the release (fancy-pypi-readme below)
 requires-python = ">=3.11"

@@ -349,16 +349,9 @@
   letter-spacing: -0.055em;
 }
 
-/* The words: amber and slanted, lit as soft neon to match the art's light: a core a little paler
-   than the amber inside a wide, low halo, so their edges glow rather than cut. */
-.andrey-home .hero .word {
-  display: inline-block;
-  color: var(--andrey-ground-amber);
-  transform: skewX(-11deg);
-}
-
+/* The words: amber, lit as soft neon to match the art's light: a core a little paler than the
+   amber inside a wide, low halo, so their edges glow rather than cut. */
 .andrey-home .hero h1 .word {
-  display: inline;
   color: color-mix(in oklab, var(--andrey-ground-amber), var(--andrey-ground-ink) 16%);
   text-shadow:
     0 0 0.02em color-mix(in srgb, var(--andrey-ground-amber) 90%, transparent),
@@ -2420,55 +2413,6 @@
   font-size: 0.88rem;
 }
 
-/* ---------- footer ---------- */
-.andrey-home .site-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem 2rem;
-  padding-block: 2.5rem 3rem;
-  color: var(--andrey-muted);
-  font-size: 0.9rem;
-}
-
-/* Abel's mark and name, one link. The mark takes the text's color. */
-.andrey-home .footer-abel {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: var(--andrey-ink);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.andrey-home .footer-abel:hover {
-  color: var(--andrey-accent);
-}
-
-.andrey-home .abel-mark {
-  width: auto;
-  height: 1.15rem;
-}
-
-/* The links on a line of their own; under them the copyright and the license, with Abel's name at
-   the right, as the documentation's footer sets them. */
-.andrey-home .site-footer nav {
-  display: flex;
-  flex-basis: 100%;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.5rem;
-}
-
-.andrey-home .footer-legal {
-  margin: 0;
-  font-size: 0.8rem;
-}
-
-.andrey-home .footer-legal a {
-  color: inherit;
-}
-
 /* ---------- narrow screens ---------- */
 @media (max-width: 44rem) {
   .andrey-home .step,
@@ -2555,3 +2499,12 @@
   }
 }
 
+
+/* Andrey's column in the features table is tinted in the accent, as in every comparison table. */
+.andrey-home .compare .ct-ours {
+  background: color-mix(in srgb, var(--andrey-accent) 10%, var(--andrey-surface));
+}
+
+.andrey-home .compare thead .ct-ours {
+  color: var(--andrey-accent);
+}

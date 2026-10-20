@@ -121,7 +121,7 @@ def graph_thumbnail(structure, **options):
 
 
 def meek_thumbnail():
-    """The replay's last frame, with the arrowhead its rule added ringed."""
+    """The replay's last frame, with the arrowhead its rule added lit."""
     *_, before, last = meek_frames()
     ((head, tail),) = np.argwhere(last["marks"] != before["marks"]).tolist()
     return graph_thumbnail(

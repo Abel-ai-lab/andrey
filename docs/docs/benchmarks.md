@@ -33,11 +33,11 @@ Permutation invariance
 
 ::::{div} release-tldr
 
-0.7.0 is here: PC, hill climbing, tabu search, BOSS, and GRaSP are order-independent (Colombo and
-Maathuis, 2014), so their graph is the same up to relabeling the nodes however you order the
-columns, and GIES, exact search, CD-NOD, MultiGroupDirectLiNGAM, GFCI, GIN, and CALM are supported.
-GES runs more than 60x faster than causal-learn at 50 to 150 variables, with the same graph on
-every dataset at those sizes.
+0.7.0 is here: PC, FCI, GFCI, CD-NOD, hill climbing, tabu search, BOSS, GRaSP, and GIN return the
+same graph, up to relabeling the nodes, however you order the columns (Colombo and Maathuis, 2014).
+GIES, exact search, CD-NOD, MultiGroupDirectLiNGAM, GFCI, GIN, and CALM are supported. GES runs more
+than 60x faster than causal-learn at 50 to 150 variables, with the same graph on every dataset at
+those sizes.
 
 :::{div} release-stats
 
@@ -48,7 +48,7 @@ every dataset at those sizes.
 
 :::{div} release-actions
 [Read the release card](benchmarks/0.7.0.md)
-[Read the post](../blog/20261031-andrey-0-7-0.md)
+[Read the post](../blog/20261019-andrey-0-7-0.md)
 :::
 ::::
 :::::
