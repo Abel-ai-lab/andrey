@@ -22,6 +22,7 @@ from andrey.api._adapt import (
     copies_named,
     data_kind,
     data_matrix,
+    default_score,
     flag,
     int_in_range,
     json_safe,
@@ -42,7 +43,7 @@ if TYPE_CHECKING:
 def ges(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC",
+    score_func: str | None = None,
     lambda_value: float = 1.0,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
@@ -59,13 +60,16 @@ def ges(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : str, default="local_score_BIC"
-        Local score objective: ``"local_score_BIC"``, the linear-Gaussian BIC, for
-        continuous data. ``"local_score_BDeu"`` is the BDeu score [3]_ and
-        ``"local_score_BIC_categorical"`` the multinomial BIC [7]_, for categorical data coded by
-        whole numbers. ``"local_score_degen_gauss"`` (degenerate Gaussian) [4]_ and
-        ``"local_score_cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed data,
-        continuous and categorical columns. See Notes.
+    score_func : str or None, default=None
+        Local score objective: ``"local_score_BIC"``, the linear-Gaussian BIC, for continuous data.
+        ``"local_score_BDeu"`` is the BDeu score [3]_ and ``"local_score_BIC_categorical"`` the
+        multinomial BIC [7]_, for categorical data coded by whole numbers.
+        ``"local_score_degen_gauss"`` (degenerate Gaussian) [4]_ and ``"local_score_cond_gauss"``
+        (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous and categorical
+        columns. ``None`` reads the column types from ``categorical``, or infers them, and picks
+        ``"local_score_BDeu"`` when every column is categorical or ``"local_score_cond_gauss"`` when
+        some are, each with a ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
+        ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers. See Notes.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
@@ -80,7 +84,8 @@ def ges(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        they may be category codes. With ``score_func=None``, the columns it infers pick the default
+        score.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -121,9 +126,11 @@ def ges(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
+        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
+        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
+        continuous setting meets columns that look like category codes. Each message warns once per
+        process.
 
     See Also
     --------
@@ -134,9 +141,9 @@ def ges(
     -----
     **When to use it.** GES suits data with no unmeasured common causes. Its default BIC score
     assumes continuous data, where each variable depends linearly on its causes with Gaussian noise;
-    in that setting it is a fast, accurate default. For categorical data, use
-    ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, and for mixed data
-    ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
+    in that setting it is a fast, accurate default. When every column is categorical, the default is
+    ``"local_score_BDeu"``, and on mixed data ``"local_score_cond_gauss"``;
+    ``"local_score_BIC_categorical"`` and ``"local_score_degen_gauss"`` also score those data.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -252,6 +259,9 @@ def ges(
     """
     from andrey.search.ges import ges as _ges
 
+    score_func, categorical = default_score(
+        data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
+    )
     X, mask = checked_data(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
@@ -530,7 +540,7 @@ def xges(
 def hc(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str | None = None,
     lambda_value: float = 1.0,
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -548,12 +558,16 @@ def hc(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : str, default="local_score_BIC_from_cov"
+    score_func : str or None, default=None
         Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
         continuous data; ``"local_score_BDeu"``, the BDeu score, or
         ``"local_score_BIC_categorical"``, the multinomial BIC, for categorical data coded by whole
         numbers; or ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"``, the degenerate
-        and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
+        column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
+        every column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC_from_cov"``. Pass
+        ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
@@ -571,7 +585,8 @@ def hc(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        they may be category codes. With ``score_func=None``, the columns it infers pick the default
+        score.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
@@ -612,9 +627,11 @@ def hc(
         When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
         graph.
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
+        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
+        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
+        continuous setting meets columns that look like category codes. Each message warns once per
+        process.
 
     Notes
     -----
@@ -665,6 +682,13 @@ def hc(
     """
     from andrey.search.hc import hc as _hc
 
+    score_func, categorical = default_score(
+        data,
+        score_func,
+        "local_score_BIC_from_cov",
+        categorical=categorical,
+        max_categories=max_categories,
+    )
     X, mask = checked_data(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
@@ -687,7 +711,7 @@ def hc(
 def tabu(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str | None = None,
     lambda_value: float = 1.0,
     tabu_length: int = 10,
     max_tabu: int | None = None,
@@ -705,11 +729,16 @@ def tabu(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : str, default="local_score_BIC_from_cov"
+    score_func : str or None, default=None
         Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
         continuous data, or ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, the BDeu
         score or the multinomial BIC for categorical data coded by whole numbers, as for
-        :func:`~andrey.ges`.
+        :func:`~andrey.ges`. ``None`` picks ``"local_score_BDeu"`` when every column is categorical
+        (a DataFrame's ``category``, ``bool``, or text column, or a column of at most 10 distinct
+        whole numbers) and warns with a ``DataTypeWarning``; otherwise it picks
+        ``"local_score_BIC_from_cov"``, on mixed data too, since tabu search has no mixed-data
+        score. Pass ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as
+        numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be finite
@@ -759,6 +788,9 @@ def tabu(
     SearchLimitWarning
         When the search takes a given ``max_iter`` moves; a larger ``max_iter`` may find a better
         graph.
+    DataTypeWarning
+        When ``score_func`` is ``None`` and every column is categorical, so the search scores with
+        BDeu; once per process.
 
     Notes
     -----
@@ -808,6 +840,7 @@ def tabu(
     from andrey.search.tabu import TABU_SCORES
     from andrey.search.tabu import tabu as _tabu
 
+    score_func, _ = default_score(data, score_func, "local_score_BIC_from_cov", mixed=False)
     if score_func not in TABU_SCORES:
         raise NotImplementedError(f"tabu supports {TABU_SCORES}, not {score_func!r}")
     if data_kind(score_func) == "categorical":
@@ -839,7 +872,7 @@ def exact_search(
     data: npt.ArrayLike,
     *,
     search_method: str = "astar",
-    score_func: str = "local_score_BIC",
+    score_func: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -858,12 +891,16 @@ def exact_search(
         become the structure's ``labels``.
     search_method : {"astar", "dp"}, default="astar"
         Exact search strategy: A* search or dynamic programming.
-    score_func : str, default="local_score_BIC"
+    score_func : str or None, default=None
         Local score: ``"local_score_BIC"``, the linear-Gaussian BIC; ``"local_score_BDeu"`` or
         ``"local_score_BIC_categorical"``, the BDeu score or the multinomial BIC for categorical
         data coded by whole numbers; or ``"local_score_degen_gauss"`` or
         ``"local_score_cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed data, as
-        for :func:`~andrey.ges`. Each BIC uses the standard penalty, ``lambda_value=1``.
+        for :func:`~andrey.ges`. Each BIC uses the standard penalty, ``lambda_value=1``. ``None``
+        reads the column types from ``categorical``, or infers them, and picks
+        ``"local_score_BDeu"`` when every column is categorical or ``"local_score_cond_gauss"`` when
+        some are, each with a ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
+        ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -873,7 +910,8 @@ def exact_search(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        they may be category codes. With ``score_func=None``, the columns it infers pick the default
+        score.
     knowledge : Knowledge or None, default=None
         Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
         allowed to be adjacent, and temporal tiers, all honored. Each variable's parent sets exclude
@@ -906,9 +944,11 @@ def exact_search(
     Warns
     -----
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
+        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
+        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
+        continuous setting meets columns that look like category codes. Each message warns once per
+        process.
 
     Notes
     -----
@@ -981,6 +1021,9 @@ def exact_search(
     from andrey.search.exact import EXACT_SCORES
     from andrey.search.exact import exact_search as _exact
 
+    score_func, categorical = default_score(
+        data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
+    )
     if score_func not in EXACT_SCORES:
         raise NotImplementedError(f"exact_search supports {EXACT_SCORES}, not {score_func!r}")
     X, mask = checked_data(

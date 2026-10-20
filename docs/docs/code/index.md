@@ -29,7 +29,11 @@ constant. `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` also ne
 edge weights.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
 `"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
-whole numbers in a column of numbers, each distinct value of a column one category. The mixed-data
+whole numbers in a column of numbers, each distinct value of a column one category. `ges`, `hc`,
+`tabu`, `boss`, `grasp`, and `exact_search` default to `score_func=None`, which picks the
+linear-Gaussian BIC, `"local_score_BDeu"` when every column is categorical, or
+`"local_score_cond_gauss"` when some are (not for `tabu`), the last two with a `DataTypeWarning`, as
+[Data types](../guides/getting-started.md#data-types) describes. The mixed-data
 settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
 `"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
 [Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
@@ -247,7 +251,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
-| {py:class}`~andrey.DataTypeWarning` | A mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
+| {py:class}`~andrey.DataTypeWarning` | A score search's default picked BDeu because every column is categorical or the conditional Gaussian score because some are, a mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:

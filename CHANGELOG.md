@@ -9,6 +9,15 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `boss`, `grasp`, `ges`, `hc`, `tabu`, and `exact_search` pick their default score from the
+  column types and warn once with a `DataTypeWarning`: BDeu when every column is categorical, and
+  the conditional Gaussian BIC, `"local_score_cond_gauss"`, when some are, except for `tabu`, which
+  has no mixed-data score. Pass `score_func="local_score_BIC_from_cov"` (`"local_score_BIC"` for
+  `ges` and `exact_search`) to keep the linear-Gaussian BIC. Data with no categorical column keep it
+  without a change. ([#237])
+
 ### Added
 
 - `andrey.data.load_dataset("diabetes")`, the bnlearn diabetes network: 413 variables and 602
@@ -469,5 +478,6 @@ First alpha release.
 [#228]: https://github.com/Abel-ai-lab/andrey/pull/228
 [#229]: https://github.com/Abel-ai-lab/andrey/pull/229
 [#233]: https://github.com/Abel-ai-lab/andrey/pull/233
+[#237]: https://github.com/Abel-ai-lab/andrey/pull/237
 [#239]: https://github.com/Abel-ai-lab/andrey/pull/239
 [#248]: https://github.com/Abel-ai-lab/andrey/pull/248
