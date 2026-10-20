@@ -40,6 +40,13 @@ change names its pull request.
   `Knowledge.from_skeleton` turns a result's adjacencies into the allowed set. ([#214])
 - `pc`, `fci`, `gfci`, and `cdnod` take `max_depth`, the largest conditioning set any test uses.
   ([#214])
+- `andrey.config.tie_break`, `andrey.config(tie_break=...)`, and `ANDREY_TIE_BREAK` choose how
+  the searches break ties: `"rank"`, the default, by a rank computed from each column's own data,
+  or `"position"`, by column position. The new Column order and machines guide lists what each
+  method keeps under a new column order and on another machine, and which methods follow the
+  setting. Under `"position"`, `pc`, `cdnod`, `fci`, and `gfci` also fire their orientation rules
+  one at a time in column order instead of in rounds, and `fci` and `gfci` default to
+  `possible_dsep="fast"`. ([#210])
 
 ### Changed
 
@@ -451,6 +458,7 @@ First alpha release.
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
 [#208]: https://github.com/Abel-ai-lab/andrey/pull/208
 [#209]: https://github.com/Abel-ai-lab/andrey/pull/209
+[#210]: https://github.com/Abel-ai-lab/andrey/pull/210
 [#211]: https://github.com/Abel-ai-lab/andrey/pull/211
 [#213]: https://github.com/Abel-ai-lab/andrey/pull/213
 [#214]: https://github.com/Abel-ai-lab/andrey/pull/214

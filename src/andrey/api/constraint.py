@@ -41,7 +41,7 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    collider_order: str = "p_value",
+    collider_order: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     max_depth: int | None = None,
@@ -74,12 +74,13 @@ def pc(
         random-feature approximation, ``"cmiknn"`` a nearest-neighbor conditional mutual
         information test, and ``"gpdc"`` Gaussian-process regression with a distance correlation
         test. See Notes.
-    collider_order : {"p_value", "column"}, default="p_value"
+    collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
         endpoints were separated with the largest p-value, so the colliders do not depend on the
         column order. ``"column"`` orients them in column order and keeps the first of two that
-        conflict. See Notes.
+        conflict. ``None`` follows ``andrey.config.tie_break``: ``"p_value"`` under ``"rank"``,
+        ``"column"`` under ``"position"``. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -172,10 +173,10 @@ def pc(
     it. Two colliders conflict when they would orient one edge in opposite directions, so the order
     in which they are oriented can change the result [3]_. A collider is skipped when it would give
     an edge an arrowhead at both ends, so of two conflicting colliders the one oriented first is
-    kept. With the default ``collider_order="p_value"``, each collider ``x -> y <- z`` ranks by the
-    largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders are
-    oriented from the highest rank to the lowest. When two conflicting colliders rank equal to nine
-    decimals, the edge they dispute stays undirected, and Meek's rules do not orient it. The
+    kept. With ``collider_order="p_value"`` (the default), each collider ``x -> y <- z`` ranks by
+    the largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders
+    are oriented from the highest rank to the lowest. When two conflicting colliders rank equal to
+    nine decimals, the edge they dispute stays undirected, and Meek's rules do not orient it. The
     colliders therefore do not depend on the column order. This adapts the conflict rule of Ramsey
     [10]_, which ranks a collider by separating sets that additional tests choose; Andrey ranks it
     by the tests that removed the edge, so orienting runs no new test. With
@@ -186,7 +187,11 @@ def pc(
     undirected, and so do orientations that would together close a directed cycle. The rounds
     repeat until one orients nothing, so Meek's rules do not depend on the column order. Such
     conflicts arise only when no DAG on the skeleton has exactly the colliders found, as test errors
-    can cause; otherwise the rounds give the CPDAG that firing the rules one at a time gives.
+    can cause; otherwise the rounds give the CPDAG that firing the rules one at a time gives. Under
+    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order instead,
+    and of two firings that would orient one edge in opposite directions the first decides. The
+    :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
+    each method.
 
     **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
     default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
@@ -284,6 +289,7 @@ def pc(
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.constraint.pc import pc as _pc
+    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories
@@ -297,10 +303,11 @@ def pc(
             X,
             alpha=alpha,
             indep_test=indep_test,
-            collider_order=collider_order,
+            collider_order=resolve_collider_order(collider_order),
             categorical=mask,
             max_depth=max_depth,
             constraints=constraints,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
@@ -315,7 +322,7 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "order_free",
+    possible_dsep: str | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -362,12 +369,14 @@ def fci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"order_free", "fast"}, default="order_free"
+    possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. See Notes and Limitations.
+        ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
+        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
+        Limitations.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -449,7 +458,12 @@ def fci(
     decides an endpoint by every shortest discriminating path, so paths whose tests disagree leave
     it a circle. The orientation rules therefore do not depend on the column order, and with
     ``possible_dsep="order_free"`` neither does the result, unless two columns are identical. With
-    ``"fast"`` the result can depend on the column order through the possible-d-separation step.
+    ``"fast"`` the result can depend on the column order through the possible-d-separation step. A
+    fixed column order gives reproducible results. Under ``andrey.config(tie_break="position")``,
+    the rules instead fire one at a time in column order, and of two firings that conflict the
+    first decides. ``possible_dsep`` then defaults to ``"fast"``. The
+    :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
+    each method.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
@@ -521,6 +535,7 @@ def fci(
     'pag'
     """
     from andrey.constraint.fci import fci as _fci
+    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
 
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories
@@ -536,9 +551,10 @@ def fci(
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=mask,
-            possible_dsep=possible_dsep,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
             max_depth=max_depth,
             constraints=constraints,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
@@ -555,7 +571,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "order_free",
+    possible_dsep: str | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -610,12 +626,14 @@ def gfci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"order_free", "fast"}, default="order_free"
+    possible_dsep : {"order_free", "fast"} or None, default=None
         The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
         search kept, one at a time, so each removal changes what the step tests after it.
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. See Notes and Limitations.
+        ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
+        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
+        Limitations.
     max_depth : int or None, default=None
         The maximum conditioning-set size of every conditional-independence test, at least ``0``:
         ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
@@ -678,7 +696,10 @@ def gfci(
     R1-R10 [2]_ then orient the endpoints, in rounds as in :func:`~andrey.fci`; an endpoint no rule
     resolves stays a circle. A rule that needs the separating set of a pair GES left non-adjacent
     uses the union of the smallest subsets of the two endpoints' CPDAG neighbors that make the pair
-    independent, which does not depend on the column order.
+    independent, which does not depend on the column order. Under
+    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order, such a
+    pair's separating set is the first subset found in column order, and ``possible_dsep`` defaults
+    to ``"fast"``.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
@@ -732,6 +753,7 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
+    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
     from andrey.search.gfci import gfci as _gfci
 
     # Both phases read the same data, so the score and the test must agree on its type.
@@ -759,9 +781,10 @@ def gfci(
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=mask,
-            possible_dsep=possible_dsep,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
             max_depth=max_depth,
             constraints=constraints,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
@@ -774,7 +797,7 @@ def cdnod(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    collider_order: str = "p_value",
+    collider_order: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
@@ -809,11 +832,13 @@ def cdnod(
         ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in continuous
         data, at a far higher cost per test. Each as for :func:`~andrey.pc`; see Notes for the
         index.
-    collider_order : {"p_value", "column"}, default="p_value"
+    collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
-        the column order, and ``"column"`` in column order. Under either order, the edges out of
-        the index are directed first, and no collider puts an arrowhead at the index.
+        the column order, and ``"column"`` in column order. ``None`` follows
+        ``andrey.config.tie_break``, which also sets whether Meek's rules run in order-free rounds
+        or fire one at a time in column order, as for :func:`~andrey.pc`. Under either order, the
+        edges out of the index are directed first, and no collider puts an arrowhead at the index.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -966,6 +991,7 @@ def cdnod(
     [(0, 1, 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
+    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask = checked_data(
@@ -993,11 +1019,12 @@ def cdnod(
             c,
             alpha=alpha,
             indep_test=indep_test,
-            collider_order=collider_order,
+            collider_order=resolve_collider_order(collider_order),
             categorical=mask,
             dependence_threshold=dependence_threshold,
             max_depth=max_depth,
             constraints=constraints,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}

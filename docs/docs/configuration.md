@@ -13,10 +13,13 @@ A blank value counts as unset. A switch takes `1`, `true`, `yes`, or `on`, and `
 or `off`. Any other value Andrey cannot read raises `ValueError` naming the variable, and
 `andrey config` and `andrey run` exit with `invalid_configuration`.
 
-The backend and the worker count can also be set in code. The most specific setting wins:
+The backend, the worker count, and the tie-break rule can also be set in code. The most specific
+setting wins:
 
-1. `with andrey.config(backend=..., num_workers=...):`, for the calls inside the block;
-2. `andrey.config.backend = ...` or `andrey.config.num_workers = ...`, for every later call;
+1. `with andrey.config(backend=..., num_workers=..., tie_break=...):`, for the calls inside the
+   block;
+2. `andrey.config.backend = ...`, `andrey.config.num_workers = ...`, or
+   `andrey.config.tie_break = ...`, for every later call;
 3. the environment variables below, read at each call;
 4. the defaults.
 
@@ -74,8 +77,16 @@ already running in the process, so a CPU fit never pays to start a GPU.
 - `ANDREY_SEED`: the seed of every stochastic method (BOSS, GRaSP, ICA-LiNGAM, CALM) when the call
   gives no `seed=` or `random_state=`. The default is `0`; it takes any integer from `0` to
   `2**32 - 1`. Deterministic methods ignore it.
+- `ANDREY_TIE_BREAK`: how the searches choose between tied candidates. `rank` (the default) orders
+  them by a rank computed from each column's own data, so reordering the columns relabels the
+  result. `position` orders them by column position, which skips computing the ranks, fires the
+  orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order, and visits
+  the possible-d-separation step of `fci` and `gfci` in column order; the result can then depend on
+  the column order.
 
 Results repeat on the same machine; across platforms they can differ, CALM's most of all.
+[Column order and machines](guides/column-order.md) lists what each method keeps under a new column
+order and on another machine.
 `andrey.seed_all(seed)` seeds Python, NumPy, and PyTorch from one number, for data you simulate.
 
 ## Datasets

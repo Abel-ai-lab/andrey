@@ -158,9 +158,9 @@ def boss(
 
     **Column order.** Each column gets a tie rank computed from its own data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: it starts from that order,
-    and the seed shuffles the order in which it visits them. Reordering the columns therefore
-    reorders the graph's nodes and changes nothing else, unless two columns are identical. The rank
-    is arbitrary with respect to causal structure.
+    and the seed shuffles the order in which it visits them. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order and on another machine.
 
     **Categorical data.** ``"local_score_BDeu"`` reads every column as categorical, each distinct
     value one category, and scores a variable given its parents with the BDeu score of
@@ -376,9 +376,9 @@ def grasp(
     **Column order.** Each column gets a tie rank computed from its own data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the seed shuffles the
     sorted columns into the starting order and the order of visiting variables, and ties between
-    candidate parents go to the lowest rank. Reordering the columns therefore reorders the graph's
-    nodes and changes nothing else, unless two columns are identical. The rank is arbitrary with
-    respect to causal structure.
+    candidate parents go to the lowest rank. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order and on another machine.
 
     **Categorical data.** ``"local_score_BDeu"`` reads every column as categorical, each distinct
     value one category, and scores a variable given its parents with the BDeu score of

@@ -58,6 +58,16 @@ def test_pc_column_order_keeps_the_recorded_output():
     assert andrey.pc(x).structure.oriented_edges() != COLUMN_ORDER_EDGES
 
 
+def test_pc_collider_order_follows_tie_break_unless_given():
+    x = conflicting_colliders()
+    default = andrey.pc(x).structure.oriented_edges()
+    with andrey.config(tie_break="position"):
+        assert andrey.pc(x).structure.oriented_edges() == COLUMN_ORDER_EDGES
+        assert andrey.pc(x, collider_order="p_value").structure.oriented_edges() == default
+    with andrey.config(tie_break="rank"):
+        assert andrey.pc(x).structure.oriented_edges() == default
+
+
 def test_pc_is_invariant_to_column_order():
     x = conflicting_colliders()
     trace: list[dict] = []

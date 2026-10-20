@@ -76,6 +76,10 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
     hashes match, the fallback to raw values can make ranks sensitive to these differences or to
     category recoding.
 
+    Under ``tie_break="position"`` (:data:`andrey.config`, ``ANDREY_TIE_BREAK``), each column's
+    rank is its position, so the methods that order ties by these ranks order them by column
+    position.
+
     Parameters
     ----------
     x : ndarray, shape (n_samples, n_features)
@@ -90,6 +94,8 @@ def tie_ranks(x: np.ndarray, categorical: np.ndarray | None = None) -> np.ndarra
         Each column's position in the tie-break order, from zero to ``n_features - 1``. Lower ranks
         take precedence when moves have equal rounded score changes.
     """
+    if backend.config.tie_break == "position":
+        return np.arange(x.shape[1])
     mask = np.zeros(x.shape[1], dtype=bool) if categorical is None else categorical
     patterns = []
     for col, is_categorical in zip(x.T, mask.tolist(), strict=True):

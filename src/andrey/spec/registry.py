@@ -43,7 +43,9 @@ _INDEP_TEST = ParamSpec(
     "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
     "data, the experimental tests, each far slower per test: kci = kernel test; rcot = its "
     "random-feature approximation; cmiknn = nearest-neighbor conditional mutual information; "
-    "gpdc = Gaussian-process regression and distance correlation.",
+    "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
+    "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
+    "order.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _CATEGORICAL = ParamSpec(
@@ -78,21 +80,25 @@ _COLLIDER_RULE = ParamSpec(
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
     type="str",
-    default="order_free",
+    default=None,
     choices=("order_free", "fast"),
     doc="The order of the possible-d-separation step, which removes edges one at a time: "
     "order_free = by a rank computed from each column's own data, so the result does not depend "
-    "on the column order unless two columns are identical; fast = column order.",
+    "on the column order unless two columns are identical; fast = column order. null follows "
+    "ANDREY_TIE_BREAK: order_free under rank, fast under position.",
+    nullable=True,
 )
 _COLLIDER_ORDER = ParamSpec(
     name="collider_order",
     type="str",
-    default="p_value",
+    default=None,
     choices=COLLIDER_ORDERS,
     doc="The order in which colliders are oriented, which decides between two that would orient "
     "one edge in opposite directions: p_value = the collider whose endpoints were separated with "
     "the largest p-value first, independent of the column order; column = in column order, the "
-    "first of two conflicting colliders kept.",
+    "first of two conflicting colliders kept. null follows ANDREY_TIE_BREAK: p_value under rank, "
+    "column under position.",
+    nullable=True,
 )
 _LAMBDA_VALUE = ParamSpec(
     name="lambda_value",
@@ -146,6 +152,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
+            '`collider_order="column"` orients colliders in column order.'
+        ),
         params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
         references=(
             "Spirtes & Glymour 1991",
@@ -171,6 +183,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires the orientation rules one at a time in column order, and '
+            'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
+        ),
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -203,6 +221,13 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires the orientation rules one at a time in column order and '
+            'records the first separating subset found, and it or `possible_dsep="fast"` visits '
+            "the possible-d-separation step in column order."
+        ),
         params=(
             ParamSpec(
                 name="score_func",
@@ -260,6 +285,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
+            '`collider_order="column"` orients colliders in column order.'
+        ),
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -300,6 +331,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="score_func",
@@ -346,6 +379,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(_LAMBDA_VALUE,),
         references=("Hauser & Buhlmann 2012",),
     )
@@ -364,6 +399,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="score_func",
@@ -410,6 +447,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="score_func",
@@ -453,6 +492,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="score_func",
@@ -509,6 +550,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="search_method",
@@ -550,6 +593,12 @@ _add(
         determinism="stochastic",
         accel="torch",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            "Repeats on one machine with one torch version; on another platform the graph "
+            "can differ."
+        ),
         seeded=True,
         passthrough=True,
         params=(
@@ -597,6 +646,8 @@ _add(
         determinism="stochastic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         seeded=True,
         params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
@@ -621,6 +672,8 @@ _add(
         determinism="stochastic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         seeded=True,
         params=(
             _BOSS_SCORE,
@@ -655,6 +708,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             _RANDOM_STATE,
             ParamSpec(
@@ -684,6 +739,12 @@ _add(
         determinism="stochastic",
         accel="numpy",
         status="supported",
+        column_order="relabels_if_converged",
+        tie_break=True,
+        order_note=(
+            "At few rows per variable, FastICA can reach another solution under a new "
+            "column order or on another machine."
+        ),
         seeded=True,
         params=(
             ParamSpec(
@@ -731,6 +792,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(_RANDOM_STATE,),
         references=("Shimizu 2012",),
     )
@@ -761,6 +824,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            "When the likelihood fit stops before it converges, the graph can change with "
+            "the numerical libraries' versions."
+        ),
         params=(
             ParamSpec(
                 name="order",
@@ -827,6 +896,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="n_lags",
@@ -870,6 +941,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="tau_max",
@@ -928,6 +1001,9 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note='With `collider_rule="none"`, the orientations can follow the column order.',
         params=(
             ParamSpec(
                 name="tau_max",
@@ -989,6 +1065,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="tau_max",
@@ -1046,6 +1124,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
         params=(
             ParamSpec(
                 name="maxlag",
@@ -1104,6 +1183,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
         references=("Hoyer et al. 2008", "Gretton et al. 2008", "Mooij et al. 2016"),
     )
 )
@@ -1144,6 +1224,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
         references=(
             "Zhang & Hyvarinen 2009",
             "Zhang & Hyvarinen 2010",
@@ -1172,6 +1253,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="can_change",
+        tie_break=True,
+        order_note=(
+            "Reordering whole clusters relabels the result; reordering the columns inside a "
+            "cluster can change the latents' order."
+        ),
         params=(
             ParamSpec(
                 name="alpha",
@@ -1241,6 +1328,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
         references=("Maeda & Shimizu 2020",),
     )
 )
@@ -1271,6 +1359,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         references=("Tashiro et al. 2014",),
     )
 )
