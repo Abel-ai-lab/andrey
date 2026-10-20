@@ -292,9 +292,10 @@ def draw(
     engine_options : mapping of str to object or None, default=None
         Graphviz graph attributes for the layout, such as ``{"rankdir": "TB"}``.
     highlight : iterable of (int, int), default=()
-        Endpoints to ring in the palette's ``accent`` color. ``(i, j)`` rings the mark at node
-        ``i`` on the edge between nodes ``i`` and ``j``; add ``(j, i)`` to ring both ends. The
-        default rings nothing.
+        Endpoints to light in the palette's ``accent`` color. ``(i, j)`` lights the mark at node
+        ``i`` on the edge between nodes ``i`` and ``j``, and that half of the edge, with a soft
+        glow under it (class ``highlight``, for a page to style or animate); add ``(j, i)`` to
+        light both ends. The default lights nothing.
 
     Returns
     -------

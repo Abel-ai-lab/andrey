@@ -40,7 +40,7 @@ sources. `site/assets/site.css` styles it, scoped to `.andrey-home` so the theme
 page's never meet. `site/assets/figures.css` and `figures.js` draw the timing comparison and the
 speed charts, which the posts and the release cards share.
 
-The hero is one screen: the headline, "Causal discovery accelerated, accurate, agentic.", the
+The hero is one screen: the headline, "Accelerated, accurate, agentic causal discovery.", the
 install line, and a card per section. A pill above the headline copies the prompt that installs the
 agent skill (`AGENT_PROMPT`, `site/assets/prompt.js`), the one the README and the FAQ give, beside
 the marks of coding agents and open models (`AGENTS`, Lobe Icons in `site/agents/`, MIT). The

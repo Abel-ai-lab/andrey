@@ -32,7 +32,10 @@ Andrey is a causal discovery package for Python.
 uv add andrey-core
 ```
 
-- **With pip**: `pip install andrey-core`
+```shell
+pip install andrey-core
+```
+
 - **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
   layouts
 - **Development version**: `uv add git+https://github.com/Abel-ai-lab/andrey`
@@ -172,7 +175,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.6.0},
+  version = {0.7.0},
   url = {https://andrey.abel.ai},
 }
 ```
