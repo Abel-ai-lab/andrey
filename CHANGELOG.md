@@ -9,42 +9,14 @@ change names its pull request.
 
 ## [Unreleased]
 
-### Highlights
-
-- Seven more methods are supported: `gfci`, `cdnod`, `gies`, `exact_search`, `calm`,
-  `multi_group_direct_lingam`, and `gin` have published benchmarks in the 0.7.0 release card and
-  checks in the release quality gate, and no longer warn with `ExperimentalWarning`. ([#184])
-
-### Breaking
-
-- The `numba` extra and backend are removed, because no method ran Numba code anymore:
-  `andrey.config(backend="numba")` and `ANDREY_BACKEND=numba` raise a `ValueError`,
-  `andrey.describe()` has no `numba` field, and `numpy` or the default `auto` runs the same code as
-  before. ([#178])
-- `camuv` and `andrey.irregular.camuv` are removed: on simulated nonlinear data with hidden common
-  causes, its graphs had more errors than the empty graph at every size measured. ([#187])
-- `cdnod` takes the domain index as `domain_index`, and `andrey run cdnod` as `--domain-index`;
-  the names `c_indx` and `--c-indx` are gone. ([#187])
-
 ### Added
 
-- `fci` and `gfci` take `possible_dsep`, the order of their possible-d-separation step:
-  `"order_free"`, the default, or `"fast"`, the column order. ([#168], [#238])
-- `gies` learns from data that mixes observation with interventions: `interventions`
-  (`--interventions` in the CLI) marks the variables set by an intervention in each row. ([#187])
-- `cdnod` takes `dependence_threshold`, which runs CD-NOD's independent-change step (Huang et al.
-  2020) to orient edges between variables that both change with the domain index; it is off by
-  default. ([#187])
-- `andrey.data.sortability.index_correlation` measures how much a dataset's column order reveals
-  of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
 - `andrey.data.load_dataset("diabetes")`, the bnlearn diabetes network: 413 variables and 602
   arcs. ([#225])
 - `boss` and `grasp` take `score_func="local_score_BDeu"` for categorical data, with the BDeu
   priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
 - `boss` and `grasp` take `score_func="local_score_BIC_categorical"`, the multinomial BIC that
   `ges`, `hc`, `tabu`, and `exact_search` take for categorical data. ([#220])
-- `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
-  only 3; smaller depths search less and run faster. ([#190])
 - `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
   detect nonlinear dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#209])
 - The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
@@ -60,6 +32,14 @@ change names its pull request.
   partial correlation does not see. ([#209])
 - KCI and CMIknn run on a CUDA GPU, KCI in float64 and CMIknn with the CPU's p-values, from the
   cutoffs `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`. ([#209])
+- `knowledge=` on `pc`, `cdnod`, `fci`, `gfci`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`,
+  `grasp`, `exact_search`, and `direct_lingam` takes `andrey.Knowledge(required=, forbidden=,
+  allowed=, tiers=)`: the edges the graph must have and must not have, the only pairs that may be
+  adjacent, and tiers in time order; knowledge that contradicts itself or names a column the data
+  lack raises a `ValueError`, and the CLI takes `knowledge=` as JSON or a path.
+  `Knowledge.from_skeleton` turns a result's adjacencies into the allowed set. ([#214])
+- `pc`, `fci`, `gfci`, and `cdnod` take `max_depth`, the largest conditioning set any test uses.
+  ([#214])
 - `andrey.config.tie_break`, `andrey.config(tie_break=...)`, and `ANDREY_TIE_BREAK` choose how
   the searches break ties: `"rank"`, the default, by a rank computed from each column's own data,
   or `"position"`, by column position. The new Column order and machines guide lists what each
@@ -70,9 +50,108 @@ change names its pull request.
 
 ### Changed
 
+- With `indep_test="fisherz"` or `"student_t"`, `pc`, `fci`, and `cdnod` reject copied columns
+  before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
+  reject a series that repeats another at the same step or some steps back, naming its lagged
+  value, such as `'a' at lag 1 repeats 'd'`. ([#206])
+- A constant column raises one `ValueError` that names every constant column and says to drop
+  them, `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` say up front that they need
+  at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
+  why a PDAG has no consistent extension, naming a chordless cycle of its undirected edges when it
+  finds one. ([#207])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
+  same graphs and p-values in less time, because each test answers many queries at once. ([#208])
+
+### Fixed
+
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` treat
+  causal-order candidates whose scores differ only by rounding as tied and pick among them by a
+  rank computed from each column's own data, so two interchangeable columns, such as two balanced
+  binary columns, no longer get a different order on another CPU or after reordering the columns.
+  ([#205])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` score
+  one column per group of copies, where a column copies another up to scale when it leaves at
+  most `1e-12` of the other's variance unexplained. The other copies follow it directly in the
+  causal order and each takes a single edge from it, so copies no longer come ahead of their
+  causes and give the same graph on every CPU. ([#205])
+- `exact_search` returns the same DAG of the equivalence class it finds on every CPU, with either
+  `search_method`, and under any column order, because it orients the edges the class leaves
+  reversible by a rank computed from each column's own data, so the DAG can differ from before but
+  its class does not. ([#205])
+- `pcmciplus` runs its tests on one BLAS thread, as `pcmci` and `lpcmci` do, so the host's BLAS
+  thread count cannot change its p-values. ([#205])
+- When several variables can come next in its causal order, `ica_lingam` picks one by a rank
+  computed from each column's own data instead of by column position, so reordering the columns no
+  longer changes that choice, and its order and graph can change. ([#205])
+- `ges`, `gies`, `xges`, `calm`, `gin`, `bottom_up_parce_lingam`, `pcmci`, `pcmciplus`, and `lpcmci`
+  break ties between equal score changes or test results by a rank computed from each column's own
+  data instead of by column position; `calm` also assigns its random draws, and
+  `bottom_up_parce_lingam` its regression predictors, in that rank order; `calm` chooses each
+  Markov-blanket member by its partial correlation where p-values underflow to zero; and `pc` and
+  `cdnod` orient colliders whose p-values agree to nine decimals together, so these choices no
+  longer depend on the column order. ([#205])
+- The nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` seed their random features,
+  shuffles, and tie-breaks, and choose the variable KCI joins to the conditioning set and CMIknn
+  shuffles, by a rank computed from each column's own data instead of by column position, so
+  reordering the columns no longer changes their p-values or the graphs built from them.
+  ([#213])
+- The independent-change step of `cdnod` (`dependence_threshold`) visits the columns by a rank
+  computed from each column's own data instead of by column position, so reordering the columns no
+  longer changes the edges it orients, and on data where its tests compete its graph can change.
+  ([#228])
+- `"rcot"` samples the random Fourier features of `x` and `y` for each conditioning set, with
+  frequencies and phases from a scrambled Halton sequence (quasi-Monte Carlo feature maps), so one
+  pair's tests over different conditioning sets no longer share features and reject together, and
+  PC with it keeps fewer false edges, misses slightly more true ones, and makes fewer errors in all
+  on graphs of 10 to 50 variables. ([#248])
+
+## [0.7.0] - 2026-10-19
+
+### Highlights
+
+- Permutation invariance: PC, FCI, GFCI, CD-NOD, hill climbing, tabu search, BOSS, GRaSP, and GIN
+  return the same graph, up to relabeling its nodes, however the columns are ordered, and the data
+  generators and the published networks shuffle their columns, so column order no longer reveals
+  the causal order. The 0.7.0 post gives the measurements. ([#168], [#179], [#192], [#202],
+  [#215], [#233], [#239])
+- Seven more methods are supported: `gfci`, `cdnod`, `gies`, `exact_search`, `calm`,
+  `multi_group_direct_lingam`, and `gin` have published benchmarks in the 0.7.0 release card and
+  checks in the release quality gate, and no longer warn with `ExperimentalWarning`. ([#184])
+- Faster GES: `ges` runs more than 60x faster than causal-learn at 50 to 150 variables, with the
+  same graph on every dataset at those sizes. ([#169])
+
+### Breaking
+
+- The `numba` extra and backend are removed, because no method ran Numba code anymore:
+  `andrey.config(backend="numba")` and `ANDREY_BACKEND=numba` raise a `ValueError`,
+  `andrey.describe()` has no `numba` field, and `numpy` or the default `auto` runs the same code as
+  before. ([#178])
+- `camuv` and `andrey.irregular.camuv` are removed: on simulated nonlinear data with hidden common
+  causes, its graphs had more errors than the empty graph at every size measured. ([#187])
+- `cdnod` takes the domain index as `domain_index`, and `andrey run cdnod` as `--domain-index`;
+  the names `c_indx` and `--c-indx` are gone. ([#187])
+
+### Added
+
+- `gies` learns from data that mixes observation with interventions: `interventions`
+  (`--interventions` in the CLI) marks the variables set by an intervention in each row. ([#187])
+- `cdnod` takes `dependence_threshold`, which runs CD-NOD's independent-change step (Huang et al.
+  2020) to orient edges between variables that both change with the domain index; it is off by
+  default. ([#187])
+- `andrey.data.sortability.index_correlation` measures how much a dataset's column order reveals
+  of its causal order: the rank correlation of each column's index with its causal depth. ([#202])
+- `grasp` takes any `depth` of at least 1, the most tucks in one chain of moves, where it took
+  only 3; smaller depths search less and run faster. ([#190])
+
+### Changed
+
 - `pc` and `cdnod` orient conflicting colliders by the p-value that separated each collider's pair,
   highest first, so their colliders no longer depend on the column order and their default output
   can change, and `collider_order="column"` keeps the column-order rule. ([#168], [#187])
+- `fci` and `gfci` run their possible-d-separation step in the order of a rank computed from each
+  column's own data, so reordering the columns no longer changes their PAG unless two columns are
+  identical and their default output can change, and the new `possible_dsep="fast"` keeps the
+  column order. ([#168], [#239])
 - `andrey.data.sample_scm`, `sample_discrete`, `sample_mixed`, and `SCM.sample` shuffle the column
   order with the true graph, from the seed, so the order no longer follows how the graph was drawn
   (the hubs of a scale-free graph came first), and `shuffle=False` keeps the drawn order. ([#168])
@@ -103,17 +182,9 @@ change names its pull request.
   that names every group of copies by column name and says to keep one column per group and read
   its edges as the group's, and `pc`, `fci`, `gfci`, and `cdnod` name the groups the same way when
   copies make a test's correlation matrix singular. ([#189])
-- With `indep_test="fisherz"` or `"student_t"`, `pc`, `fci`, and `cdnod` reject copied columns
-  before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
-  reject a series that repeats another at the same step or some steps back, naming its lagged
-  value, such as `'a' at lag 1 repeats 'd'`. ([#206])
-- A constant column raises one `ValueError` that names every constant column and says to drop
-  them, `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` say up front that they need
-  at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
-  why a PDAG has no consistent extension, naming a chordless cycle of its undirected edges when it
-  finds one. ([#207])
-- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
-  same graphs and p-values in less time, because each test answers many queries at once. ([#208])
+- `andrey.viz.draw` lights a highlighted endpoint instead of ringing it: the mark and its half of
+  the edge take the accent color over a soft accent glow, which keeps its proportions at any size
+  and carries the class `highlight`. ([#229])
 
 ### Removed
 
@@ -157,52 +228,12 @@ change names its pull request.
   parents determine scores `inf`, unavailable as under the BIC. ([#203])
 - A DataFrame with reordered columns no longer fails on the torch backend, where torch rejected
   its array's negative stride. ([#216])
-- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` treat
-  causal-order candidates whose scores differ only by rounding as tied and pick among them by a
-  rank computed from each column's own data, so two interchangeable columns, such as two balanced
-  binary columns, no longer get a different order on another CPU or after reordering the columns.
-  ([#205])
-- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` score
-  one column per group of copies, where a column copies another up to scale when it leaves at
-  most `1e-12` of the other's variance unexplained. The other copies follow it directly in the
-  causal order and each takes a single edge from it, so copies no longer come ahead of their
-  causes and give the same graph on every CPU. ([#205])
-- `exact_search` returns the same DAG of the equivalence class it finds on every CPU, with either
-  `search_method`, and under any column order, because it orients the edges the class leaves
-  reversible by a rank computed from each column's own data, so the DAG can differ from before but
-  its class does not. ([#205])
-- `pcmciplus` runs its tests on one BLAS thread, as `pcmci` and `lpcmci` do, so the host's BLAS
-  thread count cannot change its p-values. ([#205])
-- When several variables can come next in its causal order, `ica_lingam` picks one by a rank
-  computed from each column's own data instead of by column position, so reordering the columns no
-  longer changes that choice, and its order and graph can change. ([#205])
-- `ges`, `gies`, `xges`, `calm`, `gin`, `bottom_up_parce_lingam`, `pcmci`, `pcmciplus`, and `lpcmci`
-  break ties between equal score changes or test results by a rank computed from each column's own
-  data instead of by column position; `calm` also assigns its random draws, and
-  `bottom_up_parce_lingam` its regression predictors, in that rank order; `calm` chooses each
-  Markov-blanket member by its partial correlation where p-values underflow to zero; and `pc` and
-  `cdnod` orient colliders whose p-values agree to nine decimals together, so these choices no
-  longer depend on the column order. ([#205])
-- The nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` seed their random features,
-  shuffles, and tie-breaks, and choose the variable KCI joins to the conditioning set and CMIknn
-  shuffles, by a rank computed from each column's own data instead of by column position, so
-  reordering the columns no longer changes their p-values or the graphs built from them.
-  ([#213])
-- `pc`, `cdnod`, `fci`, and `gfci` apply their orientation rules, Meek's rules and FCI's R1-R10,
-  in rounds that set together everything the rules imply on the graph as it stands and leave an
-  edge or endpoint two rules decide differently undirected or a circle, where the rule reached
-  first in column order used to decide; `gfci` also keeps the union of the smallest separating sets
-  of a pair GES leaves non-adjacent instead of the first one found. Reordering the columns no
-  longer changes their orientations, and on data where the rules conflict their graphs can change.
-  ([#226])
-- The independent-change step of `cdnod` (`dependence_threshold`) visits the columns by a rank
-  computed from each column's own data instead of by column position, so reordering the columns no
-  longer changes the edges it orients, and on data where its tests compete its graph can change.
-  ([#228])
-- The possible-d-separation step of `fci` and `gfci` visits the pairs and nodes by a rank computed
-  from each column's own data instead of by column position, so reordering the columns no longer
-  changes their PAGs, their default output can change, and `possible_dsep="fast"` keeps the column
-  order. ([#238])
+- `pc`, `cdnod`, `fci`, and `gfci` apply Meek's rules and FCI's R1-R10 in rounds that set
+  together everything the rules imply on the graph as it stands, leaving an edge or endpoint two
+  rules decide differently undirected or a circle where the rule reached first in column order used
+  to decide, and `gfci` keeps the union of the smallest separating sets of a pair GES leaves
+  non-adjacent instead of the first one found, so reordering the columns no longer changes what
+  these rules orient, and on data where the rules conflict the graphs can change. ([#233])
 
 ## [0.6.0] - 2026-10-17
 
@@ -385,7 +416,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.0...v0.4.1
@@ -429,10 +461,13 @@ First alpha release.
 [#210]: https://github.com/Abel-ai-lab/andrey/pull/210
 [#211]: https://github.com/Abel-ai-lab/andrey/pull/211
 [#213]: https://github.com/Abel-ai-lab/andrey/pull/213
+[#214]: https://github.com/Abel-ai-lab/andrey/pull/214
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
 [#220]: https://github.com/Abel-ai-lab/andrey/pull/220
 [#225]: https://github.com/Abel-ai-lab/andrey/pull/225
-[#226]: https://github.com/Abel-ai-lab/andrey/pull/226
 [#228]: https://github.com/Abel-ai-lab/andrey/pull/228
-[#238]: https://github.com/Abel-ai-lab/andrey/pull/238
+[#229]: https://github.com/Abel-ai-lab/andrey/pull/229
+[#233]: https://github.com/Abel-ai-lab/andrey/pull/233
+[#239]: https://github.com/Abel-ai-lab/andrey/pull/239
+[#248]: https://github.com/Abel-ai-lab/andrey/pull/248

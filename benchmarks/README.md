@@ -1433,8 +1433,8 @@ Read `params` before comparing solutions because their defaults may optimize dif
   tigramite, and RCIT. `start_tigramite.sh` builds the environment of tigramite's fits.
 - `discrete_cpu.py` - compares PC with the chi-square and G-square tests, GES, BOSS, and GRaSP with
   BDeu, and hill climbing with BDeu and the multinomial BIC with causal-learn, bnlearn, and pgmpy on
-  categorical data, and runs BOSS and GRaSP with the multinomial BIC. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical
-  tests and scores.
+  categorical data, and runs BOSS and GRaSP with the multinomial BIC. `bnlearn_discrete.py` and
+  `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical tests and scores.
 - `mixed_cpu.py` - compares PC, GES, and hill climbing with the degenerate and conditional Gaussian
   tests and scores with Tetrad and bnlearn on mixed data.
 - `gies_cpu.py` - compares GIES with pcalg on simulated interventional data.

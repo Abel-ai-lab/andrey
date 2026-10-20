@@ -215,9 +215,11 @@ uv run python -m qa.quality_gate <NAME>
 ```
 
 On each dataset the method passes when its median SHD is below the empty graph's and within its
-tolerance of the recorded baseline in either direction. The gate runs before every release and
-fails the publish; [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances.
-It also fails any published benchmark row where the reference package has fewer errors than
+tolerance of the recorded baseline in either direction. The gate runs once per release, on the
+release pull request into `main`, which `main` requires to pass; the publish reuses that run when
+the tagged commit has the same tree and runs the gate itself otherwise.
+[`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. The gate also fails
+any published benchmark row where the reference package has fewer errors than
 Andrey, unless `benchmarks/published/parity-allowlist.json` cites the cause
 ([reference parity](qa/README.md#reference-parity)).
 
