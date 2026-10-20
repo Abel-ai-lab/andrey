@@ -311,7 +311,7 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "fast",
+    possible_dsep: str = "order_free",
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -358,12 +358,12 @@ def fci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"fast", "order_free"}, default="fast"
-        How FCI builds each possible-d-separation set [2]_ [3]_, the nodes it conditions on to
-        remove edges the first step kept. ``"fast"`` checks each node when the search reaches it,
-        so the set depends on the order the search visits nodes. ``"order_free"`` checks every
-        node once the search ends, so the set does not depend on that order; its sets can be
-        larger, so it can run more tests. See Notes.
+    possible_dsep : {"order_free", "fast"}, default="order_free"
+        The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
+        kept, one at a time, so each removal changes what the step tests after it.
+        ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
+        so the result does not depend on the column order unless two columns are identical.
+        ``"fast"`` visits them in column order. See Notes and Limitations.
     max_depth : int or None, default=None
         The largest conditioning set a test uses, at least ``0``. Smaller values run fewer tests and
         keep more edges; ``None`` tests sets of every size.
@@ -437,10 +437,9 @@ def fci(
     stands and sets them together, except that an endpoint two of them would mark one as an
     arrowhead and one as a tail stays a circle. The rounds repeat until no mark changes. Rule R4
     decides an endpoint by every shortest discriminating path, so paths whose tests disagree leave
-    it a circle. The orientation rules therefore do not depend on the column order, but the result
-    can, through the order in which the possible-d-separation step visits pairs and conditioning
-    sets, and with ``possible_dsep="fast"`` through the sets themselves. A fixed column order gives
-    reproducible results.
+    it a circle. The orientation rules therefore do not depend on the column order, and with
+    ``possible_dsep="order_free"`` neither does the result, unless two columns are identical. With
+    ``"fast"`` the result can depend on the column order through the possible-d-separation step.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
@@ -451,33 +450,43 @@ def fci(
     **Possible-d-separation set.** FCI builds each possible-d-separation set [2]_ [3]_ with a search
     that walks out from one endpoint of the pair and keeps a node when a node it was reached from
     has a possibly directed path, one with no arrowhead pointing back along it, to the endpoint or
-    to the node. With ``possible_dsep="fast"``, FCI checks a node when the search reaches it,
-    against the nodes it was reached from so far, so the set depends on the order the search visits
-    nodes. With ``"order_free"``, it checks every node once the search ends, against all the nodes
-    it was reached from, so the set does not depend on that order; it holds every node of the
-    ``"fast"`` set and sometimes more. Either set can be smaller than the published definition of
-    the set [2]_, so FCI can keep an edge that the published set would remove, even with exact
-    tests. FCI keeps this search because the published set grows quickly with the graph, the
-    search's set is the one FCI has been measured with, and on simulated data the published set did
-    not give more accurate PAGs. FCI tests every subset of the set, except the empty set and the
-    subsets of either endpoint's neighbors, which the first step already tested.
+    to the node. FCI checks a node when the search reaches it, against the nodes it was reached
+    from so far, so the set depends on the order the search visits nodes. The set can be smaller
+    than the published definition of the set [2]_, so FCI can keep an edge that the published set
+    would remove, even with exact tests. FCI keeps this search because the published set grows
+    quickly with the graph, the search's set is the one FCI has been measured with, and on
+    simulated data the published set did not give more accurate PAGs. FCI tests every subset of the
+    set, except the empty set and the subsets of either endpoint's neighbors, which the first step
+    already tested. It visits the pairs one at a time, removes a pair as soon as a subset separates
+    it, and records that subset, so each removal changes the sets of the pairs after it. With
+    ``possible_dsep="order_free"``, the pairs, the nodes of each search, and the subsets follow a
+    tie rank computed from each column's own data, as for :func:`~andrey.hc`, which moves with its
+    column when the columns are reordered; with ``"fast"``, they follow the column order.
 
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union
     because it does not depend on the order of the tests, and on simulated data it gave more
     accurate PAGs than the first set found.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2) with one variable in ten hidden, from 20 to 800 variables counting the hidden ones,
-    with ten rows per variable. Its median endpoint errors, each mismatched tail, arrowhead, or
-    circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at
-    800 (2,579 against 1,772). The median fit took 0.061 s at 20 variables and 72 s at 800, on 16
-    cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
-    passed the empty graph's (696 against 676). Rule R5 stops searching a pair after a fixed number
-    of partial paths and leaves its circles, so on graphs with many circle-circle edges it can miss
-    an undirected cycle. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
-    data the result can still depend on the column order. With the mixed-data tests, it is
-    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
+    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
+    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
+    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's at
+    every size with mean degree 4, and up to 400 variables with mean degree 2, where they passed it
+    at 800 (2,582 against 1,738 with one variable in ten hidden and ten rows per variable). With
+    those settings the median fit took 0.0064 s at 20 variables and 114 s at 800; with one variable
+    in five hidden and 50 rows per variable it took 78 s at 400 and 4,829 s at 800, where two of
+    five fits ran past 7,200 s. The default, ``"order_free"``, took 0.99 to 1.05 times as long as
+    ``"fast"`` up to 200 variables and 0.78 to 1.42 times at 400 and 800, and its median endpoint
+    errors were within 2% of ``"fast"``'s. On some graphs from 400 variables its order needs more
+    tests than the column order: on one with 400 variables, mean degree 4, one variable in five
+    hidden, and 50 rows per variable, it took 34 s against 23 to 29 s for ``"fast"`` over five
+    column orders. ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES
+    network with 1,000 simulated rows, its median endpoint errors passed the empty graph's (696
+    against 676). Rule R5 stops searching a pair after a fixed number of partial paths and leaves
+    its circles, so on graphs with many circle-circle edges it can miss an undirected cycle. With
+    the mixed-data tests, it is experimental and not benchmarked yet; its tests run it on 5
+    variables with 3,000 rows.
 
     References
     ----------
@@ -536,7 +545,7 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "fast",
+    possible_dsep: str = "order_free",
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
 ) -> StructureOutput:
@@ -591,12 +600,12 @@ def gfci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"fast", "order_free"}, default="fast"
-        How GFCI builds each possible-d-separation set [2]_ [4]_, the nodes it conditions on to
-        remove edges the adjacency search kept. ``"fast"`` checks each node when the search reaches
-        it, so the set depends on the order the search visits nodes. ``"order_free"`` checks every
-        node once the search ends, so the set does not depend on that order; its sets can be
-        larger, so it can run more tests. See Notes.
+    possible_dsep : {"order_free", "fast"}, default="order_free"
+        The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
+        search kept, one at a time, so each removal changes what the step tests after it.
+        ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
+        so the result does not depend on the column order unless two columns are identical.
+        ``"fast"`` visits them in column order. See Notes and Limitations.
     max_depth : int or None, default=None
         The largest conditioning set a test uses, at least ``0``. Smaller values run fewer tests and
         keep more edges; ``None`` tests sets of every size.
@@ -657,24 +666,32 @@ def gfci(
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
     It considers every circle path, up to a fixed search bound, and rule R8 checks each pair of
-    endpoints in both orders. GFCI shares FCI's possible-d-separation sets [2]_ [4]_, built as
+    endpoints in both orders. GFCI shares FCI's possible-d-separation step [2]_ [4]_, in the order
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2) with one variable in ten hidden, from 20 to 200 variables counting the hidden ones (18
-    to 180 observed), with ten rows per variable. Its median endpoint errors, each mismatched tail,
-    arrowhead, or circle, stayed below the empty graph's at every size (197 against 444 at 180
-    observed variables). The median fit took 0.54 s at 90 observed variables and 2.6 s at 180, on 4
-    cores. It runs a full :func:`~andrey.ges` search before any test,
-    so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
-    linear relations with Gaussian noise. With fewer rows than columns the BIC score is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    GES search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. Rule R5 has the search bound described under
-    :func:`~andrey.fci`. ``"order_free"`` is order-free only under exact (oracle) tests; on sampled
-    data the result can still depend on the column order. With the mixed-data score and test, it is
-    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
+    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
+    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
+    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's
+    wherever its fits finished (197 against 444 at 200 variables with mean degree 2, one variable in
+    ten hidden, and ten rows per variable). With those settings the median fit took 0.53 s at 100
+    variables, 2.6 s at 200, and 132 s at 800. Every fit at 800 variables finished within 7,200 s in
+    four of the eight settings; with mean degree 4, one variable in five hidden, and 50 rows per
+    variable, none did, and three of five fits at 400 ran past 3,600 s. The default,
+    ``"order_free"``, took 1.00 to 1.02 times as long as ``"fast"`` up to 200 variables and 0.87 to
+    1.03 times at 400 and 800, and its median endpoint errors were within 2% of ``"fast"``'s. On
+    some graphs from 400 variables its order needs more tests than the column order: on one with 400
+    variables, mean degree 2, one variable in five hidden, and 50 rows per variable, it took 407 s
+    against 120 to 336 s for ``"fast"`` over five column orders. ``possible_dsep="fast"`` gives the
+    column-order mode. It runs a full :func:`~andrey.ges` search before any test, so it takes at
+    least as long as GES on the same data. Its BIC score and Fisher-Z tests assume linear relations
+    with Gaussian noise. With fewer rows than columns the BIC score is unreliable. A parent set of
+    ``n_samples - 1`` or more variables fits its child exactly, so the GES search never selects one,
+    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. Rule R5 has the search bound described under :func:`~andrey.fci`. With the mixed-data
+    score and test, it is experimental and not benchmarked yet; its tests run it on 5 variables with
+    3,000 rows.
 
     References
     ----------

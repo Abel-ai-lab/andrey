@@ -78,11 +78,11 @@ _COLLIDER_RULE = ParamSpec(
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
     type="str",
-    default="fast",
-    choices=("fast", "order_free"),
-    doc="How each possible-d-separation set is built: fast = a node's check runs when the search "
-    "reaches it, so the set depends on the order the search visits nodes; order_free = the checks "
-    "run after the search, so it does not. order_free can run more tests.",
+    default="order_free",
+    choices=("order_free", "fast"),
+    doc="The order of the possible-d-separation step, which removes edges one at a time: "
+    "order_free = by a rank computed from each column's own data, so the result does not depend "
+    "on the column order unless two columns are identical; fast = column order.",
 )
 _COLLIDER_ORDER = ParamSpec(
     name="collider_order",

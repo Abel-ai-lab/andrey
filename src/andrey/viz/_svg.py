@@ -22,7 +22,7 @@ AW = 5.0  # arrowhead half-width
 CR = 4.2  # circle-endpoint radius
 SW = 2.0  # stroke width
 PAD = 32.0  # canvas padding
-HALO_R = 9.0  # ring around a highlighted endpoint
+GLOW_W = 4.0 * SW  # the soft accent stroke under a highlighted endpoint's half of the edge
 CLEAR = NODE_R + 4.0  # minimum distance from an edge to a node it does not join
 _BEND_STEP = NODE_R
 _BEND_STEPS = 8
@@ -118,6 +118,21 @@ def _control(ax: float, ay: float, bx: float, by: float, bend: float) -> tuple[f
     return (ax + bx) / 2 - dy / L * bend, (ay + by) / 2 + dx / L * bend
 
 
+def _half(
+    px: float, py: float, mx: float, my: float, qx: float, qy: float, bend: float
+) -> tuple[str, str]:
+    """Return the half of an edge from its end ``(px, py)`` to its middle.
+
+    It is a line, or, on an arc with control ``(mx, my)`` and far end ``(qx, qy)``, the arc's first
+    half; the result is the element's name and its geometry attributes.
+    """
+    cx, cy = (px + 2 * mx + qx) / 4, (py + 2 * my + qy) / 4  # the arc's middle
+    if not bend:
+        return "line", f'x1="{_f(px)}" y1="{_f(py)}" x2="{_f(cx)}" y2="{_f(cy)}"'
+    hx, hy = (px + mx) / 2, (py + my) / 2
+    return "path", f'd="M {_f(px)} {_f(py)} Q {_f(hx)} {_f(hy)} {_f(cx)} {_f(cy)}" fill="none"'
+
+
 def _edge(
     ax: float,
     ay: float,
@@ -133,28 +148,38 @@ def _edge(
 ) -> str:
     """Draw marks ``ma`` at A and ``mb`` at B on a line, or on a quadratic arc when ``bend`` is set.
 
-    A haloed end draws its mark in the accent color inside a ring.
+    A highlighted end lights its half of the edge: a soft, wide accent stroke under the edge, the
+    half itself in the accent color and a little heavier, and the mark in the accent color. Every
+    width scales with the drawing, so the highlight keeps its proportions at any size.
     """
     mx, my = _control(ax, ay, bx, by, bend)
     ends = []
-    for x, y, mark, ringed in ((ax, ay, ma, halo[0]), (bx, by, mb, halo[1])):
+    for x, y, mark, lit in ((ax, ay, ma, halo[0]), (bx, by, mb, halo[1])):
         length = math.hypot(mx - x, my - y) or 1.0
         ux, uy = (mx - x) / length, (my - y) / length
-        ends.append((x + ux * NODE_R, y + uy * NODE_R, ux, uy, mark, ringed))
+        ends.append((x + ux * NODE_R, y + uy * NODE_R, ux, uy, mark, lit))
     (sax, say), (sbx, sby) = (_stop(px, py, ux, uy, mark) for px, py, ux, uy, mark, _ in ends)
+    halves = []
+    for (px, py, *_, lit), (qx, qy, *_) in ((ends[0], ends[1]), (ends[1], ends[0])):
+        if lit:
+            halves.append(_half(px, py, mx, my, qx, qy, bend))
+    parts = [
+        f'<{tag} class="highlight" {geometry} stroke="{palette.accent}" stroke-width="{GLOW_W}" '
+        'stroke-opacity="0.28" stroke-linecap="round"/>'
+        for tag, geometry in halves
+    ]
     if bend:
-        parts = [_path(f"M {_f(sax)} {_f(say)} Q {_f(mx)} {_f(my)} {_f(sbx)} {_f(sby)}", color)]
+        parts.append(_path(f"M {_f(sax)} {_f(say)} Q {_f(mx)} {_f(my)} {_f(sbx)} {_f(sby)}", color))
     else:
-        parts = [_line(sax, say, sbx, sby, color)]
-    for px, py, ux, uy, mark, ringed in ends:
-        fill = palette.accent if ringed else color
+        parts.append(_line(sax, say, sbx, sby, color))
+    parts += [
+        f'<{tag} {geometry} stroke="{palette.accent}" stroke-width="{_f(1.5 * SW)}" '
+        'stroke-linecap="round"/>'
+        for tag, geometry in halves
+    ]
+    for px, py, ux, uy, mark, lit in ends:
+        fill = palette.accent if lit else color
         parts.append(_head(px, py, ux, uy, _glyph(mark), fill, palette.surface))
-        if ringed:
-            reach = {ARROW: ALEN / 2, CIRCLE: CR}.get(mark, 0.0)
-            parts.append(
-                f'<circle class="highlight" cx="{_f(px + ux * reach)}" cy="{_f(py + uy * reach)}" '
-                f'r="{_f(HALO_R)}" fill="none" stroke="{palette.accent}" stroke-width="{SW}"/>'
-            )
     return "".join(parts)
 
 
@@ -260,7 +285,7 @@ def render(
 ) -> str:
     """Emit the full SVG string. Optional background, then edges, then nodes on top.
 
-    ``highlight`` holds ``(node, neighbor)`` pairs: the mark at ``node`` on that edge is ringed.
+    ``highlight`` holds ``(node, neighbor)`` pairs: the mark at ``node`` on that edge is lit.
     """
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '
@@ -279,11 +304,9 @@ def render(
         others = [pos[k] for k in range(n) if k != i and k != j]
         if et == "twocycle":
             curv = _widen(ax, ay, bx, by, max(12.0, 0.14 * math.hypot(bx - ax, by - ay)), others)
-            for (x1, y1, x2, y2), ringed in (((ax, ay, bx, by), at_j), ((bx, by, ax, ay), at_i)):
+            for (x1, y1, x2, y2), lit in (((ax, ay, bx, by), at_j), ((bx, by, ax, ay), at_i)):
                 parts.append(
-                    _edge(
-                        x1, y1, x2, y2, TAIL, ARROW, color, palette, bend=curv, halo=(False, ringed)
-                    )
+                    _edge(x1, y1, x2, y2, TAIL, ARROW, color, palette, bend=curv, halo=(False, lit))
                 )
         else:
             bend = _route(ax, ay, bx, by, others)

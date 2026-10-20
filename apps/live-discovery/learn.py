@@ -217,7 +217,7 @@ def meek_replay(heading=True):
         )
     intro = (
         "<h1>Meek's rules, one step at a time</h1>"
-        "<p>Orient edges without introducing a new collider or a directed cycle. A ring marks "
+        "<p>Orient edges without introducing a new collider or a directed cycle. The accent marks "
         "the arrowhead each step adds.</p>"
     )
     body = (

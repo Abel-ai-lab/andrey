@@ -32,6 +32,7 @@ from andrey.constraint.fci import (
     _majority_sepsets,
     _remove_by_possible_dsep,
     _sepset,
+    _test_in_rank_order,
     _triple,
     _validate_collider_rule,
     _validate_possible_dsep,
@@ -54,7 +55,7 @@ def gfci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
-    possible_dsep: str = "fast",
+    possible_dsep: str = "order_free",
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
@@ -62,14 +63,17 @@ def gfci(
     """Discover a PAG with GES adjacency and FCI orientation.
 
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data score and test.
+    ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
+    visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
+    ``in_column_order`` takes the column order there too, and applies the orientation rules one
+    firing at a time in column order instead of in order-free rounds
+    (:func:`~andrey.constraint.fci._fci_orient`).
     ``max_depth`` caps the size of every conditioning set a test uses, as in
     :func:`~andrey.constraint.fci.fci`, and of the separating sets :func:`_derive_sepsets` searches.
     ``constraints`` reach the GES phase, and the test phase honors them as FCI does: no step tests
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
     joins a pair they keep apart, so its colliders over that pair come from the pattern, and its
     separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
-    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
-    of in order-free rounds (:func:`~andrey.constraint.fci._fci_orient`).
     """
     X = np.asarray(data, dtype=np.float64)
 
@@ -96,15 +100,13 @@ def gfci(
     marks = _circle_pag(support)
     _knowledge_marks(marks, constraints)
     _orient_colliders_from_pattern(marks, pattern, sepsets)
-    _remove_by_possible_dsep(
-        marks,
-        test,
-        alpha,
-        sepsets,
-        order_free=possible_dsep == "order_free",
-        keep=keep,
-        max_depth=max_depth,
-    )
+    if possible_dsep == "fast" or in_column_order:
+        _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
+    else:
+        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)
+        _remove_by_possible_dsep(
+            marks, ranked_test, alpha, sepsets, by_rank, keep=keep, max_depth=max_depth
+        )
     marks = _circle_pag(marks != NULL)
     _knowledge_marks(marks, constraints)
     ambiguous = (

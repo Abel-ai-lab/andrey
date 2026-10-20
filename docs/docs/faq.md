@@ -27,8 +27,12 @@ CI tests 3.11 to 3.14.
 uv add andrey-core
 ```
 
-[Getting started](guides/getting-started.md#install) covers pip, the optional extras, the
-development version, and building from source.
+```shell
+pip install andrey-core
+```
+
+[Getting started](guides/getting-started.md#install) covers the optional extras, the development
+version, and building from source.
 
 ### Which operating systems does it support?
 
@@ -80,8 +84,8 @@ at 200 variables with the default penalty.
 ### Why does a result differ from another package's?
 
 Methods can break ties in a different order, use different defaults, or treat the column order
-differently; FCI, for one, depends on column order. The [release cards](benchmarks.md) score every
-package on the same true graphs, so compare accuracy there rather than edge by edge.
+differently. The [release cards](benchmarks.md) score every package on the same true graphs, so
+compare accuracy there rather than edge by edge.
 
 ## Speed and hardware
 
@@ -230,7 +234,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.6.0},
+  version = {0.7.0},
   url = {https://andrey.abel.ai},
 }
 ```

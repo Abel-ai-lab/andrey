@@ -647,8 +647,8 @@ html:not(:has(.andrey-home)) .bd-header::before {
   display: none;
 }
 
-/* ---------- the documentation's footer ---------- */
-/* The documentation footer (`_templates/docs-footer.html`), modeled on craft.do's: a rounded navy
+/* ---------- the footer ---------- */
+/* The footer on every page (`_templates/docs-footer.html`), modeled on craft.do's: a rounded navy
    card inset from the page's edges, with the wordmark beside three link columns under small
    capitals and a hairline, and the copyright and Abel's mark at the bottom. The theme's footer
    row is disabled. */
@@ -721,6 +721,9 @@ html:not(:has(.andrey-home)) .bd-header::before {
 }
 
 .docs-footer__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0 0 0.9rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--rule);
@@ -729,6 +732,12 @@ html:not(:has(.andrey-home)) .bd-header::before {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.docs-footer__heading .nav-icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
 }
 
 .docs-footer ul {
@@ -1636,4 +1645,23 @@ p:has(> a > img[alt="Open in Colab"]) a.download code {
 p:has(> a > img[alt="Open in Colab"]) a.download:hover {
   border-color: var(--andrey-accent);
   color: var(--andrey-ink);
+}
+
+/* A comparison table, on a post or a release card: Andrey's columns tinted in the accent, and each
+   row's best cell in bold, shaded when it is not Andrey's (docs/conf.py, _comparison_tables; the
+   0.7.0 post's generated tables, docs/blog/0.7.0/figures.py). */
+.bd-article .ct-ours,
+.bd-article table.table :is(th, td).ct-ours,
+.bd-article table.table tbody tr:hover td.ct-ours {
+  background: color-mix(in srgb, var(--andrey-accent) 10%, var(--andrey-surface));
+  color: var(--andrey-accent);
+}
+
+.bd-article .ct-best {
+  font-weight: 700;
+}
+
+.bd-article .ct-best:not(.ct-ours),
+.bd-article table.table tbody td.ct-best:not(.ct-ours) {
+  background: var(--andrey-surface-2);
 }
