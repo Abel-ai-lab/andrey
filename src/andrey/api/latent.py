@@ -2,9 +2,9 @@
 
 The callable runs the GIN engine and returns one uniform ``StructureOutput``. GIN recovers a
 linear non-Gaussian latent-variable model from the observed data alone, so the wrapped graph spans
-both the observed indicators and the discovered latents: each latent points to its observed children
-and to every later latent in causal order, and ``node_types`` flags which nodes are latent. The
-recovered clustering and latent causal order are stored in ``metadata``.
+both the observed indicators and the discovered latents: each latent points to its observed
+children, an ordered latent also points to every later latent, and ``node_types`` flags which
+nodes are latent. The recovered clustering and latent causal order are stored in ``metadata``.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
-from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -26,8 +25,8 @@ def gin(
     """Learn a latent-variable DAG over observed indicators and their hidden latents with GIN.
 
     GIN exploits the Generalized Independent Noise condition in a linear non-Gaussian model to
-    group observed variables under shared latent parents and to order those latents [1]_. Reach
-    for it when the observed variables are noisy indicators of a few unobserved common causes
+    group observed variables under shared latent parents and to order those latents [1]_. It
+    applies when the observed variables are noisy indicators of a few unobserved common causes
     rather than direct causes of one another.
 
     Parameters
@@ -35,9 +34,9 @@ def gin(
     data : array-like of shape (n_samples, n_variables)
         Observed indicator data, one row per sample. Coerced to ``float64``.
     alpha : float, default=0.05
-        Significance level of the pooled independence test that finds the clusters, in
-        ``(0, 1)``: a group of variables forms a cluster when the test's p-value is at least
-        ``alpha``, so larger values give fewer clusters.
+        Significance level of the pooled independence test, in ``(0, 1)``. A group of variables
+        forms a cluster, and a latent is the next in the order, when the test's p-value is at
+        least ``alpha``, so larger values make each test harder to pass.
     labels : tuple of str or None, default=None
         Optional names for the observed variables, one per column. Defaults to a DataFrame's
         column names, else ``X1..Xn``. Latents are auto-named ``L1..Lm``.
@@ -46,14 +45,16 @@ def gin(
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over the observed variables (indices
-        ``0`` to ``n_variables - 1``) and one latent per cluster, appended in causal order and
-        named ``L1`` to ``Lm``; ``structure.node_types`` flags the latents. Each latent points to
-        the observed variables in its cluster and to every later latent: edges between latents
-        follow the order only and do not mean a direct effect was found. An observed variable in
-        no cluster has no edges. ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]``
-        lists the clusters as lists of column indices, ``metadata["causal_order"]`` lists them
-        earliest latent first (clusters whose order could not be resolved come last), and
-        ``metadata["n_latents"]`` is the latent count.
+        ``0`` to ``n_variables - 1``) and one latent per cluster, named ``L1`` to ``Lm``: the
+        ordered latents first, in causal order, then the unordered ones; ``structure.node_types``
+        flags the latents. Each latent points to the observed variables in its cluster. An ordered
+        latent also points to every later latent and to every unordered one, and unordered latents
+        have no edge between them: edges between latents follow the order only and do not mean a
+        direct effect was found. An observed variable in no cluster has no edges.
+        ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]`` lists the clusters as
+        lists of column indices, by smallest member, ``metadata["causal_order"]`` lists the ordered
+        ones earliest latent first, ``metadata["unordered"]`` lists the rest by smallest member,
+        and ``metadata["n_latents"]`` is the latent count.
 
     Raises
     ------
@@ -61,19 +62,47 @@ def gin(
         If ``alpha`` is not in ``(0, 1)``, or if ``labels`` does not give one name per column of
         ``data``.
 
-    Warns
-    -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
-
     Notes
     -----
-    **Limitations.** Not benchmarked yet. Its tests run it on 6 observed indicators of 2 latents,
-    with 1,500 rows. It tests every group of observed variables of each size, from pairs upward, so
-    the number of tests grows combinatorially with the variable count, and each HSIC test's time and
-    memory grow with the square of the row count. Clusters have at least two variables, so a latent
-    with a single indicator is not found.
+    A group of observed variables forms a cluster when the linear combination of the group with
+    the smallest covariance with the other variables not yet in a cluster is independent of each of
+    them; groups grow from pairs upward, and clusters that share a variable merge. The latents are
+    then ordered one at a time, given the latents already ordered: the next latent is a root, whose
+    cluster passes the independence test at ``alpha`` paired with each other remaining cluster [1]_.
+    Each such test runs once per member, as many times as the largest cluster involved has members:
+    run ``k`` builds the linear combination from member ``k`` of each cluster, cycling through a
+    smaller cluster's members, and Fisher's method pools the runs, so every member of every cluster
+    enters the test. When several candidates pass, the one whose lowest p-value is highest is taken,
+    so latents with no causal path between them are still ordered, arbitrarily. When none passes,
+    the ordering stops and the remaining latents stay unordered. A single remaining latent is
+    ordered last without a test. Fisher's method treats
+    the runs, and the variables each run is tested against, as independent tests, though they share
+    the data, so a comparison can reject a true root more often than ``alpha``, and a correct model
+    can still leave the latents from that step on unordered.
+
+    **Column order.** Each column gets a tie rank computed from its own data, as for
+    :func:`~andrey.hc`, and the search runs on the columns sorted by it: the order of the groups it
+    tests, the member each run of a root test takes, and the choice between root candidates with
+    equal p-values follow the rank. Reordering the columns therefore relabels the clusters and
+    changes nothing else, unless two columns are identical. The rank is arbitrary with respect to
+    causal structure.
+
+    **Limitations.** Measured on simulated linear measurement models with uniform noise and 1,000
+    rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its
+    own. With 2 and 3 latents its clusters matched the true ones (median adjusted Rand index 1);
+    with 4 latents (12 indicators) the median index was 0.89, and a median of one latent was missed.
+    The median fit took 0.91 s with 6 indicators, 2.6 s with 9, and 5.3 s with 12, on 4 cores. Given
+    the true clusters and 1,000 rows, over 10 seeds each, the order of a chain of three latents
+    never stopped early and that of a complete three-latent model stopped early once, with no
+    latent put after one it causes; with the benchmark's random weights instead, 2 of 10 complete
+    three-latent models put a latent after one it causes. It tests every group of observed
+    variables of each size, from pairs upward, so the number of tests grows combinatorially with
+    the variable count, and each HSIC test's time and memory grow with the square of the row count;
+    the fit keeps one such kernel matrix per variable, 8 MB each at 1,000 rows. Clusters have at
+    least two variables, so a latent with a single indicator is not found. Each cluster gets one
+    latent, so indicators that share two or more latents appear as one. It assumes every observed
+    variable measures a latent: variables that depend on no other variable pass the cluster test
+    trivially and are grouped into one cluster.
 
     References
     ----------
@@ -96,7 +125,6 @@ def gin(
     >>> out.metadata["clusters"], out.structure.labels
     ([[0, 1, 2]], ('X1', 'X2', 'X3', 'L1'))
     """
-    warn_experimental("gin")
     from andrey.latent.gin import gin_structure
 
     X = data_matrix(data)

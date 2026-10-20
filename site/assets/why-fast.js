@@ -401,10 +401,10 @@
   // ---- the homepage's carousel: one card at a time --------------------------------------------
   // The cards sit in a row that scrolls sideways and snaps each card to the center. The current
   // card plays its scene while its dot fills, rests on the last frame for REST seconds, and hands
-  // over to the next card, the last to the first. The others show their last frame. It waits
-  // while the pointer or focus is on the carousel, while it is off the screen, and while the page
-  // is hidden. Dots, arrow keys, a swipe, or a drag pick a card. Under reduced motion no card plays
-  // or moves on by itself: each shows its last frame, and the dots still pick one.
+  // over to the next card, the last to the first. The others show their last frame. A card picked
+  // by a dot, an arrow key, a swipe, or a drag plays at once. It waits while keyboard focus is on
+  // the carousel, while it is off the screen, and while the page is hidden. Under reduced motion no
+  // card plays or moves on by itself: each shows its last frame, and the dots still pick one.
   const REST = 1.6;
   for (const belt of document.querySelectorAll(".wf-belt")) {
     const row = belt.querySelector(".wf-cards");
@@ -418,7 +418,7 @@
     let current = 0;
     let run = null;
     let wait = 0;
-    let held = false; // pointer or focus on the carousel
+    let held = false; // keyboard focus on the carousel
     let seen = false; // on the screen and the page visible
     figures.forEach((figure) => play(figure, { last: true }));
 
@@ -486,15 +486,14 @@
       event.preventDefault();
       go(Math.min(cards.length - 1, Math.max(0, current + step)));
     });
-    belt.addEventListener("pointerenter", (event) => {
-      if (event.pointerType === "mouse") { held = true; pause(); }
+    // A click focuses a dot without :focus-visible, so only keyboard focus holds the carousel.
+    belt.addEventListener("focusin", (event) => {
+      if (!event.target.matches(":focus-visible")) return;
+      held = true;
+      pause();
     });
-    belt.addEventListener("pointerleave", (event) => {
-      if (event.pointerType === "mouse") { held = false; resume(); }
-    });
-    belt.addEventListener("focusin", () => { held = true; pause(); });
     belt.addEventListener("focusout", (event) => {
-      if (belt.contains(event.relatedTarget)) return;
+      if (!held || belt.contains(event.relatedTarget)) return;
       held = false;
       resume();
     });

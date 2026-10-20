@@ -1,7 +1,7 @@
 /* The timing comparison, the speed charts, the accuracy figures, and the code windows: on the
-   homepage, in the launch post, and in the benchmark explorer. Every color is an --andrey-* token generated from
-   src/andrey/viz/theme.py, so this file names no hex. Motion runs only with no reduced-motion
-   preference, and every element is visible before it starts. */
+   homepage, in the posts and the release cards, and on the Space's benchmark page. Every color is
+   an --andrey-* token generated from src/andrey/viz/theme.py, so this file names no hex. Motion
+   runs only with no reduced-motion preference, and every element is visible before it starts. */
 
 :root {
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -720,4 +720,19 @@ div[class*="highlight-"].window pre {
     .race-panels > .race-panel:nth-of-type(8) {
     display: block;
   }
+}
+
+/* The measurements table reads as every comparison table on the site: Andrey's columns tinted in
+   the accent, and the lower time and the fewer errors in bold, shaded when they are not Andrey's. */
+.speed-table .ct-ours {
+  background: color-mix(in srgb, var(--andrey-accent) 10%, var(--andrey-surface));
+  color: var(--andrey-accent);
+}
+
+.speed-table .ct-best {
+  font-weight: 700;
+}
+
+.speed-table .ct-best:not(.ct-ours) {
+  background: var(--andrey-surface-2);
 }

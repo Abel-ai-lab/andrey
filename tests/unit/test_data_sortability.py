@@ -3,16 +3,20 @@
 Refutations: the chain case matches the literature, raw linear-Gaussian varsortability is high,
 standardization drives varsortability to *exactly* 0.5, R^2-sortability *survives*
 standardization unchanged (a caveat the tests check explicitly), R^2-sortability stays
-above chance, the n>d singularity gate, and degenerate-input handling.
+above chance, the n>d singularity gate, and degenerate-input handling. The column-order
+correlation has its exact moments under every order of a small graph.
 """
 
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 import andrey.data as data
 from andrey.data.sortability import (
+    causal_depth,
     directed_adjacency,
+    index_correlation,
     r2sortability,
     standardize,
     varsortability,
@@ -94,3 +98,32 @@ def test_edge_only_variant_scales():
     ds = data.sample_scm(d=2000, n=64, seed=0, density=2.0)
     v = varsortability_edges(ds.data.astype(np.float64), ds.params.edges)
     assert 0.0 <= v <= 1.0
+
+
+def test_causal_depth_is_the_longest_path_into_each_node():
+    # 0 -> 1 -> 3 and 0 -> 3: node 3 sits two edges deep; 2 is a root.
+    edges = np.array([[0, 1], [1, 3], [0, 3], [2, 3]])
+    np.testing.assert_array_equal(causal_depth(edges, 5), [0, 1, 0, 2, 0])
+    with pytest.raises(ValueError, match="cycle"):
+        causal_depth(np.array([[0, 1], [1, 0]]), 2)
+
+
+def test_index_correlation_has_mean_zero_and_variance_one_over_k_minus_one():
+    """Over every order of five columns, ties included, the moments are exact."""
+    from itertools import permutations
+
+    edges = np.array([[0, 1], [0, 2], [1, 3], [2, 3]])  # depths 0, 1, 1, 2 and an isolated 0
+    rho = [
+        index_correlation(np.argsort(order)[edges], 5)
+        for order in map(np.array, permutations(range(5)))
+    ]
+    assert np.mean(rho) == pytest.approx(0.0, abs=1e-12)
+    assert np.var(rho) == pytest.approx(1 / 4, abs=1e-12)
+    assert np.isnan(index_correlation(np.empty((0, 2), dtype=int), 3))
+
+
+def test_index_correlation_counts_hidden_nodes_toward_the_depths_only():
+    # The hidden node 2 causes column 0, which causes column 1.
+    edges = np.array([[2, 0], [0, 1]])
+    assert index_correlation(edges, 3, n_observed=2) == pytest.approx(1.0)
+    assert index_correlation(np.array([[2, 1], [1, 0]]), 3, n_observed=2) == pytest.approx(-1.0)

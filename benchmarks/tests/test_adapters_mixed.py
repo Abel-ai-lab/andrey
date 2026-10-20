@@ -77,8 +77,6 @@ def test_every_comparator_solution_is_paired() -> None:
 
 def test_other_keys_keep_their_label_and_generator_call() -> None:
     """The mixed fields join neither the label nor the call of any other regime."""
-    plain = DatasetKey("er", "linear", "gaussian", 2.0, 10, 100, 0, "standardized")
-    assert plain.digest == "314b39c589d4"
     discrete = DatasetKey("er", "categorical", "dirichlet", 2.0, 10, 100, 0, "raw")
     shifted = DatasetKey(
         "er", "categorical", "dirichlet", 2.0, 10, 100, 0, "raw", categorical_share=0.9
@@ -104,7 +102,7 @@ def test_the_regime_rejects_rescaled_data() -> None:
 @pytest.mark.parametrize("categories", [(2, 3), (3, 5)])
 def test_the_lane_rule_reads_exactly_the_generated_categorical_columns(categories) -> None:
     key = _key(categories=categories)
-    data, marks, kind = datasets.generate_one(key)
+    data, marks, kind, _ = datasets.generate_one(key)
     truth = sample_mixed(d=8, n=600, seed=0, categories=categories).provenance["config"]
     with pytest.warns(andrey.DataTypeWarning):
         out = andrey.pc(data, indep_test="degen_gauss", max_categories=MAX_CATEGORIES)
@@ -117,7 +115,7 @@ def test_the_lane_rule_reads_exactly_the_generated_categorical_columns(categorie
 
 @pytest.mark.parametrize("adapter", andrey_mixed_adapters(), ids=lambda a: a.name)
 def test_an_andrey_fit_gives_a_cpdag(adapter) -> None:
-    data, _, _ = datasets.generate_one(_key())
+    data, _, _, _ = datasets.generate_one(_key())
     adapter.setup()
     structure = adapter.to_structure(np.asarray(adapter.fit(data, adapter.params())))
     assert structure.kind == "cpdag" and structure.n_nodes == 8
@@ -162,7 +160,7 @@ def test_the_tetrad_driver_names_its_categorical_columns_and_times_its_search() 
 @needs_tetrad
 @pytest.mark.parametrize("categories", [(2, 3), (3, 5)])
 def test_tetrad_reads_exactly_the_generated_categorical_columns(categories) -> None:
-    data, _, _ = datasets.generate_one(_key(categories=categories))
+    data, _, _, _ = datasets.generate_one(_key(categories=categories))
     truth = sample_mixed(d=8, n=600, seed=0, categories=categories).provenance["config"]
     adapter = tetrad_cmd.TetradPC("cond_gauss")
     adapter.setup()
@@ -173,7 +171,7 @@ def test_tetrad_reads_exactly_the_generated_categorical_columns(categories) -> N
 @needs_tetrad
 @pytest.mark.parametrize("adapter", tetrad_cmd.tetrad_adapters(), ids=lambda a: a.name)
 def test_a_tetrad_fit_gives_a_cpdag(adapter) -> None:
-    data, _, _ = datasets.generate_one(_key())
+    data, _, _, _ = datasets.generate_one(_key())
     adapter.setup()
     adjacency = adapter.fit(data, adapter.params())
     assert adapter.search_s > 0
@@ -186,7 +184,7 @@ def test_a_tetrad_fit_gives_a_cpdag(adapter) -> None:
 
 @needs_r()
 def test_bnlearn_gives_no_categorical_node_a_continuous_parent() -> None:
-    data, _, _ = datasets.generate_one(_key(d=10, n=1000))
+    data, _, _, _ = datasets.generate_one(_key(d=10, n=1000))
     categorical = sample_mixed(d=10, n=1000, seed=0).provenance["config"]["categorical"]
     hc = BnlearnHCCondGauss()
     hc.setup()

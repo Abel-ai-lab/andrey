@@ -1,7 +1,7 @@
 <!-- One image on its own dark ground reads on both GitHub themes; PyPI keeps a plain <img>. The
 banner links the website's homepage. -->
 <p align="center">
-  <a href="https://andrey.abel.ai/"><img alt="Andrey, a very fast causal discovery package"
+  <a href="https://andrey.abel.ai/"><img alt="Andrey: accelerated, accurate, agentic causal discovery"
     src=".github/readme/banner.svg" width="830"></a>
 </p>
 
@@ -23,7 +23,7 @@ Andrey is a causal discovery package for Python.
 
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
-- **One API**: 28 methods, each one function call.
+- **One API**: 27 methods, each one function call.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
 <!-- PITCH:END -->
@@ -32,8 +32,12 @@ Andrey is a causal discovery package for Python.
 uv add andrey-core
 ```
 
-- **With pip**: `pip install andrey-core`
-- **Optional extras**: `andrey-core[numba]` for compiled CPU code, `andrey-core[torch]` for GPUs
+```shell
+pip install andrey-core
+```
+
+- **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
+  layouts
 - **Development version**: `uv add git+https://github.com/Abel-ai-lab/andrey`
 - **[Installation guide](https://andrey.abel.ai/docs/guides/getting-started.html#install)**: the
   extras, a PyTorch build for your GPU, and building Andrey from source
@@ -46,8 +50,8 @@ uv add andrey-core
     <source media="(prefers-color-scheme: dark)"
       srcset=".github/readme/benchmark-chart-dark.svg">
     <img alt="Andrey's speedup over the slowest package on the same data: PC 941x at 400 variables,
-      Tabu search 561x at 800 variables, XGES 140x at 200 variables, DirectLiNGAM 8.9x at 100
-      variables, FCI 8.7x at 800 variables, GES 4.3x at 150 variables"
+      Tabu search 561x at 800 variables, GES 325x at 150 variables, XGES 140x at 200
+      variables, DirectLiNGAM 8.9x at 100 variables, FCI 8.7x at 800 variables"
       src=".github/readme/benchmark-chart-light.svg" width="100%">
   </picture>
 </p>
@@ -68,8 +72,8 @@ Four ideas make it fast; each is animated in
   local scores.
 - **Skip what can't matter**: tests with a closed form settle most edges before any matrix is
   inverted.
-- **Use the hardware you have**: with the optional extras, Numba compiles GES's path checks and a
-  GPU computes large tables.
+- **Use the hardware you have**: with the optional PyTorch extra, a GPU computes large entropy
+  tables.
 
 <!-- WHY_FAST:END -->
 
@@ -80,16 +84,13 @@ Four ideas make it fast; each is animated in
 
 | Family | Methods | Returns |
 |---|---|---|
-| Constraint-based | [`pc`](https://andrey.abel.ai/docs/code/generated/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/code/generated/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/code/generated/andrey.gfci.html)\*, [`cdnod`](https://andrey.abel.ai/docs/code/generated/andrey.cdnod.html)\* | CPDAG, PAG |
-| Score-based | [`ges`](https://andrey.abel.ai/docs/code/generated/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/code/generated/andrey.gies.html)\*, [`xges`](https://andrey.abel.ai/docs/code/generated/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/code/generated/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/code/generated/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/code/generated/andrey.exact_search.html)\*, [`calm`](https://andrey.abel.ai/docs/code/generated/andrey.calm.html)\* | CPDAG, DAG |
+| Constraint-based | [`pc`](https://andrey.abel.ai/docs/code/generated/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/code/generated/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/code/generated/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/code/generated/andrey.cdnod.html) | CPDAG, PAG |
+| Score-based | [`ges`](https://andrey.abel.ai/docs/code/generated/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/code/generated/andrey.gies.html), [`xges`](https://andrey.abel.ai/docs/code/generated/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/code/generated/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/code/generated/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/code/generated/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/code/generated/andrey.calm.html) | CPDAG, DAG |
 | Permutation-based | [`boss`](https://andrey.abel.ai/docs/code/generated/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/code/generated/andrey.grasp.html) | CPDAG |
-| Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.multi_group_direct_lingam.html)\* | DAG |
+| Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.multi_group_direct_lingam.html) | DAG |
 | Time series | [`varma_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/code/generated/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/code/generated/andrey.pcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/code/generated/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/code/generated/andrey.granger.html) | Temporal graph |
-| Latent variables | [`gin`](https://andrey.abel.ai/docs/code/generated/andrey.gin.html)\*, [`rcd`](https://andrey.abel.ai/docs/code/generated/andrey.rcd.html), [`camuv`](https://andrey.abel.ai/docs/code/generated/andrey.camuv.html)\*, [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.bottom_up_parce_lingam.html) | DAG, PAG |
+| Latent variables | [`gin`](https://andrey.abel.ai/docs/code/generated/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/code/generated/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.bottom_up_parce_lingam.html) | DAG, PAG |
 | Pairwise direction | [`anm`](https://andrey.abel.ai/docs/code/generated/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/code/generated/andrey.pnl.html) | Two-node DAG |
-
-\* [Experimental](https://andrey.abel.ai/docs/code/index.html#experimental-methods):
-no published benchmark yet, and the API may change.
 
 <!-- METHODS:END -->
 
@@ -172,9 +173,9 @@ If you use Andrey in your work, please cite it, or use the
 ```bibtex
 @software{andrey,
   author = {{Abel AI Lab}},
-  title = {Andrey: A very fast causal discovery package},
+  title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.6.0},
+  version = {0.7.0},
   url = {https://andrey.abel.ai},
 }
 ```

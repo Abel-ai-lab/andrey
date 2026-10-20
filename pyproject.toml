@@ -1,7 +1,7 @@
 [project]
 name = "andrey-core"       # import root is "andrey" (taken on PyPI)
-version = "0.6.0"         # must equal andrey.__version__ (scripts/check_dist.py)
-description = "Andrey, a very fast causal discovery package"
+version = "0.7.0"         # must equal andrey.__version__ (scripts/check_dist.py)
+description = "Andrey: accelerated, accurate, agentic causal discovery"
 dynamic = ["readme"]  # README.md, its image paths pinned to the release (fancy-pypi-readme below)
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -29,7 +29,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-  "numpy>=1.26",             # uncapped; numba's numpy<2.5 pin stays in its extra
+  "numpy>=1.26",
   "scipy>=1.13",
   "scikit-learn>=1.5",
   "threadpoolctl>=3",        # single-thread BLAS keeps parallel GES bit-identical
@@ -42,12 +42,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# CPU JIT for GES's reachability check, up to 64 variables.
-numba = ["numba>=0.61"]
 torch = ["torch>=2.2"]     # GPU primitives and CALM; the build (CPU/CUDA/ROCm) is picked at install
 data  = ["safetensors>=0.4"]  # andrey.data save/load
 viz   = ["matplotlib>=3.7", "pygraphviz>=2"]  # andrey.viz.mpl; Graphviz layouts
-all   = ["andrey-core[numba,torch,data,viz]"]
+all   = ["andrey-core[torch,data,viz]"]
 
 [project.scripts]
 andrey = "andrey.cli:main"
@@ -74,7 +72,7 @@ docs = [
     "sphinx-copybutton",
     "sphinx-autobuild",
     "resvg-py",                    # renders the link-preview cards
-    "andrey-core[numba,viz]",
+    "andrey-core[viz]",
     "ablog>=0.11.13",
 ]
 
@@ -132,7 +130,7 @@ include = [
     "src/andrey/api/permutation.py",
     "src/andrey/search/calm.py",
 ]
-analysis = { allowed-unresolved-imports = ["torch", "torch.**", "numba", "numba.**"] }
+analysis = { allowed-unresolved-imports = ["torch", "torch.**"] }
 
 [[tool.ty.overrides]]
 include = ["src/andrey/viz/mpl.py"]

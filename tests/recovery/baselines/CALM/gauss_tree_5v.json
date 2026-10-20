@@ -1,0 +1,60 @@
+{
+  "algorithm": "CALM",
+  "case": "gauss_tree_5v",
+  "input": {
+    "case": "gauss_tree_5v",
+    "column_order": [
+      3,
+      4,
+      2,
+      1,
+      0
+    ],
+    "seed": 20261014,
+    "sha256": "07b1875b09e95ef49d81a3daf50a2f3930dc050741efff09ac8e07e6348af27a",
+    "shape": [
+      2000,
+      5
+    ]
+  },
+  "output": {
+    "graph": [
+      [
+        0,
+        0,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        1,
+        1,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        1,
+        2,
+        0
+      ]
+    ]
+  },
+  "schema_version": 3
+}

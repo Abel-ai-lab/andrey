@@ -119,7 +119,7 @@ def test_causal_learn_returns_a_two_node_dag(monkeypatch) -> None:
 def test_every_generated_pair_has_one_edge() -> None:
     directions = set()
     for key in pnl_pairs.pair_keys([50], seeds=10):
-        _, marks, kind = datasets.generate_one(key)
+        _, marks, kind, _ = datasets.generate_one(key)
         [(source, target, _)] = GraphStructure.from_numpy(marks, kind=kind).oriented_edges()
         directions.add((source, target))
     assert directions == {(0, 1), (1, 0)}  # the seed draws the direction

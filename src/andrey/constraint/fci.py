@@ -6,9 +6,10 @@ The algorithm, its settings, and its references are described on :func:`andrey.f
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import nullcontext
-from itertools import combinations, islice
+from functools import cache
+from itertools import combinations, islice, permutations
 
 import numpy as np
 
@@ -22,9 +23,12 @@ from andrey.constraint._skeleton import (
 )
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
+from andrey.search.hc import tie_ranks
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
 _UNBOUNDED_PATH = 1000
+_R4_PARTIAL_PATHS = 10_000
+_R5_PARTIAL_PATHS = 10_000
 
 
 def fci(
@@ -34,6 +38,8 @@ def fci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
+    possible_dsep: str = "order_free",
+    in_column_order: bool = False,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
 
@@ -41,17 +47,26 @@ def fci(
     significance level in ``(0, 1)``. Skeleton pruning requires a p-value above ``alpha``;
     the optional majority collider rule also counts equality as a separating vote.
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
-    Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
+    ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
+    visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
+    ``in_column_order`` takes the column order there too, and applies the orientation rules one
+    firing at a time in column order instead of in order-free rounds (:func:`_fci_orient`). Returns
+    the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
 
     _validate_collider_rule(collider_rule)
+    _validate_possible_dsep(possible_dsep)
     test = make_indep_test(indep_test, X, categorical=categorical)
     support, sepsets = _fast_adjacency_search(X, test, alpha)
 
     marks = _circle_pag(support)
     _orient_colliders(marks, sepsets)
-    _remove_by_possible_dsep(marks, test, alpha, sepsets)
+    if possible_dsep == "fast" or in_column_order:
+        _remove_by_possible_dsep(marks, test, alpha, sepsets)
+    else:
+        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)
+        _remove_by_possible_dsep(marks, ranked_test, alpha, sepsets, by_rank)
     marks = _circle_pag(marks != NULL)
     ambiguous = (
         _majority_sepsets(marks, test, alpha, sepsets)
@@ -59,7 +74,7 @@ def fci(
         else frozenset()
     )
     _orient_colliders(marks, sepsets, ambiguous)
-    _fci_orient(marks, test, alpha, sepsets, ambiguous)
+    _fci_orient(marks, test, alpha, sepsets, ambiguous, in_column_order=in_column_order)
 
     return GraphStructure.from_numpy(marks, kind="pag")
 
@@ -68,13 +83,20 @@ def fci(
 
 
 def _fast_adjacency_search(
-    X: np.ndarray, test: CITest, alpha: float, *, prescreen: bool = True, workers: int = 1
+    X: np.ndarray,
+    test: CITest,
+    alpha: float,
+    *,
+    prescreen: bool = True,
+    workers: int = 1,
+    support: np.ndarray | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]]]:
     """Learn the undirected skeleton and every removed pair's separating set (stable, FAS-style).
 
-    Grows the conditioning size from zero over a complete graph; at each size, every still-adjacent
-    pair ``(x, y)`` is tested against subsets of a start-of-size snapshot of *either* endpoint's
-    neighborhood, and pairs found independent are removed together after the size completes.
+    Grows the conditioning size from zero over a complete graph, or over the boolean adjacency
+    ``support`` when one is given; at each size, every still-adjacent pair ``(x, y)`` is tested
+    against subsets of a start-of-size snapshot of *either* endpoint's neighborhood, and pairs
+    found independent are removed together after the size completes.
     A removed pair's separating set is the union of every conditioning set that made it independent.
 
     Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
@@ -87,7 +109,7 @@ def _fast_adjacency_search(
     scan.
     """
     d = X.shape[1]
-    support = np.ones((d, d), dtype=bool)
+    support = np.ones((d, d), dtype=bool) if support is None else np.array(support, dtype=bool)
     np.fill_diagonal(support, False)
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
@@ -105,7 +127,8 @@ def _fast_adjacency_search(
             neighbors = [np.flatnonzero(support[i]) for i in range(d)]
             remove: list[tuple[int, int]] = []
             if can_prescreen and size == 0:
-                for x, y in marginal_removals(test, np.triu(support, 1), alpha):
+                upper = np.triu(support, 1)
+                for x, y, _ in marginal_removals(test, upper, alpha, record_pvalues=False):
                     remove.append((x, y))
                     sepsets[(x, y)] = ()
                     sepsets[(y, x)] = ()  # skeleton separations are recorded both ways
@@ -114,7 +137,9 @@ def _fast_adjacency_search(
                     candidates = sorted(
                         (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
-                    separating = first_order_separating(test, x, y, candidates, alpha)
+                    separating, _ = first_order_separating(
+                        test, x, y, candidates, alpha, record_pvalues=False
+                    )
                     if separating:
                         remove.append((x, y))
                         key = tuple(separating)
@@ -123,14 +148,16 @@ def _fast_adjacency_search(
             else:
                 pairs = adjacent_pairs(support)
                 if pool is not None:
-                    removals = pool.scan(pairs, support.copy(), size, alpha)
+                    removals = pool.scan(pairs, support.copy(), size, alpha, record_pvalues=False)
                 else:
                     # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
                     # match the (1-thread) parallel skeleton workers, where it has them, whatever
                     # the host thread count.
                     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
-                        removals = scan_pairs(test, pairs, neighbors, size, alpha)
-                for x, y, separating in removals:
+                        removals = scan_pairs(
+                            test, pairs, neighbors, size, alpha, record_pvalues=False
+                        )
+                for x, y, separating, _ in removals:
                     remove.append((x, y))
                     sepsets[(x, y)] = separating
                     sepsets[(y, x)] = separating
@@ -213,6 +240,11 @@ def _sepset(
 def _validate_collider_rule(collider_rule: str) -> None:
     if collider_rule not in ("sepsets", "majority"):
         raise ValueError(f"collider_rule must be 'sepsets' or 'majority', got {collider_rule!r}")
+
+
+def _validate_possible_dsep(possible_dsep: str) -> None:
+    if possible_dsep not in ("fast", "order_free"):
+        raise ValueError(f"possible_dsep must be 'fast' or 'order_free', got {possible_dsep!r}")
 
 
 def _triple(a: int, b: int, c: int) -> tuple[int, int, int]:
@@ -358,7 +390,11 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     """Possible-d-separating nodes for the pair ``(x, y)`` (descending), from a reachability BFS.
 
     Grows a frontier of node pairs from ``x``, extending through definite colliders and adjacent
-    triples, and collects every intermediate node reachable by a possible-parent path.
+    triples, and collects every intermediate node reachable by a possible-parent path. The frontier
+    holds ``(a, c)`` pairs rather than the last edge of each path, so the set can be smaller than
+    Possible-D-Sep as Spirtes, Glymour, and Scheines (2000) define it; :func:`andrey.fci` gives the
+    reasons for keeping it. A node's possible-parent check runs when the frontier reaches it, over
+    the predecessors recorded so far, so the set depends on the order of the node indices.
     """
     n = marks.shape[0]
     dsep: set[int] = set()
@@ -405,32 +441,28 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     dsep.discard(x)
     dsep.discard(y)
     # Sort by descending labels "X{i+1}". Lexicographic order differs from numeric order
-    # at two digits; this order determines which conditioning subsets are skipped.
+    # at two digits; this order decides which separating subset is found and recorded first.
     return sorted(dsep, key=lambda v: f"X{v + 1}", reverse=True)
 
 
 def _iter_dsep_choices(
     dsep: list[int], adj_a: set[int], adj_b: set[int]
 ) -> Iterator[tuple[int, ...]]:
-    """Conditioning subsets of ``dsep`` (size >= 2) outside either endpoint's adjacency.
+    """Every non-empty subset of ``dsep`` that lies inside neither endpoint's adjacency.
 
-    Candidate subsets are enumerated by increasing size. For each size, the first combination
-    is skipped and the last is emitted twice; a size with a single combination emits it once.
-    Subsets are generated one at a time and filtered against the endpoint adjacencies.
+    Subsets come by increasing size, each size in ``combinations`` order, one at a time. The
+    adjacency search already tested the empty set and every subset of either endpoint's
+    neighbors: those neighborhoods only shrink, so each such subset was a candidate at its size
+    and left the pair dependent. Testing it again cannot remove the edge.
     """
 
-    def outside(values: tuple[int, ...]) -> bool:
-        return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
+    for size in range(1, len(dsep) + 1):
+        yield from (c for c in combinations(dsep, size) if _outside(c, adj_a, adj_b))
 
-    for size in range(2, len(dsep) + 1):
-        combos = combinations(dsep, size)
-        last = next(combos)  # skip the first combination of each size
-        for values in combos:
-            if outside(values):
-                yield values
-            last = values
-        if outside(last):  # and emits the last one twice
-            yield last
+
+def _outside(values: tuple[int, ...], adj_a: set[int], adj_b: set[int]) -> bool:
+    """``values`` lie inside neither endpoint's adjacency."""
+    return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
 
 
 def _try_remove_by_dsep(
@@ -447,8 +479,6 @@ def _try_remove_by_dsep(
 ) -> bool:
     """Remove edge ``x-y`` if some possible-d-sep subset makes ``x`` and ``y`` independent."""
     dsep = _possible_dsep(marks, a, b)
-    if len(dsep) < 2:
-        return False
     for cond in _iter_dsep_choices(dsep, adj_a, adj_b):
         if test(x, y, cond) > alpha:
             marks[x, y] = NULL
@@ -462,7 +492,7 @@ def _edge_order(marks: np.ndarray, i: int, j: int) -> tuple[int, int]:
     """Return the endpoint order used by the possible-d-sep search.
 
     A left-pointing edge uses ``(j, i)``. Every other edge uses ``(i, j)``, so its search order
-    follows the column indices.
+    follows the node indices.
     """
     if marks[i, j] == ARROW and marks[j, i] in (TAIL, CIRCLE):
         return j, i
@@ -474,12 +504,53 @@ def _remove_by_possible_dsep(
     test: CITest,
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
+    by_rank: np.ndarray | None = None,
 ) -> None:
     """Prune edges the plain skeleton kept but a possible-d-sep conditioning set separates.
 
-    Search each endpoint's possible-d-sep set for a conditioning subset outside either endpoint's
-    adjacency. Store a successful subset under the endpoint order returned by ``_edge_order``.
+    Visits the pairs one at a time and searches each endpoint's possible-d-sep set for a
+    conditioning subset outside either endpoint's adjacency; the first subset found removes the
+    pair at once, so each removal changes the sets of the pairs after it, and is stored under the
+    endpoint order returned by ``_edge_order``. The pairs, their endpoints, and the nodes of each
+    set are visited in column order. ``by_rank``, when given, is the column order of ``test``'s
+    data, as :func:`_test_in_rank_order` returns them: the step then runs on the nodes in that
+    order and maps its removals and separating sets back to the column labels once.
     """
+    if by_rank is None:
+        _remove_in_node_order(marks, test, alpha, sepsets)
+        return
+    ranked = marks[np.ix_(by_rank, by_rank)]
+    found: dict[tuple[int, int], tuple[int, ...]] = {}
+    _remove_in_node_order(ranked, test, alpha, found)
+    position = np.argsort(by_rank)
+    marks[:] = ranked[np.ix_(position, position)]
+    label = by_rank.tolist()
+    for (x, y), cond in found.items():
+        sepsets[(label[x], label[y])] = tuple(label[v] for v in cond)
+
+
+def _test_in_rank_order(
+    X: np.ndarray, indep_test: str, categorical: np.ndarray | None
+) -> tuple[np.ndarray, CITest]:
+    """The column order that sorts ``X`` by :func:`~andrey.search.hc.tie_ranks`, and the
+    ``indep_test`` test over ``X``'s columns in that order.
+
+    Each rank moves with its column, so every column order of ``X`` gives the same test.
+    """
+    by_rank = np.argsort(tie_ranks(X, categorical))
+    mask = None if categorical is None else np.asarray(categorical)[by_rank]
+    return by_rank, make_indep_test(
+        indep_test, np.ascontiguousarray(X[:, by_rank]), categorical=mask
+    )
+
+
+def _remove_in_node_order(
+    marks: np.ndarray,
+    test: CITest,
+    alpha: float,
+    sepsets: dict[tuple[int, int], tuple[int, ...]],
+) -> None:
+    """:func:`_remove_by_possible_dsep` in the order of the node indices."""
     n = marks.shape[0]
     edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
     for na, nb in edges:
@@ -495,19 +566,72 @@ def _remove_by_possible_dsep(
 # ---- FCI orientation rules ----------------------------------------------------------------------
 
 
+class _Implied:
+    """The endpoint marks the orientation rules imply in one round, without changing ``marks``.
+
+    A rule records ``out[i, j] = mark``, the mark at ``i`` on edge ``i-j``, as it would set it on
+    the mark matrix itself; :meth:`apply` then sets the marks.
+    """
+
+    def __init__(self) -> None:
+        self.marks: dict[tuple[int, int], set[int]] = {}
+
+    def __setitem__(self, endpoint: tuple[int, int], mark: int) -> None:
+        self.marks.setdefault(endpoint, set()).add(int(mark))
+
+    def apply(self, marks: np.ndarray) -> bool:
+        """Set each circle implied one mark alone to that mark; return whether any changed."""
+        changed = False
+        for endpoint, implied in self.marks.items():
+            if marks[endpoint] == CIRCLE and len(implied) == 1:
+                marks[endpoint] = implied.pop()
+                changed = True
+        return changed
+
+
 def _fci_orient(
     marks: np.ndarray,
     test: CITest,
     alpha: float,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    in_column_order: bool = False,
 ) -> None:
     """Apply the FCI orientation rules R1-R10 to a fixed point, in place over ``marks``.
 
-    Each sweep runs the arrowhead rules (R1/R2 cycle, R3, and the R4 discriminating-path rule)
-    followed by the tail and possibly-directed-path rules R5-R10; sweeps repeat until no endpoint
-    changes. Circles become tails or arrowheads only where the current marks force it.
+    Circles become tails or arrowheads only where the current marks force it; no rule changes a
+    tail or an arrowhead. The rules run in rounds. In a round, every rule reads the marks as they
+    stand when the round starts and records the marks it implies (:class:`_Implied`). A circle
+    then takes the mark the rules imply for it when they imply only that one; a circle they imply
+    both an arrowhead and a tail for stays a circle in that round. The rounds repeat until one
+    changes no endpoint, and stop because each endpoint changes at most once. R4 decides by every
+    shortest discriminating path, not the first one found (:func:`_rule_r4`), and R5 orients every
+    edge of each uncovered circle cycle it finds, which the same round also finds from each of that
+    cycle's edges. A round reads only the marks, never a node's position, so relabeling the nodes
+    relabels its marks: the result does not depend on the order in which the rules visit the
+    nodes, nor on the column order, except where R4's or R5's path search stops at its bound.
+
+    With ``in_column_order``, each sweep instead runs the arrowhead rules (R1/R2 cycle, R3, and the
+    R4 discriminating-path rule) followed by the tail and possibly-directed-path rules R5-R10, each
+    rule setting its marks at once and visiting the nodes in column order, so of two firings that
+    conflict the first decides; sweeps repeat until no endpoint changes.
     """
+    if not in_column_order:
+        test = _memoized(test)  # R4 repeats its tests in every round
+        while True:
+            implied = _Implied()
+            _rule_r1r2_cycle(marks, False, ambiguous, out=implied)
+            _rule_r3(marks, sepsets, False, ambiguous, out=implied)
+            _rule_r4(marks, test, alpha, sepsets, False, out=implied)
+            _rule_r5(marks, False, ambiguous, out=implied)
+            _rule_r6(marks, False, out=implied)
+            _rule_r7(marks, False, ambiguous, out=implied)
+            _rule_r8(marks, False, out=implied)
+            _rule_r9(marks, False, ambiguous, out=implied)
+            _rule_r10(marks, False, ambiguous, out=implied)
+            if not implied.apply(marks):
+                return
     change = True
     while change:
         change = False
@@ -523,36 +647,60 @@ def _fci_orient(
         change = _rule_r10(marks, change, ambiguous)
 
 
+def _memoized(test: CITest) -> CITest:
+    """``test``, answering a query it has answered before from memory."""
+    answered = cache(lambda x, y, condition_set: test(x, y, condition_set))
+
+    def memoized(x: int, y: int, condition_set: Iterable[int] = ()) -> float:
+        return answered(x, y, tuple(condition_set))
+
+    return memoized
+
+
 def _rule_r1(
     marks: np.ndarray,
     a: int,
     b: int,
     c: int,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
-    """R1: ``a *-> b o-* c`` with ``a``, ``c`` non-adjacent  =>  ``b -> c``."""
+    """R1: ``a *-> b o-* c`` with ``a``, ``c`` non-adjacent  =>  ``b -> c``.
+
+    Every rule reads ``marks`` and sets its marks in ``out``: ``marks`` itself when ``out`` is
+    ``None``, or an :class:`_Implied` that records them.
+    """
+    out = marks if out is None else out
     if _adjacent(marks, a, c) or _triple(a, b, c) in ambiguous:
         return False
     if marks[b, a] == ARROW and marks[b, c] == CIRCLE and _arrow_allowed(marks, b, c):
-        marks[c, b] = ARROW
-        marks[b, c] = TAIL
+        out[c, b] = ARROW
+        out[b, c] = TAIL
         return True
     return False
 
 
-def _rule_r2(marks: np.ndarray, a: int, b: int, c: int) -> bool:
+def _rule_r2(
+    marks: np.ndarray, a: int, b: int, c: int, *, out: np.ndarray | _Implied | None = None
+) -> bool:
     """R2: ``a -> b *-> c`` or ``a *-> b -> c`` with ``a o-* c``  =>  arrowhead at ``c``."""
+    out = marks if out is None else out
     if not (_adjacent(marks, a, c) and marks[c, a] == CIRCLE):
         return False
     directed = marks[b, a] == ARROW and marks[c, b] == ARROW
     if directed and (marks[a, b] == TAIL or marks[b, c] == TAIL) and _arrow_allowed(marks, a, c):
-        marks[c, a] = ARROW
+        out[c, a] = ARROW
         return True
     return False
 
 
 def _rule_r1r2_cycle(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """Sweep R1 and R2 over every node ``b`` and each ordered pair of its neighbors."""
     n = marks.shape[0]
@@ -561,10 +709,10 @@ def _rule_r1r2_cycle(
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
-                change = _rule_r1(marks, a, b, c, ambiguous) or change
-                change = _rule_r1(marks, c, b, a, ambiguous) or change
-                change = _rule_r2(marks, a, b, c) or change
-                change = _rule_r2(marks, c, b, a) or change
+                change = _rule_r1(marks, a, b, c, ambiguous, out=out) or change
+                change = _rule_r1(marks, c, b, a, ambiguous, out=out) or change
+                change = _rule_r2(marks, a, b, c, out=out) or change
+                change = _rule_r2(marks, c, b, a, out=out) or change
     return change
 
 
@@ -573,8 +721,11 @@ def _rule_r3(
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     change: bool,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R3 (double triangle): a shared circle child of two colliders gets an arrowhead."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for b in range(n):
         into_arrows = _into(marks, b, ARROW)
@@ -598,7 +749,7 @@ def _rule_r3(
                         continue
                     if not _arrow_allowed(marks, d, b):
                         continue
-                    marks[b, d] = ARROW
+                    out[b, d] = ARROW
                     change = True
     return change
 
@@ -609,8 +760,16 @@ def _rule_r4(
     alpha: float,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     change: bool,
+    *,
+    out: _Implied | None = None,
 ) -> bool:
-    """R4: orient the endpoints closing a definite discriminating path into ``b``."""
+    """R4: orient the endpoints closing a definite discriminating path into ``b``.
+
+    Without ``out``, the first discriminating path found that decides (:func:`_ddp_orient`) sets
+    the marks in ``marks``. With ``out``, every shortest discriminating path that decides records
+    its marks in ``out`` (:func:`_discriminating_paths`), so paths that decide differently leave
+    the endpoint at ``b`` a circle.
+    """
     n = marks.shape[0]
     for b in range(n):
         poss_a = [a for a in range(n) if marks[a, b] == ARROW]  # b *-> a
@@ -621,8 +780,50 @@ def _rule_r4(
                     continue
                 if marks[c, b] != ARROW:
                     continue
-                change = _ddp_orient(marks, a, b, c, test, alpha, sepsets, change)
+                if out is None:
+                    change = _ddp_orient(marks, a, b, c, test, alpha, sepsets, change)
+                    continue
+                for paths in _discriminating_paths(marks, a, b, c):
+                    decided = False
+                    for path in paths:
+                        previous = dict(zip(path, path[1:]))
+                        oriented, _ = _do_ddp(
+                            marks, path[0], a, b, c, previous, test, alpha, sepsets, False, out=out
+                        )
+                        decided = oriented or decided
+                    if decided:
+                        change = True
+                        break
     return change
+
+
+def _discriminating_paths(marks: np.ndarray, a: int, b: int, c: int) -> Iterator[list[list[int]]]:
+    """The discriminating paths ``d, ..., a, b`` for ``b`` toward ``c``, shortest first.
+
+    The paths grow backward from ``a`` one node at a time, every inner node a collider on the path
+    and a parent of ``c``, as :func:`_ddp_orient` grows them, and end at a node ``d`` non-adjacent
+    to ``c``. Each yield lists every path of one length, from ``d`` to ``b``. The search stops at
+    ``_UNBOUNDED_PATH`` nodes, or when one length holds more than ``_R4_PARTIAL_PATHS`` partial
+    paths.
+    """
+    c_parents = _parents(marks, c)
+    layer = [[b, a]]  # each partial path read from b backward
+    for _ in range(_UNBOUNDED_PATH):
+        found, extended = [], []
+        for path in layer:
+            t, p = path[-1], path[-2]
+            for d in _into(marks, t, ARROW):  # d *-> t
+                if d in path or d == c or not _is_def_collider(marks, d, t, p):
+                    continue
+                if not _adjacent(marks, d, c):
+                    found.append([*path, d][::-1])
+                elif d in c_parents:
+                    extended.append([*path, d])
+        if found:
+            yield found
+        if not extended or len(extended) > _R4_PARTIAL_PATHS:
+            return
+        layer = extended
 
 
 def _get_path(node: int, previous: Mapping[int, int]) -> list[int]:
@@ -690,8 +891,11 @@ def _do_ddp(
     alpha: float,
     sepsets: Mapping[tuple[int, int], tuple[int, ...]],
     change: bool,
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> tuple[bool, bool]:
     """Resolve the discriminating-path endpoint at ``b``: tail if ``b`` separates ``d``/``c``."""
+    out = marks if out is None else out
     path = _get_path(d, previous)
     ind = test(d, c, tuple(path)) > alpha
     path2 = [p for p in path if p != b]
@@ -704,12 +908,12 @@ def _do_ddp(
         ind = b in sep
 
     if ind:
-        marks[b, c] = TAIL
+        out[b, c] = TAIL
         return True, True
     if not _arrow_allowed(marks, a, b) or not _arrow_allowed(marks, c, b):
         return False, change
-    marks[b, a] = ARROW
-    marks[b, c] = ARROW
+    out[b, a] = ARROW
+    out[b, c] = ARROW
     return True, True
 
 
@@ -723,82 +927,137 @@ def _is_uncovered(marks: np.ndarray, path: list[int]) -> bool:
     return all(not _adjacent(marks, path[i], path[i + 2]) for i in range(len(path) - 2))
 
 
-def _uncovered_circle_paths(
-    marks: np.ndarray,
-    src: int,
-    dst: int,
-    exclude: tuple[int, int],
-    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
-) -> Iterator[list[int]]:
-    """Yield uncovered circle paths from a breadth-first search with one shared visited set.
+def _circle_reaches(marks: np.ndarray, target: int, avoid: int) -> set[int]:
+    """Nodes joined to ``target`` by a circle walk (every edge ``o-o``) that avoids ``avoid``."""
+    reachable = {target}
+    queue = deque([target])
+    while queue:
+        node = queue.popleft()
+        for other in range(marks.shape[0]):
+            if other != avoid and other not in reachable and _traverse_circle(marks, node, other):
+                reachable.add(other)
+                queue.append(other)
+    return reachable
 
-    Excluded endpoints cannot occur on the path. Each node is enqueued at most once, so alternate
-    prefixes are not enumerated. Ambiguity filters completed paths without changing the search.
+
+def _circle_walk_closes(
+    marks: np.ndarray,
+    a: int,
+    b: int,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+) -> bool:
+    """True when a circle walk ``a, c, ..., d, b`` meets every R5 condition except simplicity.
+
+    The search runs over ``(previous, current)`` edges, so it takes polynomial time. Every
+    uncovered circle path is such a walk, so ``False`` rules out an R5 cycle for ``a o-o b``.
     """
     n = marks.shape[0]
-    queue: deque[tuple[int, list[int]]] = deque()
-    visited: set[int] = set()
-    for u in range(n):
-        if u in exclude or not _traverse_circle(marks, src, u):
-            continue
-        if u not in visited:
-            visited.add(u)
-            queue.append((u, [src, u]))
+    start = [
+        (a, c)
+        for c in range(n)
+        if c != b
+        and _traverse_circle(marks, a, c)
+        and not _adjacent(marks, b, c)
+        and _triple(b, a, c) not in ambiguous
+    ]
+    seen = set(start)
+    queue = deque(start)
     while queue:
-        node, path = queue.popleft()
-        if (
-            node == dst
-            and _is_uncovered(marks, path)
-            and not any(_triple(*path[i : i + 3]) in ambiguous for i in range(len(path) - 2))
-        ):
-            yield path
-        for u in range(n):
-            if u in exclude or not _traverse_circle(marks, node, u):
+        previous, current = queue.popleft()
+        for node in range(n):
+            if node in (previous, a) or not _traverse_circle(marks, current, node):
                 continue
-            if u in visited:
+            if _adjacent(marks, previous, node) or _triple(previous, current, node) in ambiguous:
                 continue
-            visited.add(u)
-            queue.append((u, path + [u]))
+            if node == b:
+                if not _adjacent(marks, a, current) and _triple(current, b, a) not in ambiguous:
+                    return True
+            elif (current, node) not in seen:
+                seen.add((current, node))
+                queue.append((current, node))
+    return False
+
+
+def _uncovered_circle_cycle(
+    marks: np.ndarray,
+    a: int,
+    b: int,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+) -> list[int] | None:
+    """Inner nodes ``c, ..., d`` of an uncovered circle cycle ``a, c, ..., d, b, a``, or ``None``.
+
+    The circle path ``a, c, ..., d, b`` is simple and uncovered, and ``a``-``d`` and ``b``-``c``
+    are non-adjacent, so the cycle closed by ``a o-o b`` is uncovered too. No triple on the cycle
+    is ambiguous. Search state belongs to each path: reaching a node through one predecessor must
+    not block a different route. Reverse reachability prunes nodes with no circle walk to ``b``
+    avoiding ``a``.
+
+    Finding such a simple path is NP-complete in general [1]_. A polynomial walk check
+    (:func:`_circle_walk_closes`) rules out most pairs first; the path search then stops after
+    ``_R5_PARTIAL_PATHS`` partial paths and returns ``None``.
+
+    References
+    ----------
+    .. [1] Szeider, S. (2003). Finding paths in graphs avoiding forbidden transitions. Discrete
+       Applied Mathematics 126(2-3), 261-273.
+    """
+    if not _circle_walk_closes(marks, a, b, ambiguous):
+        return None
+    reachable = _circle_reaches(marks, b, a)
+    stack = [
+        [a, c]
+        for c in range(marks.shape[0])
+        if c != b
+        and c in reachable
+        and _traverse_circle(marks, a, c)
+        and not _adjacent(marks, b, c)
+        and _triple(b, a, c) not in ambiguous
+    ]
+    for _ in range(_R5_PARTIAL_PATHS):
+        if not stack:
+            return None
+        path = stack.pop()
+        last = path[-1]
+        for node in range(marks.shape[0]):
+            if node not in reachable or node in path or not _traverse_circle(marks, last, node):
+                continue
+            if _adjacent(marks, path[-2], node) or _triple(path[-2], last, node) in ambiguous:
+                continue
+            if node != b:
+                stack.append([*path, node])
+            elif not _adjacent(marks, a, last) and _triple(last, b, a) not in ambiguous:
+                return path[1:]
+    return None
 
 
 def _rule_r5(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R5: orient an uncovered circle cycle to tails when every cycle triple is unambiguous.
 
     The cycle is ``a o-o b`` closed by a circle path ``a, c, ..., d, b`` with ``a``-``d`` and
     ``b``-``c`` non-adjacent; the whole path, not only ``c, ..., d``, must be uncovered
-    (Zhang 2008).
+    (Zhang 2008). Every simple path is a candidate, so a covered route through a node never hides
+    an uncovered route through the same node. A pair whose search reaches ``_R5_PARTIAL_PATHS``
+    keeps its circles.
     """
     n = marks.shape[0]
-    for b in range(n):
-        for a in _into(marks, b, CIRCLE):
-            if marks[a, b] != CIRCLE:  # need a o-o b
+    for a in range(n):
+        for b in range(a + 1, n):
+            if not _traverse_circle(marks, a, b):
                 continue
-            a_circle = [c for c in range(n) if c not in (a, b) and _traverse_circle(marks, c, a)]
-            b_circle = [d for d in range(n) if d not in (a, b) and _traverse_circle(marks, d, b)]
-            for c in a_circle:
-                if _adjacent(marks, b, c):
-                    continue
-                for d in b_circle:
-                    if _adjacent(marks, a, d):
-                        continue
-                    for path in _uncovered_circle_paths(marks, c, d, (a, b), ambiguous):
-                        if not _is_uncovered(marks, [a, *path, b]):
-                            continue
-                        # Include both triples crossing the closing edge a-b.
-                        full_path = [a, *path, b, a, path[0]]
-                        if any(
-                            _triple(*full_path[i : i + 3]) in ambiguous
-                            for i in range(len(full_path) - 2)
-                        ):
-                            continue
-                        change = True
-                        _orient_tails(marks, a, b, path)
+            path = _uncovered_circle_cycle(marks, a, b, ambiguous)
+            if path is not None:
+                _orient_tails(marks if out is None else out, a, b, path)
+                change = True
     return change
 
 
-def _orient_tails(marks: np.ndarray, a: int, b: int, path: list[int]) -> None:
+def _orient_tails(marks: np.ndarray | _Implied, a: int, b: int, path: list[int]) -> None:
     """Set every endpoint on ``a - path - b`` to a tail (the R5 double-tail orientation)."""
     marks[a, b] = TAIL
     marks[b, a] = TAIL
@@ -811,53 +1070,56 @@ def _orient_tails(marks: np.ndarray, a: int, b: int, path: list[int]) -> None:
         marks[path[i + 1], path[i]] = TAIL
 
 
-def _rule_r6(marks: np.ndarray, change: bool) -> bool:
+def _rule_r6(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | None = None) -> bool:
     """R6: ``a --- b o-* c``  =>  tail at ``b`` on edge ``b-c``."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for b in range(n):
         if not any(marks[b, a] == TAIL and marks[a, b] == TAIL for a in range(n)):
             continue
         for c in _into(marks, b, CIRCLE):
-            marks[b, c] = TAIL
+            out[b, c] = TAIL
             change = True
     return change
 
 
 def _rule_r7(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R7: ``a --o b o-* c`` with ``a``, ``c`` non-adjacent  =>  tail at ``b`` on edge ``b-c``."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for b in range(n):
         into_circles = _into(marks, b, CIRCLE)
         tail_side = [a for a in into_circles if marks[a, b] == TAIL]  # a --o b
         for c in into_circles:
             for a in tail_side:
-                if not _adjacent(marks, a, c) and _triple(a, b, c) not in ambiguous:
-                    marks[b, c] = TAIL
-                    change = True
+                if a == c or _adjacent(marks, a, c) or _triple(a, b, c) in ambiguous:
+                    continue
+                out[b, c] = TAIL
+                change = True
     return change
 
 
-def _rule_r8(marks: np.ndarray, change: bool) -> bool:
+def _rule_r8(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | None = None) -> bool:
     """R8: ``a -> b -> c`` (or ``a --o b -> c``) with ``a o-> c``  =>  ``a -> c``."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for b in range(n):
-        adj = _adjacent_nodes(marks, b)
-        for i in range(len(adj)):
-            for k in range(i + 1, len(adj)):
-                # Test only ascending endpoint pairs (x = adj[i], z = adj[k], i < k).
-                x, z = adj[i], adj[k]
-                b_to_z = marks[z, b] == ARROW and marks[b, z] == TAIL
-                x_to_b_directed = marks[b, x] == ARROW and marks[x, b] == TAIL
-                x_to_b_circle = marks[b, x] == CIRCLE and marks[x, b] == TAIL
-                x_o_arrow_z = (
-                    _adjacent(marks, x, z) and marks[z, x] == ARROW and marks[x, z] == CIRCLE
-                )
-                if (x_to_b_directed or x_to_b_circle) and b_to_z and x_o_arrow_z:
-                    marks[x, z] = TAIL
-                    marks[z, x] = ARROW
-                    change = True
+        # Both orders of each neighbor pair, so the rule does not depend on node labels.
+        for x, z in permutations(_adjacent_nodes(marks, b), 2):
+            b_to_z = marks[z, b] == ARROW and marks[b, z] == TAIL
+            x_to_b_directed = marks[b, x] == ARROW and marks[x, b] == TAIL
+            x_to_b_circle = marks[b, x] == CIRCLE and marks[x, b] == TAIL
+            x_o_arrow_z = _adjacent(marks, x, z) and marks[z, x] == ARROW and marks[x, z] == CIRCLE
+            if (x_to_b_directed or x_to_b_circle) and b_to_z and x_o_arrow_z:
+                out[x, z] = TAIL
+                out[z, x] = ARROW
+                change = True
     return change
 
 
@@ -922,9 +1184,14 @@ def _exists_uncovered_pd_path(
 
 
 def _rule_r9(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R9: ``a o-> c`` with an uncovered possibly-directed path ``a .. b .. c``  =>  ``a -> c``."""
+    out = marks if out is None else out
     n = marks.shape[0]
     for c in range(n):
         for a in _into(marks, c, ARROW):
@@ -937,8 +1204,8 @@ def _rule_r9(
                 if _adjacent(marks, b, c):
                     continue
                 if _exists_uncovered_pd_path(marks, a, b, c, ambiguous):
-                    marks[a, c] = TAIL
-                    marks[c, a] = ARROW
+                    out[a, c] = TAIL
+                    out[c, a] = ARROW
                     change = True
                     break
     return change
@@ -952,12 +1219,17 @@ def _is_possible_child(marks: np.ndarray, parent: int, child: int) -> bool:
 
 
 def _rule_r10(
-    marks: np.ndarray, change: bool, ambiguous: frozenset[tuple[int, int, int]] = frozenset()
+    marks: np.ndarray,
+    change: bool,
+    ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    *,
+    out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """R10: complete ``a o-> c`` via two uncovered possibly-directed paths into ``b -> c <- d``.
 
     The paths reach the tails ``b`` and ``d`` from two non-adjacent possible children of ``a``.
     """
+    out = marks if out is None else out
     n = marks.shape[0]
     for c in range(n):
         into_arrows = _into(marks, c, ARROW)
@@ -976,8 +1248,8 @@ def _rule_r10(
                     if marks[b, c] != TAIL or marks[d, c] != TAIL:  # need b -> c <- d
                         continue
                     if _r10_connects(marks, children, b, d, a, ambiguous):
-                        marks[a, c] = TAIL
-                        marks[c, a] = ARROW
+                        out[a, c] = TAIL
+                        out[c, a] = ARROW
                         change = True
     return change
 

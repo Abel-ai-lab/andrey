@@ -14,12 +14,14 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 
 ## FCI column order
 
-FCI and GFCI depend on column order. `column_order.py` measures how much, for the column-order
-sentence in the 0.1.0 benchmark report. It fits both methods on 237 latent-confounded models
-(Erdos-Renyi and scale-free graphs with one hidden confounder, 6-12 nodes, 500-5000 samples, seeds
-0-9), refits each on three seeded column orders, maps the answers back, and counts the relabelings
-that change any endpoint mark. It is a measurement with no passing threshold: permutation equality
-is not a requirement for these methods.
+`column_order.py` measures how often reordering the columns changes FCI's and GFCI's endpoint
+marks, for the column-order sentence in the 0.1.0 benchmark report. It fits both methods on 237
+latent-confounded models (Erdos-Renyi and scale-free graphs with one hidden confounder, 6-12 nodes,
+500-5000 samples, seeds 0-9), refits each on three seeded column orders, maps the answers back, and
+counts the relabelings that change any endpoint mark. With the default
+`possible_dsep="order_free"`, a reordering relabels the marks and changes nothing else, unless two
+columns are identical; with `"fast"`, the possible-d-separation step can change them. It is a
+measurement with no passing threshold.
 
 ```shell
 uv run python -m qa.column_order
@@ -35,14 +37,20 @@ uv run python -m qa.quality_gate
 
 The `quality-gate` workflow runs the same command. Every job that publishes to PyPI must need a job
 that calls it; `tests/unit/test_release_gates.py` fails otherwise. Pull requests do not run the
-gate. It checks PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM, RCD,
-BottomUpParceLiNGAM, ANM, PNL, PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and Granger
-on the datasets whose assumptions each method needs:
+gate. It checks PC, FCI, GFCI, CD-NOD, GES, GIES, XGES, HC, Tabu, exact search, CALM, BOSS, GRaSP,
+DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI,
+PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and Granger on the datasets whose assumptions each
+method needs:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, GES, XGES, HC, Tabu, BOSS, GRaSP |
-| `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI |
+| `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
+| `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
+| `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
+| `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
+| `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
+| `latent_measurement` at `d = 8, 12`, `n = 1000` | 10 seeds each | GIN |
 | `lingam_sf` at `d = 20, 50` | 10 seeds each | DirectLiNGAM, ICA-LiNGAM |
 | `latent_lingam_er` at `d = 10, 15` | 10 seeds each | RCD, BottomUpParceLiNGAM |
 | `anm_pair` at `n = 1000` | 10 seeds | ANM |
@@ -53,9 +61,9 @@ on the datasets whose assumptions each method needs:
 | `varma_lingam_paper` at `d = 3, 5`, `n = 300` | 10 seeds each | VARMA-LiNGAM |
 | `longitudinal_lingam_paper` at `(d, n, m) = (3, 20, 200), (5, 20, 500)` | 10 seeds each | LongitudinalLiNGAM |
 | `var2_lagged` at `d = 5`, `n = 1000, 2000` | 10 seeds each | Granger |
-| ASIA, linear-Gaussian | 10 seeds | PC, GES, XGES, HC, Tabu, BOSS, GRaSP, FCI |
+| ASIA, linear-Gaussian | 10 seeds | PC, GES, XGES, HC, Tabu, BOSS, GRaSP, exact search, CALM, FCI, GFCI |
 | ASIA, linear with uniform noise | 10 seeds | DirectLiNGAM, ICA-LiNGAM |
-| Sachs, measured | 1 | PC, FCI, GES, XGES, HC, Tabu, BOSS, GRaSP, DirectLiNGAM, ICA-LiNGAM |
+| Sachs, measured | 1 | PC, FCI, GFCI, GES, XGES, HC, Tabu, BOSS, GRaSP, exact search, DirectLiNGAM, ICA-LiNGAM |
 
 - **Regimes.** `andrey.data` generates the published benchmark regimes with the benchmarks'
   arguments, at `n = 50d`; a test keeps the two in step. At the benchmarks' `n = 10d`, ICA-LiNGAM
@@ -64,6 +72,20 @@ on the datasets whose assumptions each method needs:
   the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
+- **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
+  each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
+  they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.
+- **Interventions, domains, groups, and indicators.** The published regimes of GIES, CD-NOD,
+  MultiGroupDirectLiNGAM, and GIN, drawn by the benchmark harness (`benchmarks/andrey_bench` and
+  GIES's benchmark driver): `interventional_gauss_er` at `n = 50d`, with intervention targets on
+  four variables in ten and the rows split evenly between no intervention and each target;
+  `domain_shift_er`, 2,000 rows from four domains, in which one variable in three shifts its mean;
+  `multi_group_er`, three groups of 1,000 rows over one graph with weights drawn for each group;
+  and `latent_measurement`, latents that each cause every later one, with three indicators each,
+  where `d` counts the latents and the indicators. CD-NOD and MultiGroupDirectLiNGAM run through
+  their benchmark adapters, which build the domain index and split the groups. GIN's number of
+  tests grows combinatorially with the indicator count, so it runs at the two smaller sizes. A test
+  keeps the domain, group, and measurement draws in step with the harness.
 - **Pairs.** `anm_pair` and `pnl_pair` are the published cause-effect pairs: two variables and one
   edge, in a direction the seed draws, at the benchmarks' 1,000-row size; a test keeps them in step
   with the benchmark drivers. The empty graph's SHD on a pair is 1, so ANM and PNL pass only when
@@ -85,9 +107,13 @@ on the datasets whose assumptions each method needs:
   from `cmu-phil/example-causal-datasets` (CC0-1.0) at a pinned commit once, checks its SHA-256,
   and caches it, so the first run needs network access.
 
-SHD follows the published summaries: PC, GES, XGES, HC, Tabu, BOSS, and GRaSP against the truth's
-CPDAG, the LiNGAM methods, ANM, and PNL against the DAG, and FCI by endpoint SHD against the PAG of
-the observed variables. RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent
+SHD follows the published summaries: PC, GES, XGES, HC, Tabu, exact search, CALM, BOSS, and GRaSP
+against the truth's CPDAG, the LiNGAM methods, ANM, and PNL against the DAG, MultiGroupDirectLiNGAM
+summed over its groups, and FCI and GFCI by endpoint SHD against the PAG of the observed variables.
+GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
+and CD-NOD against the CPDAG in which the domain index orients the edges it reaches. GIN's errors
+are the latents it misses: the true latents whose indicators it does not return as one cluster.
+RCD and BottomUpParceLiNGAM are scored by endpoint SHD against the latent
 projection, the edges and pairs their benchmark scores: `i -> j` for a directed path from `i` to `j`
 through hidden nodes only, and `i <-> j` for a pair that one hidden node reaches through hidden
 nodes only. The time-series methods are scored in their summaries' units: PCMCI by the lag-resolved
@@ -116,8 +142,8 @@ uv run python -m qa.quality_gate --capture  # re-measure; review the diff
 
 Before any fit, the gate checks the published benchmark summaries
 (`benchmarks/published/*/summary.json`) with `reference_parity.py`, which reads only those files,
-so the reference packages need not be installed. Each row pairs Andrey with one reference package at one size, and it
-fails at any margin:
+so the reference packages need not be installed. Each row pairs Andrey with one reference package
+at one size, and it fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer
   errors on more series than Andrey;

@@ -48,6 +48,7 @@ LAYOUT = (
 def render_homepage(summary, *, placeholder=False):
     """The homepage template filled from ``summary``, as the site build fills it."""
     jinja2 = pytest.importorskip("jinja2")
+    pytest.importorskip("PIL")  # the sweep traces the art; Pillow is the viz extra's, not dev's
     loader = jinja2.ChoiceLoader(
         [
             jinja2.DictLoader(
@@ -266,22 +267,27 @@ def test_errors_compare_as_a_share_rounded_against_andrey():
     ]
 
 
-def test_methods_list_every_registered_method():
+def test_methods_list_every_registered_method(monkeypatch):
+    # GFCI is experimental here, so it carries the status label and no seal.
+    specs = [
+        s.model_copy(update={"status": "experimental"}) if s.name == "gfci" else s
+        for s in list_specs()
+    ]
+    monkeypatch.setattr(build, "list_specs", lambda: specs)
     summaries = placeholder_summaries()
     title, html = build.methods(summaries)
-    specs = list_specs()
     assert title.startswith(f"{len(specs)} methods in ")
     assert html.count('class="method"') == len(specs)
     for spec in specs:
         assert f"docs/code/generated/andrey.{spec.name}.html" in html
     # Each supported method a release's summary compares with another package has the seal, and a
     # tooltip that describes it.
+    status = {s.name: s.status for s in specs}
     measured = {build.registry_name(m) for s in summaries for m in s["methods"]}
     sealed = sorted(re.findall(r'aria-describedby="bench-(\w+)"', html))
-    assert sealed == sorted(n for n in measured if get_spec(n).status == "supported")
+    assert sealed == sorted(n for n in measured if status[n] == "supported")
     assert html.count('role="tooltip"') == len(sealed) and "Benchmarked</a>" not in html
-    experimental = [s for s in specs if s.status == "experimental"]
-    assert html.count('class="method-status"') == len(experimental)
+    assert html.count('class="method-status"') == 1
     assert "Experimental Score-then-FCI hybrid" in re.sub(r"<[^>]+>", "", html)  # read as text
 
 
@@ -306,6 +312,7 @@ def test_unpublished_summary_needs_the_placeholder_flag():
     with pytest.raises(ValueError, match="andrey_placeholder=1"):
         build.load_summary(PLACEHOLDER)
     summary = build.load_summary(PLACEHOLDER, placeholder=True)
+    pytest.importorskip("PIL")  # the context traces the art's sweep
     marked = build.homepage_context(summary, placeholder=True)
     assert 'content="noindex"' in marked["robots"] and "Not for release" in marked["banner"]
     unmarked = build.homepage_context(summary)
@@ -439,8 +446,8 @@ def test_placeholder_numbers_are_refused_wherever_the_file_sits(tmp_path, monkey
 def test_the_headline_is_one_sentence_with_no_number(placeholder_page):
     found = re.search(r'<h1 id="headline">(.*?)</h1>', placeholder_page, re.S)[1]
     text = re.sub(r"<[^>]+>", "", found)
-    assert text == "Causal discovery: accelerated, accurate, agentic."
-    assert '<span class="word">accelerated, accurate, agentic.</span>' in found
+    assert text == "Accelerated, accurate, agentic causal discovery."
+    assert '<span class="word">Accelerated, accurate, agentic</span>' in found
 
 
 def test_the_hero_cards_lead_to_the_sections_and_repeat_their_claims(placeholder_page):
@@ -469,7 +476,9 @@ def test_the_lede_names_every_registry_family_in_one_sentence(placeholder_page):
 
 def test_the_page_title_is_the_one_line_description(placeholder_page):
     # The description pyproject.toml and the README give, as the browser tab shows it.
-    assert "<title>Andrey, a very fast causal discovery package</title>" in placeholder_page
+    assert (
+        "<title>Andrey: accelerated, accurate, agentic causal discovery</title>" in placeholder_page
+    )
 
 
 # The registry as it is, and without one method the description does not name: the count of "more"
@@ -558,8 +567,8 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     for release, name in build.PANEL:
         size, bars = shown[name]
         # The slide is the method's largest size with a published ratio, at the panel's mean
-        # degree, and Andrey's bar prints that ratio, "≥" before a lower bound. A pair's size is
-        # its rows.
+        # degree, or the size PANEL_SIZES names, and Andrey's bar prints that ratio, "≥" before a
+        # lower bound. A pair's size is its rows.
         methods = [m for m in by_release[release]["methods"] if m["method"] == name]
         rows = [
             r
@@ -570,7 +579,7 @@ def test_the_readme_chart_has_six_cards_each_a_published_ratio():
         pairs = methods[0].get("family") == "pairwise"
         unit = "rows" if pairs else "variables"
         size_of = (lambda r: r["n"]) if pairs else (lambda r: r.get("observed", r["d"]))
-        largest = max(size_of(r) for r in rows)
+        largest = build.PANEL_SIZES.get((release, name), max(size_of(r) for r in rows))
         assert size == f"{largest:,} {unit}"
         ratio, at_least = max(build.claimed_ratio(r) for r in rows if size_of(r) == largest)
         andrey = next(label for package, _, label in bars if package == "Andrey")
@@ -724,7 +733,7 @@ def test_every_speedup_bar_comes_from_andreys_paired_ratios():
 def test_every_timed_package_needs_a_published_ratio():
     """No silent fallback to a time quotient for a package without a paired ratio."""
     summaries = placeholder_summaries()
-    release, name = build.PANEL[2]
+    release, name = build.PANEL[0]
     summary = summaries[build.RELEASES.index(release)]
     method = next(m for m in summary["methods"] if m["method"] == name)
     row = max((r for r in method["rows"] if r["ratio"]), key=lambda r: r["d"])
@@ -857,7 +866,7 @@ def test_the_comparison_table_has_three_groups_with_a_mark_for_every_package():
     assert table.count('<tr class="compare-group">') == len(groups)
     for _, feature, marks, _ in build.COMPARISON:
         assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
-    assert table.count('<th scope="col">') == len(build.PEERS)
+    assert len(re.findall(r'<th scope="col"[ >]', table)) == len(build.PEERS)
 
 
 def test_interface_example_returns_every_kind_of_graph():
@@ -958,15 +967,10 @@ def test_the_homepage_shows_the_whole_agent_session(placeholder_page):
     assert "grid-column: 3" in replay[: replay.index("}")]
 
 
-def test_the_footer_credits_abel_with_its_mark_and_name(placeholder_page):
-    start = placeholder_page.index('<footer class="site-footer')
-    footer = placeholder_page[start : placeholder_page.index("</footer>", start)]
-    link = footer[footer.index('<a class="footer-abel" href="https://abel.ai/">') :]
-    link = link[: link.index("</a>")]
-    # One link holds the mark and the name; the mark is drawn in the text's color.
-    assert link.endswith("Abel AI Lab") and "Built by" not in footer
-    assert '<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true"' in link
-    assert 'fill="currentColor"' in link and "white" not in link
+def test_abels_mark_takes_the_text_color():
+    mark = build.abel_mark()
+    assert mark.startswith('<svg class="abel-mark" viewBox="0 0 726 460" aria-hidden="true"')
+    assert 'fill="currentColor"' in mark and "white" not in mark
 
 
 def test_the_agent_session_wraps_long_lines_inside_the_terminal(placeholder_page):
@@ -1371,7 +1375,7 @@ def test_the_card_shows_its_title_with_the_accent_word_and_no_version(cards):
     assert andrey.__version__ not in svg
     assert " ".join(word for word, _ in _title_words(svg)) == cards.TAGLINE
     amber = [word for word, fill in _title_words(svg) if fill == cards.grain.AMBER]
-    assert amber == [cards.ACCENT]
+    assert amber == list(cards.ACCENT)
     plain = cards.card_svg(cards.TAGLINE)
     assert {fill for _, fill in _title_words(plain)} == {"#ffffff"}
 
@@ -1471,7 +1475,8 @@ def test_the_sweep_follows_the_streak_in_the_art():
     # The traced path lies on the art's amber pixels from its foot to its tip, so the light runs
     # up the streak, the trail's dots, or the arm, and nowhere else.
     import numpy as np
-    from PIL import Image
+
+    Image = pytest.importorskip("PIL.Image")
 
     assert set(build.SWEPT) == {art for _, _, art, _ in build.ACTS} | {
         build.EXAMPLE_ART,
@@ -1566,9 +1571,9 @@ def test_the_readme_banner_is_the_committed_rounded_svg_the_readme_links(cards):
     assert 'src=".github/readme/banner.svg"' in header
     # The banner links the website's homepage.
     assert '<a href="https://andrey.abel.ai/"><img' in header
-    assert 'alt="Andrey, a very fast causal discovery package"' in header
+    assert 'alt="Andrey: accelerated, accurate, agentic causal discovery"' in header
     assert "<picture" not in header and "<h1" not in readme
-    assert cards.TAGLINE == "A very fast causal discovery package"
+    assert cards.TAGLINE == "Accelerated, accurate, agentic causal discovery"
 
 
 @pytest.mark.parametrize("kind", ["pair", "lanes", "iceberg", "contour", "hourglass", "ground"])
@@ -1685,7 +1690,9 @@ def test_every_hand_written_copy_of_the_claim_is_the_builds():
 def test_the_citation_title_is_the_tagline():
     # The package's own line, as on the README banner; the homepage's headline is campaign wording.
     cff = (ROOT / "CITATION.cff").read_text()
-    assert 'title: "Andrey: A very fast causal discovery package"' in cff
+    assert 'title: "Andrey: Accelerated, accurate, agentic causal discovery"' in cff
     for page in (ROOT / "README.md", ROOT / "docs" / "docs" / "faq.md"):
         text = page.read_text()
-        assert "title = {Andrey: A very fast causal discovery package}," in text, page.name
+        assert "title = {Andrey: Accelerated, accurate, agentic causal discovery}," in text, (
+            page.name
+        )

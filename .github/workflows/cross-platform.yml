@@ -35,11 +35,11 @@ jobs:
       - name: Build the wheel
         run: uv build --wheel
       - name: Install into a clean environment and import
-        # torch and numba live behind extras, so the core wheel must not pull them in.
+        # torch lives behind an extra, so the core wheel must not pull it in.
         run: |
           uv venv --python ${{ matrix.python-version }}
           uv pip install dist/*.whl
-          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None, 'core must be torch-free'; assert u.find_spec('numba') is None, 'core must be numba-free'; import andrey, numpy, platform; print('andrey', andrey.__version__, '| numpy', numpy.__version__, '|', platform.platform())"
+          uv run --no-project python -c "import importlib.util as u; assert u.find_spec('torch') is None, 'core must be torch-free'; import andrey, numpy, platform; print('andrey', andrey.__version__, '| numpy', numpy.__version__, '|', platform.platform())"
       - name: CLI help and configuration
         run: |
           uv run --no-project andrey --help

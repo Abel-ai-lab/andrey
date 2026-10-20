@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from andrey.core.orient import (
+    _cpdag_of_pdag,
     dag2cpdag,
     from_structure,
     meek,
@@ -93,6 +94,14 @@ def test_dag2cpdag_triangle_fully_unorients():
     assert np.array_equal(dag2cpdag(triangle), undirected([(0, 1), (0, 2), (1, 2)], 3))
 
 
+def test_dag2cpdag_rejects_an_undirected_edge():
+    # An undirected (tail-tail) edge next to a directed one is not a DAG.
+    graph = dag([(1, 2)], 3)
+    graph[0, 1] = graph[1, 0] = TAIL
+    with pytest.raises(ValueError, match="requires a DAG"):
+        dag2cpdag(graph)
+
+
 def test_dag2cpdag_diamond_golden():
     # Diamond 0 -> {1, 2} -> 3: the collider at 3 (1 and 2 non-adjacent) is compelled, while the
     # two top edges are reversible.
@@ -161,6 +170,69 @@ def test_meek_is_a_fixed_point_of_cpdags(d: int):
         assert np.array_equal(meek(cpdag), cpdag)
 
 
+def relabel(adj: np.ndarray, order: np.ndarray) -> np.ndarray:
+    """``adj`` with node ``order[k]`` renamed ``k``."""
+    return adj[np.ix_(order, order)]
+
+
+def random_pdag(rng: np.random.Generator, d: int) -> np.ndarray:
+    """A PDAG whose edges are each undirected or directed either way at random."""
+    a = np.zeros((d, d), dtype=np.int8)
+    for i in range(d):
+        for j in range(i + 1, d):
+            if rng.random() < 0.5:
+                a[i, j], a[j, i] = [(TAIL, TAIL), (TAIL, ARROW), (ARROW, TAIL)][rng.integers(3)]
+    return a
+
+
+def test_meek_leaves_an_edge_two_firings_direct_both_ways_undirected():
+    # R1 directs 1 -> 2 from 0 -> 1 and 2 -> 1 from 3 -> 2.
+    pdag = dag([(0, 1), (3, 2)], 4) + undirected([(1, 2)], 4)
+    assert np.array_equal(meek(pdag), pdag)
+    # One firing at a time, the directed edge with the lower tail decides.
+    assert np.array_equal(meek(pdag, in_column_order=True), dag([(0, 1), (3, 2), (1, 2)], 4))
+
+
+def test_meek_leaves_out_orientations_that_close_a_cycle_together():
+    # R1 directs 1 -> 3 from 2 -> 1, and 0 -> 2 from 3 -> 0: together they close the cycle
+    # 0 -> 2 -> 1 -> 3 -> 0.
+    pdag = dag([(2, 1), (3, 0)], 4) + undirected([(1, 3), (0, 2)], 4)
+    assert np.array_equal(meek(pdag), pdag)
+    assert np.count_nonzero(meek(pdag, in_column_order=True) != pdag) == 1
+
+
+@pytest.mark.parametrize("d", range(5, 9))
+def test_meek_ignores_node_labels(d: int):
+    # Relabeling the nodes relabels the completion, on PDAGs whose orientations conflict too; one
+    # firing at a time, some relabeling changes it.
+    rng = np.random.default_rng(300 + d)
+    in_order_changed = False
+    for _ in range(40):
+        pdag = random_pdag(rng, d)
+        completed, in_order = meek(pdag), meek(pdag, in_column_order=True)
+        for _ in range(4):
+            order = rng.permutation(d)
+            assert np.array_equal(meek(relabel(pdag, order)), relabel(completed, order))
+            in_order_changed |= not np.array_equal(
+                meek(relabel(pdag, order), in_column_order=True), relabel(in_order, order)
+            )
+    assert in_order_changed
+
+
+@pytest.mark.parametrize("d", range(4, 9))
+def test_meek_fires_as_one_at_a_time_when_a_dag_extends_the_pdag(d: int):
+    # The colliders of a DAG's skeleton, with some of the DAG's other edges directed as background
+    # knowledge: no orientations conflict, so the rounds complete it as single firings do.
+    rng = np.random.default_rng(400 + d)
+    for _ in range(40):
+        adj = random_dag(rng, d)
+        skeleton = np.where(adj != NULL, np.int8(TAIL), np.int8(NULL))
+        pdag = orient_colliders(skeleton, true_sepsets(adj))
+        known = (rng.random((d, d)) < 0.2) & (adj == ARROW)  # known[j, i]: the edge i -> j
+        pdag[known] = ARROW
+        assert np.array_equal(meek(pdag), meek(pdag, in_column_order=True))
+
+
 # ---- PDAG extension ------------------------------------------------------------------------------
 
 
@@ -183,6 +255,59 @@ def test_pdag2dag_keeps_directed_edges():
     out = pdag2dag(pdag)
     assert out[0, 1] == TAIL and out[1, 0] == ARROW  # 0 -> 1 kept
     assert out[1, 2] != NULL and out[2, 1] != NULL  # 1 -- 2 now directed some way
+
+
+def _perturbed_cpdag(rng: np.random.Generator, d: int, p: float | None = None) -> np.ndarray:
+    """A random DAG's CPDAG with some undirected edges directed and some directed edges undirected.
+
+    ``p`` is the DAG's edge density, drawn from ``[0.1, 0.7]`` when not given. Some of these PDAGs
+    have no consistent extension.
+    """
+    p = float(rng.uniform(0.1, 0.7)) if p is None else p
+    pdag = dag2cpdag(random_dag(rng, d, p))
+    for a, b in np.argwhere((pdag == TAIL) & (pdag.T == TAIL)):
+        if a < b and rng.random() < 0.3:
+            pdag[a, b], pdag[b, a] = (TAIL, ARROW) if rng.random() < 0.5 else (ARROW, TAIL)
+    for a, b in np.argwhere((pdag == TAIL) & (pdag.T == ARROW)):
+        if rng.random() < 0.15:
+            pdag[a, b], pdag[b, a] = TAIL, TAIL
+    return pdag
+
+
+def test_cpdag_of_pdag_matches_extension_then_cpdag():
+    # The bitmask rebuild GES runs after each move returns dag2cpdag(pdag2dag(pdag)), and raises
+    # pdag2dag's error when the PDAG has no consistent extension.
+    rng = np.random.default_rng(7)
+    raised = 0
+    for _ in range(600):
+        d = int(rng.integers(1, 30))
+        for pdag in (random_dag(rng, d), _perturbed_cpdag(rng, d)):
+            try:
+                expected = dag2cpdag(pdag2dag(pdag))
+            except ValueError:
+                raised += 1
+                with pytest.raises(ValueError, match="no consistent"):
+                    _cpdag_of_pdag(pdag)
+                continue
+            assert np.array_equal(_cpdag_of_pdag(pdag), expected)
+    assert 0 < raised < 600
+
+
+@pytest.mark.parametrize("d", [63, 64, 65, 128, 129])
+def test_cpdag_of_pdag_across_word_boundary(d):
+    # Node masks past 64 nodes span more than one 64-bit word; the rebuild still matches the
+    # reference on sparse DAGs, their CPDAGs, and perturbed CPDAGs.
+    rng = np.random.default_rng(d)
+    for _ in range(4):
+        p = float(rng.uniform(1.0, 4.0)) / d
+        for pdag in (random_dag(rng, d, p), _perturbed_cpdag(rng, d, p)):
+            try:
+                expected = dag2cpdag(pdag2dag(pdag))
+            except ValueError:
+                with pytest.raises(ValueError, match="no consistent"):
+                    _cpdag_of_pdag(pdag)
+                continue
+            assert np.array_equal(_cpdag_of_pdag(pdag), expected)
 
 
 # ---- collider orientation ------------------------------------------------------------------------

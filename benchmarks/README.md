@@ -9,10 +9,10 @@ folder under `published/` with the summary its numbers come from:
 
 | Release | Release card | Summary |
 |---|---|---|
-| 0.4.0 | [Pairwise direction](../docs/docs/benchmarks/0.4.0.md) | [`published/pairwise-2026-10/summary.json`](published/pairwise-2026-10/summary.json) |
-| 0.3.0 | [Score-based search](../docs/docs/benchmarks/0.3.0.md) | [`published/score-search-2026-10/summary.json`](published/score-search-2026-10/summary.json) |
-| 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/hidden-confounders-2026-10/summary.json`](published/hidden-confounders-2026-10/summary.json) |
-| 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/alpha-2026-09/summary.json`](published/alpha-2026-09/summary.json) |
+| 0.4.0 | [Pairwise direction](../docs/docs/benchmarks/0.4.0.md) | [`published/0.4.0/summary.json`](published/0.4.0/summary.json) |
+| 0.3.0 | [Score-based search](../docs/docs/benchmarks/0.3.0.md) | [`published/0.3.0/summary.json`](published/0.3.0/summary.json) |
+| 0.2.0 | [Hidden common causes](../docs/docs/benchmarks/0.2.0.md) | [`published/0.2.0/summary.json`](published/0.2.0/summary.json) |
+| 0.1.0 | [The alpha benchmarks](../docs/docs/benchmarks/0.1.0.md) | [`published/0.1.0/summary.json`](published/0.1.0/summary.json) |
 
 A summary holds one row per comparison and size. It is generated from the recorded fits; those
 records and the script that writes it are kept outside this repository. A released report and its
@@ -38,7 +38,7 @@ Packages:
 - [bnlearn](https://www.bnlearn.com/) (R)
 - [pgmpy](https://github.com/pgmpy/pgmpy) - see [Categorical data](#categorical-data)
 - [Tetrad](https://github.com/cmu-phil/tetrad), through its causal-cmd jar - see
-  [Mixed data](#mixed-data)
+  [Mixed data](#mixed-data) and [GFCI](#gfci)
 - [xges](https://github.com/ANazaret/XGES) - uses a separate environment; see below
 - [tigramite](https://github.com/jakobrunge/tigramite) - GPL-licensed; uses a separate environment
   and is compared by its outputs only; see below
@@ -81,6 +81,14 @@ environment:
 ```shell
 benchmarks/start_xges.sh
 export ANDREY_BENCH_XGES_PYTHON=$PWD/benchmarks/.venv-xges/bin/python
+```
+
+lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports, pins scipy below 1.17.
+lingam's MultiGroupDirectLiNGAM runs in a third environment, on Python 3.12:
+
+```shell
+benchmarks/start_lingam.sh
+export ANDREY_BENCH_LINGAM_PYTHON=$PWD/benchmarks/.venv-lingam/bin/python
 ```
 
 An adapter selects another environment by setting `python_env` to the name of the variable that
@@ -148,19 +156,26 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 
 | method | solutions |
 |---|---|
-| GES | Andrey (numpy/serial, numpy/parallel, numba/serial), causal-learn, gCastle, pcalg |
+| GES | Andrey (numpy/serial, numpy/parallel), causal-learn, gCastle, pcalg |
 | XGES (GES family) | Andrey and xges, each with and without the extended search |
 | HC | Andrey, bnlearn (`hc`), pgmpy (categorical data) |
 | Tabu | Andrey, bnlearn (`tabu`) |
+| GIES | Andrey, pcalg (`gies`) |
+| Exact search | Andrey, causal-learn (`bic_exact_search`) |
 | PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
+| GFCI | Andrey, Tetrad |
+| CALM | Andrey (two optimizer schedules), causal-learn |
 | BOSS | Andrey, causal-learn |
 | GRaSP | Andrey, causal-learn |
 | DirectLiNGAM | Andrey, causal-learn, lingam |
 | ICA-LiNGAM | Andrey, causal-learn |
-| RCD, BottomUpParceLiNGAM, CAM-UV | Andrey, lingam |
+| RCD, BottomUpParceLiNGAM | Andrey, lingam |
 | ANM | Andrey, causal-learn |
 | PNL | Andrey, causal-learn |
+| CD-NOD | Andrey, causal-learn |
+| GIN | Andrey, Tetrad, causal-learn |
+| MultiGroupDirectLiNGAM | Andrey, lingam |
 | PCMCI | Andrey (Student-t, Fisher-z), tigramite |
 | PCMCI+, LPCMCI | Andrey (Student-t), tigramite |
 | VARMA-LiNGAM, LongitudinalLiNGAM | Andrey, lingam |
@@ -172,6 +187,22 @@ identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selec
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
 
 The harness does not submit jobs. One file is one job.
+
+### Column order
+
+A generated dataset lists its columns in an order drawn from its seed, with its truth permuted the
+same way, so a method's accuracy cannot depend on the column order the simulation used. The shuffle
+is part of the generator call: a shuffled dataset has its own `dataset_id` and a label ending in
+`-shuffled`, the registry records its `column_order`, and `DatasetKey(shuffle=False)` keeps the
+generated order under the `dataset_id` its records carry. The PCMCI, PCMCI+, LPCMCI, and
+longitudinal LiNGAM simulations, GIN's `latent_measurement`, and the GIES lane's own simulation draw
+an order that carries no information about the graph and take no shuffle step. The summaries
+published up to 0.6.0 were measured on the generated order and stay as recorded.
+
+`public_datasets.py` loads the bnlearn networks with `load_dataset`, which lists their columns in an
+order drawn from the seed rather than the file's order, often a causal one; each record carries
+`shuffle`. Sachs keeps its file's order, which does not follow its network. The public-datasets
+rows published with 0.1.0 were measured on the file's order and stay as recorded.
 
 ### Hidden confounders
 
@@ -187,59 +218,52 @@ against the PAG's circles. Use PAG methods and the empty graph on these datasets
 
 ### Hidden-confounder methods
 
-`confounded_cpu.py` compares Andrey's `rcd`, `bottom_up_parce_lingam`, and `camuv` with lingam's
-`RCD`, `BottomUpParceLiNGAM`, and `CAMUV`, with the empty-graph baseline. It holds three methods in
-one file because they answer the same question: which variables share a hidden common cause. RCD and
-BottomUpParceLiNGAM run on `latent_lingam_er`, linear with uniform noise. CAM-UV runs on
-`latent_anm_er`, nonlinear with Gaussian additive noise. Both regimes use an Erdos-Renyi graph and
-hide one node in five, at least one, as in [Hidden confounders](#hidden-confounders); `d` includes
-the hidden nodes. Both packages run each method with the same settings, listed in `params`.
+`confounded_cpu.py` compares Andrey's `rcd` and `bottom_up_parce_lingam` with lingam's `RCD` and
+`BottomUpParceLiNGAM`, with the empty-graph baseline. It holds both methods in one file because they
+answer the same question: which variables share a hidden common cause. Both run on
+`latent_lingam_er`, linear with uniform noise on an Erdos-Renyi graph that hides one node in five,
+at least one, as in [Hidden confounders](#hidden-confounders); `d` includes the hidden nodes. Both
+packages run each method with the same settings, listed in `params`.
 
 The defaults are 2000 rows, `d` of 5, 10, and 15, five seeds, one repeat without warm-up, and
-`--cap-wall-s` of 1800. A fit that reaches the cap is a `timeout` record with no scores. lingam's
-CAM-UV needs pygam 0.12 or newer; older releases fail with current scipy, and its fits end in
-`error` records. A smoke run covers every solution on one small dataset per regime:
+`--cap-wall-s` of 1800. A fit that reaches the cap is a `timeout` record with no scores. A smoke run
+covers every solution on one small dataset:
 
 ```shell
 $ANDREY_BENCH_PYTHON benchmarks/confounded_cpu.py --out outputs/confounded-smoke --smoke
 ```
 
 Every estimate is a PAG and gets the observed-PAG scores of the FCI runs, but those do not rank
-these methods: RCD and CAM-UV use their functional assumptions to mark `<->` where the observed PAG
-has `o-o`, so the PAG scores count a correct `<->` as an error and BottomUpParceLiNGAM's `o-o` as a
-match. Read two other scores instead.
+these methods: RCD uses its functional assumptions to mark `<->` where the observed PAG has `o-o`,
+so the PAG scores count a correct `<->` as an error and BottomUpParceLiNGAM's `o-o` as a match. Read
+two other scores instead.
 
-The directed edges are scored against two targets. `directed_projection_*` uses the latent
-projection, observed `i -> j` when a directed path runs from `i` to `j` through hidden nodes only,
-less the edges whose endpoints share a hidden cause: RCD and BottomUpParceLiNGAM estimate these,
-and mark a pair with a hidden cause instead of orienting it. `directed_direct_*` uses the edges
-between two observed nodes with no unobserved path between them, which CAM-UV estimates: it marks
-a pair with such a path as unresolved instead. Each holds `n_true`, `precision`, `recall`, `f1`,
-and `errors`, the edges in one set and not the other (a reversed edge counts twice);
-`directed_n_est` counts the estimate's edges.
+The directed edges are scored against the latent projection, observed `i -> j` when a directed path
+runs from `i` to `j` through hidden nodes only, less the edges whose endpoints share a hidden cause:
+RCD and BottomUpParceLiNGAM estimate these, and mark a pair with a hidden cause instead of orienting
+it. `directed_projection_*` holds `n_true`, `precision`, `recall`, `f1`, and `errors`, the edges in
+one set and not the other (a reversed edge counts twice); `directed_n_est` counts the estimate's
+edges.
 
-A fit also names the pairs it attributes to a hidden common cause: the `<->` edges for RCD and
-CAM-UV, which match `metadata["confounded_pairs"]` of Andrey's result, and the `o-o` edges for
+A fit also names the pairs it attributes to a hidden common cause: the `<->` edges for RCD,
+which match `metadata["confounded_pairs"]` of Andrey's result, and the `o-o` edges for
 BottomUpParceLiNGAM. BottomUpParceLiNGAM's `o-o` edges join every pair of the one block of variables
 it leaves unordered: the confounded variables, their observed ancestors, and any other confounded
 pairs. Pairs in the block that share no cause count against its precision, and edges among the
 block's variables stay unoriented, which caps its directed recall. Read its pair recall, the share
-of true pairs it leaves unordered. `confounded_n_est` counts the pairs, and three sets of true pairs
+of true pairs it leaves unordered. `confounded_n_est` counts the pairs, and two sets of true pairs
 score them:
 
 | columns | true pairs |
 |---|---|
 | `confounded_hidden_cause_*` | the observed pairs that one hidden node reaches through hidden nodes only |
-| `confounded_unobserved_path_*` | the pairs joined by an unobserved causal path (one that enters an endpoint from a hidden parent) or an unobserved backdoor path (one that enters both from hidden parents), as CAM-UV defines them |
 | `confounded_pag_*` | the observed pairs joined by `<->` in the observed PAG |
 
 Each set has `n_true`, `precision`, `recall`, and `f1`. Score RCD and BottomUpParceLiNGAM on
 `directed_projection_*` and `confounded_hidden_cause_*`: both mark a pair that shares a hidden
 cause, even when one node is the other's parent. Compare each method across the two packages, not
-RCD with BottomUpParceLiNGAM, whose block caps its scores as described above. Compare CAM-UV on
-`directed_direct_*` and `confounded_unobserved_path_*`: it marks every pair with an unobserved path
-as unresolved, even when one node is the other's parent, and its direct edges are the rest. The
-driver's summary prints these. A PAG keeps `<->` only where conditional independences fix both
+RCD with BottomUpParceLiNGAM, whose block caps its scores as described above. The driver's summary
+prints these. A PAG keeps `<->` only where conditional independences fix both
 arrowheads, so `confounded_pag_*` has nothing to find on nearly every dataset at `d = 5`. A ratio
 with no denominator is `NaN` rather than 1: report how many datasets define it, and read the
 `n_true` columns beside the scores. The `confounder_*` columns from `andrey.metrics` score empty
@@ -254,10 +278,167 @@ first run's flags:
 $ANDREY_BENCH_PYTHON benchmarks/confounded_cpu.py --out outputs/confounded-cpu --rescore
 ```
 
-The two CAM-UV implementations differ inside, so the same settings can give different decisions:
-Andrey regresses with spline features and least squares where lingam fits pygam's `LinearGAM`, and
-their HSIC tests use different kernel bandwidths and null approximations. Report this beside the
-CAM-UV results.
+### Domains, groups, and latent indicators
+
+Three methods take data that is more than one plain sample. Their regimes come from
+`andrey_bench/regime_models.py`, which gives each layout and truth; every dataset is still one
+`(n, columns)` matrix, so the harness stores, fits, and scores it as any other. Each driver runs
+Andrey and the reference with the same settings, listed in `params`, and the empty-graph baseline.
+Its summary counts, in `same`, the datasets where the reference returned Andrey's graph.
+
+| driver | method | reference | regime | data | scored against |
+|---|---|---|---|---|---|
+| `cdnod_cpu.py` | CD-NOD | causal-learn | `domain_shift_er` | `n` rows from four domains in equal blocks | the CPDAG CD-NOD can identify |
+| `multi_group_cpu.py` | MultiGroupDirectLiNGAM | lingam | `multi_group_er` | three groups of `n` rows, side by side | the groups' DAGs, side by side |
+| `gin_cpu.py` | GIN | Tetrad, causal-learn | `latent_measurement` | three indicators per latent | the latents' clusters and order |
+
+`domain_shift_er` is a linear-Gaussian Erdos-Renyi DAG at mean degree 2 in which one variable in
+three, at least one, shifts its mean over the domains, linearly in the domain's number, so the
+Fisher-Z test of both packages can detect the shift. Both adapters rebuild the domain index,
+Andrey's `domain_index` and causal-learn's `c_indx`, from the rows; the shuffle permutes the
+variables' columns and leaves the rows, and so the domains, in place. The truth adds the index as a
+source pointing into the shifted variables, takes that DAG's CPDAG, directs the index's edges out
+of it, applies Meek's rules, and drops the index: an edge only the index can orient is directed.
+That projection uses the orientation helpers of Andrey's CD-NOD, so it does not check them
+independently. Andrey runs with its default `dependence_threshold=None`, which skips the
+independent-change step, so the projection matches what it can orient. Both packages run Fisher-Z
+at `alpha = 0.05` with a stable skeleton search and a collider rule that keeps an edge already
+directed (causal-learn's `uc_rule=0, uc_priority=2`); the order in which colliders are visited can
+still differ when two conflict.
+
+`multi_group_er` gives every group the same DAG with weights drawn for each, and uniform noise. A
+dataset holds the groups side by side as one sample of their block-diagonal DAG, and each solution
+returns the groups' DAGs the same way, so `shd` is the sum over the groups. The shuffle draws one
+order of the variables and applies it in every group, so each group keeps its block of columns, and
+the recorded `column_order` covers all of them.
+
+`latent_measurement` has `m` latents, each a cause of every later one, each with three indicators
+in a random column order; `--ladder` gives `m`, and `d` counts latents and indicators. Andrey and
+causal-learn run the gamma-approximation HSIC test at `alpha = 0.05` (causal-learn's
+`indep_test_method="hsic"`; its default is KCI). Tetrad's GIN takes a raw marginal test, and runs
+Tetrad's KCI under its defaults: a Gaussian kernel with a median-distance bandwidth and the gamma
+approximation, the same family with its own bandwidth rule, at `alpha = 0.05`. causal-learn
+0.1.4.8's GIN tests each candidate cluster against the wrong columns
+([py-why/causal-learn#271](https://github.com/py-why/causal-learn/issues/271)), so that reference
+is causal-learn with that one fix, which `start.sh` applies from `benchmarks/patches/`; Tetrad's GIN
+needs no fix. Every package can leave a cluster unordered, and every adapter keeps it, with no
+order. After each rung the driver
+adds `measurement_cluster_ari`, the adjusted Rand index of the clustering, `measurement_n_latents`,
+`measurement_clusters_found`, the share of true clusters found exactly, and
+`measurement_order_accuracy`, the share of pairs of found latents put in the true order. A rescore
+recomputes them without fitting anything; pass the first run's flags:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/gin_cpu.py --out outputs/gin-cpu --rescore
+```
+
+Tetrad's GIN runs as GFCI does (below): the adapter writes a CSV, runs the one-file driver
+`TetradGinDriver.java` in one `java` call, and reads the clusters back, and `wall_s` is the search
+inside the JVM. GIN needs tetrad-lib 7.6.10, which no causal-cmd release bundles, so it runs on
+tetrad-lib's shaded jar, named by `ANDREY_BENCH_TETRAD_GIN_JAR`:
+
+```shell
+curl -fLO https://repo1.maven.org/maven2/io/github/cmu-phil/tetrad-lib/7.6.10/tetrad-lib-7.6.10-shaded.jar
+curl -fsL https://repo1.maven.org/maven2/io/github/cmu-phil/tetrad-lib/7.6.10/tetrad-lib-7.6.10-shaded.jar.sha1
+sha1sum tetrad-lib-7.6.10-shaded.jar  # 3a160a01a8cb648c03ceb8c7d5f47e5a8a1e2283
+export ANDREY_BENCH_TETRAD_GIN_JAR=$PWD/tetrad-lib-7.6.10-shaded.jar
+```
+
+The three regimes rescale every variable to unit variance in causal order. A smoke run covers every
+solution on one small dataset:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/cdnod_cpu.py --out outputs/cdnod-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/multi_group_cpu.py --out outputs/multi-group-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/gin_cpu.py --out outputs/gin-smoke --smoke
+```
+
+### GFCI
+
+`gfci_latent.py` compares Andrey's GFCI with Tetrad's, with Andrey's FCI and the empty-graph
+baseline beside them. Andrey's GFCI runs twice: `andrey.gfci.numpy` in one process, and
+`andrey.gfci.numpy.parallel` with the GES step in the fit's cores as worker processes. Both
+return the same PAG. It runs on `latent_gauss_er`, as `fci_latent.py` does (see
+[Hidden confounders](#hidden-confounders)), and every estimate is scored against the observed PAG;
+read `shd_endpoint`. Each package's names for the settings map to Andrey's:
+
+| Andrey | Tetrad (causal-cmd) |
+|---|---|
+| `indep_test="fisherz"`, `alpha=0.05` | `--test fisher-z-test --alpha 0.05` |
+| `score_func="local_score_BIC"`, `lambda_value=1.0` | `--score sem-bic-score --penaltyDiscount 1`, with `--semBicStructurePrior 0 --semBicRule 1` |
+| no cap on conditioning sets or discriminating paths | `--depth -1 --maxPathLength -1` |
+| possible-d-separation, the discriminating-path rule, and rules R1-R10 | `--possibleMsepDone --doDiscriminatingPathRule --completeRuleSetUsed` |
+
+Tetrad runs through the driver of the [Mixed data](#mixed-data) lane, with one timing mechanism
+for every Tetrad solution. Each fit writes the data to a CSV file, starts `java` once on
+`andrey_bench/adapters/TetradDriver.java` with causal-cmd's arguments for GFCI on continuous data,
+and reads the PAG back from the text file the driver writes. The driver runs the warm-up search in
+the same JVM and times the search call alone, so `wall_s` is Tetrad's search inside the JVM,
+excluding JVM start, source compile, and data loading, and `process_s` is the whole call. Its PAG
+equals the one `java -jar` returns, which the lane's tests check. The JVM sees only the fit's
+cores, and `precomputeCovariances` lets it compute the covariance matrix once. Running a source
+file needs a `java` with the `jdk.compiler` module, as a JDK has. The adapter was written against
+causal-cmd 1.12.0, which bundles tetrad-lib 7.6.3. Download the jar from Maven Central, check its
+SHA-1 against the published one, and point `ANDREY_BENCH_TETRAD_JAR` at it (`ANDREY_BENCH_JAVA`
+names `java` when it is not on `PATH`):
+
+```shell
+curl -fLO https://repo1.maven.org/maven2/io/github/cmu-phil/causal-cmd/1.12.0/causal-cmd-1.12.0-jar-with-dependencies.jar
+curl -fsL https://repo1.maven.org/maven2/io/github/cmu-phil/causal-cmd/1.12.0/causal-cmd-1.12.0-jar-with-dependencies.jar.sha1
+sha1sum causal-cmd-1.12.0-jar-with-dependencies.jar  # b0e3c3fb3b0277e0a44c54dbb82f0023c4fd9e54
+export ANDREY_BENCH_TETRAD_JAR=$PWD/causal-cmd-1.12.0-jar-with-dependencies.jar
+```
+
+The defaults are `d` of 20, 50, 100, and 200, five seeds, one repeat after one warm-up fit, and a
+wall cap of 1800 s. A smoke run fits every solution once at `d = 10`:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/gfci_latent.py --out outputs/gfci-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/gfci_latent.py --out outputs/gfci-latent --cap-mem-mb 30000
+```
+
+### CALM
+
+`calm_cpu.py` compares Andrey's CALM with causal-learn's, which the CALM paper's first author
+contributed, with the empty-graph baseline. The paper's code repository runs the same optimizer
+but has no license, so the lane runs causal-learn's copy. It runs on the canonical sparse slice of
+`ges_cpu.py`: linear-Gaussian data on an Erdos-Renyi graph at average degree 2, standardized, with
+`n = 10 * d` rows. Each estimate is a DAG, scored against the true DAG (`shd`) and through its
+equivalence class (`mec_shd`, the score the paper reports).
+
+Andrey runs twice. `andrey.calm.torch-cpu` uses Andrey's defaults: 3,000 Adam steps per round at
+learning rate 0.01, `rho` from 1e-3, at most 25 rounds, and an edge kept only when its weight is
+at least 0.3. `andrey.calm.torch-cpu.paper_schedule` uses the paper's schedule, which is
+causal-learn's default: 40,000 steps per round at learning rate 0.001, `rho` from 1e-5, at most
+100 rounds, and no weight threshold. Compare causal-learn with the paper-schedule solution, which
+runs its settings. Every CALM solution uses `lambda1 = 0.005`, a gate temperature of 0.5,
+Fisher-Z moral-graph tests at `alpha = 0.01`, `rho` three times larger each round until the
+acyclicity residual is below 1e-8, and seed 0; `params` records every setting. causal-learn's
+names map to Andrey's:
+
+| Andrey | causal-learn |
+|---|---|
+| `lambda1`, `alpha`, `tau`, `rho_init`, `rho_mult`, `subproblem_iter`, `standardize` | the same names |
+| `h_tol` | `htol` |
+| `lr=0.001`, `max_outer=100`, `rho_max=1e16`, `gate_threshold=0.5`, `w_threshold=0` | fixed inside `calm` |
+| `seed=0` | `torch.manual_seed(0)` before the fit |
+
+causal-learn's `calm` stops after 100 rounds whether or not its graph is acyclic; a cyclic graph
+fails the conversion to a DAG and ends the fit in an error record. Andrey removes the weakest edge
+of any cycle left after its last round. causal-learn also runs every step of every round, while
+Andrey ends a round early once, after 50 steps, its loss changes by less than a 1e-7 fraction from
+one step to the next, so the paper-schedule solution can run fewer steps than causal-learn.
+
+The defaults are `d` of 10, 20, and 50, five seeds, one repeat without a warm-up fit, and a wall
+cap of 3600 s. A smoke run fits every solution once at `d = 5`, and a run can keep to some
+solutions:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/calm_cpu.py --out outputs/calm-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/calm_cpu.py --out outputs/calm-cpu --cap-mem-mb 30000
+$ANDREY_BENCH_PYTHON benchmarks/calm_cpu.py --out outputs/calm-andrey --ladder 100 \
+    --solutions andrey.calm.torch-cpu,baseline.empty
+```
 
 ### XGES
 
@@ -488,13 +669,15 @@ ANDREY_BENCH_DATA=outputs/discrete-cpu/data $ANDREY_BENCH_PYTHON benchmarks/disc
 
 The p-values and BDeu scores of Andrey and causal-learn follow the same definitions (Andrey's BDeu
 is `-2` times causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py`
-the two packages return the same graph. Each comparator's objective is checked against Andrey's in
+the two packages return the same graph, with Andrey's PC on the column-order collider rule that
+causal-learn's PC runs; PC's default p-value order can orient conflicting colliders differently.
+Each comparator's objective is checked against Andrey's in
 `benchmarks/tests/test_adapters_discrete_comparators.py`, where R or pgmpy is installed: the scores
-agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets,
-and each declared setting takes effect. pgmpy's search ends in a different local optimum on some
+agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets, and
+each declared setting takes effect. pgmpy's search ends in a different local optimum on some
 datasets: each package takes the first of equal moves in its own scan order, and the graphs can
-differ at equal settings. pgmpy breaks ties by the iteration order of a set of column-name pairs,
-so its columns are named by integer position, which keeps the graph the same under any
+differ at equal settings. pgmpy breaks ties by the iteration order of a set of column-name pairs, so
+its columns are named by integer position, which keeps the graph the same under any
 `PYTHONHASHSEED`. Read the error columns beside the speed-up: where the graphs differ, the
 difference is a result to report.
 
@@ -530,16 +713,17 @@ package's names for the settings map to Andrey's:
 | `alpha=0.05` | `--alpha 0.05` | `alpha = 0.05` |
 | `lambda_value=1.0` | `--penaltyDiscount 1` | the default `k = log(n) / 2` |
 
-Tetrad's PC runs order-independent (`--stableFAS`), keeps the first of two conflicting colliders
-(`--conflictRule 1`), and has no depth cap, as Andrey's PC does. FGES runs with no structure prior
-(`--structurePrior 0`), since Andrey's GES has none. Both hill climbings take the best add, remove,
-or reverse move from the empty graph until none improves the score, with no restarts, and neither
-gives a categorical node a continuous parent. bnlearn's hill climbing returns a DAG, so its
-comparable error is `mec_shd`; every other row is a CPDAG, scored by `shd`. The two packages define
-some of these tests and scores differently from Andrey, so their graphs can differ on the same
-data: Tetrad's conditional Gaussian parameter count leaves out each category's means, its
-degenerate Gaussian test statistic is twice the likelihood ratio, and its degenerate Gaussian score
-sums one regression per category of a categorical child.
+Tetrad's PC runs order-independent (`--stableFAS`) and has no depth cap, as Andrey's PC does. It
+keeps Tetrad's default collider conflict rule (`--conflictRule 1`), under which a later collider
+replaces an earlier one; Andrey's PC keeps the collider whose pair was separated with the larger
+p-value. FGES runs with no structure prior (`--structurePrior 0`), since Andrey's GES has none. Both
+hill climbings take the best add, remove, or reverse move from the empty graph until none improves
+the score, with no restarts, and neither gives a categorical node a continuous parent. bnlearn's
+hill climbing returns a DAG, so its comparable error is `mec_shd`; every other row is a CPDAG,
+scored by `shd`. The two packages define some of these tests and scores differently from Andrey, so
+their graphs can differ on the same data: Tetrad's conditional Gaussian parameter count leaves out
+each category's means, its degenerate Gaussian test statistic is twice the likelihood ratio, and its
+degenerate Gaussian score sums one regression per category of a categorical child.
 
 causal-cmd 1.12.0 parses `--numCategories` but never stores it, so its own command line reads every
 column as continuous. Tetrad's fits therefore run through `andrey_bench/adapters/TetradDriver.java`,
@@ -556,7 +740,8 @@ java -XX:ActiveProcessorCount=4 --class-path causal-cmd-1.12.0-jar-with-dependen
 Tetrad's time is its search inside the JVM, excluding JVM start, source compile and data loading,
 as Andrey's time excludes interpreter start and import. The driver times the search call alone and
 the record keeps it as `wall_s`; the whole call is `process_s`. With `--warmup` above 0, the
-warm-up searches run in the same JVM before the timed one. The JVM sees only the fit's cores.
+warm-up searches run in the same JVM before the timed one. The JVM sees only the fit's cores. The
+[GFCI](#gfci) lane's Tetrad solution runs the same driver and timing.
 
 Running a source file needs a `java` with the `jdk.compiler` module, as a JDK has; the adapter's
 setup checks for it. Each record's `package_version` names the causal-cmd, tetrad-lib, and Java
@@ -586,6 +771,61 @@ $ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-andrey --soluti
     andrey.pc.degen_gauss andrey.ges.cond_gauss baseline.empty
 $ANDREY_BENCH_PYTHON benchmarks/mixed_cpu.py --out outputs/mixed-cpu --rescore
 ```
+
+### GIES
+
+`gies_cpu.py` compares Andrey's `gies` with pcalg's on data that mixes observation with
+interventions. Its data follows the simulation of Hauser and Buhlmann (2012, Section 5.2.1): a
+random DAG with mean vertex degree 2; edge weights from `U([-1, -0.1] U [0.1, 1])` and error
+variances from `U(0.5, 1)`, rescaled to unit variance without interventions; single-variable
+intervention targets, `0.4 * d` of them by default, each setting its variable from `N(2, 0.2^2)`;
+and `10 * d` rows, split evenly between no intervention and each target. A fit takes the samples
+and the 0/1 intervention matrix side by side; pcalg's adapter turns the matrix into its `targets`
+and `target.index` inside the timed fit.
+
+Both packages score BIC with every row counted in the penalty, pcalg's `lambda = 0.5 * log(n)` in
+log-likelihood units and Andrey's `lambda_value=1.0` in deviance units, and both fit an intercept:
+pcalg's `GaussL0penIntScore` defaults to none, so the adapter sets `intercept = TRUE`. Both run the
+forward, backward, and turning phases until none improves, with no degree cap. `params` records the
+settings.
+
+Each fit's graph is scored against the interventional essential graph of the generating DAG:
+`shd` counts the variable pairs whose edge differs, and `empty_shd`, the true edge count, is the
+empty graph's. `bic` is the graph's BIC on its data in Andrey's deviance units and `truth_bic` the
+generating DAG's. The records go to `records.jsonl`, one line per fit, with each graph's endpoint
+marks, and the build and machine to `provenance.json`; the summary counts the datasets where Andrey
+returned pcalg's graph. Load R as [The R lane](#the-r-lane) describes, with pcalg in the library,
+then:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/gies_cpu.py --out outputs/gies-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/gies_cpu.py --out outputs/gies-cpu --cores 1 --cap-mem-mb 32000
+```
+
+The defaults are `d` of 10, 20, 50, and 100, five seeds, one untimed warm-up fit, one timed fit,
+and `--cap-wall-s` of 1800. Both searches are serial.
+
+### Exact search
+
+`exact_cpu.py` compares Andrey's `exact_search` with causal-learn's `bic_exact_search`, both with
+A* and no parent cap, and the empty graph. Both find a DAG with the lowest BIC, so they should
+reach the same score on the same data, possibly with different DAGs of the optimal class. Both
+score a node by `n * log(RSS / n) + n_parents * log(n)`; Andrey centers each column first and
+causal-learn does not, which agree on the standardized data of the R lane's slice:
+linear-Gaussian on Erdos-Renyi graphs at average degree 2 with `n = 10 * d` rows. The cost at least
+doubles with each added variable, so the ladder stays small.
+
+Each fit also gets `bic`, the BIC of its DAG in Andrey's deviance units. The summary prints, per
+solution and `d`, the largest absolute difference between its `bic` and causal-learn's on the same
+dataset, zero when both reach the optimum, and the median `mec_shd`:
+
+```shell
+$ANDREY_BENCH_PYTHON benchmarks/exact_cpu.py --out outputs/exact-smoke --smoke
+$ANDREY_BENCH_PYTHON benchmarks/exact_cpu.py --out outputs/exact-cpu --cores 1 --cap-mem-mb 32000
+```
+
+The defaults are `d` of 5, 10, and 15, five seeds, one untimed warm-up fit, one timed fit, and
+`--cap-wall-s` of 1800.
 
 ### PCMCI on lagged series
 
@@ -779,8 +1019,9 @@ its paper, drawn by `andrey_bench/lingam_models.py`:
 | `varma_lingam_paper` | VARMA-LiNGAM | Hyvarinen et al. (2010), Sect. 5.4, plus one moving-average matrix | N x T, one series |
 | `longitudinal_lingam_paper` | LongitudinalLiNGAM | Kadowaki et al. (2013), JSAI Sect. 6.1 | N x T, M units per time point |
 
-`varma_lingam_paper` draws a strictly lower-triangular same-step matrix with 0.8 N links and a
-lag-1 matrix with 2 N links, the paper's 40% of entries at N = 5 held per variable as N grows,
+`varma_lingam_paper` draws a same-step DAG with 0.8 N links (strictly lower-triangular before the
+[column shuffle](#column-order)) and a lag-1 matrix with 2 N links, the paper's 40% of entries at
+N = 5 held per variable as N grows,
 weights 0.05 to 0.5 in magnitude with a random sign, and super-Gaussian noise. The paper's model
 has no moving-average part, so the series adds one moving-average matrix drawn like the lag-1 one.
 `longitudinal_lingam_paper` draws, at every time point, a dense same-step DAG with weights 0.5 to
@@ -829,11 +1070,12 @@ numba and XGES inside `fit`. Account for those imports when comparing fit times.
 `setup_s` records setup duration and is included in `warmup_s`. At `--warmup 0`, they are equal and
 provide no fit-time bound.
 
-A package whose search runs in a process `fit` starts, such as Tetrad's JVM, times that search
-itself: its adapter declares `search_s` and sets it in `fit` to the seconds the process measured
-around the search call alone. The record keeps that time as `wall_s` and the whole `fit` call as
-`process_s`, which is null for every other adapter. Its warm-up searches run in the timed fit's
-process before its clock, so `warmup_s` holds only `setup_s`. See `contracts.SolutionAdapter`.
+A package whose search runs in a process `fit` starts, such as Tetrad's JVM in every lane that
+runs it, times that search itself: its adapter declares `search_s` and sets it in `fit` to the
+seconds the process measured around the search call alone. The record keeps that time as `wall_s`
+and the whole `fit` call as `process_s`, which is null for every other adapter. Its warm-up
+searches run in the timed fit's process before its clock, so `warmup_s` holds only `setup_s`. See
+`contracts.SolutionAdapter`.
 
 ### Measure the dispatch thresholds
 
@@ -846,9 +1088,9 @@ Three thresholds were calibrated once on one machine. Later measurements found e
 25x for `cov`, and 40x for entropy. Each error kept the faster path disabled.
 
 **The worker-pool default suits a single fit, not a campaign.** A campaign runs many fits in one
-process, and after the first pool start (about 2 s) the pool pays off at smaller sizes. With 8
-workers, `andrey calibrate` measured about 1,100 for GES, against the default of 10,000. Repeated
-runs produce a range because other node activity affects pool round-trip time.
+process, and after the first pool start the pool can pay off at smaller sizes. `andrey calibrate`
+measures the cutoff in the gate's unit, the largest estimated work of a pass. Repeated runs produce
+a range because other node activity affects pool round-trip time.
 
 Measure on the campaign node with the pool size used for fits, and **apply the measured
 thresholds**. Recording an unused calibration is worse than no calibration: it records a threshold
@@ -986,7 +1228,8 @@ and guidance in [Reading a result](#reading-a-result).
 | `provenance.json` | package versions and BLAS of the bench venv, CPU, GPU, git sha. Captured |
 | | once, so a resume keeps the recorded build |
 | `run_meta.json` | flags and literals, written before the first fit |
-| `data/registry.json` | each dataset's generator call; under `$ANDREY_BENCH_DATA` when set |
+| `data/registry.json` | each dataset's generator call and column order; under |
+| | `$ANDREY_BENCH_DATA` when set |
 
 Each fit uses a temporary compute-node directory for its pickled job, result, and start marker. The
 runner removes the directory after the fit.
@@ -1110,12 +1353,13 @@ Read `params` before comparing solutions because their defaults may optimize dif
 ## Layout
 
 - `benchmark.py` - defines solutions, slice, and ladder, then writes one `runs.parquet`. Copy it.
-- `xges_ges.py` - compares three Andrey GES backends, causal-learn GES, and XGES at two BIC weights
-  on CPU, with the baseline.
+- `xges_ges.py` - compares serial and parallel Andrey GES, causal-learn GES, and XGES at two BIC
+  weights on CPU, with the baseline.
 - `andrey_bench/aggregate.py` - pools a results root and joins each run with its provenance.
 - `andrey_bench/pairing.py` - defines valid comparisons, including run pairing, dataset grouping,
   duration skew, and timeout meaning.
-- `ges_cpu.py` - compares three Andrey backends, causal-learn, gCastle, and the baseline on CPU.
+- `ges_cpu.py` - compares serial and parallel Andrey GES, causal-learn, gCastle, and the baseline
+  on CPU.
 - `boss_grasp_cpu.py` - compares BOSS and GRaSP with causal-learn at matched BIC penalties.
 - `boss_grasp_reach.py` - extends the paired BOSS comparison beyond GRaSP's measured range.
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.
@@ -1127,8 +1371,14 @@ Read `params` before comparing solutions because their defaults may optimize dif
   simulations.
 - `rescore_cross_links.py` - adds cross-link F1 to a finished time-series run, from its stored
   graphs.
-- `confounded_cpu.py` - compares RCD, BottomUpParceLiNGAM, and CAM-UV with lingam on data with
+- `confounded_cpu.py` - compares RCD and BottomUpParceLiNGAM with lingam on data with
   hidden confounders.
+- `gfci_latent.py` - compares GFCI with Tetrad on data with hidden confounders.
+- `calm_cpu.py` - compares CALM with causal-learn on linear-Gaussian data.
+- `cdnod_cpu.py` - compares CD-NOD with causal-learn on data pooled from several domains.
+- `multi_group_cpu.py` - compares MultiGroupDirectLiNGAM with lingam on several groups of data.
+- `gin_cpu.py` - compares GIN with Tetrad and causal-learn on latent variables and their indicators.
+- `start_lingam.sh` - builds the environment of lingam's fits.
 - `xges_cpu.py` - compares Andrey's XGES, with and without the extended search, with the xges
   package's and with Andrey GES, by time, SHD, and BIC under one scorer.
 - `tabu_cpu.py` - compares tabu search and hill climbing with bnlearn, and scores each graph's
@@ -1141,6 +1391,9 @@ Read `params` before comparing solutions because their defaults may optimize dif
   scores.
 - `mixed_cpu.py` - compares PC, GES, and hill climbing with the degenerate and conditional Gaussian
   tests and scores with Tetrad and bnlearn on mixed data.
+- `gies_cpu.py` - compares GIES with pcalg on simulated interventional data.
+- `exact_cpu.py` - compares exact search with causal-learn on small graphs, and scores each DAG's
+  BIC.
 - `granger_var.py` - compares lasso Granger causality with causal-learn on vector-autoregressive
   series.
 - `public_datasets.py` - compares every package on Sachs and the bnlearn networks from
@@ -1159,6 +1412,7 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `andrey_bench/memcap.py` - caps process-tree memory or uses `srun --mem=`.
 - `andrey_bench/datasets.py` - dataset store and regime vocabulary; every solution reads identical
   bytes.
+- `andrey_bench/regime_models.py` - the data of the domain, group, and latent-indicator regimes.
 - `andrey_bench/integration.py` - runs dataset key -> data -> fit -> structure -> score -> record.
 - `andrey_bench/scoring.py` - computes metrics and the cross-package structure hash.
 

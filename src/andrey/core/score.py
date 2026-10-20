@@ -32,12 +32,15 @@ data-types. Proceedings of Machine Learning Research 104:4-21.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import math
+from collections.abc import Callable, Sequence
 from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
+from scipy.linalg import get_lapack_funcs
+from scipy.sparse.csgraph import connected_components
 from scipy.special import gammaln
 
 from . import categorical, stats
@@ -46,6 +49,9 @@ from .mixed import _LRU, ConditionalGaussian, DegenerateGaussian
 #: The scores that read category codes, and those that read mixed data with a categorical mask.
 DISCRETE_SCORES: tuple[str, ...] = ("local_score_BDeu", "local_score_BIC_categorical")
 MIXED_SCORES: tuple[str, ...] = ("local_score_cond_gauss", "local_score_degen_gauss")
+
+# A residual variance at most this fraction of the node's variance is zero up to rounding.
+ZERO_RESIDUAL = 1e-12
 
 
 def local_score_bic(
@@ -64,6 +70,11 @@ def local_score_bic(
     the linear-regression residual variance
     ``cov[node, node] - cov[node, parents] @ inv(cov[parents, parents]) @ cov[parents, node]``.
     Lower is better; the value is proportional to ``-2 * BIC``.
+
+    The family is unavailable, and the score ``inf``, when ``parents`` has more than ``n - 2``
+    members, which fit ``node`` exactly, or when ``R`` is at most :data:`ZERO_RESIDUAL` times
+    ``cov[node, node]``, zero up to rounding. A search that minimizes the score never selects an
+    unavailable family.
 
     Branches on ``len(parents)`` for scalar fast paths (0/1/2 parents); the general path uses
     ``np.linalg.solve`` with a ``pinv`` fallback on singular ``cov[parents, parents]``.
@@ -91,22 +102,25 @@ def local_score_bic(
         cov_diag = np.diag(cov)
     node = int(node)
     n_parents = len(parents)
+    if n_parents > n - 2:
+        return math.inf
+    variance = float(cov_diag[node])
+    penalty = log_n * n_parents * lambda_value
 
     if n_parents == 0:
-        return float(n * np.log(cov_diag[node]))
+        return _from_residual(variance, variance, n, penalty)
 
     if n_parents == 1:
         parent = int(parents[0])
         parent_var = float(cov_diag[parent])
         if parent_var != 0.0:
             cov_ip = float(cov[node, parent])
-            residual = float(cov_diag[node]) - cov_ip * (cov_ip / parent_var)
-            return float(n * np.log(residual) + log_n * lambda_value)
+            residual = variance - cov_ip * (cov_ip / parent_var)
+            return _from_residual(residual, variance, n, penalty)
         yX = cov[node : node + 1, parent : parent + 1]
         XX = cov[parent : parent + 1, parent : parent + 1]
         beta = _solve(XX, yX.T)
-        H = float(np.log(cov_diag[node] - (yX @ beta).item()))
-        return float(n * H + log_n * lambda_value)
+        return _from_residual(variance - (yX @ beta).item(), variance, n, penalty)
 
     if n_parents == 2:
         parent0 = int(parents[0])
@@ -119,15 +133,140 @@ def local_score_bic(
             ]
         )
         beta = _solve(XX, yX.T)
-        H = float(np.log(cov_diag[node] - (yX @ beta).item()))
-        return float(n * H + log_n * 2 * lambda_value)
+        return _from_residual(variance - (yX @ beta).item(), variance, n, penalty)
 
     pa = [int(p) for p in parents]
     yX = cov[node : node + 1, pa]
     XX = cov[pa][:, pa]
     beta = _solve(XX, yX.T)
-    H = np.log(cov_diag[node] - (yX @ beta).item())
-    return float(n * H + log_n * n_parents * lambda_value)
+    return _from_residual(variance - (yX @ beta).item(), variance, n, penalty)
+
+
+def _from_residual(residual: float, variance: float, n: int, penalty: float) -> float:
+    """``n * log(residual) + penalty``, or ``inf`` when ``residual`` is zero up to rounding."""
+    if not residual > ZERO_RESIDUAL * variance:
+        return math.inf
+    return float(n * np.log(residual) + penalty)
+
+
+class CopiedColumnsError(ValueError):
+    """Raised when data columns repeat other columns up to scale and shift.
+
+    ``groups`` holds each group of copies as column positions, as :func:`copy_groups` returns
+    them; the message is :func:`copies_message` of those groups.
+    """
+
+    groups: tuple[tuple[int, ...], ...] = ()
+
+
+def copy_groups(corr: np.ndarray, n: int) -> tuple[tuple[int, ...], ...]:
+    """Return the groups of columns that repeat one another up to scale and shift.
+
+    Two columns are copies when ``1 - corr**2`` is at most ``ZERO_RESIDUAL``: either one's residual
+    variance given the other is zero up to rounding. A group is a connected set of copies, given as
+    its positions in increasing order, so the first is the column to keep. Groups are ordered by
+    that first column. With at most two rows ``n`` every pair of columns is a copy, so the result is
+    empty.
+
+    Parameters
+    ----------
+    corr : ndarray, shape (d, d)
+        Correlation matrix of the data's columns.
+    n : int
+        Sample count.
+    """
+    if n <= 2 or corr.shape[0] < 2:
+        return ()
+    alike = np.abs(corr)
+    np.fill_diagonal(alike, 0.0)
+    copies = 1.0 - alike**2 <= ZERO_RESIDUAL
+    if not copies.any():
+        return ()
+    _, component = connected_components(copies, directed=False)
+    members: dict[int, list[int]] = {}
+    for j, label in enumerate(component.tolist()):
+        members.setdefault(label, []).append(j)
+    return tuple(tuple(group) for group in members.values() if len(group) > 1)
+
+
+def copies_message(groups: Sequence[Sequence[int]], name: Callable[[int], str] = str) -> str:
+    """Return the error message for the groups of copies ``groups``, naming columns by ``name``.
+
+    The message names every group, its first column the one to keep, and says what to do: keep one
+    column per group and read its edges as the group's.
+    """
+    parts = []
+    for kept, *copies in groups:
+        names = [name(j) for j in copies]
+        listed = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+        parts.append(f"{listed} {'repeats' if len(names) == 1 else 'repeat'} {name(kept)}")
+    return (
+        f"data columns repeat other columns up to scale and shift: {'; '.join(parts)}. Copies of "
+        "one variable cannot be told apart, so keep one column per group, drop the others before "
+        "the fit, and read the kept column's edges as the group's"
+    )
+
+
+def check_columns(cov: np.ndarray, n: int) -> None:
+    """Raise ``ValueError`` when a column of the data behind ``cov`` makes BIC scoring meaningless.
+
+    A column is rejected when it is constant; with more than two rows ``n``, when its residual
+    variance given one other column is at most ``ZERO_RESIDUAL`` times its variance (an affine copy
+    of that column); and with more rows than columns, when its residual variance given all other
+    columns is at most ``ZERO_RESIDUAL`` times its variance (a linear function of other columns).
+    Every column is a linear function of any ``n - 1`` others, so the last two checks apply only
+    where the row count does not force such a fit. Copies raise one :class:`CopiedColumnsError`
+    that names every group :func:`copy_groups` finds.
+
+    The residual variance of column ``j`` given all others, relative to its variance, is
+    ``1 / inv(corr)[j, j]`` for the correlation matrix ``corr``. It is at least the smallest
+    eigenvalue of ``corr``, so data whose smallest eigenvalue exceeds ``ZERO_RESIDUAL`` pass
+    without the per-column computation.
+
+    Parameters
+    ----------
+    cov : ndarray, shape (d, d)
+        Sample covariance matrix.
+    n : int
+        Sample count.
+
+    Raises
+    ------
+    CopiedColumnsError
+        If a column is an affine copy of another column when ``n`` exceeds 2.
+    ValueError
+        If a column is constant, or a linear function of other columns when ``n`` exceeds the
+        column count.
+    """
+    variance = np.diag(cov)
+    constant = np.flatnonzero(~(variance > 0.0))
+    if constant.size:
+        raise ValueError(f"data column {int(constant[0])} is constant; drop it before the fit")
+    d = cov.shape[0]
+    if d < 2 or n <= 2:
+        return
+    sd = np.sqrt(variance)
+    corr = cov / np.outer(sd, sd)
+    groups = copy_groups(corr, n)
+    if groups:
+        error = CopiedColumnsError(copies_message(groups))
+        error.groups = groups
+        raise error
+    if n <= d:
+        return
+    if np.linalg.eigvalsh(corr)[0] > ZERO_RESIDUAL:
+        return
+    values, vectors = np.linalg.eigh(corr)
+    # diag(inv(corr)) from the eigendecomposition. Eigenvalues below the rounding of the largest
+    # are zero up to rounding; the floor keeps them finite and off the columns they do not touch.
+    floor = np.finfo(np.float64).eps * values[-1]
+    residual = 1.0 / ((vectors**2) @ (1.0 / np.maximum(values, floor)))
+    columns = np.flatnonzero(~(residual > ZERO_RESIDUAL)).tolist()
+    if columns:
+        raise ValueError(
+            f"data columns {columns} are linearly dependent: one is a linear function of the "
+            "others; drop one of them before the fit"
+        )
 
 
 def penalty_weight(lambda_value: float) -> float:
@@ -172,6 +311,12 @@ class BICScore:
         Weight on the BIC complexity term of the deviance the search minimizes.
     cache_size : int or None, default=1_000_000
         Memoization cache bound; ``None`` is unbounded.
+
+    Raises
+    ------
+    ValueError
+        If ``data`` is not 2-D, holds ``NaN`` or ``inf``, or has a column :func:`check_columns`
+        rejects.
     """
 
     def __init__(
@@ -190,6 +335,7 @@ class BICScore:
             raise ValueError("data contains NaN or Inf; cannot compute BIC scores")
         # np.cov of a single column is a 0-d variance; keep the (1, 1) matrix the score reads.
         cov = np.atleast_2d(stats.cov(data, rowvar=False))
+        check_columns(cov, data.shape[0])
         self._init(cov, data.shape[0], lambda_value, cache_size)
 
     @classmethod
@@ -204,7 +350,8 @@ class BICScore:
         """Build a scorer from a precomputed covariance.
 
         Pooled workers use the parent's ``cov`` bytes, giving every process identical inputs to
-        :func:`local_score_bic` and bit-identical scores on the same host BLAS.
+        :func:`local_score_bic` and bit-identical scores on the same host BLAS. The columns are not
+        checked with :func:`check_columns`.
 
         Parameters
         ----------
@@ -488,6 +635,20 @@ class DGScore:
     columns, so on continuous columns only, the two scores are equal. Scores are memoized by
     ``(node, sorted parents)``.
 
+    The parents' columns are collinear when one parent's categories determine another's, as in a
+    network with deterministic conditional probabilities, and a solve on their singular covariance
+    can return a wrong fit without raising. A pivoted Cholesky factorization of their correlation
+    matrix then picks, one at a time, the column with the most residual variance given the columns
+    already picked, and stops when none keeps more than :data:`ZERO_RESIDUAL` of its variance.
+    ``Y`` is regressed on the picked columns, which fit it as all of them do, and ``|X|`` still
+    counts every column.
+
+    The family is unavailable, and the score ``inf``, when a combination of the node's columns
+    keeps at most :data:`ZERO_RESIDUAL` of its variance given the parents, the rule
+    :func:`local_score_bic` applies to a single column. A node its parents determine, such as a
+    merge of a parent's categories, is one. A search that minimizes the score never selects an
+    unavailable family.
+
     Parameters
     ----------
     data : ndarray, shape (n, d)
@@ -519,13 +680,31 @@ class DGScore:
         self.lambda_value = penalty_weight(lambda_value)
         self.log_n = float(np.log(self.n))
         self._cov_diag = np.diag(self._dg.cov)
+        self._sd = np.sqrt(self._cov_diag)
+        # When every eigenvalue of the embedded columns' correlation matrix exceeds ZERO_RESIDUAL,
+        # so does each column's share of variance left given any other columns: no parents are
+        # collinear.
+        corr = self._dg.cov / np.outer(self._sd, self._sd)
+        try:
+            np.linalg.cholesky(corr - ZERO_RESIDUAL * np.eye(len(corr)))
+            self._check_collinear = False
+        except np.linalg.LinAlgError:
+            self._check_collinear = True
         self._score_key = lru_cache(maxsize=cache_size)(self._score_key_impl)
 
     def _score_key_impl(self, node: int, parents: tuple[int, ...]) -> float:
         cov = self._dg.cov
         ys = self._dg.columns([node])
         xs = self._dg.columns(parents)
-        if ys.size == 1:
+        kept = xs
+        if self._check_collinear and xs.size > 1:
+            sd = self._sd[xs]
+            corr = cov[np.ix_(xs, xs)] / np.outer(sd, sd)
+            (pstrf,) = get_lapack_funcs(("pstrf",), (corr,))
+            _, pivots, rank, _ = pstrf(corr, tol=ZERO_RESIDUAL, lower=1)
+            if rank < xs.size:
+                kept = xs[np.sort(pivots[:rank] - 1)]
+        if ys.size == 1 and kept.size == xs.size:
             return local_score_bic(
                 cov,
                 self.n,
@@ -535,12 +714,18 @@ class DGScore:
                 log_n=self.log_n,
                 cov_diag=self._cov_diag,
             )
-        residual = cov[np.ix_(ys, ys)]
-        if xs.size:
-            cross = cov[np.ix_(xs, ys)]
-            residual = residual - cross.T @ _solve(cov[np.ix_(xs, xs)], cross)
-        sign, log_det = np.linalg.slogdet(residual)
-        log_det = log_det if sign > 0 else -np.inf
+        own = cov[np.ix_(ys, ys)]
+        residual = own
+        if kept.size:
+            cross = cov[np.ix_(kept, ys)]
+            residual = own - cross.T @ _solve(cov[np.ix_(kept, kept)], cross)
+        try:
+            # Positive definite when every combination of the node's columns keeps more than
+            # ZERO_RESIDUAL of its variance.
+            np.linalg.cholesky(residual - ZERO_RESIDUAL * own)
+        except np.linalg.LinAlgError:
+            return math.inf
+        log_det = np.linalg.slogdet(residual)[1]
         return float(self.n * log_det + self.log_n * self.lambda_value * ys.size * xs.size)
 
     def score(self, node: int, parents: Sequence[int]) -> float:

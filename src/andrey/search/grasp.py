@@ -2,8 +2,9 @@
 
 A depth-bounded search of tucks (:func:`_dfs`) relaxes a variable order; each variable's parents
 come from its persistent grow-shrink tree (:class:`_GST`). Scores are negated local scores, so the
-search maximizes. The algorithm and its
-reference are described on :func:`andrey.grasp`.
+search maximizes. The search runs on the columns sorted by tie rank
+(:func:`~andrey.search.boss.ranked_score`), so a variable's index is its tie rank. The algorithm and
+its reference are described on :func:`andrey.grasp`.
 """
 
 from __future__ import annotations
@@ -15,13 +16,9 @@ import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import BICScore, LocalScore, make_score
+from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
-from andrey.search.boss import PERMUTATION_SCORES
-
-# The depth-first search of covered tucks descends at most this many score-preserving moves before
-# backtracking.
-_DEPTH = 3
+from andrey.search.boss import PERMUTATION_SCORES, ranked_score
 
 # DFS accepts a tuck when the total negated BIC increases by more than this tolerance;
 # changes in (-tolerance, tolerance] are explored as ties. Grow recomputes full BIC scores
@@ -381,6 +378,7 @@ def grasp(
     data: np.ndarray,
     *,
     lambda_value: float = 1.0,
+    depth: int = 3,
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",
     categorical: np.ndarray | None = None,
@@ -390,7 +388,10 @@ def grasp(
     Runs the greedy relaxation of the sparsest permutation: seeds a permutation, grow-shrinks each
     variable's parents from its predecessors, then relaxes the order through depth-bounded covered
     tucks until no tuck improves the total score. The settled parent sets form a DAG, returned as
-    its CPDAG. The search is stochastic and seeded from ``random_state`` for a reproducible run.
+    its CPDAG. The search is stochastic and seeded from ``random_state`` for a reproducible run. It
+    runs on the columns sorted by :func:`~andrey.search.boss.ranked_score`, so the starting order,
+    the visiting order, and every tie follow the columns' data, and reordering the columns of
+    ``data`` reorders the CPDAG's nodes.
 
     Parameters
     ----------
@@ -398,6 +399,8 @@ def grasp(
         Data matrix; rows are observations, columns are variables.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
+    depth : int
+        Most tucks in one chain of moves, at least ``1``.
     random_state : int
         Seed for the private RNG that fixes the initial permutation and DFS shuffles.
     score_func : str
@@ -421,7 +424,7 @@ def grasp(
         raise NotImplementedError(
             f"unsupported score_func {score_func!r}; use one of {PERMUTATION_SCORES}"
         )
-    score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
+    score, ranks = ranked_score(X, score_func, lambda_value, categorical)
     delta = DeltaBICScore(score) if isinstance(score, BICScore) else FullScoreDelta(score)
     rng = random.Random(random_state)
     gsts = [_GST(v, score, delta, n_features) for v in range(n_features)]
@@ -434,7 +437,7 @@ def grasp(
         order.set_local_score(y, local_score)
         order.bump_edges(len(y_parents))
 
-    while _dfs(_DEPTH - 1, set(), [], order, gsts, rng):
+    while _dfs(depth - 1, set(), [], order, gsts, rng):
         pass
 
     adj = np.zeros((n_features, n_features), dtype=np.int8)
@@ -446,5 +449,5 @@ def grasp(
             adj[x, y] = TAIL
             adj[y, x] = ARROW
 
-    cpdag = dag2cpdag(adj)
+    cpdag = dag2cpdag(adj[np.ix_(ranks, ranks)])
     return to_structure(cpdag, kind="cpdag"), float(total_bic)

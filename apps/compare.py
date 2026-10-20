@@ -40,7 +40,8 @@ from runners import signed_marks  # noqa: E402
 RECORDING = Path(__file__).with_name("compare-causal-learn.json")
 CAUSAL_LEARN = "0.1.4.8"
 
-# Node order is topological and sets each layout column's top-to-bottom order.
+# Node order is topological and sets each layout column's top-to-bottom order. The data list the
+# variables in an order drawn from the seed, so their order says nothing about the causal order.
 LABELS = (
     "sunlight",
     "rain",
@@ -128,14 +129,30 @@ def labeled(marks, kind="cpdag"):
 
 
 @functools.cache
+def sample():
+    """The model's sample at the seed, its columns in an order drawn from the seed."""
+    return MODEL.sample(n=N_SAMPLES, seed=SEED, scale="standardize")
+
+
+def column_order():
+    """The index in LABELS of each data column."""
+    return np.asarray(sample().provenance["column_order"])
+
+
+def in_label_order(marks):
+    """Renumber an endpoint-mark matrix over the data's columns in the order of LABELS."""
+    column = np.argsort(column_order())  # the data column of each label
+    return np.asarray(marks)[np.ix_(column, column)]
+
+
+@functools.cache
 def dataset():
-    """Return the standardized, rounded observations (read-only) and the true DAG."""
-    sample = MODEL.sample(n=N_SAMPLES, seed=SEED, scale="standardize")
+    """Return the standardized, rounded observations (read-only) and the true DAG over LABELS."""
     # The generator's matrix products differ in the last bit between BLAS kernels; six decimals,
     # as a CSV would store them, give every machine the same bytes.
-    data = np.round(sample.data, 6)
+    data = np.round(sample().data, 6)
     data.flags.writeable = False
-    return data, labeled(sample.graph.to_numpy(), kind="dag")
+    return data, labeled(in_label_order(sample().graph.to_numpy()), kind="dag")
 
 
 def fingerprint(data):
@@ -148,8 +165,10 @@ def andrey_graphs():
     """Fit Andrey's PC and GES at their defaults."""
     data, _ = dataset()
     return {
-        "PC": labeled(andrey.pc(data, alpha=ALPHA, indep_test="fisherz").structure.to_numpy()),
-        "GES": labeled(andrey.ges(data).structure.to_numpy()),
+        "PC": labeled(
+            in_label_order(andrey.pc(data, alpha=ALPHA, indep_test="fisherz").structure.to_numpy())
+        ),
+        "GES": labeled(in_label_order(andrey.ges(data).structure.to_numpy())),
     }
 
 
@@ -172,16 +191,17 @@ def record(path=RECORDING):
         "causal-learn": version,
         "data": {
             "labels": list(LABELS),
+            "column_order": column_order().tolist(),
             "shape": list(data.shape),
             "seed": SEED,
             "sha256": fingerprint(data),
         },
-        "graph_format": "causal-learn endpoint codes; row i, column j is the mark at variable i "
-        "on its edge with j: -1 tail, 1 arrowhead, 2 circle, 0 no edge",
+        "graph_format": "causal-learn endpoint codes over the labels; row i, column j is the mark "
+        "at variable i on its edge with j: -1 tail, 1 arrowhead, 2 circle, 0 no edge",
         "methods": {
             method: {
                 "parameters": CAUSAL_LEARN_PARAMETERS[method],
-                "graph": np.asarray(fit.graph, dtype=int).tolist(),
+                "graph": in_label_order(np.asarray(fit.graph, dtype=int)).tolist(),
             }
             for method, fit in fits.items()
         },
@@ -204,6 +224,7 @@ def causal_learn_graphs(recording=None):
     data, _ = dataset()
     expected = {
         "labels": list(LABELS),
+        "column_order": column_order().tolist(),
         "shape": list(data.shape),
         "seed": SEED,
         "sha256": fingerprint(data),
@@ -536,7 +557,8 @@ def compare_page(heading=True):
     body = (
         f"<main>{intro if heading else ''}"
         f'<p class="note">{n:,} samples of {d} variables from a linear-Gaussian model, '
-        f"standardized and rounded to six decimals, seed {SEED}. causal-learn's graphs were "
+        f"standardized and rounded to six decimals, seed {SEED}, the columns in an order drawn "
+        "from the seed. causal-learn's graphs were "
         "recorded with causal-learn "
         f"{escape(version)} on the same data.</p>"
         f'<div class="controls"><fieldset><legend>Method</legend>'

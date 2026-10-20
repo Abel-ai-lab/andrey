@@ -23,9 +23,11 @@ def frame(seed: int = 0) -> pd.DataFrame:
 
 
 def inputs(spec, frames) -> list:
-    """The method's positional inputs, with a DataFrame wherever it takes a data matrix."""
+    """The method's required positional inputs, with a DataFrame wherever it takes a data matrix."""
     args = []
     for inp in spec.data.inputs:
+        if not inp.required:
+            continue
         if inp.kind == "matrix":
             pair = spec.family == "pairwise"
             args.append(frames[0][COLUMNS[:2]] if pair else frames[0])
@@ -48,12 +50,16 @@ TABLE_SPECS = [
     spec for spec in list_specs() if {i.kind for i in spec.data.inputs} & {"matrix", "panel"}
 ]
 
+#: Settings that shorten a slow fit; the labels come from the same facade path.
+SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
+
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
 def test_dataframe_columns_become_labels(spec):
     if spec.name == "calm":
         pytest.importorskip("torch")
-    out = getattr(andrey, spec.name)(*inputs(spec, [frame(0), frame(1), frame(2)]))
+    frames = [frame(0), frame(1), frame(2)]
+    out = getattr(andrey, spec.name)(*inputs(spec, frames), **SHORT.get(spec.name, {}))
     for result in out if isinstance(out, list) else [out]:
         for graph in graphs(result.structure):
             # GIN appends its latents after the observed columns; a pairwise test takes two.
@@ -75,6 +81,20 @@ def test_reversed_columns_give_the_same_named_edges():
     forward = andrey.direct_lingam(df).structure.oriented_edges()
     reverse = andrey.direct_lingam(df[COLUMNS[::-1]]).structure.oriented_edges()
     assert sorted(forward) == sorted(reverse) == [("x", "y", "directed"), ("y", "z", "directed")]
+
+
+def test_reversed_columns_give_the_same_named_edges_on_torch(monkeypatch):
+    # A reversed frame's numpy array is a view with a negative stride, which torch rejects.
+    pytest.importorskip("torch")
+    monkeypatch.setenv("ANDREY_DEVICE", "cpu")  # a pinned device runs even a small fit on torch
+    noise = np.random.default_rng(0).standard_normal((N, 3))
+    collider = noise[:, 0] + noise[:, 1] + noise[:, 2]
+    df = pd.DataFrame(np.column_stack([noise[:, 0], collider, noise[:, 1]]), columns=COLUMNS)
+    forward = andrey.pc(df).structure
+    reverse = andrey.pc(df[COLUMNS[::-1]]).structure
+    assert reverse.labels == tuple(COLUMNS[::-1])
+    assert sorted(reverse.oriented_edges()) == sorted(forward.oriented_edges())
+    assert sorted(forward.oriented_edges()) == [("x", "y", "directed"), ("z", "y", "directed")]
 
 
 def test_gin_explicit_labels_beat_columns():

@@ -1,20 +1,27 @@
 {
   "_about": "Recorded values for qa/quality_gate.py: `supported` gates the supported methods before a release.",
   "supported": {
-    "_about": "Median SHD over each dataset's draws, against the known graph (endpoint SHD for FCI). A cell passes when its median is below the empty graph's and within the method's tolerance of its baseline, in either direction: a median better than the baseline by more than the tolerance also fails, so an intended improvement is recorded by a recapture. Recapture with `uv run python -m qa.quality_gate --capture` and review the diff.",
+    "_about": "Median errors over each dataset's draws, against the known graph, in the units qa/README.md lists for each method. A cell passes when its median is below the empty graph's and within the method's tolerance of its baseline, in either direction: a median better than the baseline by more than the tolerance also fails, so an intended improvement is recorded by a recapture. Recapture with `uv run python -m qa.quality_gate --capture` and review the diff.",
     "tolerances": {
       "PC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline independence decision to differ on another host."},
       "FCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline independence decision to differ on another host."},
+      "GFCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison or independence decision to differ on another host."},
+      "CDNOD": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "GES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
+      "GIES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "XGES": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "HC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "Tabu": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
+      "ExactSearch": {"median_shd": 1, "reason": "When every input was perturbed by a relative 1e-12, ten times, the DAG it returned moved within its equivalence class on up to 9 of 10 draws, since equivalent DAGs score the same, and no draw's SHD changed. One allows a single borderline score comparison to differ on another host."},
+      "CALM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, three times. One allows a single borderline edge decision to differ on another host."},
       "BOSS": {"median_shd": 1, "reason": "No graph changed on the linear_gauss_er cells when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline score comparison to differ on another host."},
       "GRaSP": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline score comparison to differ on another host."},
       "DirectLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times, or on other CPUs and dependency versions. One allows a single borderline ordering decision to differ on another host."},
       "ICA-LiNGAM": {"median_shd": 2, "reason": "FastICA's causal order can flip on rounding. Under a relative 1e-12 input perturbation the median at d = 50 moved by 1, and 4 of 100 draws changed. Two covers that with one to spare."},
+      "MultiGroupDirectLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline ordering decision to differ on another host."},
       "RCD": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "BottomUpParceLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "GIN": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, three times. One allows a single borderline cluster or order decision to differ on another host."},
       "ANM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
       "PNL": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline direction decision to differ on another host."},
       "PCMCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
@@ -26,22 +33,36 @@
     },
     "baselines": {
       "PC": {
-        "linear_gauss_er_d20": {"median_shd": 4.5, "empty_median_shd": 20.0, "shd": [4, 12, 7, 1, 0, 2, 6, 5, 12, 0]},
-        "linear_gauss_er_d50": {"median_shd": 12.0, "empty_median_shd": 50.0, "shd": [13, 14, 23, 15, 11, 11, 13, 11, 6, 5]},
-        "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [2, 0, 3, 3, 2, 0, 3, 2, 3, 5]},
+        "linear_gauss_er_d20": {"median_shd": 4.0, "empty_median_shd": 20.0, "shd": [4, 9, 7, 1, 3, 3, 7, 4, 12, 0]},
+        "linear_gauss_er_d50": {"median_shd": 10.0, "empty_median_shd": 50.0, "shd": [12, 14, 18, 10, 9, 6, 13, 10, 10, 5]},
+        "asia_gauss": {"median_shd": 2.5, "empty_median_shd": 8.0, "shd": [0, 0, 3, 3, 0, 0, 3, 2, 3, 5]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "FCI": {
-        "latent_gauss_er_d20": {"median_shd": 17.0, "empty_median_shd": 40.0, "shd": [9, 21, 19, 2, 19, 21, 13, 15, 29, 12]},
-        "latent_gauss_er_d50": {"median_shd": 36.0, "empty_median_shd": 105.0, "shd": [33, 38, 51, 36, 33, 36, 42, 37, 26, 22]},
+        "latent_gauss_er_d20": {"median_shd": 17.0, "empty_median_shd": 40.0, "shd": [9, 21, 19, 2, 22, 21, 13, 15, 31, 12]},
+        "latent_gauss_er_d50": {"median_shd": 35.0, "empty_median_shd": 105.0, "shd": [33, 38, 51, 36, 27, 35, 42, 35, 31, 22]},
         "asia_gauss": {"median_shd": 3.5, "empty_median_shd": 16.0, "shd": [2, 0, 8, 5, 2, 0, 7, 2, 7, 9]},
         "sachs": {"median_shd": 20.0, "empty_median_shd": 34.0, "shd": [20]}
+      },
+      "GFCI": {
+        "latent_gauss_er_d20": {"median_shd": 12.0, "empty_median_shd": 40.0, "shd": [6, 22, 16, 2, 21, 17, 7, 8, 24, 4]},
+        "latent_gauss_er_d50": {"median_shd": 22.0, "empty_median_shd": 105.0, "shd": [14, 27, 20, 19, 23, 21, 24, 29, 23, 12]},
+        "asia_gauss": {"median_shd": 4.5, "empty_median_shd": 16.0, "shd": [4, 0, 5, 5, 0, 0, 7, 0, 7, 9]},
+        "sachs": {"median_shd": 20.0, "empty_median_shd": 34.0, "shd": [20]}
+      },
+      "CDNOD": {
+        "domain_shift_er_d20": {"median_shd": 5.5, "empty_median_shd": 20.0, "shd": [5, 6, 11, 2, 4, 6, 2, 14, 4, 7]},
+        "domain_shift_er_d50": {"median_shd": 13.5, "empty_median_shd": 50.0, "shd": [20, 8, 8, 19, 15, 16, 11, 9, 17, 12]}
       },
       "GES": {
         "linear_gauss_er_d20": {"median_shd": 7.5, "empty_median_shd": 20.0, "shd": [10, 7, 8, 6, 0, 8, 10, 2, 26, 5]},
         "linear_gauss_er_d50": {"median_shd": 15.5, "empty_median_shd": 50.0, "shd": [11, 20, 8, 14, 24, 10, 17, 10, 22, 26]},
         "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [9, 0, 0, 0, 0, 0, 1, 0, 0, 0]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
+      "GIES": {
+        "interventional_gauss_er_d20": {"median_shd": 3.5, "empty_median_shd": 20.0, "shd": [12, 7, 2, 3, 4, 2, 8, 3, 2, 5]},
+        "interventional_gauss_er_d50": {"median_shd": 11.0, "empty_median_shd": 49.0, "shd": [15, 9, 11, 11, 7, 8, 17, 14, 12, 10]}
       },
       "XGES": {
         "linear_gauss_er_d20": {"median_shd": 5.5, "empty_median_shd": 20.0, "shd": [5, 7, 8, 6, 0, 8, 2, 2, 26, 2]},
@@ -50,26 +71,36 @@
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "HC": {
-        "linear_gauss_er_d20": {"median_shd": 9.0, "empty_median_shd": 20.0, "shd": [7, 7, 13, 4, 8, 24, 3, 15, 20, 10]},
-        "linear_gauss_er_d50": {"median_shd": 36.0, "empty_median_shd": 50.0, "shd": [36, 69, 57, 49, 36, 43, 27, 27, 34, 36]},
-        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 6, 0, 0, 1, 0, 1, 0, 0, 4]},
-        "sachs": {"median_shd": 10.0, "empty_median_shd": 17.0, "shd": [10]}
+        "linear_gauss_er_d20": {"median_shd": 10.0, "empty_median_shd": 20.0, "shd": [22, 7, 17, 6, 5, 10, 2, 10, 29, 12]},
+        "linear_gauss_er_d50": {"median_shd": 36.5, "empty_median_shd": 50.0, "shd": [30, 64, 36, 47, 56, 27, 29, 37, 45, 36]},
+        "asia_gauss": {"median_shd": 4.5, "empty_median_shd": 8.0, "shd": [4, 9, 5, 4, 4, 5, 1, 13, 4, 9]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
       "Tabu": {
-        "linear_gauss_er_d20": {"median_shd": 7.5, "empty_median_shd": 20.0, "shd": [5, 7, 13, 6, 8, 14, 2, 14, 20, 5]},
-        "linear_gauss_er_d50": {"median_shd": 27.5, "empty_median_shd": 50.0, "shd": [29, 70, 43, 40, 20, 17, 27, 17, 26, 28]},
-        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 0, 0, 0, 1, 0, 1, 0, 0, 0]},
-        "sachs": {"median_shd": 10.0, "empty_median_shd": 17.0, "shd": [10]}
+        "linear_gauss_er_d20": {"median_shd": 6.5, "empty_median_shd": 20.0, "shd": [9, 7, 17, 6, 0, 8, 2, 4, 26, 5]},
+        "linear_gauss_er_d50": {"median_shd": 34.0, "empty_median_shd": 50.0, "shd": [25, 42, 23, 36, 49, 11, 30, 36, 40, 32]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 5, 0, 0, 1, 0, 1, 0, 0, 0]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
-      "BOSS": {
-        "linear_gauss_er_d20": {"median_shd": 4.0, "empty_median_shd": 20.0, "shd": [5, 7, 2, 6, 0, 7, 0, 15, 3, 2]},
-        "linear_gauss_er_d50": {"median_shd": 9.5, "empty_median_shd": 50.0, "shd": [9, 8, 7, 24, 13, 10, 20, 8, 9, 12]},
+      "ExactSearch": {
+        "linear_gauss_er_d10": {"median_shd": 2.5, "empty_median_shd": 10.0, "shd": [0, 3, 3, 6, 3, 2, 3, 0, 2, 0]},
+        "linear_gauss_er_d15": {"median_shd": 2.0, "empty_median_shd": 15.0, "shd": [2, 2, 7, 5, 1, 7, 0, 3, 0, 2]},
         "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 0, 0, 0, 1, 0, 1, 0, 0, 0]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
+      "CALM": {
+        "linear_gauss_er_d10": {"median_shd": 4.0, "empty_median_shd": 10.0, "shd": [3, 3, 8, 1, 4, 4, 5, 2, 11, 8]},
+        "asia_gauss": {"median_shd": 4.0, "empty_median_shd": 8.0, "shd": [4, 6, 6, 4, 1, 4, 4, 0, 4, 6]}
+      },
+      "BOSS": {
+        "linear_gauss_er_d20": {"median_shd": 4.0, "empty_median_shd": 20.0, "shd": [5, 3, 4, 6, 0, 8, 2, 4, 3, 6]},
+        "linear_gauss_er_d50": {"median_shd": 10.0, "empty_median_shd": 50.0, "shd": [10, 19, 7, 21, 9, 10, 15, 10, 7, 16]},
+        "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 8, 0, 0, 1, 0, 4, 0, 0, 10]},
+        "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
+      },
       "GRaSP": {
-        "linear_gauss_er_d20": {"median_shd": 3.0, "empty_median_shd": 20.0, "shd": [5, 7, 3, 4, 0, 8, 0, 2, 3, 2]},
-        "linear_gauss_er_d50": {"median_shd": 14.0, "empty_median_shd": 50.0, "shd": [10, 18, 7, 18, 20, 8, 22, 9, 7, 22]},
+        "linear_gauss_er_d20": {"median_shd": 5.5, "empty_median_shd": 20.0, "shd": [7, 11, 11, 4, 0, 23, 0, 13, 3, 2]},
+        "linear_gauss_er_d50": {"median_shd": 9.5, "empty_median_shd": 50.0, "shd": [10, 5, 8, 20, 9, 17, 18, 8, 9, 23]},
         "asia_gauss": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [0, 0, 0, 0, 1, 0, 1, 0, 0, 0]},
         "sachs": {"median_shd": 11.0, "empty_median_shd": 17.0, "shd": [11]}
       },
@@ -80,18 +111,26 @@
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
       },
       "ICA-LiNGAM": {
-        "lingam_sf_d20": {"median_shd": 1.0, "empty_median_shd": 19.0, "shd": [0, 0, 1, 1, 0, 9, 16, 6, 0, 5]},
-        "lingam_sf_d50": {"median_shd": 10.0, "empty_median_shd": 49.0, "shd": [10, 5, 7, 10, 94, 98, 53, 4, 8, 20]},
-        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 1, 0, 0, 0, 0, 0]},
+        "lingam_sf_d20": {"median_shd": 1.5, "empty_median_shd": 19.0, "shd": [2, 0, 1, 2, 1, 10, 8, 0, 0, 7]},
+        "lingam_sf_d50": {"median_shd": 9.5, "empty_median_shd": 49.0, "shd": [10, 3, 5, 9, 17, 73, 30, 17, 1, 4]},
+        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 1, 1, 0, 0, 0, 0]},
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
       },
+      "MultiGroupDirectLiNGAM": {
+        "multi_group_er_d10": {"median_shd": 0.0, "empty_median_shd": 30.0, "shd": [0, 0, 1, 1, 0, 0, 1, 0, 0, 2]},
+        "multi_group_er_d20": {"median_shd": 2.0, "empty_median_shd": 60.0, "shd": [1, 1, 1, 9, 1, 3, 0, 3, 3, 5]}
+      },
       "RCD": {
-        "latent_lingam_er_d10": {"median_shd": 9.5, "empty_median_shd": 20.0, "shd": [4, 8, 10, 11, 23, 19, 10, 5, 8, 9]},
-        "latent_lingam_er_d15": {"median_shd": 15.0, "empty_median_shd": 29.0, "shd": [9, 23, 6, 10, 16, 22, 14, 7, 38, 20]}
+        "latent_lingam_er_d10": {"median_shd": 8.5, "empty_median_shd": 20.0, "shd": [4, 8, 10, 8, 23, 19, 10, 5, 8, 9]},
+        "latent_lingam_er_d15": {"median_shd": 15.0, "empty_median_shd": 29.0, "shd": [9, 23, 6, 10, 16, 22, 14, 7, 38, 23]}
       },
       "BottomUpParceLiNGAM": {
         "latent_lingam_er_d10": {"median_shd": 13.0, "empty_median_shd": 20.0, "shd": [22, 17, 3, 14, 16, 1, 12, 9, 9, 15]},
         "latent_lingam_er_d15": {"median_shd": 25.0, "empty_median_shd": 29.0, "shd": [21, 41, 13, 24, 32, 31, 17, 26, 44, 22]}
+      },
+      "GIN": {
+        "latent_measurement_d8": {"median_shd": 0.0, "empty_median_shd": 2.0, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+        "latent_measurement_d12": {"median_shd": 0.0, "empty_median_shd": 3.0, "shd": [0, 0, 2, 0, 0, 0, 0, 3, 2, 0]}
       },
       "ANM": {
         "anm_pair_n1000": {"median_shd": 0.0, "empty_median_shd": 1.0, "shd": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
@@ -113,15 +152,15 @@
       },
       "VARMA-LiNGAM": {
         "varma_lingam_paper_d3_n300": {"median_shd": 2.0, "empty_median_shd": 7.0, "shd": [4, 5, 2, 2, 2, 1, 0, 1, 4, 2]},
-        "varma_lingam_paper_d5_n300": {"median_shd": 5.0, "empty_median_shd": 12.0, "shd": [3, 10, 7, 5, 5, 5, 5, 10, 5, 6]}
+        "varma_lingam_paper_d5_n300": {"median_shd": 5.0, "empty_median_shd": 12.0, "shd": [3, 11, 7, 5, 5, 5, 4, 10, 4, 6]}
       },
       "LongitudinalLiNGAM": {
         "longitudinal_lingam_paper_d3_n20_m200": {"median_shd": 0.0, "empty_median_shd": 171.0, "shd": [0, 0, 0, 0, 1, 0, 0, 1, 1, 1]},
-        "longitudinal_lingam_paper_d5_n20_m500": {"median_shd": 2.5, "empty_median_shd": 570.0, "shd": [0, 7, 4, 1, 4, 0, 5, 0, 2, 3]}
+        "longitudinal_lingam_paper_d5_n20_m500": {"median_shd": 3.0, "empty_median_shd": 570.0, "shd": [0, 7, 4, 1, 4, 0, 5, 0, 2, 4]}
       },
       "Granger": {
         "var2_lagged_d5_n1000": {"median_shd": 13.5, "empty_median_shd": 28.5, "shd": [14, 14, 11, 21, 8, 9, 15, 15, 13, 13]},
-        "var2_lagged_d5_n2000": {"median_shd": 13.0, "empty_median_shd": 28.5, "shd": [13, 10, 14, 17, 10, 9, 13, 13, 14, 9]}
+        "var2_lagged_d5_n2000": {"median_shd": 12.5, "empty_median_shd": 28.5, "shd": [12, 10, 14, 17, 10, 9, 13, 13, 14, 9]}
       }
     }
   }

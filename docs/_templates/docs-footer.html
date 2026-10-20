@@ -1,6 +1,7 @@
-{#- The documentation footer, modeled on craft.do's: a rounded navy card below the page, with the
-    wordmark and three link columns under small capitals, and the copyright, license, and Abel's
-    mark at the bottom. The homepage has its own footer (`site/homepage.html`). -#}
+{#- The site's footer on every page, the homepage's too, modeled on craft.do's: a rounded navy card
+    below the page, with the wordmark and three link columns under small capitals, and the
+    copyright, license, and Abel's mark at the bottom. -#}
+{%- from "nav-icons.html" import icon %}
 <div class="docs-footer">
   <div class="docs-footer__top">
     <a class="docs-footer__brand" href="{{ pathto('', 1) }}" aria-label="Andrey home">
@@ -8,7 +9,7 @@
     </a>
     <nav class="docs-footer__columns" aria-label="{{ _('Footer') }}">
       <div>
-        <p class="docs-footer__heading">Documentation</p>
+        <p class="docs-footer__heading">{{ icon("book") }}Documentation</p>
         <ul>
           <li><a href="{{ pathto('docs/guides/getting-started') }}">Get started</a></li>
           <li><a href="{{ pathto('docs/code/index') }}">API reference</a></li>
@@ -17,7 +18,7 @@
         </ul>
       </div>
       <div>
-        <p class="docs-footer__heading">Learn</p>
+        <p class="docs-footer__heading">{{ icon("notebook") }}Learn</p>
         <ul>
           <li><a href="{{ pathto('docs/examples/index') }}">Examples</a></li>
           <li><a href="{{ pathto('docs/demos/index') }}">Demos</a></li>
@@ -26,7 +27,7 @@
         </ul>
       </div>
       <div>
-        <p class="docs-footer__heading">Project</p>
+        <p class="docs-footer__heading">{{ icon("folder") }}Project</p>
         <ul>
           <li><a href="{{ repo_url }}">GitHub</a></li>
           <li><a href="{{ pypi_url }}">PyPI</a></li>

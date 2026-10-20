@@ -22,9 +22,13 @@ import pytest
 
 from andrey import GraphStructure
 from andrey_bench.adapters.andrey_boss import AndreyBOSS
+from andrey_bench.adapters.andrey_calm import AndreyCALM
 from andrey_bench.adapters.andrey_direct_lingam import andrey_direct_lingam_adapters
+from andrey_bench.adapters.andrey_exact_search import AndreyExactSearch
 from andrey_bench.adapters.andrey_fci import AndreyFCI
 from andrey_bench.adapters.andrey_ges import andrey_ges_adapters
+from andrey_bench.adapters.andrey_gfci import AndreyGFCI
+from andrey_bench.adapters.andrey_gies import AndreyGIES
 from andrey_bench.adapters.andrey_grasp import AndreyGRaSP
 from andrey_bench.adapters.andrey_hc import andrey_hc_adapters
 from andrey_bench.adapters.andrey_ica_lingam import AndreyICALiNGAM
@@ -36,7 +40,9 @@ from andrey_bench.adapters.bnlearn_hc import BnlearnHC
 from andrey_bench.adapters.bnlearn_pc_stable import BnlearnPCStable
 from andrey_bench.adapters.bnlearn_tabu import BnlearnTabu
 from andrey_bench.adapters.causal_learn_boss import CausalLearnBOSS
+from andrey_bench.adapters.causal_learn_calm import CausalLearnCALM
 from andrey_bench.adapters.causal_learn_direct_lingam import CausalLearnDirectLiNGAM
+from andrey_bench.adapters.causal_learn_exact_search import CausalLearnExactSearch
 from andrey_bench.adapters.causal_learn_fci import CausalLearnFCI
 from andrey_bench.adapters.causal_learn_ges import CausalLearnGES
 from andrey_bench.adapters.causal_learn_grasp import CausalLearnGRaSP
@@ -47,8 +53,10 @@ from andrey_bench.adapters.gcastle_pc import GCastlePC
 from andrey_bench.adapters.lingam_direct import LingamDirect
 from andrey_bench.adapters.pcalg_fci import PcalgFCI
 from andrey_bench.adapters.pcalg_ges import PcalgGES
+from andrey_bench.adapters.pcalg_gies import PcalgGIES
 from andrey_bench.adapters.pcalg_pc import PcalgPC
 from andrey_bench.adapters.pcalg_rfci import PcalgRFCI
+from andrey_bench.adapters.tetrad_gfci import TetradGFCI
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.oracle import OracleGES
 
@@ -59,26 +67,36 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyPC(),
     AndreyFCI(),
     AndreyFCI("majority"),
+    AndreyGFCI(),
+    AndreyGFCI("parallel"),
+    AndreyCALM(),
+    AndreyCALM("paper"),
     AndreyBOSS(),
     AndreyGRaSP(),
     *andrey_direct_lingam_adapters(),
     AndreyICALiNGAM(),
     AndreyXGES(),
     AndreyXGES(name="andrey.xges.numpy.no_extended_search", extended_search=False),
+    AndreyGIES(),
+    AndreyExactSearch(),
     CausalLearnGES(),
     CausalLearnPC(),
     CausalLearnFCI(),
+    CausalLearnCALM(),
     CausalLearnBOSS(),
     CausalLearnGRaSP(),
     CausalLearnDirectLiNGAM(),
     CausalLearnICALiNGAM(),
+    CausalLearnExactSearch(),
     GCastleGES(),
     GCastlePC(),
     LingamDirect(),
     PcalgGES(),
+    PcalgGIES(),
     PcalgPC(),
     PcalgFCI(),
     PcalgRFCI(),
+    TetradGFCI(),
     BnlearnHC(),
     BnlearnTabu(),
     BnlearnPCStable(),
@@ -128,12 +146,15 @@ def test_every_adapter_survives_the_pickle_the_runner_puts_it_through(
 DEFERRED_MODULES = {
     "andrey.ges.numpy.serial": "andrey.search.ges",
     "andrey.ges.numpy.parallel": "andrey.search.ges",
-    "andrey.ges.numba.serial": "andrey.search.ges",
     "andrey.hc.numpy.serial": "andrey.search.hc",
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
     "andrey.fci.numpy": "andrey.constraint.fci",
     "andrey.fci.majority.numpy": "andrey.constraint.fci",
+    "andrey.gfci.numpy": "andrey.search.gfci",
+    "andrey.gfci.numpy.parallel": "andrey.search.gfci",
+    "andrey.calm.torch-cpu": "andrey.search.calm",
+    "andrey.calm.torch-cpu.paper_schedule": "andrey.search.calm",
     "andrey.boss.numpy": "andrey.search.boss",
     "andrey.grasp.numpy": "andrey.search.grasp",
     "andrey.direct_lingam.numpy": "andrey.lingam.direct",
@@ -141,6 +162,9 @@ DEFERRED_MODULES = {
     "andrey.ica_lingam.numpy": "andrey.lingam.ica",
     "andrey.xges.numpy": "andrey.search.xges",
     "andrey.xges.numpy.no_extended_search": "andrey.search.xges",
+    "andrey.gies.numpy": "andrey.search.gies",
+    "andrey.exact_search.numpy": "andrey.search.exact",
+    "causal-learn.exact_search": "causallearn.search.ScoreBased.ExactSearch",
     "causal-learn.boss": "causallearn.search.PermutationBased.BOSS",
     "causal-learn.grasp": "causallearn.search.PermutationBased.GRaSP",
 }
@@ -210,7 +234,10 @@ FIT_CASES = [
     _case(CausalLearnBOSS(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(CausalLearnGRaSP(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(AndreyXGES(), "linear_gauss_er", "cpdag", _MARKS),
+    _case(AndreyExactSearch(), "linear_gauss_er", "dag", _MARKS),
+    _case(CausalLearnExactSearch(), "linear_gauss_er", "dag", _ADJACENCY),
     _case(AndreyFCI(), "latent_confounded_er", "pag", _PAG_MARKS),
+    _case(AndreyGFCI(), "latent_confounded_er", "pag", _PAG_MARKS),
     _case(CausalLearnFCI(), "latent_confounded_er", "pag", _PAG_MARKS),
     *[
         _case(a, "lingam_sf", "dag", _ADJACENCY)

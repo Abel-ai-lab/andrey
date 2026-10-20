@@ -22,7 +22,7 @@ PAGE = {
 }
 SOFTWARE = {
     "name": "Andrey",
-    "description": "Andrey, a very fast causal discovery package",
+    "description": "Andrey: accelerated, accurate, agentic causal discovery",
     "version": "0.4.0",
     "license": {
         "@type": "CreativeWork",

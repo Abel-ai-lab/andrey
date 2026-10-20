@@ -27,8 +27,12 @@ CI tests 3.11 to 3.14.
 uv add andrey-core
 ```
 
-[Getting started](guides/getting-started.md#install) covers pip, the optional extras, the
-development version, and building from source.
+```shell
+pip install andrey-core
+```
+
+[Getting started](guides/getting-started.md#install) covers the optional extras, the development
+version, and building from source.
 
 ### Which operating systems does it support?
 
@@ -52,8 +56,7 @@ Andrey in its first cell.
 
 ### Which methods are there?
 
-{{ n_supported }} are supported: {{ supported_methods }}. {{ n_experimental }} more are experimental,
-including time-series, hidden-variable, and multi-dataset methods. The
+{{ n_supported }} are supported: {{ supported_methods }}. The
 [API reference](code/index.md#structure-learning-methods) lists them all, and `andrey list` prints
 them with their status.
 
@@ -61,7 +64,8 @@ them with their status.
 
 A supported method is benchmarked and checked on known graphs before each release. An experimental
 method has recovery tests but no published benchmark. It warns with `andrey.ExperimentalWarning` the
-first time it runs in a process.
+first time it runs in a process. Every method is supported now; a new method starts as
+experimental.
 
 ### Which method should I start with?
 
@@ -81,8 +85,8 @@ case, including Andrey's GES at 200 variables with the default penalty.
 ### Why does a result differ from another package's?
 
 Methods can break ties in a different order, use different defaults, or treat the column order
-differently; FCI, for one, depends on column order. The [release cards](benchmarks.md) score every
-package on the same true graphs, so compare accuracy there rather than edge by edge.
+differently. The [release cards](benchmarks.md) score every package on the same true graphs, so
+compare accuracy there rather than edge by edge.
 
 ## Speed and hardware
 
@@ -96,7 +100,7 @@ speed support.
 ### Why is it faster?
 
 It batches independent tests and scores into array operations, reuses work across steps, skips
-work that cannot change the result, and uses compiled or GPU code where that helps.
+work that cannot change the result, and uses GPU code where that helps.
 [Why Andrey is fast](../blog/20261008-why-andrey-is-fast.md) explains the four ideas.
 
 ### Do I need a GPU?
@@ -108,15 +112,14 @@ large enough to repay the transfer; correlation matrices move too when you set
 
 ### What do the optional extras add?
 
-- `numba`: compiled CPU code for GES's path checks.
 - `torch`: the PyTorch backend for GPUs, and CALM.
 - `viz`: Matplotlib chart styling (`andrey.viz.mpl`), and Graphviz layouts for drawn graphs.
 - `data`: saving and loading generated datasets (`andrey.data`).
-- `all`: all four.
+- `all`: all three.
 
 ### Can it use more CPU cores?
 
-GES, GIES, and GFCI (in its GES phase) can spread each pass over worker processes: set
+GES and GFCI (in its GES phase) can spread each pass over worker processes: set
 `ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one. A script that
 does this must put its entry point under `if __name__ == "__main__":`, because starting the workers
 re-imports the script; [Getting started](guides/getting-started.md#backends-and-parallelism) shows
@@ -229,9 +232,9 @@ citation.
 ```bibtex
 @software{andrey,
   author = {{Abel AI Lab}},
-  title = {Andrey: A very fast causal discovery package},
+  title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.6.0},
+  version = {0.7.0},
   url = {https://andrey.abel.ai},
 }
 ```

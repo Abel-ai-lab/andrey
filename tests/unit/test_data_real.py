@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from andrey.data import list_datasets, load_dataset, real
+from andrey.data.sortability import index_correlation
 
 
 def test_sachs_is_the_observational_rows_and_the_consensus_network(offline_datasets):
@@ -145,25 +146,30 @@ ASIA_ARCS = {
 }
 
 
+ASIA_NODES = ["asia", "tub", "smoke", "lung", "bronc", "either", "xray", "dysp"]
+
+
 def test_a_published_network_is_its_graph_with_data_simulated_on_it(offline_datasets):
     asia = load_dataset("asia")
     assert asia.data.shape == (1000, 8)
-    assert list(asia.data.columns) == [
-        "asia",
-        "tub",
-        "smoke",
-        "lung",
-        "bronc",
-        "either",
-        "xray",
-        "dysp",
-    ]
+    assert sorted(asia.data.columns) == sorted(ASIA_NODES)
+    assert list(asia.data.columns) == list(asia.feature_names) == list(asia.graph.labels)
+    assert list(load_dataset("asia", shuffle=False).data.columns) == ASIA_NODES
     edges = asia.graph.oriented_edges()
     assert {(s, t) for s, t, _ in edges} == ASIA_ARCS and {k for *_, k in edges} == {"directed"}
     # Standardized columns, and the simulation recorded in the description.
     np.testing.assert_allclose(asia.data.std(ddof=0), 1.0)
     assert "simulated" in asia.description and "n=1000, seed=0" in asia.description
     assert "Lauritzen" in asia.description
+
+
+def test_each_simulated_column_is_the_variable_it_is_named_for(offline_datasets):
+    """The two ends of every arc are correlated; two variables with no path or common cause are
+    not."""
+    corr = load_dataset("asia").data.corr().abs()
+    assert all(corr.loc[s, t] > 0.3 for s, t in ASIA_ARCS)
+    unrelated = [(a, b) for a in ("asia", "tub") for b in ("smoke", "lung", "bronc")]
+    assert all(corr.loc[s, t] < 0.15 for s, t in unrelated)
 
 
 def test_n_and_seed_fix_the_simulated_rows(offline_datasets):
@@ -286,3 +292,42 @@ def test_the_table_reader_numbers_rows_by_the_parents_in_their_listed_order():
 def test_the_table_reader_refuses_an_incomplete_table(change, named):
     with pytest.raises(ValueError, match=named):
         real.read_bif_tables(_TABLES.replace(*change))
+
+
+@pytest.mark.parametrize("discrete", [False, True])
+def test_the_shuffle_relabels_a_published_network(offline_datasets, discrete):
+    """The shuffled rows are the unshuffled ones under the same names, with the same graph."""
+    shuffled = load_dataset("asia", n=300, seed=5, discrete=discrete)
+    plain = load_dataset("asia", n=300, seed=5, discrete=discrete, shuffle=False)
+    assert list(shuffled.feature_names) != ASIA_NODES
+    assert shuffled.data[list(plain.feature_names)].equals(plain.data)
+    assert set(shuffled.graph.oriented_edges()) == set(plain.graph.oriented_edges())
+    assert "order drawn from the seed" in shuffled.description
+    assert "keep the file's variable order" in plain.description
+
+
+def test_measured_data_keep_the_file_column_order(offline_datasets):
+    sachs = load_dataset("sachs")
+    assert sachs.feature_names == real.SACHS_NODES
+    assert load_dataset("sachs", shuffle=False).data.equals(sachs.data)
+
+
+def _asia_correlation(seed: int, shuffle: bool) -> float:
+    asia = load_dataset("asia", n=2, seed=seed, as_frame=False, shuffle=shuffle)
+    column = {name: j for j, name in enumerate(asia.feature_names)}
+    edges = np.array([(column[a], column[b]) for a, b, _ in asia.graph.oriented_edges()])
+    return index_correlation(edges, len(column))
+
+
+def test_a_published_network_column_order_says_nothing_of_the_causal_order(offline_datasets):
+    """ASIA's file lists its variables in causal order (a correlation of 0.90 with their depth).
+
+    Under a uniform column order the rank correlation of column index and causal depth has mean 0
+    and variance ``1 / 7`` on ASIA's eight columns, so its mean over 200 seeds stays within four
+    standard deviations, ``4 / sqrt(200 * 7)``, of 0. The file's order, the positive control, does
+    not.
+    """
+    seeds = range(200)
+    bound = 4 / np.sqrt(len(seeds) * 7)
+    assert abs(np.mean([_asia_correlation(s, True) for s in seeds])) < bound
+    assert _asia_correlation(0, False) > bound

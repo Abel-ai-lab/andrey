@@ -461,7 +461,14 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
     for required in ("", "docs/faq.html", "docs/benchmarks/0.4.0.html", "blog/index.html"):
         assert f"https://andrey.abel.ai/{required}" in urls, required
     # Left out: pages with no content of their own, and the redirects from moved addresses.
-    left_out = ("search.html", "404.html", "genindex.html", "blog/drafts.html", "demo/index.html")
+    left_out = (
+        "search.html",
+        "404.html",
+        "genindex.html",
+        "blog/drafts.html",
+        "demo/index.html",
+        "docs/demos/benchmark-explorer.html",
+    )
     moved = (
         "blog/andrey-0-2-0.html",
         "blog/introducing-andrey.html",
@@ -502,21 +509,26 @@ def test_the_404_page_resolves_its_links_from_the_site_root(html):
         assert (html / target).exists(), target
 
 
-def test_every_documentation_page_ends_on_the_documentation_footer(html):
-    # Documentation pages use their own footer without the theme's credits ("Created using
-    # Sphinx", "Built with the PyData Sphinx Theme"); the homepage has a separate footer.
+def test_every_page_ends_on_the_same_footer(html):
+    # Every page, the homepage included, ends on one footer without the theme's credits ("Created
+    # using Sphinx", "Built with the PyData Sphinx Theme"), and credits Abel with one link that
+    # holds its mark and its name.
     for page, text in _pages(html):
-        if page == html / "index.html":
-            assert 'class="docs-footer"' not in text
-            continue
         footer = text[text.index('<footer class="bd-footer">') :]
         assert 'class="docs-footer"' in footer, page
-        assert re.findall(r'<p class="docs-footer__heading">([^<]+)</p>', footer) == [
+        # Each heading is its icon, then its name.
+        headings = re.findall(r'<p class="docs-footer__heading">(.*?)</p>', footer, re.S)
+        assert [re.sub(r"<[^>]+>", "", h).strip() for h in headings] == [
             "Documentation",
             "Learn",
             "Project",
         ], page
+        assert all('<svg class="nav-icon' in h for h in headings), page
         assert "Created using" not in footer and "PyData Sphinx Theme" not in footer, page
+        abel = footer[footer.index('<a class="docs-footer__abel" href="https://abel.ai/">') :]
+        abel = abel[: abel.index("</a>")]
+        assert '<svg class="abel-mark"' in abel and abel.endswith("Abel AI Lab"), page
+        assert "Built by" not in footer, page
         for href in re.findall(r'href="([^"#:]+\.html)"', footer):
             assert (page.parent / href).resolve().is_file(), (page, href)
 

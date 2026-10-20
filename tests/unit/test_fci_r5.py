@@ -67,6 +67,32 @@ def test_r5_leaves_a_cycle_with_one_directed_chord():
     np.testing.assert_array_equal(marks, before)
 
 
+def test_r5_stops_at_the_partial_path_bound(monkeypatch):
+    """A search cut short by the bound returns no cycle, so R5 leaves the circles."""
+    marks = _circles(5, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 0)])
+    assert fci._uncovered_circle_cycle(marks, 0, 4) is not None
+    monkeypatch.setattr(fci, "_R5_PARTIAL_PATHS", 1)
+    assert fci._uncovered_circle_cycle(marks, 0, 4) is None
+    before = marks.copy()
+    assert not fci._rule_r5(marks, False)
+    np.testing.assert_array_equal(marks, before)
+
+
+def test_r5_finishes_on_a_layered_graph():
+    """Five complete bipartite layers between ``a = 0`` and ``b = 1`` give exponentially many
+    circle paths, but ``a`` is adjacent to every neighbor of ``b``, so no cycle closes on
+    ``a o-o b``. The whole rule, which also orients the four-cycles between layers, finishes.
+    """
+    width, depth = 5, 5
+    layers = [[2 + i * width + j for j in range(width)] for i in range(depth)]
+    edges = [(0, 1), *((0, u) for u in layers[0]), *((0, u) for u in layers[-1])]
+    edges += [(1, u) for u in layers[-1]]
+    edges += [(u, v) for i in range(depth - 1) for u in layers[i] for v in layers[i + 1]]
+    marks = _circles(2 + width * depth, edges)
+    assert fci._uncovered_circle_cycle(marks, 0, 1) is None
+    fci._rule_r5(marks, False)
+
+
 def test_the_sachs_truth_pag_has_no_undirected_edges():
     """Without selection variables the true PAG has no tail-tail edge; Sachs's is all circles."""
     parents, children = qg.arc_indices(qg.SACHS_NODES, qg.SACHS_ARCS)

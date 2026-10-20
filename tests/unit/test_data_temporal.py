@@ -137,3 +137,30 @@ def test_truth_stores_the_process_matrices_transposed():
     assert truth.lag_weights[0][0, 1] == 0.5 and truth.lag_weights[0][1, 0] == 0.0
     assert truth.lag_weights[1][0, 1] == 0.7 and truth.lag_weights[1][1, 0] == 0.0
     assert truth.lag_weights_ma[0][1, 0] == 0.4 and truth.lag_weights_ma[0][0, 1] == 0.0
+
+
+@pytest.mark.parametrize("functional", ["var", "varma"])
+def test_shuffle_relabels_every_lag(functional):
+    """Shuffling permutes the series and every lag graph and weight block on both axes."""
+    kwargs = {"functional": functional, "d": 7, "n": 300, "seed": 2, "density": 2.0}
+    plain = data.sample_scm(**kwargs, shuffle=False)
+    shuffled = data.sample_scm(**kwargs)
+    order = np.asarray(shuffled.provenance["column_order"])
+    assert np.array_equal(np.sort(order), np.arange(7)) and not np.array_equal(order, np.arange(7))
+    index = np.ix_(order, order)
+    assert np.array_equal(shuffled.data, plain.data[:, order])
+    assert shuffled.graph.lags == plain.graph.lags
+    for lag in plain.graph.lags:
+        assert shuffled.graph.lag(lag).kind == plain.graph.lag(lag).kind
+        assert np.array_equal(
+            shuffled.graph.lag(lag).to_numpy(), plain.graph.lag(lag).to_numpy()[index]
+        )
+    assert np.array_equal(
+        shuffled.graph.lag_weights, plain.graph.lag_weights[:, order][:, :, order]
+    )
+    ma = plain.graph.lag_weights_ma
+    if ma is not None:
+        assert np.array_equal(shuffled.graph.lag_weights_ma, ma[:, order][:, :, order])
+    assert np.array_equal(shuffled.params.edges, np.argsort(order)[plain.params.edges])
+    assert np.array_equal(shuffled.params.weights, plain.params.weights)
+    assert np.array_equal(shuffled.params.noise_scales, plain.params.noise_scales[order])

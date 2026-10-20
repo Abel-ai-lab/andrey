@@ -29,6 +29,7 @@ from andrey.data import sample_discrete
 from andrey.search.hc import hc
 from andrey_bench import datasets, rsession
 from andrey_bench.adapters import andrey_hc
+from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.scoring import structure_hash
@@ -106,7 +107,7 @@ def test_the_regime_stores_category_codes_and_the_true_dag() -> None:
     call = datasets.generation_kwargs(key)
     assert call["generator"] == "sample_discrete"
     assert {k: call[k] for k in datasets.DISCRETE_SETTINGS} == datasets.DISCRETE_SETTINGS
-    data, marks, kind = datasets.generate_one(key)
+    data, marks, kind, _ = datasets.generate_one(key)
     assert kind == "dag" and marks.shape == (6, 6)
     assert data.shape == (400, 6) and np.array_equal(data, np.round(data))
 
@@ -121,7 +122,7 @@ def test_the_regime_rejects_rescaled_codes() -> None:
 
 @pytest.mark.parametrize("adapter", ADAPTERS, ids=lambda a: a.name)
 def test_a_fit_gives_a_cpdag(adapter: SolutionAdapter) -> None:
-    data, _, _ = datasets.generate_one(_key())
+    data, _, _, _ = datasets.generate_one(_key())
     adapter.setup()
     structure = adapter.to_structure(np.asarray(adapter.fit(data, adapter.params())))
     assert structure.kind == "cpdag" and structure.n_nodes == 6
@@ -172,11 +173,17 @@ def test_bdeu_is_minus_twice_causal_learns_score() -> None:
 @pytest.mark.parametrize("seed", [0, 1, 2])
 @pytest.mark.parametrize("method", list(discrete_cpu.PAIRS))
 def test_both_packages_return_the_same_graph(method: str, seed: int) -> None:
+    """causal-learn's PC orients conflicting colliders in column order, so Andrey's PC runs that
+    rule here; its default p-value order can orient them differently. The campaign runs the
+    default, which this check does not cover."""
     data = sample_discrete(d=8, n=2000, seed=seed).data
     hashes = []
     for adapter in discrete_cpu.PAIRS[method]:
         adapter.setup()
-        native = adapter.fit(data, adapter.params())
+        params = adapter.params()
+        if isinstance(adapter, AndreyPC):
+            params["collider_order"] = "column"
+        native = adapter.fit(data, params)
         hashes.append(structure_hash(adapter.to_structure(np.asarray(native))))
     assert hashes[0] == hashes[1]
 

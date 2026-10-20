@@ -135,7 +135,9 @@ EXAMPLES = HERE / "docs" / "examples"
 # The example notebooks carry their outputs, so a slow builder runs none of them:
 # `scripts/execute_notebooks.py` stores the outputs, and the docs workflow checks they match a fresh
 # run. speed_on_your_machine.ipynb ships without outputs: its timings belong to the reader's
-# machine. The getting-started guide, a MyST notebook, runs at build time.
+# machine. calm.ipynb needs torch, which the docs workflow does not install, so its stored outputs
+# come from a local run and the workflow does not rerun it. The getting-started guide, a MyST
+# notebook, runs at build time.
 nb_execution_mode = "cache"
 nb_execution_timeout = 600
 nb_execution_raise_on_error = True
@@ -242,7 +244,8 @@ html_theme_options = {
     "navigation_with_keys": True,
     "show_prev_next": False,
     "icon_links": [{"name": "GitHub", "url": REPO_URL, "icon": "fa-brands fa-github"}],
-    # The documentation footer (`_templates/docs-footer.html`); the theme's three areas are empty.
+    # One footer on every page, the homepage's too (`_templates/docs-footer.html`); the theme's
+    # other two areas are empty.
     "footer_start": ["docs-footer"],
     "footer_center": [],
     "footer_end": [],
@@ -261,7 +264,7 @@ html_context = {
     "report_bug_url": f"{REPO_URL}/issues/new",
     "repo_url": REPO_URL,
     "pypi_url": PYPI_URL,
-    # Abel's mark uses the text color in the documentation footer.
+    # Abel's mark uses the text color in the footer.
     "abel_mark": site.abel_mark(),
 }
 # A post's author and date sit under its title (_post_byline); the blog index links the archive.
@@ -295,7 +298,11 @@ NAV_ICONS = {
     "docs/brand": "palette",
 }
 NAV_SHOWN = 5
-html_additional_pages = {"index": "homepage.html", "demo/index": "demo-redirect.html"}
+html_additional_pages = {
+    "index": "homepage.html",
+    "demo/index": "demo-redirect.html",
+    "docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html",
+}
 
 # ---- blog (ABlog) ----------------------------------------------------------------------------
 # A post is a page under blog/ whose front matter sets `blogpost: true`, with its `date`. ABlog
@@ -382,7 +389,6 @@ def _methods_text() -> dict[str, str]:
     return {
         "method_count": f"{len(list_specs())} methods",
         "n_supported": str(len(supported)),
-        "n_experimental": str(len(list_specs()) - len(supported)),
         "supported_methods": ", ".join(supported[:-1]) + f", and {supported[-1]}",
     }
 
@@ -712,9 +718,16 @@ def _dated_posts(app) -> list[tuple[str, str, str]]:  # noqa: ANN001
 
 
 def _release_post(app) -> tuple[str, str]:  # noqa: ANN001
-    """The post about the latest release, whose version the navbar's dot on Release cards names:
-    the newest dated blog post with a version, as its docname and version."""
+    """The post about the latest release, whose date opens the week of the navbar's dot on Release
+    cards: the newest dated blog post with a version, as its docname and version."""
     return _newest_post([post for post in _dated_posts(app) if post[2]])
+
+
+def _newest_card() -> str:
+    """The version of the newest release card under ``docs/benchmarks/``, which the navbar's dot on
+    Release cards names; a card can land before its release's post."""
+    cards = (HERE / "docs" / "benchmarks").glob("*.md")
+    return ".".join(map(str, max(tuple(map(int, card.stem.split("."))) for card in cards)))
 
 
 def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa: ANN001
@@ -724,8 +737,11 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     """
     # The navbar's dot on Release cards (_templates/site-nav.html) names the latest release and the
     # date of its post, which opens the dot's week.
-    release_doc, context["release_version"] = _release_post(app)
-    context["release_date"] = next(d for doc, d, _ in _dated_posts(app) if doc == release_doc)
+    context["release_version"] = _newest_card()
+    posts = _dated_posts(app)
+    release_doc = next((doc for doc, _, v in posts if v == context["release_version"]), None)
+    release_doc = release_doc or _release_post(app)[0]
+    context["release_date"] = next(d for doc, d, _ in posts if doc == release_doc)
     css, js = [], []
     if pagename == "index":
         context["home"] = app.andrey_home
@@ -747,6 +763,9 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
         css, js = ["benchmarks.css", "figures.css"], ["figures.js"]
     elif pagename == "docs/guides/graph-representation":
         js = ["graph-guides.js"]
+    # The 0.7.0 post's column-order figure (docs/blog/0.7.0/order.html).
+    if pagename == "blog/20261019-andrey-0-7-0":
+        js = [*js, "column-order.js"]
     # The "Why Andrey is fast" scenes, on top of the page's own files: Motion, then its script.
     if pagename in WHY_FAST_PAGES:
         css, js = [*css, "why-fast.css"], [*js, "motion.js", "why-fast.js"]
@@ -841,6 +860,92 @@ def _short_cells(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event
         text = entry.astext()
         if "\n" not in text and len(text) <= SHORT_CELL:
             entry["classes"].append("nowrap")
+
+
+# A comparison table on a post or a release card reads as the 0.7.0 post's tables do: Andrey's
+# columns tinted in the accent, and in each set of columns that measure one thing for different
+# packages (``Andrey (s)`` and ``causal-learn (s)``, ``Errors, Andrey`` and ``Errors, Tetrad``,
+# ``Andrey ahead`` and ``Tetrad ahead``) the best cell of a row in bold. The empty graph is a
+# reference, never the best, and an earlier Andrey release is a package like any other. Only
+# the presentation changes; every number and word stays as written.
+_PACKAGES = re.compile(
+    r"^(Andrey\b.*|causal-learn|gCastle|pgmpy|bnlearn|pcalg|Tetrad|lingam|tigramite|xges|cdt"
+    r"|[Ee]mpty(?:[- ]graph)?)$"
+)
+# The quantities where more is better; every other one counts errors, gaps, or time.
+_MORE = re.compile(r"F1|[Tt]rue direction|[Aa]ccuracy|AUC|[Pp]recision|[Rr]ecall|ahead")
+
+
+def _metric(header: str) -> tuple[str, str, bool] | None:
+    """A header's measured quantity, its package, and whether more is better, or None when the
+    column is not one package's measurement: ``Andrey (s)``, ``Errors, Tetrad``, ``Andrey
+    ahead``, ``causal-learn SHD``, or a bare package name, which a release card uses for time."""
+    for pattern in (
+        r"^(?P<who>.+?) \((?P<what>s)\)$",
+        r"^(?P<what>.+?), (?P<who>.+)$",
+        r"^(?P<who>.+?) (?P<what>ahead|SHD|speedup)$",
+        r"^(?P<who>.+?)(?P<what>)$",
+    ):
+        match = re.match(pattern, header)
+        if match and _PACKAGES.match(match["who"]):
+            what = match["what"]
+            return what, match["who"], bool(_MORE.search(what))
+    return None
+
+
+def _number(text: str) -> float | None:
+    """The first number in a cell, without its thousands commas, or None."""
+    match = re.search(r"-?\d[\d,]*(?:\.\d+)?", text)
+    return float(match[0].replace(",", "")) if match else None
+
+
+def _comparison_tables(app, doctree, docname) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Tint Andrey's columns and bold each row's best cell in a post's or a card's tables."""
+    if not (docname.startswith("blog/") or docname.startswith("docs/benchmarks/")):
+        return
+    version = str(app.env.metadata.get(docname, {}).get("version") or docname.rsplit("/", 1)[-1])
+
+    def ours(who: str) -> bool:
+        if not who.startswith("Andrey"):
+            return False
+        named = re.match(r"Andrey (\d+\.\d+\.\d+)", who)
+        return named is None or named[1] == version
+
+    for table in doctree.findall(nodes.table):
+        thead = next(table.findall(nodes.thead), None)
+        tbody = next(table.findall(nodes.tbody), None)
+        if thead is None or tbody is None:
+            continue
+        heads = [entry.astext().strip() for entry in next(thead.findall(nodes.row)).children]
+        metrics = [_metric(h) for h in heads]
+        tinted = {
+            k
+            for k, (h, m) in enumerate(zip(heads, metrics))
+            if (m and ours(m[1])) or (m is None and ours(h.split("'")[0]))
+        }
+        groups: dict[str, list[int]] = {}
+        for k, m in enumerate(metrics):
+            if m and not m[1].lower().startswith("empty") and m[0] != "speedup":
+                groups.setdefault(m[0], []).append(k)
+        groups = {key: cols for key, cols in groups.items() if len(cols) > 1}
+        if not tinted:
+            continue
+        table["classes"].append("ct-md")
+        for row in (*thead.findall(nodes.row), *tbody.findall(nodes.row)):
+            for k in tinted & set(range(len(row.children))):
+                row.children[k]["classes"].append("ct-ours")
+        for row in tbody.findall(nodes.row):
+            cells = row.children
+            for key, cols in groups.items():
+                more = metrics[cols[0]][2]
+                values = {k: _number(cells[k].astext()) for k in cols if k < len(cells)}
+                found = [v for v in values.values() if v is not None]
+                if len(found) < 2 or len(set(found)) == 1:
+                    continue
+                best = max(found) if more else min(found)
+                for k, v in values.items():
+                    if v == best:
+                        cells[k]["classes"].append("ct-best")
 
 
 # The API reference's summary tables (autosummary) list a name and its description with no header
@@ -1067,8 +1172,8 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
 
 
 # ---- the examples and demos galleries ------------------------------------------------------------
-# Each demo's page (docs/demos/), and, from the summary, the generated file that page shows at full
-# width and the gallery card's thumbnail.
+# Each demo's page (docs/demos/), the generated file that page shows at full width, and the gallery
+# card's thumbnail.
 INTERACTIVE = {
     "docs/demos/compare": (
         "compare.html",
@@ -1089,11 +1194,6 @@ INTERACTIVE = {
         "d-separation.html",
         lambda summary: build_assets.dsep_document(heading=False),
         lambda summary: build_assets.dsep_thumbnail(),
-    ),
-    "docs/demos/benchmark-explorer": (
-        "benchmarks.html",
-        lambda summary: build_assets.benchmarks_page(summary, links="../../docs/", heading=False),
-        build_assets.benchmarks_thumbnail,
     ),
 }
 THUMBS = GENERATED / "thumbs"
@@ -1197,6 +1297,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-resolved", _post_byline)
     app.connect("doctree-resolved", _summary_headers)
     app.connect("doctree-resolved", _short_cells)
+    app.connect("doctree-resolved", _comparison_tables)
     app.add_directive("blog-index", _BlogIndex)
     app.connect("doctree-resolved", _blog_index)
     # Before sphinx_autodoc_typehints, which returns a signature of its own.

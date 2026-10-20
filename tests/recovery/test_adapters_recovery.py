@@ -67,6 +67,8 @@ def test_gies_recovery():
 
 
 def test_hc_recovery():
+    # On this sample hill climbing stops at a local optimum, not the true CPDAG, from every column
+    # order; a positional tie rule reaches the truth from only some orders.
     out = andrey.hc(datagen.generate("gauss_5v"))
     assert_recorded_output(out, "HC", case="gauss_5v")
 

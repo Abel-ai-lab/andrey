@@ -11,7 +11,6 @@ from .api import (
     boss,
     bottom_up_parce_lingam,
     calm,
-    camuv,
     cdnod,
     direct_lingam,
     exact_search,
@@ -48,7 +47,7 @@ from .core.warning_policy import (
     SearchLimitWarning,
 )
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 __all__ = [
     "__version__",
@@ -101,6 +100,5 @@ __all__ = [
     "pnl",
     # Hidden common causes: a PAG over the observed variables.
     "rcd",
-    "camuv",
     "bottom_up_parce_lingam",
 ]

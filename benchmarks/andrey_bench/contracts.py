@@ -188,6 +188,8 @@ class RunRecord:
     tau_max: int | None = None
     # A panel dataset's number of time points; `n` is then its units per time point. 0 otherwise.
     times: int = 0
+    # Dataset coordinate with a default: the columns are in an order drawn from the seed.
+    shuffle: bool = True
     wall_s: float | None = None
     # The whole timed `fit` call, when the adapter reports its own search time as `wall_s`.
     process_s: float | None = None

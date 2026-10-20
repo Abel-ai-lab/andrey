@@ -17,6 +17,8 @@ from andrey.api._adapt import (
     categorical_metadata,
     checked_data,
     column_labels,
+    copies_named,
+    int_in_range,
     json_safe,
     structure_output,
 )
@@ -93,7 +95,10 @@ def boss(
         an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
-        suit the score, as for :func:`~andrey.ges`.
+        suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
+        another up to scale and shift given more than two rows or, with more rows than columns, is a
+        linear function of other columns. One message names every group of copies and says to keep
+        one column per group.
 
     Warns
     -----
@@ -119,12 +124,9 @@ def boss(
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
 
-    **Choosing lambda_value.** As for :func:`~andrey.ges`, a larger value gives a sparser graph, and
-    ``1.0`` is the standard BIC.
-
     **Choosing seed.** The search visits variables in a random order and stops when no move improves
-    the order. Different seeds can therefore reach different graphs. When the result matters,
-    compare a few seeds.
+    the order. Different seeds can therefore reach different graphs; comparing a few shows whether
+    a result depends on the seed.
 
     **How it works.** BOSS searches variable orders for the best DAG with the lowest total score
     [1]_. Each variable uses a grow-shrink tree to cache its best parent set for any set of
@@ -134,7 +136,14 @@ def boss(
 
     A move or parent change must improve the score by more than ``1e-6``, a fixed absolute tolerance
     shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties. The
-    earliest order position wins; among candidate parents, the lowest column index wins.
+    earliest order position wins; among candidate parents, the column with the lowest tie rank
+    wins.
+
+    **Column order.** Each column gets a tie rank computed from its own data, as for
+    :func:`~andrey.hc`, and the search runs on the columns sorted by it: it starts from that order,
+    and the seed shuffles the order in which it visits them. Reordering the columns therefore
+    reorders the graph's nodes and changes nothing else, unless two columns are identical. The rank
+    is arbitrary with respect to causal structure.
 
     **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
     data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
@@ -146,8 +155,11 @@ def boss(
     median errors (SHD) stayed below the empty graph's at every size, 24 against 800 at 800
     variables. The median fit took 0.031 s at 20 variables and 292 s at 800, on 16 cores. On the
     223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``, its median errors
-    passed the empty graph's (506 against 338). The mixed-data scores are experimental and not
-    benchmarked yet; their tests run BOSS on 5 variables with 3,000 rows.
+    passed the empty graph's (506 against 338). With fewer rows than columns the BIC score is
+    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
+    search never selects one, nor any parent set that leaves its child a residual variance of at
+    most ``1e-12`` times its variance. The mixed-data scores are experimental and not benchmarked
+    yet; their tests run BOSS on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -182,13 +194,14 @@ def boss(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
-    cpdag, score = _boss(
-        X,
-        lambda_value=lambda_value,
-        random_state=resolve_seed(seed),
-        score_func=score_func,
-        categorical=mask,
-    )
+    with copies_named(labels):
+        cpdag, score = _boss(
+            X,
+            lambda_value=lambda_value,
+            random_state=resolve_seed(seed),
+            score_func=score_func,
+            categorical=mask,
+        )
     metadata = {"algorithm": "BOSS", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
 
@@ -224,7 +237,10 @@ def grasp(
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
         be finite and non-negative.
     depth : int, default=3
-        Maximum number of tucks in one chain of moves. Only ``3`` is supported.
+        Maximum number of tucks in one chain of moves, at least ``1``. The depth-first search
+        follows a chain of tucks that leave the score unchanged until one improves it or the chain
+        reaches ``depth`` tucks. ``1`` tries single tucks only; larger depths search more chains,
+        which can reach a better score, and run longer.
     seed : int or None, default=None
         Seed for the random starting order and the order in which the search visits variables.
         ``None`` uses the ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so
@@ -254,13 +270,16 @@ def grasp(
     Raises
     ------
     NotImplementedError
-        If ``score_func`` names no available score, or ``depth`` is not ``3``.
+        If ``score_func`` names no available score.
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        If ``depth`` is not an int, ``categorical`` is not a list of column names and positions, or
+        ``max_categories`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
-        suit the score, as for :func:`~andrey.ges`.
+        If ``depth`` is less than ``1``, ``lambda_value`` is negative or non-finite, or if ``data``
+        or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
+        also if a column repeats another up to scale and shift given more than two rows or, with
+        more rows than columns, is a linear function of other columns. One message names every
+        group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -290,11 +309,9 @@ def grasp(
     the better score on a given dataset. On the published benchmarks, GRaSP took far longer than
     :func:`~andrey.boss` at 400 variables.
 
-    **Choosing lambda_value.** As for :func:`~andrey.ges`, a larger value gives a sparser graph, and
-    ``1.0`` is the standard BIC.
-
     **Choosing seed.** Both the starting order and the order of visiting variables are random, so
-    different seeds can reach different graphs. When the result matters, compare a few seeds.
+    different seeds can reach different graphs; comparing a few shows whether a result depends on
+    the seed.
 
     **How it works.** GRaSP searches variable orders for the best DAG with the lowest total score
     [1]_. Each variable uses a grow-shrink tree [2]_ to cache its best parent set for any set of
@@ -307,6 +324,13 @@ def grasp(
     Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
     :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged.
 
+    **Column order.** Each column gets a tie rank computed from its own data, as for
+    :func:`~andrey.hc`, and the search runs on the columns sorted by it: the seed shuffles the
+    sorted columns into the starting order and the order of visiting variables, and ties between
+    candidate parents go to the lowest rank. Reordering the columns therefore reorders the graph's
+    nodes and changes nothing else, unless two columns are identical. The rank is arbitrary with
+    respect to causal structure.
+
     **Mixed data.** ``"local_score_degen_gauss"`` [3]_ and ``"local_score_cond_gauss"`` [4]_ score
     data with continuous and categorical columns, as :func:`~andrey.ges` describes, and read the
     categorical columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full
@@ -317,9 +341,12 @@ def grasp(
     median errors (SHD) stayed below the empty graph's at every size, 0 against 400 at 400
     variables. The median fit took 0.037 s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16
     cores; larger graphs were not measured. On the 223-variable ANDES network with 1,000 simulated
-    rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338). The
-    mixed-data scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables
-    with 3,000 rows.
+    rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338).
+    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
+    more variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance. The mixed-data
+    scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables with
+    3,000 rows.
 
     References
     ----------
@@ -350,18 +377,19 @@ def grasp(
 
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(f"GRaSP supports {PERMUTATION_SCORES}, not {score_func!r}")
-    if depth != 3:
-        raise NotImplementedError(f"GRaSP supports depth=3, not {depth!r}")
+    depth = int_in_range(depth, "depth", 1)
     X, mask = checked_data(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
-    cpdag, score = _grasp(
-        X,
-        lambda_value=lambda_value,
-        random_state=resolve_seed(seed),
-        score_func=score_func,
-        categorical=mask,
-    )
+    with copies_named(labels):
+        cpdag, score = _grasp(
+            X,
+            lambda_value=lambda_value,
+            depth=depth,
+            random_state=resolve_seed(seed),
+            score_func=score_func,
+            categorical=mask,
+        )
     metadata = {"algorithm": "GRaSP", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)

@@ -8,7 +8,7 @@ when given, else ``ANDREY_DATA_DIR``, else ``$XDG_CACHE_HOME/andrey`` (``~/.cach
 ``sachs`` is measured data. ``asia``, ``alarm``, ``hepar2``, and ``andes`` are published
 Bayesian-network structures from the bnlearn repository; their data are simulated on the graph by
 a seeded linear-Gaussian model or, with ``discrete=True``, sampled from the networks' own
-conditional probability tables.
+conditional probability tables, and their columns come in an order drawn from the seed.
 
 >>> from andrey.data import list_datasets
 >>> list_datasets()
@@ -36,7 +36,7 @@ from andrey.core import GraphStructure, env
 from . import functional, noise
 from .discrete import _forward_sample
 from .graphs import FixedDAG
-from .scm import _NOISE, SCM, _component_rng
+from .scm import _NOISE, SCM, _column_order, _component_rng
 
 __all__ = ["RealDataset", "list_datasets", "load_dataset"]
 
@@ -440,6 +440,7 @@ def load_dataset(
     n: int | None = None,
     seed: int | None = None,
     discrete: bool = False,
+    shuffle: bool = True,
     as_frame: bool = True,
     data_home: str | os.PathLike[str] | None = None,
 ) -> RealDataset:
@@ -466,14 +467,21 @@ def load_dataset(
         Rows to simulate on a published network; ``None`` gives 1000. Measured data such as
         ``"sachs"`` take no ``n``.
     seed : int or None, default=None
-        Seed of the simulation's weights and noise; ``None`` gives 0. The same seed and ``n``
-        give the same rows. Measured data take no ``seed``.
+        Seed of the simulation's weights and noise, and of the column order; ``None`` gives 0.
+        The same seed and ``n`` give the same rows. Measured data take no ``seed``.
     discrete : bool, default=False
         Sample a published network from its own conditional probability tables instead of a
         linear-Gaussian model: each variable is drawn from its table's row for its parents'
         categories, in causal order. A DataFrame column holds the network's category names as a
         pandas ``category``, in the file's order; an array holds the codes ``0..r-1`` in that
         order. Measured data take no ``discrete``.
+    shuffle : bool, default=True
+        List a published network's variables in an order drawn from the seed, with
+        ``feature_names`` and the graph's labels in the same order. A network file lists its
+        variables in its authors' order, which often follows the causal order, and a method whose
+        result depends on the column order would gain or lose accuracy from it. The rows are the
+        same as with ``shuffle=False``, which keeps the file's order, for example to show the
+        network as published. Measured data keep the file's column order.
     as_frame : bool, default=True
         Return the observations as a pandas DataFrame named by variable, so a method run on them
         names its nodes. ``False`` returns a float64 NumPy array in the same column order.
@@ -547,30 +555,40 @@ def load_dataset(
     description = remote.description
     values = contents.values
     states = None
-    if values is None and discrete:
+    if values is None:
         n, seed = SIMULATED_ROWS if n is None else n, 0 if seed is None else seed
-        tables = read_bif_tables(gzip.decompress(raw).decode("utf-8"))
-        values = tables.sample(n, _component_rng(np.random.SeedSequence(seed), _NOISE))
-        values = values.astype(np.float64)
-        states = tables.states
-        description = description.replace(
-            "{simulation}",
-            "The rows are sampled from the network's own conditional probability tables "
-            f"(n={n}, seed={seed}).",
+        # ``columns[j]`` is the file's index of the variable in column ``j``: the SCM's draw from
+        # the seed's column stream, the same permutation for both kinds of rows.
+        root = np.random.SeedSequence(seed)
+        if discrete:
+            columns = _column_order(root, len(contents.nodes), shuffle).tolist()
+            tables = read_bif_tables(gzip.decompress(raw).decode("utf-8"))
+            values = tables.sample(n, _component_rng(root, _NOISE))[:, columns]
+            states = tuple(tables.states[j] for j in columns)
+            simulation = (
+                "The rows are sampled from the network's own conditional probability tables "
+                f"(n={n}, seed={seed})."
+            )
+        else:
+            scm = SCM(
+                graph=FixedDAG(nodes=contents.nodes, arcs=contents.arcs),
+                functional=functional.linear(),
+                noise=noise.gaussian(),
+            )
+            sample = scm.sample(n=n, seed=seed, scale="standardize", shuffle=shuffle)
+            values, columns = sample.data, sample.provenance["column_order"]
+            simulation = (
+                "The network's own probability tables are not used: the rows come from a "
+                f"linear-Gaussian structural causal model on the graph (n={n}, seed={seed})."
+            )
+        order = (
+            "The columns are listed in an order drawn from the seed, not the file's order."
+            if shuffle
+            else "The columns keep the file's variable order."
         )
-    elif values is None:
-        n, seed = SIMULATED_ROWS if n is None else n, 0 if seed is None else seed
-        scm = SCM(
-            graph=FixedDAG(nodes=contents.nodes, arcs=contents.arcs),
-            functional=functional.linear(),
-            noise=noise.gaussian(),
-        )
-        values = scm.sample(n=n, seed=seed, scale="standardize").data
-        description = description.replace(
-            "{simulation}",
-            "The network's own probability tables are not used: the rows come from a "
-            f"linear-Gaussian structural causal model on the graph (n={n}, seed={seed}).",
-        )
+        description = description.replace("{simulation}", f"{simulation} {order}")
+        nodes = tuple(contents.nodes[j] for j in columns)
+        contents = Contents(nodes, contents.arcs, None)
     data: Any = values
     if as_frame:
         import pandas as pd

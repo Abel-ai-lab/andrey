@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 Family = Literal["constraint", "score", "permutation", "lingam", "temporal", "latent", "pairwise"]
 Determinism = Literal["deterministic", "stochastic"]
-Accel = Literal["numpy", "numba", "torch"]
+Accel = Literal["numpy", "torch"]
 # supported: benchmarked and gated before each release. experimental: warns once; API may change.
 Status = Literal["supported", "experimental"]
 
@@ -39,7 +39,7 @@ class Spec(BaseModel):
 class InputSpec(Spec):
     """One array input to a method (matches the facade parameter name)."""
 
-    name: str  # facade parameter name: "data", "c_indx", "x", "y", "data_groups", "data_list"
+    name: str
     kind: InputKind
     doc: str
     required: bool = True

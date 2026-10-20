@@ -97,6 +97,7 @@ ALGORITHMS = {
     "ExactSearch": (_facade("exact_search"), "gauss_5v"),
     "BOSS": (_facade("boss", lambda_value=2.0), "gauss_5v"),
     "GRaSP": (_facade("grasp", lambda_value=2.0), "gauss_5v"),
+    "CALM": (_facade("calm"), "gauss_tree_5v"),
     "VARLiNGAM": (_run_varlingam, "var_4v_stable"),
     "VARMALiNGAM": (_run_varmalingam, "varma_3v"),
     "VARMALiNGAMPruned": (_run_varmalingam_pruned, "varma_3v"),
@@ -105,6 +106,7 @@ ALGORITHMS = {
     "BottomUpParceLiNGAM": (_facade("bottom_up_parce_lingam", alpha=0.01), "confounded_fork_4v"),
     "ANM": (_facade("anm"), "anm_pair_cubic"),
     "PNL": (_facade("pnl"), "anm_pair_cubic"),
+    "GIN": (_facade("gin"), "measurement_6v"),
     "PCMCI": (_facade("pcmci", tau_max=2), "var_3v_lag2"),
     "PCMCIplus": (_facade("pcmciplus", tau_max=2), "var_4v_stable"),
     "LPCMCI": (_facade("lpcmci", tau_max=2), "var_6v_hidden"),
@@ -148,6 +150,7 @@ def capture(args: argparse.Namespace) -> None:
             input_block = {
                 "case": case,
                 "seeds": seeds,
+                "column_order": datagen.column_order(case).tolist(),
                 "shapes": [list(X.shape) for X in groups],
                 "sha256": datagen.input_sha256(case),
             }
@@ -158,6 +161,7 @@ def capture(args: argparse.Namespace) -> None:
             input_block = {
                 "case": case,
                 "seed": datagen.CASES[case]["seed"],
+                "column_order": datagen.column_order(case).tolist(),
                 "shape": list(X.shape),
                 "sha256": datagen.input_sha256(case),
             }

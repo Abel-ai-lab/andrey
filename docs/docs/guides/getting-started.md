@@ -22,14 +22,19 @@ With [uv](https://docs.astral.sh/uv/), add it to your project (`uv init` creates
 
 ```shell
 uv add andrey-core            # base (pure NumPy)
-uv add "andrey-core[numba]"   # CPU JIT for GES, up to 64 variables
 uv add "andrey-core[torch]"   # torch backend: GPU primitives
 uv add "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
 uv add "andrey-core[all]"     # every extra
 ```
 
-With pip, use the same names: `pip install andrey-core`, `pip install "andrey-core[numba]"`, and so
-on.
+With pip:
+
+```shell
+pip install andrey-core            # base (pure NumPy)
+pip install "andrey-core[torch]"   # torch backend: GPU primitives
+pip install "andrey-core[viz]"     # Graphviz layouts and matplotlib styling
+pip install "andrey-core[all]"     # every extra
+```
 
 ### PyTorch for a GPU
 
@@ -262,9 +267,10 @@ methods, and draw the learned graph beside the known one.
 
 Pass a pandas DataFrame, whose column names become the node names, or a NumPy array with one row
 per sample and one column per variable. Most methods take that one argument and return the same
-kind of result; `cdnod` also takes a domain index, and `multi_group_direct_lingam` and
-`longitudinal_lingam` take a list of datasets. `andrey list` names the methods, and
-{doc}`graph-types` explains which graph each one returns.
+kind of result; `cdnod` also takes a domain index, `gies` also takes which variables were
+intervened on in each row, and `multi_group_direct_lingam` and `longitudinal_lingam` take a list of
+datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph each one
+returns.
 
 ## Data types
 
@@ -325,9 +331,9 @@ JSON result lists the categorical columns under `metadata.categorical` and the w
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
 `ANDREY_BACKEND` and `ANDREY_NUM_WORKERS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
-worker, GES, GIES, and GFCI scan each pass in worker processes, and GES returns the same graph as it
-does serially. `granger` fits its variables on worker threads, with the same coefficients, and
-needs none of the guard below.
+worker, GES and GFCI scan each pass in worker processes, and GES returns the same graph as it does
+serially. `granger` fits its variables on worker threads, with the same coefficients, and needs
+none of the guard below.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
 more than one worker (`ANDREY_NUM_WORKERS` above 1, or `-1` for every core) must put its entry
@@ -352,11 +358,10 @@ the fit stops with `RuntimeError: parallel-search workers failed to start`.
 
 ## Known limits
 
-FCI and GFCI depend on column order, and GES was more accurate with a stronger penalty on the large
-sparse benchmark graphs. PC is practical to roughly 1,000 variables; FCI's errors passed the empty
-graph's at 800 ([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API
-page states the data and sizes it was measured on. See
-[Known limits](../benchmarks/0.1.0.md#known-limits).
+GES was more accurate with a stronger penalty on the large sparse benchmark graphs. PC is practical
+to roughly 1,000 variables; FCI's errors passed the empty graph's at 800
+([Large graphs](../benchmarks/0.1.0.md#large-graphs)). Each supported method's API page states the
+data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#known-limits).
 
 ## References
 

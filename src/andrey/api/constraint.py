@@ -18,11 +18,11 @@ from andrey.api._adapt import (
     check_categories,
     checked_data,
     column_labels,
+    copies_named,
     data_kind,
     open_unit_interval,
     structure_output,
 )
-from andrey.api._experimental import warn_experimental
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -37,6 +37,7 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    collider_order: str = "p_value",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
 ) -> StructureOutput:
@@ -62,6 +63,12 @@ def pc(
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
         mixed data, continuous and categorical columns, by a likelihood ratio. See Notes.
+    collider_order : {"p_value", "column"}, default="p_value"
+        The order in which colliders are oriented, which decides between two colliders that would
+        orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
+        endpoints were separated with the largest p-value, so the colliders do not depend on the
+        column order. ``"column"`` orients them in column order and keeps the first of two that
+        conflict. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -94,7 +101,9 @@ def pc(
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test.
+        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. When
+        copies of a column, up to scale and shift, make that matrix singular, the message names
+        every group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -117,7 +126,7 @@ def pc(
     assumes continuous data, where each variable depends linearly on its causes with roughly
     Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, and for mixed data
     ``"degen_gauss"`` or ``"cond_gauss"``. It is fastest on sparse graphs, where every variable has
-    few neighbors [5]_. An undirected edge (``--``) is one the data cannot orient.
+    few neighbors [5]_.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -125,19 +134,37 @@ def pc(
     **Choosing alpha.** A test removes an edge when it cannot reject independence at ``alpha``. A
     larger ``alpha`` therefore keeps more edges, true and false. On the Sachs data in the
     getting-started guide, raising ``alpha`` from 0.05 to 0.2 found more known links, but a smaller
-    share of the links found were known. No value is right in general. Choose it by weighing the
-    cost of a missed edge against a false one, and report how the graph changes with it.
+    share of the links found were known. No value is right in general: it trades missed edges
+    against false ones, so a result is best reported with how the graph changes with ``alpha``.
 
     **How it works.** Edge removal is order-independent (PC-stable) [3]_. At each conditioning-set
     size, every test uses the adjacencies from the start of that size. Edges found independent are
     removed together. A removed pair's separating set combines all conditioning sets that separated
-    it. If two colliders conflict, the one found first in column order is kept.
+    it. Two colliders conflict when they would orient one edge in opposite directions, so the order
+    in which they are oriented can change the result [3]_. A collider is skipped when it would give
+    an edge an arrowhead at both ends, so of two conflicting colliders the one oriented first is
+    kept. With the default ``collider_order="p_value"``, each collider ``x -> y <- z`` ranks by the
+    largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders are
+    oriented from the highest rank to the lowest. When two conflicting colliders rank exactly
+    equal, the edge they dispute stays undirected, and Meek's rules do not orient it. The colliders
+    therefore do not depend on the column order. This adapts the conflict rule of Ramsey [10]_,
+    which ranks a collider by separating sets that additional tests choose; Andrey ranks it by the
+    tests that removed the edge, so orienting runs no new test. With ``collider_order="column"``,
+    colliders are oriented by middle node, then by endpoint pair, in column order, so the result
+    can depend on the column order. After the colliders, Meek's rules run in rounds: each round
+    collects every orientation they imply on the graph as it stands and applies them together,
+    except that an edge two of them would direct both ways stays undirected, and so do
+    orientations that would together close a directed cycle. The rounds repeat until one orients
+    nothing, so Meek's rules do not depend on the column order. Such conflicts arise only when no
+    DAG on the skeleton has exactly the colliders found, as test errors can cause; otherwise the
+    rounds give the CPDAG that firing the rules one at a time gives.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 400 variables with ten rows per variable: its median errors (SHD) stayed
-    below the empty graph's at every size, 357 against 400 at 400 variables. The median fit took
-    0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network with
-    1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
+    **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
+    default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
+    (mean degree 2), from 20 to 400 variables with ten rows per variable, its median errors (SHD)
+    stayed below the empty graph's at every size, 357 against 400 at 400 variables. The median fit
+    took 0.0076 s at 20 variables and 0.82 s at 400, on 16 cores. On the 223-variable ANDES network
+    with 1,000 simulated rows, its median errors passed the empty graph's (372 against 338). It is
     practical to roughly 1,000 variables on sparse data with ten rows per variable; runtime grows
     combinatorially with the largest neighborhood, so sparser graphs can stay feasible beyond that.
     On simulated mixed data (conditional linear Gaussian networks on sparse random graphs, the
@@ -194,6 +221,8 @@ def pc(
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
     .. [9] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
        Statistical Association 84(405), 165-175.
+    .. [10] Ramsey, J. (2016). Improving accuracy and scalability of the PC algorithm by maximizing
+       P-value. arXiv:1610.00378, Section 5.
 
     Examples
     --------
@@ -232,7 +261,10 @@ def pc(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    cpdag = _pc(X, alpha=alpha, indep_test=indep_test, categorical=mask)
+    with copies_named(labels):
+        cpdag = _pc(
+            X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+        )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
     )
@@ -246,6 +278,7 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    possible_dsep: str = "order_free",
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -286,6 +319,13 @@ def fci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    possible_dsep : {"order_free", "fast"}, default="order_free"
+        The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
+        kept, one at a time, so each removal changes what the step tests after it.
+        ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
+        so the result does not depend on the column order unless two columns are identical.
+        ``"fast"`` visits them in column order. Both took about the same time on the benchmark
+        graphs; see Notes and Limitations.
 
     Returns
     -------
@@ -304,9 +344,11 @@ def fci(
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int.
     ValueError
-        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha``
-        is not in ``(0, 1)``, if ``collider_rule`` is not a supported choice, or if ``data`` or
-        ``categorical`` does not suit the test, as for :func:`~andrey.pc`.
+        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
+        not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice, or
+        if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. When
+        copies of a column, up to scale and shift, make that matrix singular, the message names
+        every group of copies and says to keep one column per group.
 
     Warns
     -----
@@ -331,12 +373,7 @@ def fci(
     **When not to.** When every common cause is measured, :func:`~andrey.pc` orients more of the
     graph with fewer tests. FCI's possible-d-separation step runs tests PC does not.
 
-    **Choosing alpha.** As for :func:`~andrey.pc`, a larger ``alpha`` keeps more edges, true and
-    false.
-
-    **Choosing collider_rule.** ``"sepsets"`` uses the separating set recorded when the edge was
-    removed. ``"majority"`` tests the pair again given every subset of either endpoint's neighbors
-    and follows the majority [4]_, at the cost of the extra tests described under the parameter.
+    **Choosing alpha.** A larger ``alpha`` keeps more edges, true and false.
 
     **How it works.** FCI runs in three steps. First, it removes edges by conditional-independence
     tests, as PC does, and orients colliders from the separating sets. Next, it tests each remaining
@@ -345,11 +382,40 @@ def fci(
     applies Zhang's orientation rules R1-R10 [3]_ until no mark changes. An endpoint no rule
     resolves stays a circle.
 
-    The result can depend on the column order, for example, through the possible-d-separation step.
-    Keep a fixed column order for reproducible results.
+    The rules run in rounds: each round collects the marks every rule implies on the graph as it
+    stands and sets them together, except that an endpoint two of them would mark one as an
+    arrowhead and one as a tail stays a circle. The rounds repeat until no mark changes. Rule R4
+    decides an endpoint by every shortest discriminating path, so paths whose tests disagree leave
+    it a circle. The orientation rules therefore do not depend on the column order, and with
+    ``possible_dsep="order_free"`` neither does the result, unless two columns are identical. With
+    ``"fast"`` the result can depend on the column order through the possible-d-separation step.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
+    It considers every circle path, up to a fixed search bound, so a covered route through a node
+    never hides an uncovered route through the same node. Rule R8 checks each pair of endpoints in
+    both orders, so whether it fires does not depend on the node labels.
+
+    **Possible-d-separation set.** FCI builds each possible-d-separation set [2]_ [3]_ with a search
+    that walks out from one endpoint of the pair and keeps a node when a node it was reached from
+    has a possibly directed path, one with no arrowhead pointing back along it, to the endpoint or
+    to the node. FCI checks a node when the search reaches it, against the nodes it was reached
+    from so far, so the set depends on the order the search visits nodes. The set can be smaller
+    than the published definition of the set [2]_, so FCI can keep an edge that the published set
+    would remove, even with exact tests. FCI keeps this search because the published set grows
+    quickly with the graph, the search's set is the one FCI has been measured with, and on
+    simulated data the published set did not give more accurate PAGs. FCI tests every subset of the
+    set, except the empty set and the subsets of either endpoint's neighbors, which the first step
+    already tested. It visits the pairs one at a time, removes a pair as soon as a subset separates
+    it, and records that subset, so each removal changes the sets of the pairs after it. With
+    ``possible_dsep="order_free"``, the pairs, the nodes of each search, and the subsets follow a
+    tie rank computed from each column's own data, as for :func:`~andrey.hc`, which moves with its
+    column when the columns are reordered; with ``"fast"``, they follow the column order.
+
+    **Separating sets.** When several conditioning sets of the same size make a pair independent
+    in the first step, FCI records their union as the pair's separating set. FCI keeps the union
+    because it does not depend on the order of the tests, and on simulated data it gave more
+    accurate PAGs than the first set found.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
     degree 2) with one variable in ten hidden, from 20 to 800 variables counting the hidden ones,
@@ -357,7 +423,13 @@ def fci(
     circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at
     800 (2,579 against 1,772). The median fit took 0.061 s at 20 variables and 72 s at 800, on 16
     cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
-    passed the empty graph's (696 against 676). With the mixed-data tests, it is experimental and
+    passed the empty graph's (696 against 676). Rule R5 stops searching a pair after a fixed number
+    of partial paths and leaves its circles, so on graphs with many circle-circle edges it can miss
+    an undirected cycle. On these graphs, the default ``possible_dsep="order_free"`` took as long as
+    ``"fast"`` (median time ratio 0.99 to 1.05 at each size). At 400 variables with one variable in
+    five hidden and 50 rows per variable, its rank order needed more tests than the column orders
+    tried on some graphs: on one graph of mean degree 4, 33 to 34 s against 23 to 29 s for
+    ``"fast"`` over the same five column orders. With the mixed-data tests, it is experimental and
     not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
@@ -389,7 +461,15 @@ def fci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pag = _fci(X, alpha=alpha, indep_test=indep_test, collider_rule=collider_rule, categorical=mask)
+    with copies_named(labels):
+        pag = _fci(
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=possible_dsep,
+        )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
     )
@@ -405,12 +485,14 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    possible_dsep: str = "order_free",
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
-    GFCI [1]_ builds a skeleton with score-based GES, then applies FCI orientation to account for
-    possible latent confounding. Its scored skeleton is usually more accurate than FCI's test-only
-    one.
+    GFCI [1]_ starts from the adjacencies of a score-based GES search, removes those that
+    conditional-independence tests reject, and orients the endpoints with FCI's rules to account
+    for possible latent confounding. Its scored skeleton is usually more accurate than FCI's
+    test-only one.
 
     Parameters
     ----------
@@ -436,12 +518,14 @@ def gfci(
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
-        How GFCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
-        are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the recorded
-        separating set of ``x`` and ``y``. ``"majority"`` tests ``x`` and ``y`` given every subset
-        of ``x``'s neighbors and every subset of ``y``'s neighbors, and makes it a collider when
-        fewer than half of the separating subsets (``p >= alpha``) contain ``z`` [3]_; at exactly
-        half the triple stays unoriented. Majority runs up to ``2**degree`` extra tests per triple.
+        How GFCI decides whether ``z`` is a collider on a triple ``x - z - y`` where the tests
+        removed the GES edge between ``x`` and ``y``; on the other triples whose ends are not
+        adjacent, the GES CPDAG decides (see Notes). ``"sepsets"`` makes it a collider when ``z``
+        is not in the recorded separating set of ``x`` and ``y``. ``"majority"`` tests ``x`` and
+        ``y`` given every subset of ``x``'s neighbors and every subset of ``y``'s neighbors, and
+        makes it a collider when fewer than half of the separating subsets (``p >= alpha``)
+        contain ``z`` [3]_; at exactly half the triple stays unoriented. Majority runs
+        ``2**degree(x) + 2**degree(y)`` tests per triple.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and
@@ -452,6 +536,13 @@ def gfci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    possible_dsep : {"order_free", "fast"}, default="order_free"
+        The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
+        search kept, one at a time, so each removal changes what the step tests after it.
+        ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
+        so the result does not depend on the column order unless two columns are identical.
+        ``"fast"`` visits them in column order. Both took about the same time on the benchmark
+        graphs; see Notes and Limitations.
 
     Returns
     -------
@@ -471,15 +562,15 @@ def gfci(
         an int.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
-        ``collider_rule`` is not a supported choice, if ``score_func`` and ``indep_test`` read
-        different data (continuous, categorical, or mixed), or if ``data`` or ``categorical`` does
-        not suit them, as for :func:`~andrey.pc`.
+        ``collider_rule`` or ``possible_dsep`` is not a supported choice, if ``score_func`` and
+        ``indep_test`` read different data (continuous, categorical, or mixed), or if ``data`` or
+        ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
+        column repeats another up to scale and shift given more than two rows or, with more rows
+        than columns, is a linear function of other columns. One message names every group of copies
+        and says to keep one column per group.
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When the mixed-data score and test infers the categorical columns, or finds none and so runs
         as the linear-Gaussian form, or when a continuous setting meets columns that look like
@@ -487,20 +578,43 @@ def gfci(
 
     Notes
     -----
-    GFCI keeps the adjacencies of the GES CPDAG and tests each non-adjacent pair given subsets of
-    the two endpoints' neighbors to find its separating set. FCI's possible-d-separation step can
-    remove more edges but never adds one, so the PAG's adjacencies are a subset of the GES CPDAG's.
-    Zhang's rules R1-R10 [2]_ then orient the endpoints; an endpoint no rule resolves stays a
-    circle.
+    GFCI first runs :func:`~andrey.ges` and keeps its CPDAG. FCI's adjacency search then starts
+    from the CPDAG's adjacencies instead of a complete graph: it removes an edge ``x - y`` at the
+    smallest size at which a subset of ``x``'s or ``y``'s neighbors makes the two independent, and
+    records the union of those subsets as their separating set. On a triple ``x - z - y`` whose
+    ends are not adjacent, ``z`` is a collider when the CPDAG has ``x -> z <- y``; when the CPDAG
+    had the edge ``x - y``, the separating set decides, as ``collider_rule`` describes. FCI's
+    possible-d-separation step can remove more edges, after which the colliders are decided again.
+    No step adds an edge, so the PAG's adjacencies are a subset of the GES CPDAG's. Zhang's rules
+    R1-R10 [2]_ then orient the endpoints, in rounds as in :func:`~andrey.fci`; an endpoint no rule
+    resolves stays a circle. A rule that needs the separating set of a pair GES left non-adjacent
+    uses the union of the smallest subsets of the two endpoints' CPDAG neighbors that make the pair
+    independent, which does not depend on the column order.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
+    It considers every circle path, up to a fixed search bound, and rule R8 checks each pair of
+    endpoints in both orders. GFCI shares FCI's possible-d-separation step [2]_ [4]_, in the order
+    ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
+    both and the reasons for keeping them.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 12 variables with 600 rows,
-    and on 1,200 rows with 7 variables. It runs a full :func:`~andrey.ges` search before any test,
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2) with one variable in ten hidden, from 20 to 200 variables counting the hidden ones (18
+    to 180 observed), with ten rows per variable. Its median endpoint errors, each mismatched tail,
+    arrowhead, or circle, stayed below the empty graph's at every size (197 against 444 at 180
+    observed variables). The median fit took 0.58 s at 90 observed variables and 2.9 s at 180, on 4
+    cores. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
-    linear relations with Gaussian noise. With the mixed-data score and test, its tests run it on
-    5 variables with 3,000 rows.
+    linear relations with Gaussian noise. With fewer rows than columns the BIC score is
+    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
+    GES search never selects one, nor any parent set that leaves its child a residual variance of at
+    most ``1e-12`` times its variance. Rule R5 has the search bound described under
+    :func:`~andrey.fci`. On these graphs, the default ``possible_dsep="order_free"`` took as long
+    as ``"fast"`` (median time ratio 1.00 to 1.02 at each size). At 400 variables with one variable
+    in five hidden and 50 rows per variable, its rank order needed more tests than the column
+    orders tried on some graphs: on one graph of mean degree 2, 406 to 417 s against 120 to 336 s
+    for ``"fast"`` over the same five column orders. With the mixed-data score and test, it is
+    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
@@ -511,6 +625,8 @@ def gfci(
        1873-1896.
     .. [3] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
        structure learning. JMLR 15, 3921-3962.
+    .. [4] Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search,
+       2nd ed. MIT Press.
 
     Examples
     --------
@@ -522,7 +638,6 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
-    warn_experimental("gfci")
     from andrey.search.gfci import gfci as _gfci
 
     # Both phases read the same data, so the score and the test must agree on its type.
@@ -539,15 +654,17 @@ def gfci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    pag = _gfci(
-        X,
-        score_func=score_func,
-        lambda_value=lambda_value,
-        alpha=alpha,
-        indep_test=indep_test,
-        collider_rule=collider_rule,
-        categorical=mask,
-    )
+    with copies_named(labels):
+        pag = _gfci(
+            X,
+            score_func=score_func,
+            lambda_value=lambda_value,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_rule=collider_rule,
+            categorical=mask,
+            possible_dsep=possible_dsep,
+        )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
     )
@@ -555,17 +672,19 @@ def gfci(
 
 def cdnod(
     data: npt.ArrayLike,
-    c_indx: npt.ArrayLike,
+    domain_index: npt.ArrayLike,
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
+    collider_order: str = "p_value",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    dependence_threshold: float | None = None,
 ) -> StructureOutput:
-    """Learn a CPDAG over the data variables from nonstationary / multi-domain data with CDNOD.
+    """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
     CDNOD [1]_ adds a domain/context index as an extra causal parent, so distribution shifts
-    across regimes are modeled, then runs PC-style discovery. Use it when samples are pooled across
+    across regimes are modeled, then runs PC-style discovery. It applies to samples pooled across
     domains, regimes, or time blocks. The index is appended as a trailing pseudo-node and removed
     from the result.
 
@@ -574,7 +693,7 @@ def cdnod(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    c_indx : array-like of shape (n_samples,) or (n_samples, 1)
+    domain_index : array-like of shape (n_samples,) or (n_samples, 1)
         Domain or context index of each row of ``data``, such as ``0`` and ``1`` for two domains, or
         the time step for data that drift over time. Coerced to ``float64``; whole numbers with
         ``"chisq"``, ``"gsq"``, ``"degen_gauss"``, or ``"cond_gauss"``. See Notes for more than two
@@ -588,6 +707,11 @@ def cdnod(
         (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
         coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data, as for
         :func:`~andrey.pc`; see Notes for the index.
+    collider_order : {"p_value", "column"}, default="p_value"
+        The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
+        largest p-value that separated each collider's endpoints, so the colliders do not depend on
+        the column order, and ``"column"`` in column order. Under either order, the edges out of
+        the index are directed first, and no collider puts an arrowhead at the index.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -599,15 +723,25 @@ def cdnod(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    dependence_threshold : float or None, default=None
+        Runs the independent-change step at this threshold, in ``(0, 1)``, on its module
+        dependence measure: two modules, the distributions of a candidate cause and of its effect
+        given it, whose measure is at most the threshold count as changing independently. ``None``
+        skips the step. See Notes.
 
     Returns
     -------
     StructureOutput
-        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
+        Wraps a :class:`~andrey.core.GraphStructure` over the ``d`` data variables;
         ``metadata["algorithm"]`` is ``"CDNOD"``. Directed marks (``->``) are oriented edges,
-        undirected (``--``) the ones the equivalence class leaves open. Under a mixed-data setting,
-        ``metadata["categorical"]`` lists the categorical columns it read, by name or 0-based
-        position.
+        undirected (``--``) the ones left open. The graph is partially directed, not the CPDAG of
+        an observational equivalence class: the index orients edges that the true DAG's CPDAG
+        leaves undirected, and the graph stands for the DAGs that agree on every direction CD-NOD
+        can identify [1]_. Andrey has no kind for such a graph, so it is tagged ``cpdag``, and
+        :mod:`andrey.metrics` scores a ``cpdag`` against the truth's CPDAG; score the result
+        against the graph CD-NOD can identify instead.
+        Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
+        read, by name or 0-based position.
 
     Raises
     ------
@@ -617,16 +751,15 @@ def cdnod(
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int.
     ValueError
-        If ``c_indx`` does not hold one value per row of ``data`` or holds ``NaN`` / ``inf``, if
-        ``data`` has too few rows for a test, if ``alpha`` is not in ``(0, 1)``, if ``data`` or
-        ``categorical`` does not suit the test, as for :func:`~andrey.pc`, or, with a categorical
-        or mixed-data test, if ``c_indx`` holds a value that is not a whole number.
+        If ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` /
+        ``inf``, if ``data`` has too few rows for a test, if ``alpha`` or ``dependence_threshold``
+        is not in ``(0, 1)``, if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index`` holds a
+        value that is not a whole number. Also if ``collider_order`` is not ``"p_value"`` or
+        ``"column"``.
 
     Warns
     -----
-    ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
     DataTypeWarning
         When a mixed-data test infers the categorical columns, or finds none and so runs as the
         linear-Gaussian form, or when a continuous setting meets columns that look like category
@@ -639,37 +772,78 @@ def cdnod(
     orient edges that PC leaves undirected on the same data.
 
     ``"fisherz"`` and ``"student_t"`` test the index as a number, by linear correlation, so they
-    find a shift only when the shift follows the index's values. With two domains the coding does
-    not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
-    undetected, and recoding the domains can change the result. ``"chisq"``, ``"gsq"``,
-    ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they find a
-    shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the index
-    is categorical, so every data column may be continuous.
+    find a change in a variable's mean that follows the index's values. With two domains the coding
+    does not matter. With three domains coded ``0, 1, 2``, a shift in domain ``1`` alone can go
+    undetected, and recoding the domains can change the result. A change in a variable's noise
+    variance alone, or in the size of an effect whose cause has mean zero, leaves the mean
+    unchanged, so the index keeps no edge to that variable. The paper uses a kernel
+    conditional-independence test [1]_ [2]_ that detects such changes; Andrey has none. ``"chisq"``,
+    ``"gsq"``, ``"degen_gauss"``, and ``"cond_gauss"`` take each index value as a category, so they
+    find a shift in any domain, whatever the coding. With ``"degen_gauss"`` or ``"cond_gauss"``, the
+    index is categorical, so every data column may be continuous.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on at most 10 variables with 500 rows,
-    and on 1,200 rows with 7 variables. It runs the PC search with the index as one more variable,
-    so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
-    partial-correlation tests assume linear relations with Gaussian noise. With a mixed-data test,
-    its tests run it on 5 variables with 3,000 rows.
+    With ``dependence_threshold`` set, the independent-change step [1]_ orients undirected edges
+    between two variables that both keep an edge to the index. For a candidate direction
+    ``x -> y``, it measures how strongly the change of ``P(x, Z)`` across the index values and the
+    change of ``P(y | x, Z)`` depend on each other, where ``Z`` is a set of neighbors that blocks
+    their common causes. The measure is the normalized HSIC of the two modules' kernel embeddings
+    at each row's index value, with the Gaussian kernel widths of [2]_. ``x -> y`` is oriented when
+    that measure is at most the threshold and the measure for ``y -> x`` is above it; when both are
+    above it, the edge stays undirected. An orientation that would close a directed cycle is
+    skipped, so that edge stays undirected unless Meek's rules orient it. Meek's rules run before
+    and after the step. The measure compares the index values as separate domains, so the step needs
+    many domains, each with many rows: with two domains, the two changes always depend on each
+    other, and nothing is oriented; a per-row index, such as a time step, makes every row its own
+    domain, and the step cannot measure a change. The paper leaves the threshold open. For two
+    modules that change independently, the measure sits near ``1 / (K - 1)`` over ``K`` domains, so
+    the threshold has to rise as the number of domains falls; the 0.06 below is the value the
+    measurements used, not a default. The step is off by default, because with ``"fisherz"`` or
+    ``"student_t"`` only a variable whose mean follows the index reaches it, and such a shared trend
+    makes the changes depend on each other.
+
+    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
+    degree 2), with 2,000 rows pooled from four domains of equal size, in which one variable in
+    three shifts its mean with the domain, from 10 to 50 variables with 20 datasets per size. Its
+    median errors (SHD against the CPDAG the domain index makes identifiable) stayed below the empty
+    graph's at every size (12 against 50 at 50 variables). The median fit took 0.18 s at 50
+    variables, on 4 cores. The independent-change step is not benchmarked yet; its tests run it on
+    at most 3 variables with 600 rows from 20 domains. It runs the PC search with the index as one
+    more variable, so it costs about as much as :func:`~andrey.pc` on the data plus one column. Its
+    partial-correlation tests assume linear relations with Gaussian noise and find only a change in
+    a variable's mean that is linear in the index: on two variables from two domains with 600 rows,
+    a mean shift of the cause oriented the edge on 20 of 20 seeds, and a change of its variance
+    alone, or of the weight of the effect on a mean-zero cause alone, on none. Without the
+    independent-change step, an edge between two variables that both change with the index stays
+    undirected unless the collider or Meek's rules orient it. With ``"fisherz"`` or
+    ``"student_t"``, the step reaches only variables whose means follow the index. On two variables
+    from 20 domains with 600 rows, both means rising linearly by about 1 across the domains, the
+    cause's noise scale drawn per domain, and the effect's weight on it drawn per domain from
+    (0.5, 2.5), at the threshold 0.06 it oriented the edge on 1 of 20 seeds. Given the true skeleton
+    of ten complete three-variable DAGs from 20 domains with 600 rows, no mean trend, and weights in
+    (-2, 2) drawn per domain, it oriented 18 of their 30 edges correctly and 4 against the truth.
+    The paper fits the kernel widths, the index kernel, and the ridge of the step by
+    Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, it is experimental and
+    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
 
     References
     ----------
     .. [1] Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and
        Scholkopf, B. (2020). Causal discovery from heterogeneous/nonstationary data. JMLR 21(89),
        1-53.
+    .. [2] Zhang, K., Peters, J., Janzing, D., and Scholkopf, B. (2011). Kernel-based conditional
+       independence test and application in causal discovery. UAI, 804-813.
 
     Examples
     --------
     >>> import numpy as np
     >>> from andrey import cdnod
     >>> rng = np.random.default_rng(0)
-    >>> c_indx = np.repeat([0.0, 1.0], 300)
-    >>> x = 2.0 * c_indx + rng.standard_normal(600)
+    >>> domain_index = np.repeat([0.0, 1.0], 300)
+    >>> x = 2.0 * domain_index + rng.standard_normal(600)
     >>> y = x + 0.5 * rng.standard_normal(600)
-    >>> cdnod(np.column_stack([x, y]), c_indx).structure.oriented_edges()
+    >>> cdnod(np.column_stack([x, y]), domain_index).structure.oriented_edges()
     [(0, 1, 'directed')]
     """
-    warn_experimental("cdnod")
     from andrey.constraint.cdnod import cdnod as _cdnod
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
@@ -683,10 +857,21 @@ def cdnod(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
-    c = np.asarray(c_indx, dtype=np.float64)
+    c = np.asarray(domain_index, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
-        check_categories(c, None, f"indep_test={indep_test!r}", name="c_indx")
-    cpdag = _cdnod(X, c, alpha=alpha, indep_test=indep_test, categorical=mask)
+        check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
+    if dependence_threshold is not None:
+        dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
+    with copies_named(labels):
+        cpdag = _cdnod(
+            X,
+            c,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_order=collider_order,
+            categorical=mask,
+            dependence_threshold=dependence_threshold,
+        )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}
     )

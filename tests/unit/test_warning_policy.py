@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.api._experimental import warn_experimental
 from andrey.cli import main
 from andrey.core import backend, ci, warning_policy
 
@@ -33,7 +34,7 @@ class _AlwaysDependent:
 
 def _backend_fallback(monkeypatch):
     monkeypatch.setattr(backend, "_is_available", lambda name: False)
-    return lambda: backend.resolve_bitset(backend="numba")
+    return lambda: backend.select(backend._TORCH_PINNABLE, backend._TORCH_AUTO, backend="cuda")
 
 
 def _pc_expensive_pass(monkeypatch):
@@ -58,8 +59,7 @@ def _default_pool_cutoff(monkeypatch):
 
 
 def _experimental(monkeypatch):
-    data = np.random.default_rng(0).standard_normal((50, 3))
-    return lambda: andrey.gies(data)
+    return lambda: warn_experimental("new_method")  # an experimental facade's first line
 
 
 def _search_limit(monkeypatch):

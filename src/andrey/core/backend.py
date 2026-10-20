@@ -1,10 +1,12 @@
-"""Backend and worker selection for the core primitives.
+"""Backend and worker selection for numeric operations.
 
-``backend`` chooses the numeric kernels and ``num_workers`` the process pool;
-``docs/docs/configuration.md`` describes every value. Each op implements some
-backends over an always-present numpy reference. A backend the op lacks falls back silently
-(:func:`dispatch_stats` records which one ran); a backend unavailable on the machine warns once
-and falls back. The ``torch`` and ``numba`` extras are imported lazily.
+``backend`` sets a preference for NumPy or PyTorch and the device it runs on; ``num_workers``
+controls parallel execution. ``docs/docs/configuration.md`` describes every value. Each operation
+supports a subset of the backends, including the always-available ``numpy`` reference. A backend
+the operation does not support falls back to automatic selection without a warning
+(:func:`dispatch_stats` records which one ran). A supported backend unavailable on the machine
+warns once and uses automatic selection. PyTorch, provided by the ``torch`` extra, is imported
+only when needed.
 
 A setting resolves from the call's argument, then ``with andrey.config(...)``, then the
 :data:`config` object, then ``ANDREY_BACKEND`` / ``ANDREY_NUM_WORKERS`` (read live), then the
@@ -36,12 +38,9 @@ logger = logging.getLogger(__name__)
 # Per-op auto-preference orders (best first) and the CPU fallback.
 _TORCH_PINNABLE = ("numpy", "cpu", "cuda", "mps")
 _TORCH_AUTO = ("cuda", "numpy")  # cpu-torch and mps are pin-only, never auto-selected
-_BITSET_PINNABLE = ("numpy", "numba")
-_BITSET_AUTO = ("numba", "numpy")
 
 # What to install when a pinned-but-unavailable backend falls back (surfaced in the warning).
 _UNAVAILABLE_HINT = {
-    "numba": " (install the [numba] extra)",
     "cpu": " (torch-on-CPU; install the [torch] extra)",
     "cuda": " (needs a CUDA GPU and the [torch] extra)",
     "mps": " (needs Apple MPS and the [torch] extra)",
@@ -78,22 +77,10 @@ def torch():
     return _torch
 
 
-@lru_cache(maxsize=1)
-def numba():
-    """The ``numba`` module, or ``None`` if the ``[numba]`` extra is not installed."""
-    try:
-        import numba as _numba
-    except ImportError:
-        return None
-    return _numba
-
-
 def _is_available(b: str) -> bool:
     """True iff backend ``b`` can run on this machine right now."""
     if b == "numpy":
         return True
-    if b == "numba":
-        return numba() is not None
     t = torch()
     if t is None:
         return False
@@ -132,18 +119,24 @@ def _is_live(b: str) -> bool:
 class _Config:
     """Process-wide backend and worker settings, also usable as a ``with`` block.
 
-    Set ``andrey.config.backend`` or ``andrey.config.num_workers`` to change the default for every
-    later call, or assign ``None`` to return to ``ANDREY_BACKEND`` and ``ANDREY_NUM_WORKERS``.
+    Assigning ``andrey.config.backend`` or ``andrey.config.num_workers`` changes the default for
+    later calls; assigning ``None`` returns to ``ANDREY_BACKEND`` and ``ANDREY_NUM_WORKERS``.
     ``with andrey.config(backend=..., num_workers=...):`` changes them inside the block only, and
     does not reach threads started inside it. The order, most specific first: ``with`` block,
     these attributes, the environment variables, the defaults.
 
-    ``backend`` is a preference: ``"auto"`` (the default), ``"numpy"``, ``"numba"``, ``"cuda"``,
-    ``"mps"``, or ``"cpu"`` (torch on the CPU); ``"none"`` means ``"cpu"`` and ``"metal"`` means
-    ``"mps"``. An operation without the requested backend uses its default, and an unavailable
-    backend warns once with ``BackendFallbackWarning``. ``num_workers`` counts worker processes
-    (threads for ``granger``): ``-1`` uses every usable core, and ``0`` or ``1`` runs serially (the
-    default).
+    ``backend="auto"`` (the default) considers ``"cuda"`` when the operation meets its size and
+    runtime-startup requirements and a compatible GPU is available; otherwise it uses ``"numpy"``.
+    ``"numpy"`` uses NumPy on the CPU in float64. The ``torch`` extra provides ``"cpu"`` for
+    PyTorch on the CPU, ``"cuda"`` for a CUDA-compatible GPU, and ``"mps"`` for an Apple GPU in
+    unvalidated float32. ``"none"`` means ``"cpu"`` and ``"metal"`` means ``"mps"``. An explicit
+    choice bypasses the size and startup requirements. An operation without the requested backend
+    uses ``"auto"``; a supported but unavailable backend also warns once with
+    ``BackendFallbackWarning`` before using ``"auto"``. Unknown names raise ``ValueError``.
+
+    ``num_workers`` counts worker processes (threads for ``granger``): ``-1`` uses every usable
+    core, ``0`` or ``1`` runs serially (the default is ``1``), and larger values request that many
+    workers.
     """
 
     _backend: str | None = None
@@ -395,11 +388,6 @@ def resolve(
     return dev
 
 
-def resolve_bitset(*, backend: str | None = None) -> str:
-    """Pick ``numba`` or ``numpy`` for the bitset kernels (numba when available, else numpy)."""
-    return select(_BITSET_PINNABLE, _BITSET_AUTO, backend=backend, op="bitset")
-
-
 # ---- the executor axis: num_workers over a process pool -----------------------------------------
 
 
@@ -549,6 +537,8 @@ def as_tensor(data: np.ndarray, dev: str):
     """A torch tensor of ``data`` on ``dev`` -- float32 on ``mps``, else float64."""
     t = torch()
     dtype = t.float32 if dev == "mps" else t.float64
+    if any(stride < 0 for stride in data.strides):  # torch rejects negative strides
+        data = np.ascontiguousarray(data)
     return t.as_tensor(data, dtype=dtype, device=dev)
 
 
@@ -566,7 +556,6 @@ class Backend:
 
     backend: str
     num_workers: int
-    numba: bool
     torch: bool
     cuda: bool
     mps: bool
@@ -583,10 +572,9 @@ class Backend:
         )
 
     def available_backends(self) -> dict[str, bool]:
-        """Availability keyed by the ``ANDREY_BACKEND`` values: ``cpu`` is torch on the CPU."""
+        """Availability for each explicit ``ANDREY_BACKEND`` choice; ``cpu`` uses PyTorch."""
         return {
             "numpy": True,
-            "numba": self.numba,
             "cpu": self.torch,
             "cuda": self.cuda,
             "mps": self.mps,
@@ -636,31 +624,34 @@ def _torch_gpu_build() -> bool:
 
 
 def describe() -> Backend:
-    """Report the backend and worker settings in effect, and the backends this machine can run.
+    """The backend and worker settings in effect, with package and device availability.
 
     Each operation picks its own implementation, so the report gives the preference, not the
-    backend a given call will use. Checking for numba and torch does not import them; torch is
-    imported only to look for a GPU, on a CUDA or ROCm build of torch or on macOS.
+    backend a given call will use. Checking whether the ``torch`` module is installed does not
+    import it. GPU checks may import it on macOS or when the build supports CUDA or ROCm; an
+    unrecognized build is also checked by importing it.
 
     Returns
     -------
     Backend
         A read-only snapshot with the fields ``backend`` (the preference, such as ``"auto"``),
-        ``num_workers`` (``-1`` means every usable core), and ``numba``, ``torch``, ``cuda``, and
-        ``mps`` (``True`` when usable here). ``available_backends()`` maps each ``backend`` value
-        to its availability, and ``as_dict()`` returns the values as a JSON-ready dict.
+        ``num_workers`` (``-1`` means every usable core), ``torch`` (whether the module is installed
+        or already imported), and ``cuda`` and ``mps`` (whether PyTorch reports a usable device).
+        ``available_backends()`` maps ``numpy``, ``cpu``, ``cuda``, and ``mps`` to availability;
+        ``cpu`` uses the ``torch`` field. ``as_dict()`` returns ``backend``, ``num_workers``, and
+        this availability mapping as a JSON-ready dict.
 
     Raises
     ------
     ValueError
-        If ``ANDREY_BACKEND``, ``ANDREY_DEVICE``, or ``ANDREY_NUM_WORKERS`` holds an invalid value.
+        If a setting read from ``ANDREY_BACKEND``, ``ANDREY_DEVICE``, or ``ANDREY_NUM_WORKERS``
+        holds an invalid value; a context or config override takes precedence over those variables.
     """
     has_torch = _installed("torch")
     cuda_build = has_torch and ("torch" in sys.modules or _torch_gpu_build())
     return Backend(
         backend=_resolve_backend(None),
         num_workers=_resolve_num_workers(None),
-        numba=_installed("numba"),
         torch=has_torch,
         cuda=cuda_build and _is_available("cuda"),
         mps=has_torch and sys.platform == "darwin" and _is_available("mps"),

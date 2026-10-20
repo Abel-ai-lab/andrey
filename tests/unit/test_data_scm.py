@@ -8,6 +8,7 @@ statistical thresholds here.
 
 from __future__ import annotations
 
+import dataclasses
 import tracemalloc
 
 import networkx as nx
@@ -16,6 +17,7 @@ import pytest
 
 import andrey.data as data
 from andrey.core.structure import GraphStructure
+from andrey.data.sortability import causal_depth, index_correlation
 
 
 def _scm(d=12, density=2.0, heteroscedastic=False):
@@ -170,3 +172,187 @@ def test_sample_scm_convenience():
     assert ds.graph.kind == "dag"
     with pytest.raises(ValueError):
         data.sample_scm(graph="nope", d=5, n=5, seed=0)
+
+
+# ---- column shuffle -----------------------------------------------------------------------------
+
+
+def _assert_relabeled(plain, shuffled):
+    """``shuffled`` is ``plain`` with its observed nodes in ``column_order``; latents stay last."""
+    order = np.asarray(shuffled.provenance["column_order"])
+    n_obs, d = plain.data.shape[1], plain.graph.n_nodes
+    assert np.array_equal(np.sort(order), np.arange(n_obs))
+    full = np.concatenate([order, np.arange(n_obs, d)])
+    assert np.array_equal(shuffled.data, plain.data[:, order])
+    assert shuffled.data.flags.c_contiguous and plain.data.flags.c_contiguous
+    assert shuffled.graph.kind == plain.graph.kind
+    assert np.array_equal(shuffled.graph.to_numpy(), plain.graph.to_numpy()[np.ix_(full, full)])
+    types = plain.graph.node_types
+    if types is None:
+        assert shuffled.graph.node_types is None
+    else:
+        assert np.array_equal(shuffled.graph.node_types, types[full])
+    assert np.array_equal(shuffled.params.edges, np.argsort(full)[plain.params.edges])
+    assert np.array_equal(shuffled.params.weights, plain.params.weights, equal_nan=True)
+    scales = plain.params.noise_scales  # per node, or empty for a discrete network
+    assert np.array_equal(
+        shuffled.params.noise_scales, scales[full] if scales.size else scales, equal_nan=True
+    )
+    assert plain.provenance["column_order"] == list(range(n_obs))
+    assert (plain.provenance["config"]["shuffle"], shuffled.provenance["config"]["shuffle"]) == (
+        False,
+        True,
+    )
+
+
+@pytest.mark.parametrize("latents", [0, 2])
+def test_shuffle_relabels_an_scm_sample(latents):
+    """Shuffling permutes the observed columns and the truth together and changes nothing else."""
+    kwargs = {"d": 14, "n": 200, "seed": 3, "density": 4.0, "latents": latents}
+    plain = data.sample_scm(**kwargs, shuffle=False)
+    shuffled = data.sample_scm(**kwargs)
+    _assert_relabeled(plain, shuffled)
+    assert shuffled.provenance["column_order"] != list(range(14 - latents))
+    assert shuffled.report.varsortability == pytest.approx(plain.report.varsortability)
+    assert shuffled.report.r2sortability == pytest.approx(plain.report.r2sortability)
+
+
+@pytest.mark.parametrize(("scale", "latents"), [("standardize", 0), ("rescale", 2)])
+def test_shuffle_relabels_noise_scales_and_scaled_or_screened_samples(scale, latents):
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(d=12, avg_degree=3.0),
+        functional=data.functional.linear(),
+        noise=data.noise.gaussian(heteroscedastic=True),
+        latents=latents,
+    )
+    screen = data.FaithfulnessScreen(min_abs_corr=0.01)
+    plain = scm.sample(n=300, seed=1, scale=scale, screen=screen, shuffle=False)
+    shuffled = scm.sample(n=300, seed=1, scale=scale, screen=screen)
+    _assert_relabeled(plain, shuffled)
+    assert shuffled.report.faithfulness_accept_rate == plain.report.faithfulness_accept_rate
+
+
+def test_shuffle_relabels_a_discrete_sample():
+    kwargs = {"graph": "erdos_renyi", "d": 10, "n": 300, "seed": 2, "categories": (2, 4)}
+    plain = data.sample_discrete(**kwargs, shuffle=False)
+    shuffled = data.sample_discrete(**kwargs)
+    _assert_relabeled(plain, shuffled)
+    cards = plain.provenance["config"]["categories"]
+    order = shuffled.provenance["column_order"]
+    assert shuffled.provenance["config"]["categories"] == [cards[i] for i in order]
+
+
+def test_shuffle_relabels_a_mixed_sample():
+    """The categorical columns and their category counts move with the data."""
+    kwargs = {"graph": "erdos_renyi", "d": 10, "n": 300, "seed": 2, "categories": (2, 4)}
+    plain = data.sample_mixed(**kwargs, shuffle=False)
+    shuffled = data.sample_mixed(**kwargs)
+    _assert_relabeled(plain, shuffled)
+    config = plain.provenance["config"]
+    cards = dict(zip(config["categorical"], config["categories"], strict=True))
+    order = shuffled.provenance["column_order"]
+    moved = [j for j, i in enumerate(order) if i in cards]
+    assert shuffled.provenance["config"]["categorical"] == moved
+    assert shuffled.provenance["config"]["categories"] == [cards[order[j]] for j in moved]
+
+
+def test_the_column_order_comes_from_its_own_stream_of_the_seed():
+    """The same seed gives the same order whatever the noise; another seed gives another order."""
+    order = data.sample_scm(d=20, n=10, seed=4).provenance["column_order"]
+    assert data.sample_scm(d=20, n=10, seed=4).provenance["column_order"] == order
+    assert data.sample_scm(d=20, n=10, seed=4, noise="laplace").provenance["column_order"] == order
+    assert data.sample_scm(d=20, n=10, seed=5).provenance["column_order"] != order
+    discrete = data.sample_discrete(d=20, n=10, seed=4).provenance["column_order"]
+    assert data.sample_discrete(d=20, n=10, seed=4).provenance["column_order"] == discrete
+
+
+# --- the column order says nothing of the causal order ----------------------------------------
+
+#: Seeds of each column-order check.
+_ORDER_SEEDS = range(200)
+#: A fixed DAG listed in causal order, so its drawn order follows the graph.
+_LISTED = data.graphs.FixedDAG(
+    nodes=tuple("abcdefghij"),
+    arcs=(
+        ("a", "c"),
+        ("b", "c"),
+        ("c", "d"),
+        ("c", "e"),
+        ("d", "f"),
+        ("e", "f"),
+        ("f", "g"),
+        ("b", "h"),
+        ("h", "i"),
+        ("g", "j"),
+    ),
+)
+
+
+def _listed(*, seed: int, shuffle: bool, **_) -> data.CausalDataset:
+    scm = data.SCM(graph=_LISTED, functional=data.functional.linear(), noise=data.noise.gaussian())
+    return scm.sample(n=5, seed=seed, shuffle=shuffle)
+
+
+#: Each generator, its arguments beyond the size, seed, and shuffle, and whether its drawn order
+#: follows the graph without the shuffle: a fixed DAG keeps the order it is listed in, and a
+#: scale-free graph puts its hubs first. An Erdos-Renyi, small-world, or hub draw already numbers
+#: its nodes in a random order.
+_GENERATORS = {
+    "fixed": (_listed, {}, True),
+    "scale_free": (data.sample_scm, {"graph": "scale_free"}, True),
+    "erdos_renyi": (data.sample_scm, {}, False),
+    "small_world": (data.sample_scm, {"graph": "small_world"}, False),
+    "hub": (data.sample_scm, {"graph": "hub"}, False),
+    "latents": (data.sample_scm, {"density": 3.0, "latents": 2}, False),
+    "var": (data.sample_scm, {"functional": "var"}, False),
+    "discrete": (data.sample_discrete, {"graph": "scale_free"}, True),
+    "mixed": (data.sample_mixed, {"graph": "scale_free"}, True),
+}
+
+
+def _draw(generator: str, seed: int, shuffle: bool) -> data.CausalDataset:
+    sample, kwargs, _ = _GENERATORS[generator]
+    return sample(**{"d": 20, "n": 5, "density": 2.0, **kwargs}, seed=seed, shuffle=shuffle)
+
+
+def _order_check(datasets) -> tuple[float, float]:
+    """Return the mean rank correlation of column index and causal depth, and its bound.
+
+    Under a uniform column order the correlation of a dataset with ``k`` columns has mean 0 and
+    variance ``1 / (k - 1)``, so the mean over ``S`` datasets has standard deviation
+    ``sqrt(sum 1 / (k - 1)) / S``; the bound is four of those.
+    """
+    pairs = [
+        (index_correlation(ds.params.edges, ds.graph.n_nodes, n_observed=ds.data.shape[1]), k)
+        for ds in datasets
+        for k in [ds.data.shape[1]]
+    ]
+    rho, k = np.array([p for p in pairs if np.isfinite(p[0])]).T
+    return float(rho.mean()), 4 * float(np.sqrt(np.sum(1 / (k - 1)))) / len(k)
+
+
+def _by_depth(ds: data.CausalDataset) -> data.CausalDataset:
+    """The dataset with its truth's columns sorted by causal depth: an order following the graph."""
+    edges, d = ds.params.edges, ds.graph.n_nodes
+    k = ds.data.shape[1]
+    column = np.arange(d)
+    column[:k] = np.argsort(np.argsort(causal_depth(edges, d)[:k], kind="stable"), kind="stable")
+    params = dataclasses.replace(ds.params, edges=column[edges])
+    return dataclasses.replace(ds, params=params)
+
+
+@pytest.mark.parametrize("generator", list(_GENERATORS))
+def test_the_column_order_says_nothing_of_the_causal_order(generator):
+    """Across seeds the mean correlation of column index and causal depth is within its bound.
+
+    The positive control fails it: the unshuffled order where the drawn order follows the graph,
+    and otherwise the same draws with their columns sorted by causal depth.
+    """
+    shuffled = [_draw(generator, s, True) for s in _ORDER_SEEDS]
+    mean, bound = _order_check(shuffled)
+    assert abs(mean) < bound
+    if _GENERATORS[generator][2]:
+        control, _ = _order_check([_draw(generator, s, False) for s in _ORDER_SEEDS])
+    else:
+        control, _ = _order_check([_by_depth(ds) for ds in shuffled])
+    assert abs(control) > bound

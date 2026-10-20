@@ -9,8 +9,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from andrey import GraphStructure
+from andrey import GraphStructure, data
+from andrey.core import LATENT
 from andrey.data import real
+from andrey.data.sortability import causal_depth, index_correlation
 from qa import quality_gate as qg
 
 
@@ -28,13 +30,17 @@ def empty_answer(draw: qg.Draw, target: qg.Target) -> object:
 
 
 def shifted_truth(draw: qg.Draw, target: qg.Target) -> object:
-    """The true graph with each variable moved one column: an off-by-one in column handling."""
+    """The true graph with each variable moved one column: an off-by-one in column handling. A
+    measurement model moves its indicators and keeps its latents last."""
     if target in qg.SERIES_TARGETS:
         return shifted_series_truth(draw.truth, target)
     truth = qg.target_truth(draw.truth, target)
     marks = truth.to_numpy()
-    shift = np.roll(np.arange(len(marks)), 1)
-    return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=truth.kind)
+    shift = np.arange(len(marks))
+    types = None if target != "clusters" else np.asarray(truth.node_types)
+    observed = shift if types is None else np.flatnonzero(types != LATENT)
+    shift[observed] = np.roll(observed, 1)
+    return GraphStructure.from_numpy(marks[np.ix_(shift, shift)], kind=truth.kind, node_types=types)
 
 
 def shifted_series_truth(truth: object, target: qg.Target) -> object:
@@ -102,6 +108,33 @@ def test_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) ->
             assert qg.regime_kwargs(regime, d, n, 3) == bench.generation_kwargs(key)
 
 
+def test_model_regimes_match_the_benchmark_harness(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The gate draws CD-NOD's, MultiGroupDirectLiNGAM's, and GIN's regimes as the harness does."""
+    pytest.importorskip("fcntl")  # the harness's dataset store locks files with fcntl
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "benchmarks"))
+    bench = importlib.import_module("andrey_bench.datasets")
+    for regime, (model, noise) in qg.MODEL_REGIMES.items():
+        topology, functional, bench_noise, standardize = bench.REGIMES[regime]
+        assert (functional, bench_noise) == (model, noise)
+        d, n = qg.MODEL_SIZES[regime][0]
+        spec = qg.regime_models.MODELS[model]
+        key = bench.DatasetKey(
+            topology=topology,
+            functional=functional,
+            noise=noise,
+            density=getattr(spec, "indicators", bench.CANONICAL_DENSITY),
+            d=d,
+            n=n,
+            seed=3,
+            standardize=standardize,
+            latents=bench.latents_for(regime, d),
+        )
+        data, marks, kind, _ = bench.generate_one(key)
+        draw = qg.model_draws(regime, d, n)[3]
+        assert np.array_equal(draw.data, data) and np.array_equal(draw.truth.to_numpy(), marks)
+        assert draw.truth.kind == kind
+
+
 def test_pairs_match_the_benchmark_drivers(monkeypatch: pytest.MonkeyPatch) -> None:
     """The gate draws each cause-effect pair with the arguments its benchmark driver used."""
     pytest.importorskip("fcntl")  # the harness's dataset store locks files with fcntl
@@ -160,3 +193,74 @@ def test_the_gates_asia_is_bnlearns():
     nodes, arcs = real.read_bif(gzip.decompress(bif.read_bytes()).decode("utf-8"))
     assert nodes == qg.ASIA_NODES and set(arcs) == set(qg.ASIA_ARCS) and len(arcs) == 8
     assert len(set(qg.ASIA_ARCS)) == len(qg.ASIA_ARCS)
+
+
+#: Seeds of the column-order checks, in place of the gate's ten; the bound is four standard
+#: deviations of the mean correlation over them.
+_ORDER_SEEDS = range(200)
+
+
+def _correlations(draws, by_depth: bool = False) -> tuple[float, float]:
+    """The mean rank correlation of column index and causal depth over ``draws``, and its bound.
+
+    Under a uniform column order the correlation on ``k`` columns has mean 0 and variance
+    ``1 / (k - 1)``. ``by_depth`` sorts each draw's columns by causal depth first: an order that
+    follows the graph, the positive control where the drawn order is random already.
+    """
+    rhos, ks = [], []
+    for draw in draws:
+        truth, k = draw.truth, draw.data.shape[1]
+        edges = np.array([e[:2] for e in truth.oriented_edges(index=True)], dtype=np.int64)
+        edges = edges.reshape(-1, 2)
+        if by_depth:
+            depth = causal_depth(edges, truth.n_nodes)
+            column = np.arange(truth.n_nodes)
+            column[:k] = np.argsort(np.argsort(depth[:k], kind="stable"), kind="stable")
+            edges = column[edges]
+        rho = index_correlation(edges, truth.n_nodes, n_observed=k)
+        if np.isfinite(rho):
+            rhos.append(rho)
+            ks.append(k)
+    return float(np.mean(rhos)), 4 * float(np.sqrt(np.sum(1 / (np.array(ks) - 1)))) / len(ks)
+
+
+def _regime_draws(regime: str) -> list:
+    """The gate's draws of ``regime`` at its smaller size, skipping a seed that hides too many."""
+    d = qg.sizes(regime)[0][0]
+    out = []
+    for seed in _ORDER_SEEDS:
+        try:
+            ds = data.sample_scm(**{**qg.regime_kwargs(regime, d, 5, seed), "n": 5})
+        except ValueError as err:  # fewer nodes with two children than nodes to hide
+            assert "cannot hide" in str(err)
+            continue
+        out.append(qg.Draw(ds.data, ds.graph))
+    return out
+
+
+@pytest.mark.parametrize("cell", [*qg.REGIMES, *qg.PAIRS, "asia"])
+def test_the_gates_columns_say_nothing_of_the_causal_order(cell, monkeypatch) -> None:
+    """The gate's regimes, pairs, and ASIA list their columns in an order drawn from the seed.
+
+    The control: ASIA's unshuffled columns, which follow its file; for the regimes and pairs, the
+    same draws sorted by causal depth, since an Erdos-Renyi draw already numbers its nodes at
+    random. Sachs is measured data in its file's order, a correlation of -0.08 with the depth of
+    its consensus network.
+    """
+    monkeypatch.setattr(qg, "SEEDS", _ORDER_SEEDS)
+    monkeypatch.setattr(qg, "ASIA_N", 5)
+    if cell == "asia":
+        draws = qg.asia_draws("gaussian")
+        scm = data.SCM(
+            graph=data.graphs.FixedDAG(nodes=qg.ASIA_NODES, arcs=qg.ASIA_ARCS),
+            functional=data.functional.linear(),
+            noise=data.noise.gaussian(),
+        )
+        plain = [scm.sample(n=5, seed=s, shuffle=False) for s in _ORDER_SEEDS]
+        control, _ = _correlations(qg.Draw(ds.data, ds.graph) for ds in plain)
+    else:
+        draws = qg.pair_draws(cell, 5) if cell in qg.PAIRS else _regime_draws(cell)
+        control, _ = _correlations(draws, by_depth=True)
+    mean, bound = _correlations(draws)
+    assert abs(mean) < bound
+    assert abs(control) > bound

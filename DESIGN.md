@@ -73,8 +73,8 @@ A figure is a drawn graph, a chart, or a diagram in the docs.
    partial mark).
 2. **Marks by shape, not by color.** An endpoint is an arrowhead, a hollow circle, or a plain tail,
    so a graph reads without color and in grayscale.
-3. **Cobalt is the accent, not a fill.** It marks a highlighted endpoint, and links and selection on
-   the website. Nodes stay neutral.
+3. **Cobalt is the accent, not a fill.** It lights a highlighted endpoint, and marks links and
+   selection on the website. Nodes stay neutral.
 4. **Light and dark are equal.** Every color has a light and a dark value.
 
 ### Colors
@@ -101,6 +101,21 @@ A figure is a drawn graph, a chart, or a diagram in the docs.
 - `andrey.viz.mpl` applies both to matplotlib: `mpl.use()` or `mpl.context()` for the style,
   `mpl.cycle()` for the series colors, and `mpl.cmap()` for the ramp.
 
+### Tables
+
+A table that compares Andrey with other packages or builds reads one way everywhere:
+
+- Andrey's column comes first and is tinted in the accent, its values in the accent color.
+- In each row, the best value of each measure (the lower time, the fewer errors, the higher F1) is
+  bold, and shaded neutral when another column holds it. The empty graph is a reference, never the
+  best.
+- Rows group by method family, the family's label set on the table's side.
+- A share is a percentage, its denominator in the text or the row's label, not in every cell.
+
+The 0.7.0 post's tables come from `table()` in `docs/blog/0.7.0/figures.py`; a Markdown table on a
+post or a release card gets the tint and the bold at build time (`_comparison_tables`,
+`docs/conf.py`).
+
 ### Drawing a graph
 
 `andrey.viz.draw` follows these rules for every kind of graph (DAG, CPDAG, PAG, digraph):
@@ -114,4 +129,6 @@ A figure is a drawn graph, a chart, or a diagram in the docs.
   is directed.
 - Labels sit inside the nodes when every label has at most two characters, and below them
   otherwise, the same for the whole figure.
-- A highlighted endpoint gets an accent ring.
+- A highlighted endpoint lights up: its mark and its half of the edge turn accent, a little
+  heavier, over a soft accent glow. The highlight is drawn in strokes, so it keeps its proportions
+  at any size.
