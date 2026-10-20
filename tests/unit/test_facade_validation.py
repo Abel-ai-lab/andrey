@@ -1106,10 +1106,17 @@ def test_categorical_lists_columns_the_data_has(data, categorical, error, messag
 
 
 @pytest.mark.parametrize("categorical", [["1", "2"], [0, 2], ["1", 2]])
-def test_categorical_reads_a_string_as_a_label_and_an_integer_as_a_position(categorical):
+@pytest.mark.parametrize(
+    "fit",
+    [partial(andrey.pc, indep_test="degen_gauss"), andrey.ges],  # ges picks its score from them
+    ids=["pc", "ges"],
+)
+def test_categorical_reads_a_string_as_a_label_and_an_integer_as_a_position(fit, categorical):
     pd = pytest.importorskip("pandas")
     x = pd.DataFrame(_mixed_data(), columns=[1, 0, 2])  # categories in columns "1" and "2"
-    out = andrey.pc(x, indep_test="degen_gauss", categorical=categorical)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", andrey.DataTypeWarning)
+        out = fit(x, categorical=categorical)
     assert out.metadata["categorical"] == ["1", "2"]
 
 

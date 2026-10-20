@@ -200,19 +200,18 @@ def _inference_rule(max_categories: int) -> str:
 
 
 def _listed_mask(data: npt.ArrayLike, categorical: Sequence[str | int]) -> np.ndarray:
-    """Mark the columns of ``data`` that ``categorical`` lists by name or 0-based position.
+    """Mark the columns of ``data`` that ``categorical`` lists by label or 0-based position.
 
     Raises as :func:`data_matrix` does when ``data`` is not a 2-D table, and as :func:`mixed_matrix`
     does when ``categorical`` is not a list of the columns ``data`` has.
     """
-    columns = getattr(data, "columns", None)
     try:
         shape = np.shape(data)
     except ValueError:
         shape = ()
     if len(shape) != 2:
         data_matrix(data)
-    return _column_mask(categorical, None if columns is None else list(columns), shape[1])
+    return _column_mask(categorical, column_labels(data), shape[1])
 
 
 def _inferred_columns(
