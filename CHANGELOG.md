@@ -19,7 +19,7 @@ change names its pull request.
   GIES, XGES, CALM, GIN, ParceLiNGAM, the PCMCI methods, and the nonlinear tests break ties by
   each column's own data instead of its position or rounding. ([#205], [#213], [#228])
 - Faster categorical tests: `pc` with `indep_test="chisq"` or `"gsq"` runs 4-6x faster than in
-  0.7.0, with the same p-values and graphs. ([#208])
+  0.7.0 on the alarm, hepar2, and andes networks, with the same p-values and graphs. ([#208])
 
 ### Added
 
