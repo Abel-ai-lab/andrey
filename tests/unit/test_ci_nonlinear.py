@@ -21,7 +21,7 @@ import pytest
 from scipy.integrate import quad
 from scipy.spatial.distance import pdist, squareform
 from scipy.special import digamma
-from scipy.stats import chi2, gamma
+from scipy.stats import binom, chi2, gamma
 from sklearn.gaussian_process import GaussianProcessRegressor
 from threadpoolctl import threadpool_info, threadpool_limits
 
@@ -357,22 +357,49 @@ def test_kci_decomposes_each_conditioning_set_once(monkeypatch):
         assert [KCI(data)(*query) for query in queries] == pvalues
 
 
-def test_rcot_draws_the_features_of_each_column_set_once(monkeypatch):
-    """Queries share the features of a variable and of a conditioning set, and the p-values equal
-    those of a test that draws every query's features afresh."""
-    draws = []
-    draw = ci_kernel._fourier_features
+def test_rcot_samples_features_per_variable_and_conditioning_set(monkeypatch):
+    """Queries share the features of a variable given one conditioning set, and of the set; a
+    repeated query samples nothing, and the p-values equal those of a test that samples every
+    query's features afresh."""
+    counts = []
+    sample = ci_kernel._fourier_features
     monkeypatch.setattr(
         ci_kernel,
         "_fourier_features",
-        lambda v, count, rng: draws.append(count) or draw(v, count, rng),
+        lambda v, count, rng, scale=None: counts.append(count) or sample(v, count, rng, scale),
     )
     data = _common_cause(seed=3, n=120, n_cond=2)
-    queries = [(0, 1, (2,)), (0, 3, (2,)), (1, 3, (2,)), (0, 1, ()), (0, 1, (2, 3))]
+    queries = [(0, 1, (2,)), (0, 3, (2,)), (1, 3, (2,)), (0, 1, ()), (0, 1, (2, 3)), (1, 0, (2,))]
     test = RCoT(data)
     pvalues = [test(*query) for query in queries]
-    assert sorted(draws) == [5, 5, 5, 100, 100]  # columns 0, 1, 3; sets {2}, {2, 3}
+    # 0, 1, 3 given {2}; 0, 1 alone; 0, 1 given {2, 3}; the sets {2} and {2, 3}
+    assert sorted(counts) == [5] * 7 + [100] * 2
     assert [RCoT(data)(*query) for query in queries] == pvalues
+
+
+def test_rcot_queries_of_one_pair_sample_independent_features():
+    """PC removes an edge when any conditioning set accepts, so one pair's queries over different
+    conditioning sets sample their own features: given each of 40 independent columns, the
+    p-values of two independent columns spread as much as one query's p-values over 40 seeds."""
+    spread_sets, spread_seeds = [], []
+    for data_seed in range(5):
+        data = np.random.default_rng(data_seed).standard_normal((500, 42))
+        test = RCoT(data, seed=0)
+        spread_sets.append(np.std([test(0, 1, (k,)) for k in range(2, 42)]))
+        spread_seeds.append(np.std([RCoT(data, seed=s)(0, 1, (2,)) for s in range(1, 41)]))
+    assert np.mean(spread_sets) > 0.75 * np.mean(spread_seeds)
+
+
+def test_rcot_rejects_a_true_independence_near_alpha_and_a_dependence_nearly_always():
+    """On 100 datasets of 500 rows where ``x`` and ``y`` are different nonlinear functions of one
+    conditioning variable, RCoT rejects their independence given it within the 99.9% binomial
+    range of a test at level alpha, and rejects nearly always once they share a noise term."""
+    null, dependent = [], []
+    for seed in range(100):
+        null.append(RCoT(_common_cause(seed=seed, n=500, n_cond=1))(0, 1, (2,)))
+        dependent.append(RCoT(_common_cause(seed=seed, n=500, n_cond=1, shared=0.3))(0, 1, (2,)))
+    assert np.mean(np.array(null) <= ALPHA) <= binom.ppf(0.999, 100, ALPHA) / 100
+    assert np.mean(np.array(dependent) <= ALPHA) >= 0.95
 
 
 def test_cmiknn_draws_the_shuffles_of_each_conditioning_set_once(monkeypatch):
