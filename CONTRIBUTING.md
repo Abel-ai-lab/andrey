@@ -59,7 +59,7 @@ gitleaks, to this checkout, so they run on every commit; `prek run --all-files` 
   The release pull request, from that branch to `main`, is the only one that merges to `main`;
   the release's tag follows it. A required check, `release-branch`, fails a pull request into
   `main` from any other branch, and the release pull request runs the quality gate
-  ([`qa/README.md`](qa/README.md#quality-gate)), also required, once for the whole release.
+  (`qa/README.md`), also required, once for the whole release.
 - When the public API changes, update its docstrings and the API reference
   (`docs/docs/code/index.md`) in the same pull request.
 - Everything in `andrey.__all__` is public and documented. Names that start with `_` are internal
