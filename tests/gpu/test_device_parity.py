@@ -139,13 +139,15 @@ def test_pnl_matches_the_cpu(device):
         got = pnl_pairs(table)
         threaded = pnl_pairs(table, num_workers=3)
     assert backend.dispatch_stats() == {("pnl", "cuda"): 2}
-    assert np.array_equal(threaded, got)
     assert (cpu[:, :2] == 0).all(axis=1).any()  # the statistics decide a pair
-    assert np.allclose(got[:, :2], cpu[:, :2], rtol=0, atol=1e-9)
-    assert np.allclose(got[:, 2:], cpu[:, 2:], rtol=1e-9, atol=0)
+    # The largest difference over 4,490 pairs of up to 5,000 rows was 5e-15 on an A100.
+    for rows in (got, threaded):
+        assert np.allclose(rows[:, :2], cpu[:, :2], rtol=0, atol=1e-12)
+        assert np.allclose(rows[:, 2:], cpu[:, 2:], rtol=1e-12, atol=0)
 
     def decisions(rows):
         by_pvalue = np.sign(rows[:, 0] - rows[:, 1])
         return np.where(by_pvalue != 0, by_pvalue, np.sign(rows[:, 3] - rows[:, 2]))
 
     assert np.array_equal(decisions(got), decisions(cpu))
+    assert np.array_equal(decisions(threaded), decisions(cpu))

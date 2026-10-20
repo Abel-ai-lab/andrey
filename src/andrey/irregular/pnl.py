@@ -46,7 +46,11 @@ _TOL = 1e-8
 _BLOCK_ELEMENTS = 32768
 
 # Smallest kernel matrix (rows squared) at which `auto` runs a table's PNL tests on a CUDA GPU.
-_PNL_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 250_000, "mps": None}
+# `qa/gpu_calibration_validate.py` on an A100-SXM4-80GB found 26,278 (163 rows) on each of five
+# runs, against the CPU path at its default of one worker; on its table of four columns, the GPU
+# ran at 1.5x the CPU's speed at 200 rows, 4.2x at 500, and 10x at 1,000 (against four workers:
+# 1.1x, 1.8x, 3.6x). PNL computes in float64, so `mps` (float32) is never used.
+_PNL_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 26_278, "mps": None}
 
 # Device memory one batch of disturbance kernels uses.
 _DEVICE_BATCH_BYTES = 2**30
@@ -355,8 +359,9 @@ def _ordered_tests(
     """Return ``{(cause, effect): (statistic, p_value)}`` for the distinct ``tasks``.
 
     On ``numpy`` the tasks, sorted by cause, are cut into ``workers`` contiguous runs, one per
-    worker thread, each on one BLAS thread; every task's result is the same whatever the number
-    of workers. On a torch device, :func:`_device_tests` runs them.
+    worker thread, each on one BLAS thread. A task's result does not depend on the number of
+    workers, except that the fits' last digits can: a lone worker's fits run on every BLAS thread.
+    On a torch device, :func:`_device_tests` runs them.
     """
     ordered = sorted(dict.fromkeys(tasks))
     if dev != "numpy":

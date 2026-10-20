@@ -94,8 +94,13 @@ def _decisions(rows: np.ndarray) -> np.ndarray:
 
 @pytest.mark.parametrize("n", [150, 600, 1300])
 def test_torch_path_matches_numpy(n):
-    """On torch's CPU backend, the p-values and statistics match NumPy's to rounding, a batch
-    smaller than a cause's effects included, and every decision is the same."""
+    """On torch's CPU backend, the p-values and statistics match NumPy's to 1e-8, a batch smaller
+    than a cause's effects included, and every decision is the same, except where NumPy's two
+    statistics tie exactly (a column against itself or its copy) and rounding may break the tie.
+
+    The tolerance covers torch's float64 ``exp``, which on some CPUs is off by up to 3e-9 relative
+    in a fraction of processes.
+    """
     pytest.importorskip("torch")
     X = _table(n)
     pairs = [(0, 1), (1, 0), (2, 3), (3, 3), (0, 3), (1, 2)]
@@ -107,7 +112,9 @@ def test_torch_path_matches_numpy(n):
         with mock.patch.object(_pnl, "_DEVICE_BATCH_BYTES", 8 * n * n):  # one kernel per batch
             one_per_batch = _pnl.pnl_pairs(X, pairs, num_workers=2)
     assert backend.dispatch_stats() == {("pnl", "cpu"): 2}
+    tied = expected[:, 2] == expected[:, 3]
+    assert tied.sum() == 2 and not tied.all()
     for rows in (got, one_per_batch):
-        assert np.allclose(rows[:, :2], expected[:, :2], rtol=0, atol=1e-12)
-        assert np.allclose(rows[:, 2:], expected[:, 2:], rtol=1e-12, atol=0)
-        assert np.array_equal(_decisions(rows), _decisions(expected))
+        assert np.allclose(rows[:, :2], expected[:, :2], rtol=0, atol=1e-8)
+        assert np.allclose(rows[:, 2:], expected[:, 2:], rtol=1e-8, atol=0)
+        assert np.array_equal(_decisions(rows)[~tied], _decisions(expected)[~tied])

@@ -105,7 +105,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
     EnvVarSpec(
         name="ANDREY_PNL_GPU_THRESHOLD",
         values="integer (elements: rows squared)",
-        default="cuda 250000, mps never",
+        default="cuda 26278, mps never",
         effect=(
             "Smallest kernel matrix (rows squared) at which `auto` runs the HSIC tests of PNL's "
             "pairs on a CUDA GPU, in float64. A set value replaces the `cuda` default; PNL never "

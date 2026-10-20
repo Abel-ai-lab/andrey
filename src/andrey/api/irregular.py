@@ -209,7 +209,7 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
     linear inner transform and an invertible nonlinear outer one, and Laplace noise, from 200 to
     5,000 rows. It named the true direction on three pairs in four at 200 rows and on every pair
-    from 1,000 rows. The median fit took under 2 s at 5,000 rows, on 4 cores. Each HSIC test builds
+    from 1,000 rows. The median fit took 0.8 s at 5,000 rows, on 4 cores. Each HSIC test builds
     kernel matrices with one row and one column per sample, so time and memory grow with the square
     of the row count: each worker thread holds three such float64 matrices, 600 MB at 5,000 rows.
 

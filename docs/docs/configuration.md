@@ -61,7 +61,7 @@ The cutoff matters only with more than one worker. `andrey calibrate` measures i
   elements (rows squared). The default is `1024`, 32 rows. Its p-values on `cuda` equal those on
   the CPU.
 - `ANDREY_PNL_GPU_THRESHOLD`: the same for the independence tests of `pnl`, in float64, from this
-  many kernel-matrix elements (rows squared). The default is `250000`, 500 rows. A single pair
+  many kernel-matrix elements (rows squared). The default is `26278`, about 163 rows. A single pair
   uses the GPU only when it is already running, by the rule below.
 - `ANDREY_GPU_CALIBRATE`: when on, the first `auto` use of covariance, correlation, or entropy
   measures where `cuda` starts to beat NumPy on this machine, and keeps the result in
