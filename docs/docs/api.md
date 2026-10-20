@@ -54,13 +54,13 @@ and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests))
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
 `knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
-[Background knowledge](../guides/getting-started.md#background-knowledge) shows them in use.
+[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 ```{eval-rst}
 .. currentmodule:: andrey
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
 
    Knowledge
 ```
