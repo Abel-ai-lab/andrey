@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
-from collections.abc import Callable, Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -114,56 +114,90 @@ def default_score(
     score_func: str | None,
     linear: str,
     *,
-    categorical: object = None,
+    categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-) -> str:
-    """Return ``score_func``, or for ``None`` the default score of a score search on ``data``.
+    mixed: bool = True,
+) -> tuple[str, Sequence[str | int] | None]:
+    """Return the score of a score search on ``data`` and the ``categorical`` it reads.
 
-    The default is ``"local_score_BDeu"`` when every column is categorical by the rule
-    :func:`mixed_matrix` infers with: a DataFrame's ``category``, ``bool``, ``object``, and
-    ``string`` columns, and every column of at most ``max_categories`` distinct whole numbers. It
-    warns once with a :class:`~andrey.DataTypeWarning` naming ``linear``, the linear-Gaussian BIC
-    the search uses otherwise, since columns of counts or ratings meet the rule too. A given
-    ``categorical`` keeps ``linear``, as does data that is not a finite numeric table apart from its
-    typed columns, so that :func:`checked_data` reports it.
+    A given ``score_func`` returns as it is, with ``categorical``. For ``None``, the columns are
+    inferred by the rule :func:`mixed_matrix` infers with: a DataFrame's ``category``, ``bool``,
+    ``object``, and ``string`` columns, and every column of at most ``max_categories`` distinct
+    whole numbers, are categorical. When every column is, the score is ``"local_score_BDeu"``; when
+    some are, ``"local_score_cond_gauss"``, the conditional Gaussian BIC, returned with the inferred
+    columns by 0-based position so that :func:`checked_data` reads them without inferring again.
+    Either switch warns once with a :class:`~andrey.DataTypeWarning` naming ``linear``, the
+    linear-Gaussian BIC the search uses otherwise, since columns of counts or ratings meet the rule
+    too. ``mixed=False``, for a search without a mixed-data score, keeps ``linear`` on mixed data. A
+    given ``categorical`` keeps ``linear``, as does data that is not a finite numeric table apart
+    from its typed columns, so that :func:`checked_data` reports it.
 
     Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2.
     """
     if score_func is not None:
-        return score_func
+        return score_func, categorical
     max_categories = int_in_range(max_categories, "max_categories", 2)
-    if categorical is not None or not _all_categorical(data, max_categories):
-        return linear
+    inferred = None if categorical is not None else _inferred_columns(data, max_categories)
+    if inferred is None:
+        return linear, categorical
+    typed, counts = inferred
+    mask = typed | (counts > 0)
+    rule = f"a category, bool, or text type, or at most max_categories={max_categories} distinct"
+    if mask.all():
+        warn_once(
+            f"every column of data is categorical ({rule} whole numbers), so the score defaults "
+            "to score_func='local_score_BDeu'; if the columns are counts or ratings to read as "
+            f"numbers, pass score_func={linear!r}, the linear-Gaussian BIC (see Data types in the "
+            "getting-started guide)",
+            DataTypeWarning,
+        )
+        return "local_score_BDeu", None
+    if not mask.any() or not mixed:
+        return linear, None
+    columns = np.flatnonzero(mask).tolist()
     warn_once(
-        "every column of data is categorical (a category, bool, or text type, or at most "
-        f"max_categories={max_categories} distinct whole numbers), so the score defaults to "
-        "score_func='local_score_BDeu'; if the columns are counts or ratings to read as numbers, "
-        f"pass score_func={linear!r}, the linear-Gaussian BIC (see Data types in the "
-        "getting-started guide)",
+        f"data columns {_listed_columns(data, columns, typed, counts)} are categorical ({rule}"
+        " whole numbers) and the others continuous, so the score defaults to "
+        "score_func='local_score_cond_gauss', the conditional Gaussian BIC; pass "
+        f"score_func={linear!r} to keep the linear-Gaussian BIC, which reads every column as "
+        "numbers, or score_func='local_score_cond_gauss' with categorical=[...] to name the "
+        "categorical columns (see Data types in the getting-started guide)",
         DataTypeWarning,
     )
-    return "local_score_BDeu"
+    return "local_score_cond_gauss", columns
 
 
-def _all_categorical(data: npt.ArrayLike, max_categories: int) -> bool:
-    """Whether every column of ``data`` is categorical by :func:`default_score`'s rule.
+def _inferred_columns(
+    data: npt.ArrayLike, max_categories: int
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Return the typed columns of ``data`` and each other column's count of category codes.
 
-    ``False`` when ``data`` has no columns, or its untyped columns are not a finite numeric table.
+    ``typed`` marks a DataFrame's ``category``, ``bool``, ``object``, and ``string`` columns;
+    ``counts`` holds each other column's count of distinct whole numbers when at most
+    ``max_categories``, else ``0``. ``None`` when ``data`` has no columns, or its untyped columns
+    are not a finite numeric table of at least 2 rows with no constant column, which
+    :func:`data_matrix` rejects.
     """
     if getattr(data, "columns", None) is None:
-        numeric, typed = data, 0
+        numeric, typed = data, None
     else:
         import pandas as pd
 
-        mask = _categorical_dtypes(data)
-        numeric, typed = pd.DataFrame(data).iloc[:, ~mask], int(mask.sum())
+        typed = _categorical_dtypes(data)
+        numeric = pd.DataFrame(data).iloc[:, ~typed]
     try:
         X = np.asarray(numeric, dtype=np.float64)
     except (TypeError, ValueError):
-        return False
-    if X.ndim != 2 or X.shape[1] + typed == 0 or not np.isfinite(X).all():
-        return False
-    return bool((_category_counts(X, max_categories) > 0).all())
+        return None
+    if X.ndim != 2 or X.shape[0] < 2 or not np.isfinite(X).all() or (np.ptp(X, axis=0) == 0).any():
+        return None
+    if typed is None:
+        typed = np.zeros(X.shape[1], dtype=bool)
+    if typed.size == 0:
+        return None
+    counts = np.zeros(typed.size, dtype=np.int64)
+    counts[~typed] = _category_counts(X, max_categories)
+    return typed, counts
 
 
 def checked_data(
@@ -284,12 +318,7 @@ def mixed_matrix(
         counts = _category_counts(X, max_categories)
         mask = (counts > 0) | (typed if typed.size else False)
         if mask.any():
-            listed = ", ".join(
-                f"{_column_name(data, j)} ("
-                + (_dtype_word(data, j) if typed.size and typed[j] else f"{counts[j]} values")
-                + ")"
-                for j in np.flatnonzero(mask).tolist()
-            )
+            listed = _listed_columns(data, np.flatnonzero(mask).tolist(), typed, counts)
             warn_once(
                 f"{setting} reads {name} columns {listed} as categorical, inferred from a "
                 "category, bool, or text type or from at most "
@@ -344,6 +373,16 @@ def _category_counts(X: np.ndarray, max_categories: int) -> np.ndarray:
         if k <= max_categories:
             counts[j] = k
     return counts
+
+
+def _listed_columns(data: object, columns: list[int], typed: np.ndarray, counts: np.ndarray) -> str:
+    """Name each of ``columns`` with why it is categorical: its type, or its count of values."""
+    return ", ".join(
+        f"{_column_name(data, j)} ("
+        + (_dtype_word(data, j) if typed.size and typed[j] else f"{counts[j]} values")
+        + ")"
+        for j in columns
+    )
 
 
 def _dtype_word(data: object, j: int) -> str:

@@ -778,7 +778,11 @@ def test_a_dataframe_types_mark_columns_and_the_warning_names_why():
 
 @pytest.mark.parametrize(
     "fit",
-    [lambda x: andrey.pc(x), lambda x: andrey.ges(x), lambda x: andrey.boss(x)],
+    [
+        lambda x: andrey.pc(x),
+        lambda x: andrey.ges(x, score_func="local_score_BIC"),
+        lambda x: andrey.boss(x, score_func="local_score_BIC_from_cov"),
+    ],
     ids=["pc", "ges", "boss"],
 )
 def test_a_continuous_setting_hints_at_columns_that_look_like_codes(fit):
@@ -787,9 +791,9 @@ def test_a_continuous_setting_hints_at_columns_that_look_like_codes(fit):
     assert "categorical" not in out.metadata
 
 
-#: The score searches whose ``score_func=None`` picks BDeu on all-categorical data: each one's
-#: facade, the module and name of the search it calls, and the linear-Gaussian BIC it picks
-#: otherwise.
+#: The score searches whose ``score_func=None`` picks BDeu on all-categorical data and, but for
+#: tabu, the conditional Gaussian BIC on mixed data: each one's facade, the module and name of the
+#: search it calls, and the linear-Gaussian BIC it picks otherwise.
 SCORE_SEARCHES = {
     "ges": (andrey.ges, "andrey.search.ges", "ges", "local_score_BIC"),
     "hc": (andrey.hc, "andrey.search.hc", "hc", "local_score_BIC_from_cov"),
@@ -844,7 +848,20 @@ def _same_fit(a, b):
 
 
 def _switch_warnings(caught):
-    return [w for w in caught if "local_score_BDeu" in str(w.message)]
+    return [w for w in caught if "the score defaults to" in str(w.message)]
+
+
+def _mixed_frame():
+    """The columns of :func:`_mixed_data` as a category, a float, and a bool column."""
+    pd = pytest.importorskip("pandas")
+    x = _mixed_data()
+    return pd.DataFrame(
+        {"group": pd.Categorical(x[:, 0].astype(int)), "u": x[:, 1], "flag": x[:, 2] > 0}
+    )
+
+
+#: The score searches with a mixed-data score, so a default that switches on mixed data.
+MIXED_DEFAULTS = [name for name in SCORE_SEARCHES if name != "tabu"]
 
 
 @pytest.mark.parametrize("data", [_categorical_data, _categorical_frame], ids=["codes", "frame"])
@@ -864,22 +881,53 @@ def test_all_categorical_data_defaults_to_bdeu_with_one_warning(name, data, monk
 
 
 @pytest.mark.parametrize("name", list(SCORE_SEARCHES))
-def test_an_explicit_score_func_wins_on_categorical_data(name, monkeypatch):
+def test_an_explicit_score_func_wins_on_categorical_and_mixed_data(name, monkeypatch):
     fit, _, _, linear = SCORE_SEARCHES[name]
     used = _scores_used(monkeypatch, name)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         fit(_categorical_data(), score_func=linear)
         fit(_categorical_data(), score_func="local_score_BIC_categorical")
-    assert used == [linear, "local_score_BIC_categorical"]
+        fit(_mixed_data(), score_func=linear)
+    assert used == [linear, "local_score_BIC_categorical", linear]
     assert _switch_warnings(caught) == []
 
 
-@pytest.mark.parametrize("data", ["mixed", "continuous"])
-@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
-def test_data_with_a_continuous_column_keeps_the_linear_bic(name, data, monkeypatch):
+@pytest.mark.parametrize("data", [_mixed_data, _mixed_frame], ids=["codes", "frame"])
+@pytest.mark.parametrize("name", MIXED_DEFAULTS)
+def test_mixed_data_defaults_to_the_conditional_gaussian_with_one_warning(name, data, monkeypatch):
     fit, _, _, linear = SCORE_SEARCHES[name]
-    x = _mixed_data() if data == "mixed" else np.random.default_rng(1).standard_normal((200, 3))
+    x = data()
+    used = _scores_used(monkeypatch, name)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        out = fit(x)
+        fit(x)
+    assert used == ["local_score_cond_gauss"] * 2
+    assert [w.category for w in caught] == [andrey.DataTypeWarning]
+    message = str(caught[0].message)
+    assert "local_score_cond_gauss" in message and linear in message
+    named = fit(x, score_func="local_score_cond_gauss", categorical=[0, 2])
+    assert _same_fit(out, named)
+    assert len(out.metadata["categorical"]) == 2
+
+
+def test_tabu_keeps_the_linear_bic_on_mixed_data(monkeypatch):
+    """Tabu search has no mixed-data score, so mixed data keep the linear-Gaussian BIC."""
+    used = _scores_used(monkeypatch, "tabu")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        out = andrey.tabu(_mixed_data())
+        explicit = andrey.tabu(_mixed_data(), score_func="local_score_BIC_from_cov")
+    assert used == ["local_score_BIC_from_cov"] * 2
+    assert _same_fit(out, explicit)
+    assert _switch_warnings(caught) == []
+
+
+@pytest.mark.parametrize("name", list(SCORE_SEARCHES))
+def test_continuous_data_keep_the_linear_bic(name, monkeypatch):
+    fit, _, _, linear = SCORE_SEARCHES[name]
+    x = np.random.default_rng(1).standard_normal((200, 3))
     used = _scores_used(monkeypatch, name)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -887,7 +935,7 @@ def test_data_with_a_continuous_column_keeps_the_linear_bic(name, data, monkeypa
         explicit = fit(x, score_func=linear)
     assert used == [linear, linear]
     assert _same_fit(out, explicit)
-    assert _switch_warnings(caught) == []
+    assert caught == []
 
 
 @pytest.mark.parametrize("name", list(SCORE_SEARCHES))
@@ -902,11 +950,15 @@ def test_the_default_score_and_graph_follow_the_columns_in_any_order(name, monke
             assert np.array_equal(
                 moved.structure.to_numpy(), out.structure.to_numpy()[order][:, order]
             )
-    assert used == [linear, linear, "local_score_BDeu", "local_score_BDeu"]
+    mixed = linear if name == "tabu" else "local_score_cond_gauss"
+    assert used == [mixed, mixed, "local_score_BDeu", "local_score_BDeu"]
 
 
 def test_whole_number_counts_read_as_categories_and_the_warning_names_the_bic(monkeypatch):
-    """Counts of at most ``max_categories`` values meet the rule, so the warning names the BIC."""
+    """Counts of at most ``max_categories`` values meet the rule, so the warning names the BIC.
+
+    With ``max_categories=9``, the third column's 10 values read as continuous: the data are mixed.
+    """
     rng = np.random.default_rng(0)
     x = rng.binomial(4, 0.5, 500)
     y = x + rng.binomial(3, 0.5, 500)
@@ -918,7 +970,7 @@ def test_whole_number_counts_read_as_categories_and_the_warning_names_the_bic(mo
         andrey.hc(counts, score_func="local_score_BIC_from_cov")
         andrey.hc(counts, max_categories=9)
     assert "local_score_BIC_from_cov" in str(caught[0].message)
-    assert used == ["local_score_BDeu", "local_score_BIC_from_cov", "local_score_BIC_from_cov"]
+    assert used == ["local_score_BDeu", "local_score_BIC_from_cov", "local_score_cond_gauss"]
 
 
 @pytest.mark.parametrize("setting", list(MIXED), ids="-".join)

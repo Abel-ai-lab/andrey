@@ -58,11 +58,12 @@ def boss(
         BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
         multinomial BIC for categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` picks
-        ``"local_score_BDeu"`` when every column is categorical by the rule ``categorical=None``
-        infers with, and warns with a ``DataTypeWarning``; otherwise, or with ``categorical`` given,
-        it picks ``"local_score_BIC_from_cov"``. Pass ``"local_score_BIC_from_cov"`` to read whole
-        numbers, such as counts, as numbers.
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
+        column types as ``categorical=None`` infers them and picks ``"local_score_BDeu"`` when every
+        column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise, or with ``categorical`` given, it picks
+        ``"local_score_BIC_from_cov"``. Pass ``"local_score_BIC_from_cov"`` to read whole numbers,
+        such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
@@ -81,7 +82,8 @@ def boss(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        they may be category codes. With ``score_func=None``, the columns it infers pick the default
+        score.
 
     Returns
     -------
@@ -113,10 +115,11 @@ def boss(
     Warns
     -----
     DataTypeWarning
-        When ``score_func`` is ``None`` and every column is categorical, so the search scores with
-        BDeu; when a mixed-data score infers the categorical columns, or finds none and so runs as
-        the linear-Gaussian form; or when a continuous setting meets columns that look like
-        category codes. Each message warns once per process.
+        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
+        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
+        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
+        continuous setting meets columns that look like category codes. Each message warns once per
+        process.
 
     See Also
     --------
@@ -131,8 +134,8 @@ def boss(
     **When to use it.** BOSS suits the same data as :func:`~andrey.ges`: continuous data with linear
     effects, Gaussian noise, and no unmeasured common causes. It was designed for hundreds of highly
     connected variables [1]_. When every column is categorical, the default score is
-    ``"local_score_BDeu"``; ``"local_score_BIC_categorical"`` also scores categorical data, and for
-    mixed data use ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
+    ``"local_score_BDeu"``, and on mixed data ``"local_score_cond_gauss"``;
+    ``"local_score_BIC_categorical"`` and ``"local_score_degen_gauss"`` also score those data.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -214,7 +217,7 @@ def boss(
     from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.boss import boss as _boss
 
-    score_func = default_score(
+    score_func, categorical = default_score(
         data,
         score_func,
         "local_score_BIC_from_cov",
@@ -266,11 +269,12 @@ def grasp(
         BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
         multinomial BIC for categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` picks
-        ``"local_score_BDeu"`` when every column is categorical by the rule ``categorical=None``
-        infers with, and warns with a ``DataTypeWarning``; otherwise, or with ``categorical`` given,
-        it picks ``"local_score_BIC_from_cov"``. Pass ``"local_score_BIC_from_cov"`` to read whole
-        numbers, such as counts, as numbers.
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
+        column types as ``categorical=None`` infers them and picks ``"local_score_BDeu"`` when every
+        column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise, or with ``categorical`` given, it picks
+        ``"local_score_BIC_from_cov"``. Pass ``"local_score_BIC_from_cov"`` to read whole numbers,
+        such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
@@ -294,7 +298,8 @@ def grasp(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        they may be category codes. With ``score_func=None``, the columns it infers pick the default
+        score.
 
     Returns
     -------
@@ -326,10 +331,11 @@ def grasp(
     Warns
     -----
     DataTypeWarning
-        When ``score_func`` is ``None`` and every column is categorical, so the search scores with
-        BDeu; when a mixed-data score infers the categorical columns, or finds none and so runs as
-        the linear-Gaussian form; or when a continuous setting meets columns that look like
-        category codes. Each message warns once per process.
+        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
+        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
+        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
+        continuous setting meets columns that look like category codes. Each message warns once per
+        process.
 
     See Also
     --------
@@ -344,8 +350,8 @@ def grasp(
     **When to use it.** GRaSP suits the same data as :func:`~andrey.ges`: continuous data with
     linear effects, Gaussian noise, and no unmeasured common causes. Its authors report accurate
     search even on dense graphs [1]_. When every column is categorical, the default score is
-    ``"local_score_BDeu"``; ``"local_score_BIC_categorical"`` also scores categorical data, and for
-    mixed data use ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``.
+    ``"local_score_BDeu"``, and on mixed data ``"local_score_cond_gauss"``;
+    ``"local_score_BIC_categorical"`` and ``"local_score_degen_gauss"`` also score those data.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -434,7 +440,7 @@ def grasp(
     from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.grasp import grasp as _grasp
 
-    score_func = default_score(
+    score_func, categorical = default_score(
         data,
         score_func,
         "local_score_BIC_from_cov",

@@ -11,10 +11,12 @@ change names its pull request.
 
 ### Breaking
 
-- On data whose every column is categorical, `boss`, `grasp`, `ges`, `hc`, `tabu`, and
-  `exact_search` score with BDeu by default and warn once with a `DataTypeWarning`; pass
-  `score_func="local_score_BIC_from_cov"` (`"local_score_BIC"` for `ges` and `exact_search`) to
-  keep the linear-Gaussian BIC. Data with a continuous column keeps it without a change. ([#237])
+- `boss`, `grasp`, `ges`, `hc`, `tabu`, and `exact_search` pick their default score from the
+  column types and warn once with a `DataTypeWarning`: BDeu when every column is categorical, and
+  the conditional Gaussian BIC, `"local_score_cond_gauss"`, when some are, except for `tabu`, which
+  has no mixed-data score. Pass `score_func="local_score_BIC_from_cov"` (`"local_score_BIC"` for
+  `ges` and `exact_search`) to keep the linear-Gaussian BIC. Data with no categorical column keep it
+  without a change. ([#237])
 
 ### Added
 

@@ -288,8 +288,8 @@ _add(
         summary="Greedy equivalence search: a score-based greedy search over CPDAGs. Fast and "
         "accurate on linear-Gaussian data with the BIC; local_score_BDeu, the default when every "
         "column is categorical, or local_score_BIC_categorical for categorical data, "
-        "local_score_degen_gauss or local_score_cond_gauss for mixed data. The score is in "
-        "metadata['score'].",
+        "local_score_cond_gauss, the default when some columns are, or local_score_degen_gauss for "
+        "mixed data. The score is in metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -310,8 +310,9 @@ _add(
                 "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
                 "Gaussian BIC, for mixed data; "
-                "null picks local_score_BDeu, with a DataTypeWarning, when every column is "
-                "categorical (at most max_categories distinct whole numbers), else "
+                "null picks local_score_BDeu when every column is categorical (a category, bool, "
+                "or text column, or at most max_categories distinct whole numbers) and "
+                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
                 "local_score_BIC.",
                 choices=GES_SCORES,
                 nullable=True,
@@ -401,8 +402,8 @@ _add(
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
         "score improves; a simple greedy baseline. BIC by default, BDeu when every column is "
-        "categorical; score_func=local_score_BDeu or local_score_BIC_categorical for categorical "
-        "data, local_score_degen_gauss or "
+        "categorical, conditional Gaussian when some are; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
         "local_score_cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
         "when set. Returns the CPDAG of the final DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
@@ -425,8 +426,9 @@ _add(
                 "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
                 "Gaussian BIC, for mixed data; "
-                "null picks local_score_BDeu, with a DataTypeWarning, when every column is "
-                "categorical (at most max_categories distinct whole numbers), else "
+                "null picks local_score_BDeu when every column is categorical (a category, bool, "
+                "or text column, or at most max_categories distinct whole numbers) and "
+                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
                 "local_score_BIC_from_cov.",
                 choices=HC_SCORES,
                 nullable=True,
@@ -472,7 +474,8 @@ _add(
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
                 "categorical data coded by whole numbers; "
                 "null picks local_score_BDeu, with a DataTypeWarning, when every column is "
-                "categorical (at most 10 distinct whole numbers), else local_score_BIC_from_cov.",
+                "categorical (at most 10 distinct whole numbers), else local_score_BIC_from_cov, "
+                "mixed data included: tabu has no mixed-data score.",
                 choices=TABU_SCORES,
                 nullable=True,
             ),
@@ -511,8 +514,8 @@ _add(
         summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
         "the best-scoring equivalence class. BIC by default, BDeu when every column is "
-        "categorical; score_func=local_score_BDeu or local_score_BIC_categorical for categorical "
-        "data, local_score_degen_gauss or "
+        "categorical, conditional Gaussian when some are; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
         "local_score_cond_gauss for mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -539,8 +542,9 @@ _add(
                 "and local_score_BIC_categorical = multinomial BIC, for categorical data coded by "
                 "whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
                 "and conditional Gaussian BIC, for mixed data; "
-                "null picks local_score_BDeu, with a DataTypeWarning, when every column is "
-                "categorical (at most max_categories distinct whole numbers), else "
+                "null picks local_score_BDeu when every column is categorical (a category, bool, "
+                "or text column, or at most max_categories distinct whole numbers) and "
+                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
                 "local_score_BIC.",
                 choices=EXACT_SCORES,
                 nullable=True,
@@ -595,8 +599,9 @@ _BOSS_SCORE = ParamSpec(
     "data coded by whole numbers; "
     "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional Gaussian BIC, "
     "for mixed data (experimental); "
-    "null picks local_score_BDeu, with a DataTypeWarning, when every column is "
-    "categorical (at most max_categories distinct whole numbers), else local_score_BIC_from_cov.",
+    "null picks local_score_BDeu when every column is categorical (a category, bool, or text "
+    "column, or at most max_categories distinct whole numbers) and local_score_cond_gauss when "
+    "some are, each with a DataTypeWarning, else local_score_BIC_from_cov.",
     choices=PERMUTATION_SCORES,
     nullable=True,
 )
@@ -606,8 +611,9 @@ _add(
         family="permutation",
         summary="Best-order score search: a permutation search over the linear-Gaussian BIC, fast "
         "and accurate on linear-Gaussian data; local_score_BDeu, the default when every column is "
-        "categorical, or local_score_BIC_categorical for categorical data, local_score_degen_gauss "
-        "or local_score_cond_gauss for mixed data. Returns a CPDAG + score.",
+        "categorical, or local_score_BIC_categorical for categorical data, local_score_cond_gauss, "
+        "the default when some columns are, or local_score_degen_gauss for mixed data. Returns a "
+        "CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -630,9 +636,8 @@ _add(
         summary="Greedy relaxation of the sparsest permutation: a permutation search over the "
         "linear-Gaussian BIC, like BOSS with a different move (tucks); local_score_BDeu, the "
         "default when every column is categorical, or local_score_BIC_categorical for categorical "
-        "data, "
-        "local_score_degen_gauss or local_score_cond_gauss for mixed data. Returns a CPDAG + "
-        "score.",
+        "data, local_score_cond_gauss, the default when some columns are, or "
+        "local_score_degen_gauss for mixed data. Returns a CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
