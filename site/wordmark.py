@@ -26,9 +26,9 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
+from grain import NAVY  # site/grain.py: the art's darkest ground
 
 import andrey.viz
-from grain import NAVY  # site/grain.py: the art's darkest ground
 
 WORD = "Andrey"
 WEIGHT = 600  # Unbounded's SemiBold
@@ -130,7 +130,8 @@ def icon(a: pathops.Path, stroke: pathops.Path) -> str:
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{cx - side / 2:g} {-cy - side / 2:g} '
         f'{side:g} {side:g}"><rect x="{cx - side / 2:g}" y="{-cy - side / 2:g}" width="{side:g}" '
         f'height="{side:g}" rx="{side * 0.22:g}" fill="{NAVY}"/>'
-        f'<path fill="{andrey.viz.LIGHT.surface}" d="{svg_d(rest)}"/><path fill="{AMBER}" d="{svg_d(stroke)}"/></svg>\n'
+        f'<path fill="{andrey.viz.LIGHT.surface}" d="{svg_d(rest)}"/>'
+        f'<path fill="{AMBER}" d="{svg_d(stroke)}"/></svg>\n'
     )
 
 
