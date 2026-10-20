@@ -13,8 +13,8 @@ import pytest
 import andrey
 from andrey import Knowledge
 from andrey.cli import main
-from andrey.constraint.fci import _fci_orient
-from andrey.core import ARROW, TAIL
+from andrey.constraint.fci import _fci_orient, _remove_by_possible_dsep
+from andrey.core import ARROW, NULL, TAIL
 from andrey.core.knowledge import admits, resolve
 from andrey.core.orient import dag2cpdag, from_structure, meek
 from andrey.core.structure import CIRCLE
@@ -108,6 +108,44 @@ def test_knowledge_holds_whether_the_rules_run_in_rounds_or_one_at_a_time(
     _assert_required_forbidden_and_tiers_hold(name, from_structure(structure), LABELS)
 
 
+@pytest.mark.parametrize("columns", [LABELS, LABELS[::-1], list("cfaebd")])
+@pytest.mark.parametrize("setting", [{}, {"possible_dsep": "fast"}], ids=["default", "fast"])
+@pytest.mark.parametrize("name", ["fci", "gfci"])
+def test_knowledge_holds_through_the_possible_dsep_step_in_every_column_order(
+    name, setting, columns, data
+):
+    # The default runs that step on the columns sorted by rank, so the knowledge moves with them.
+    marks, labels = _marks(_fit(name, data[columns], knowledge=KNOWLEDGE, **setting))
+    _assert_required_forbidden_and_tiers_hold(name, marks, labels)
+
+
+@pytest.mark.parametrize("by_rank", [None, [3, 1, 0, 2, 4]], ids=["column order", "rank order"])
+def test_the_possible_dsep_step_never_removes_a_required_pair(by_rank):
+    # A triangle 0, 1, 2 and the edge 2 - 3: node 3 is in the possible-d-sep set of 0 and 1 and in
+    # neither one's neighborhood, so a test that finds them independent given {3} removes the edge.
+    marks = np.zeros((5, 5), dtype=np.int8)
+    for i, j, at_i, at_j in [(0, 1, 3, 1), (0, 2, 2, 2), (1, 2, 1, 3), (2, 3, 2, 3)]:
+        marks[i, j], marks[j, i] = at_i, at_j
+    keep = np.zeros((5, 5), dtype=bool)
+    keep[0, 1] = keep[1, 0] = True
+    where = np.arange(5) if by_rank is None else np.argsort(by_rank)  # each node's test index
+    pair = {int(where[0]), int(where[1])}
+    order = None if by_rank is None else np.array(by_rank)
+
+    def test(x, y, condition_set):
+        return 1.0 if {x, y} == pair else 0.0
+
+    unprotected, sepsets = marks.copy(), {}
+    _remove_by_possible_dsep(unprotected, test, 0.05, sepsets, order)
+    assert unprotected[0, 1] == NULL  # the test would remove it
+    # The separating set holds column labels, not ranks.
+    assert {frozenset(pair): cond for pair, cond in sepsets.items()} == {frozenset((0, 1)): (3,)}
+    protected, sepsets = marks.copy(), {}
+    _remove_by_possible_dsep(protected, test, 0.05, sepsets, order, keep=keep)
+    np.testing.assert_array_equal(protected, marks)
+    assert not sepsets
+
+
 @pytest.mark.parametrize("name", METHODS)
 def test_allowed_pairs_hold(name, data):
     allowed = {*TRUTH, ("b", "e")}
@@ -154,8 +192,13 @@ def test_bdeu_search_honors_required_forbidden_and_tiers(name):
     assert ("c", "d", "directed") in free.structure.oriented_edges()
 
 
-@pytest.mark.parametrize("name", DEPTH)
-def test_max_depth_caps_the_conditioning_sets(name, monkeypatch):
+@pytest.mark.parametrize(
+    ("name", "setting"),
+    [(name, {}) for name in DEPTH]
+    + [(name, {"possible_dsep": "fast"}) for name in DEPTH if name in PAGS],
+    ids=lambda value: value if isinstance(value, str) else ("fast" if value else "default"),
+)
+def test_max_depth_caps_the_conditioning_sets(name, setting, monkeypatch):
     rng = np.random.default_rng(1)
     d = 8
     weights = np.tril(rng.uniform(0.5, 1.0, (d, d)) * rng.choice([-1, 1], (d, d)), -1)
@@ -196,10 +239,10 @@ def test_max_depth_caps_the_conditioning_sets(name, monkeypatch):
             module, "make_indep_test", lambda *a, _make=make, **k: Recorder(_make(*a, **k))
         )
     frame = pd.DataFrame(X)
-    _fit(name, frame)
+    _fit(name, frame, **setting)
     assert max(largest) >= 2
     largest.clear()
-    _fit(name, frame, max_depth=1)
+    _fit(name, frame, max_depth=1, **setting)
     assert max(largest) <= 1
 
 
