@@ -277,7 +277,7 @@ returns.
 ## Background knowledge
 
 What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,
-naming columns by their labels:
+naming each column by its label, a string, or by its 0-based position, an integer:
 
 ```python
 from andrey import Knowledge, pc
@@ -305,7 +305,8 @@ arrowhead at `a` and can leave a circle at `b`. Knowledge that contradicts itsel
 required edge into an earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD,
 and FCI, knowledge whose directions close a cycle over the edges the search kept raises one after
 the adjacency search. Labels stay attached to their columns, so the same knowledge fits the table
-in any column order. On the command line, give a JSON object inline or as a file:
+in any column order. A label is the column name as text: name a column called `1` with `"1"`, as
+the integer `1` is the second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
 ## Data types
@@ -336,8 +337,9 @@ variable's spread as well as its mean; it needs several rows for each combinatio
 conditions on. Both are experimental. With either score, `hc` gives no categorical column a
 continuous parent.
 
-**Marking the categorical columns.** Name them with `categorical`, by column name or 0-based
-position: `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without
+**Marking the categorical columns.** Name them with `categorical`, by label (the column name as
+text) or 0-based position:
+`andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without
 `categorical`, a mixed-data setting infers them: a DataFrame's `category`, `bool`, and text columns,
 and every column whose values, over all its rows, are at most `max_categories` distinct whole
 numbers (10 by default). pandas does not mark a column as categorical by itself, so this follows

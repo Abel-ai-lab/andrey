@@ -1185,7 +1185,8 @@ _add(
                 type="str_list",
                 default=None,
                 doc="Names for the observed variables, for example, labels=[x1,x2]. null uses the "
-                "data file's header, else X1..Xn; latents are named L1..Lm.",
+                "data file's header, else X1..Xn; latents are named L1, L2, ..., skipping a name "
+                "an observed variable has.",
                 nullable=True,
             ),
         ),

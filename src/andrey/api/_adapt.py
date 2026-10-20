@@ -13,7 +13,7 @@ from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
 from andrey.core.knowledge import column_position
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
-from andrey.core.structure import relabel
+from andrey.core.structure import node_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
 
 if TYPE_CHECKING:
@@ -486,33 +486,13 @@ def structure_output(
     return StructureOutput.new(structure, ordering=order, weighted_adjacency=weights, metadata=meta)
 
 
-def node_labels(names: Iterable[object]) -> tuple[str, ...]:
-    """Turn column names into node labels: each name as text, ``str(name)``.
-
-    Raises ``ValueError`` naming each label that two columns share, such as ``1`` and ``"1"``,
-    which are both ``"1"`` as text.
-    """
-    names = list(names)
-    labels = tuple(str(name) for name in names)
-    shared = [label for label in dict.fromkeys(labels) if labels.count(label) > 1]
-    if shared:
-        clashes = "; ".join(
-            f"{label!r} names columns {[j for j, other in enumerate(labels) if other == label]}"
-            for label in shared
-        )
-        raise ValueError(
-            f"column names must be unique as text to name the nodes, but {clashes}; rename the "
-            "columns so each has its own name"
-        )
-    return labels
-
-
 def column_labels(data: object) -> tuple[str, ...] | None:
-    """Return a DataFrame's column names as node labels (:func:`node_labels`); ``None`` for arrays.
+    """Return a DataFrame's column names as node labels; ``None`` for arrays.
 
     Reads any table with a ``columns`` attribute (pandas, polars), so pandas stays optional. Default
-    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Raises
-    ``ValueError`` when two columns share a name.
+    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Each
+    name becomes text, and ``ValueError`` names each label two columns share
+    (:func:`~andrey.core.structure.node_labels`).
     """
     columns = getattr(data, "columns", None)
     if columns is None:

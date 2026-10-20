@@ -70,7 +70,7 @@ def boss(
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
         the same graph. Different seeds can reach different graphs.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
@@ -282,7 +282,7 @@ def grasp(
         ``None`` uses the ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so
         repeated calls return the same graph. Different seeds can reach different graphs.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.

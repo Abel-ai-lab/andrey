@@ -72,7 +72,7 @@ def ges(
         be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
         per free parameter of a variable's conditional probability table.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
@@ -561,7 +561,7 @@ def hc(
         each move lowers the score. A given ``max_iter`` also bounds the edge count, as each move
         adds at most one edge.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
@@ -868,7 +868,7 @@ def exact_search(
         ``"local_score_cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed data, as
         for :func:`~andrey.ges`. Each BIC uses the standard penalty, ``lambda_value=1``.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.

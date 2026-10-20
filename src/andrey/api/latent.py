@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
+from andrey.core.structure import node_labels
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -38,29 +39,30 @@ def gin(
         forms a cluster, and a latent is the next in the order, when the test's p-value is at
         least ``alpha``, so larger values make each test harder to pass.
     labels : tuple of str or None, default=None
-        Optional names for the observed variables, one per column. Defaults to a DataFrame's
-        column names, else ``X1..Xn``. Latents are auto-named ``L1..Lm``.
+        Optional names for the observed variables, one per column, each taken as text,
+        ``str(label)``. Defaults to a DataFrame's column names, else ``X1..Xn``. Latents are
+        named ``L1``, ``L2``, and so on, skipping a name an observed variable has.
 
     Returns
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over the observed variables (indices
-        ``0`` to ``n_variables - 1``) and one latent per cluster, named ``L1`` to ``Lm``: the
-        ordered latents first, in causal order, then the unordered ones; ``structure.node_types``
-        flags the latents. Each latent points to the observed variables in its cluster. An ordered
-        latent also points to every later latent and to every unordered one, and unordered latents
-        have no edge between them: edges between latents follow the order only and do not mean a
-        direct effect was found. An observed variable in no cluster has no edges.
-        ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]`` lists the clusters as
-        lists of column indices, by smallest member, ``metadata["causal_order"]`` lists the ordered
-        ones earliest latent first, ``metadata["unordered"]`` lists the rest by smallest member,
-        and ``metadata["n_latents"]`` is the latent count.
+        ``0`` to ``n_variables - 1``) and one latent per cluster, named ``L1``, ``L2``, and so on:
+        the ordered latents first, in causal order, then the unordered ones;
+        ``structure.node_types`` flags the latents. Each latent points to the observed variables in
+        its cluster. An ordered latent also points to every later latent and to every unordered one,
+        and unordered latents have no edge between them: edges between latents follow the order only
+        and do not mean a direct effect was found. An observed variable in no cluster has no edges.
+        ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]`` lists the clusters as lists
+        of column indices, by smallest member, ``metadata["causal_order"]`` lists the ordered ones
+        earliest latent first, ``metadata["unordered"]`` lists the rest by smallest member, and
+        ``metadata["n_latents"]`` is the latent count.
 
     Raises
     ------
     ValueError
         If ``alpha`` is not in ``(0, 1)``, or if ``labels`` does not give one name per column of
-        ``data``.
+        ``data`` or gives two that are equal as text.
 
     Notes
     -----
@@ -133,5 +135,5 @@ def gin(
         raise ValueError(
             f"labels must name each of the {X.shape[1]} columns of data, got {len(labels)} names"
         )
-    names = labels if labels is not None else column_labels(data)
+    names = node_labels(labels) if labels is not None else column_labels(data)
     return gin_structure(X, alpha=alpha, labels=names)
