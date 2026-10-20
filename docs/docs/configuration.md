@@ -41,8 +41,8 @@ without a warning.
 ## Parallel search
 
 - `ANDREY_NUM_WORKERS`: the worker processes for GES and GFCI, and the worker threads for the
-  per-variable regressions of `granger`. `1` (the default) and `0` run serially; `-1` uses every
-  usable core.
+  per-variable regressions of `granger` and the two directions of `pnl`. `1` (the default) and `0`
+  run serially; `-1` uses every usable core.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 
