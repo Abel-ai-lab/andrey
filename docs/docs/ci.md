@@ -14,8 +14,10 @@ the optional extras. It also builds and installs the wheel, builds this website,
 notebook, which must reproduce the outputs the website shows. NumPy in float64 is the reference:
 the PyTorch paths must match its results and repeat exactly.
 
-Before each release, a quality gate fits the nine supported methods to data with known graphs,
-seven of them to the Sachs data too, and the release is published only when every method passes.
+Each release's pull request into `main` runs a quality gate that fits the nine supported methods
+to data with known graphs, seven of them to the Sachs data too, and the release merges only when
+every method passes. The publish reuses that run when the tagged commit has the same files as the
+commit the gate checked, and runs the gate again when it does not.
 Every pull request also checks the published benchmarks: a method fails when its reference package
 has fewer errors at any size, unless a cited source shows that Andrey follows the method's paper or
 that the reference has a defect.
