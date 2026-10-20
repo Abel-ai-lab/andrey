@@ -405,6 +405,15 @@ def test_pag_orientations_are_invariant_to_column_order(module, draw):
     assert _invariant_to_column_order(fit, x)
 
 
+@pytest.mark.parametrize("module", ["andrey.constraint.fci", "andrey.search.gfci"])
+def test_possible_dsep_is_invariant_to_column_order(module):
+    """A draw on which the possible-d-separation step removes different edges when it visits
+    them in column order."""
+    x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1).data
+    fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
+    assert _invariant_to_column_order(fit, x)
+
+
 def test_fci_output_contract():
     assert andrey.fci(datagen.generate("gauss_5v")).structure.kind == "pag"
 

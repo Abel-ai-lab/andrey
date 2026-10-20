@@ -23,6 +23,7 @@ from andrey.constraint._skeleton import (
 )
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
+from andrey.search.hc import tie_ranks
 
 # Bound discriminating and possible-d-sep paths by this finite cap.
 _UNBOUNDED_PATH = 1000
@@ -37,7 +38,7 @@ def fci(
     indep_test: str = "fisherz",
     collider_rule: str = "sepsets",
     categorical: np.ndarray | None = None,
-    possible_dsep: str = "fast",
+    possible_dsep: str = "order_free",
     in_column_order: bool = False,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
@@ -46,10 +47,11 @@ def fci(
     significance level in ``(0, 1)``. Skeleton pruning requires a p-value above ``alpha``;
     the optional majority collider rule also counts equality as a separating vote.
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
-    ``possible_dsep`` (``"fast"`` or ``"order_free"``) selects how each possible-d-sep set is built.
-    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
-    of in order-free rounds (:func:`_fci_orient`). Returns the PAG as a ``GraphStructure`` of kind
-    ``"pag"`` (circle marks and all).
+    ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
+    visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
+    ``in_column_order`` takes the column order there too, and applies the orientation rules one
+    firing at a time in column order instead of in order-free rounds (:func:`_fci_orient`). Returns
+    the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
 
@@ -60,7 +62,11 @@ def fci(
 
     marks = _circle_pag(support)
     _orient_colliders(marks, sepsets)
-    _remove_by_possible_dsep(marks, test, alpha, sepsets, order_free=possible_dsep == "order_free")
+    if possible_dsep == "fast" or in_column_order:
+        _remove_by_possible_dsep(marks, test, alpha, sepsets)
+    else:
+        by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)
+        _remove_by_possible_dsep(marks, ranked_test, alpha, sepsets, by_rank)
     marks = _circle_pag(marks != NULL)
     ambiguous = (
         _majority_sepsets(marks, test, alpha, sepsets)
@@ -237,8 +243,8 @@ def _validate_collider_rule(collider_rule: str) -> None:
 
 
 def _validate_possible_dsep(possible_dsep: str) -> None:
-    if possible_dsep not in ("fast", "order_free"):
-        raise ValueError(f"possible_dsep must be 'fast' or 'order_free', got {possible_dsep!r}")
+    if possible_dsep not in ("order_free", "fast"):
+        raise ValueError(f"possible_dsep must be 'order_free' or 'fast', got {possible_dsep!r}")
 
 
 def _triple(a: int, b: int, c: int) -> tuple[int, int, int]:
@@ -380,37 +386,18 @@ def _exists_possible_parent_path(
     return False
 
 
-def _semidirected_reach(step: np.ndarray, src: int) -> np.ndarray:
-    """Mask of the nodes a semidirected path ``src o-> ... o-> v`` reaches from ``src``.
-
-    ``step[u, v]`` allows the step ``u -> v``: the endpoint at ``u`` on edge ``u-v`` is a tail or a
-    circle.
-    """
-    seen = step[src].copy()
-    frontier = seen.copy()
-    while frontier.any():
-        frontier = step[frontier].any(axis=0) & ~seen
-        seen |= frontier
-    return seen
-
-
-def _possible_dsep(marks: np.ndarray, x: int, y: int, order_free: bool = False) -> list[int]:
+def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     """Possible-d-separating nodes for the pair ``(x, y)`` (descending), from a reachability BFS.
 
     Grows a frontier of node pairs from ``x``, extending through definite colliders and adjacent
     triples, and collects every intermediate node reachable by a possible-parent path. The frontier
     holds ``(a, c)`` pairs rather than the last edge of each path, so the set can be smaller than
     Possible-D-Sep as Spirtes, Glymour, and Scheines (2000) define it; :func:`andrey.fci` gives the
-    reasons for keeping it.
-
-    By default a node's possible-parent check runs when the frontier reaches it, over the
-    predecessors recorded so far, so the set depends on the order the frontier is visited in. With
-    ``order_free``, the check runs once the frontier is exhausted, over every predecessor recorded
-    for the node, so the set does not depend on that order, nor on the column order.
+    reasons for keeping it. A node's possible-parent check runs when the frontier reaches it, over
+    the predecessors recorded so far, so the set depends on the order of the node indices.
     """
     n = marks.shape[0]
     dsep: set[int] = set()
-    reached: set[int] = set()
     queue: deque[tuple[int, int]] = deque()
     visited: set[tuple[int, int]] = set()
     previous: dict[int, set[int]] = {}
@@ -436,9 +423,7 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int, order_free: bool = False) 
             if distance > _UNBOUNDED_PATH:
                 break
         a, b = t
-        if order_free:
-            reached.add(b)
-        elif _exists_possible_parent_path(previous, b, x, marks):
+        if _exists_possible_parent_path(previous, b, x, marks):
             dsep.add(b)
         for c in range(n):
             if not _adjacent(marks, b, c) or c in (a, x, y):
@@ -453,22 +438,6 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int, order_free: bool = False) 
                 if first is None:
                     first = u
 
-    if order_free:
-        step = (marks == TAIL) | (marks == CIRCLE)
-        reach: dict[int, np.ndarray] = {}
-
-        def possible_parent_path(b: int) -> bool:
-            """A predecessor of ``b`` other than ``x`` has a semidirected path to ``x`` or ``b``."""
-            for r in previous.get(b, ()):
-                if r in (b, x):
-                    continue
-                if r not in reach:
-                    reach[r] = _semidirected_reach(step, r)
-                if reach[r][x] or reach[r][b]:
-                    return True
-            return False
-
-        dsep.update(filter(possible_parent_path, reached))
     dsep.discard(x)
     dsep.discard(y)
     # Sort by descending labels "X{i+1}". Lexicographic order differs from numeric order
@@ -487,11 +456,13 @@ def _iter_dsep_choices(
     and left the pair dependent. Testing it again cannot remove the edge.
     """
 
-    def outside(values: tuple[int, ...]) -> bool:
-        return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
-
     for size in range(1, len(dsep) + 1):
-        yield from filter(outside, combinations(dsep, size))
+        yield from (c for c in combinations(dsep, size) if _outside(c, adj_a, adj_b))
+
+
+def _outside(values: tuple[int, ...], adj_a: set[int], adj_b: set[int]) -> bool:
+    """``values`` lie inside neither endpoint's adjacency."""
+    return not (all(v in adj_a for v in values) or all(v in adj_b for v in values))
 
 
 def _try_remove_by_dsep(
@@ -505,10 +476,9 @@ def _try_remove_by_dsep(
     test: CITest,
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
-    order_free: bool,
 ) -> bool:
     """Remove edge ``x-y`` if some possible-d-sep subset makes ``x`` and ``y`` independent."""
-    dsep = _possible_dsep(marks, a, b, order_free)
+    dsep = _possible_dsep(marks, a, b)
     for cond in _iter_dsep_choices(dsep, adj_a, adj_b):
         if test(x, y, cond) > alpha:
             marks[x, y] = NULL
@@ -522,7 +492,7 @@ def _edge_order(marks: np.ndarray, i: int, j: int) -> tuple[int, int]:
     """Return the endpoint order used by the possible-d-sep search.
 
     A left-pointing edge uses ``(j, i)``. Every other edge uses ``(i, j)``, so its search order
-    follows the column indices.
+    follows the node indices.
     """
     if marks[i, j] == ARROW and marks[j, i] in (TAIL, CIRCLE):
         return j, i
@@ -534,14 +504,53 @@ def _remove_by_possible_dsep(
     test: CITest,
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
-    order_free: bool = False,
+    by_rank: np.ndarray | None = None,
 ) -> None:
     """Prune edges the plain skeleton kept but a possible-d-sep conditioning set separates.
 
-    Search each endpoint's possible-d-sep set (built as ``order_free`` selects) for a conditioning
-    subset outside either endpoint's adjacency. Store a successful subset under the endpoint order
-    returned by ``_edge_order``.
+    Visits the pairs one at a time and searches each endpoint's possible-d-sep set for a
+    conditioning subset outside either endpoint's adjacency; the first subset found removes the
+    pair at once, so each removal changes the sets of the pairs after it, and is stored under the
+    endpoint order returned by ``_edge_order``. The pairs, their endpoints, and the nodes of each
+    set are visited in column order. ``by_rank``, when given, is the column order of ``test``'s
+    data, as :func:`_test_in_rank_order` returns them: the step then runs on the nodes in that
+    order and maps its removals and separating sets back to the column labels once.
     """
+    if by_rank is None:
+        _remove_in_node_order(marks, test, alpha, sepsets)
+        return
+    ranked = marks[np.ix_(by_rank, by_rank)]
+    found: dict[tuple[int, int], tuple[int, ...]] = {}
+    _remove_in_node_order(ranked, test, alpha, found)
+    position = np.argsort(by_rank)
+    marks[:] = ranked[np.ix_(position, position)]
+    label = by_rank.tolist()
+    for (x, y), cond in found.items():
+        sepsets[(label[x], label[y])] = tuple(label[v] for v in cond)
+
+
+def _test_in_rank_order(
+    X: np.ndarray, indep_test: str, categorical: np.ndarray | None
+) -> tuple[np.ndarray, CITest]:
+    """The column order that sorts ``X`` by :func:`~andrey.search.hc.tie_ranks`, and the
+    ``indep_test`` test over ``X``'s columns in that order.
+
+    Each rank moves with its column, so every column order of ``X`` gives the same test.
+    """
+    by_rank = np.argsort(tie_ranks(X, categorical))
+    mask = None if categorical is None else np.asarray(categorical)[by_rank]
+    return by_rank, make_indep_test(
+        indep_test, np.ascontiguousarray(X[:, by_rank]), categorical=mask
+    )
+
+
+def _remove_in_node_order(
+    marks: np.ndarray,
+    test: CITest,
+    alpha: float,
+    sepsets: dict[tuple[int, int], tuple[int, ...]],
+) -> None:
+    """:func:`_remove_by_possible_dsep` in the order of the node indices."""
     n = marks.shape[0]
     edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
     for na, nb in edges:
@@ -549,11 +558,9 @@ def _remove_by_possible_dsep(
             continue
         adj_a = set(_adjacent_nodes(marks, na))
         adj_b = set(_adjacent_nodes(marks, nb))
-        _try_remove_by_dsep(marks, na, nb, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free)
+        _try_remove_by_dsep(marks, na, nb, na, nb, adj_a, adj_b, test, alpha, sepsets)
         if _adjacent(marks, na, nb):
-            _try_remove_by_dsep(
-                marks, nb, na, na, nb, adj_a, adj_b, test, alpha, sepsets, order_free
-            )
+            _try_remove_by_dsep(marks, nb, na, na, nb, adj_a, adj_b, test, alpha, sepsets)
 
 
 # ---- FCI orientation rules ----------------------------------------------------------------------

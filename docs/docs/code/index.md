@@ -106,8 +106,9 @@ bound. R8 checks each pair of endpoints in both orders, so it does not depend on
 The rules run in rounds, each setting together the marks every rule implies on the graph as it
 stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
-With `possible_dsep="order_free"`, FCI and GFCI build possible-d-separation sets that do not depend
-on the order their search visits nodes; the default, `"fast"`, builds them in that order.
+Their possible-d-separation step visits the pairs and nodes by a rank computed from each column's
+own data, so with the default `possible_dsep="order_free"` their result does not depend on the
+column order unless two columns are identical; `"fast"` visits them in column order.
 
 ### Experimental methods
 

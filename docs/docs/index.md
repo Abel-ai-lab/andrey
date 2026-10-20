@@ -20,6 +20,10 @@ including where Andrey is not faster.
 uv add andrey-core
 ```
 
+```shell
+pip install andrey-core
+```
+
 ```{literalinclude} ../../site/example.py
 :language: python
 ```
@@ -57,22 +61,24 @@ What changed in each release.
 :::
 ::::
 
-## Documentation
+## Guides and reference
 
-- [Install](guides/getting-started.md#install) Andrey and choose optional GPU acceleration.
-- [Get started](guides/getting-started.md#learn-a-graph) by learning a causal graph from real data.
-- [Examples](examples/index) are notebooks; [demos](demos/index) run in your browser.
-- [API reference](code/index.md) covers methods, graph structures, and visualization.
-- [Graph representation](guides/graph-representation.md) compares Andrey's graph model with other
+- [Install](guides/getting-started.md#install): the package and optional GPU acceleration.
+- [Get started](guides/getting-started.md#learn-a-graph): learn a causal graph from real data.
+- [Examples](examples/index): notebooks that run one method or task each.
+- [Demos](demos/index): methods to step through in your browser.
+- [API reference](code/index.md): methods, graph structures, and visualization.
+- [CLI reference](code/index.md#command-line-interface): run methods from the shell.
+- [Graph types](guides/graph-types.md): DAGs, CPDAGs, PAGs, and temporal graphs, with diagrams.
+- [Graph representation](guides/graph-representation.md): Andrey's graph model compared with other
   causal discovery packages.
-- [Graph types](guides/graph-types.md) explains DAGs, CPDAGs, PAGs, and temporal graphs with
-  diagrams.
-- [CLI reference](code/index.md#command-line-interface) covers running methods from the shell.
-- [Configuration](configuration.md) lists the environment variables Andrey reads.
-- [Release cards](benchmarks.md) keep each release's record: timings, accuracy, and known limits.
-- [Testing](ci.md) says what each release is tested on, and how to run the GPU checks.
-- [Brand kit](brand.md) offers wordmark, icon, and avatar downloads, with colors and usage
-  guidelines.
+- [Release cards](benchmarks.md): each release's timings, accuracy, and known limits.
+
+## More
+
+- [Configuration](configuration.md): the environment variables Andrey reads.
+- [Testing](ci.md): what each release is tested on, and how to run the GPU checks.
+- [Brand kit](brand.md): wordmark, icon, and avatar downloads, with colors and usage guidelines.
 
 ```{toctree}
 :hidden:
