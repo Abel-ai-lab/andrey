@@ -82,7 +82,7 @@ def html() -> pathlib.Path:
     generated = (
         BUILD,
         DOCS / "_generated",
-        DOCS / "docs" / "code" / "generated",
+        DOCS / "docs" / "api",
         *(DOCS / "docs" / "examples").glob("*.ipynb"),
         DOCS / "_static" / "graph-comparison.html",
         *(DOCS / "_static").glob("graph-types-*.html"),
@@ -143,7 +143,7 @@ def test_the_docs_write_math_in_katex_not_unicode():
 
 
 def test_the_reference_documents_every_public_name_and_nothing_else(html):
-    generated = html / "docs" / "code" / "generated"
+    generated = html / "docs" / "api"
     public = {prefix + name for module, prefix in PUBLIC_MODULES for name in module.__all__}
     documented = {p.stem.removeprefix("andrey.") for p in generated.glob("andrey.*.html")}
     missing = sorted(public - documented - COVERAGE_SKIP)

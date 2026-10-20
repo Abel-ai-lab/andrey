@@ -244,7 +244,7 @@ them):
 - a **Limitations.** paragraph from the campaign: the data and sizes measured, the sizes where its
   median errors reach the empty graph's, its fit times with the core count, and the size where it
   stops being practical, if the report shows one;
-- the method under "Supported methods" in `docs/docs/code/index.md`;
+- the method under "Supported methods" in `docs/docs/api.md`;
 - its rows in `benchmarks/published/<label>/summary.json` for the release that publishes it,
   generated from the campaign's records and passing `uv run python -m qa.reference_parity`;
 - a section in that release's card, `docs/docs/benchmarks/<release>.md`, with its driver in the
@@ -255,7 +255,7 @@ them):
 
 ## Command-line interface
 
-The [API reference](docs/docs/code/index.md#command-line-interface) lists the commands, generated
+The [API reference](docs/docs/api.md#command-line-interface) lists the commands, generated
 from the Typer app. A change keeps this contract:
 
 - `--help` selects introspection and `--json` the representation: method help reads no data or

@@ -88,7 +88,7 @@ extensions = [
 # MyST and print its autodoc directives as text.
 source_suffix = {".rst": "restructuredtext", ".md": "myst-nb", ".ipynb": "myst-nb"}
 # Stubs an earlier build wrote as .md would now sit beside their .rst twins and fail the build.
-for _stale in (HERE / "docs" / "code" / "generated").glob("*.md"):
+for _stale in (HERE / "docs" / "api").glob("*.md"):
     _stale.unlink()
 # The homepage is a template, not a document, so the documentation's index is the root document.
 root_doc = "docs/index"
@@ -222,7 +222,7 @@ LLMS_SECTIONS = (
             "docs/index",
             "docs/guides/getting-started",
             "docs/faq",
-            "docs/code/index",
+            "docs/api",
             "docs/configuration",
             "docs/guides/graph-types",
             "docs/guides/graph-representation",
@@ -289,7 +289,7 @@ NAV_SECTIONS = {
 NAV_REFERENCE = ("Reference", "code")
 # The reference pages' icons in the documentation tree (_templates/nav-icons.html).
 NAV_ICONS = {
-    "docs/code/index": "braces",
+    "docs/api": "braces",
     "docs/configuration": "sliders",
     "docs/benchmarks": "chart",
     "docs/faq": "help",
@@ -303,6 +303,19 @@ html_additional_pages = {
     "demo/index": "demo-redirect.html",
     "docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html",
 }
+
+
+def _moved_pages(app):  # noqa: ANN001, ANN202 -- Sphinx event arguments
+    """The API reference's earlier addresses, docs/code/index and its generated pages under
+    docs/code/generated/, each a page that sends the reader to its place under docs/api."""
+    reference = {"title": "API reference", "target": "../api.html"}
+    yield "docs/code/index", reference, "moved-redirect.html"
+    for doc in sorted(app.env.found_docs):
+        if doc.startswith("docs/api/"):
+            name = doc.removeprefix("docs/api/")
+            context = {"title": name, "target": f"../../api/{name}.html"}
+            yield f"docs/code/generated/{name}", context, "moved-redirect.html"
+
 
 # ---- blog (ABlog) ----------------------------------------------------------------------------
 # A post is a page under blog/ whose front matter sets `blogpost: true`, with its `date`. ABlog
@@ -1292,6 +1305,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
+    app.connect("html-collect-pages", _moved_pages)
     app.connect("build-finished", _write_discovery)
     app.connect("build-finished", _version_assets)
     app.connect("doctree-resolved", _post_byline)

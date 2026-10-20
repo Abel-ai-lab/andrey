@@ -986,7 +986,7 @@ def test_missing_method_suggests_next_command(args, hint, capsys):
     "path",
     [
         "DEVELOPMENT.md",
-        "docs/docs/code/index.md",
+        "docs/docs/api.md",
     ],
 )
 def test_documented_schema_version_matches_code(path):

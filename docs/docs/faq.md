@@ -57,7 +57,7 @@ Andrey in its first cell.
 ### Which methods are there?
 
 {{ n_supported }} are supported: {{ supported_methods }}. The
-[API reference](code/index.md#structure-learning-methods) lists them all, and `andrey list` prints
+[API reference](api.md#structure-learning-methods) lists them all, and `andrey list` prints
 them with their status.
 
 ### What is the difference between supported and experimental?
@@ -166,7 +166,7 @@ andrey run pc --help               # its inputs and parameters
 andrey run pc --data your_data.csv alpha=0.01
 ```
 
-The [command-line reference](code/index.md#command-line-interface) has every command and flag.
+The [command-line reference](api.md#command-line-interface) has every command and flag.
 
 ### How does an agent use it?
 
@@ -186,7 +186,7 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 
 Andrey is in alpha: any release may change the API, including the supported methods. Pin the
 version you depend on, and read the [changelog](changelog.md) before upgrading. The public API is
-what the [API reference](code/index.md) documents; names that start with an underscore are private
+what the [API reference](api.md) documents; names that start with an underscore are private
 and can change in any release.
 
 ### What is planned next?

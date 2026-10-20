@@ -279,7 +279,7 @@ def test_methods_list_every_registered_method(monkeypatch):
     assert title.startswith(f"{len(specs)} methods in ")
     assert html.count('class="method"') == len(specs)
     for spec in specs:
-        assert f"docs/code/generated/andrey.{spec.name}.html" in html
+        assert f"docs/api/andrey.{spec.name}.html" in html
     # Each supported method a release's summary compares with another package has the seal, and a
     # tooltip that describes it.
     status = {s.name: s.status for s in specs}

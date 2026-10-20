@@ -1035,7 +1035,7 @@ def methods(summaries: list[dict]) -> tuple[str, str]:
             status = EXPERIMENTAL if spec.status == "experimental" else ""
             items.append(
                 f'<li class="method"><div class="method-head"><span class="method-title">'
-                f'<a class="method-name" href="docs/code/generated/andrey.{spec.name}.html">'
+                f'<a class="method-name" href="docs/api/andrey.{spec.name}.html">'
                 f"<code>andrey.{spec.name}</code></a>{bench}</span>"
                 f'<span class="method-kind">{returns_text(spec)}</span></div>'
                 f'<p class="method-what">{status}{escape(first_clause(spec.summary))}</p></li>'
@@ -1498,7 +1498,7 @@ DOC_PAGES = (
         "Graph types",
         "What a DAG, CPDAG, PAG, or temporal graph claims.",
     ),
-    ("code", "docs/code/index.html", "API reference", "Every method, structure, and command."),
+    ("code", "docs/api.html", "API reference", "Every method, structure, and command."),
     (
         "chart",
         "docs/benchmarks.html",

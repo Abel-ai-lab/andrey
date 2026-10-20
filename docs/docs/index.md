@@ -67,8 +67,8 @@ What changed in each release.
 - [Get started](guides/getting-started.md#learn-a-graph): learn a causal graph from real data.
 - [Examples](examples/index): notebooks that run one method or task each.
 - [Demos](demos/index): methods to step through in your browser.
-- [API reference](code/index.md): methods, graph structures, and visualization.
-- [CLI reference](code/index.md#command-line-interface): run methods from the shell.
+- [API reference](api.md): methods, graph structures, and visualization.
+- [CLI reference](api.md#command-line-interface): run methods from the shell.
 - [Graph types](guides/graph-types.md): DAGs, CPDAGs, PAGs, and temporal graphs, with diagrams.
 - [Graph representation](guides/graph-representation.md): Andrey's graph model compared with other
   causal discovery packages.
@@ -87,7 +87,7 @@ What changed in each release.
 guides/index
 examples/index
 demos/index
-code/index
+api
 configuration
 benchmarks
 faq
