@@ -554,14 +554,9 @@ def claimed_comparisons(summaries: list[dict]) -> list[dict]:
 
 
 # ---- speed across methods --------------------------------------------------------------------
-def family_intro(methods: list[dict]) -> str:
-    """Say what a family's charts show and which packages they cover."""
-    packages = sorted({m["comparator"] for m in methods}, key=str.lower)
-    return (
-        f"Andrey was measured alongside {listed(packages)} on the same datasets and the same "
-        "machine at each size. Each chart plots the median fit time against the number of "
-        "variables, or of rows for a pair of variables: up and to the left is better."
-    )
+def family_intro() -> str:
+    """What a family's charts show, in one line; each chart's legend names its packages."""
+    return "Median fit time, on the same data and machine at each size. Up and left is faster."
 
 
 def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
@@ -673,12 +668,23 @@ def seconds_axis(v: float) -> str:
     return {1000: "1k", 10000: "10k"}.get(v, f"{v:g}")
 
 
-def speed_figures(summaries: list[dict]) -> list[tuple[str, str]]:
+def speed_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
+    """The groups of ``time_groups`` that get a speedup chart: a comparison where Andrey is not
+    faster stays in the release cards' tables."""
+    return [(n, ms) for n, ms in time_groups(summaries) if all(faster(m) for m in ms)]
+
+
+def chart_key(name: str, methods: list[dict]) -> tuple[str, ...]:
+    """A chart's identity: its name and its packages, since one method can have two charts."""
+    return (name, *(m["comparator"] for m in methods))
+
+
+def speed_figures(summaries: list[dict], keep: set[tuple] | None = None) -> list[tuple[str, str]]:
     """A chart per method (or per run where a method's comparisons differ), each with its largest
-    speedup, as (registry family, chart). The charts share one time axis, so they compare at a
-    glance; each size axis spans its own chart's sizes."""
-    # A speedup chart: a comparison where Andrey is not faster stays in the release cards' tables.
-    groups = [(n, ms) for n, ms in time_groups(summaries) if all(faster(m) for m in ms)]
+    speedup, as (registry family, chart), or only the charts ``keep`` holds (``chart_key``). The
+    charts share one time axis, so they compare at a glance; each size axis spans its own chart's
+    sizes."""
+    groups = speed_groups(summaries)
     times = [
         t
         for _, methods in groups
@@ -688,7 +694,46 @@ def speed_figures(summaries: list[dict]) -> list[tuple[str, str]]:
         if t is not None
     ]
     xr = (10 ** math.floor(math.log10(min(times))), 10 ** math.ceil(math.log10(max(times))))
-    return [(methods[0]["family"], time_chart(name, methods, xr)) for name, methods in groups]
+    return [
+        (methods[0]["family"], time_chart(name, methods, xr))
+        for name, methods in groups
+        if keep is None or chart_key(name, methods) in keep
+    ]
+
+
+# A family's dialog shows each method once, at its default setting, and only its clear wins. A
+# setting's chart extends its method's name ("XGES without extended search", "PC on mixed data,
+# ..."), so a method's default is its shortest-named chart; among a method's charts with that
+# name, the fastest. A chart below DIALOG_MIN_SPEEDUP is left to the release cards, except the one
+# behind its family tile's number.
+DIALOG_MIN_SPEEDUP = 10
+
+
+def best_ratio(methods: list[dict]) -> float:
+    """The largest published speedup among ``methods``' rows."""
+    return max(r["ratio"] for m in methods for r in m["rows"] if r["ratio"] is not None)
+
+
+def dialog_charts(summaries: list[dict]) -> set[tuple]:
+    """The charts the family dialogs show, by ``chart_key``."""
+    default: dict[str, tuple[str, list[dict]]] = {}
+    for name, methods in speed_groups(summaries):
+        shown = default.get(methods[0]["spec"])
+        if (
+            shown is None
+            or len(name) < len(shown[0])
+            or (name == shown[0] and best_ratio(methods) > best_ratio(shown[1]))
+        ):
+            default[methods[0]["spec"]] = (name, methods)
+    keep = {
+        chart_key(*shown)
+        for shown in default.values()
+        if best_ratio(shown[1]) >= DIALOG_MIN_SPEEDUP
+    }
+    best = [info["best"][0] for info in family_tiles(summaries)]
+    return keep | {
+        chart_key(n, ms) for n, ms in speed_groups(summaries) if any(m in best for m in ms)
+    }
 
 
 def speed_chart(summaries: list[dict]) -> str:
@@ -852,8 +897,8 @@ def accuracy_rows(summaries: list[dict]) -> list[dict]:
         for c in error_comparisons(methods):
             row = by.setdefault(
                 c["method"]["comparator"],
-                {"name": name, "spec": c["method"]["spec"], "comparator": c["method"]["comparator"],
-                 "ours": 0.0, "theirs": 0.0},
+                {"name": name, "spec": c["method"]["spec"], "family": c["method"]["family"],
+                 "comparator": c["method"]["comparator"], "ours": 0.0, "theirs": 0.0},
             )  # fmt: skip
             row["ours"] += c["row"]["andrey_errors"]
             row["theirs"] += c["row"]["comparator_errors"]
@@ -873,14 +918,23 @@ def accuracy_change(row: dict) -> float:
     return 100 * row["ours"] / row["theirs"] - 100 if row["theirs"] else 0.0
 
 
+def family_wins(summaries: list[dict]) -> list[dict]:
+    """Each family's largest cut in errors against a package, most fewer first; a family where
+    Andrey has no fewer errors anywhere is left to the release cards. A row whose change rounds to
+    0% is on par."""
+    best: dict[str, dict] = {}
+    for r in accuracy_rows(summaries):
+        if accuracy_change(r) <= -0.5 and (
+            r["family"] not in best or accuracy_change(r) < accuracy_change(best[r["family"]])
+        ):
+            best[r["family"]] = r
+    return sorted(best.values(), key=accuracy_change)
+
+
 def accuracy_wins(summaries: list[dict]) -> str:
-    """Each method and package where Andrey has fewer errors, most fewer first: both packages'
-    errors summed over the sizes the two share, as a pair of bars on the row's own scale, and how
-    many fewer in words."""
-    # A row whose change rounds to 0% is on par.
-    wins = sorted(
-        (r for r in accuracy_rows(summaries) if accuracy_change(r) <= -0.5), key=accuracy_change
-    )
+    """Each family's largest cut in errors (``family_wins``): both packages' errors summed over the
+    sizes the two share, as a pair of bars on the row's own scale, and how many fewer in words."""
+    wins = family_wins(summaries)
     rows = []
     for r in wins:
         bars = "".join(
@@ -1654,11 +1708,16 @@ def family_tiles(summaries: list[dict]) -> list[dict]:
             continue
         cells = [(m, r) for m in found for r in m["rows"] if r["ratio"] is not None]
         method, row = max(cells, key=lambda cell: cell[1]["ratio"])
+        # Each method once, by its default's name, the shortest of its comparisons' names.
+        names: dict[str, str] = {}
+        for m in found:
+            if m["spec"] not in names or len(m["method"]) < len(names[m["spec"]]):
+                names[m["spec"]] = m["method"]
         tiles.append(
             {
                 "family": family,
                 "title": title,
-                "methods": list(dict.fromkeys(m["method"] for m in found)),
+                "methods": list(names.values()),
                 "comparisons": found,
                 "best": (method, row),
                 "number": round_down(row["ratio"]) if row["ratio"] >= 2 else None,
@@ -1832,7 +1891,7 @@ def accuracy_tiles(summaries: list[dict]) -> str:
     return glass_tile(
         "7",
         "Fewer errors than the other package",
-        "Summed over every size both ran.",
+        "Each family's largest cut, summed over every size both ran.",
         accuracy_wins(summaries),
     ) + (
         '<li class="bento-note"><h3>Tested against the true graphs</h3>'
@@ -1979,19 +2038,17 @@ def family_dialog(info: dict, charts: list[str]) -> str:
         else "<p>No chart for this family compares like with like yet.</p>"
     )
     return (
-        dialog_head(
-            f"speed-{info['family']}", f"{info['title']} speed", family_intro(info["comparisons"])
-        )
+        dialog_head(f"speed-{info['family']}", f"{info['title']} speed", family_intro())
         + body
-        + '<p class="tile-more"><a href="docs/benchmarks.html">Every measurement, in the release '
-        "cards</a></p>" + DIALOG_TAIL
+        + '<p class="tile-more"><a href="docs/benchmarks.html">Details in the release cards</a></p>'
+        + DIALOG_TAIL
     )
 
 
 def family_dialogs(summaries: list[dict]) -> str:
     """The dialogs of ``family_tiles``, each with the charts of its family."""
     charts: dict[str, list[str]] = {}
-    for family, figure in speed_figures(summaries):
+    for family, figure in speed_figures(summaries, dialog_charts(summaries)):
         charts.setdefault(family, []).append(figure)
     return "".join(family_dialog(i, charts.get(i["family"], [])) for i in family_tiles(summaries))
 

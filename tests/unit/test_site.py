@@ -229,11 +229,32 @@ def test_charts_cover_only_comparisons_with_a_published_ratio():
     assert "ICA-LiNGAM" in build.speed_table(SUMMARY)
 
 
-def test_a_family_intro_names_its_packages_and_leaves_accuracy_out():
-    constraint = [m for m in build.claimed_comparisons([SUMMARY]) if m["family"] == "constraint"]
-    intro = build.family_intro(constraint)
-    assert "alongside causal-learn and gCastle" in intro or "alongside causal-learn" in intro
-    assert "errors" not in intro
+def test_a_family_dialog_opens_on_one_short_line_and_ends_on_the_release_cards():
+    # The charts' legends name the packages, so the caption says only what a chart plots.
+    intro = build.family_intro()
+    assert len(intro) < 100 and "errors" not in intro
+    info = build.family_tiles([SUMMARY])[0]
+    dialog = build.family_dialog(info, [])
+    assert dialog.index(intro) < dialog.index('href="docs/benchmarks.html"')
+    assert ">Details in the release cards</a>" in dialog and "Every measurement" not in dialog
+
+
+def test_a_family_dialog_shows_each_method_once_and_only_its_clear_wins():
+    summaries = build.release_summaries(SUMMARY)
+    keep = build.dialog_charts(summaries)
+    shown = [(n, ms) for n, ms in build.speed_groups(summaries) if build.chart_key(n, ms) in keep]
+    best = [info["best"][0] for info in build.family_tiles(summaries)]
+    for name, methods in shown:
+        # A clear win, or the chart behind its tile's number.
+        assert build.best_ratio(methods) >= build.DIALOG_MIN_SPEEDUP or any(
+            m in best for m in methods
+        ), name
+    # Each method once, unless a second chart backs its tile's number.
+    specs = [ms[0]["spec"] for _, ms in shown if not any(m in best for m in ms)]
+    assert len(specs) == len(set(specs))
+    # Every tile's number keeps its chart.
+    for info in build.family_tiles(summaries):
+        assert any(info["best"][0] in ms for _, ms in shown), info["title"]
 
 
 def test_the_release_promise_is_the_quality_gate():
@@ -322,9 +343,10 @@ def test_unpublished_summary_needs_the_placeholder_flag():
 def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_page):
     summaries = placeholder_summaries()
     page = placeholder_page
-    # Each chart's largest speedup, as "NNNx+"; every size is on the release cards.
-    for _, methods in build.time_groups(summaries):
-        if all(build.faster(m) for m in methods):
+    # Each dialog chart's largest speedup, as "NNNx+"; every size is on the release cards.
+    keep = build.dialog_charts(summaries)
+    for name, methods in build.speed_groups(summaries):
+        if build.chart_key(name, methods) in keep:
             claimed = [r for m in methods for r in m["rows"] if r["ratio"] is not None]
             best = max(claimed, key=lambda r: r["ratio"])
             family = methods[0]["family"]
@@ -428,8 +450,8 @@ def test_numbers_read_as_written():
 
 def test_intro_claims_one_machine_per_size_not_per_comparison():
     # Two comparisons list two CPU models across their sizes, so the pairing holds within a size.
-    intro = build.family_intro(build.claimed_comparisons([SUMMARY]))
-    assert "on the same datasets and the same machine at each size" in intro
+    intro = build.family_intro()
+    assert "on the same data and machine at each size" in intro
     assert "Each comparison ran both packages" not in intro
 
 
@@ -1182,10 +1204,14 @@ def test_the_hero_and_the_first_section_share_one_art(placeholder_page):
 def test_the_accuracy_bars_draw_only_the_methods_with_fewer_errors():
     rows = build.accuracy_rows([SUMMARY])
     figure = build.accuracy_wins([SUMMARY])
-    # No count of comparisons: a pair of bars only where Andrey has fewer errors, each saying how
-    # many fewer, and the other tile bounds the other methods.
-    wins = [r for r in rows if build.accuracy_change(r) <= -0.5]
+    # No count of comparisons: a pair of bars for each family's largest cut in errors, each saying
+    # how many fewer, and the other tile bounds the other methods.
+    wins = build.family_wins([SUMMARY])
     assert 0 < len(wins) < len(rows)
+    assert len({r["family"] for r in wins}) == len(wins)
+    for r in wins:
+        same = [o for o in rows if o["family"] == r["family"]]
+        assert build.accuracy_change(r) == min(build.accuracy_change(o) for o in same) <= -0.5
     # Each win is a pair of bars, Andrey's then the other package's, on the row's own scale.
     assert figure.count('<div class="err-bar err-bar--andrey">') == len(wins)
     assert figure.count('<div class="err-bar">') == len(wins)
