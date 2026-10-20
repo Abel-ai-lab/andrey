@@ -311,7 +311,8 @@ _add(
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
                 "Gaussian BIC, for mixed data; "
                 "null picks local_score_BDeu when every column is categorical (a category, bool, "
-                "or text column, or at most max_categories distinct whole numbers) and "
+                "or text column, or at most max_categories distinct whole numbers, or a column "
+                "categorical lists) and "
                 "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
                 "local_score_BIC.",
                 choices=GES_SCORES,
@@ -427,7 +428,8 @@ _add(
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
                 "Gaussian BIC, for mixed data; "
                 "null picks local_score_BDeu when every column is categorical (a category, bool, "
-                "or text column, or at most max_categories distinct whole numbers) and "
+                "or text column, or at most max_categories distinct whole numbers, or a column "
+                "categorical lists) and "
                 "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
                 "local_score_BIC_from_cov.",
                 choices=HC_SCORES,
@@ -543,7 +545,8 @@ _add(
                 "whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
                 "and conditional Gaussian BIC, for mixed data; "
                 "null picks local_score_BDeu when every column is categorical (a category, bool, "
-                "or text column, or at most max_categories distinct whole numbers) and "
+                "or text column, or at most max_categories distinct whole numbers, or a column "
+                "categorical lists) and "
                 "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
                 "local_score_BIC.",
                 choices=EXACT_SCORES,
@@ -600,8 +603,9 @@ _BOSS_SCORE = ParamSpec(
     "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional Gaussian BIC, "
     "for mixed data (experimental); "
     "null picks local_score_BDeu when every column is categorical (a category, bool, or text "
-    "column, or at most max_categories distinct whole numbers) and local_score_cond_gauss when "
-    "some are, each with a DataTypeWarning, else local_score_BIC_from_cov.",
+    "column, or at most max_categories distinct whole numbers, or a column categorical lists) "
+    "and local_score_cond_gauss when some are, each with a DataTypeWarning, else "
+    "local_score_BIC_from_cov.",
     choices=PERMUTATION_SCORES,
     nullable=True,
 )

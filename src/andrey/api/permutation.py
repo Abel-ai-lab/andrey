@@ -59,11 +59,10 @@ def boss(
         multinomial BIC for categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
-        column types as ``categorical=None`` infers them and picks ``"local_score_BDeu"`` when every
-        column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
-        ``DataTypeWarning``; otherwise, or with ``categorical`` given, it picks
-        ``"local_score_BIC_from_cov"``. Pass ``"local_score_BIC_from_cov"`` to read whole numbers,
-        such as counts, as numbers.
+        column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
+        every column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC_from_cov"``. Pass
+        ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
@@ -270,11 +269,10 @@ def grasp(
         multinomial BIC for categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
-        column types as ``categorical=None`` infers them and picks ``"local_score_BDeu"`` when every
-        column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
-        ``DataTypeWarning``; otherwise, or with ``categorical`` given, it picks
-        ``"local_score_BIC_from_cov"``. Pass ``"local_score_BIC_from_cov"`` to read whole numbers,
-        such as counts, as numbers.
+        column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
+        every column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC_from_cov"``. Pass
+        ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
