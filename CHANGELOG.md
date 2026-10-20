@@ -84,10 +84,11 @@ change names its pull request.
   computed from each column's own data instead of by column position, so reordering the columns no
   longer changes the edges it orients, and on data where its tests compete its graph can change.
   ([#228])
-- `"rcot"` samples the random Fourier features of `x` and `y` for each conditioning set, as its
-  published method samples them for each test, so one pair's tests over different conditioning sets
-  no longer share features and reject together: PC keeps fewer false edges on large graphs and can
-  miss more weak edges on small ones. ([#248])
+- `"rcot"` samples the random Fourier features of `x` and `y` for each conditioning set, with
+  frequencies and phases from a scrambled Halton sequence (quasi-Monte Carlo feature maps), so one
+  pair's tests over different conditioning sets no longer share features and reject together, and
+  PC with it keeps fewer false edges, misses slightly more true ones, and makes fewer errors in all
+  on graphs of 10 to 50 variables. ([#248])
 
 ## [0.7.0] - 2026-10-19
 

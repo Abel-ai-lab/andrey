@@ -21,7 +21,7 @@ import pytest
 from scipy.integrate import quad
 from scipy.spatial.distance import pdist, squareform
 from scipy.special import digamma
-from scipy.stats import chi2, gamma
+from scipy.stats import binom, chi2, gamma
 from sklearn.gaussian_process import GaussianProcessRegressor
 from threadpoolctl import threadpool_info, threadpool_limits
 
@@ -388,6 +388,18 @@ def test_rcot_queries_of_one_pair_sample_independent_features():
         spread_sets.append(np.std([test(0, 1, (k,)) for k in range(2, 42)]))
         spread_seeds.append(np.std([RCoT(data, seed=s)(0, 1, (2,)) for s in range(1, 41)]))
     assert np.mean(spread_sets) > 0.75 * np.mean(spread_seeds)
+
+
+def test_rcot_rejects_a_true_independence_near_alpha_and_a_dependence_nearly_always():
+    """On 100 datasets of 500 rows where ``x`` and ``y`` are different nonlinear functions of one
+    conditioning variable, RCoT rejects their independence given it within the 99.9% binomial
+    range of a test at level alpha, and rejects nearly always once they share a noise term."""
+    null, dependent = [], []
+    for seed in range(100):
+        null.append(RCoT(_common_cause(seed=seed, n=500, n_cond=1))(0, 1, (2,)))
+        dependent.append(RCoT(_common_cause(seed=seed, n=500, n_cond=1, shared=0.3))(0, 1, (2,)))
+    assert np.mean(np.array(null) <= ALPHA) <= binom.ppf(0.999, 100, ALPHA) / 100
+    assert np.mean(np.array(dependent) <= ALPHA) >= 0.95
 
 
 def test_cmiknn_draws_the_shuffles_of_each_conditioning_set_once(monkeypatch):
