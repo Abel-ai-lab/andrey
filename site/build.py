@@ -24,6 +24,7 @@ import json
 import math
 import re
 import runpy
+import statistics
 import tempfile
 import warnings
 import xml.etree.ElementTree as ET
@@ -329,7 +330,7 @@ def comparisons(summary: dict) -> list[dict]:
     for method in summary["methods"]:
         spec = specs[registry_name(method)]
         kind = error_kind(method)
-        ours, theirs, _ = ERRORS[kind][0]
+        ours, theirs, empty = ERRORS[kind][0]
         pairs = spec.family == "pairwise"
         rows = []
         for row in method["rows"]:
@@ -345,6 +346,9 @@ def comparisons(summary: dict) -> list[dict]:
                     "at_least": at_least,
                     "andrey_errors": row[ours],
                     "comparator_errors": row[theirs],
+                    # Errors against the empty graph's: a pair's empty graph gets every pair
+                    # wrong.
+                    "empty_errors": row["paired"] if pairs else row.get(empty) if empty else None,
                 }
             )
         out.append(
@@ -555,8 +559,8 @@ def claimed_comparisons(summaries: list[dict]) -> list[dict]:
 
 # ---- speed across methods --------------------------------------------------------------------
 def family_intro() -> str:
-    """What a family's charts show, in one line; each chart's legend names its packages."""
-    return "Median fit time, on the same data and machine at each size. Up and left is faster."
+    """What a family's figure shows, in one line; its legend names the packages."""
+    return "Each method at the largest size both packages ran. Down and to the left is better."
 
 
 def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
@@ -674,16 +678,10 @@ def speed_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
     return [(n, ms) for n, ms in time_groups(summaries) if all(faster(m) for m in ms)]
 
 
-def chart_key(name: str, methods: list[dict]) -> tuple[str, ...]:
-    """A chart's identity: its name and its packages, since one method can have two charts."""
-    return (name, *(m["comparator"] for m in methods))
-
-
-def speed_figures(summaries: list[dict], keep: set[tuple] | None = None) -> list[tuple[str, str]]:
+def speed_figures(summaries: list[dict]) -> list[tuple[str, str]]:
     """A chart per method (or per run where a method's comparisons differ), each with its largest
-    speedup, as (registry family, chart), or only the charts ``keep`` holds (``chart_key``). The
-    charts share one time axis, so they compare at a glance; each size axis spans its own chart's
-    sizes."""
+    speedup, as (registry family, chart). The charts share one time axis, so they compare at a
+    glance; each size axis spans its own chart's sizes."""
     groups = speed_groups(summaries)
     times = [
         t
@@ -694,46 +692,7 @@ def speed_figures(summaries: list[dict], keep: set[tuple] | None = None) -> list
         if t is not None
     ]
     xr = (10 ** math.floor(math.log10(min(times))), 10 ** math.ceil(math.log10(max(times))))
-    return [
-        (methods[0]["family"], time_chart(name, methods, xr))
-        for name, methods in groups
-        if keep is None or chart_key(name, methods) in keep
-    ]
-
-
-# A family's dialog shows each method once, at its default setting, and only its clear wins. A
-# setting's chart extends its method's name ("XGES without extended search", "PC on mixed data,
-# ..."), so a method's default is its shortest-named chart; among a method's charts with that
-# name, the fastest. A chart below DIALOG_MIN_SPEEDUP is left to the release cards, except the one
-# behind its family tile's number.
-DIALOG_MIN_SPEEDUP = 10
-
-
-def best_ratio(methods: list[dict]) -> float:
-    """The largest published speedup among ``methods``' rows."""
-    return max(r["ratio"] for m in methods for r in m["rows"] if r["ratio"] is not None)
-
-
-def dialog_charts(summaries: list[dict]) -> set[tuple]:
-    """The charts the family dialogs show, by ``chart_key``."""
-    default: dict[str, tuple[str, list[dict]]] = {}
-    for name, methods in speed_groups(summaries):
-        shown = default.get(methods[0]["spec"])
-        if (
-            shown is None
-            or len(name) < len(shown[0])
-            or (name == shown[0] and best_ratio(methods) > best_ratio(shown[1]))
-        ):
-            default[methods[0]["spec"]] = (name, methods)
-    keep = {
-        chart_key(*shown)
-        for shown in default.values()
-        if best_ratio(shown[1]) >= DIALOG_MIN_SPEEDUP
-    }
-    best = [info["best"][0] for info in family_tiles(summaries)]
-    return keep | {
-        chart_key(n, ms) for n, ms in speed_groups(summaries) if any(m in best for m in ms)
-    }
+    return [(methods[0]["family"], time_chart(name, methods, xr)) for name, methods in groups]
 
 
 def speed_chart(summaries: list[dict]) -> str:
@@ -1948,14 +1907,6 @@ def coverage_tiles(summaries: list[dict], graphs: str) -> str:
             for family, label in SPEC_FAMILIES.items()
         ]
     )
-    bars = []
-    for i, package in enumerate(PEERS):
-        marks = [row[2][i] for row in COMPARISON]
-        full, part = marks.count("yes"), marks.count("part")
-        bars.append(
-            f'<li><span>{escape(package)}</span><i style="--yes: {full}; --part: {part}; '
-            f'--all: {len(COMPARISON)}"></i><b>{full}</b></li>'
-        )
     return (
         f'<li class="bento-note"><h3>{len(specs)} methods</h3>'
         f"<p>For every kind of data, by family: {escape(families)}.</p>"
@@ -1963,9 +1914,8 @@ def coverage_tiles(summaries: list[dict], graphs: str) -> str:
         + glass_tile(
             "7",
             "How Andrey compares",
-            f"Features each package has, of {len(COMPARISON)}.",
-            f'<ul class="coverage-bars">{"".join(bars)}</ul>',
-            key="compare",
+            "What each package guarantees, read from its released code.",
+            comparison_table() + f'<p class="compare-source">{escape(comparison_source())}</p>',
         )
         + glass_tile(
             "wide",
@@ -2030,13 +1980,10 @@ def dialog_head(key: str, title: str, intro: str = "") -> str:
 DIALOG_TAIL = "</div></dialog>"
 
 
-def family_dialog(info: dict, charts: list[str]) -> str:
-    """A family's dialog: its charts, one per method, and the way to the release cards."""
-    body = (
-        f'<div class="tile-charts">{"".join(charts)}</div>'
-        if charts
-        else "<p>No chart for this family compares like with like yet.</p>"
-    )
+def family_dialog(info: dict, figure: str) -> str:
+    """A family's dialog: its methods on one figure (``frontier_chart``), and the way to the
+    release cards."""
+    body = figure or "<p>No chart for this family compares like with like yet.</p>"
     return (
         dialog_head(f"speed-{info['family']}", f"{info['title']} speed", family_intro())
         + body
@@ -2046,79 +1993,304 @@ def family_dialog(info: dict, charts: list[str]) -> str:
 
 
 def family_dialogs(summaries: list[dict]) -> str:
-    """The dialogs of ``family_tiles``, each with the charts of its family."""
-    charts: dict[str, list[str]] = {}
-    for family, figure in speed_figures(summaries, dialog_charts(summaries)):
-        charts.setdefault(family, []).append(figure)
-    return "".join(family_dialog(i, charts.get(i["family"], [])) for i in family_tiles(summaries))
+    """The dialogs of ``family_tiles``, each with its family's methods on one figure."""
+    points = frontier_points(summaries)
+    return "".join(
+        family_dialog(i, frontier_chart(i["title"], points.get(i["family"], [])))
+        for i in family_tiles(summaries)
+    )
+
+
+# ---- a family's methods on one figure: fit time against errors ------------------------------
+# Each method at its default setting (its shortest-named comparison: a setting's name extends its
+# method's, "XGES without extended search"), at the largest size where Andrey and every package
+# compared ran and were scored. Errors are a share of the empty graph's, so methods of different
+# sizes share one axis: 0 is the true graph, 1 no better than the empty one.
+FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star")
+FRONTIER_BAND = 0.25  # the share of the height above the empty graph's errors, when any point is
+
+
+def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
+    """Per family, a point per method and package: ``method``, ``package``, ``ours``, ``size``,
+    ``unit``, ``seconds``, and ``share`` (errors over the empty graph's)."""
+    default: dict[str, tuple[str, list[dict]]] = {}
+    for name, methods in time_groups(summaries):
+        if not all(faster(m) for m in methods):
+            continue
+        shown = default.get(methods[0]["spec"])
+        if shown is None or len(name) < len(shown[0]):
+            default[methods[0]["spec"]] = (name, methods)
+    out: dict[str, list[dict]] = {}
+    for name, methods in default.values():
+        by_size = [{r["d"]: r for r in m["rows"]} for m in methods]
+        scored = [
+            d
+            for d in by_size[0]
+            if all(
+                d in rows
+                and rows[d]["andrey_s"] is not None
+                and rows[d]["comparator_s"] is not None
+                and rows[d]["empty_errors"]
+                for rows in by_size
+            )
+        ]
+        if not scored:
+            continue
+        d = max(scored)
+        first = by_size[0][d]
+        common = {"method": name, "size": d, "unit": methods[0]["unit"]}
+        points = [
+            {**common, "package": "Andrey", "ours": True, "seconds": first["andrey_s"],
+             "share": first["andrey_errors"] / first["empty_errors"]}
+        ] + [
+            {**common, "package": m["comparator"], "ours": False,
+             "seconds": rows[d]["comparator_s"],
+             "share": rows[d]["comparator_errors"] / rows[d]["empty_errors"]}
+            for m, rows in zip(methods, by_size, strict=True)
+        ]  # fmt: skip
+        out.setdefault(methods[0]["family"], []).extend(points)
+    return out
+
+
+def shape(kind: str, cx: float, cy: float, r: float) -> str:
+    """A package's marker, as SVG path data centered on (cx, cy)."""
+    if kind == "square":
+        return f"M{cx - r:.1f} {cy - r:.1f}h{2 * r:.1f}v{2 * r:.1f}h{-2 * r:.1f}Z"
+    if kind == "triangle":
+        return f"M{cx:.1f} {cy - 1.2 * r:.1f}L{cx + r:.1f} {cy + 0.8 * r:.1f}H{cx - r:.1f}Z"
+    if kind == "diamond":
+        k = 1.3 * r
+        return (
+            f"M{cx:.1f} {cy - k:.1f}L{cx + k:.1f} {cy:.1f}"
+            f"L{cx:.1f} {cy + k:.1f}L{cx - k:.1f} {cy:.1f}Z"
+        )
+    if kind == "cross":
+        return (
+            f"M{cx - r:.1f} {cy - r:.1f}L{cx + r:.1f} {cy + r:.1f}"
+            f"M{cx + r:.1f} {cy - r:.1f}L{cx - r:.1f} {cy + r:.1f}"
+        )
+    tips = [math.pi / 2 + i * 4 * math.pi / 5 for i in range(5)]
+    return (
+        "M"
+        + "L".join(
+            f"{cx + 1.2 * r * math.cos(a):.1f} {cy - 1.2 * r * math.sin(a):.1f}" for a in tips
+        )
+        + "Z"
+    )
+
+
+def place_labels(
+    labels: list[tuple[float, float, str]], left: float, marks: list[tuple[float, float]]
+) -> str:
+    """Each method's name beside its point: on the left, else on the right where the left would
+    overlap a name, a mark, or the axis, else moved down past what it would overlap."""
+    # Each name's or mark's left edge, right edge, and baseline.
+    placed = [(cx - 6, cx + 6, cy + 3) for cx, cy in marks]
+    out = []
+
+    def free(x0: float, x1: float, ly: float) -> bool:
+        return x0 >= left and not any(
+            abs(ly - py) < 11 and x0 < b and a < x1 for a, b, py in placed
+        )
+
+    for cx, cy, name in sorted(labels, key=lambda label: label[1]):
+        width = 5.6 * len(name)
+        ly = cy + 3
+        for x0, anchor in ((cx - 8 - width, "end"), (cx + 8, "start")):
+            if free(x0, x0 + width, ly):
+                break
+        else:
+            # Down past what it overlaps, on the side the axis leaves room for.
+            x0, anchor = (cx - 8 - width, "end") if cx - 8 - width >= left else (cx + 8, "start")
+            while any(abs(ly - py) < 11 and x0 < q and p < x0 + width for p, q, py in placed):
+                ly += 11
+        placed.append((x0, x0 + width, ly))
+        tx = x0 + width if anchor == "end" else x0
+        out.append(
+            f'<text class="pf-label" x="{tx:.1f}" y="{ly:.1f}" text-anchor="{anchor}">'
+            f"{escape(name)}</text>"
+        )
+    return "".join(out)
+
+
+def key(mark: str, label: str) -> str:
+    """A legend entry: a marker drawn on its own small square, and its label."""
+    return (
+        f'<span class="pf-key"><svg viewBox="0 0 12 12" aria-hidden="true">{mark}</svg>'
+        f"{escape(label)}</span>"
+    )
+
+
+def frontier_chart(title: str, points: list[dict]) -> str:
+    """A family's methods on one figure: fit time (x, log) against errors as a share of the empty
+    graph's (y), a point per method and package. Andrey's points are the one color; each other
+    package has its own gray shape, joined to Andrey's point for the same method: each method's
+    data differ, so a method's points compare with each other, not across methods. The shaded
+    corner is faster and with fewer errors than the median point on both."""
+    if not points:
+        return ""
+    w, h, left, right, top, bottom = 640, 380, 58, 560, 12, 336
+    times = [p["seconds"] for p in points]
+    xr = (10 ** math.floor(math.log10(min(times))), 10 ** math.ceil(math.log10(max(times))))
+    x = log_scale(xr[0], xr[1], left, right)
+    # Errors up to the empty graph's take most of the height on a linear scale; any above, where
+    # both packages make more errors than the empty graph, share a band at the top on a log scale.
+    # Where every point has far fewer errors, the axis ends at the first tick above them.
+    ymax = max(p["share"] for p in points)
+    split = top + (bottom - top) * (FRONTIER_BAND if ymax > 1.05 else 0.0)
+    above = log_scale(1, ymax, split, top) if ymax > 1.05 else None
+    if ymax > 0.9:
+        span, step = 1.0, 0.25
+    else:
+        step = next(t for t in (0.01, 0.02, 0.05, 0.1, 0.25) if ymax * 1.1 <= 4 * t)
+        span = step * math.ceil(ymax * 1.1 / step)
+
+    def y(v: float) -> float:
+        if above and v > 1:
+            return above(v)
+        return bottom - (bottom - split) * v / span
+
+    grid = []
+    for k in range(round(math.log10(xr[0])), round(math.log10(xr[1])) + 1):
+        v = 10.0**k
+        grid.append(
+            f'<line x1="{x(v):.1f}" x2="{x(v):.1f}" y1="{top}" y2="{bottom}" class="tc-grid"/>'
+            f'<text x="{x(v):.1f}" y="{bottom + 14}" text-anchor="middle">{seconds_axis(v)}</text>'
+        )
+    ticks = [round(k * step, 2) for k in range(round(span / step) + 1)]
+    ticks += [v for v in ((1.5, 2) if ymax < 3 else (2, 5, 10, 20)) if above and v <= ymax]
+    for v in ticks:
+        empty = " pf-empty" if v == 1 else ""
+        grid.append(
+            f'<line x1="{left}" x2="{right}" y1="{y(v):.1f}" y2="{y(v):.1f}" '
+            f'class="tc-grid{empty}"/>'
+            f'<text x="{left - 6}" y="{y(v) + 3:.1f}" text-anchor="end">{v:g}</text>'
+        )
+    if span >= 1:
+        grid.append(f'<text x="{right + 6}" y="{y(1) + 3:.1f}">empty graph</text>')
+    packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
+    shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
+    ours = {p["method"]: p for p in points if p["ours"]}
+    pairs = [
+        f'<line class="pf-pair" x1="{x(ours[p["method"]]["seconds"]):.1f}" '
+        f'y1="{y(ours[p["method"]]["share"]):.1f}" x2="{x(p["seconds"]):.1f}" '
+        f'y2="{y(p["share"]):.1f}"/>'
+        for p in points
+        if not p["ours"]
+    ]
+    # The most attractive quadrant: faster and with fewer errors than the median point.
+    mid_x = x(statistics.median(times))
+    mid_y = y(statistics.median(p["share"] for p in points))
+    quadrant = (
+        f'<rect class="pf-quadrant" x="{left}" y="{mid_y:.1f}" width="{mid_x - left:.1f}" '
+        f'height="{bottom - mid_y:.1f}"/>'
+    )
+    marks, labels = [], []
+    for p in points:
+        cx, cy = x(p["seconds"]), y(p["share"])
+        tip = escape(
+            f"{p['method']}, {p['package']}, {p['size']:,} {p['unit']}: "
+            f"{seconds_text(p['seconds'])}, {p['share']:.2f} of the empty graph's errors"
+        )
+        if p["ours"]:
+            marks.append(
+                f'<circle class="pf-andrey" cx="{cx:.1f}" cy="{cy:.1f}" r="5"><title>{tip}</title>'
+                "</circle>"
+            )
+            labels.append((cx, cy, p["method"]))
+        else:
+            kind = shapes[p["package"]]
+            marks.append(
+                f'<path class="pf-other pf-{kind}" d="{shape(kind, cx, cy, 4.5)}">'
+                f"<title>{tip}</title></path>"
+            )
+    centers = [(x(p["seconds"]), y(p["share"])) for p in points]
+    legend = (
+        key('<circle class="pf-andrey" cx="6" cy="6" r="5"/>', "Andrey")
+        + "".join(
+            key(f'<path class="pf-other pf-{k}" d="{shape(k, 6, 6, 4)}"/>', name)
+            for name, k in shapes.items()
+        )
+        + '<span class="pf-key"><i class="pf-quadrant-key" aria-hidden="true"></i>'
+        "Most attractive quadrant</span>"
+    )
+    return (
+        '<figure class="tchart pf-chart">'
+        f'<p class="tc-legend">{legend}</p>'
+        f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{escape(title)}: fit time against '
+        f"errors as a share of the empty graph's, for {escape(listed(list(ours)))}, by Andrey "
+        f'and {escape(listed(packages))}">'
+        f'{quadrant}<g class="tc-axis">{"".join(grid)}</g>'
+        f'<text class="tc-title" x="{(left + right) / 2:.1f}" y="{h - 4}" text-anchor="middle">'
+        "Fit time, seconds (log)</text>"
+        f'<text class="tc-title" transform="translate(12 {(top + bottom) / 2:.1f}) rotate(-90)" '
+        'text-anchor="middle">Errors, share of the empty graph&#39;s</text>'
+        f"{''.join(pairs)}"
+        f"{''.join(marks)}{place_labels(labels, left, centers)}</svg></figure>"
+    )
 
 
 # ---- compared with other packages ------------------------------------------------------------
-# Checked against each package's released code (causal-learn 0.1.4.8, gCastle 1.0.4, lingam
-# 1.13.0); the published-speed row against its README, documentation, and release notes. A family
-# counts every method a package ships, experimental or not.
-PEERS = ("Andrey", "causal-learn", "gCastle", "lingam")
-PEER_VERSIONS = "causal-learn 0.1.4.8, gCastle 1.0.4, and lingam 1.13.0"
+# What Andrey guarantees, beside the most used packages. Checked against each package's released
+# code (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1), and
+# py-tetrad's development branch; the column-order row from the 0.7.0 post's measurements; the
+# published-speed row against each package's README, documentation, and release notes.
+PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
+PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
 MARKS = {
     "yes": ("check", "Yes", "\u2713"),
     "part": ("minus", "Partly", "\u25d0"),
     "no": ("x", "No", "\u2717"),
 }
-# (group, feature, one mark per package in PEERS order, a note for every "part" mark by package).
+# (group, guarantee, one mark per package in PEERS order, a note for every "part" mark by package).
 COMPARISON = (
     (
-        "Interface",
-        "One result type from every method, with its graph type and edge marks",
-        ("yes", "part", "part", "part"),
+        "Results",
+        "The same graph in any column order",
+        ("yes", "no", "part", "no", "no"),
         {
-            "causal-learn": "PC, FCI, GES, BOSS, and GRaSP give a GeneralGraph with endpoint "
-            "marks, bare or inside an object, a tuple, or a dict; the LiNGAM family gives a "
-            "fitted model.",
-            "gCastle": "Every method gives an adjacency matrix, without a graph type or edge "
-            "marks.",
-            "lingam": "Every method gives weighted adjacency matrices, without a graph type; RCD, "
-            "CAM-UV, and BottomUpParceLiNGAM mark hidden confounding with NaN.",
+            "Tetrad": "PC and FCI follow the variables' names; BOSS, GRaSP, and GIN changed with "
+            "the column order.",
         },
     ),
-    ("Interface", "Command line with JSON output", ("yes", "no", "no", "no"), {}),
     (
-        "Interface",
-        "A machine-readable schema for every method, and a guide for agents",
-        ("yes", "no", "no", "no"),
-        {},
+        "Results",
+        "One result type from every method, with its graph type and edge marks",
+        ("yes", "no", "part", "no", "part"),
+        {
+            "Tetrad": "Every search returns a graph with edge marks; its graph type belongs to "
+            "the algorithm, not the result.",
+            "bnlearn": "Every learner returns a bn object, with directed and undirected arcs only "
+            "and no graph type.",
+        },
     ),
     (
-        "Coverage",
-        "Constraint-, score-, and permutation-based search",
-        ("yes", "yes", "part", "no"),
-        {"gCastle": "PC and GES; no permutation-based search."},
+        "Agents",
+        "An agent-native interface: JSON results and a schema for every method",
+        ("yes", "no", "part", "no", "no"),
+        {
+            "Tetrad": "causal-cmd writes graphs as JSON, and py-tetrad's development branch adds "
+            "guides for coding agents; no method has a parameter schema.",
+        },
     ),
-    ("Coverage", "LiNGAM family", ("yes", "yes", "yes", "yes"), {}),
-    (
-        "Coverage",
-        "Time series",
-        ("yes", "yes", "part", "yes"),
-        {"gCastle": "Event sequences only (TTPM)."},
-    ),
-    ("Coverage", "Hidden variables", ("yes", "yes", "no", "yes"), {}),
     (
         "Speed",
         "CPU-parallel and GPU backends",
-        ("yes", "part", "part", "part"),
+        ("yes", "part", "part", "part", "part"),
         {
-            "causal-learn": "A GPU for CALM only, through its device argument; several CPU cores "
-            "for RLCD and the FastKCI test only.",
-            "gCastle": "A GPU for the PyTorch-based methods only, through device_type; several "
-            "CPU cores for PC's parallel variant only.",
-            "lingam": "A GPU for DirectLiNGAM only, through its pwling_fast measure and the "
-            "separate culingam package; no search runs on several CPU cores.",
+            "causal-learn": "A GPU for CALM only; several CPU cores for RLCD and the FastKCI test "
+            "only.",
+            "Tetrad": "Several CPU threads for FGES, BOSS, GFCI, and PC's adjacency search; no "
+            "GPU.",
+            "pcalg": "Several cores for the skeleton step of its stable.fast method only; no GPU.",
+            "bnlearn": "A cluster for its constraint-based methods and DirectLiNGAM only; no GPU.",
         },
     ),
     (
         "Speed",
-        "Speed against other packages, published with each feature release",
-        ("yes", "no", "no", "no"),
+        "Speed against other packages, published with each release",
+        ("yes", "no", "no", "no", "no"),
         {},
     ),
 )
@@ -2185,8 +2357,8 @@ def comparison_table() -> str:
 def comparison_source() -> str:
     """What the table's marks were read from."""
     return (
-        "Read from each package's released code, and the published-speed row from its README, "
-        f"documentation, and release notes: {PEER_VERSIONS}."
+        f"{PEER_VERSIONS}. The column-order row is measured; the published-speed row is read from "
+        "each package's README, documentation, and release notes."
     )
 
 
@@ -2264,7 +2436,6 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
     summaries = release_summaries(summary)
     code, printed, figure = run_example()
     _, _, interface_figures = run_interface()
-    comparison = comparison_table()
     methods_title, methods_list = methods(summaries)
     claims = act_claims(summaries)
     frames = agent_frames()
@@ -2305,8 +2476,6 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "agent_demo": agent_demo(frames, figure),
         "methods_title": methods_title,
         "methods": methods_list,
-        "compare_source": comparison_source(),
-        "comparison": comparison,
         "docs_grid": docs_grid(),
         "style": homepage_code_css(),
     }

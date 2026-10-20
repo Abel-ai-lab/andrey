@@ -462,6 +462,70 @@ div[class*="highlight-"].window pre {
   stroke: var(--andrey-muted);
 }
 
+/* A family's methods on one figure: Andrey's points in the accent, every other package a gray
+   shape joined to Andrey's point for the same method, and the Pareto frontier behind them. */
+.pf-chart svg text.pf-label {
+  fill: var(--andrey-ink);
+  font-weight: 600;
+}
+
+.pf-andrey {
+  fill: var(--andrey-accent);
+  stroke: var(--andrey-surface);
+  stroke-width: 1.5;
+}
+
+.pf-other {
+  fill: var(--andrey-muted);
+  stroke: var(--andrey-surface);
+  stroke-width: 1;
+}
+
+.pf-other.pf-cross {
+  fill: none;
+  stroke: var(--andrey-muted);
+  stroke-width: 2;
+}
+
+.pf-pair {
+  stroke: var(--andrey-line);
+  stroke-width: 1.5;
+}
+
+.pf-quadrant {
+  fill: var(--andrey-accent);
+  fill-opacity: 0.07;
+}
+
+.pf-chart .tc-grid {
+  stroke-dasharray: 2 3;
+}
+
+.tc-grid.pf-empty {
+  stroke-dasharray: 4 3;
+}
+
+.pf-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pf-key svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin: 0;
+  overflow: visible;
+}
+
+.pf-key i.pf-quadrant-key {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  background: var(--andrey-accent);
+  opacity: 0.18;
+}
+
 /* The charts ride a belt that slides left in a loop and fades at both edges. It pauses under the
    pointer or keyboard focus; with reduced motion it stands still and scrolls by hand. */
 .tc-belt {

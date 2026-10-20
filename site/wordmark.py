@@ -28,6 +28,7 @@ from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
 import andrey.viz
+from grain import NAVY  # site/grain.py: the art's darkest ground
 
 WORD = "Andrey"
 WEIGHT = 600  # Unbounded's SemiBold
@@ -119,17 +120,17 @@ def document(
 
 
 def icon(a: pathops.Path, stroke: pathops.Path) -> str:
-    """The A alone on a square, with ink that follows the browser's light or dark bar."""
+    """The A alone on a rounded navy square, white with its amber stroke, so it reads the same
+    on a light or a dark browser bar."""
     x0, y0, x1, y1 = a.bounds
-    side = max(x1 - x0, y1 - y0) * 1.12
+    side = max(x1 - x0, y1 - y0) / 0.7
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     rest = pathops.op(a, stroke, pathops.PathOp.DIFFERENCE)
-    light, dark = andrey.viz.LIGHT.ink, andrey.viz.DARK.ink
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{cx - side / 2:g} {-cy - side / 2:g} '
-        f'{side:g} {side:g}"><style>.ink{{fill:{light}}}@media (prefers-color-scheme: dark)'
-        f"{{.ink{{fill:{dark}}}}}</style>"
-        f'<path class="ink" d="{svg_d(rest)}"/><path fill="{AMBER}" d="{svg_d(stroke)}"/></svg>\n'
+        f'{side:g} {side:g}"><rect x="{cx - side / 2:g}" y="{-cy - side / 2:g}" width="{side:g}" '
+        f'height="{side:g}" rx="{side * 0.22:g}" fill="{NAVY}"/>'
+        f'<path fill="{andrey.viz.LIGHT.surface}" d="{svg_d(rest)}"/><path fill="{AMBER}" d="{svg_d(stroke)}"/></svg>\n'
     )
 
 

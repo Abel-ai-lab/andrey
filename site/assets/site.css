@@ -1204,35 +1204,16 @@
   text-align: center;
 }
 
-/* How many of the table's features each package has: a bar of full marks, then partial ones. */
-.andrey-home .coverage-bars {
-  display: grid;
-  gap: 0.55rem;
+/* The comparison on the tile's glass: compact, its sources in small type under it. */
+.andrey-home .tile-glass .compare {
+  font-size: 0.8rem;
+}
+
+.andrey-home .compare-source {
   margin: 0;
-  padding: 1rem;
-  list-style: none;
-}
-
-.andrey-home .coverage-bars li {
-  display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr) 1.2rem;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.82rem;
-}
-
-.andrey-home .coverage-bars i {
-  height: 0.55rem;
-  border-radius: 999px;
-  background:
-    linear-gradient(90deg, var(--andrey-accent) 0 calc(var(--yes) / var(--all) * 100%),
-      color-mix(in srgb, var(--andrey-accent) 35%, transparent) 0
-      calc((var(--yes) + var(--part)) / var(--all) * 100%),
-      var(--andrey-surface-2) 0);
-}
-
-.andrey-home .coverage-bars b {
-  text-align: right;
+  padding: 0.5rem 1rem 0.8rem;
+  color: var(--andrey-muted);
+  font-size: 0.72rem;
 }
 
 /* The tiles fly in as they enter the screen, a row at a time with a short stagger across it

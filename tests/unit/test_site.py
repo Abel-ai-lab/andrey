@@ -239,22 +239,35 @@ def test_a_family_dialog_opens_on_one_short_line_and_ends_on_the_release_cards()
     assert ">Details in the release cards</a>" in dialog and "Every measurement" not in dialog
 
 
-def test_a_family_dialog_shows_each_method_once_and_only_its_clear_wins():
+def test_a_family_figure_shows_each_method_once_at_a_size_both_packages_ran():
     summaries = build.release_summaries(SUMMARY)
-    keep = build.dialog_charts(summaries)
-    shown = [(n, ms) for n, ms in build.speed_groups(summaries) if build.chart_key(n, ms) in keep]
-    best = [info["best"][0] for info in build.family_tiles(summaries)]
-    for name, methods in shown:
-        # A clear win, or the chart behind its tile's number.
-        assert build.best_ratio(methods) >= build.DIALOG_MIN_SPEEDUP or any(
-            m in best for m in methods
-        ), name
-    # Each method once, unless a second chart backs its tile's number.
-    specs = [ms[0]["spec"] for _, ms in shown if not any(m in best for m in ms)]
-    assert len(specs) == len(set(specs))
-    # Every tile's number keeps its chart.
-    for info in build.family_tiles(summaries):
-        assert any(info["best"][0] in ms for _, ms in shown), info["title"]
+    points = build.frontier_points(summaries)
+    for family, shown in points.items():
+        ours = [p for p in shown if p["ours"]]
+        # One Andrey point per method, and each package's point at that method's size.
+        assert len({p["method"] for p in ours}) == len(ours), family
+        for p in shown:
+            mine = next(o for o in ours if o["method"] == p["method"])
+            assert p["size"] == mine["size"] and p["seconds"] > 0 and p["share"] >= 0
+    # A setting's comparison ("XGES without extended search") stands in for no method.
+    names = {p["method"] for shown in points.values() for p in shown}
+    assert not any(" on " in n or " without " in n or ", " in n for n in names)
+
+
+def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
+    summaries = build.release_summaries(SUMMARY)
+    points = build.frontier_points(summaries)["constraint"]
+    figure = build.frontier_chart("Constraint-based", points)
+    ours = [p for p in points if p["ours"]]
+    assert figure.count('class="pf-andrey"') == len(ours) + 1  # and its legend's
+    packages = {p["package"] for p in points if not p["ours"]}
+    shapes = set(re.findall(r'class="pf-other pf-(\w+)"', figure))
+    assert len(shapes) == len(packages)
+    assert figure.count('class="pf-pair"') == len(points) - len(ours)
+    assert 'class="pf-quadrant"' in figure and "Pareto" not in figure
+    # Every method's name, once, and none drawn past the axis.
+    for p in ours:
+        assert figure.count(f">{build.escape(p['method'])}</text>") == 1
 
 
 def test_the_release_promise_is_the_quality_gate():
@@ -343,17 +356,15 @@ def test_unpublished_summary_needs_the_placeholder_flag():
 def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_page):
     summaries = placeholder_summaries()
     page = placeholder_page
-    # Each dialog chart's largest speedup, as "NNNx+"; every size is on the release cards.
-    keep = build.dialog_charts(summaries)
-    for name, methods in build.speed_groups(summaries):
-        if build.chart_key(name, methods) in keep:
-            claimed = [r for m in methods for r in m["rows"] if r["ratio"] is not None]
-            best = max(claimed, key=lambda r: r["ratio"])
-            family = methods[0]["family"]
-            dialog = page[page.index(f'id="speed-{family}"') :]
-            _, shown = build.more_than(best["ratio"])
-            up = f"<b>{shown:,}x+</b>"
-            assert up in dialog[: dialog.index("</dialog>")]
+    # Each family's dialog holds its figure, a point per method; every size is on the release
+    # cards.
+    points = build.frontier_points(summaries)
+    for info in build.family_tiles(summaries):
+        dialog = page[page.index(f'id="speed-{info["family"]}"') :]
+        dialog = dialog[: dialog.index("</dialog>")]
+        for p in points.get(info["family"], []):
+            if p["ours"]:
+                assert f">{build.escape(p['method'])}</text>" in dialog
     assert not re.search(r"/scratch/|/home/|\bsc\d{3}\b|\bsol\b", page, re.IGNORECASE)
     # A summary's notes on its runs stay on the release cards.
     for summary in summaries:
@@ -406,14 +417,15 @@ def test_a_graph_in_parts_is_drawn_part_by_part():
 
 def test_wordmark_takes_the_palette_ink_and_its_a_one_amber_stroke():
     # The word uses the palette's ink, with the A's right stroke in the art's amber. The icon is
-    # that A alone, with ink that follows the browser's light or dark bar.
+    # that A alone, white on the art's navy, so it reads on a light or a dark browser bar.
     amber = andrey.viz.LIGHT.categorical[1]
     for name, palette in (("light", andrey.viz.LIGHT), ("dark", andrey.viz.DARK)):
         svg = (ROOT / "site" / "brand" / f"wordmark-{name}.svg").read_text()
         assert re.findall(r'fill="([^"]+)"', svg) == [palette.ink, amber]
     icon = (ROOT / "site" / "brand" / "favicon.svg").read_text()
-    assert f".ink{{fill:{andrey.viz.LIGHT.ink}}}" in icon and f'fill="{amber}"' in icon
-    assert f"prefers-color-scheme: dark){{.ink{{fill:{andrey.viz.DARK.ink}}}" in icon
+    navy = runpy.run_path(str(ROOT / "site" / "grain.py"))["NAVY"]
+    assert re.findall(r'fill="([^"]+)"', icon) == [navy, andrey.viz.LIGHT.surface, amber]
+    assert "prefers-color-scheme" not in icon
 
 
 def test_a_ratio_needs_both_times_and_not_better_graphs(tmp_path):
@@ -451,7 +463,7 @@ def test_numbers_read_as_written():
 def test_intro_claims_one_machine_per_size_not_per_comparison():
     # Two comparisons list two CPU models across their sizes, so the pairing holds within a size.
     intro = build.family_intro()
-    assert "on the same data and machine at each size" in intro
+    assert "at the largest size both packages ran" in intro
     assert "Each comparison ran both packages" not in intro
 
 
@@ -871,7 +883,7 @@ def test_every_partial_mark_says_what_it_covers():
     assert table.count(" title=") == len(notes) and "compare-note-" not in table
     for _, _, _, note in notes:
         assert f"Partly: {build.escape(note)}</span>" in table
-    bad = list(build.COMPARISON) + [("Coverage", "Unexplained", ("yes", "part", "no", "no"), {})]
+    bad = list(build.COMPARISON) + [("Speed", "Unexplained", ("yes", "part", "no", "no", "no"), {})]
     original, build.COMPARISON = build.COMPARISON, tuple(bad)
     try:
         with pytest.raises(ValueError, match="in part"):
@@ -882,7 +894,7 @@ def test_every_partial_mark_says_what_it_covers():
 
 def test_the_comparison_table_has_three_groups_with_a_mark_for_every_package():
     groups = list(dict.fromkeys(group for group, *_ in build.COMPARISON))
-    assert groups == ["Interface", "Coverage", "Speed"]
+    assert groups == ["Results", "Agents", "Speed"]
     # A group's rows sit together, so each group heads the table once.
     table = build.comparison_table()
     assert table.count('<tr class="compare-group">') == len(groups)
@@ -1149,7 +1161,7 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
         "all-in-one": (
             'data-tile="methods"',
             'data-tile="graphs"',
-            'data-tile="compare"',
+            '<table class="compare">',
             'id="example"',
         ),
     }
@@ -1338,8 +1350,8 @@ def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeh
 
 
 def test_the_homepage_names_its_sources_where_they_are_used(placeholder_page):
-    # No notes at the page's foot: the comparison dialog names what its marks were read from, and
-    # each partial mark carries its note as a tooltip.
+    # No notes at the page's foot: the comparison names what its marks were read from, and each
+    # partial mark carries its note as a tooltip.
     page = placeholder_page
     for note in (
         'class="footnotes"',
@@ -1348,10 +1360,10 @@ def test_the_homepage_names_its_sources_where_they_are_used(placeholder_page):
         'class="compare-notes"',
     ):
         assert note not in page
-    dialog = page[page.index('id="compare"') :]
-    assert build.comparison_source() in dialog[: dialog.index('<table class="compare">')]
+    tile = page[page.index('<table class="compare">') :]
+    assert html.escape(build.comparison_source()) in tile[: tile.index("</li>")]
     for feature, package, _, note in build.comparison_notes():
-        assert f'title="{html.escape(note)}"' in dialog, (feature, package)
+        assert f'title="{html.escape(note)}"' in tile, (feature, package)
     assert 'href="docs/benchmarks.html"' in page
 
 
