@@ -439,6 +439,9 @@ class RCoT:
     variables and 2,000 rows, nearly always). RCoT tests conditional uncorrelatedness of
     ``n_features`` features per variable, which can miss a dependence the full kernel test finds,
     such as one between an odd and an even function of the same cause on a few hundred rows.
+    Because each query draws its own features, PC tests a weak dependence against every
+    conditioning set with a new chance to miss it: on simulated nonmonotone graphs of 10 variables
+    and 2,000 rows, PC with RCoT missed 16 of 100 true edges.
 
     References
     ----------
