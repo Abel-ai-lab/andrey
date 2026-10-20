@@ -99,7 +99,11 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    limit, such as an assumption on the data or a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"`, and call
-   `warn_experimental("<name>")` first in the facade until the method is supported.
+   `warn_experimental("<name>")` first in the facade until the method is supported. Its
+   `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
+   [column-order guide](docs/docs/guides/column-order.md): break ties with
+   `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
+   `tests/unit/test_column_labels.py` checks both fields on every method.
 3. Run `uv run pytest tests/unit/test_spec_registry.py`, which names whatever is missing. The CLI,
    the schema, and the skill pick up the method on their own.
 4. Test it as [Test a method](#test-a-method) describes.

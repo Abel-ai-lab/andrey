@@ -58,8 +58,8 @@ def fci(
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
     visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
-    ``in_column_order`` takes the column order there too, and applies the orientation rules one
-    firing at a time in column order instead of in order-free rounds (:func:`_fci_orient`).
+    ``in_column_order`` applies the orientation rules one firing at a time in column order instead
+    of in order-free rounds (:func:`_fci_orient`).
     ``max_depth`` caps the size of every conditioning set a test uses: the adjacency search, the
     possible-d-sep subsets, the majority votes, and the discriminating-path tests. With
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
@@ -89,7 +89,7 @@ def fci(
     marks = _circle_pag(support)
     _knowledge_marks(marks, constraints)
     _orient_colliders(marks, sepsets)
-    if possible_dsep == "fast" or in_column_order:
+    if possible_dsep == "fast":
         _remove_by_possible_dsep(marks, test, alpha, sepsets, keep=keep, max_depth=max_depth)
     else:
         by_rank, ranked_test = _test_in_rank_order(X, indep_test, categorical)

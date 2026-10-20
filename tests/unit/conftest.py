@@ -20,6 +20,7 @@ def _reset_backend_state():
     yield
     backend.config._backend = None
     backend.config._num_workers = None
+    backend.config._tie_break = None
     backend._reset_warnings()
     backend.reset_dispatch_stats()
     stats._CALIBRATED.clear()

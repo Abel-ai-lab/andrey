@@ -20,6 +20,18 @@ change names its pull request.
   each column's own data instead of its position or rounding. ([#205], [#213], [#228])
 - Faster categorical tests: `pc` with `indep_test="chisq"` or `"gsq"` runs 4-6x faster than in
   0.7.0 on the alarm, hepar2, and andes networks, with the same p-values and graphs. ([#208])
+- Background knowledge for every search: all 13 searches take required and forbidden edges, the
+  pairs that may be adjacent, and temporal tiers through `knowledge=`, and the constraint-based
+  methods take `max_depth`. ([#214])
+
+### Breaking
+
+- `boss`, `grasp`, `ges`, `hc`, `tabu`, and `exact_search` pick their default score from the
+  column types and warn once with a `DataTypeWarning`: BDeu when every column is categorical, and
+  the conditional Gaussian BIC, `"local_score_cond_gauss"`, when some are, except for `tabu`, which
+  has no mixed-data score. Pass `score_func="local_score_BIC_from_cov"` (`"local_score_BIC"` for
+  `ges` and `exact_search`) to keep the linear-Gaussian BIC. Data with no categorical column keep it
+  without a change. ([#237])
 
 ### Added
 
@@ -52,6 +64,13 @@ change names its pull request.
   `Knowledge.from_skeleton` turns a result's adjacencies into the allowed set. ([#214])
 - `pc`, `fci`, `gfci`, and `cdnod` take `max_depth`, the largest conditioning set any test uses.
   ([#214])
+- `andrey.config.tie_break`, `andrey.config(tie_break=...)`, and `ANDREY_TIE_BREAK` choose how
+  the searches break ties: `"rank"`, the default, by a rank computed from each column's own data,
+  or `"position"`, by column position. The new Column order and machines guide lists what each
+  method keeps under a new column order and on another machine, and which methods follow the
+  setting. Under `"position"`, `pc`, `cdnod`, `fci`, and `gfci` also fire their orientation rules
+  one at a time in column order instead of in rounds, and `fci` and `gfci` default to
+  `possible_dsep="fast"`. ([#210])
 
 ### Changed
 
@@ -463,6 +482,7 @@ First alpha release.
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
 [#208]: https://github.com/Abel-ai-lab/andrey/pull/208
 [#209]: https://github.com/Abel-ai-lab/andrey/pull/209
+[#210]: https://github.com/Abel-ai-lab/andrey/pull/210
 [#211]: https://github.com/Abel-ai-lab/andrey/pull/211
 [#213]: https://github.com/Abel-ai-lab/andrey/pull/213
 [#214]: https://github.com/Abel-ai-lab/andrey/pull/214
@@ -473,5 +493,6 @@ First alpha release.
 [#228]: https://github.com/Abel-ai-lab/andrey/pull/228
 [#229]: https://github.com/Abel-ai-lab/andrey/pull/229
 [#233]: https://github.com/Abel-ai-lab/andrey/pull/233
+[#237]: https://github.com/Abel-ai-lab/andrey/pull/237
 [#239]: https://github.com/Abel-ai-lab/andrey/pull/239
 [#248]: https://github.com/Abel-ai-lab/andrey/pull/248

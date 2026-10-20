@@ -106,6 +106,37 @@ def pc(
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
 
 
+def resolve_collider_order(collider_order: str | None) -> str:
+    """Return ``collider_order``, or for ``None`` the order ``andrey.config.tie_break`` selects.
+
+    ``"rank"`` selects ``"p_value"`` and ``"position"`` selects ``"column"``. An explicit
+    ``collider_order`` is returned as given, without reading the setting.
+    """
+    if collider_order is not None:
+        return collider_order
+    return "column" if backend.config.tie_break == "position" else "p_value"
+
+
+def resolve_in_column_order() -> bool:
+    """Whether ``andrey.config.tie_break`` is ``"position"``, which fires the orientation rules.
+
+    Under ``"position"``, Meek's rules and FCI's rules R1-R10 fire one at a time in column order
+    (``in_column_order``); under ``"rank"``, they run in order-free rounds.
+    """
+    return backend.config.tie_break == "position"
+
+
+def resolve_possible_dsep(possible_dsep: str | None) -> str:
+    """Return ``possible_dsep``, or for ``None`` the order ``andrey.config.tie_break`` selects.
+
+    ``"rank"`` selects ``"order_free"`` and ``"position"`` selects ``"fast"``. An explicit
+    ``possible_dsep`` is returned as given, without reading the setting.
+    """
+    if possible_dsep is not None:
+        return possible_dsep
+    return "fast" if backend.config.tie_break == "position" else "order_free"
+
+
 def check_collider_order(collider_order: str) -> None:
     """Raise ``ValueError`` unless ``collider_order`` is one of :data:`COLLIDER_ORDERS`."""
     if collider_order not in COLLIDER_ORDERS:

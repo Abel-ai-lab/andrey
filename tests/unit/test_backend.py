@@ -104,6 +104,36 @@ def test_andrey_device_is_alias_of_andrey_backend(monkeypatch):
     assert andrey.config.backend == "numpy"
 
 
+def test_tie_break_precedence_context_over_config_over_env(monkeypatch):
+    """Every layer reaches the ranks a fit reads: position ranks are the column positions."""
+    from andrey.search.hc import tie_ranks
+
+    monkeypatch.delenv("ANDREY_TIE_BREAK", raising=False)
+    x = np.random.default_rng(0).standard_normal((50, 4))
+    ranked, by_position = tie_ranks(x), np.arange(4)
+    assert andrey.config.tie_break == "rank" and (ranked != by_position).any()  # default
+    monkeypatch.setenv("ANDREY_TIE_BREAK", "Position")
+    assert andrey.config.tie_break == "position"  # env, any case
+    np.testing.assert_array_equal(tie_ranks(x), by_position)
+    andrey.config.tie_break = "rank"
+    np.testing.assert_array_equal(tie_ranks(x), ranked)  # config object over env
+    with andrey.config(tie_break="position"):
+        np.testing.assert_array_equal(tie_ranks(x), by_position)  # context over config object
+    np.testing.assert_array_equal(tie_ranks(x), ranked)  # context restored
+    andrey.config.tie_break = None
+    assert andrey.config.tie_break == "position"  # back to env
+
+
+def test_unknown_tie_break_names_the_allowed_values(monkeypatch):
+    with pytest.raises(ValueError, match="rank/position"):
+        andrey.config.tie_break = "column"
+    with pytest.raises(ValueError, match="rank/position"), andrey.config(tie_break="column"):
+        pass
+    monkeypatch.setenv("ANDREY_TIE_BREAK", "column")
+    with pytest.raises(ValueError, match="ANDREY_TIE_BREAK.*rank/position"):
+        _ = andrey.config.tie_break
+
+
 def test_num_workers_resolution(monkeypatch):
     monkeypatch.delenv("ANDREY_NUM_WORKERS", raising=False)
     assert andrey.config.num_workers == 1  # serial default
