@@ -322,7 +322,11 @@ def _data_types_section() -> str:
         name for name, spec in REGISTRY.items() if any(p.name == "categorical" for p in spec.params)
     ]
     return (
-        "The default tests and scores read every column as continuous. For categorical columns "
+        "The default tests read every column as continuous. A score search left at "
+        "`score_func=null` picks `local_score_BDeu` when every column is categorical and "
+        "`local_score_cond_gauss` when some are (`tabu`, with no mixed-data score, keeps the BIC), "
+        "inferring the columns by the rule below and saying so in a `DataTypeWarning`; otherwise "
+        "it picks the linear-Gaussian BIC. For categorical columns "
         f"coded by whole numbers, choose `indep_test` {code(DISCRETE_INDEP_TESTS)} or `score_func` "
         f"{code(DISCRETE_SCORES)}. For mixed data, choose `indep_test` {code(MIXED_INDEP_TESTS)} "
         f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "

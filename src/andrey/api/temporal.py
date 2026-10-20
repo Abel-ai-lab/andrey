@@ -331,8 +331,8 @@ def pcmci(
     every remaining candidate given the ``p`` strongest other candidates, one conditioning set per
     candidate, then drops those that test independent. A candidate's strength is the smallest
     absolute partial correlation it has had so far. Equal strengths are ordered by each variable's
-    rank, as in :func:`~andrey.hc`, so reordering the columns reorders the variables of the result
-    and changes nothing else, unless two columns are identical.
+    rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says
+    what the rank keeps.
 
     **Limitations.** Measured on simulated linear-Gaussian series with an autodependency in every
     variable and one cross-link per variable at lag 1 or 2, from 10 to 160 variables with 500 to
@@ -633,11 +633,11 @@ def lpcmci(
     distinct separating sets stored and found among the neighbors of the two. A mark that rules
     orient both ways is a conflict. The candidates of a step are ordered by statistics frozen when
     its group of links starts, so the order in which a group's links are tested changes nothing.
-    Equal statistics are ordered by each variable's rank, as in :func:`~andrey.hc`, so their order
-    does not depend on the order of the variables either, unless two columns are identical. The
-    collider rule stores every separating set its tests find, each made weakly minimal by dropping
-    first the node whose removal leaves the largest p-value, so the stored sets do not depend on
-    the order of the variables.
+    Equal statistics are ordered by each variable's rank, as in :func:`~andrey.hc`; the
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps. The collider
+    rule stores every separating set its tests find, each made weakly minimal by dropping first the
+    node whose removal leaves the largest p-value, so the stored sets do not depend on the order of
+    the variables.
 
     All tests use the same time steps, the last ``n_samples - 2 * tau_max``, and every node a test
     conditions on lies within ``tau_max`` steps of the later end. A test's partial correlation is

@@ -146,9 +146,8 @@ def direct_lingam(
     with the same number of ones, have equal scores up to rounding, which differs between CPUs.
     Each step treats candidates as tied when the square roots of their negated scores lie within
     ``1e-10`` of the best one, and picks among them by a rank computed from each column's own data,
-    as :func:`~andrey.hc` does. The rank moves with the column, so reordering the columns reorders
-    the causal order and changes nothing else, unless two columns are identical, and the same data
-    give the same order on other machines.
+    as :func:`~andrey.hc` does. The :doc:`column-order guide </docs/guides/column-order>` says what
+    the rank keeps under a new column order and on another machine.
 
     **Copies.** Two columns are copies when one leaves at most ``1e-12`` of the other's variance
     unexplained, as for a column and a rescaled or rank-reversed copy of it. Each step scores one
@@ -262,14 +261,10 @@ def ica_lingam(
     orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
     converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
 
-    **Results across machines.** When several variables can come next in the causal order, the one
-    whose column ranks first by its own values goes first, so the choice moves with its column when
-    the columns are reordered and does not depend on the CPU. FastICA itself can still differ:
-    with few rows per variable it converges slowly, and last-bit rounding differences, such as
-    those between CPUs or BLAS builds, can lead it to a different unmixing matrix and so to a
-    different order and graph; tighter FastICA tolerances do not prevent this. With more rows per
-    variable, FastICA converges in fewer iterations and these differences shrink. Reordering the
-    columns gives the same order and graph only where FastICA converges.
+    **Column order and machines.** When several variables can come next in the causal order, the one
+    whose column ranks first by its own values goes first. FastICA itself can reach another solution
+    under a new column order or on another machine when it converges slowly, at few rows per
+    variable; the :doc:`column-order guide </docs/guides/column-order>` gives the measured limit.
 
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)

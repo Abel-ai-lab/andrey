@@ -508,6 +508,16 @@ def test_pvalues_follow_the_variables_under_any_column_order(name, monkeypatch):
     assert any(pvalues(order) != by_position for order in orders)
 
 
+@pytest.mark.parametrize("name", TESTS)
+def test_position_tie_break_ranks_the_columns_by_position(name):
+    data = _common_cause(seed=2, n=120, n_cond=3)
+    data[:, 4] = np.round(data[:, 4])
+    by_position = list(range(5))
+    assert _build(name, data)._tie_rank != by_position
+    with andrey.config(tie_break="position"):
+        assert _build(name, data)._tie_rank == by_position
+
+
 @pytest.mark.parametrize("name", ["rcot", "cmiknn", "gpdc"])
 def test_seed_reproduces_the_pvalue(name, monkeypatch):
     """A random test's p-value follows its seed, not the queries before it; ``None`` reads

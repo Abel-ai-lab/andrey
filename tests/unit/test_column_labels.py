@@ -1,4 +1,8 @@
-"""A DataFrame's column names become the result's node labels, for every method that takes one."""
+"""A DataFrame's column names become the result's node labels, for every method that takes one.
+
+The labels also name each edge under any column order, which checks the registry's column-order
+fields on every method.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,7 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey.core import TemporalStructure
+from andrey.core import TemporalStructure, backend
 from andrey.core.knowledge import column_position
 from andrey.core.structure import node_labels
 from andrey.spec import list_specs
@@ -77,6 +81,50 @@ def test_columns_named_alike_as_text_raise_before_the_fit(spec):
     frames = [frame(seed).head(1).set_axis(["1", 1, 0], axis=1) for seed in range(3)]
     with pytest.raises(ValueError, match=r"'1' names columns \[0, 1\]"):
         getattr(andrey, spec.name)(*inputs(spec, frames))
+
+
+def named_marks(out) -> list[dict]:
+    """Each graph of a result as ``{(label, label): mark}``, which no column order changes."""
+    found = []
+    for result in out if isinstance(out, list) else [out]:
+        for graph in graphs(result.structure):
+            m, labels = graph.to_numpy(), graph.labels
+            found.append(
+                {(a, b): int(m[i, j]) for i, a in enumerate(labels) for j, b in enumerate(labels)}
+            )
+    return found
+
+
+@pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
+def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
+    """A method marked order-free names the same edges under reordered columns, and exactly the
+    methods marked ``tie_break`` read the setting during a fit. A pairwise method's two columns
+    swap."""
+    if spec.name == "calm":
+        pytest.importorskip("torch")
+    reads = []
+    resolve = backend._resolve_tie_break
+    monkeypatch.setattr(backend, "_resolve_tie_break", lambda: reads.append(1) or resolve())
+
+    def fit(columns: list[str], **given):
+        frames = [frame(seed)[columns] for seed in range(3)]
+        return getattr(andrey, spec.name)(
+            *inputs(spec, frames), **SHORT.get(spec.name, {}), **given
+        )
+
+    want = named_marks(fit(COLUMNS))
+    assert bool(reads) == spec.tie_break
+    for given in ({"collider_order": "p_value"}, {"possible_dsep": "order_free"}):
+        if given.keys() <= {param.name for param in spec.params}:
+            # An order given in the call does not consult the setting for that order.
+            read_by_default = len(reads)
+            reads.clear()
+            fit(COLUMNS, **given)
+            assert len(reads) == read_by_default - 1
+    if spec.column_order != "can_change":
+        pair = spec.family == "pairwise"
+        for order in ([1, 0, 2],) if pair else ([1, 2, 0], [2, 0, 1]):
+            assert named_marks(fit([COLUMNS[k] for k in order])) == want
 
 
 @pytest.mark.parametrize("data", [frame().to_numpy(), pd.DataFrame(frame().to_numpy())])
