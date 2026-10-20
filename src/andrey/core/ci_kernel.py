@@ -341,14 +341,23 @@ def _hall_buckley_eagleson_pvalue(statistic: float, weights: np.ndarray) -> floa
     return float(gammaincc(dof / 2.0, max(chi2, 0.0) / 2.0))
 
 
-def _fourier_features(values: np.ndarray, count: int, rng: np.random.Generator) -> np.ndarray:
+def _median_distance(values: np.ndarray) -> float:
+    """The median pairwise distance between the first 500 rows of ``values``; 0 below 2 rows."""
+    dists = pdist(values[:500], "euclidean")
+    return float(np.median(dists)) if dists.size else 0.0
+
+
+def _fourier_features(
+    values: np.ndarray, count: int, rng: np.random.Generator, scale: float | None = None
+) -> np.ndarray:
     """``count`` random Fourier features of the rows of ``values`` for the Gaussian kernel
-    ``exp(-|a - b|^2 / (2 s^2))``, ``s`` the median pairwise distance over the first 500 rows.
+    ``exp(-|a - b|^2 / (2 s^2))``, ``s`` the median pairwise distance over the first 500 rows, or
+    ``scale`` when given.
 
     The average product of two rows' features converges to their kernel value.
     """
-    dists = pdist(values[:500], "euclidean")
-    scale = float(np.median(dists)) if dists.size else 0.0
+    if scale is None:
+        scale = _median_distance(values)
     weights = rng.standard_normal((values.shape[1], count))
     offsets = rng.uniform(0.0, 2.0 * np.pi, count)
     if scale > 0.0:
@@ -406,12 +415,16 @@ class RCoT:
     chi-squared law (Hall-Buckley-Eagleson) [2]_ [3]_. An empty conditioning set uses ``A`` and
     ``B``, centered.
 
-    The features of a variable, and those of a conditioning set, are drawn from a generator seeded
-    by ``seed`` and the :func:`~andrey.search.hc.tie_ranks` rank of each of its columns, a rank
-    computed from each column's own data, so every query on the same variable or conditioning set
-    uses the same features, and the test object keeps them, and the residuals, for later queries.
-    A p-value does not depend on the order of the queries, of the arguments, or of the columns, and
-    the same seed reproduces it.
+    The features of ``x`` and of ``y`` are drawn from generators seeded by ``seed``, the variable,
+    and the conditioning set, and those of the conditioning set from one seeded by ``seed`` and the
+    set; each column enters by its :func:`~andrey.search.hc.tie_ranks` rank, computed from the
+    column's own data. The queries of one pair with different conditioning sets therefore use
+    independent features. PC removes an edge when any conditioning set gives a p-value above
+    ``alpha``, and features shared by those queries would make them reject together, which keeps
+    edges between conditionally independent variables. Queries on the same variable and
+    conditioning set share its features, and the test object keeps them, and the residuals, for
+    later queries. A p-value does not depend on the order of the queries, of the arguments, or of
+    the columns, and the same seed reproduces it.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. Measured on columns independent of each other, its rate of rejecting a true
@@ -464,10 +477,10 @@ class RCoT:
         self._n_features = int(n_features)
         self._n_features_cond = int(n_features_cond)
         self._seed = resolve_seed(seed)
-        # Features and residuals depend only on their columns, so queries share them.
+        # Bandwidths, features, and residuals depend only on their columns, so queries share them.
         n = self._n
-        self._column_features = lru_cache(maxsize=None)(
-            lambda column: self._features((column,), self._n_features)
+        self._scale = lru_cache(maxsize=None)(
+            lambda column: _median_distance(self._data[:, [column]])
         )
         self._residual = lru_cache(_cache_entries(n * self._n_features))(self._fit_residual)
         self._cond_factor = lru_cache(_cache_entries(n * self._n_features_cond))(self._factor)
@@ -490,23 +503,26 @@ class RCoT:
         return _hall_buckley_eagleson_pvalue(statistic, weights)
 
     def _fit_residual(self, column: int, cond: tuple[int, ...]) -> np.ndarray:
-        """The features of ``column`` minus what a ridge regression on the features of ``cond``
-        explains; the standardized features themselves when ``cond`` is empty."""
-        features = self._column_features(column)
+        """Standardized features of ``column``, drawn from a generator seeded by the seed,
+        ``column``, and ``cond``, minus what a ridge regression on the features of ``cond``
+        explains; the features themselves when ``cond`` is empty."""
+        # The leading 1 (0 for a conditioning set) keeps the two kinds of draws apart.
+        rng = np.random.default_rng([self._seed, 1, self._n_features, column, *cond])
+        values = self._data[:, [column]]
+        features = _standardize(
+            _fourier_features(values, self._n_features, rng, self._scale(column))
+        )
         if not cond:
             return features
         c, factor = self._cond_factor(cond)
         return features - c @ cho_solve(factor, c.T @ features)
 
-    def _features(self, columns: tuple[int, ...], count: int) -> np.ndarray:
-        """Standardized random Fourier features of ``columns``, drawn from a generator seeded by
-        the seed, ``count``, and ``columns``."""
-        rng = np.random.default_rng([self._seed, count, *columns])
-        return _standardize(_fourier_features(self._data[:, list(columns)], count, rng))
-
     def _factor(self, cond: tuple[int, ...]) -> tuple[np.ndarray, tuple]:
-        """The conditioning set's features ``C`` and the Cholesky factor of
-        ``C'C + ridge (n - 1) I``, that is ``(n - 1)(Sigma_CC + ridge I)``."""
-        c = self._features(cond, self._n_features_cond)
+        """The conditioning set's standardized features ``C``, drawn from a generator seeded by the
+        seed and ``cond``, and the Cholesky factor of ``C'C + ridge (n - 1) I``, that is
+        ``(n - 1)(Sigma_CC + ridge I)``."""
+        rng = np.random.default_rng([self._seed, 0, self._n_features_cond, *cond])
+        values = self._data[:, list(cond)]
+        c = _standardize(_fourier_features(values, self._n_features_cond, rng))
         gram = c.T @ c + 1e-10 * (self._n - 1) * np.eye(c.shape[1])
         return c, cho_factor(gram)
