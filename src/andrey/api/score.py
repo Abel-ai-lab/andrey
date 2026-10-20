@@ -28,6 +28,7 @@ from andrey.api._adapt import (
     structure_output,
 )
 from andrey.core import backend
+from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
@@ -45,6 +46,7 @@ def ges(
     lambda_value: float = 1.0,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with greedy equivalence search (GES).
 
@@ -79,6 +81,12 @@ def ges(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -98,7 +106,7 @@ def ges(
         If ``score_func`` names no available score.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``max_categories`` is less than ``2``,
         with a categorical score, if ``data`` holds a number that is not whole, or, with a
@@ -107,7 +115,8 @@ def ges(
         with another score. With the BIC score, also if a column repeats another up to scale and
         shift given more than two rows or, with more rows than columns, is a linear function of
         other columns. One message names every group of copies and says to keep one column per
-        group.
+        group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -246,8 +255,15 @@ def ges(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="ges")
     with copies_named(labels):
-        cpdag, score = _ges(X, score_func=score_func, lambda_value=lambda_value, categorical=mask)
+        cpdag, score = _ges(
+            X,
+            score_func=score_func,
+            lambda_value=lambda_value,
+            categorical=mask,
+            constraints=constraints,
+        )
     return structure_output(
         cpdag,
         labels=labels,
@@ -264,6 +280,7 @@ def gies(
     interventions: npt.ArrayLike | None = None,
     *,
     lambda_value: float = 1.0,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn an interventional essential graph with greedy interventional equivalence search (GIES).
 
@@ -285,6 +302,12 @@ def gies(
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -298,6 +321,8 @@ def gies(
 
     Raises
     ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
         no constant column; if ``interventions`` does not have ``data``'s shape, holds a value
@@ -305,7 +330,8 @@ def gies(
         intervention; if ``lambda_value`` is negative or non-finite; or if a column repeats another
         up to scale and shift given more than two rows or, with more rows than columns, is a linear
         function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -362,9 +388,10 @@ def gies(
 
     X = data_matrix(data)
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="gies")
     mask = None if interventions is None else intervention_mask(interventions, X)
     with copies_named(labels):
-        graph, score = _gies(X, mask, lambda_value=lambda_value)
+        graph, score = _gies(X, mask, lambda_value=lambda_value, constraints=constraints)
     metadata = {"algorithm": "GIES", "score": json_safe(score)}
     return structure_output(graph, labels=labels, metadata=metadata)
 
@@ -375,6 +402,7 @@ def xges(
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
     extended_search: bool = True,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with extremely greedy equivalence search (XGES).
 
@@ -395,6 +423,12 @@ def xges(
     extended_search : bool, default=True
         Run the extended search after the base search (see Notes). ``False`` returns the base
         search's graph, which is faster.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -409,13 +443,15 @@ def xges(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC"``.
     TypeError
-        If ``extended_search`` is not a bool.
+        If ``extended_search`` is not a bool. Also if ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, if
         ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
         column up to scale and shift given more than two rows, or, with more rows than columns, is a
         linear function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -476,9 +512,14 @@ def xges(
     X = data_matrix(data)
     extended_search = flag(extended_search, "extended_search")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="xges")
     with copies_named(labels):
         cpdag, score = _xges(
-            X, score_func=score_func, lambda_value=lambda_value, extended_search=extended_search
+            X,
+            score_func=score_func,
+            lambda_value=lambda_value,
+            extended_search=extended_search,
+            constraints=constraints,
         )
     metadata = {"algorithm": "XGES", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -492,6 +533,7 @@ def hc(
     max_iter: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with hill-climbing search.
 
@@ -528,6 +570,12 @@ def hc(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -545,13 +593,16 @@ def hc(
         If ``score_func`` names no available score.
     TypeError
         If a given ``max_iter`` is not an int, ``categorical`` is not a list of column names and
-        positions, or ``max_categories`` is not an int.
+        positions, or ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None``
+        nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
         or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With
         the BIC score, also if a column repeats another up to scale and shift given more than two
         rows or, with more rows than columns, is a linear function of other columns. One message
-        names every group of copies and says to keep one column per group.
+        names every group of copies and says to keep one column per group. Also if ``knowledge``
+        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists,
+        or, under a mixed-data score, requires an edge from a continuous into a categorical column.
 
     Warns
     -----
@@ -622,9 +673,15 @@ def hc(
     )
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="hc")
     with copies_named(labels):
         cpdag, score = _hc(
-            X, score_func=score_func, lambda_value=lambda_value, max_iter=max_iter, categorical=mask
+            X,
+            score_func=score_func,
+            lambda_value=lambda_value,
+            max_iter=max_iter,
+            categorical=mask,
+            constraints=constraints,
         )
     metadata = {"algorithm": "HC", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -638,6 +695,7 @@ def tabu(
     tabu_length: int = 10,
     max_tabu: int | None = None,
     max_iter: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with tabu search.
 
@@ -668,6 +726,12 @@ def tabu(
         Maximum moves, improving or not, at least ``1``; ``None`` sets no limit. The search still
         terminates: non-improving runs are bounded by ``max_tabu``, and each new best DAG scores
         strictly lower.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -682,14 +746,16 @@ def tabu(
     NotImplementedError
         If ``score_func`` names no score tabu search takes.
     TypeError
-        If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int.
+        If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int. Also if
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
         less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or, with a categorical
         score, if ``data`` holds a number that is not whole. With the BIC score, also if a column
         repeats another up to scale and shift given more than two rows or, with more rows than
         columns, is a linear function of other columns. One message names every group of copies and
-        says to keep one column per group.
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -757,6 +823,7 @@ def tabu(
     )
     max_iter = None if max_iter is None else int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="tabu")
     with copies_named(labels):
         cpdag, score = _tabu(
             X,
@@ -765,6 +832,7 @@ def tabu(
             tabu_length=tabu_length,
             max_tabu=max_tabu,
             max_iter=max_iter,
+            constraints=constraints,
         )
     metadata = {"algorithm": "Tabu", "score": json_safe(score)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -777,6 +845,7 @@ def exact_search(
     score_func: str = "local_score_BIC",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the globally optimal DAG for a decomposable score by exact search.
 
@@ -808,6 +877,11 @@ def exact_search(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each variable's parent sets exclude
+        the forbidden parents and include the required ones, so the DAG found is the best one that
+        satisfies the knowledge.
 
     Returns
     -------
@@ -823,13 +897,14 @@ def exact_search(
         If ``score_func`` names no available score.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical`` does
         not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
         another up to scale and shift given more than two rows or, with more rows than columns, is a
         linear function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -849,11 +924,12 @@ def exact_search(
     **Tied DAGs.** Every DAG of the optimal equivalence class has the same score, so the search's
     own pick among them would follow last-bit rounding and the column order. Exact search instead
     reports one fixed member of the class it found: it keeps the edges every DAG of the class
-    shares and orients the others by a rank computed from each column's own data, as
-    :func:`~andrey.hc` ranks tied moves. The rank moves with the column, so reordering the columns
-    reorders the graph's nodes and changes nothing else, unless two columns are identical. The
-    rank is arbitrary with respect to causal structure. Rounding differences, such as another CPU's
-    BLAS kernel makes, leave the reported DAG unchanged whenever they leave the class unchanged.
+    shares, and those the knowledge directs, and orients the others by a rank computed from each
+    column's own data, as :func:`~andrey.hc` ranks tied moves. The rank moves with the column, so
+    reordering the columns reorders the graph's nodes and changes nothing else, unless two columns
+    are identical. The rank is arbitrary with respect to causal structure. Rounding differences,
+    such as another CPU's BLAS kernel makes, leave the reported DAG unchanged whenever they leave
+    the class unchanged.
 
     **Categorical data.** ``"local_score_BDeu"`` [5]_ and ``"local_score_BIC_categorical"`` [6]_
     read each distinct value of a column as one category and score a variable by its counts in
@@ -913,8 +989,15 @@ def exact_search(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="exact_search")
     with copies_named(labels):
-        dag = _exact(X, search_method=search_method, score_func=score_func, categorical=mask)
+        dag = _exact(
+            X,
+            search_method=search_method,
+            score_func=score_func,
+            categorical=mask,
+            constraints=constraints,
+        )
     return structure_output(
         dag,
         labels=labels,
