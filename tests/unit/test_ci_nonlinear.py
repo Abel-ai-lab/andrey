@@ -357,30 +357,30 @@ def test_kci_decomposes_each_conditioning_set_once(monkeypatch):
         assert [KCI(data)(*query) for query in queries] == pvalues
 
 
-def test_rcot_draws_features_per_variable_and_conditioning_set(monkeypatch):
+def test_rcot_samples_features_per_variable_and_conditioning_set(monkeypatch):
     """Queries share the features of a variable given one conditioning set, and of the set; a
-    repeated query draws nothing, and the p-values equal those of a test that draws every query's
-    features afresh."""
-    draws = []
-    draw = ci_kernel._fourier_features
+    repeated query samples nothing, and the p-values equal those of a test that samples every
+    query's features afresh."""
+    counts = []
+    sample = ci_kernel._fourier_features
     monkeypatch.setattr(
         ci_kernel,
         "_fourier_features",
-        lambda v, count, rng, scale=None: draws.append(count) or draw(v, count, rng, scale),
+        lambda v, count, rng, scale=None: counts.append(count) or sample(v, count, rng, scale),
     )
     data = _common_cause(seed=3, n=120, n_cond=2)
     queries = [(0, 1, (2,)), (0, 3, (2,)), (1, 3, (2,)), (0, 1, ()), (0, 1, (2, 3)), (1, 0, (2,))]
     test = RCoT(data)
     pvalues = [test(*query) for query in queries]
     # 0, 1, 3 given {2}; 0, 1 alone; 0, 1 given {2, 3}; the sets {2} and {2, 3}
-    assert sorted(draws) == [5] * 7 + [100] * 2
+    assert sorted(counts) == [5] * 7 + [100] * 2
     assert [RCoT(data)(*query) for query in queries] == pvalues
 
 
-def test_rcot_queries_of_one_pair_draw_independent_features():
+def test_rcot_queries_of_one_pair_sample_independent_features():
     """PC removes an edge when any conditioning set accepts, so one pair's queries over different
-    conditioning sets draw their own features: given each of 40 independent columns, the p-values
-    of two independent columns spread as much as one query's p-values over 40 seeds."""
+    conditioning sets sample their own features: given each of 40 independent columns, the
+    p-values of two independent columns spread as much as one query's p-values over 40 seeds."""
     spread_sets, spread_seeds = [], []
     for data_seed in range(5):
         data = np.random.default_rng(data_seed).standard_normal((500, 42))

@@ -378,9 +378,9 @@ class RCoT:
     data : ndarray of shape (n_samples, n_variables)
         Observed data, one row per sample. Each column is standardized to unit variance.
     n_features : int, default=5
-        Random Fourier features drawn for ``x`` and for ``y``.
+        Random Fourier features sampled for ``x`` and for ``y``.
     n_features_cond : int, default=100
-        Random Fourier features drawn for the conditioning set. More features remove more of the
+        Random Fourier features sampled for the conditioning set. More features remove more of the
         conditioning set's effect, at a cost that grows with their square. The default is four
         times the 25 of [1]_: with 25, two conditioning variables that drive both ``x`` and ``y``
         leave enough of their effect to reject most true independences at 500 rows.
@@ -402,8 +402,9 @@ class RCoT:
     Notes
     -----
     **How it works.** A variable ``v`` with median pairwise distance ``s`` (over its first 500
-    rows) gets features ``sqrt(2) cos(v W + b)`` with ``W`` normal of standard deviation
-    ``1 / s`` and ``b`` uniform on ``[0, 2 pi]``, the random features of the Gaussian kernel
+    rows) gets features ``sqrt(2) cos(v W + b)``, with frequencies ``W`` sampled from the kernel's
+    spectral distribution, normal of standard deviation ``1 / s``, and phases ``b`` uniform on
+    ``[0, 2 pi]``: the random Fourier features [5]_ of the Gaussian kernel
     ``exp(-|v - v'|^2 / (2 s^2))``. The median distance is that kernel's bandwidth, the median
     heuristic [4]_ that [1]_ uses; [1]_ prints the kernel as ``exp(-|v - v'|^2 / s)``. Every
     feature is standardized [1]_. With ``A`` and ``B`` the features of ``x`` and ``y``, and ``C``
@@ -415,16 +416,17 @@ class RCoT:
     chi-squared law (Hall-Buckley-Eagleson) [2]_ [3]_. An empty conditioning set uses ``A`` and
     ``B``, centered.
 
-    The features of ``x`` and of ``y`` are drawn from generators seeded by ``seed``, the variable,
-    and the conditioning set, and those of the conditioning set from one seeded by ``seed`` and the
-    set; each column enters by its :func:`~andrey.search.hc.tie_ranks` rank, computed from the
-    column's own data. The queries of one pair with different conditioning sets therefore use
-    independent features. PC removes an edge when any conditioning set gives a p-value above
-    ``alpha``, and features shared by those queries would make them reject together, which keeps
-    edges between conditionally independent variables. Queries on the same variable and
-    conditioning set share its features, and the test object keeps them, and the residuals, for
-    later queries. A p-value does not depend on the order of the queries, of the arguments, or of
-    the columns, and the same seed reproduces it.
+    The features of ``x`` and of ``y`` are sampled for each conditioning set, from generators
+    seeded by ``seed``, the variable, and the set, and those of the conditioning set from one
+    seeded by ``seed`` and the set; each column enters by its :func:`~andrey.search.hc.tie_ranks`
+    rank, computed from the column's own data. The queries of one pair with different
+    conditioning sets therefore use independent features, as in [1]_, where every test samples its
+    own. PC removes an edge when any conditioning set gives a p-value above ``alpha``, and features
+    shared by those queries would make them reject together, which keeps edges between
+    conditionally independent variables. Queries on the same variable and conditioning set share
+    its features, and the test object keeps them, and the residuals, for later queries. A p-value
+    does not depend on the order of the queries, of the arguments, or of the columns, and the same
+    seed reproduces it.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. Measured on columns independent of each other, its rate of rejecting a true
@@ -435,13 +437,13 @@ class RCoT:
     the threshold. The regression on the conditioning-set features removes a strong nonlinear effect
     of that set only approximately, and what remains reads as dependence: with two or more
     conditioning variables that drive both ``x`` and ``y``, the test rejects a true independence
-    more often than ``alpha``, increasingly so as the rows grow (on simulated draws with three such
+    more often than ``alpha``, increasingly so as the rows grow (on simulated data with three such
     variables and 2,000 rows, nearly always). RCoT tests conditional uncorrelatedness of
     ``n_features`` features per variable, which can miss a dependence the full kernel test finds,
     such as one between an odd and an even function of the same cause on a few hundred rows.
-    Because each query draws its own features, PC tests a weak dependence against every
-    conditioning set with a new chance to miss it: on simulated nonmonotone graphs of 10 variables
-    and 2,000 rows, PC with RCoT missed 16 of 100 true edges.
+    Because the features are sampled for each conditioning set, PC tests a weak dependence against
+    every conditioning set with a new chance to miss it: on simulated nonmonotone graphs of 10
+    variables and 2,000 rows, PC with RCoT missed 16 of 100 true edges.
 
     References
     ----------
@@ -455,6 +457,8 @@ class RCoT:
     .. [4] Gretton, A., Fukumizu, K., Teo, C. H., Song, L., Scholkopf, B., and Smola, A. J.
        (2007). A kernel statistical test of independence. Advances in Neural Information
        Processing Systems 20, 585-592.
+    .. [5] Rahimi, A., and Recht, B. (2007). Random features for large-scale kernel machines.
+       Advances in Neural Information Processing Systems 20, 1177-1184.
     """
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
@@ -506,10 +510,11 @@ class RCoT:
         return _hall_buckley_eagleson_pvalue(statistic, weights)
 
     def _fit_residual(self, column: int, cond: tuple[int, ...]) -> np.ndarray:
-        """Standardized features of ``column``, drawn from a generator seeded by the seed,
+        """Standardized features of ``column``, sampled from a generator seeded by the seed,
         ``column``, and ``cond``, minus what a ridge regression on the features of ``cond``
         explains; the features themselves when ``cond`` is empty."""
-        # The leading 1 (0 for a conditioning set) keeps the two kinds of draws apart.
+        # The leading 1 (0 for a conditioning set) gives a variable's generator and a set's
+        # different seeds.
         rng = np.random.default_rng([self._seed, 1, self._n_features, column, *cond])
         values = self._data[:, [column]]
         features = _standardize(
@@ -521,8 +526,8 @@ class RCoT:
         return features - c @ cho_solve(factor, c.T @ features)
 
     def _factor(self, cond: tuple[int, ...]) -> tuple[np.ndarray, tuple]:
-        """The conditioning set's standardized features ``C``, drawn from a generator seeded by the
-        seed and ``cond``, and the Cholesky factor of ``C'C + ridge (n - 1) I``, that is
+        """The conditioning set's standardized features ``C``, sampled from a generator seeded by
+        the seed and ``cond``, and the Cholesky factor of ``C'C + ridge (n - 1) I``, that is
         ``(n - 1)(Sigma_CC + ridge I)``."""
         rng = np.random.default_rng([self._seed, 0, self._n_features_cond, *cond])
         values = self._data[:, list(cond)]
