@@ -66,7 +66,10 @@ jobs:
               - 'README.md'
               - 'LICENSE'
               - 'scripts/check_dist.py'
+              - 'scripts/gate_reuse.py'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/publish.yml'
+              - '.github/workflows/quality-gate.yml'
       - name: Ruff (lint + format check)
         run: |
           uvx ruff check .
