@@ -23,7 +23,10 @@ InputKind = Literal[
     "context",  # an auxiliary (n_samples, k) matrix aligned to the data rows (cdnod)
 ]
 # Hyperparameter value types -- map to a JSON-schema type and a CLI option.
-ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list"]
+# knowledge: an object with required/forbidden/allowed edge lists and tiers (andrey.Knowledge).
+ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list", "knowledge"]
+# The parts of an andrey.Knowledge a method honors.
+KnowledgePart = Literal["required", "forbidden", "allowed", "tiers"]
 
 EnvGroup = Literal["backend", "reproducibility", "determinism", "data"]
 
@@ -102,6 +105,7 @@ class MethodSpec(Spec):
     passthrough: bool = False  # accepts extra **params (CALM optimizer knobs)
     references: tuple[str, ...] = ()
     aliases: tuple[str, ...] = ()
+    knowledge: tuple[KnowledgePart, ...] = ()  # the Knowledge parts its knowledge= honors
 
 
 class EnvVarSpec(Spec):

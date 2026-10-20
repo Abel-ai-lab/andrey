@@ -22,9 +22,11 @@ from andrey.api._adapt import (
     column_namer,
     copies_named,
     data_kind,
+    int_in_range,
     open_unit_interval,
     structure_output,
 )
+from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -42,6 +44,8 @@ def pc(
     collider_order: str = "p_value",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with the PC algorithm.
 
@@ -86,6 +90,20 @@ def pc(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs and never removes a required pair; the tests can remove any other allowed
+        pair. A pair the knowledge makes non-adjacent is tested for a separating set, so colliders
+        over it are oriented as usual; when the search finds none within ``max_depth``, no rule
+        reads its unshielded triples as colliders or non-colliders. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow, giving the maximally
+        oriented PDAG (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges
+        the search kept into a directed cycle raises ``ValueError``.
 
     Returns
     -------
@@ -101,7 +119,8 @@ def pc(
         If ``indep_test`` names no available test.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
         not in ``(0, 1)``, if ``max_categories`` is less than ``2``, with ``"chisq"`` or ``"gsq"``,
@@ -111,7 +130,8 @@ def pc(
         with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. With
         ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
         before any test runs; one message names every group of copies and says to keep one column
-        per group.
+        per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -270,9 +290,17 @@ def pc(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="pc")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         cpdag = _pc(
-            X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_order=collider_order,
+            categorical=mask,
+            max_depth=max_depth,
+            constraints=constraints,
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
@@ -288,6 +316,8 @@ def fci(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     possible_dsep: str = "order_free",
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -338,6 +368,22 @@ def fci(
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
         ``"fast"`` visits them in column order. See Notes and Limitations.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove. It caps the tests of
+        the adjacency search, the possible-d-separation step, the majority rule, and the
+        discriminating-path rule.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs and never removes a required pair; the tests can remove any other allowed
+        pair. A pair the knowledge makes non-adjacent is tested for a separating set, so colliders
+        over it are oriented as usual; when the search finds none within ``max_depth``, no rule
+        reads its unshielded triples as colliders or non-colliders. In the PAG, a forbidden
+        ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and can leave a circle at ``b``,
+        and a required one is ``a -> b``; knowledge that puts an arrowhead at ``a`` on an edge
+        ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``.
 
     Returns
     -------
@@ -354,14 +400,16 @@ def fci(
         If ``indep_test`` names no available test.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
         not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice, or
         if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
         ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
         before any test runs; one message names every group of copies and says to keep one column
-        per group.
+        per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -479,6 +527,8 @@ def fci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="fci")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         pag = _fci(
             X,
@@ -487,6 +537,8 @@ def fci(
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=possible_dsep,
+            max_depth=max_depth,
+            constraints=constraints,
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
@@ -504,6 +556,8 @@ def gfci(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     possible_dsep: str = "order_free",
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -562,6 +616,19 @@ def gfci(
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
         ``"fast"`` visits them in column order. See Notes and Limitations.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove. It caps the tests of
+        the adjacency search, the separating sets for the pairs GES leaves non-adjacent, the
+        possible-d-separation step, the majority rule, and the discriminating-path rule, but not the
+        GES phase.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The GES phase honors it as
+        :func:`~andrey.ges` does, and the test phase starts from the adjacencies GES found and never
+        removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an
+        arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
 
     Returns
     -------
@@ -578,7 +645,8 @@ def gfci(
         If ``score_func`` names no available score, or ``indep_test`` no available test.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
         ``collider_rule`` or ``possible_dsep`` is not a supported choice, if ``score_func`` and
@@ -586,7 +654,9 @@ def gfci(
         ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
         column repeats another up to scale and shift given more than two rows or, with more rows
         than columns, is a linear function of other columns. One message names every group of copies
-        and says to keep one column per group.
+        and says to keep one column per group. Also if a given ``max_depth`` is negative, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -678,6 +748,8 @@ def gfci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         pag = _gfci(
             X,
@@ -688,6 +760,8 @@ def gfci(
             collider_rule=collider_rule,
             categorical=mask,
             possible_dsep=possible_dsep,
+            max_depth=max_depth,
+            constraints=constraints,
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
@@ -704,6 +778,8 @@ def cdnod(
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
@@ -754,6 +830,20 @@ def cdnod(
         dependence measure: two modules, the distributions of a candidate cause and of its effect
         given it, whose measure is at most the threshold count as changing independently. ``None``
         skips the step. See Notes.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs and never removes a required pair; the tests can remove any other allowed
+        pair. A pair the knowledge makes non-adjacent is tested for a separating set, so colliders
+        over it are oriented as usual; when the search finds none within ``max_depth``, no rule
+        reads its unshielded triples as colliders or non-colliders. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
+        a directed cycle raises ``ValueError``. The domain index is unconstrained.
 
     Returns
     -------
@@ -775,7 +865,8 @@ def cdnod(
         If ``indep_test`` names no available test.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
     ValueError
         If ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` /
         ``inf``, if ``data`` has too few rows for a test, if ``alpha`` or ``dependence_threshold``
@@ -785,7 +876,8 @@ def cdnod(
         ``"column"``. With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or
         ``domain_index`` with more than one domain, repeats another up to scale and shift, before
         any test runs; one message names every group of copies and says to keep one column per
-        group.
+        group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -886,6 +978,8 @@ def cdnod(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     c = np.asarray(domain_index, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
@@ -902,6 +996,8 @@ def cdnod(
             collider_order=collider_order,
             categorical=mask,
             dependence_threshold=dependence_threshold,
+            max_depth=max_depth,
+            constraints=constraints,
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}

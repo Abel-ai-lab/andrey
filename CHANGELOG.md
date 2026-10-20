@@ -32,6 +32,14 @@ change names its pull request.
   partial correlation does not see. ([#209])
 - KCI and CMIknn run on a CUDA GPU, KCI in float64 and CMIknn with the CPU's p-values, from the
   cutoffs `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`. ([#209])
+- `knowledge=` on `pc`, `cdnod`, `fci`, `gfci`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`,
+  `grasp`, `exact_search`, and `direct_lingam` takes `andrey.Knowledge(required=, forbidden=,
+  allowed=, tiers=)`: the edges the graph must have and must not have, the only pairs that may be
+  adjacent, and tiers in time order; knowledge that contradicts itself or names a column the data
+  lack raises a `ValueError`, and the CLI takes `knowledge=` as JSON or a path.
+  `Knowledge.from_skeleton` turns a result's adjacencies into the allowed set. ([#214])
+- `pc`, `fci`, `gfci`, and `cdnod` take `max_depth`, the largest conditioning set any test uses.
+  ([#214])
 
 ### Changed
 
@@ -445,6 +453,7 @@ First alpha release.
 [#209]: https://github.com/Abel-ai-lab/andrey/pull/209
 [#211]: https://github.com/Abel-ai-lab/andrey/pull/211
 [#213]: https://github.com/Abel-ai-lab/andrey/pull/213
+[#214]: https://github.com/Abel-ai-lab/andrey/pull/214
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
 [#220]: https://github.com/Abel-ai-lab/andrey/pull/220

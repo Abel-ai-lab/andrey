@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import heapq
 from collections import deque
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from itertools import combinations
 
 import numpy as np
@@ -162,35 +162,48 @@ def from_structure(structure: GraphStructure) -> np.ndarray:
 
 
 def meek(
-    pdag: np.ndarray, *, in_column_order: bool = False, _trace: list[dict] | None = None
+    pdag: np.ndarray,
+    *,
+    rule4: bool = False,
+    ambiguous: Collection[tuple[int, int, int]] = frozenset(),
+    in_column_order: bool = False,
+    _trace: list[dict] | None = None,
 ) -> np.ndarray:
-    """Complete a PDAG to a CPDAG by applying Meek's rules R1-R3 to a fixed point.
+    """Apply Meek's rules R1-R3, and R4 with ``rule4``, to a PDAG until none orients an edge.
 
     Returns a new endpoint-mark matrix. Each rule directs an undirected edge only when doing so
     avoids a new unshielded collider (R1), a directed cycle (R2), or an inconsistency around a
     shared child (R3); an orientation that would close a directed cycle is skipped. Adjacency (which
     pairs share an edge) is never changed -- only tails become arrowheads. A bidirected edge counts
     as an adjacency only: no rule reads it as directed or undirected, or orients it. R4 is not
-    required to complete a v-structure pattern in the absence of background knowledge.
+    required to complete a v-structure pattern in the absence of background knowledge; with
+    ``rule4`` set, for a PDAG that also carries background knowledge, R4 runs as well: for
+    ``i -- j``, ``i -- k``, ``k -> m -> j`` with ``i`` adjacent to ``m`` and ``k``, ``j``
+    non-adjacent, it orients ``i -> j``.
+
+    R1, R3, and R4 each read an unshielded triple whose middle node is not a collider. A triple
+    ``(a, b, c)`` in ``ambiguous``, middle node ``b`` and endpoints in either order, has an unknown
+    collider status, such as a triple over a pair background knowledge makes non-adjacent with no
+    separating set found; no rule reads it, so no rule orients through it.
 
     The rules run in rounds. A round reads the graph as it stands when the round starts and
-    collects every orientation R1-R3 imply on it. An edge they would direct both ways stays
-    undirected in that round, and so does every orientation that would close a directed cycle,
-    whether alone or together with other orientations of the round. The round applies the rest
-    together, and the rounds repeat until one orients nothing; orientations are never undone, so
-    the rounds stop. A round reads only the marks, never a node's position, so relabeling the nodes
-    relabels its orientations: the completion does not depend on the order in which the rules visit
-    the nodes, nor on the column order. When some DAG extends the PDAG, keeping its directed edges
-    and adding no unshielded collider, as for the colliders :func:`orient_colliders` finds from a
-    DAG's skeleton and separating sets, every implied orientation holds in each such DAG (Meek
-    1995), so none conflict or close a cycle, and the completion is the one the rules give when
-    they fire one at a time, in any order.
+    collects every orientation R1-R3, and R4 with ``rule4``, imply on it. An edge they would direct
+    both ways stays undirected in that round, and so does every orientation that would close a
+    directed cycle, whether alone or together with other orientations of the round. The round
+    applies the rest together, and the rounds repeat until one orients nothing; orientations are
+    never undone, so the rounds stop. A round reads only the marks, never a node's position, so
+    relabeling the nodes relabels its orientations: the completion does not depend on the order in
+    which the rules visit the nodes, nor on the column order. When some DAG extends the PDAG,
+    keeping its directed edges and adding no unshielded collider, as for the colliders
+    :func:`orient_colliders` finds from a DAG's skeleton and separating sets, every implied
+    orientation holds in each such DAG (Meek 1995), so none conflict or close a cycle, and the
+    completion is the one the rules give when they fire one at a time, in any order.
 
     With ``in_column_order``, the rules instead fire one at a time, each on the graph the previous
-    firing left. On a PDAG a DAG extends the result is the same; on any other it can depend on the
-    firing order. R1 visits the directed edges ``i -> j`` by ``i``, then ``j``,
-    so when two of them demand opposite directions for one undirected edge, the edge with the lower
-    tail index decides.
+    firing left, R4 after R3 in each sweep. On a PDAG a DAG extends the result is the same; on any
+    other it can depend on the firing order. R1 visits the directed edges ``i -> j`` by ``i``, then
+    ``j``, so when two of them demand opposite directions for one undirected edge, the edge with
+    the lower tail index decides.
 
     The private ``_trace`` sink records each orientation's rule, participating nodes, and full
     before/after endpoint matrices, one record per oriented edge; a round's orientations are
@@ -198,10 +211,11 @@ def meek(
     requested.
     """
     adj = _validate_adjacency(pdag)
+    ambiguous = frozenset((min(a, c), b, max(a, c)) for a, b, c in ambiguous)
     if in_column_order:
-        return _meek_in_column_order(adj, _trace)
+        return _meek_in_column_order(adj, rule4, ambiguous, _trace)
     while True:
-        implied = _meek_implied(adj)
+        implied = _meek_implied(adj, rule4, ambiguous)
         accepted = {edge: firing for edge, firing in implied.items() if edge[::-1] not in implied}
         if accepted:
             directed = (adj == TAIL) & (adj.T == ARROW)
@@ -223,11 +237,14 @@ def meek(
                 _trace.append(dict(rule=rule, triple=triple, before=before, after=adj.copy()))
 
 
-def _meek_implied(adj: np.ndarray) -> dict[tuple[int, int], tuple[str, tuple[int, ...]]]:
-    """Every orientation R1-R3 imply on ``adj``, keyed ``(tail, head)``, with one firing for each.
+def _meek_implied(
+    adj: np.ndarray, rule4: bool, ambiguous: frozenset[tuple[int, int, int]]
+) -> dict[tuple[int, int], tuple[str, tuple[int, ...]]]:
+    """Every orientation R1-R3 (and R4 with ``rule4``) imply on ``adj``, keyed ``(tail, head)``.
 
-    Every rule reads ``adj`` as given, which is left unchanged. A firing is the rule's name and its
-    participating nodes; of several firings that imply one orientation, the first found is kept.
+    Every rule reads ``adj`` as given, which is left unchanged, and skips a triple in ``ambiguous``.
+    A firing is the rule's name and its participating nodes; of several firings that imply one
+    orientation, the first found is kept.
     """
     directed = (adj == TAIL) & (adj.T == ARROW)  # directed[i, j]: i -> j
     undirected = (adj == TAIL) & (adj.T == TAIL)
@@ -235,7 +252,7 @@ def _meek_implied(adj: np.ndarray) -> dict[tuple[int, int], tuple[str, tuple[int
     # R1: i -> j -- k with i, k non-adjacent  =>  j -> k
     for i, j in np.argwhere(directed).tolist():
         for k in np.flatnonzero(undirected[j]).tolist():
-            if k != i and not _is_adjacent(adj, i, k):
+            if k != i and not _is_adjacent(adj, i, k) and not _is_ambiguous(ambiguous, i, j, k):
                 implied.setdefault((j, k), ("R1", (i, j, k)))
     # R2: i -> l -> k with i -- k  =>  i -> k
     for i, k in np.argwhere(undirected).tolist():
@@ -245,13 +262,31 @@ def _meek_implied(adj: np.ndarray) -> dict[tuple[int, int], tuple[str, tuple[int
     # R3: i -- j, i -- k, j -> t, k -> t, i -- t, j and k non-adjacent  =>  i -> t
     for i, t in np.argwhere(undirected).tolist():
         cand = np.flatnonzero(undirected[i] & directed[:, t]).tolist()
-        pair = next(((j, k) for j, k in combinations(cand, 2) if not _is_adjacent(adj, j, k)), None)
+        pair = next(
+            (
+                (j, k)
+                for j, k in combinations(cand, 2)
+                if not _is_adjacent(adj, j, k) and not _is_ambiguous(ambiguous, j, i, k)
+            ),
+            None,
+        )
         if pair is not None:
             implied.setdefault((i, t), ("R3", (i, *pair, t)))
+    if rule4:
+        # R4: i -- j, i -- k, k -> m -> j, i adjacent to m, k and j non-adjacent  =>  i -> j
+        for i, j in np.argwhere(undirected).tolist():
+            hit = _rule4_triple(adj, ambiguous, i, j)
+            if hit is not None:
+                implied.setdefault((i, j), ("R4", hit))
     return implied
 
 
-def _meek_in_column_order(adj: np.ndarray, _trace: list[dict] | None = None) -> np.ndarray:
+def _meek_in_column_order(
+    adj: np.ndarray,
+    rule4: bool,
+    ambiguous: frozenset[tuple[int, int, int]],
+    _trace: list[dict] | None = None,
+) -> np.ndarray:
     """:func:`meek` with ``in_column_order``: one firing at a time, on ``adj`` in place."""
     changed = True
     while changed:
@@ -260,7 +295,7 @@ def _meek_in_column_order(adj: np.ndarray, _trace: list[dict] | None = None) -> 
         directed = np.argwhere((adj == TAIL) & (adj.T == ARROW))  # rows (i, j): i -> j
         for i, j in directed.tolist():
             for k in np.nonzero((adj[j] == TAIL) & (adj[:, j] == TAIL))[0].tolist():
-                if k == i or _is_adjacent(adj, i, k):
+                if k == i or _is_adjacent(adj, i, k) or _is_ambiguous(ambiguous, i, j, k):
                     continue
                 if not _reaches_directed(adj, k, j):
                     if _trace is not None:
@@ -302,7 +337,9 @@ def _meek_in_column_order(adj: np.ndarray, _trace: list[dict] | None = None) -> 
             found = False
             for a in range(len(cand)):
                 for b in range(a + 1, len(cand)):
-                    if not _is_adjacent(adj, cand[a], cand[b]):
+                    if not _is_adjacent(adj, cand[a], cand[b]) and not _is_ambiguous(
+                        ambiguous, cand[a], i, cand[b]
+                    ):
                         found = True
                         break
                 if found:
@@ -321,7 +358,52 @@ def _meek_in_column_order(adj: np.ndarray, _trace: list[dict] | None = None) -> 
                         )
                     )
                 changed = True
+        if rule4 and _rule4(adj, ambiguous, _trace):
+            changed = True
     return adj
+
+
+def _is_ambiguous(ambiguous: frozenset[tuple[int, int, int]], a: int, b: int, c: int) -> bool:
+    """Whether the triple ``a - b - c`` is in ``ambiguous``, keyed ``(min(a, c), b, max(a, c))``."""
+    return bool(ambiguous) and (min(a, c), b, max(a, c)) in ambiguous
+
+
+def _rule4_triple(
+    adj: np.ndarray, ambiguous: frozenset[tuple[int, int, int]], i: int, j: int
+) -> tuple[int, int, int, int] | None:
+    """The nodes ``(i, k, m, j)`` that let Meek's R4 orient the undirected edge ``i -- j`` as
+    ``i -> j``, or ``None``: ``i -- k``, ``k -> m -> j``, ``i`` adjacent to ``m``, and ``k``, ``j``
+    non-adjacent; a triple ``k - i - j`` in ``ambiguous`` does not count."""
+    for mid in np.nonzero((adj[:, j] == TAIL) & (adj[j] == ARROW))[0].tolist():  # mid -> j
+        if mid == i or not _is_adjacent(adj, i, mid):
+            continue
+        for k in np.nonzero((adj[:, mid] == TAIL) & (adj[mid] == ARROW))[0].tolist():  # k -> mid
+            if (
+                k not in (i, j)
+                and _is_undirected(adj, i, k)
+                and not _is_adjacent(adj, k, j)
+                and not _is_ambiguous(ambiguous, k, i, j)
+            ):
+                return i, k, mid, j
+    return None
+
+
+def _rule4(
+    adj: np.ndarray, ambiguous: frozenset[tuple[int, int, int]], _trace: list[dict] | None
+) -> bool:
+    """Meek's R4 over every undirected edge, one at a time, in place (:func:`_rule4_triple`)."""
+    changed = False
+    for i, j in np.argwhere((adj == TAIL) & (adj.T == TAIL)).tolist():
+        if not _is_undirected(adj, i, j):
+            continue
+        hit = _rule4_triple(adj, ambiguous, i, j)
+        if hit and not _reaches_directed(adj, j, i):
+            before = adj.copy() if _trace is not None else None
+            _orient(adj, i, j)
+            if _trace is not None:
+                _trace.append(dict(rule="R4", triple=hit, before=before, after=adj.copy()))
+            changed = True
+    return changed
 
 
 # ---- PDAG to DAG --------------------------------------------------------------------------------

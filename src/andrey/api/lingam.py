@@ -28,6 +28,7 @@ from andrey.api._adapt import (
     shared_labels,
     structure_output,
 )
+from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -67,7 +68,11 @@ def _pruning_rows(X: np.ndarray, name: str = "data") -> np.ndarray:
 
 
 def direct_lingam(
-    data: npt.ArrayLike, *, random_state: int | None = None, measure: str = "pwling"
+    data: npt.ArrayLike,
+    *,
+    random_state: int | None = None,
+    measure: str = "pwling",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a fully oriented DAG with DirectLiNGAM (linear, non-Gaussian noise).
 
@@ -87,6 +92,13 @@ def direct_lingam(
     measure : {"pwling"}, default="pwling"
         How the order search picks the most exogenous remaining variable at each step. Only
         ``"pwling"``, the pairwise likelihood-ratio measure [2]_, is supported.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The causal order puts the cause of
+        each required edge, and each earlier tier, first; the regression on that order drops the
+        forbidden parents and does not penalize the required ones. A variable with a required parent
+        takes least-squares weights on the parents it keeps; the others keep the adaptive Lasso's.
+        Every required edge is in the DAG, even where its least-squares weight is ``0``.
 
     Returns
     -------
@@ -94,16 +106,21 @@ def direct_lingam(
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"DirectLiNGAM"``. ``ordering`` is the causal order as a tuple of column indices, causes
         first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
-        adaptive Lasso; the DAG has an edge exactly where the coefficient is nonzero.
+        adaptive Lasso, or by least squares for a copy (see Notes) and for a variable with a
+        required parent; the DAG has an edge where the coefficient is nonzero and at every required
+        edge.
 
     Raises
     ------
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``data`` is not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a
         constant column, named in the message. Also if it has fewer than ``n_variables + 1`` rows,
-        the fewest with which the pruning step can estimate the edge weights.
+        the fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``
+        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -170,10 +187,12 @@ def direct_lingam(
 
     X = _pruning_rows(data_matrix(data))
     labels = column_labels(data)
-    order, B = _native(X, measure=measure)
+    constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
+    order, B = _native(X, measure=measure, constraints=constraints)
     weighted = _canonical_weights(B)
+    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
     return structure_output(
-        dag_from_adjacency(weighted),
+        dag_from_adjacency(edges),
         labels=labels,
         ordering=order,
         weighted_adjacency=weighted,

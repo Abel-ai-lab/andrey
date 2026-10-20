@@ -37,6 +37,7 @@ from .api import (
 )
 from .core import GraphStructure, Structure, StructureOutput, SummaryGraph, TemporalStructure
 from .core.backend import config, describe
+from .core.knowledge import Knowledge
 from .core.seeding import seed_all
 from .core.warning_policy import (
     AndreyWarning,
@@ -57,6 +58,8 @@ __all__ = [
     "TemporalStructure",
     "SummaryGraph",
     "StructureOutput",
+    # Background knowledge every search takes as knowledge=.
+    "Knowledge",
     # Seeds random, NumPy's global generator, and torch for the caller's own draws.
     "seed_all",
     # Backend grammar: pick the backend + num_workers, layered selection (see ANDREY_BACKEND).

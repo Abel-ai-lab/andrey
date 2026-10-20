@@ -17,6 +17,7 @@ from operator import ne
 import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, BICScore, make_score
@@ -143,8 +144,9 @@ class MoveScanner:
     (:func:`~andrey.core.score.local_score_bic`), so no move does.
 
     ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
-    legal. ``None`` forbids none. ``ranks[u]`` is column ``u``'s place in the tie-break order,
-    :func:`tie_ranks` of the data.
+    legal. ``None`` forbids none. ``required[v, u]`` marks edges ``u -> v`` no move removes or
+    reverses; the caller starts from a DAG that has them. ``None`` requires none. ``ranks[u]`` is
+    column ``u``'s place in the tie-break order, :func:`tie_ranks` of the data.
 
     ``reach[x, y]`` records whether ``x`` reaches ``y``. Added edges extend it; removed edges
     trigger recomputation for nodes that reached them and rebuild rows whose targets reach fewer
@@ -160,6 +162,7 @@ class MoveScanner:
         *,
         ranks: np.ndarray,
         forbidden: np.ndarray | None = None,
+        required: np.ndarray | None = None,
     ) -> None:
         self._delta = delta
         self._score = delta.score_obj
@@ -182,6 +185,8 @@ class MoveScanner:
         self._set_with = np.zeros(d, dtype=np.intp)
         # [v, u]: the edge u -> v is never added, nor made by a reverse.
         self._forbidden = np.zeros((d, d), dtype=bool) if forbidden is None else forbidden
+        # [v, u]: the edge u -> v is never removed, nor reversed.
+        self._required = required
 
     def best(
         self,
@@ -207,6 +212,8 @@ class MoveScanner:
             rev = self._add[tails, heads] + self._rem[heads, tails]
         rev[(self._set_of[heads] == self._set_with[tails]) & np.isfinite(rev)] = 0.0
         rev[np.isnan(rev) | self._cyclic | self._forbidden[tails, heads]] = np.inf
+        if self._required is not None:
+            rev[self._required[heads, tails]] = np.inf
         held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
         try:
             while True:
@@ -271,6 +278,8 @@ class MoveScanner:
             row = np.where(self._parent[v], self._rem[v], self._add[v])
             row[self._parent[:, v] | reach[v] | np.isnan(row)] = np.inf
             row[self._forbidden[v] & ~self._parent[v]] = np.inf  # forbidden adds; removes stay
+            if self._required is not None:
+                row[self._required[v]] = np.inf  # required edges are never removed
             self._single[v] = row
             self._low[v] = row.min()
         self._adj = list(adj_int)
@@ -393,6 +402,17 @@ def _bits(row: int) -> list[int]:
     return out
 
 
+def start_dag(d: int, constraints: Constraints | None) -> tuple[list[int], dict[int, list[int]]]:
+    """The bitset adjacency and sorted parent sets of the start DAG: the required edges, if any."""
+    adj_int: list[int] = [0] * d
+    parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
+    if constraints is not None:
+        for u, v in zip(*np.nonzero(constraints.required)):
+            adj_int[u] |= 1 << int(v)
+            parents_of[int(v)].append(int(u))  # row-major: each parent list stays sorted
+    return adj_int, parents_of
+
+
 def _apply_move(
     adj_int: list[int], parents_of: dict[int, list[int]], move: tuple[str, int, int]
 ) -> None:
@@ -421,17 +441,19 @@ def hc(
     lambda_value: float = 1.0,
     max_iter: int | None = None,
     categorical: np.ndarray | None = None,
+    constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by hill climbing over a BIC, categorical, or mixed-data score.
 
-    Runs greedy add/remove/reverse edge moves from the empty graph until no move improves the total
-    score or, when set, ``max_iter`` moves are taken, then canonicalizes the discovered DAG to its
-    CPDAG. Moves with equal rounded score changes are chosen by :func:`tie_ranks`, whose ranks
-    follow the columns when reordered, subject to its hash and rounding limits. These choices can
-    affect later moves and the final CPDAG; the ranks do not indicate causal direction. Under a
-    mixed-data score the DAG stays a conditional linear Gaussian network: no move gives a
-    categorical node a continuous parent. Returns the CPDAG and the DAG's total objective (lower
-    is better), the sum of the final per-node local scores.
+    Runs greedy add/remove/reverse edge moves from the empty graph (or the required edges of
+    ``constraints``) until no move improves the total score or, when set, ``max_iter`` moves are
+    taken, then canonicalizes the discovered DAG to its CPDAG. Moves with equal rounded score
+    changes are chosen by :func:`tie_ranks`, whose ranks follow the columns when reordered, subject
+    to its hash and rounding limits. These choices can affect later moves and the final CPDAG; the
+    ranks do not indicate causal direction. Under a mixed-data score the DAG stays a conditional
+    linear Gaussian network: no move gives a categorical node a continuous parent. Returns the
+    CPDAG and the DAG's total objective (lower is better), the sum of the final per-node local
+    scores.
 
     Parameters
     ----------
@@ -451,6 +473,11 @@ def hc(
         ``SearchLimitWarning``.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
+    constraints : Constraints or None
+        Background knowledge: the search starts from the required edges, never removes or reverses
+        one, and never adds a forbidden edge. The CPDAG is then narrowed by the knowledge
+        (:func:`~andrey.core.knowledge.mpdag`). Under a mixed-data score, a required edge from a
+        continuous into a categorical column raises ``ValueError``.
 
     Returns
     -------
@@ -469,13 +496,23 @@ def hc(
     if score_func in MIXED_SCORES:  # [v, u]: categorical v, continuous u
         mask = column_mask(categorical, d)
         forbidden = mask[:, None] & ~mask[None, :]
+    if constraints is not None:
+        if forbidden is not None and (constraints.required & forbidden.T).any():
+            raise ValueError(
+                "knowledge requires an edge from a continuous into a categorical column, which a "
+                "mixed-data score does not allow"
+            )
+        knowledge_forbidden = constraints.forbidden.T  # [v, u]: no u -> v
+        forbidden = knowledge_forbidden if forbidden is None else forbidden | knowledge_forbidden
+    required = None if constraints is None else constraints.required.T
 
-    adj_int: list[int] = [0] * d
-    parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
+    adj_int, parents_of = start_dag(d, constraints)
 
     # One BLAS thread keeps the Schur updates reproducible across thread counts.
     with backend.one_blas_thread():
-        scanner = MoveScanner(delta, d, ranks=tie_ranks(X, mask), forbidden=forbidden)
+        scanner = MoveScanner(
+            delta, d, ranks=tie_ranks(X, mask), forbidden=forbidden, required=required
+        )
         moves = 0
         while max_iter is None or moves < max_iter:
             best = scanner.best(adj_int, parents_of)
@@ -498,6 +535,8 @@ def hc(
             dag[p, v] = TAIL
             dag[v, p] = ARROW
     cpdag = dag2cpdag(dag)
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
 
     total = float(sum(score.score(i, parents_of[i]) for i in range(d)))
     return to_structure(cpdag, kind="cpdag"), total
