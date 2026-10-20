@@ -602,7 +602,7 @@ def gfci(
     degree 2) with one variable in ten hidden, from 20 to 200 variables counting the hidden ones (18
     to 180 observed), with ten rows per variable. Its median endpoint errors, each mismatched tail,
     arrowhead, or circle, stayed below the empty graph's at every size (197 against 444 at 180
-    observed variables). The median fit took 0.54 s at 90 observed variables and 2.6 s at 180, on 4
+    observed variables). The median fit took 0.58 s at 90 observed variables and 2.9 s at 180, on 4
     cores. It runs a full :func:`~andrey.ges` search before any test,
     so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
     linear relations with Gaussian noise. With fewer rows than columns the BIC score is
