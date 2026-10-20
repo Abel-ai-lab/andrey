@@ -1,4 +1,5 @@
-{#- The homepage: pydata's navbar, then the page's own sections. docs/conf.py fills `home` from
+{#- The homepage: pydata's navbar, the page's own sections, then the site's footer
+    (docs/_templates/docs-footer.html), as on every page. docs/conf.py fills `home` from
     site/build.py (homepage_context); site/assets/site.css styles everything under .andrey-home. -#}
 {%- extends "layout.html" %}
 {%- block htmltitle %}<title>{{ home.title }}</title>{%- endblock htmltitle %}
@@ -32,10 +33,13 @@
       <div class="hero-ground">
         <div class="hero-intro">
           {{ home.agent_pill }}
-          <h1 id="headline">Causal discovery <span class="word">accelerated, accurate, agentic.</span></h1>
+          <h1 id="headline"><span class="word">Accelerated, accurate, agentic</span> causal discovery.</h1>
           <div class="hero-actions">
             <div class="install-line">
               <code>uv add andrey-core</code>
+            </div>
+            <div class="install-line">
+              <code>pip install andrey-core</code>
             </div>
             {{ home.hero_chips }}
           </div>
@@ -129,22 +133,6 @@
     </div>
   </section>
 </main>
-
-
-<footer class="site-footer wrap">
-  <nav aria-label="Footer">
-    <a href="docs/">Documentation</a>
-    <a href="docs/benchmarks.html">Release cards</a>
-    <a href="docs/code/index.html">API reference</a>
-    <a href="docs/faq.html">FAQ</a>
-    <a href="docs/changelog.html">Changelog</a>
-    <a href="{{ report_bug_url }}">Report a bug</a>
-  </nav>
-  <p class="footer-legal">© 2026 Abel AI Lab. Andrey is open source under the
-    <a href="{{ repo_url }}/blob/main/LICENSE">Apache License 2.0</a>.</p>
-  <a class="footer-abel" href="https://abel.ai/">{{ home.abel_mark }}Abel AI Lab</a>
-</footer>
 </div>
   {%- block scripts_end %}{{ super() }}{% endblock scripts_end %}
 {%- endblock content %}
-{%- block footer %}{% endblock footer %}
