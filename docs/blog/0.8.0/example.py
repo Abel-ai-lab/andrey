@@ -1,15 +1,11 @@
 import warnings
 
-import numpy as np
-
 import andrey
 from andrey.data import sample_scm
 
 warnings.simplefilter("ignore", andrey.ExperimentalWarning)
 
-data = sample_scm(
-    d=8, n=500, functional="nonmonotone", density=2.0, scale="standardize", seed=0
-)
+data = sample_scm(d=8, n=500, functional="nonmonotone", density=2.0, scale="standardize", seed=0)
 true = data.graph.adjacency != 0
 true |= true.T
 
