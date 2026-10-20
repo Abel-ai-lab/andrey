@@ -22,10 +22,12 @@ remove_by_possible_dsep = fci_module._remove_by_possible_dsep
 _, T, A, C = 0, TAIL, ARROW, CIRCLE
 
 
-def _oracle_fci(monkeypatch, n_obs, edges, selection=(), removed=None, **params):
+def _oracle_fci(monkeypatch, n_obs, edges, selection=(), removed=None, data=None, **params):
     """Run ``fci`` with a d-separation test on the DAG ``edges`` given ``selection``.
 
     ``removed``, when given, receives the number of edges the possible-d-separation step removes.
+    ``data`` (zeros by default) only sets the order the possible-d-separation step visits the nodes
+    in.
     """
     dag = nx.DiGraph(edges)
     dag.add_nodes_from(range(n_obs))
@@ -39,10 +41,24 @@ def _oracle_fci(monkeypatch, n_obs, edges, selection=(), removed=None, **params)
         remove_by_possible_dsep(marks, *args, **kwargs)
         removed.append((before - np.count_nonzero(marks)) // 2)
 
-    monkeypatch.setattr(fci_module, "make_indep_test", lambda name, X, categorical=None: test)
+    data = np.zeros((10, n_obs)) if data is None else data
+
+    def make_test(name, X, categorical=None):
+        """The d-separation test over ``X``, whose columns are ``data``'s in some order."""
+        unused = list(range(n_obs))
+        label = []
+        for column in X.T:
+            j = next(j for j in unused if np.array_equal(column, data[:, j]))
+            unused.remove(j)
+            label.append(j)
+        return lambda x, y, condition_set=(): test(
+            label[x], label[y], [label[v] for v in condition_set]
+        )
+
+    monkeypatch.setattr(fci_module, "make_indep_test", make_test)
     if removed is not None:
         monkeypatch.setattr(fci_module, "_remove_by_possible_dsep", counted)
-    pag = fci_module.fci(np.zeros((10, n_obs)), alpha=0.5, **params)
+    pag = fci_module.fci(data, alpha=0.5, **params)
     return np.asarray(pag.to_numpy(), dtype=np.int8)
 
 
@@ -140,7 +156,7 @@ def test_r8_graphs_do_not_depend_on_labels(monkeypatch, name):
 
 
 # Six observed nodes 0-5 with hidden common causes from node 6 up. On each, the
-# possible-d-separation step removes an edge, and the default and order-free sets differ.
+# possible-d-separation step removes an edge.
 ORACLE_GRAPHS = {
     "one extra edge": [(6, 2), (6, 5), (7, 1), (7, 0), (4, 5), (4, 1), (5, 0), (1, 2), (3, 0)]
     + [(8, 1), (8, 3)],
@@ -152,16 +168,21 @@ ORACLE_GRAPHS = {
 
 
 @pytest.mark.parametrize("name", sorted(ORACLE_GRAPHS))
-def test_order_free_pag_ignores_node_labels_under_exact_tests(monkeypatch, name):
-    """With exact tests, every labeling gives the same order-free PAG once mapped back."""
+def test_pag_ignores_node_labels_under_exact_tests(monkeypatch, name):
+    """With exact tests, every labeling gives the same PAG once mapped back.
+
+    Each node keeps its data column, so the possible-d-separation step visits the nodes in the same
+    order under every labeling.
+    """
     edges = ORACLE_GRAPHS[name]
+    x = np.random.default_rng(1).standard_normal((10, 6))
     removed = []
-    reference = _oracle_fci(monkeypatch, 6, edges, removed=removed, possible_dsep="order_free")
+    reference = _oracle_fci(monkeypatch, 6, edges, removed=removed, data=x)
     assert removed[0] > 0
     rng = np.random.default_rng(0)
     for _ in range(24):
         order = rng.permutation(6)
-        pag = _oracle_fci(monkeypatch, 6, _relabel(6, edges, order), possible_dsep="order_free")
+        pag = _oracle_fci(monkeypatch, 6, _relabel(6, edges, order), data=x[:, order])
         back = np.empty_like(pag)
         back[np.ix_(order, order)] = pag
         np.testing.assert_array_equal(back, reference)

@@ -40,7 +40,7 @@
       },
       "FCI": {
         "latent_gauss_er_d20": {"median_shd": 17.0, "empty_median_shd": 40.0, "shd": [9, 21, 19, 2, 22, 21, 13, 15, 31, 12]},
-        "latent_gauss_er_d50": {"median_shd": 35.5, "empty_median_shd": 105.0, "shd": [33, 38, 51, 36, 27, 35, 42, 36, 26, 26]},
+        "latent_gauss_er_d50": {"median_shd": 35.0, "empty_median_shd": 105.0, "shd": [33, 38, 51, 36, 27, 35, 42, 35, 31, 22]},
         "asia_gauss": {"median_shd": 3.5, "empty_median_shd": 16.0, "shd": [2, 0, 8, 5, 2, 0, 7, 2, 7, 9]},
         "sachs": {"median_shd": 20.0, "empty_median_shd": 34.0, "shd": [20]}
       },
