@@ -225,10 +225,10 @@ def admits(adj: np.ndarray, constraints: Constraints, cut: np.ndarray) -> bool:
     """Whether some DAG in the interventional class ``adj`` satisfies ``constraints``.
 
     Directs the lines the constraints decide and asks for a consistent extension (Dor and Tarsi)
-    whose interventional essential graph is ``adj``. Once ``adj`` directs no forbidden edge and
-    joins no pair kept apart, a line with a forbidden direction is one the constraints decide, so
-    the extension uses no forbidden edge; when they decide no line, every DAG of the class
-    satisfies them.
+    whose interventional essential graph is ``adj``. Once ``adj`` has every required adjacency,
+    directs no forbidden edge, and joins no pair the constraints make non-adjacent, a line with a
+    forbidden direction is one the constraints decide, so the extension uses no forbidden edge;
+    when they decide no line, every DAG of the class satisfies them.
     """
     if violates(adj, constraints):
         return False

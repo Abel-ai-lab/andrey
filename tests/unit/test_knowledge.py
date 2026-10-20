@@ -15,9 +15,10 @@ from andrey import Knowledge
 from andrey.cli import main
 from andrey.constraint.fci import _fci_orient, _remove_by_possible_dsep
 from andrey.core import ARROW, NULL, TAIL
-from andrey.core.knowledge import admits, resolve
+from andrey.core.knowledge import KnowledgeError, admits, resolve
 from andrey.core.orient import dag2cpdag, from_structure, meek
 from andrey.core.structure import CIRCLE
+from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
 
 METHODS = [name for name, spec in REGISTRY.items() if spec.knowledge]
@@ -399,6 +400,16 @@ def test_admits_rejects_a_class_the_knowledge_contradicts():
     assert not admits(cpdag, resolve(Knowledge(forbidden=[(0, 1)]), 3, None, method="ges"))
 
 
+def test_admits_rejects_a_class_without_a_required_adjacency():
+    constraints = resolve(Knowledge(required=[(0, 1)]), 2, None, method="ges")
+    no_cut = np.zeros((2, 2), dtype=bool)
+    line = _pdag(2, undirected=[(0, 1)])
+    assert admits(line, constraints) and gies_admits(line, constraints, no_cut)
+    empty = np.zeros((2, 2), dtype=np.int8)
+    assert not admits(empty, constraints)
+    assert not gies_admits(empty, constraints, no_cut)
+
+
 def test_cli_reads_knowledge_from_a_file_and_inline(tmp_path, capsys, data):
     path = tmp_path / "data.csv"
     data.to_csv(path, index=False)
@@ -486,6 +497,15 @@ def test_a_required_edge_keeps_its_direction_where_the_data_allow_both(name, edg
     assert marks[cause, effect] == TAIL and marks[effect, cause] == ARROW
 
 
+def test_direct_lingam_keeps_a_required_edge_whose_weight_is_zero():
+    # The two columns are uncorrelated, so least squares weighs the required 0 -> 1 at exactly 0.
+    X = np.array([[-1.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [1.0, 1.0]])
+    out = andrey.direct_lingam(X, knowledge=Knowledge(required=[(0, 1)]))
+    assert out.weighted_adjacency[0, 1] == 0.0
+    marks = from_structure(out.structure)
+    assert marks[0, 1] == TAIL and marks[1, 0] == ARROW
+
+
 def test_a_skeleton_as_knowledge_keeps_the_colliders():
     data = _collider()
     plain = andrey.pc(data).structure.oriented_edges()
@@ -513,7 +533,7 @@ ANCESTOR = Knowledge(required=[("c", "b"), ("b", "a")], tiers=[["a"], ["c"]])
     [("pc", CYCLE), ("cdnod", CYCLE), ("pc", ANCESTOR), ("cdnod", ANCESTOR), ("fci", ANCESTOR)],
 )
 def test_knowledge_that_closes_a_cycle_raises(name, knowledge):
-    with pytest.raises(ValueError, match="into a cycle"):
+    with pytest.raises(KnowledgeError):
         _fit(name, _triangle(), knowledge=knowledge)
 
 

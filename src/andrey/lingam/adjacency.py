@@ -56,12 +56,12 @@ def predict_with_required(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Effects on ``target`` of unpenalized ``required`` columns and Lasso-selected ``predictors``.
 
-    The ``required`` columns are partialled out of ``target`` and of each of ``predictors`` by
-    least squares (with an intercept); the adaptive Lasso of :func:`predict_adaptive_lasso` selects
-    among ``predictors`` on those residuals, which by the Frisch-Waugh theorem is the selection
-    with the required effects held fixed. One least-squares fit of ``target`` on ``required`` and
-    the selected predictors then gives every coefficient. Returns the coefficients of ``required``
-    and of ``predictors``, zero for an unselected one.
+    The ``required`` columns are partialed out of ``target`` and of each of ``predictors`` by least
+    squares (with an intercept), and the adaptive Lasso of :func:`predict_adaptive_lasso` selects
+    among ``predictors`` on those residuals, so the required columns are never penalized. One
+    least-squares fit of ``target`` on ``required`` and the selected predictors then estimates
+    every coefficient: a required coefficient is estimated, not fixed, and can be ``0``. Returns
+    the coefficients of ``required`` and of ``predictors``, zero for an unselected one.
     """
     from sklearn.linear_model import LinearRegression
 

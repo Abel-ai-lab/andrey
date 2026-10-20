@@ -169,7 +169,7 @@ def meek(
     in_column_order: bool = False,
     _trace: list[dict] | None = None,
 ) -> np.ndarray:
-    """Complete a PDAG to a CPDAG by applying Meek's rules R1-R3 to a fixed point.
+    """Apply Meek's rules R1-R3, and R4 with ``rule4``, to a PDAG until none orients an edge.
 
     Returns a new endpoint-mark matrix. Each rule directs an undirected edge only when doing so
     avoids a new unshielded collider (R1), a directed cycle (R2), or an inconsistency around a
@@ -183,8 +183,8 @@ def meek(
 
     R1, R3, and R4 each read an unshielded triple whose middle node is not a collider. A triple
     ``(a, b, c)`` in ``ambiguous``, middle node ``b`` and endpoints in either order, has an unknown
-    collider status, such as a triple over a pair the data find dependent although no edge joins
-    it; no rule reads it, so no rule orients through it.
+    collider status, such as a triple over a pair background knowledge makes non-adjacent with no
+    separating set found; no rule reads it, so no rule orients through it.
 
     The rules run in rounds. A round reads the graph as it stands when the round starts and
     collects every orientation R1-R3, and R4 with ``rule4``, imply on it. An edge they would direct

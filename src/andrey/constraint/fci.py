@@ -63,10 +63,10 @@ def fci(
     ``max_depth`` caps the size of every conditioning set a test uses: the adjacency search, the
     possible-d-sep subsets, the majority votes, and the discriminating-path tests. With
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
-    a required pair, a pair they keep apart gets a separating set when one exists
+    a required pair, a pair they make non-adjacent gets a separating set when the search finds one
     (:func:`_fast_adjacency_search`), and :func:`_knowledge_marks` sets their endpoints before the
-    orientation rules, which change circles only. A triple over a kept-apart pair that no set
-    separates is neither a collider nor a non-collider to any rule
+    orientation rules, which change circles only. A triple over a non-adjacent pair with no
+    separating set is neither a collider nor a non-collider to any rule
     (:func:`~andrey.constraint._skeleton.unseparated_triples`).
     An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
     ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
@@ -138,9 +138,9 @@ def _fast_adjacency_search(
     tested, so it stays; it still conditions the tests of other pairs.
     A removed pair's separating set is the union of every conditioning set that made it independent.
     After the last size, a pair marked in the boolean ``apart`` (the pairs background knowledge
-    keeps apart, outside ``support``) that shares a neighbor gets its separating set the same way,
-    from the final neighborhoods (:func:`~andrey.constraint._skeleton.separate_apart`); a pair no
-    conditioning set separates gets none.
+    makes non-adjacent, outside ``support``) that shares a neighbor gets its separating set the same
+    way, from the final neighborhoods (:func:`~andrey.constraint._skeleton.separate_apart`); a pair
+    no tested conditioning set separates gets none.
 
     Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
     it lives and the skeleton does not depend on how the caller ordered the columns.

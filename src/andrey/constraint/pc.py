@@ -59,15 +59,16 @@ def pc(
     the order of :func:`_orient_colliders`, and ``categorical``, a boolean mask of the categorical
     columns, reaches a mixed-data test. ``max_depth`` caps the conditioning-set size of the
     skeleton search. With ``constraints``, the skeleton search starts from the pairs they allow,
-    never tests a required pair, and gives a pair they keep apart a separating set when one exists
-    (:func:`_discover_skeleton`); every edge they decide is directed before the colliders, and
-    Meek's rules run with R4, so the result is the class narrowed by the knowledge. A triple over a
-    kept-apart pair that no set separates is neither a collider nor a non-collider to any rule
-    (:func:`~andrey.constraint._skeleton.unseparated_triples`). Edges they decide that close a
+    never tests a required pair, and gives a pair they make non-adjacent a separating set when it
+    finds one (:func:`_discover_skeleton`); every edge they decide is directed before the
+    colliders, and Meek's rules run with R4, so the result is the maximally oriented PDAG (MPDAG)
+    of the class under the knowledge (Meek 1995; Perkovic, Kalisch, and Maathuis 2017). A triple
+    over a non-adjacent pair with no separating set is neither a collider nor a non-collider to any
+    rule (:func:`~andrey.constraint._skeleton.unseparated_triples`). Edges they decide that close a
     directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`). ``in_column_order`` fires
     Meek's rules one at a time in column order instead of in order-free rounds
-    (:func:`~andrey.core.orient.meek`). Returns the CPDAG as a ``GraphStructure`` of kind
-    ``"cpdag"``.
+    (:func:`~andrey.core.orient.meek`). Returns the CPDAG, or the MPDAG with ``constraints``, as a
+    ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -135,10 +136,18 @@ def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) 
                 cycle = [x]
                 while cycle[-1] != y:
                     cycle.append(previous[cycle[-1]])
-                path = " -> ".join(str(v) for v in [*cycle[::-1], y])
+                if closing is paths:
+                    path = " -> ".join(str(v) for v in [*cycle[::-1], y])
+                    conflict = f"orients the edges {path} into a directed cycle"
+                else:
+                    path = " -> ".join(str(v) for v in cycle[::-1])
+                    conflict = (
+                        f"requires the directed path {path}, which makes {y} an ancestor of {x}, "
+                        f"and puts an arrowhead at {y} on the edge {x} - {y}, which denies it"
+                    )
                 raise KnowledgeError(
-                    f"the knowledge directs the edges {path} that the data keep into a cycle; "
-                    "forbid or allow one of them"
+                    f"the background knowledge {conflict}, over the adjacencies the search kept; "
+                    "change the required edges, forbidden edges, or tiers that set them"
                 )
             for z in successors[x]:
                 if z not in previous:
@@ -161,7 +170,7 @@ def _orient_colliders(
     result is a new matrix. An unshielded triple ``x - y - z`` (``x`` and ``z`` both adjacent to
     ``y`` but not to each other) is a collider ``x -> y <- z`` iff ``y`` is not in the separating
     set of ``x`` and ``z``; a triple whose endpoints have no recorded separating set, a pair the
-    knowledge keeps apart that no conditioning set separates, is skipped. A collider is skipped
+    knowledge makes non-adjacent for which the search found none, is skipped. A collider is skipped
     when an edge it would orient already has an arrowhead at ``x`` or ``z``, which it would make
     bidirected; so of two conflicting colliders, the one oriented first is kept, and an edge
     directed before the colliders is never reversed or made bidirected.
@@ -284,10 +293,10 @@ def _discover_skeleton(
     column collider order, which ranks nothing, no p-value is compared or kept and the returned
     p-value dict is empty; the skeleton and the separating sets are the same.
 
-    After the last size, a pair ``constraints`` keep apart that shares a neighbor gets its
+    After the last size, a pair ``constraints`` make non-adjacent that shares a neighbor gets its
     separating set and p-value the same way, from the final neighborhoods
     (:func:`~andrey.constraint._skeleton.separate_apart`), so colliders over it are oriented as
-    usual; a pair no conditioning set separates gets neither.
+    usual; a pair no tested conditioning set separates gets neither.
 
     When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
     the size-0 and size-1 passes take them (all-pairs marginal threshold, then one first-order

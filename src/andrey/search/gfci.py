@@ -72,8 +72,8 @@ def gfci(
     :func:`~andrey.constraint.fci.fci`, and of the separating sets :func:`_derive_sepsets` searches.
     ``constraints`` reach the GES phase, and the test phase honors them as FCI does: no step tests
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
-    joins a pair they keep apart, so its colliders over that pair come from the pattern, and its
-    separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
+    joins a pair they make non-adjacent, so its colliders over that pair come from the pattern, and
+    its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
     """
     X = np.asarray(data, dtype=np.float64)
 

@@ -52,11 +52,11 @@ def _edges(values: Iterable | None, what: str) -> tuple[tuple[Node, Node], ...]:
     if values is None:
         return ()
     if isinstance(values, (str, bytes)):
-        raise TypeError(f"{what} must be a list of (a, b) pairs, got {values!r}")
+        raise TypeError(f"{what} must be an iterable of (a, b) pairs, got {values!r}")
     edges = []
     for pair in values:
         if isinstance(pair, (str, bytes)) or len(pair) != 2:
-            raise TypeError(f"{what} must be a list of (a, b) pairs, got {pair!r}")
+            raise TypeError(f"{what} must be an iterable of (a, b) pairs, got {pair!r}")
         a, b = _node(pair[0], what), _node(pair[1], what)
         if a == b:
             raise ValueError(f"{what} lists the self-loop ({a!r}, {b!r})")
@@ -87,48 +87,64 @@ class Knowledge:
     required : iterable of (cause, effect) pairs, optional
         Directed edges ``cause -> effect`` the result must have.
     forbidden : iterable of (cause, effect) pairs, optional
-        Directed edges ``cause -> effect`` the result must not have. Forbid both directions to keep
-        two variables non-adjacent.
+        Directed edges ``cause -> effect`` the result must not have. Forbidding ``a -> b`` forbids
+        that edge only, not a directed path from ``a`` to ``b`` through other variables. Forbid both
+        directions to make two variables non-adjacent.
     allowed : iterable of (a, b) pairs or None, optional
-        The only pairs that may be adjacent, in either direction; ``None`` allows every pair. A
-        small set restricts the search to it, which also makes the search faster. For the
-        constraint-based methods it is the skeleton the search starts from.
-    tiers : sequence of sequences of nodes, optional
-        Variables grouped in time order: no edge points from a variable of a later tier into one of
-        an earlier tier. A variable in no tier is unconstrained; a variable may be in one tier only.
+        The only pairs that may be adjacent, in either direction. Listing a pair permits an edge
+        but does not require one, and does not override ``forbidden`` or ``tiers``. ``None`` allows
+        every pair, and an empty iterable allows none. Listing few pairs narrows the search, which
+        can make it faster.
+    tiers : iterable of iterables of nodes, optional
+        Temporal tiers, variables grouped in time order: no edge points from a variable of a later
+        tier into one of an earlier tier. A variable in no tier is unconstrained; a variable may be
+        in one tier only.
 
     Raises
     ------
     TypeError
-        If a part is not a list of pairs (``tiers``: of lists), or names a node by something other
-        than a label or a position.
+        If ``required``, ``forbidden``, or ``allowed`` is not an iterable of (a, b) pairs, ``tiers``
+        is not an iterable of node iterables, or a node is neither a column label nor a 0-based
+        position.
     ValueError
         If an edge is a self-loop or a node is in two tiers. A method raises ``ValueError`` when the
         knowledge names a column the data lacks, or contradicts itself: a required edge that is
         forbidden, directly, by the tiers, or by ``allowed``, or required edges forming a cycle.
         ``boss``, ``grasp``, and ``direct_lingam`` also raise it when the required edges and the
-        tiers admit no causal order, through a column in no tier; ``pc``, ``cdnod``, and ``fci``
-        when the edges the knowledge directs close a cycle over the edges the data keep.
+        tiers admit no causal order, through a column in no tier. ``pc`` and ``cdnod`` raise it when
+        the edges the knowledge orients form a directed cycle over the adjacencies the search kept;
+        ``fci`` when a directed path of required edges leads from ``a`` to ``b`` while ``forbidden``
+        or ``tiers`` put an arrowhead at ``a`` on the edge between them.
 
     Notes
     -----
-    The constraint-based methods start from the allowed pairs in place of the complete graph and
-    never test a required pair, so neither is removed; a pair the knowledge keeps apart is tested
-    for a separating set, so colliders over it are oriented as usual (when no set separates it, no
-    rule orients through its triples), and knowledge that directs the edges the data keep into a
-    cycle raises ``ValueError``. A method whose result is an equivalence
-    class (a CPDAG) directs every edge the knowledge decides and then applies Meek's rules [1]_,
-    including the fourth, which background knowledge needs; the result is the class of graphs that
-    agree with both the data and the knowledge, still tagged ``cpdag``. In a PAG, a forbidden
-    ``a -> b`` on an adjacent pair puts an arrowhead at ``a``, and a required ``a -> b`` is
-    ``a -> b``. The methods that search over causal orders (``boss``, ``grasp``,
-    ``direct_lingam``) also keep each variable of a tier after those of earlier tiers; with every
-    variable in a tier, this is the same as forbidding the edges.
+    PC, FCI, and CD-NOD start their adjacency search from the allowed pairs in place of the complete
+    graph and never test a required pair, so no required adjacency is removed; the tests can remove
+    any other allowed pair. GFCI's GES phase searches only the allowed pairs, and its test phase
+    starts from the adjacencies GES found. A pair the knowledge makes non-adjacent is still tested
+    for a separating set, so colliders over it are oriented as usual; when the search finds none
+    within ``max_depth``, no rule reads its unshielded triples as colliders or non-colliders.
+
+    A method whose result is a CPDAG directs every edge the knowledge decides and then applies
+    Meek's rules R1-R4 [1]_, R4 being needed only with background knowledge. For a CPDAG and
+    knowledge consistent with it, the result is the maximally oriented PDAG (MPDAG) [2]_, which
+    stands for the DAGs of the equivalence class that satisfy the knowledge; it keeps the ``cpdag``
+    tag. On sample data the tests can disagree with the knowledge; the rules then skip the
+    orientations that conflict, so the result can leave undirected an edge the MPDAG would direct.
+
+    In a PAG, the edges are those of an ancestral graph over the measured variables, where
+    ``a -> b`` says that ``a`` is an ancestor of ``b``, not necessarily its direct cause. A
+    forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and can leave a circle at
+    ``b``, and a required ``a -> b`` is ``a -> b``. The methods that search over causal orders
+    (``boss``, ``grasp``, ``direct_lingam``) also keep each variable of a tier after those of
+    earlier tiers; with every variable in a tier, this is the same as forbidding the edges.
 
     References
     ----------
     .. [1] Meek, C. (1995). Causal inference and causal explanation with background knowledge.
        UAI, 403-410.
+    .. [2] Perkovic, E., Kalisch, M., and Maathuis, M. H. (2017). Interpreting and using CPDAGs
+       with background knowledge. UAI.
 
     Examples
     --------
@@ -162,12 +178,14 @@ class Knowledge:
         if tiers is None:
             tiers = ()
         if isinstance(tiers, (str, bytes)):
-            raise TypeError(f"tiers must be a list of lists of nodes, got {tiers!r}")
+            raise TypeError(f"tiers must be an iterable of node iterables, got {tiers!r}")
         grouped: list[tuple[Node, ...]] = []
         seen: set[Node] = set()
         for tier in tiers:
             if isinstance(tier, (str, bytes, int, np.integer)):
-                raise TypeError(f"tiers must be a list of lists of nodes, got the tier {tier!r}")
+                raise TypeError(
+                    f"tiers must be an iterable of node iterables, got the tier {tier!r}"
+                )
             nodes = tuple(_node(v, "tiers") for v in tier)
             for v in nodes:
                 if v in seen:
@@ -187,11 +205,15 @@ class Knowledge:
     ) -> Knowledge:
         """Knowledge whose allowed pairs are the adjacent pairs of ``skeleton``.
 
+        A later search then looks for edges only among those pairs. Edge directions, endpoint
+        marks, and weights are ignored, and an allowed pair is not required to stay adjacent.
+
         Parameters
         ----------
         skeleton : StructureOutput, GraphStructure, or array-like of shape (d, d)
-            A result, a graph, or an adjacency matrix whose nonzero entries mark adjacent pairs. A
-            graph with labels names its pairs by label, otherwise by position.
+            A result, a graph, or a square matrix in which a pair is adjacent when either of its
+            two entries is nonzero; the diagonal is ignored. A graph with labels names its pairs by
+            label, otherwise by position.
         required, forbidden, tiers
             The other parts, as for :class:`Knowledge`.
 
@@ -199,6 +221,11 @@ class Knowledge:
         -------
         Knowledge
             The knowledge, with ``allowed`` set to every adjacent pair of ``skeleton``.
+
+        Raises
+        ------
+        ValueError
+            If ``skeleton`` is an array that is not a square matrix.
         """
         graph = getattr(skeleton, "structure", skeleton)
         labels = getattr(graph, "labels", None)
@@ -403,16 +430,24 @@ def orient(pdag: np.ndarray, constraints: Constraints) -> np.ndarray:
 
 
 def violates(pdag: np.ndarray, constraints: Constraints) -> bool:
-    """Whether ``pdag`` directs an edge the constraints forbid, or joins a pair they keep apart."""
+    """Whether ``pdag`` directs an edge the constraints forbid, joins a pair they make
+    non-adjacent, or lacks a required adjacency."""
     directed = (pdag == TAIL) & (pdag.T == ARROW)
     adjacent = pdag != NULL
-    kept_apart = adjacent & ~constraints.support()
-    return bool((directed & constraints.forbidden).any() or kept_apart.any())
+    return bool(
+        (directed & constraints.forbidden).any()
+        or (adjacent & ~constraints.support()).any()
+        or (constraints.required & ~adjacent).any()
+    )
 
 
 def mpdag(cpdag: np.ndarray, constraints: Constraints) -> np.ndarray:
-    """The class of ``cpdag`` narrowed by the constraints: knowledge orientations, then Meek's rules
-    with R4."""
+    """The maximally oriented PDAG (MPDAG) of ``cpdag`` under the constraints: knowledge
+    orientations, then Meek's rules with R4.
+
+    ``cpdag`` is a class :func:`admits` accepts: it has every required adjacency and some DAG in it
+    satisfies the constraints.
+    """
     from .orient import meek
 
     return meek(orient(cpdag, constraints), rule4=True)
@@ -421,10 +456,10 @@ def mpdag(cpdag: np.ndarray, constraints: Constraints) -> np.ndarray:
 def admits(cpdag: np.ndarray, constraints: Constraints) -> bool:
     """Whether some DAG in the class ``cpdag`` satisfies the constraints.
 
-    The class must direct no edge the constraints forbid and join no pair they keep apart. Every
-    remaining undirected edge with a forbidden direction is one the constraints decide, so after
-    directing those, a consistent extension (Dor and Tarsi) that keeps the class's skeleton and
-    colliders satisfies them, and one must exist.
+    The class must have every required adjacency, direct no edge the constraints forbid, and join
+    no pair they make non-adjacent. Every remaining undirected edge with a forbidden direction is
+    one the constraints decide, so after directing those, a consistent extension (Dor and Tarsi)
+    that keeps the class's skeleton and colliders satisfies them, and one must exist.
     """
     from .orient import _cpdag_of_pdag
 

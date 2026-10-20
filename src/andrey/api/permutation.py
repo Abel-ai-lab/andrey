@@ -80,11 +80,12 @@ def boss(
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
     knowledge : Knowledge or None, default=None
-        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and tiers, all honored. Each variable's parents exclude the
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
         forbidden ones and include the required ones, and every causal order the search visits puts
         the cause of each required edge, and each earlier tier, first. The result directs every edge
-        the knowledge decides, then Meek's rules direct the edges that follow.
+        the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -105,13 +106,14 @@ def boss(
         If ``score_func`` names no available score.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
         suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
         another up to scale and shift given more than two rows or, with more rows than columns, is a
         linear function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -290,11 +292,12 @@ def grasp(
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
     knowledge : Knowledge or None, default=None
-        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and tiers, all honored. Each variable's parents exclude the
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
         forbidden ones and include the required ones, and every causal order the search visits puts
         the cause of each required edge, and each earlier tier, first. The result directs every edge
-        the knowledge decides, then Meek's rules direct the edges that follow.
+        the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -315,13 +318,15 @@ def grasp(
         If ``score_func`` names no available score.
     TypeError
         If ``depth`` is not an int, ``categorical`` is not a list of column names and positions, or
-        ``max_categories`` is not an int.
+        ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``depth`` is less than ``1``, ``lambda_value`` is negative or non-finite, or if ``data``
         or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
         more rows than columns, is a linear function of other columns. One message names every
-        group of copies and says to keep one column per group.
+        group of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----

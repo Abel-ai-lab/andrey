@@ -82,10 +82,11 @@ def ges(
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
     knowledge : Knowledge or None, default=None
-        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and tiers, all honored. No move adds a forbidden edge or removes a
-        required one, and the search starts from the required edges. The result directs every edge
-        the knowledge decides, then Meek's rules direct the edges that follow.
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -105,7 +106,7 @@ def ges(
         If ``score_func`` names no available score.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``max_categories`` is less than ``2``,
         with a categorical score, if ``data`` holds a number that is not whole, or, with a
@@ -114,7 +115,8 @@ def ges(
         with another score. With the BIC score, also if a column repeats another up to scale and
         shift given more than two rows or, with more rows than columns, is a linear function of
         other columns. One message names every group of copies and says to keep one column per
-        group.
+        group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -301,10 +303,11 @@ def gies(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
     knowledge : Knowledge or None, default=None
-        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and tiers, all honored. No move adds a forbidden edge or removes a
-        required one, and the search starts from the required edges. The result directs every edge
-        the knowledge decides, then Meek's rules direct the edges that follow.
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -318,6 +321,8 @@ def gies(
 
     Raises
     ------
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``data`` is not a 2-D numeric matrix with at least two rows, no ``NaN`` or ``inf``, and
         no constant column; if ``interventions`` does not have ``data``'s shape, holds a value
@@ -325,7 +330,8 @@ def gies(
         intervention; if ``lambda_value`` is negative or non-finite; or if a column repeats another
         up to scale and shift given more than two rows or, with more rows than columns, is a linear
         function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -418,10 +424,11 @@ def xges(
         Run the extended search after the base search (see Notes). ``False`` returns the base
         search's graph, which is faster.
     knowledge : Knowledge or None, default=None
-        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and tiers, all honored. No move adds a forbidden edge or removes a
-        required one, and the search starts from the required edges. The result directs every edge
-        the knowledge decides, then Meek's rules direct the edges that follow.
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -436,13 +443,15 @@ def xges(
     NotImplementedError
         If ``score_func`` is not ``"local_score_BIC"``.
     TypeError
-        If ``extended_search`` is not a bool.
+        If ``extended_search`` is not a bool. Also if ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``data`` is not a 2-D numeric matrix with at least two rows and no ``NaN`` or ``inf``, if
         ``lambda_value`` is negative or non-finite, or if a column is constant, repeats another
         column up to scale and shift given more than two rows, or, with more rows than columns, is a
         linear function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -562,10 +571,11 @@ def hc(
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
     knowledge : Knowledge or None, default=None
-        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and tiers, all honored. No move adds a forbidden edge or removes a
-        required one, and the search starts from the required edges. The result directs every edge
-        the knowledge decides, then Meek's rules direct the edges that follow.
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -583,13 +593,16 @@ def hc(
         If ``score_func`` names no available score.
     TypeError
         If a given ``max_iter`` is not an int, ``categorical`` is not a list of column names and
-        positions, or ``max_categories`` is not an int.
+        positions, or ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None``
+        nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``lambda_value`` is negative or non-finite, if a given ``max_iter`` is less than ``1``,
         or if ``data`` or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With
         the BIC score, also if a column repeats another up to scale and shift given more than two
         rows or, with more rows than columns, is a linear function of other columns. One message
-        names every group of copies and says to keep one column per group.
+        names every group of copies and says to keep one column per group. Also if ``knowledge``
+        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists,
+        or, under a mixed-data score, requires an edge from a continuous into a categorical column.
 
     Warns
     -----
@@ -714,10 +727,11 @@ def tabu(
         terminates: non-improving runs are bounded by ``max_tabu``, and each new best DAG scores
         strictly lower.
     knowledge : Knowledge or None, default=None
-        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and tiers, all honored. No move adds a forbidden edge or removes a
-        required one, and the search starts from the required edges. The result directs every edge
-        the knowledge decides, then Meek's rules direct the edges that follow.
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. No move adds a forbidden edge or
+        removes a required one, and the search starts from the required edges. The result directs
+        every edge the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -732,14 +746,16 @@ def tabu(
     NotImplementedError
         If ``score_func`` names no score tabu search takes.
     TypeError
-        If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int.
+        If ``tabu_length``, ``max_tabu``, or a given ``max_iter`` is not an int. Also if
+        ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``lambda_value`` is negative or non-finite, if ``tabu_length`` or a given ``max_iter`` is
         less than ``1``, if ``max_tabu`` is outside ``1..tabu_length``, or, with a categorical
         score, if ``data`` holds a number that is not whole. With the BIC score, also if a column
         repeats another up to scale and shift given more than two rows or, with more rows than
         columns, is a linear function of other columns. One message names every group of copies and
-        says to keep one column per group.
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -862,9 +878,9 @@ def exact_search(
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
     knowledge : Knowledge or None, default=None
-        Background knowledge, an :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
-        allowed to be adjacent, and tiers, all honored. Each variable's parent sets exclude the
-        forbidden parents and include the required ones, so the DAG found is the best one that
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each variable's parent sets exclude
+        the forbidden parents and include the required ones, so the DAG found is the best one that
         satisfies the knowledge.
 
     Returns
@@ -881,13 +897,14 @@ def exact_search(
         If ``score_func`` names no available score.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``search_method`` is not ``"astar"`` or ``"dp"``, or if ``data`` or ``categorical`` does
         not suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
         another up to scale and shift given more than two rows or, with more rows than columns, is a
         linear function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----

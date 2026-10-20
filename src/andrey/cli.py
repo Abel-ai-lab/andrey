@@ -499,7 +499,8 @@ def _knowledge_object(value: object, name: str) -> dict:
     if not isinstance(value, dict) or set(value) - set(keys):
         raise CliError(
             "bad_value",
-            f"{name} must be an object with the keys {', '.join(keys)}",
+            f"{name} must be a JSON object whose keys are among {', '.join(keys)}; each is "
+            "optional",
             EXIT_USAGE,
             valid_options=list(keys),
         )

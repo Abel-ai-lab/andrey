@@ -28,8 +28,8 @@ def direct_lingam(
     knowledge ``constraints``, the order keeps
     :meth:`~andrey.core.knowledge.Constraints.precedence` (required edges and tiers), and the
     regression drops forbidden parents and keeps required ones unpenalized
-    (:func:`~andrey.lingam.adjacency.estimate`), so ``B`` holds every required edge and no
-    forbidden one.
+    (:func:`~andrey.lingam.adjacency.estimate`), so ``B`` has no forbidden edge. A required edge's
+    least-squares weight can be ``0``; :func:`andrey.direct_lingam` still puts the edge in its DAG.
     """
     if measure != "pwling":
         raise NotImplementedError(f"DirectLiNGAM supports measure='pwling', not {measure!r}")

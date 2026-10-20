@@ -252,17 +252,19 @@ def separate_apart(
     trace: list[dict] | None = None,
     record_pvalues: bool = True,
 ) -> list[Removal]:
-    """Separating sets for the pairs background knowledge keeps apart, over the final skeleton.
+    """Separating sets, over the final skeleton, for the pairs background knowledge makes
+    non-adjacent.
 
     ``adjacency`` is the boolean skeleton the search ends with and ``apart`` the boolean pairs the
-    knowledge keeps apart, which the search never tested. Every such pair that shares a neighbor,
-    and so forms an unshielded triple, is tested as the search tests a pair it removes: against
-    subsets of either endpoint's neighbors by increasing size, up to ``max_depth`` when one is
-    given, with :func:`scan_pairs`. Returns ``(x, y, separating, p)``, ``x < y``, for every pair
+    knowledge makes non-adjacent, which the search never tested. Every such pair that shares a
+    neighbor, and so forms an unshielded triple, is tested as the search tests a pair it removes:
+    against subsets of either endpoint's neighbors by increasing size, up to ``max_depth`` when one
+    is given, with :func:`scan_pairs`. Returns ``(x, y, separating, p)``, ``x < y``, for every pair
     some size separates: the union of the separating subsets at the first size that separates it
-    and their largest p-value (``None`` when ``record_pvalues`` is false). A pair no subset
-    separates, which the data find dependent although the knowledge keeps it apart, is left out.
-    With ``trace`` given, every test is recorded as :func:`scan_pairs` records it.
+    and their largest p-value (``None`` when ``record_pvalues`` is false). A pair no tested subset
+    separates is left out: the subsets come from the final neighborhoods and stop at
+    ``max_depth``, so a separating set elsewhere is not found. With ``trace`` given, every test is
+    recorded as :func:`scan_pairs` records it.
     """
     common = adjacency.astype(np.float32) @ adjacency.astype(np.float32) > 0
     pairs = adjacent_pairs(np.triu(apart & common, 1))
@@ -288,12 +290,13 @@ def unseparated_triples(
     sepsets: Mapping[tuple[int, int], object],
     constraints: Constraints | None,
 ) -> frozenset[tuple[int, int, int]]:
-    """The unshielded triples ``(a, b, c)``, ``a < c``, over a kept-apart pair no set separates.
+    """The unshielded triples ``(a, b, c)``, ``a < c``, over a non-adjacent pair with no
+    separating set.
 
     ``adjacency`` is the boolean skeleton and ``sepsets`` the separating sets, keyed in either
-    order. The data find a pair ``constraints`` keep apart that ``sepsets`` leaves out dependent,
-    although no edge joins it, so whether ``b`` is a collider is unknown: no rule reads the triple
-    as a collider or a non-collider. Without constraints the search tested every pair it left
+    order. A pair ``constraints`` make non-adjacent that ``sepsets`` leaves out has no separating
+    set the search found, so whether ``b`` is a collider is unknown: no rule reads the triple as a
+    collider or a non-collider. Without constraints the search tested every pair it left
     non-adjacent, and there are none.
     """
     if constraints is None:

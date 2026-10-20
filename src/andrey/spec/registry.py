@@ -1278,17 +1278,22 @@ _add(
 # --- background knowledge and the conditioning-set cap ------------------------------------------
 
 _SKELETON_RULE = (
-    "The search starts from the allowed pairs and never removes a required pair; a pair the "
-    "knowledge keeps apart is tested for a separating set, so colliders over it are oriented as "
-    "usual; when no set separates it, no rule orients through its triples. "
+    "The adjacency search starts from the allowed pairs and never removes a required pair; the "
+    "tests can remove any other allowed pair. A pair the knowledge makes non-adjacent is tested "
+    "for a separating set, so colliders over it are oriented as usual; when the search finds none "
+    "within max_depth, no rule orients through its unshielded triples. "
 )
-_PAG_MARKS = "In the PAG, a forbidden a -> b puts an arrowhead at a, and a required one is a -> b. "
+_PAG_MARKS = (
+    "In the PAG, a forbidden a -> b on an adjacent pair puts an arrowhead at a and can leave a "
+    "circle at b, and a required one is a -> b. "
+)
 _CLASS_RULE = (
     "The result directs every edge the knowledge decides, then Meek's rules direct the edges that "
     "follow."
 )
 _MOVE_RULE = (
-    "No move adds a forbidden edge or removes a required one; the search starts from them. "
+    "No move adds a forbidden edge or removes a required one; the search starts from the required "
+    "edges. "
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
@@ -1296,8 +1301,8 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
     "fci": _SKELETON_RULE + _PAG_MARKS,
-    "gfci": "The GES phase moves as ges does; the test phase never removes a required pair. "
-    + _PAG_MARKS,
+    "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
+    "and never removes a required pair. " + _PAG_MARKS,
     "ges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
     "xges": _MOVE_RULE + _CLASS_RULE,
@@ -1307,7 +1312,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
     "direct_lingam": _ORDER_RULE + "The regression drops forbidden parents and does not penalize "
-    "required ones.",
+    "required ones; every required edge is in the DAG.",
 }
 #: The Knowledge parts each method honors (every part, for every method that takes knowledge).
 _KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
@@ -1317,8 +1322,9 @@ _MAX_DEPTH = ParamSpec(
     name="max_depth",
     type="int",
     default=None,
-    doc="The largest conditioning set a test uses, at least 0. Smaller values run fewer tests and "
-    "keep more edges. null tests sets of every size.",
+    doc="The maximum conditioning-set size of every conditional-independence test, at least 0: 0 "
+    "runs only unconditional tests, and null sets no limit. A smaller cap runs fewer tests and can "
+    "keep edges that a larger conditioning set would remove.",
     nullable=True,
 )
 
@@ -1328,7 +1334,7 @@ for _name, _how in _KNOWLEDGE_HOW.items():
         type="knowledge",
         default=None,
         doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
-        f"adjacent, and tiers in time order. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
+        f"adjacent, and temporal tiers. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
         nullable=True,
     )
     _depth = (_MAX_DEPTH,) if _name in ("pc", "cdnod", "fci", "gfci") else ()
