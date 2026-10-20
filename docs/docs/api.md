@@ -29,7 +29,11 @@ constant. `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` also ne
 edge weights.
 The categorical settings, `indep_test="chisq"` or `"gsq"` and `score_func="local_score_BDeu"` or
 `"local_score_BIC_categorical"`, read text, boolean, and `category` columns as categories and need
-whole numbers in a column of numbers, each distinct value of a column one category. The mixed-data
+whole numbers in a column of numbers, each distinct value of a column one category. `ges`, `hc`,
+`tabu`, `boss`, `grasp`, and `exact_search` default to `score_func=None`, which picks the
+linear-Gaussian BIC, `"local_score_BDeu"` when every column is categorical, or
+`"local_score_cond_gauss"` when some are (not for `tabu`), the last two with a `DataTypeWarning`, as
+[Data types](guides/getting-started.md#data-types) describes. The mixed-data
 settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
 `"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
 [Data types](guides/getting-started.md#data-types) describes; a categorical column of numbers
@@ -120,8 +124,9 @@ The rules run in rounds, each setting together the marks every rule implies on t
 stands and leaving a circle where two of them disagree, so they do not depend on the node labels.
 The same rules determine the oracle PAG returned by `andrey.data.latent.marginal(..., "pag")`.
 Their possible-d-separation step visits the pairs and nodes by a rank computed from each column's
-own data, so with the default `possible_dsep="order_free"` their result does not depend on the
-column order unless two columns are identical; `"fast"` visits them in column order.
+own data, so with `possible_dsep="order_free"`, the default, their result does not depend on the
+column order unless two columns are identical; `"fast"` visits them in column order and is the
+default under `andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
@@ -225,11 +230,12 @@ mutual information estimate the test's p-value is built on, a dependence measure
    seed_all
 ```
 
-`andrey.config` holds the process-wide backend preference and worker count. Assign
-`andrey.config.backend` or `andrey.config.num_workers` to change the default for every later call,
-or use `with andrey.config(backend=..., num_workers=...):` for one block.
-[Configuration](configuration.md) lists the `ANDREY_*` environment variables and the order in
-which the settings apply.
+`andrey.config` holds the process-wide backend preference, worker count, and tie-break rule. Assign
+`andrey.config.backend`, `andrey.config.num_workers`, or `andrey.config.tie_break` to change the
+default for every later call, or use `with andrey.config(backend=..., num_workers=...,
+tie_break=...):` for one block. [Configuration](configuration.md) lists the `ANDREY_*`
+environment variables and the order in which the settings apply, and
+[Column order and machines](guides/column-order.md) describes `tie_break`.
 
 ## Warnings
 
@@ -245,7 +251,7 @@ made the call. A warning from a dependency keeps its own category, such as sciki
 | {py:class}`~andrey.BackendFallbackWarning` | A requested backend is unavailable, so the call runs on another one. |
 | {py:class}`~andrey.SearchLimitWarning` | A search stopped at its move limit: `hc` or `tabu` took `max_iter` moves. |
 | {py:class}`~andrey.SampleSizeWarning` | A test runs below its minimum rows, so it may reject a true independence more often than `alpha`: RCoT conditions on fewer than 500 rows. |
-| {py:class}`~andrey.DataTypeWarning` | A mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
+| {py:class}`~andrey.DataTypeWarning` | A score search's default picked BDeu because every column is categorical or the conditional Gaussian score because some are, a mixed-data setting inferred its categorical columns or found none, or a continuous one met columns that look like category codes. |
 
 Filter the base class for all of them, or one category. A later filter takes precedence, so
 the broad one goes first:

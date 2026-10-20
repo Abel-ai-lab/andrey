@@ -65,8 +65,8 @@ def test_boss_equal_scores_are_stable_under_input_rounding():
     # each column's row-to-row pattern, so its tie rank.
     rng = np.random.default_rng(10_000)
     perturbed = x * (1 + 1e-12 * rng.standard_normal(x.shape[1]))
-    base = andrey.boss(x, seed=0).structure
-    moved = andrey.boss(perturbed, seed=0).structure
+    base = andrey.boss(x, seed=0, score_func="local_score_BIC_from_cov").structure
+    moved = andrey.boss(perturbed, seed=0, score_func="local_score_BIC_from_cov").structure
 
     assert base.kind == moved.kind == "cpdag"
     # Both inputs give the undirected edges 0 -- 2 and 1 -- 2: column 2 has the lowest tie rank.

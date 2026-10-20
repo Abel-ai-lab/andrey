@@ -139,13 +139,15 @@ row names the nodes) or a `.npy` file.
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
 text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
-data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS,
-GRaSP, and exact search score it with `score_func="local_score_BDeu"` or
-`"local_score_BIC_categorical"`. Mixed data, with continuous and categorical columns, is
-experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and exact search take
-`indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
-`"local_score_cond_gauss"`. They infer which columns are categorical unless you name them with
-`categorical`, and warn about what they inferred. We have not benchmarked them yet.
+data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS, GRaSP,
+and exact search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`;
+all but GFCI pick BDeu by default when every column is categorical. Mixed data, with continuous and
+categorical columns, is experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and
+exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
+`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`; GES, hill climbing, BOSS,
+GRaSP, and exact search pick `"local_score_cond_gauss"` by default when some columns are
+categorical. They infer which columns are categorical unless you name them with `categorical`, and
+warn about what they inferred. We have not benchmarked them yet.
 [Data types](guides/getting-started.md#data-types) explains the settings, the inference rule, and
 how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
 

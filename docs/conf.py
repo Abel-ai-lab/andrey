@@ -430,6 +430,28 @@ def _brand_colors() -> str:
     return f'<ul class="brand-colors">{items}</ul>\n'
 
 
+# The column-order guide's wording for each MethodSpec.column_order.
+COLUMN_ORDER = {
+    "relabels": "Relabels",
+    "relabels_if_converged": "Relabels where FastICA converges",
+    "can_change": "Can change",
+}
+
+
+def _column_order_table() -> str:
+    """The column-order guide's table, one row per method, from the registry."""
+    rows = [
+        "| Method | Reordering the columns | Ties follow `tie_break` | Notes |",
+        "|---|---|---|---|",
+        *(
+            f"| `{s.name}` | {COLUMN_ORDER[s.column_order]} | {'Yes' if s.tie_break else 'No'} "
+            f"| {s.order_note} |"
+            for s in list_specs()
+        ),
+    ]
+    return "\n".join(rows) + "\n"
+
+
 def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its application objects
     """Fill the homepage's context from the summary, and the FAQ's method counts."""
     (GENERATED / "static").mkdir(parents=True, exist_ok=True)
@@ -449,6 +471,7 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     for name, data in cards.brand_kit().items():
         _write_bytes(GENERATED / "static" / "brand" / name, data)
     _write(GENERATED / "brand-colors.html", _brand_colors())
+    _write(GENERATED / "column-order.md", _column_order_table())
 
 
 # Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage's card carries the
