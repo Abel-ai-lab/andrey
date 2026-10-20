@@ -12,13 +12,19 @@ one chunk in memory however many subsets it visits.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from contextlib import nullcontext
 from functools import partial
 from itertools import combinations, islice
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.core.ci import CITest
+from andrey.core import backend
+from andrey.core.ci import CITest, pins_blas
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 #: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
 #: p-value is ``None`` when the scan does not record it.
@@ -234,6 +240,74 @@ def scan_pairs(
         if found:
             removals.append((x, y, tuple(sorted(separating)), max(largest) if largest else None))
     return removals
+
+
+def separate_apart(
+    test: CITest,
+    adjacency: np.ndarray,
+    apart: np.ndarray,
+    alpha: float,
+    *,
+    max_depth: int | None = None,
+    trace: list[dict] | None = None,
+    record_pvalues: bool = True,
+) -> list[Removal]:
+    """Separating sets, over the final skeleton, for the pairs background knowledge makes
+    non-adjacent.
+
+    ``adjacency`` is the boolean skeleton the search ends with and ``apart`` the boolean pairs the
+    knowledge makes non-adjacent, which the search never tested. Every such pair that shares a
+    neighbor, and so forms an unshielded triple, is tested as the search tests a pair it removes:
+    against subsets of either endpoint's neighbors by increasing size, up to ``max_depth`` when one
+    is given, with :func:`scan_pairs`. Returns ``(x, y, separating, p)``, ``x < y``, for every pair
+    some size separates: the union of the separating subsets at the first size that separates it
+    and their largest p-value (``None`` when ``record_pvalues`` is false). A pair no tested subset
+    separates is left out: the subsets come from the final neighborhoods and stop at
+    ``max_depth``, so a separating set elsewhere is not found. With ``trace`` given, every test is
+    recorded as :func:`scan_pairs` records it.
+    """
+    common = adjacency.astype(np.float32) @ adjacency.astype(np.float32) > 0
+    pairs = adjacent_pairs(np.triu(apart & common, 1))
+    neighbors = [np.flatnonzero(row) for row in adjacency]
+    found: list[Removal] = []
+    size = 0
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        while pairs and (max_depth is None or size <= max_depth):
+            removals = scan_pairs(test, pairs, neighbors, size, alpha, trace, record_pvalues)
+            found.extend(removals)
+            separated = {(x, y) for x, y, _, _ in removals}
+            pairs = [
+                (x, y)
+                for x, y in pairs
+                if (x, y) not in separated and max(neighbors[x].size, neighbors[y].size) > size
+            ]
+            size += 1
+    return found
+
+
+def unseparated_triples(
+    adjacency: np.ndarray,
+    sepsets: Mapping[tuple[int, int], object],
+    constraints: Constraints | None,
+) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples ``(a, b, c)``, ``a < c``, over a non-adjacent pair with no
+    separating set.
+
+    ``adjacency`` is the boolean skeleton and ``sepsets`` the separating sets, keyed in either
+    order. A pair ``constraints`` make non-adjacent that ``sepsets`` leaves out has no separating
+    set the search found, so whether ``b`` is a collider is unknown: no rule reads the triple as a
+    collider or a non-collider. Without constraints the search tested every pair it left
+    non-adjacent, and there are none.
+    """
+    if constraints is None:
+        return frozenset()
+    apart = ~constraints.support()
+    triples = set()
+    for b, row in enumerate(adjacency):
+        for a, c in combinations(np.flatnonzero(row).tolist(), 2):
+            if apart[a, c] and (a, c) not in sepsets and (c, a) not in sepsets:
+                triples.add((a, b, c))
+    return frozenset(triples)
 
 
 def adjacent_pairs(adjacency: np.ndarray) -> list[tuple[int, int]]:
