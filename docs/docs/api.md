@@ -49,6 +49,22 @@ single column gives a one-node graph.
 `"cond_gauss"` for mixed data, and the experimental nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`,
 and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
 
+`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
+`exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
+and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
+`knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
+`max_depth`, the maximum conditioning-set size of their conditional-independence tests.
+[Background knowledge](../guides/getting-started.md#background-knowledge) shows them in use.
+
+```{eval-rst}
+.. currentmodule:: andrey
+
+.. autosummary::
+   :toctree: generated
+
+   Knowledge
+```
+
 ### Supported methods
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
