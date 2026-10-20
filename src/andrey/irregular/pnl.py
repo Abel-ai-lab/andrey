@@ -13,20 +13,26 @@ convex program. Each variable is first mapped to normal scores by rank.
 by cause, so a column's normal scores, basis designs, and centered HSIC kernel are computed once and
 shared by every pair that uses it, and each kernel is built in row blocks into reused buffers. Each
 pair's four numbers equal :func:`pnl`'s on that pair, bit for bit.
+
+On the ``cuda`` backend, or under ``auto`` from ``ANDREY_PNL_GPU_THRESHOLD`` rows squared, the
+kernels and their sums run in float64 torch on the device, a batch of disturbances at a time; the
+fits, the normal scores, and the gamma p-values stay on the CPU, so the results match the CPU's to
+rounding.
 """
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from itertools import combinations
+from itertools import combinations, groupby
 
 import numpy as np
 from scipy.special import gammainc
 from scipy.stats import norm, rankdata
 
-from andrey.core import backend
+from andrey.core import backend, env
 from andrey.core.independence import _empirical_bandwidth, _standardize
 
 _N_FEATURES = 10
@@ -38,6 +44,12 @@ _TOL = 1e-8
 # Kernel elements computed per block (rows times columns), so a block's elementwise steps run in
 # cache.
 _BLOCK_ELEMENTS = 32768
+
+# Smallest kernel matrix (rows squared) at which `auto` runs a table's PNL tests on a CUDA GPU.
+_PNL_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 250_000, "mps": None}
+
+# Device memory one batch of disturbance kernels uses.
+_DEVICE_BATCH_BYTES = 2**30
 
 
 def _gaussianize(values: np.ndarray) -> np.ndarray:
@@ -185,7 +197,7 @@ class _Buffers:
         return cls(np.empty((n, n)), np.empty((n, n)), np.empty((n, n)), np.empty((rows, n)))
 
 
-def _centered_kernel(z: np.ndarray, width: float, out: np.ndarray, block: np.ndarray) -> np.ndarray:
+def _kernel_into(z: np.ndarray, width: float, out: np.ndarray, block: np.ndarray) -> np.ndarray:
     """Write the centered Gaussian kernel of the standardized 1-D ``z`` into ``out`` and return it.
 
     The matrix equals, bit for bit, the one :func:`~andrey.core.independence.hsic_statistic_test`
@@ -223,14 +235,26 @@ def _hsic(
     squared entries; the statistic and the gamma null's moments take the same operations, in the
     same order, as in :func:`~andrey.core.independence.hsic_statistic_test`.
     """
-    n = disturbance.shape[0]
     raw = disturbance.reshape(-1, 1)
-    kyc = _centered_kernel(
+    kyc = _kernel_into(
         _standardize(raw)[:, 0], _empirical_bandwidth(raw), buffers.disturbance, buffers.block
     )
     statistic = np.sum(np.multiply(kxc, kyc, out=buffers.product))
-    mean_appr = trace_x * np.trace(kyc) / n
-    var_appr = 2 * sumsq_x * np.sum(np.square(kyc, out=buffers.product)) / n / n
+    sumsq_y = np.sum(np.square(kyc, out=buffers.product))
+    return _gamma_test(statistic, trace_x, sumsq_x, np.trace(kyc), sumsq_y, kyc.shape[0])
+
+
+def _gamma_test(
+    statistic: float, trace_x: float, sumsq_x: float, trace_y: float, sumsq_y: float, n: int
+) -> tuple[float, float]:
+    """Return ``(statistic / mean, p_value)`` of the HSIC test from its two kernels' sums.
+
+    ``trace_*`` and ``sumsq_*`` are each centered kernel's trace and sum of squared entries; the
+    gamma null's moments take the same operations, in the same order, as in
+    :func:`~andrey.core.independence.hsic_statistic_test`.
+    """
+    mean_appr = trace_x * trace_y / n
+    var_appr = 2 * sumsq_x * sumsq_y / n / n
     shape = mean_appr**2 / var_appr
     scale = var_appr / mean_appr
     return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
@@ -251,7 +275,7 @@ def _run_tasks(
         source, target = columns[cause], columns[effect]
         if cause != current:
             current = cause
-            kxc = _centered_kernel(source.standardized, source.width, buffers.cause, buffers.block)
+            kxc = _kernel_into(source.standardized, source.width, buffers.cause, buffers.block)
             trace_x = np.trace(kxc)
             sumsq_x = np.sum(np.square(kxc, out=buffers.product))
         disturbance = _fit_disturbance(source.phi, target.outer, target.outer_deriv)
@@ -259,15 +283,84 @@ def _run_tasks(
     return results
 
 
+def _device_kernels(z, width: float):
+    """Return the centered Gaussian kernels of the rows of ``z`` as an ``(m, n, n)`` tensor.
+
+    ``z`` is an ``(m, n)`` float64 tensor of standardized values. Each kernel takes the steps of
+    :func:`_kernel_into`, on ``z``'s device; the sums run in another order, so the entries match
+    it to rounding.
+    """
+    n = z.shape[1]
+    k = z[:, :, None] - z[:, None, :]
+    k.square_().mul_(-0.5 * width).exp_()
+    col_sums = k.sum(dim=1)
+    shift = col_sums.sum(dim=1) / n**2
+    k.sub_(col_sums[:, None, :] / n).sub_(col_sums[:, :, None] / n).add_(shift[:, None, None])
+    return k
+
+
+def _device_tests(
+    columns: dict[int, _Column], ordered: list[tuple[int, int]], workers: int, dev: str
+) -> list[tuple[float, float]]:
+    """Return ``(statistic, p_value)`` for each ``(cause, effect)`` task in ``ordered``, sorted by
+    cause, with the kernels on the torch device ``dev``.
+
+    ``workers`` threads fit the disturbances in order while this thread runs each cause's kernel
+    and its disturbances' kernels, a batch of ``_DEVICE_BATCH_BYTES`` at a time. Every column and
+    disturbance has ``n`` rows, so they share one kernel width.
+    """
+    torch = backend.torch()
+    n = next(iter(columns.values())).standardized.shape[0]
+    batch = max(1, _DEVICE_BATCH_BYTES // (8 * n * n))
+
+    def standardized_disturbance(task: tuple[int, int]) -> np.ndarray:
+        source, target = columns[task[0]], columns[task[1]]
+        disturbance = _fit_disturbance(source.phi, target.outer, target.outer_deriv)
+        return _standardize(disturbance.reshape(-1, 1))[:, 0]
+
+    sums = []  # per task: statistic, the cause's trace and sum of squares, the disturbance's
+    with contextlib.ExitStack() as stack:
+        if workers > 1:
+            stack.enter_context(backend.one_blas_thread())
+            pool = stack.enter_context(ThreadPoolExecutor(max_workers=workers))
+            fitted = pool.map(standardized_disturbance, ordered)
+        else:
+            fitted = map(standardized_disturbance, ordered)
+        for cause, group in groupby(zip(ordered, fitted, strict=True), key=lambda t: t[0][0]):
+            source = columns[cause]
+            kxc = _device_kernels(backend.as_tensor(source.standardized[None], dev), source.width)
+            kxc = kxc.reshape(-1)
+            cause_sums = torch.stack([kxc[:: n + 1].sum(), kxc @ kxc])
+            disturbances = [z for _, z in group]
+            for start in range(0, len(disturbances), batch):
+                z = backend.as_tensor(np.stack(disturbances[start : start + batch]), dev)
+                kyc = _device_kernels(z, source.width).reshape(z.shape[0], -1)
+                sums.append(
+                    torch.column_stack(
+                        [
+                            kyc @ kxc,
+                            cause_sums.expand(z.shape[0], 2),
+                            kyc[:, :: n + 1].sum(dim=1),
+                            torch.einsum("mk,mk->m", kyc, kyc),
+                        ]
+                    )
+                )
+    values = backend.to_numpy(torch.cat(sums))
+    return [_gamma_test(st, tx, sx, ty, sy, n) for st, tx, sx, ty, sy in values]
+
+
 def _ordered_tests(
-    columns: dict[int, _Column], tasks: list[tuple[int, int]], workers: int
+    columns: dict[int, _Column], tasks: list[tuple[int, int]], workers: int, dev: str = "numpy"
 ) -> dict[tuple[int, int], tuple[float, float]]:
     """Return ``{(cause, effect): (statistic, p_value)}`` for the distinct ``tasks``.
 
-    The tasks, sorted by cause, are cut into ``workers`` contiguous runs, one per worker thread,
-    each on one BLAS thread; every task's result is the same whatever the number of workers.
+    On ``numpy`` the tasks, sorted by cause, are cut into ``workers`` contiguous runs, one per
+    worker thread, each on one BLAS thread; every task's result is the same whatever the number
+    of workers. On a torch device, :func:`_device_tests` runs them.
     """
     ordered = sorted(dict.fromkeys(tasks))
+    if dev != "numpy":
+        return dict(zip(ordered, _device_tests(columns, ordered, workers, dev), strict=True))
     runs = [
         [ordered[k] for k in part]
         for part in np.array_split(np.arange(len(ordered)), max(1, workers))
@@ -285,6 +378,19 @@ def _ordered_tests(
     }
 
 
+def _pnl_backend(n: int, *, amortized: bool) -> str:
+    """Where PNL's tests on ``n`` rows run: ``numpy``, or torch on ``cpu`` or ``cuda``."""
+    manual = env.PNL_GPU_THRESHOLD.read()
+    return backend.select(
+        ("numpy", "cpu", "cuda"),
+        ("cuda", "numpy"),
+        metric=n * n,
+        thresholds=_PNL_GPU_THRESHOLDS if manual is None else {"cuda": manual},
+        amortized=amortized,
+        op="pnl",
+    )
+
+
 def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
     """Return ``(pval_forward, pval_backward, stat_forward, stat_backward)`` for the pair ``x, y``.
 
@@ -296,7 +402,8 @@ def pnl(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float, float]:
     value means weaker dependence. ``x`` and ``y`` are 1-D arrays of equal length.
     """
     columns = {0: _column(x), 1: _column(y)}
-    tests = _ordered_tests(columns, [(0, 1), (1, 0)], backend.worker_count())
+    dev = _pnl_backend(columns[0].standardized.shape[0], amortized=False)
+    tests = _ordered_tests(columns, [(0, 1), (1, 0)], backend.worker_count(), dev)
     (stat_forward, pval_forward), (stat_backward, pval_backward) = tests[0, 1], tests[1, 0]
     return pval_forward, pval_backward, stat_forward, stat_backward
 
@@ -328,7 +435,8 @@ def pnl_pairs(
         return np.empty((0, 4))
     columns = {k: _column(arr[:, k]) for k in sorted({k for pair in chosen for k in pair})}
     tasks = [(i, j) for i, j in chosen] + [(j, i) for i, j in chosen]
-    tests = _ordered_tests(columns, tasks, backend.worker_count(num_workers))
+    dev = _pnl_backend(arr.shape[0], amortized=True)
+    tests = _ordered_tests(columns, tasks, backend.worker_count(num_workers), dev)
     return np.array(
         [(tests[i, j][1], tests[j, i][1], tests[i, j][0], tests[j, i][0]) for i, j in chosen],
         dtype=np.float64,

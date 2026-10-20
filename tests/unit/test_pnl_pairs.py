@@ -1,12 +1,18 @@
-"""PNL's batched pairs: the blocked HSIC equals the reference test, and rows equal single calls."""
+"""PNL's batched pairs: the blocked HSIC equals the reference test, rows equal single calls, and the
+torch path matches NumPy's to rounding."""
 
 from __future__ import annotations
 
+import functools
 import importlib
+import math
+from unittest import mock
 
 import numpy as np
 import pytest
 
+import andrey
+from andrey.core import backend
 from andrey.core.independence import hsic_statistic_test
 
 _pnl = importlib.import_module("andrey.irregular.pnl")
@@ -26,7 +32,7 @@ def test_blocked_hsic_equals_the_reference_test(n):
     cause, effect = _pnl._column(X[:, 0]), _pnl._column(X[:, 1])
     disturbance = _pnl._fit_disturbance(cause.phi, effect.outer, effect.outer_deriv)
     buffers = _pnl._Buffers.for_rows(n)
-    kxc = _pnl._centered_kernel(cause.standardized, cause.width, buffers.cause, buffers.block)
+    kxc = _pnl._kernel_into(cause.standardized, cause.width, buffers.cause, buffers.block)
     blocked = _pnl._hsic(kxc, np.trace(kxc), np.sum(kxc**2), disturbance, buffers)
     assert blocked == hsic_statistic_test(_pnl._gaussianize(X[:, 0]), disturbance)
 
@@ -49,3 +55,59 @@ def test_pairs_default_to_every_column_pair_and_are_checked():
         _pnl.pnl_pairs(X, [(0, 4)])
     with pytest.raises(ValueError, match="table"):
         _pnl.pnl_pairs(X[:, 0])
+
+
+def test_device_dispatch_gates_on_rows_squared(monkeypatch):
+    """A pair asks for a device by rows squared without starting one; a table may start one."""
+    seen = []
+
+    def spy(pinnable, auto_order, *, metric=None, thresholds=None, amortized=True, op=None):
+        seen.append((metric, amortized, op, "mps" in pinnable))
+        return "numpy"
+
+    monkeypatch.setattr(_pnl.backend, "select", spy)
+    X = _table(60)
+    _pnl.pnl(X[:, 0], X[:, 1])
+    _pnl.pnl_pairs(X)
+    assert seen == [(60 * 60, False, "pnl", False), (60 * 60, True, "pnl", False)]
+
+
+def test_device_cutoff_reads_its_variable_and_never_chooses_mps(monkeypatch):
+    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", "ANDREY_PNL_GPU_THRESHOLD"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
+    first = math.isqrt(_pnl._PNL_GPU_THRESHOLDS["cuda"] - 1) + 1  # fewest rows reaching it
+    choose = functools.partial(_pnl._pnl_backend, amortized=True)
+    assert (choose(first - 1), choose(first)) == ("numpy", "cuda")
+    monkeypatch.setenv("ANDREY_PNL_GPU_THRESHOLD", "100")
+    assert (choose(9), choose(10)) == ("numpy", "cuda")
+    with andrey.config(backend="mps"):
+        assert choose(10) == "cuda"  # float32 mps is not a PNL backend
+    assert _pnl._PNL_GPU_THRESHOLDS["mps"] is None
+
+
+def _decisions(rows: np.ndarray) -> np.ndarray:
+    """``andrey.pnl``'s choice per row with ``alpha=None``: 1 forward, -1 backward, 0 no edge."""
+    by_pvalue = np.sign(rows[:, 0] - rows[:, 1])
+    return np.where(by_pvalue != 0, by_pvalue, np.sign(rows[:, 3] - rows[:, 2]))
+
+
+@pytest.mark.parametrize("n", [150, 600, 1300])
+def test_torch_path_matches_numpy(n):
+    """On torch's CPU backend, the p-values and statistics match NumPy's to rounding, a batch
+    smaller than a cause's effects included, and every decision is the same."""
+    pytest.importorskip("torch")
+    X = _table(n)
+    pairs = [(0, 1), (1, 0), (2, 3), (3, 3), (0, 3), (1, 2)]
+    with andrey.config(backend="numpy"):
+        expected = _pnl.pnl_pairs(X, pairs)
+    backend.reset_dispatch_stats()
+    with andrey.config(backend="cpu"):
+        got = _pnl.pnl_pairs(X, pairs)
+        with mock.patch.object(_pnl, "_DEVICE_BATCH_BYTES", 8 * n * n):  # one kernel per batch
+            one_per_batch = _pnl.pnl_pairs(X, pairs, num_workers=2)
+    assert backend.dispatch_stats() == {("pnl", "cpu"): 2}
+    for rows in (got, one_per_batch):
+        assert np.allclose(rows[:, :2], expected[:, :2], rtol=0, atol=1e-12)
+        assert np.allclose(rows[:, 2:], expected[:, 2:], rtol=1e-12, atol=0)
+        assert np.array_equal(_decisions(rows), _decisions(expected))

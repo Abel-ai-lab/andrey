@@ -34,9 +34,9 @@ The backend and the worker count can also be set in code. The most specific sett
 - `ANDREY_DEVICE`: another name for `ANDREY_BACKEND`; if you set both, `ANDREY_BACKEND` takes
   precedence, but both values must be valid.
 
-A GPU speeds up covariance, correlation, entropy, and the KCI and CMIknn tests. GES, hill climbing,
-and the other searches run on the CPU. An operation without the requested backend uses `auto`,
-without a warning.
+A GPU speeds up covariance, correlation, entropy, the KCI and CMIknn tests, and the independence
+tests of `pnl`. GES, hill climbing, and the other searches run on the CPU. An operation without the
+requested backend uses `auto`, without a warning.
 
 ## Parallel search
 
@@ -60,6 +60,9 @@ The cutoff matters only with more than one worker. `andrey calibrate` measures i
 - `ANDREY_CMIKNN_GPU_THRESHOLD`: the same for a CMIknn query, from this many distance-matrix
   elements (rows squared). The default is `1024`, 32 rows. Its p-values on `cuda` equal those on
   the CPU.
+- `ANDREY_PNL_GPU_THRESHOLD`: the same for the independence tests of `pnl`, in float64, from this
+  many kernel-matrix elements (rows squared). The default is `250000`, 500 rows. A single pair
+  uses the GPU only when it is already running, by the rule below.
 - `ANDREY_GPU_CALIBRATE`: when on, the first `auto` use of covariance, correlation, or entropy
   measures where `cuda` starts to beat NumPy on this machine, and keeps the result in
   `$XDG_CACHE_HOME/andrey/gpu_calibration.json`, else `~/.cache/andrey/gpu_calibration.json`. Off

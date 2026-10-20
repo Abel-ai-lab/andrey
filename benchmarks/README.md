@@ -1123,8 +1123,8 @@ searches run in the timed fit's process before its clock, so `warmup_s` holds on
 Andrey uses hardcoded thresholds for accelerated paths:
 
 - `ANDREY_GES_PARALLEL_MIN_WORK` selects the worker pool.
-- `ANDREY_COV_GPU_THRESHOLD`, `ANDREY_ENTROPY_GPU_THRESHOLD`, `ANDREY_KCI_GPU_THRESHOLD`, and
-  `ANDREY_CMIKNN_GPU_THRESHOLD` select the accelerator.
+- `ANDREY_COV_GPU_THRESHOLD`, `ANDREY_ENTROPY_GPU_THRESHOLD`, `ANDREY_KCI_GPU_THRESHOLD`,
+  `ANDREY_CMIKNN_GPU_THRESHOLD`, and `ANDREY_PNL_GPU_THRESHOLD` select the accelerator.
 
 Three thresholds were calibrated once on one machine. Later measurements found errors of 7x for GES,
 25x for `cov`, and 40x for entropy. Each error kept the faster path disabled.
@@ -1139,9 +1139,9 @@ thresholds**. Recording an unused calibration is worse than no calibration: it r
 that did not control the run.
 
 **Check the unit before setting a threshold.** GES uses candidate evaluations, `cov` uses `n * d`,
-`entropy` uses batch width `B`, and KCI and CMIknn use `n * n`. `andrey.spec.environment` lists
-these units, and `andrey --help --json` prints them. A value in the wrong unit silently selects the
-wrong path.
+`entropy` uses batch width `B`, and KCI, CMIknn, and PNL use `n * n`. `andrey.spec.environment`
+lists these units, and `andrey --help --json` prints them. A value in the wrong unit silently
+selects the wrong path.
 
 **Backend pins affect the gates differently.** Worker-pool gates run on each search pass and ignore
 the backend. Below the GES threshold, `ges.numpy.parallel` uses the serial path. Device thresholds
