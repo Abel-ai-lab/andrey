@@ -1967,7 +1967,7 @@ def speed_panel(summaries: list[dict]) -> str:
         panels.append(
             f'<div class="seg-panel" role="tabpanel" id="speed-{key}" '
             f'aria-labelledby="speed-tab-{key}"><div class="seg-head">'
-            f"<h3>{escape(info['title'])}</h3>{family_number(info)}</div>"
+            f"{family_number(info)}</div>"
             f"{method_bar(points.get(key, []))}"
             f'{figure}<p class="seg-foot">{escape(family_intro())} '
             '<a href="docs/benchmarks.html">Details in the release cards</a></p></div>'
