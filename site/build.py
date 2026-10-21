@@ -1918,13 +1918,6 @@ def tile(key: str, size: str, body: str, *, kind: str = "") -> str:
     )
 
 
-def method_names(names: list[str]) -> str:
-    """A family's methods for its tile: all of them up to three, else two and the count."""
-    if len(names) <= 3:
-        return listed(names)
-    return f"{names[0]}, {names[1]}, and {len(names) - 2} more"
-
-
 def family_number(info: dict) -> str:
     """A family's best speedup in words, "more than" its one-digit number or "at least" where
     nothing is rounded off, or nothing where Andrey is not at least twice as fast."""
@@ -1974,8 +1967,7 @@ def speed_panel(summaries: list[dict]) -> str:
         panels.append(
             f'<div class="seg-panel" role="tabpanel" id="speed-{key}" '
             f'aria-labelledby="speed-tab-{key}"><div class="seg-head">'
-            f"<div><h3>{escape(info['title'])}</h3>"
-            f"<p>{escape(method_names(info['methods']))}</p></div>{family_number(info)}</div>"
+            f"<h3>{escape(info['title'])}</h3>{family_number(info)}</div>"
             f"{method_bar(points.get(key, []))}"
             f'{figure}<p class="seg-foot">{escape(family_intro())} '
             '<a href="docs/benchmarks.html">Details in the release cards</a></p></div>'
