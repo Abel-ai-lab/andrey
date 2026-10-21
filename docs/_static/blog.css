@@ -916,3 +916,75 @@ ul.ablog-archive {
   font-size: 0.85rem;
   line-height: 1.45;
 }
+
+/* The 0.8.0 post's figures (docs/blog/0.8.0/): three relationships, each with the p-values
+   partial correlation and KCI give it, and the example's graphs, one card per test. */
+.dp,
+.gf {
+  margin: 2rem 0;
+  padding: 1rem 1.1rem 0.9rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
+}
+
+.dp-grid,
+.gf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem 1.2rem;
+}
+
+.dp-name,
+.gf-name {
+  margin: 0;
+  color: var(--andrey-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.dp svg,
+.gf svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.dp-dots circle {
+  fill: var(--andrey-accent);
+  fill-opacity: 0.45;
+}
+
+.dp-tests {
+  margin: 0.3rem 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  list-style: none;
+}
+
+.dp-tests b {
+  font-weight: 600;
+}
+
+.dp-tests .dp-seen {
+  color: var(--andrey-ink);
+}
+
+.dp-tests .dp-missed {
+  color: var(--andrey-muted);
+}
+
+.gf-count {
+  margin: 0;
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+}
+
+.dp figcaption,
+.gf figcaption {
+  margin-top: 0.8rem;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
