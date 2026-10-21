@@ -58,17 +58,27 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     ent = stats.entropy(x_std)  # (m,) batched candidate entropy
     cov = np.cov(x_std, rowvar=False, ddof=0)  # (m, m), same ddof as var: least-squares slopes
     var = np.var(x_std, axis=0)  # (m,), ddof=0
-    m = len(cols)
+    n, m = x_std.shape
+    # Residual buffers every candidate reuses: ``r_ij`` column-major like the fancy-indexed ``xj``,
+    # ``r_ji`` row-major. The layout sets the order of the column sums in ``np.std`` and
+    # ``stats.entropy`` (pairwise down a contiguous column, row by row otherwise), so a change of
+    # layout moves the scores in the last bits.
+    r_ij, work_ij = np.empty((n, m - 1), order="F"), np.empty((n, m - 1), order="F")
+    r_ji, work_ji = np.empty((n, m - 1)), np.empty((n, m - 1))
     scores = np.empty(m, dtype=np.float64)
     for a in range(m):
         others = np.arange(m) != a
         xi = x_std[:, a][:, None]  # (n, 1)
         xj = x_std[:, others]  # (n, m-1)
-        r_ij = xi - (cov[a, others] / var[others])[None, :] * xj  # residual of i on each j
-        r_ji = xj - (cov[others, a] / var[a])[None, :] * xi  # residual of each j on i
+        np.multiply(cov[a, others] / var[others], xj, out=r_ij)
+        np.subtract(xi, r_ij, out=r_ij)  # residual of i on each j
+        np.multiply(cov[others, a] / var[a], xi, out=r_ji)
+        np.subtract(xj, r_ji, out=r_ji)  # residual of each j on i
         r_ij /= np.std(r_ij, axis=0)
         r_ji /= np.std(r_ji, axis=0)
-        diff = (ent[others] + stats.entropy(r_ij)) - (ent[a] + stats.entropy(r_ji))
+        diff = (ent[others] + stats.entropy(r_ij, work=work_ij)) - (
+            ent[a] + stats.entropy(r_ji, work=work_ji)
+        )
         scores[a] = -np.sum(np.minimum(0.0, diff) ** 2)
     return scores
 
