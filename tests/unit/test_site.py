@@ -877,13 +877,13 @@ def test_homepage_styles_are_scoped_to_the_homepage():
 def test_every_partial_mark_says_what_it_covers():
     notes = build.comparison_notes()
     assert all(mark == "part" or package != "Andrey" for _, package, mark, _ in notes)
-    table = build.comparison_table()
+    table = build.comparison_table([SUMMARY])
     assert table.count('class="mark mark--') == len(build.COMPARISON) * len(build.PEERS)
     # Each partial mark carries its note as a tooltip and in its screen-reader text.
     assert table.count(" title=") == len(notes) and "compare-note-" not in table
     for _, _, _, note in notes:
         assert f"Partly: {build.escape(note)}</span>" in table
-    bad = list(build.COMPARISON) + [("Speed", "Unexplained", ("yes", "part", "no", "no", "no"), {})]
+    bad = list(build.COMPARISON) + [("Unexplained", ("yes", "part", "no", "no", "no"), {})]
     original, build.COMPARISON = build.COMPARISON, tuple(bad)
     try:
         with pytest.raises(ValueError, match="in part"):
@@ -892,15 +892,25 @@ def test_every_partial_mark_says_what_it_covers():
         build.COMPARISON = original
 
 
-def test_the_comparison_table_has_three_groups_with_a_mark_for_every_package():
-    groups = list(dict.fromkeys(group for group, *_ in build.COMPARISON))
-    assert groups == ["Results", "Agents", "Speed"]
-    # A group's rows sit together, so each group heads the table once.
-    table = build.comparison_table()
-    assert table.count('<tr class="compare-group">') == len(groups)
-    for _, feature, marks, _ in build.COMPARISON:
+def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
+    table = build.comparison_table([SUMMARY])
+    # One table, no group rows; each guarantee in a few words, its detail in the notes.
+    assert "compare-group" not in table
+    for feature, marks, _ in build.COMPARISON:
+        assert len(feature.split()) <= 6, feature
         assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
     assert len(re.findall(r'<th scope="col"[ >]', table)) == len(build.PEERS)
+    # The methods count sits on the same tile, with the way to every method.
+    tiles = build.coverage_tiles([SUMMARY], "")
+    # The measured rows: Andrey at 1x and each package's time against it, and the most variables
+    # each fit within the budget.
+    rows = dict(build.measured_rows(build.release_summaries(SUMMARY)))
+    times = rows["Fit time (Andrey = 1x)"]
+    assert times[0] == "1x" and all(t is None or t.endswith("x") for t in times)
+    fits = rows[f"Variables fit in {build.FIT_BUDGET_S} s"]
+    assert int(fits[0].replace(",", "")) >= max(int(f.replace(",", "")) for f in fits if f)
+    assert f"{len(list_specs())} methods" in tiles and 'data-tile="methods"' in tiles
+    assert "bento-note" not in tiles
 
 
 def test_interface_example_returns_every_kind_of_graph():
@@ -1269,16 +1279,13 @@ def test_the_first_section_shows_why_it_is_fast_as_a_carousel(placeholder_page):
 
 
 def test_a_list_is_a_note_in_plain_type_not_a_card(placeholder_page):
-    # The release promise and the methods by family need no figure, which a card would only
-    # frame: each is a note beside a tile, its heading and text on the page's paper.
+    # The release promise needs no figure, which a card would only frame: it is a note beside a
+    # tile, its heading and text on the page's paper. The methods count sits in the comparison.
     notes = re.findall(r'<li class="bento-note">(.*?)</li>', placeholder_page, re.S)
     assert [re.search(r"<h3>([^<]+)</h3>", note)[1] for note in notes] == [
         "Tested against the true graphs",
-        f"{len(list_specs())} methods",
     ]
     assert not any("tile-glass" in note or "wf-plus" in note for note in notes)
-    # The family list opens the methods dialog, which holds the full table.
-    assert '<a href="#methods" data-tile="methods">' in notes[1]
 
 
 def test_the_covers_move_only_without_reduced_motion_and_only_by_transform_and_opacity():

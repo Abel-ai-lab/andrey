@@ -1898,32 +1898,22 @@ def names_only(figures: str) -> str:
 
 
 def coverage_tiles(summaries: list[dict], graphs: str) -> str:
-    """What the package covers: its methods by family, in plain text beside the features other
-    packages have, then the kinds of causal graph its methods return."""
-    specs = list_specs()
-    families = listed(
-        [
-            f"{label[0].lower() + label[1:]} ({sum(s.family == family for s in specs)})"
-            for family, label in SPEC_FAMILIES.items()
-        ]
-    )
-    return (
-        f'<li class="bento-note"><h3>{len(specs)} methods</h3>'
-        f"<p>For every kind of data, by family: {escape(families)}.</p>"
-        '<p><a href="#methods" data-tile="methods">Every method</a></p></li>'
-        + glass_tile(
-            "7",
-            "How Andrey compares",
-            "What each package guarantees, read from its released code.",
-            comparison_table() + f'<p class="compare-source">{escape(comparison_source())}</p>',
-        )
-        + glass_tile(
-            "wide",
-            graph_title(),
-            f"{listed(graph_kinds())}.",
-            f'<div class="glass-graphs">{names_only(graphs)}</div>',
-            key="graphs",
-        )
+    """What the package covers and guarantees: its methods and the comparison with the most used
+    packages in one table, then the kinds of causal graph its methods return."""
+    count = len(list_specs())
+    return glass_tile(
+        "wide",
+        "How Andrey compares",
+        f'{count} methods in {len(SPEC_FAMILIES)} families (<a href="#methods" '
+        'data-tile="methods">every method</a>), and what each package guarantees.',
+        comparison_table(summaries)
+        + f'<p class="compare-source">{escape(comparison_source())}</p>',
+    ) + glass_tile(
+        "wide",
+        graph_title(),
+        f"{listed(graph_kinds())}.",
+        f'<div class="glass-graphs">{names_only(graphs)}</div>',
+        key="graphs",
     )
 
 
@@ -2243,11 +2233,26 @@ MARKS = {
     "part": ("minus", "Partly", "\u25d0"),
     "no": ("x", "No", "\u2717"),
 }
-# (group, guarantee, one mark per package in PEERS order, a note for every "part" mark by package).
+# (guarantee, one mark per package in PEERS order, a note for every "part" mark by package). A
+# guarantee is a few words; its notes carry the detail.
 COMPARISON = (
     (
-        "Results",
-        "The same graph in any column order",
+        "CPU parallelization",
+        ("yes", "part", "part", "part", "part"),
+        {
+            "causal-learn": "Several CPU cores for RLCD and the FastKCI test only.",
+            "Tetrad": "Several threads for FGES, BOSS, GFCI, and PC's adjacency search.",
+            "pcalg": "Several cores for the skeleton step of its stable.fast method only.",
+            "bnlearn": "A cluster for its constraint-based methods and DirectLiNGAM only.",
+        },
+    ),
+    (
+        "GPU acceleration",
+        ("yes", "part", "no", "no", "no"),
+        {"causal-learn": "CALM only."},
+    ),
+    (
+        "Same graph in any column order",
         ("yes", "no", "part", "no", "no"),
         {
             "Tetrad": "PC and FCI follow the variables' names; BOSS, GRaSP, and GIN changed with "
@@ -2255,19 +2260,7 @@ COMPARISON = (
         },
     ),
     (
-        "Results",
-        "One result type from every method, with its graph type and edge marks",
-        ("yes", "no", "part", "no", "part"),
-        {
-            "Tetrad": "Every search returns a graph with edge marks; its graph type belongs to "
-            "the algorithm, not the result.",
-            "bnlearn": "Every learner returns a bn object, with directed and undirected arcs only "
-            "and no graph type.",
-        },
-    ),
-    (
-        "Agents",
-        "An agent-native interface: JSON results and a schema for every method",
+        "Agent-native interface",
         ("yes", "no", "part", "no", "no"),
         {
             "Tetrad": "causal-cmd writes graphs as JSON, and py-tetrad's development branch adds "
@@ -2275,31 +2268,51 @@ COMPARISON = (
         },
     ),
     (
-        "Speed",
-        "CPU-parallel and GPU backends",
-        ("yes", "part", "part", "part", "part"),
-        {
-            "causal-learn": "A GPU for CALM only; several CPU cores for RLCD and the FastKCI test "
-            "only.",
-            "Tetrad": "Several CPU threads for FGES, BOSS, GFCI, and PC's adjacency search; no "
-            "GPU.",
-            "pcalg": "Several cores for the skeleton step of its stable.fast method only; no GPU.",
-            "bnlearn": "A cluster for its constraint-based methods and DirectLiNGAM only; no GPU.",
-        },
-    ),
-    (
-        "Speed",
-        "Speed against other packages, published with each release",
+        "Benchmarks with each release",
         ("yes", "no", "no", "no", "no"),
         {},
     ),
 )
+# The table's measured rows, from every release's published benchmarks, over the comparisons in
+# variables: each package's fit time against Andrey's, the geometric mean over its comparisons of
+# the ratio at the largest size both finished; and the most variables each fit within
+# FIT_BUDGET_S seconds in any comparison.
+FIT_BUDGET_S = 1
+
+
+def measured_rows(summaries: list[dict]) -> list[tuple[str, list[str]]]:
+    """The measured rows, a value per package in PEERS order, None where a package has none."""
+    logs: dict[str, list[float]] = {p: [] for p in PEERS[1:]}
+    most = {p: 0 for p in PEERS}
+    for m in supported(summaries):
+        package = m["comparator"]
+        if m["unit"] != "variables" or package not in logs:
+            continue
+        paired = [r for r in m["rows"] if r["andrey_s"] and r["comparator_s"]]
+        if paired:
+            top = max(paired, key=lambda r: r["d"])
+            logs[package].append(math.log(top["comparator_s"] / top["andrey_s"]))
+        for r in m["rows"]:
+            if r["andrey_s"] is not None and r["andrey_s"] <= FIT_BUDGET_S:
+                most["Andrey"] = max(most["Andrey"], r["d"])
+            if r["comparator_s"] is not None and r["comparator_s"] <= FIT_BUDGET_S:
+                most[package] = max(most[package], r["d"])
+    times = ["1x"] + [
+        ratio_text(math.exp(statistics.fmean(logs[p]))) if logs[p] else None for p in PEERS[1:]
+    ]
+    return [
+        ("Fit time (Andrey = 1x)", times),
+        (
+            f"Variables fit in {FIT_BUDGET_S} s",
+            [f"{most[p]:,}" if most[p] else None for p in PEERS],
+        ),
+    ]
 
 
 def comparison_notes() -> list[tuple[str, str, str, str]]:
     """Check the table and number its notes: (feature, package, mark, note) in reading order."""
     notes = []
-    for _, feature, marks, row_notes in COMPARISON:
+    for feature, marks, row_notes in COMPARISON:
         if len(marks) != len(PEERS) or set(marks) - MARKS.keys():
             raise ValueError(f"{feature!r}: give one of {sorted(MARKS)} for each of {PEERS}")
         if set(row_notes) - set(PEERS):
@@ -2313,8 +2326,9 @@ def comparison_notes() -> list[tuple[str, str, str, str]]:
     return notes
 
 
-def comparison_table() -> str:
-    """The features table, one column per package.
+def comparison_table(summaries: list[dict]) -> str:
+    """The comparison, one column per package: the measured rows (``measured_rows``), then the
+    attributes, a mark each.
 
     Each partial mark keeps its note as text for screen readers and as a tooltip.
     """
@@ -2323,14 +2337,14 @@ def comparison_table() -> str:
         f'<th scope="col"{" class=ct-ours" if p == "Andrey" else ""}>{escape(p)}</th>'
         for p in PEERS
     )
-    rows, group = [], None
-    for section, feature, marks, _ in COMPARISON:
-        if section != group:
-            rows.append(
-                f'<tr class="compare-group"><th scope="colgroup" colspan="{1 + len(PEERS)}">'
-                f"{section}</th></tr>"
-            )
-            group = section
+    rows = []
+    for label, values in measured_rows(summaries):
+        cells = "".join(
+            f'<td class="value{" ct-ours" if p == "Andrey" else ""}">{escape(v) if v else "-"}</td>'
+            for p, v in zip(PEERS, values, strict=True)
+        )
+        rows.append(f'<tr class="compare-alone"><th scope="row">{escape(label)}</th>{cells}</tr>')
+    for feature, marks, _ in COMPARISON:
         cells = []
         for package, mark in zip(PEERS, marks):
             icon, word, _ = MARKS[mark]
@@ -2357,8 +2371,8 @@ def comparison_table() -> str:
 def comparison_source() -> str:
     """What the table's marks were read from."""
     return (
-        f"{PEER_VERSIONS}. The column-order row is measured; the published-speed row is read from "
-        "each package's README, documentation, and release notes."
+        "Times from our published benchmarks; the rest read from each package's released code: "
+        f"{PEER_VERSIONS}."
     )
 
 

@@ -1205,6 +1205,16 @@
 }
 
 /* The comparison on the tile's glass: compact, its sources in small type under it. */
+.andrey-home .compare td.value {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.andrey-home .compare td.value.ct-ours {
+  color: var(--andrey-accent);
+  font-weight: 600;
+}
+
 .andrey-home .tile-glass .compare {
   font-size: 0.8rem;
 }
