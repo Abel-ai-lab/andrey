@@ -21,7 +21,11 @@ a list of datasets and returns one result per dataset. Each method is either sup
 experimental; `andrey list` prints the status.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
-least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, distinct column names.
+least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, column names that
+differ as text. Each column name becomes its node's label as text, `str(name)`, so columns named
+`1` and `"1"` would share the label `"1"`, and the `ValueError` names it with both positions.
+Where an argument names columns, as `Knowledge` and `categorical` do, a string is a label and an
+integer is a 0-based position: the column named `1` is `"1"`, and `1` is the second column.
 A constant column holds no information about the other variables, so one `ValueError` names every
 constant column and asks you to drop them; resampling or subsetting rows can make a column
 constant. `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` also need at least

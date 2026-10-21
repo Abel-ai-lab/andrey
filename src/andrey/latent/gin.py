@@ -26,7 +26,7 @@ Each column's HSIC kernel matrix is built once per fit and reused by every test,
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import combinations
+from itertools import combinations, count, islice
 
 import numpy as np
 from scipy.special import gammaincc
@@ -280,9 +280,12 @@ def _structure_from_result(
     node_types[n_variables:] = LATENT
 
     observed_labels = (
-        tuple(labels) if labels is not None else tuple(f"X{i + 1}" for i in range(n_variables))
+        tuple(str(label) for label in labels)
+        if labels is not None
+        else tuple(f"X{i + 1}" for i in range(n_variables))
     )
-    all_labels = observed_labels + tuple(f"L{k + 1}" for k in range(n_latent))
+    free = (f"L{k}" for k in count(1) if f"L{k}" not in observed_labels)
+    all_labels = observed_labels + tuple(islice(free, n_latent))
 
     structure = GraphStructure.from_numpy(
         marks, kind="dag", labels=all_labels, node_types=node_types
@@ -304,9 +307,10 @@ def gin_structure(
 
     A convenience over :func:`gin` that materializes the clustering and latent order as a directed
     graph over observed *and* latent nodes: observed variables occupy indices ``0..n_variables-1``
-    (optionally named by ``labels``), latents follow named ``L1..Lm``, the ordered ones first, and
-    ``node_types`` flags which nodes are latent. Each latent points to its observed children, and an
-    ordered latent to every later latent; the clustering and order also ride along in ``metadata``.
+    (optionally named by ``labels``), latents follow named ``L1``, ``L2``, and so on, skipping a
+    name an observed variable has, the ordered ones first, and ``node_types`` flags which nodes are
+    latent. Each latent points to its observed children, and an ordered latent to every later
+    latent; the clustering and order also ride along in ``metadata``.
     """
     data = np.asarray(data, dtype=np.float64)
     return _structure_from_result(data.shape[1], gin(data, alpha=alpha), labels)
