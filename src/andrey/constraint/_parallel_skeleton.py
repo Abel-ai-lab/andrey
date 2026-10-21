@@ -37,11 +37,9 @@ from andrey.search._parallel import collect as _collect
 from andrey.search._parallel import pick_context as _pick_context
 
 #: The fewest tests a conditioning-size pass needs to run on the worker pool; a smaller pass scans
-#: in the caller's process. Provisional until an A/B on an exclusive node measures the crossover:
-#: it equals GES's default gate (``_parallel_ges._DEFAULT_MIN_WORK``) because a partial-correlation
-#: test and a GES candidate evaluation each solve one small linear system over a conditioning or
-#: parent set, and both gates pay for the pool's start in the fit that first crosses them.
-MIN_POOL_QUERIES: int = 10_000
+#: in the caller's process. Starting the pool costs about half a second per fit, which a pass of
+#: this size repays at 4 to 8 workers; a smaller pass finishes sooner in the caller's process.
+MIN_POOL_QUERIES: int = 500_000
 
 # Per-worker state installed once by _init_worker and reused across every task and size pass.
 _WORKER_TEST: PartialCorrelationTest | None = None
