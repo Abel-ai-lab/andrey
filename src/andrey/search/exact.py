@@ -53,6 +53,10 @@ EXACT_SCORES: tuple[str, ...] = (
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.
 _ParentEntry = tuple[tuple[int, ...], float, int]
 
+# Parent sets of one size scored per call, which bounds the memory of the BIC score's stacked
+# normal equations.
+_SCORE_BATCH = 4096
+
 
 def _structure_bits(structure: Sequence[int]) -> int:
     """Bitmask of a parent set: bit ``v`` set iff ``v`` is in ``structure``."""
@@ -173,22 +177,23 @@ def _generate_parent_graph(
         candidates = [c for c in np.flatnonzero(legal).tolist() if c != node]
     insert(required, score.score(node, required), _structure_bits(required))
     for size in range(1, len(candidates) + 1):
-        extras = list(itertools.combinations(candidates, size))
-        combos = [tuple(sorted(required + extra)) if required else extra for extra in extras]
-        if isinstance(score, _GramBICScore):  # one stacked solve per size
-            values = score.score_many(node, combos)
-        else:
-            values = [score.score(node, list(combo)) for combo in combos]
-        for extra, combo, value in zip(extras, combos, values, strict=True):
-            bits = _structure_bits(combo)
-            maximal = True
-            for v in extra:  # dropping a required parent leaves no legal subset
-                _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))
-                if sub_value < value:  # a subset already scores lower -- combo is dominated
-                    maximal = False
-                    break
-            if maximal:
-                insert(combo, value, bits)
+        level = itertools.combinations(candidates, size)
+        while extras := list(itertools.islice(level, _SCORE_BATCH)):
+            combos = [tuple(sorted(required + extra)) if required else extra for extra in extras]
+            if isinstance(score, _GramBICScore):  # one stacked solve per batch
+                values = score.score_many(node, combos)
+            else:
+                values = [score.score(node, list(combo)) for combo in combos]
+            for extra, combo, value in zip(extras, combos, values, strict=True):
+                bits = _structure_bits(combo)
+                maximal = True
+                for v in extra:  # dropping a required parent leaves no legal subset
+                    _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))
+                    if sub_value < value:  # a subset already scores lower -- combo is dominated
+                        maximal = False
+                        break
+                if maximal:
+                    insert(combo, value, bits)
     return parent_graph
 
 
