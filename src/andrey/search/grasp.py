@@ -124,28 +124,29 @@ class _GSTNode:
 
     def trace(
         self,
-        available: list[int],
+        excluded: set[int],
         parents: list[int],
         prefix_set: set[int],
     ) -> float:
         """Walk the grow-shrink tree along ``prefix_set``, returning the settled local score.
 
         Descends into the first improving addition whose variable is an allowed predecessor (in
-        ``prefix_set``), appending it to ``parents``; variables passed over are removed from
-        ``available``. When no further addition is allowed, applies the shrink step and returns the
-        higher-is-better local score of the settled parent set.
+        ``prefix_set``), appending it to ``parents``; variables passed over are added to
+        ``excluded``, and a node grows from the tree's ``available`` variables outside it. When no
+        further addition is allowed, applies the shrink step and returns the higher-is-better local
+        score of the settled parent set.
         """
         if self.branches is None:
-            self.grow(available, parents)
+            self.grow([u for u in self.tree.available if u not in excluded], parents)
         branches = self.branches
         assert branches is not None  # grow() above always assigns a list
         for branch in branches:
             add = branch.add
             assert add is not None  # only the root has add=None, and it is never a branch
-            available.remove(add)
+            excluded.add(add)
             if add in prefix_set:
                 parents.append(add)
-                return branch.trace(available, parents, prefix_set)
+                return branch.trace(excluded, parents, prefix_set)
         if self.remove is None:
             self.shrink(parents, self.tree.required)
             return self.shrink_score
@@ -170,10 +171,9 @@ class _GST:
         "vertex",
         "score",
         "delta",
-        "n_features",
         "empty_score",
         "root",
-        "candidates",
+        "available",
         "required",
     )
 
@@ -190,8 +190,9 @@ class _GST:
         self.vertex = vertex
         self.score = score
         self.delta = delta
-        self.n_features = n_features
-        self.candidates = candidates
+        self.available = tuple(
+            [i for i in range(n_features) if i != vertex] if candidates is None else candidates
+        )
         self.required = [] if required is None else required
         self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
@@ -203,12 +204,8 @@ class _GST:
         the return is its higher-is-better local score. ``available`` is every variable except the
         target, or the ``candidates``.
         """
-        if self.candidates is None:
-            available = [i for i in range(self.n_features) if i != self.vertex]
-        else:
-            available = list(self.candidates)
         parents.extend(self.required)
-        return self.root.trace(available, parents, set(prefix))
+        return self.root.trace(set(), parents, set(prefix))
 
 
 class _Order:
