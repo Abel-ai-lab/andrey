@@ -18,7 +18,7 @@ from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
     Removal,
     adjacent_pairs,
-    first_order_separating,
+    first_order_removals,
     marginal_removals,
     prescreen_capable,
     scan_pairs,
@@ -374,15 +374,9 @@ def _discover_skeleton(
                 for x, y, p in marginal_removals(test, upper, alpha, _trace, record_pvalues):
                     removals.append((x, y, (), p))
             elif can_prescreen and size == 1:
-                for x, y in adjacent_pairs(testable):
-                    candidates = sorted(
-                        (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
-                    )
-                    separating, p = first_order_separating(
-                        test, x, y, candidates, alpha, _trace, record_pvalues
-                    )
-                    if separating:
-                        removals.append((x, y, tuple(separating), p))
+                removals = first_order_removals(
+                    test, adjacent_pairs(testable), neighbors, alpha, _trace, record_pvalues
+                )
             else:
                 pairs = adjacent_pairs(testable)
                 if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbors, size):
