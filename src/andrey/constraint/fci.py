@@ -17,7 +17,7 @@ import numpy as np
 from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
     adjacent_pairs,
-    first_order_separating,
+    first_order_removals,
     marginal_removals,
     prescreen_capable,
     scan_pairs,
@@ -180,18 +180,13 @@ def _fast_adjacency_search(
                     sepsets[(x, y)] = ()
                     sepsets[(y, x)] = ()  # skeleton separations are recorded both ways
             elif can_prescreen and size == 1:
-                for x, y in adjacent_pairs(testable):
-                    candidates = sorted(
-                        (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
-                    )
-                    separating, _ = first_order_separating(
-                        test, x, y, candidates, alpha, record_pvalues=False
-                    )
-                    if separating:
-                        remove.append((x, y))
-                        key = tuple(separating)
-                        sepsets[(x, y)] = key
-                        sepsets[(y, x)] = key
+                pairs = adjacent_pairs(testable)
+                for x, y, separating, _ in first_order_removals(
+                    test, pairs, neighbors, alpha, record_pvalues=False
+                ):
+                    remove.append((x, y))
+                    sepsets[(x, y)] = separating
+                    sepsets[(y, x)] = separating
             else:
                 pairs = adjacent_pairs(testable)
                 if pool is not None:

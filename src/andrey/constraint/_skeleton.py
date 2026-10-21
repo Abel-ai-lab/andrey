@@ -12,7 +12,7 @@ chunks, so the scan holds one chunk in memory however many subsets it visits.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import partial
 from itertools import combinations, islice
@@ -159,9 +159,13 @@ def record_tests(
 # (``marginal_pvalues`` and ``first_order_pvalues``: the partial-correlation closed forms over the
 # correlation matrix, the chi-square tables counted together, the conditional Gaussian sets fit
 # together) lets the size-0 pass run as a single all-pairs matrix threshold and the size-1 pass as
-# one vectorized read per surviving pair, in place of the dense per-pair scalar loop. The decisions
-# (p > alpha) and separating sets are identical to the scalar scan (the p-values match exactly), so
-# the recovered skeleton is unchanged.
+# one vectorized read per surviving pair, or per stack of pairs for FisherZ and StudentT, in place
+# of the dense per-pair scalar loop. The decisions (p > alpha) and separating sets are identical to
+# the scalar scan (the p-values match exactly), so the recovered skeleton is unchanged.
+
+# The most first-order queries one stack of pairs holds, so the size-1 pass holds a bounded array
+# however many pairs it tests.
+_FIRST_ORDER_STACK = 1 << 16
 
 
 def prescreen_capable(test: CITest) -> bool:
@@ -200,34 +204,74 @@ def marginal_removals(
     return list(zip(xs.tolist(), ys.tolist(), pmat[xs, ys].tolist()))
 
 
-def first_order_separating(
+def first_order_removals(
     test: CITest,
-    x: int,
-    y: int,
-    candidates: list[int],
+    pairs: list[tuple[int, int]],
+    neighbors: list[np.ndarray],
     alpha: float,
     trace: list[dict] | None = None,
     record_pvalues: bool = True,
-) -> tuple[list[int], float | None]:
-    """(size 1) The candidates whose first-order test separates ``(x, y)``, and their largest p.
+) -> list[Removal]:
+    """(size 1) The ``pairs`` a single conditioner separates, as ``(x, y, separating, p)``.
 
-    ``candidates`` is the pair's start-of-size snapshot conditioners: either endpoint's neighbors
-    minus the pair, in PC and FCI alike. Vectorized over the candidates in one shot; no cache
-    writes. Returns the separating conditioners sorted ascending (the separating-set key order) and
-    the largest p-value among their tests, ``([], None)`` when none separate; the p-value is
-    ``None`` when ``record_pvalues`` is false. With ``trace`` given, every candidate's test is
-    recorded.
+    Each pair ``x < y`` is tested against its start-of-size snapshot conditioners: either
+    endpoint's ``neighbors`` minus the pair, in PC and FCI alike. ``separating`` holds the
+    conditioners whose test separates the pair, ascending (the separating-set key order), and ``p``
+    is the largest p-value among the pair's tests, or ``None`` when ``record_pvalues`` is false. A
+    FisherZ or StudentT test evaluates the queries of consecutive pairs in one stack
+    (:func:`_stacked_first_order`); another test evaluates each pair's candidates in one
+    ``first_order_pvalues`` call. With ``trace`` given, every test is recorded, pair by pair.
     """
-    if not candidates:
-        return [], None
-    pvals = test.first_order_pvalues(x, y, candidates)  # ty: ignore[unresolved-attribute]
-    if trace is not None:
-        record_tests(trace, 1, x, y, [(c,) for c in candidates], pvals, alpha)
-    passing = np.asarray(candidates)[pvals > alpha]
-    if not passing.size or not record_pvalues:
-        return sorted(passing.tolist()), None
-    # Some candidate separates, so the largest p-value is a separating one.
-    return sorted(passing.tolist()), max(pvals.tolist())
+    queries = []
+    for x, y in pairs:
+        candidates = sorted((set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y})
+        if candidates:
+            queries.append((x, y, candidates))
+    canonical = _canonical_pvalues(test)
+    tested = (
+        _stacked_first_order(canonical, queries)
+        if canonical is not None
+        else (
+            (x, y, c, test.first_order_pvalues(x, y, c))  # ty: ignore[unresolved-attribute]
+            for x, y, c in queries
+        )
+    )
+    removals: list[Removal] = []
+    for x, y, candidates, pvals in tested:
+        if trace is not None:
+            record_tests(trace, 1, x, y, [(c,) for c in candidates], pvals, alpha)
+        passing = np.asarray(candidates)[pvals > alpha]
+        if passing.size:
+            # Some candidate separates, so the largest p-value is a separating one.
+            p = max(pvals.tolist()) if record_pvalues else None
+            removals.append((x, y, tuple(sorted(passing.tolist())), p))
+    return removals
+
+
+def _stacked_first_order(
+    pvalues: Callable[..., np.ndarray], queries: list[tuple[int, int, list[int]]]
+) -> Iterator[tuple[int, int, list[int], np.ndarray]]:
+    """Yield each ``(x, y, candidates)`` query with the first-order p-values of its candidates.
+
+    ``pvalues`` takes canonical query arrays. Consecutive queries are stacked, whole, up to
+    ``_FIRST_ORDER_STACK`` conditioners at a time; the first-order closed form is elementwise, so
+    each p-value is the one a query evaluated alone gets.
+    """
+    start = 0
+    while start < len(queries):
+        stop, held = start + 1, len(queries[start][2])
+        while stop < len(queries) and held + len(queries[stop][2]) <= _FIRST_ORDER_STACK:
+            held += len(queries[stop][2])
+            stop += 1
+        block = queries[start:stop]
+        counts = [len(candidates) for _, _, candidates in block]
+        x = np.repeat(np.array([q[0] for q in block], dtype=np.intp), counts)
+        y = np.repeat(np.array([q[1] for q in block], dtype=np.intp), counts)
+        z = np.fromiter((c for _, _, candidates in block for c in candidates), np.intp, held)
+        stacked = pvalues(x, y, z[:, None])
+        for query, pvals in zip(block, np.split(stacked, np.cumsum(counts)[:-1])):
+            yield (*query, pvals)
+        start = stop
 
 
 def scan_pairs(
