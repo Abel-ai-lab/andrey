@@ -237,9 +237,8 @@ mutual information estimate the test's p-value is built on, a dependence measure
 `andrey.config` holds the process-wide backend preference, worker count, and tie-break rule. Assign
 `andrey.config.backend`, `andrey.config.num_workers`, or `andrey.config.tie_break` to change the
 default for every later call, or use `with andrey.config(backend=..., num_workers=...,
-tie_break=...):` for one block. `pc`, `fci`, `gfci`, and `cdnod` also take `num_workers` for one
-call, ahead of `andrey.config.num_workers`. [Configuration](../configuration.md) lists the
-`ANDREY_*` environment variables and the order in which the settings apply, and
+tie_break=...):` for one block. [Configuration](../configuration.md) lists the `ANDREY_*`
+environment variables and the order in which the settings apply, and
 [Column order and machines](../guides/column-order.md) describes `tie_break`.
 
 ## Warnings

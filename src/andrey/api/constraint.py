@@ -26,7 +26,6 @@ from andrey.api._adapt import (
     open_unit_interval,
     structure_output,
 )
-from andrey.core import backend
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -47,7 +46,6 @@ def pc(
     max_categories: int = MAX_CATEGORIES,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-    num_workers: int | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with the PC algorithm.
 
@@ -107,14 +105,6 @@ def pc(
         the knowledge decides, then Meek's rules direct the edges that follow, giving the maximally
         oriented PDAG (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges
         the search kept into a directed cycle raises ``ValueError``.
-    num_workers : int or None, default=None
-        Worker processes for the adjacency search: ``-1`` uses every usable core, ``0`` or ``1``
-        runs serially, and larger values request that many workers. ``None`` follows
-        ``andrey.config.num_workers``. With ``"fisherz"`` or ``"student_t"``, each
-        conditioning-set size from two up runs its tests on the workers when it has enough tests to
-        repay them; every other test runs in this process. The result is the same with any number
-        of workers. A script that starts workers needs the ``__main__`` guard of the
-        :doc:`getting-started guide </docs/guides/getting-started>`.
 
     Returns
     -------
@@ -131,7 +121,7 @@ def pc(
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_depth`` or ``num_workers`` is not an int.
+        given ``max_depth`` is not an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
         not in ``(0, 1)``, if ``max_categories`` is less than ``2``, with ``"chisq"`` or ``"gsq"``,
@@ -141,9 +131,8 @@ def pc(
         with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. With
         ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
         before any test runs; one message names every group of copies and says to keep one column
-        per group. Also if a given ``max_depth`` is negative or ``num_workers`` is below ``-1``, or
-        if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -309,7 +298,6 @@ def pc(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="pc")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
-    workers = _worker_count(num_workers)
     with copies_named(labels):
         cpdag = _pc(
             X,
@@ -320,7 +308,6 @@ def pc(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
-            workers=workers,
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
@@ -338,7 +325,6 @@ def fci(
     possible_dsep: str | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-    num_workers: int | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -407,14 +393,6 @@ def fci(
         ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and can leave a circle at ``b``,
         and a required one is ``a -> b``; knowledge that puts an arrowhead at ``a`` on an edge
         ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``.
-    num_workers : int or None, default=None
-        Worker processes for the adjacency search: ``-1`` uses every usable core, ``0`` or ``1``
-        runs serially, and larger values request that many workers. ``None`` follows
-        ``andrey.config.num_workers``. With ``"fisherz"`` or ``"student_t"``, each
-        conditioning-set size from two up runs its tests on the workers when it has enough tests to
-        repay them; every other test runs in this process. The result is the same with any number
-        of workers. A script that starts workers needs the ``__main__`` guard of the
-        :doc:`getting-started guide </docs/guides/getting-started>`.
 
     Returns
     -------
@@ -432,16 +410,15 @@ def fci(
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_depth`` or ``num_workers`` is not an int.
+        given ``max_depth`` is not an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
         not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice, or
         if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
         ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
         before any test runs; one message names every group of copies and says to keep one column
-        per group. Also if a given ``max_depth`` is negative or ``num_workers`` is below ``-1``, or
-        if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -567,7 +544,6 @@ def fci(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="fci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
-    workers = _worker_count(num_workers)
     with copies_named(labels):
         pag = _fci(
             X,
@@ -579,7 +555,6 @@ def fci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
-            workers=workers,
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
@@ -599,7 +574,6 @@ def gfci(
     possible_dsep: str | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-    num_workers: int | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -673,14 +647,6 @@ def gfci(
         :func:`~andrey.ges` does, and the test phase starts from the adjacencies GES found and never
         removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an
         arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
-    num_workers : int or None, default=None
-        Worker processes for the GES phase and the adjacency search: ``-1`` uses every usable core,
-        ``0`` or ``1`` runs serially, and larger values request that many workers. ``None`` follows
-        ``andrey.config.num_workers``. The GES phase uses them as :func:`~andrey.ges` does. With
-        ``"fisherz"`` or ``"student_t"``, each conditioning-set size from two up runs its tests on
-        the workers when it has enough tests to repay them; every other test runs in this process.
-        The result is the same with any number of workers. A script that starts workers needs the
-        ``__main__`` guard of the :doc:`getting-started guide </docs/guides/getting-started>`.
 
     Returns
     -------
@@ -698,7 +664,7 @@ def gfci(
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_depth`` or ``num_workers`` is not an int.
+        given ``max_depth`` is not an int.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
         ``collider_rule`` or ``possible_dsep`` is not a supported choice, if ``score_func`` and
@@ -706,9 +672,9 @@ def gfci(
         ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
         column repeats another up to scale and shift given more than two rows or, with more rows
         than columns, is a linear function of other columns. One message names every group of copies
-        and says to keep one column per group. Also if a given ``max_depth`` is negative or
-        ``num_workers`` is below ``-1``, or if ``knowledge`` names a column ``data`` lacks or
-        contradicts itself, as :class:`~andrey.Knowledge` lists.
+        and says to keep one column per group. Also if a given ``max_depth`` is negative, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -806,7 +772,6 @@ def gfci(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
-    workers = _worker_count(num_workers)
     with copies_named(labels):
         pag = _gfci(
             X,
@@ -820,7 +785,6 @@ def gfci(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
-            workers=workers,
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
@@ -839,7 +803,6 @@ def cdnod(
     dependence_threshold: float | None = None,
     max_depth: int | None = None,
     knowledge: Knowledge | None = None,
-    num_workers: int | None = None,
 ) -> StructureOutput:
     """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
@@ -906,14 +869,6 @@ def cdnod(
         the knowledge decides, then Meek's rules direct the edges that follow, as
         :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
         a directed cycle raises ``ValueError``. The domain index is unconstrained.
-    num_workers : int or None, default=None
-        Worker processes for the adjacency search: ``-1`` uses every usable core, ``0`` or ``1``
-        runs serially, and larger values request that many workers. ``None`` follows
-        ``andrey.config.num_workers``. With ``"fisherz"`` or ``"student_t"``, each
-        conditioning-set size from two up runs its tests on the workers when it has enough tests to
-        repay them; every other test runs in this process. The result is the same with any number
-        of workers. A script that starts workers needs the ``__main__`` guard of the
-        :doc:`getting-started guide </docs/guides/getting-started>`.
 
     Returns
     -------
@@ -936,7 +891,7 @@ def cdnod(
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
         an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
-        given ``max_depth`` or ``num_workers`` is not an int.
+        given ``max_depth`` is not an int.
     ValueError
         If ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` /
         ``inf``, if ``data`` has too few rows for a test, if ``alpha`` or ``dependence_threshold``
@@ -946,9 +901,8 @@ def cdnod(
         ``"column"``. With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or
         ``domain_index`` with more than one domain, repeats another up to scale and shift, before
         any test runs; one message names every group of copies and says to keep one column per
-        group. Also if a given ``max_depth`` is negative or ``num_workers`` is below ``-1``, or if
-        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1052,7 +1006,6 @@ def cdnod(
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
     max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
-    workers = _worker_count(num_workers)
     c = np.asarray(domain_index, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
@@ -1072,19 +1025,7 @@ def cdnod(
             max_depth=max_depth,
             constraints=constraints,
             in_column_order=resolve_in_column_order(),
-            workers=workers,
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}
     )
-
-
-def _worker_count(num_workers: object) -> int:
-    """Return the worker count of a fit.
-
-    ``num_workers`` is an int of at least ``-1``, where ``-1`` counts every usable core, or ``None``
-    for ``andrey.config.num_workers``.
-    """
-    if num_workers is not None:
-        num_workers = int_in_range(num_workers, "num_workers", -1)
-    return backend.worker_count(num_workers)

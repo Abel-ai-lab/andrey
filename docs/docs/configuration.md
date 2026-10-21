@@ -43,12 +43,11 @@ requested backend uses `auto`, without a warning.
 
 ## Parallel search
 
-- `ANDREY_NUM_WORKERS`: the worker processes for GES and GFCI, the worker processes for the
-  adjacency searches of PC, FCI, GFCI, and CD-NOD with the `fisherz` and `student_t` tests, and the
-  worker threads for the per-variable regressions of `granger` and the two directions of `pnl`. `1`
-  (the default) and `0` run serially; `-1` uses every usable core. The `num_workers` argument of
-  `pc`, `fci`, `gfci`, and `cdnod` takes precedence for one call. An adjacency search sends a
-  conditioning-set size to the workers only when it has enough tests to repay them.
+- `ANDREY_NUM_WORKERS`: the worker processes for GES and GFCI, and the worker threads for the
+  per-variable regressions of `granger` and the two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
+  also use the worker processes for their skeleton search with the `fisherz` and `student_t` tests,
+  and send a conditioning-set size to them only when it has enough tests to repay them. `1` (the
+  default) and `0` run serially; `-1` uses every usable core.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 

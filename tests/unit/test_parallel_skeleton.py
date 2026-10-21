@@ -1,12 +1,12 @@
-"""Skeleton worker pool: the gate, the tests it takes, its order, its errors, and ``num_workers``.
+"""Skeleton worker pool: the gate, the tests it takes, its order, its errors, and the worker count.
 
 The pool runs an ``|S| >= 2`` pass of a FisherZ or StudentT test when the pass holds at least
 ``MIN_POOL_QUERIES`` tests. A pooled pass returns the serial scan's removals in the serial order,
 so the adjacency, the separating sets, their insertion order, and the p-values are the serial
 ones, and a singular query raises the serial exception. ``andrey.pc``, ``fci``, ``gfci``, and
-``cdnod`` take ``num_workers`` ahead of ``andrey.config.num_workers``. The tests that need the pool
-set the gate to 0, so a small case still reaches it, and spy on the pool's creation, so a pooled
-comparison cannot silently run serial against serial.
+``cdnod`` read the worker count from ``andrey.config.num_workers`` or ``ANDREY_NUM_WORKERS``. Most
+tests that need the pool set the gate to 0, so a small case still reaches it, and every one spies
+on the pool's creation, so a pooled comparison cannot silently run serial against serial.
 """
 
 from __future__ import annotations
@@ -133,10 +133,10 @@ def _domain_index(n: int) -> np.ndarray:
 
 
 _FACADES = {
-    "pc": lambda x, **kw: andrey.pc(x, **kw),
-    "fci": lambda x, **kw: andrey.fci(x, **kw),
-    "gfci": lambda x, **kw: andrey.gfci(x, **kw),
-    "cdnod": lambda x, **kw: andrey.cdnod(x, _domain_index(len(x)), **kw),
+    "pc": andrey.pc,
+    "fci": andrey.fci,
+    "gfci": andrey.gfci,
+    "cdnod": lambda x: andrey.cdnod(x, _domain_index(len(x))),
 }
 
 
@@ -148,28 +148,33 @@ def _same_output(a: andrey.StructureOutput, b: andrey.StructureOutput) -> bool:
 
 @pytest.mark.usefixtures("open_gate")
 @pytest.mark.parametrize("method", sorted(_FACADES))
-def test_facades_run_num_workers_on_the_pool(pools: list[int], method: str) -> None:
+def test_facades_run_the_configured_workers_on_the_pool(pools: list[int], method: str) -> None:
     x = _gaussian_dag(1, 600, 20, 0.25)
     fit = _FACADES[method]
-    assert _same_output(fit(x, num_workers=2), fit(x))
+    serial = fit(x)
+    with andrey.config(num_workers=2):
+        pooled = fit(x)
     assert pools == [2]
+    assert _same_output(pooled, serial)
 
 
 @pytest.mark.usefixtures("open_gate")
-def test_num_workers_takes_precedence_over_the_config(pools: list[int]) -> None:
+def test_the_environment_sets_the_workers(
+    pools: list[int], monkeypatch: pytest.MonkeyPatch
+) -> None:
     x = _gaussian_dag(1, 600, 20, 0.25)
-    with andrey.config(num_workers=3):
-        serial = andrey.pc(x, num_workers=1)
-        assert pools == []
-        pooled = andrey.pc(x)
+    serial = andrey.fci(x)
+    monkeypatch.setenv("ANDREY_NUM_WORKERS", "3")
+    pooled = andrey.fci(x)
     assert pools == [3]
     assert _same_output(pooled, serial)
 
 
-@pytest.mark.parametrize("method", sorted(_FACADES))
-def test_num_workers_is_checked(method: str) -> None:
-    x = _gaussian_dag(0, 100, 4, 0.5)
-    with pytest.raises(ValueError, match="num_workers"):
-        _FACADES[method](x, num_workers=-2)
-    with pytest.raises(TypeError, match="num_workers"):
-        _FACADES[method](x, num_workers=2.0)
+def test_a_pass_above_the_gate_runs_on_the_pool(pools: list[int]) -> None:
+    # Dense enough that the size-2 pass holds more tests than the gate; capped there.
+    x = _gaussian_dag(4, 800, 40, 0.3)
+    serial = andrey.pc(x, max_depth=2)
+    with andrey.config(num_workers=2):
+        pooled = andrey.pc(x, max_depth=2)
+    assert pools == [2]
+    assert _same_output(pooled, serial)

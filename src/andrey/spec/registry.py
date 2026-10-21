@@ -1451,21 +1451,6 @@ _MAX_DEPTH = ParamSpec(
     nullable=True,
 )
 
-
-def _num_workers(phases: str) -> ParamSpec:
-    """The ``num_workers`` parameter of a method whose ``phases`` run on worker processes."""
-    return ParamSpec(
-        name="num_workers",
-        type="int",
-        default=None,
-        doc=f"Worker processes for {phases}: -1 uses every usable core, 0 or 1 runs serially, and "
-        "null follows ANDREY_NUM_WORKERS. With fisherz or student_t, each conditioning-set size "
-        "from two up runs its tests on the workers when it has enough tests to repay them; the "
-        "result is the same with any number of workers.",
-        nullable=True,
-    )
-
-
 for _name, _how in _KNOWLEDGE_HOW.items():
     _knowledge = ParamSpec(
         name="knowledge",
@@ -1475,15 +1460,10 @@ for _name, _how in _KNOWLEDGE_HOW.items():
         f"adjacent, and temporal tiers. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
         nullable=True,
     )
-    _skeleton = _name in ("pc", "cdnod", "fci", "gfci")
-    _depth = (_MAX_DEPTH,) if _skeleton else ()
-    _phases = (
-        "the GES phase and the adjacency search" if _name == "gfci" else "the adjacency search"
-    )
-    _workers = (_num_workers(_phases),) if _skeleton else ()
+    _depth = (_MAX_DEPTH,) if _name in ("pc", "cdnod", "fci", "gfci") else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
         update={
-            "params": (*REGISTRY[_name].params, *_depth, _knowledge, *_workers),
+            "params": (*REGISTRY[_name].params, *_depth, _knowledge),
             "knowledge": _KNOWLEDGE_PARTS[_name],
         }
     )
