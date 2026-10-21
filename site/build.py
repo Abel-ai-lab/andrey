@@ -560,7 +560,7 @@ def claimed_comparisons(summaries: list[dict]) -> list[dict]:
 # ---- speed across methods --------------------------------------------------------------------
 def family_intro() -> str:
     """What a family's figure shows, in one line; its legend names the packages."""
-    return "Each method at the largest size both packages ran. Down and to the left is better."
+    return "Each line runs from a method's smallest graph to its largest. Down and left is better."
 
 
 def time_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
@@ -1537,19 +1537,10 @@ def chip(icon: str, url: str, text: str, *, primary: bool = False) -> str:
 
 # The hero's art (site/brand/art-<name>.jpg), which the first section's title shares, the art of
 # "From data to graph" and of the documentation, and each bento tile's (site/brand/bento/
-# <name>.jpg): a crop of a cover's art at twice the tile's size. A family without art shows the
-# stipple ground.
+# <name>.jpg): a crop of a cover's art at twice the tile's size.
 HERO_ART = "lanes"
 EXAMPLE_ART = "start"
 DOCS_ART = "docs"
-FAMILY_ART = {
-    "constraint": "constraint",
-    "score": "contour",
-    "permutation": "permutation",
-    "lingam": "lingam",
-    "latent": "iceberg",
-    "pairwise": "hourglass",
-}
 TILE_SIZES = {"4": (768, 416), "6": (1168, 416)}
 PRIORITY = ' fetchpriority="high"'
 
@@ -1833,8 +1824,9 @@ def glass_tile(span: str, title: str, text: str, glass: str, *, key: str = "") -
     card is decorative where the dialog says it in full."""
     hidden = ' aria-hidden="true"' if key else ""
     body = (
-        f'<h3 class="tile-title">{title}</h3><p class="tile-text">{text}</p>'
-        f'<div class="tile-glass"{hidden}>{glass}</div>'
+        f'<h3 class="tile-title">{title}</h3>'
+        + (f'<p class="tile-text">{text}</p>' if text else "")
+        + f'<div class="tile-glass"{hidden}>{glass}</div>'
     )
     if not key:
         return f'<li class="tile tile--{span} tile--glass"><div class="tile-face">{body}</div></li>'
@@ -1900,12 +1892,10 @@ def names_only(figures: str) -> str:
 def coverage_tiles(summaries: list[dict], graphs: str) -> str:
     """What the package covers and guarantees: its methods and the comparison with the most used
     packages in one table, then the kinds of causal graph its methods return."""
-    count = len(list_specs())
     return glass_tile(
         "wide",
-        "How Andrey compares",
-        f'{count} methods in {len(SPEC_FAMILIES)} families (<a href="#methods" '
-        'data-tile="methods">every method</a>), and what each package guarantees.',
+        "Compared with other packages",
+        "",
         comparison_table(summaries)
         + f'<p class="compare-source">{escape(comparison_source())}</p>',
     ) + glass_tile(
@@ -1934,25 +1924,46 @@ def method_names(names: list[str]) -> str:
     return f"{names[0]}, {names[1]}, and {len(names) - 2} more"
 
 
-def family_tile(info: dict) -> str:
-    """A family's tile: its name, its methods, and its best speedup in words, "more than" its
-    one-digit number or "at least" where nothing is rounded off."""
-    lead = (
-        "more than" if info["number"] and info["best"][1]["ratio"] > info["number"] else "at least"
-    )
-    number = (
+def family_number(info: dict) -> str:
+    """A family's best speedup in words, "more than" its one-digit number or "at least" where
+    nothing is rounded off, or nothing where Andrey is not at least twice as fast."""
+    if not info["number"]:
+        return ""
+    lead = "more than" if info["best"][1]["ratio"] > info["number"] else "at least"
+    return (
         f'<p class="tile-number"><span>{lead}</span><b>{info["number"]:,}x</b>'
         "<span>faster</span></p>"
-        if info["number"]
-        else ""
     )
-    art = FAMILY_ART.get(info["family"])
-    return tile(
-        f"speed-{info['family']}",
-        "4",
-        (tile_art(art, "4") if art else "") + f'<h3 class="tile-title">{escape(info["title"])}</h3>'
-        f'<p class="tile-text">{escape(method_names(info["methods"]))}</p>{number}',
-        kind="family",
+
+
+def speed_panel(summaries: list[dict]) -> str:
+    """The families' speed in one panel: a tab per family, each showing the family's methods on
+    one figure (``frontier_chart``) under its best speedup. Without script every family's panel
+    shows in turn; ``tiles.js`` makes the tabs switch them."""
+    points = frontier_points(summaries)
+    frame = frontier_frame([p for family in points.values() for p in family])
+    tabs, panels = [], []
+    for k, info in enumerate(family_tiles(summaries)):
+        key = info["family"]
+        tabs.append(
+            f'<button class="seg-tab" type="button" role="tab" id="speed-tab-{key}" '
+            f'aria-controls="speed-{key}" aria-selected="{"true" if k == 0 else "false"}">'
+            f"{escape(info['title'])}</button>"
+        )
+        figure = frontier_chart(info["title"], points.get(key, []), frame) or (
+            "<p>No chart for this family compares like with like yet.</p>"
+        )
+        panels.append(
+            f'<div class="seg-panel" role="tabpanel" id="speed-{key}" '
+            f'aria-labelledby="speed-tab-{key}"><div class="seg-head">'
+            f"<div><h3>{escape(info['title'])}</h3>"
+            f"<p>{escape(method_names(info['methods']))}</p></div>{family_number(info)}</div>"
+            f'{figure}<p class="seg-foot">{escape(family_intro())} '
+            '<a href="docs/benchmarks.html">Details in the release cards</a></p></div>'
+        )
+    return (
+        '<div class="seg" data-seg><div class="seg-tabs" role="tablist" '
+        f'aria-label="Method family">{"".join(tabs)}</div>{"".join(panels)}</div>'
     )
 
 
@@ -1970,27 +1981,6 @@ def dialog_head(key: str, title: str, intro: str = "") -> str:
 DIALOG_TAIL = "</div></dialog>"
 
 
-def family_dialog(info: dict, figure: str) -> str:
-    """A family's dialog: its methods on one figure (``frontier_chart``), and the way to the
-    release cards."""
-    body = figure or "<p>No chart for this family compares like with like yet.</p>"
-    return (
-        dialog_head(f"speed-{info['family']}", f"{info['title']} speed", family_intro())
-        + body
-        + '<p class="tile-more"><a href="docs/benchmarks.html">Details in the release cards</a></p>'
-        + DIALOG_TAIL
-    )
-
-
-def family_dialogs(summaries: list[dict]) -> str:
-    """The dialogs of ``family_tiles``, each with its family's methods on one figure."""
-    points = frontier_points(summaries)
-    return "".join(
-        family_dialog(i, frontier_chart(i["title"], points.get(i["family"], [])))
-        for i in family_tiles(summaries)
-    )
-
-
 # ---- a family's methods on one figure: fit time against errors ------------------------------
 # Each method at its default setting (its shortest-named comparison: a setting's name extends its
 # method's, "XGES without extended search"), at the largest size where Andrey and every package
@@ -2001,8 +1991,10 @@ FRONTIER_BAND = 0.25  # the share of the height above the empty graph's errors, 
 
 
 def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
-    """Per family, a point per method and package: ``method``, ``package``, ``ours``, ``size``,
-    ``unit``, ``seconds``, and ``share`` (errors over the empty graph's)."""
+    """Per family, a line per method and package across the sizes where Andrey and every package
+    compared ran and were scored: ``method``, ``package``, ``ours``, ``unit``, and ``sizes``, each
+    ``(size, seconds, share)`` with share the errors over the empty graph's, smallest first; and
+    the largest size's ``size``, ``seconds``, and ``share``."""
     default: dict[str, tuple[str, list[dict]]] = {}
     for name, methods in time_groups(summaries):
         if not all(faster(m) for m in methods):
@@ -2026,19 +2018,22 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
         ]
         if not scored:
             continue
-        d = max(scored)
-        first = by_size[0][d]
-        common = {"method": name, "size": d, "unit": methods[0]["unit"]}
-        points = [
-            {**common, "package": "Andrey", "ours": True, "seconds": first["andrey_s"],
-             "share": first["andrey_errors"] / first["empty_errors"]}
-        ] + [
-            {**common, "package": m["comparator"], "ours": False,
-             "seconds": rows[d]["comparator_s"],
-             "share": rows[d]["comparator_errors"] / rows[d]["empty_errors"]}
-            for m, rows in zip(methods, by_size, strict=True)
-        ]  # fmt: skip
-        out.setdefault(methods[0]["family"], []).extend(points)
+        scored.sort()
+
+        def line(package: str, ours: bool, rows: dict) -> dict:
+            who = "andrey" if ours else "comparator"
+            sizes = [
+                (d, rows[d][f"{who}_s"], rows[d][f"{who}_errors"] / rows[d]["empty_errors"])
+                for d in scored
+            ]
+            d, seconds, share = sizes[-1]
+            return {"method": name, "package": package, "ours": ours, "unit": methods[0]["unit"],
+                    "sizes": sizes, "size": d, "seconds": seconds, "share": share}  # fmt: skip
+
+        lines = [line("Andrey", True, by_size[0])] + [
+            line(m["comparator"], False, rows) for m, rows in zip(methods, by_size, strict=True)
+        ]
+        out.setdefault(methods[0]["family"], []).extend(lines)
     return out
 
 
@@ -2111,29 +2106,36 @@ def key(mark: str, label: str) -> str:
     )
 
 
-def frontier_chart(title: str, points: list[dict]) -> str:
+def frontier_frame(points: list[dict]) -> dict:
+    """The frame every family's figure shares, from all families' points: one time axis, one
+    errors axis, and one corner (faster and with fewer errors than the median point of them
+    all), so the figures line up."""
+    times = [t for p in points for _, t, _ in p["sizes"]]
+    shares = [e for p in points for _, _, e in p["sizes"]]
+    return {
+        "xr": (10 ** math.floor(math.log10(min(times))), 10 ** math.ceil(math.log10(max(times)))),
+        "ymax": max(shares),
+        "corner": (statistics.median(times), statistics.median(shares)),
+    }
+
+
+def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
     """A family's methods on one figure: fit time (x, log) against errors as a share of the empty
-    graph's (y), a point per method and package. Andrey's points are the one color; each other
-    package has its own gray shape, joined to Andrey's point for the same method: each method's
-    data differ, so a method's points compare with each other, not across methods. The shaded
-    corner is faster and with fewer errors than the median point on both."""
+    graph's (y), a line per method and package through its sizes, its largest size's mark the
+    larger. Andrey's lines are the one color; each other package's are gray, marked with its own
+    shape. Each method's data differ, so a method's lines compare with each other, not across
+    methods. The shaded corner is the same in every family's figure (``frontier_frame``)."""
     if not points:
         return ""
     w, h, left, right, top, bottom = 640, 380, 58, 560, 12, 336
-    times = [p["seconds"] for p in points]
-    xr = (10 ** math.floor(math.log10(min(times))), 10 ** math.ceil(math.log10(max(times))))
+    xr = frame["xr"]
     x = log_scale(xr[0], xr[1], left, right)
     # Errors up to the empty graph's take most of the height on a linear scale; any above, where
     # both packages make more errors than the empty graph, share a band at the top on a log scale.
-    # Where every point has far fewer errors, the axis ends at the first tick above them.
-    ymax = max(p["share"] for p in points)
+    ymax = frame["ymax"]
     split = top + (bottom - top) * (FRONTIER_BAND if ymax > 1.05 else 0.0)
     above = log_scale(1, ymax, split, top) if ymax > 1.05 else None
-    if ymax > 0.9:
-        span, step = 1.0, 0.25
-    else:
-        step = next(t for t in (0.01, 0.02, 0.05, 0.1, 0.25) if ymax * 1.1 <= 4 * t)
-        span = step * math.ceil(ymax * 1.1 / step)
+    span, step = 1.0, 0.25
 
     def y(v: float) -> float:
         if above and v > 1:
@@ -2161,40 +2163,45 @@ def frontier_chart(title: str, points: list[dict]) -> str:
     packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
     shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
     ours = {p["method"]: p for p in points if p["ours"]}
+    # Each line runs through its sizes, smallest to largest.
     pairs = [
-        f'<line class="pf-pair" x1="{x(ours[p["method"]]["seconds"]):.1f}" '
-        f'y1="{y(ours[p["method"]]["share"]):.1f}" x2="{x(p["seconds"]):.1f}" '
-        f'y2="{y(p["share"]):.1f}"/>'
+        f'<polyline class="pf-line{" pf-line--andrey" if p["ours"] else ""}" points="'
+        + " ".join(f"{x(t):.1f},{y(e):.1f}" for _, t, e in p["sizes"])
+        + '"/>'
         for p in points
-        if not p["ours"]
+        if len(p["sizes"]) > 1
     ]
-    # The most attractive quadrant: faster and with fewer errors than the median point.
-    mid_x = x(statistics.median(times))
-    mid_y = y(statistics.median(p["share"] for p in points))
+    # The most attractive quadrant, the same in every family's figure.
+    mid_x, mid_y = x(frame["corner"][0]), y(frame["corner"][1])
     quadrant = (
         f'<rect class="pf-quadrant" x="{left}" y="{mid_y:.1f}" width="{mid_x - left:.1f}" '
         f'height="{bottom - mid_y:.1f}"/>'
     )
+    # A mark at every size, the largest size's larger; a method's name at Andrey's largest size.
     marks, labels = [], []
     for p in points:
-        cx, cy = x(p["seconds"]), y(p["share"])
-        tip = escape(
-            f"{p['method']}, {p['package']}, {p['size']:,} {p['unit']}: "
-            f"{seconds_text(p['seconds'])}, {p['share']:.2f} of the empty graph's errors"
-        )
+        for k, (d, t, e) in enumerate(p["sizes"]):
+            cx, cy = x(t), y(e)
+            last = k == len(p["sizes"]) - 1
+            tip = escape(
+                f"{p['method']}, {p['package']}, {d:,} {p['unit']}: {seconds_text(t)}, "
+                f"errors {e:.2f} (empty graph = 1)"
+            )
+            if p["ours"]:
+                marks.append(
+                    f'<circle class="pf-andrey" cx="{cx:.1f}" cy="{cy:.1f}" '
+                    f'r="{5 if last else 3}"><title>{tip}</title></circle>'
+                )
+            else:
+                kind = shapes[p["package"]]
+                marks.append(
+                    f'<path class="pf-other pf-{kind}" '
+                    f'd="{shape(kind, cx, cy, 4.5 if last else 3)}">'
+                    f"<title>{tip}</title></path>"
+                )
         if p["ours"]:
-            marks.append(
-                f'<circle class="pf-andrey" cx="{cx:.1f}" cy="{cy:.1f}" r="5"><title>{tip}</title>'
-                "</circle>"
-            )
-            labels.append((cx, cy, p["method"]))
-        else:
-            kind = shapes[p["package"]]
-            marks.append(
-                f'<path class="pf-other pf-{kind}" d="{shape(kind, cx, cy, 4.5)}">'
-                f"<title>{tip}</title></path>"
-            )
-    centers = [(x(p["seconds"]), y(p["share"])) for p in points]
+            labels.append((x(p["seconds"]), y(p["share"]), p["method"]))
+    centers = [(x(t), y(e)) for p in points for _, t, e in p["sizes"]]
     legend = (
         key('<circle class="pf-andrey" cx="6" cy="6" r="5"/>', "Andrey")
         + "".join(
@@ -2214,7 +2221,7 @@ def frontier_chart(title: str, points: list[dict]) -> str:
         f'<text class="tc-title" x="{(left + right) / 2:.1f}" y="{h - 4}" text-anchor="middle">'
         "Fit time, seconds (log)</text>"
         f'<text class="tc-title" transform="translate(12 {(top + bottom) / 2:.1f}) rotate(-90)" '
-        'text-anchor="middle">Errors, share of the empty graph&#39;s</text>'
+        'text-anchor="middle">Errors (empty graph = 1)</text>'
         f"{''.join(pairs)}"
         f"{''.join(marks)}{place_labels(labels, left, centers)}</svg></figure>"
     )
@@ -2252,7 +2259,7 @@ COMPARISON = (
         {"causal-learn": "CALM only."},
     ),
     (
-        "Same graph in any column order",
+        "Permutation invariance",
         ("yes", "no", "part", "no", "no"),
         {
             "Tetrad": "PC and FCI follow the variables' names; BOSS, GRaSP, and GIN changed with "
@@ -2268,7 +2275,7 @@ COMPARISON = (
         },
     ),
     (
-        "Benchmarks with each release",
+        "Open benchmarks",
         ("yes", "no", "no", "no", "no"),
         {},
     ),
@@ -2278,6 +2285,12 @@ COMPARISON = (
 # the ratio at the largest size both finished; and the most variables each fit within
 # FIT_BUDGET_S seconds in any comparison.
 FIT_BUDGET_S = 1
+# Distinct methods per package, each a published algorithm that returns a whole graph, counted
+# once: a variant chosen by an argument, a multi-dataset or instance-specific version, another
+# score or test in the same search, a wrapper, and a search that only orients a given graph count
+# with the method they extend, or not at all. Andrey's gies runs ges's search and its
+# multi_group_direct_lingam extends direct_lingam. Read from each package's released code.
+METHOD_COUNTS = {"Andrey": 25, "causal-learn": 21, "Tetrad": 21, "pcalg": 8, "bnlearn": 10}
 
 
 def measured_rows(summaries: list[dict]) -> list[tuple[str, list[str]]]:
@@ -2301,6 +2314,7 @@ def measured_rows(summaries: list[dict]) -> list[tuple[str, list[str]]]:
         ratio_text(math.exp(statistics.fmean(logs[p]))) if logs[p] else None for p in PEERS[1:]
     ]
     return [
+        ("Distinct methods", [str(METHOD_COUNTS[p]) for p in PEERS]),
         ("Fit time (Andrey = 1x)", times),
         (
             f"Variables fit in {FIT_BUDGET_S} s",
@@ -2343,7 +2357,10 @@ def comparison_table(summaries: list[dict]) -> str:
             f'<td class="value{" ct-ours" if p == "Andrey" else ""}">{escape(v) if v else "-"}</td>'
             for p, v in zip(PEERS, values, strict=True)
         )
-        rows.append(f'<tr class="compare-alone"><th scope="row">{escape(label)}</th>{cells}</tr>')
+        name = escape(label)
+        if label == "Distinct methods":
+            name = f'<a href="#methods" data-tile="methods">{name}</a>'
+        rows.append(f'<tr class="compare-alone"><th scope="row">{name}</th>{cells}</tr>')
     for feature, marks, _ in COMPARISON:
         cells = []
         for package, mark in zip(PEERS, marks):
@@ -2477,8 +2494,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "accuracy_tiles": accuracy_tiles(summaries),
         "agent_tile": agent_tile(frames),
         "coverage_tiles": coverage_tiles(summaries, interface_figures),
-        "family_tiles": "".join(family_tile(info) for info in family_tiles(summaries)),
-        "family_dialogs": family_dialogs(summaries),
+        "speed_panel": speed_panel(summaries),
         "dialog_head": dialog_head,
         "dialog_tail": DIALOG_TAIL,
         "method_count": str(len(list_specs())),

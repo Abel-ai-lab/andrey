@@ -789,6 +789,134 @@
   padding-block: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 2rem);
 }
 
+/* A segmented panel: a pill of tabs, one per figure, over one card that shows the chosen figure.
+   Without script every panel shows in turn. On a narrow screen the tabs scroll sideways. */
+.andrey-home .seg-tabs {
+  position: relative;
+  display: flex;
+  gap: 0.25rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 1.25rem;
+  padding: 0.3rem;
+  overflow-x: auto;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: var(--andrey-surface);
+  scrollbar-width: none;
+}
+
+.andrey-home .seg-tab {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  padding: 0.5rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--andrey-muted);
+  font: 500 0.92rem var(--font-sans);
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+
+.andrey-home .seg-tab:hover {
+  color: var(--andrey-ink);
+}
+
+/* The selection is cobalt. Without script the chosen tab carries it; with script a pill glides
+   under the tab beneath the pointer and settles back on the chosen one (tiles.js). */
+.andrey-home .seg-tab[aria-selected="true"],
+.andrey-home .seg-tabs.has-glide .seg-tab.is-lit {
+  color: var(--andrey-surface);
+}
+
+.andrey-home .seg-tabs:not(.has-glide) .seg-tab[aria-selected="true"] {
+  background: var(--andrey-accent);
+}
+
+.andrey-home .seg-tabs.has-glide .seg-tab[aria-selected="true"]:not(.is-lit) {
+  color: var(--andrey-accent);
+}
+
+.andrey-home .seg-glide {
+  position: absolute;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  left: 0;
+  border-radius: 999px;
+  background: var(--andrey-accent);
+  transition: transform 0.25s var(--ease), width 0.25s var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .andrey-home .seg-glide,
+  .andrey-home .seg-tab {
+    transition: none;
+  }
+}
+
+.andrey-home .seg-tab:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+
+.andrey-home .seg-panel {
+  padding: clamp(1rem, 3vw, 1.75rem);
+  border: 1px solid var(--andrey-line);
+  border-radius: 20px;
+  background: var(--andrey-surface);
+}
+
+.andrey-home .seg-panel + .seg-panel {
+  margin-top: 1.25rem;
+}
+
+.andrey-home .seg-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.5rem 2rem;
+  margin-bottom: 1rem;
+}
+
+.andrey-home .seg-head h3 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.andrey-home .seg-head p {
+  margin: 0.2rem 0 0;
+  color: var(--andrey-muted);
+}
+
+.andrey-home .seg-head .tile-number {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.andrey-home .seg-head .tile-number b {
+  color: var(--andrey-accent);
+  font-size: clamp(2rem, 3.6vw, 3rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.andrey-home .seg-panel .pf-chart {
+  padding: 0;
+  border: 0;
+}
+
+.andrey-home .seg-foot {
+  margin: 0.75rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+}
+
 /* Eased stops: a straight ramp shows a line where it starts. */
 .andrey-home .run-sheet::before {
   content: "";

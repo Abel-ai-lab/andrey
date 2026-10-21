@@ -487,9 +487,18 @@ div[class*="highlight-"].window pre {
   stroke-width: 2;
 }
 
-.pf-pair {
-  stroke: var(--andrey-line);
-  stroke-width: 1.5;
+.pf-line {
+  fill: none;
+  stroke: var(--andrey-muted);
+  stroke-width: 1.25;
+  stroke-opacity: 0.55;
+  stroke-linejoin: round;
+}
+
+.pf-line--andrey {
+  stroke: var(--andrey-accent);
+  stroke-width: 2;
+  stroke-opacity: 0.8;
 }
 
 .pf-quadrant {

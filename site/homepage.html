@@ -53,9 +53,7 @@
       {{ home.act_covers["accelerated"] }}
       {#- The ideas behind the speed, a card each, one playing at a time (why-fast.js). #}
       {{ home.why_fast_belt }}
-      <div class="run-sheet">
-        <ul class="bento-grid">{{ home.family_tiles }}</ul>
-      </div>
+      <div class="run-sheet">{{ home.speed_panel }}</div>
     </section>
   </div>
 
@@ -97,7 +95,6 @@
   </section>
 
   <div class="tile-details">
-    {{ home.family_dialogs }}
     {{ home.dialog_head("graphs", home.graph_title) }}
     <p>A causal graph says which variables drive which, and how much the data can tell decides its
       kind. Four methods on data about a lawn, its sprinkler, and the rain: three on a table of

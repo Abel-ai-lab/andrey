@@ -229,14 +229,24 @@ def test_charts_cover_only_comparisons_with_a_published_ratio():
     assert "ICA-LiNGAM" in build.speed_table(SUMMARY)
 
 
-def test_a_family_dialog_opens_on_one_short_line_and_ends_on_the_release_cards():
-    # The charts' legends name the packages, so the caption says only what a chart plots.
+def test_the_speed_panel_has_a_tab_and_a_figure_per_family():
+    summaries = build.release_summaries(SUMMARY)
+    panel = build.speed_panel(summaries)
+    families = [info["family"] for info in build.family_tiles(summaries)]
+    # A tab per family, the first chosen, each controlling its own panel.
+    tabs = re.findall(r'role="tab" id="speed-tab-([\w-]+)" aria-controls="speed-([\w-]+)"', panel)
+    assert [t for t, _ in tabs] == families and all(t == c for t, c in tabs)
+    assert panel.count('aria-selected="true"') == 1
+    # Each panel opens on its family's speed, shows its figure, and ends on one short line and
+    # the release cards.
     intro = build.family_intro()
     assert len(intro) < 100 and "errors" not in intro
-    info = build.family_tiles([SUMMARY])[0]
-    dialog = build.family_dialog(info, [])
-    assert dialog.index(intro) < dialog.index('href="docs/benchmarks.html"')
-    assert ">Details in the release cards</a>" in dialog and "Every measurement" not in dialog
+    for key in families:
+        body = panel[panel.index(f'id="speed-{key}"') :]
+        body = body[: body.index('class="seg-panel"') if 'class="seg-panel"' in body else None]
+        assert 'class="tchart pf-chart"' in body or "No chart" in body
+        assert body.index(build.escape(intro)) < body.index(">Details in the release cards</a>")
+    assert "Every measurement" not in panel
 
 
 def test_a_family_figure_shows_each_method_once_at_a_size_both_packages_ran():
@@ -256,14 +266,17 @@ def test_a_family_figure_shows_each_method_once_at_a_size_both_packages_ran():
 
 def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
     summaries = build.release_summaries(SUMMARY)
-    points = build.frontier_points(summaries)["constraint"]
-    figure = build.frontier_chart("Constraint-based", points)
+    every = build.frontier_points(summaries)
+    frame = build.frontier_frame([p for family in every.values() for p in family])
+    points = every["constraint"]
+    figure = build.frontier_chart("Constraint-based", points, frame)
     ours = [p for p in points if p["ours"]]
-    assert figure.count('class="pf-andrey"') == len(ours) + 1  # and its legend's
+    sizes = sum(len(p["sizes"]) for p in ours)
+    assert figure.count('class="pf-andrey"') == sizes + 1  # and its legend's
     packages = {p["package"] for p in points if not p["ours"]}
     shapes = set(re.findall(r'class="pf-other pf-(\w+)"', figure))
     assert len(shapes) == len(packages)
-    assert figure.count('class="pf-pair"') == len(points) - len(ours)
+    assert figure.count('class="pf-line') == sum(len(p["sizes"]) > 1 for p in points)
     assert 'class="pf-quadrant"' in figure and "Pareto" not in figure
     # Every method's name, once, and none drawn past the axis.
     for p in ours:
@@ -463,7 +476,7 @@ def test_numbers_read_as_written():
 def test_intro_claims_one_machine_per_size_not_per_comparison():
     # Two comparisons list two CPU models across their sizes, so the pairing holds within a size.
     intro = build.family_intro()
-    assert "at the largest size both packages ran" in intro
+    assert "smallest graph to its largest" in intro
     assert "Each comparison ran both packages" not in intro
 
 
@@ -909,8 +922,7 @@ def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
     assert times[0] == "1x" and all(t is None or t.endswith("x") for t in times)
     fits = rows[f"Variables fit in {build.FIT_BUDGET_S} s"]
     assert int(fits[0].replace(",", "")) >= max(int(f.replace(",", "")) for f in fits if f)
-    assert f"{len(list_specs())} methods" in tiles and 'data-tile="methods"' in tiles
-    assert "bento-note" not in tiles
+    assert "Compared with other packages" in tiles and "bento-note" not in tiles
 
 
 def test_interface_example_returns_every_kind_of_graph():
@@ -1088,7 +1100,7 @@ def _tiles(page):
 def test_every_tile_leads_to_its_details_without_script(placeholder_page):
     page = placeholder_page
     tiles = _tiles(page)
-    assert len(tiles) >= 10
+    assert len(tiles) >= 4
     for target, key in tiles:
         if target is None:
             continue  # the tile is its own evidence
@@ -1105,9 +1117,13 @@ def test_the_page_has_a_tile_per_family_with_a_comparison(placeholder_page):
     families = {m["family"] for m in build.claimed_comparisons(summaries)}
     assert [t["family"] for t in tiles] == [f for f in build.SPEC_FAMILIES if f in families]
     for info in tiles:
-        assert placeholder_page.count(f'data-tile="speed-{info["family"]}"') == 1
-        dialog = _dialog(placeholder_page, f"speed-{info['family']}")
-        assert 'href="docs/benchmarks.html"' in dialog
+        assert placeholder_page.count(f'id="speed-tab-{info["family"]}"') == 1
+        panel = placeholder_page[placeholder_page.index(f'id="speed-{info["family"]}"') :]
+        assert 'href="docs/benchmarks.html"' in panel[: panel.index("</div></div>")] or (
+            'href="docs/benchmarks.html"' in panel[: panel.index('class="seg-panel"', 1)]
+            if 'class="seg-panel"' in panel[1:]
+            else 'href="docs/benchmarks.html"' in panel
+        )
         best = max(r["ratio"] for m in info["comparisons"] for r in m["rows"] if r["ratio"])
         if info["number"] is None:
             assert best < 2
@@ -1135,7 +1151,7 @@ def test_a_family_where_andrey_is_not_faster_shows_no_number():
                     row.update(ratio=0.8, ratio_is_lower_bound=False)
     tiles = {t["family"]: t for t in build.family_tiles(summaries)}
     assert tiles["constraint"]["number"] is None
-    assert "faster</span>" not in build.family_tile(tiles["constraint"])
+    assert build.family_number(tiles["constraint"]) == ""
     assert tiles["lingam"]["number"] is not None
 
 
@@ -1165,7 +1181,7 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
     start = {k: placeholder_page.index(f'id="{k}"') for k in sections}
     ends = [*list(start.values())[1:], placeholder_page.index('<div class="tile-details">')]
     held = {
-        "accelerated": ('data-scene="parallel"', 'data-tile="speed-constraint"'),
+        "accelerated": ('data-scene="parallel"', 'id="speed-tab-constraint"'),
         "accurate": ('class="err-pairs"', 'href="docs/benchmarks.html"'),
         "agentic": ('data-tile="agents"', "andrey run pc --help --json"),
         "all-in-one": (
@@ -1180,8 +1196,10 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
         # Every section shows its evidence after its cover: tiles, and notes in plain type where
         # a figure would add nothing.
         cover = re.search(r'<div class="[\w -]*\bact-cover\b', body)
-        assert cover and cover.start() < body.index('<ul class="bento-grid">'), key
-        assert body.count('<li class="tile') + body.count('<li class="bento-note">') >= 1, key
+        evidence = re.search(r'<ul class="bento-grid">|<div class="seg"', body)
+        assert cover and evidence and cover.start() < evidence.start(), key
+        shown = ('<li class="tile', '<li class="bento-note">', 'class="seg-panel"')
+        assert sum(body.count(mark) for mark in shown) >= 1, key
         for mark in held[key]:
             assert mark in body, (key, mark)
     # No two tiles open the same dialog: what one would show twice is one tile.
@@ -1207,8 +1225,8 @@ def test_the_hero_and_the_first_section_share_one_art(placeholder_page):
     assert f'src="_static/art-{build.HERO_ART}.jpg"' in art and 'fetchpriority="high"' in art
     assert 'class="cover-sweep"' in art
     first = run[run.index('id="accelerated"') : run.index('id="accurate"')]
-    assert "<img" not in first[: first.index('<ul class="bento-grid">')]
-    assert first.index('<div class="run-sheet">') < first.index('<ul class="bento-grid">')
+    assert "<img" not in first[: first.index('class="seg"')]
+    assert first.index('<div class="run-sheet">') < first.index('class="seg"')
     css = (ROOT / "site" / "assets" / "site.css").read_text(encoding="utf-8")
     rule = css[css.index(".andrey-home .run-art {") :]
     assert "position: sticky;" in rule[: rule.index("}")]
@@ -1347,7 +1365,7 @@ def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeh
         r'width="(\d+)" height="(\d+)"',
         placeholder_page,
     )
-    assert len(tiles) >= len(build.FAMILY_ART) + 2 * len(build.ACTS)
+    assert len(tiles) >= 2 * len(build.ACTS)
     for path, width, height in tiles:
         with Image.open(brand / path) as image:
             assert image.size == (int(width), int(height)), path

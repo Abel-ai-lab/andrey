@@ -61,7 +61,56 @@
     for (const sweep of document.querySelectorAll(".cover-sweep")) lit.observe(sweep);
   }
 
-  // An address that ends in a tile's id, such as an old link to #methods, opens that tile.
+  // A segmented panel: its tabs show one panel at a time; the arrow keys move between tabs.
+  const choose = new Map();
+  for (const seg of document.querySelectorAll("[data-seg]")) {
+    const tabs = [...seg.querySelectorAll('[role="tab"]')];
+    let show = (tab, focus) => {
+      for (const each of tabs) {
+        const on = each === tab;
+        each.setAttribute("aria-selected", String(on));
+        each.tabIndex = on ? 0 : -1;
+        document.getElementById(each.getAttribute("aria-controls")).hidden = !on;
+      }
+      if (focus) tab.focus();
+    };
+    // A pill glides under the tab beneath the pointer and settles back on the chosen tab.
+    const bar = seg.querySelector('[role="tablist"]');
+    const glide = document.createElement("span");
+    glide.className = "seg-glide";
+    glide.setAttribute("aria-hidden", "true");
+    bar.prepend(glide);
+    bar.classList.add("has-glide");
+    const chosen = () => tabs.find((tab) => tab.getAttribute("aria-selected") === "true");
+    const light = (tab) => {
+      glide.style.width = `${tab.offsetWidth}px`;
+      glide.style.transform = `translateX(${tab.offsetLeft}px)`;
+      for (const each of tabs) each.classList.toggle("is-lit", each === tab);
+    };
+    for (const tab of tabs) tab.addEventListener("pointerenter", () => light(tab));
+    bar.addEventListener("pointerleave", () => light(chosen()));
+    window.addEventListener("resize", () => light(chosen()));
+    const settle = show;
+    show = (tab, focus) => { settle(tab, focus); light(tab); };
+    show(chosen() || tabs[0], false);
+    tabs.forEach((tab, i) => {
+      choose.set(tab.getAttribute("aria-controls"), () => show(tab, false));
+      tab.addEventListener("click", () => show(tab, false));
+      tab.addEventListener("keydown", (event) => {
+        const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        show(tabs[(i + step + tabs.length) % tabs.length], true);
+      });
+    });
+  }
+
+  // An address that ends in a tile's id, such as an old link to #methods, opens that tile; one
+  // that ends in a panel's id, such as #speed-score, shows that panel.
   const target = location.hash && document.getElementById(location.hash.slice(1));
   if (target && target.matches("dialog.tile-dialog")) open(target);
+  if (target && choose.has(target.id)) {
+    choose.get(target.id)();
+    target.scrollIntoView();
+  }
 })();
