@@ -928,14 +928,12 @@ ul.ablog-archive {
   background: var(--andrey-surface);
 }
 
-.dp-grid,
 .gf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 1rem 1.2rem;
 }
 
-.dp-name,
 .gf-name {
   margin: 0;
   color: var(--andrey-ink);
@@ -943,7 +941,6 @@ ul.ablog-archive {
   font-weight: 600;
 }
 
-.dp svg,
 .gf svg {
   display: block;
   width: 100%;
@@ -955,23 +952,68 @@ ul.ablog-archive {
   fill-opacity: 0.45;
 }
 
-.dp-tests {
-  margin: 0.3rem 0 0;
-  padding: 0;
-  font-size: 0.8rem;
-  line-height: 1.45;
-  list-style: none;
+/* The relationships' table: each row its points, then whether each test finds the dependence. */
+.dp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
 }
 
-.dp-tests b {
+.dp-table thead th {
+  padding: 0 0.75rem 0.5rem;
+  color: var(--andrey-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.dp-table tbody tr + tr > * {
+  border-top: 1px solid var(--andrey-line);
+}
+
+.dp-table tbody th {
+  width: 45%;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  font-weight: 400;
+  text-align: left;
+}
+
+.dp-table tbody th svg {
+  display: block;
+  width: 100%;
+  max-width: 14rem;
+  height: auto;
+}
+
+.dp-name {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--andrey-ink);
   font-weight: 600;
 }
 
-.dp-tests .dp-seen {
-  color: var(--andrey-ink);
+.dp-table td {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
 }
 
-.dp-tests .dp-missed {
+.dp-table td b {
+  display: block;
+  font-weight: 600;
+}
+
+.dp-table td small {
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+}
+
+.dp-table .dp-seen b {
+  color: var(--andrey-accent);
+}
+
+.dp-table .dp-missed b {
   color: var(--andrey-muted);
 }
 

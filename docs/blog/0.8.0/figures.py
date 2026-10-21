@@ -53,7 +53,8 @@ def p_text(p: float) -> str:
 
 
 def dependence_figure() -> str:
-    # 400 draws of x, and y as a line, a cos, and a square of x with the same noise.
+    # 400 draws of x, and y as a line, a cos, and a square of x with the same noise: each
+    # relationship's points on the left of its row, and on the right whether each test finds it.
     rng = np.random.default_rng(0)
     x = rng.uniform(-3, 3, 400)
     noise = rng.normal(0, 0.3, 400)
@@ -62,34 +63,37 @@ def dependence_figure() -> str:
         ("y = cos(x)", np.cos(x)),
         ("y = x²", x**2 / 3 - 1),
     )
-    w, h, pad = 220, 180, 14
-    panels = []
+    tests = (("fisherz", "Partial correlation"), ("kci", "KCI"))
+    w, h, pad = 180, 110, 8
+    rows = []
     for name, signal in shapes:
         y = signal + noise
         data = np.column_stack([x, y])
-        found = {test: make_indep_test(test, data)(0, 1, ()) for test in ("fisherz", "kci")}
+        found = {test: make_indep_test(test, data)(0, 1, ()) for test in dict(tests)}
         sx = lambda v: pad + (v + 3) / 6 * (w - 2 * pad)  # noqa: E731
         lo, hi = float(y.min()), float(y.max())
         sy = lambda v: h - pad - (v - lo) / (hi - lo) * (h - 2 * pad)  # noqa: E731
         dots = "".join(
-            f'<circle cx="{sx(a):.1f}" cy="{sy(b):.1f}" r="1.8"/>'
+            f'<circle cx="{sx(a):.1f}" cy="{sy(b):.1f}" r="1.6"/>'
             for a, b in zip(x, y, strict=True)
         )
-        seen = ["misses it", "sees it"]
-        rows = "".join(
-            f'<li class="{"dp-seen" if found[t] < 0.05 else "dp-missed"}"><b>{label}</b> '
-            f"{escape(p_text(found[t]))}, {seen[found[t] < 0.05]}</li>"
-            for t, label in (("fisherz", "Partial correlation"), ("kci", "KCI"))
+        cells = "".join(
+            f'<td class="{"dp-seen" if found[t] < 0.05 else "dp-missed"}">'
+            f"<b>{'Finds it' if found[t] < 0.05 else 'Misses it'}</b>"
+            f"<small>{escape(p_text(found[t]))}</small></td>"
+            for t in dict(tests)
         )
-        panels.append(
-            f'<div class="dp-panel"><p class="dp-name">{escape(name)}</p>'
-            f'<svg viewBox="0 0 {w} {h}" role="img" aria-label="{escape(name)}: 400 points">'
-            f'<g class="dp-dots">{dots}</g></svg><ul class="dp-tests">{rows}</ul></div>'
+        rows.append(
+            f'<tr><th scope="row"><svg viewBox="0 0 {w} {h}" role="img" '
+            f'aria-label="{escape(name)}: 400 points"><g class="dp-dots">{dots}</g></svg>'
+            f'<span class="dp-name">{escape(name)}</span></th>{cells}</tr>'
         )
+    head = "".join(f'<th scope="col">{label}</th>' for _, label in tests)
     return (
-        '<figure class="dp"><div class="dp-grid">' + "".join(panels) + "</div>"
+        '<figure class="dp"><table class="dp-table"><thead><tr><td></td>'
+        f"{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
         "<figcaption>Three ways y depends on x, each with the same noise. Partial correlation "
-        "measures only a straight-line trend, so it misses the cos and the square; KCI sees all "
+        "measures only a straight-line trend, so it misses the cos and the square; KCI finds all "
         "three.</figcaption></figure>\n"
     )
 
