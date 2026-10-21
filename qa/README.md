@@ -23,7 +23,9 @@ weights, the causal order, and every metadata value, such as a score or a p-valu
 their bytes, so equal hashes mean equal bits; a second hash covers only the graphs' endpoint marks.
 The manifest has one row per fit, keyed by method, dataset, seed, permutation, and worker count,
 under a header naming the commit, the Python, NumPy, and SciPy versions, the loaded BLAS, the CPU,
-and the thread settings.
+and the thread settings. It also names the directory of the Andrey package the run imported and,
+when that directory is in a git work tree, that tree's commit, so a manifest made with Andrey
+imported from another tree through `PYTHONPATH` names the tree it ran.
 
 A fit that queries a CI test or a local score also records two counts, which are deterministic, so
 a change can be held to not raising them: the CI-test queries of a pair made after a query of that
