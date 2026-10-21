@@ -63,9 +63,9 @@ def scan_conditioning_sets(
 
     ``candidates`` are ascending and exclude ``a`` and ``b``, so every subset is a sorted, distinct
     conditioning set. A FisherZ or StudentT test evaluates the subsets in size-bounded chunks of
-    canonical query arrays (``_canonical_pvalues``), with no re-sorting. Another test that exposes
-    ``batched_call(a, b, condition_sets)`` evaluates the same chunks through it; otherwise each
-    subset is tested with a scalar ``test(a, b, subset)`` call, or
+    canonical query arrays (the test's ``_canonical_pvalues``), with no re-sorting. Another test
+    that exposes ``batched_call(a, b, condition_sets)`` evaluates the same chunks through it;
+    otherwise each subset is tested with a scalar ``test(a, b, subset)`` call, or
     ``test._bounded_pvalue(a, b, subset, alpha, exact_above)`` where the test has one, with
     ``exact_above`` true when ``largest`` is given. All paths visit the same subsets in the same
     order and take the same ``p > alpha`` decisions, so the accumulated ``separating``, the largest
@@ -83,7 +83,7 @@ def scan_conditioning_sets(
     scalar = (
         test if bounded is None else partial(bounded, alpha=alpha, exact_above=largest is not None)
     )
-    canonical = _canonical_pvalues(test)
+    canonical = _canonical_route(test)
     if canonical is not None:
         batched = partial(_canonical_chunk, canonical, size)
     else:
@@ -110,8 +110,9 @@ def scan_conditioning_sets(
     return found
 
 
-def _canonical_pvalues(test: CITest) -> Callable[..., np.ndarray] | None:
-    """The p-values of canonical query arrays for a FisherZ or StudentT test, else ``None``.
+def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
+    """A FisherZ or StudentT test's ``_canonical_pvalues``, which the skeleton's canonical query
+    arrays take, else ``None``.
 
     A subclass or a wrapper of either test keeps the ``batched_call`` and ``first_order_pvalues``
     it may override.
@@ -227,7 +228,7 @@ def first_order_removals(
         candidates = sorted((set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y})
         if candidates:
             queries.append((x, y, candidates))
-    canonical = _canonical_pvalues(test)
+    canonical = _canonical_route(test)
     tested = (
         _stacked_first_order(canonical, queries)
         if canonical is not None
