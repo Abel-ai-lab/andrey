@@ -7,6 +7,7 @@ import importlib
 import pkgutil
 import struct
 import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -186,3 +187,21 @@ def _manifest(**changes: object) -> dict:
 def test_compare_counts_the_rows_that_differ(changes, status, message, capsys) -> None:
     assert identity.compare(_manifest(), _manifest(**changes)) == status
     assert message in capsys.readouterr().out
+
+
+def test_the_header_names_the_imported_package_and_its_tree(tmp_path, monkeypatch) -> None:
+    code = identity.commit()
+    assert code["andrey_path"] == str(Path(andrey.__file__).resolve().parent)
+    assert code["andrey_commit"] is None or len(code["andrey_commit"]) == 40
+    outside = tmp_path / "andrey"
+    outside.mkdir()
+    monkeypatch.setattr(andrey, "__file__", str(outside / "__init__.py"))
+    assert identity.commit()["andrey_commit"] is None
+
+
+def test_compare_ignores_the_package_header(capsys) -> None:
+    before, after = _manifest(), _manifest()
+    before["header"].update(andrey_path="/a/src/andrey", andrey_commit="a")
+    after["header"].update(andrey_path="/b/src/andrey", andrey_commit=None)
+    assert identity.compare(before, after) == 0
+    assert "0 with a different graph, 0 with only different bits" in capsys.readouterr().out

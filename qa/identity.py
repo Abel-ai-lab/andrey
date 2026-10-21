@@ -9,8 +9,9 @@ equal hashes mean equal bits. A second hash covers only the endpoint marks of th
 difference reads as a changed graph or as changed bits under the same graph.
 
 The manifest holds one row per fit, keyed by method, dataset, seed, permutation, and worker count,
-under a header naming the commit, the Python, NumPy, and SciPy versions, the loaded BLAS, the CPU,
-and the thread settings. ``--compare`` counts the rows of two manifests that differ. A fit that
+under a header naming the commit, the imported Andrey package's directory and commit, the Python,
+NumPy, and SciPy versions, the loaded BLAS, the CPU, and the thread settings. ``--compare`` counts
+the rows of two manifests that differ. A fit that
 queries a CI test or a local score also records two deterministic counts (:class:`Counts`), and a
 compare names every row where one rose.
 
@@ -563,10 +564,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def commit() -> dict[str, Any]:
-    """Return the checked-out commit and whether tracked files differ from it."""
+    """Return the checked-out commit, whether tracked files differ from it, and the imported
+    Andrey package's directory with the commit of its git work tree, or ``None`` outside one."""
+    package = Path(andrey.__file__).resolve().parent
     return {
         "commit": _git("rev-parse", "HEAD") or "unknown",
         "uncommitted_changes": bool(_git("status", "--porcelain", "--untracked-files=no")),
+        "andrey_path": str(package),
+        "andrey_commit": _git("rev-parse", "HEAD", cwd=package) or None,
     }
 
 
@@ -598,9 +603,9 @@ def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict
     }
 
 
-def _git(*args: str) -> str:
+def _git(*args: str, cwd: Path = ROOT) -> str:
     try:
-        done = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+        done = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
     except OSError:
         return ""
     return done.stdout.strip() if done.returncode == 0 else ""
