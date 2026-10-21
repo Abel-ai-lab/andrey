@@ -41,6 +41,22 @@ def _descending(scores: list[float], tolerance: float = 0.0) -> bool:
     return all(a >= b - tolerance for a, b in zip(scores, scores[1:]))
 
 
+def _exact_batch(gains: dict[int, float]) -> SimpleNamespace:
+    """A batch scorer whose scores are the negated ``gains``, each a full score (bound 0)."""
+
+    def score_many_with_base(vertex, parents, moves, *, bounds=None):
+        if bounds is not None:
+            bounds[:] = [0.0] * len(moves)
+        return [-gains[u] for _, u in moves]
+
+    return SimpleNamespace(score_many_with_base=score_many_with_base)
+
+
+def _leaf(score: float) -> SimpleNamespace:
+    """A traced leaf whose negated local score is ``score``, a full score."""
+    return SimpleNamespace(score=score, bound=0.0)
+
+
 def test_boss_grows_best_scoring_branch_first() -> None:
     """BOSS's tree orders a node's improving additions best-first, up to ``_SCORE_EPS`` ties."""
     x = _sample()
@@ -63,10 +79,7 @@ def test_boss_grows_best_scoring_branch_first() -> None:
     ],
 )
 def test_boss_grow_ties_use_variable_index_and_require_an_improvement(gains, expected) -> None:
-    delta = SimpleNamespace(
-        score_many_with_base=lambda vertex, parents, moves: [-gains[u] for _, u in moves]
-    )
-    tree = SimpleNamespace(vertex=4, empty_score=0.0, delta=delta)
+    tree = SimpleNamespace(vertex=4, empty_score=0.0, delta=_exact_batch(gains))
     node = boss_mod._GSTNode(tree)
 
     node._grow(sorted(gains, reverse=True), [])
@@ -77,10 +90,7 @@ def test_boss_grow_ties_use_variable_index_and_require_an_improvement(gains, exp
 def test_boss_shrink_ties_use_variable_index_and_require_an_improvement() -> None:
     eps = boss_mod._SCORE_EPS
     gains = {0: 10.0, 1: 10.0 + eps / 2}
-    delta = SimpleNamespace(
-        score_many_with_base=lambda vertex, parents, moves: [-gains[u] for _, u in moves]
-    )
-    tree = SimpleNamespace(vertex=2, empty_score=0.0, delta=delta)
+    tree = SimpleNamespace(vertex=2, empty_score=0.0, delta=_exact_batch(gains), leaves={})
     node = boss_mod._GSTNode(tree)
     parents = [1, 0]
 
@@ -105,9 +115,9 @@ def test_boss_shrink_ties_use_variable_index_and_require_an_improvement() -> Non
 def test_boss_mutation_prefers_the_leftmost_improving_tied_position(left, right, expected) -> None:
     # Moving variable 1 to either end changes the total from zero to `left` or `right`.
     gsts = [
-        SimpleNamespace(trace=lambda prefix: left if 1 in prefix else 0),
-        SimpleNamespace(trace=lambda prefix: right if 2 in prefix else 0),
-        SimpleNamespace(trace=lambda prefix: 0),
+        SimpleNamespace(trace=lambda prefix: _leaf(left if 1 in prefix else 0)),
+        SimpleNamespace(trace=lambda prefix: _leaf(right if 2 in prefix else 0)),
+        SimpleNamespace(trace=lambda prefix: _leaf(0)),
     ]
     order = [0, 1, 2]
     positions = {v: v for v in order}
