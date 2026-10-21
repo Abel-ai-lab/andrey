@@ -38,17 +38,20 @@ def test_blocked_hsic_equals_the_reference_test(n):
 
 
 def test_pair_rows_equal_single_calls():
+    """On the numpy backend, pinned because a torch device reduces a batch in another order."""
     X = _table(120)
     pairs = [(0, 1), (1, 0), (2, 3), (3, 3), (0, 3)]
-    rows = _pnl.pnl_pairs(X, pairs)
-    assert [tuple(row) for row in rows] == [_pnl.pnl(X[:, i], X[:, j]) for i, j in pairs]
-    assert np.array_equal(_pnl.pnl_pairs(X, pairs, num_workers=3), rows)
+    with andrey.config(backend="numpy"):
+        rows = _pnl.pnl_pairs(X, pairs)
+        assert [tuple(row) for row in rows] == [_pnl.pnl(X[:, i], X[:, j]) for i, j in pairs]
+        assert np.array_equal(_pnl.pnl_pairs(X, pairs, num_workers=3), rows)
 
 
 def test_pairs_default_to_every_column_pair_and_are_checked():
     X = _table(50)
-    rows = _pnl.pnl_pairs(X)
-    assert np.array_equal(rows[1], _pnl.pnl_pairs(X, [(0, 2)])[0])
+    with andrey.config(backend="numpy"):  # a torch device batches a cause's pairs differently
+        rows = _pnl.pnl_pairs(X)
+        assert np.array_equal(rows[1], _pnl.pnl_pairs(X, [(0, 2)])[0])
     assert rows.shape == (6, 4)
     assert _pnl.pnl_pairs(X, []).shape == (0, 4)
     with pytest.raises(ValueError, match="out of range"):

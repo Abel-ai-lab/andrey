@@ -11,8 +11,8 @@ convex program. Each variable is first mapped to normal scores by rank.
 
 :func:`pnl_pairs` runs the test on many pairs of one table's columns. The ordered pairs are grouped
 by cause, so a column's normal scores, basis designs, and centered HSIC kernel are computed once and
-shared by every pair that uses it, and each kernel is built in row blocks into reused buffers. Each
-pair's four numbers equal :func:`pnl`'s on that pair, bit for bit.
+shared by every pair that uses it, and each kernel is built in row blocks into reused buffers. On
+the ``numpy`` backend, each pair's four numbers equal :func:`pnl`'s on that pair, bit for bit.
 
 On the ``cuda`` backend, or under ``auto`` from ``ANDREY_PNL_GPU_THRESHOLD`` rows squared, the
 kernels and their sums run in float64 torch on the device, a batch of disturbances at a time; the
@@ -422,11 +422,12 @@ def pnl_pairs(
     """Return :func:`pnl`'s four numbers for pairs of ``data``'s columns, one row per pair.
 
     Row ``k`` is ``(pval_forward, pval_backward, stat_forward, stat_backward)`` for the ``k``-th
-    pair ``(i, j)``, where forward means column ``i`` -> column ``j``; it equals
-    ``pnl(data[:, i], data[:, j])`` bit for bit. ``pairs`` defaults to every ``i < j`` in
-    lexicographic order. ``num_workers`` worker threads share the ordered pairs (``None`` reads
-    ``andrey.config`` and ``ANDREY_NUM_WORKERS``, ``-1`` uses every usable core); each holds three
-    ``n x n`` float64 matrices.
+    pair ``(i, j)``, where forward means column ``i`` -> column ``j``; on the ``numpy`` backend it
+    equals ``pnl(data[:, i], data[:, j])`` bit for bit, and on a torch device to rounding, because
+    a device sums a batch of a cause's pairs in another order than a single pair. ``pairs``
+    defaults to every ``i < j`` in lexicographic order. ``num_workers`` worker threads share the
+    ordered pairs (``None`` reads ``andrey.config`` and ``ANDREY_NUM_WORKERS``, ``-1`` uses every
+    usable core); each holds three ``n x n`` float64 matrices.
     """
     arr = np.asarray(data, dtype=np.float64)
     if arr.ndim != 2:
