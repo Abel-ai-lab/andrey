@@ -274,15 +274,50 @@ intervened on in each row, and `multi_group_direct_lingam` and `longitudinal_lin
 datasets. `andrey list` names the methods, and {doc}`graph-types` explains which graph each one
 returns.
 
+## Background knowledge
+
+What you already know about the system narrows the search. Pass it as an `andrey.Knowledge`,
+naming each column by its label, a string, or by its 0-based position, an integer:
+
+```python
+from andrey import Knowledge, pc
+
+knowledge = Knowledge(
+    required=[("smoking", "tar")],          # edges the graph must have
+    forbidden=[("cancer", "smoking")],      # edges it must not have
+    tiers=[["age", "sex"], ["smoking"], ["tar", "cancer"]],  # no edge into an earlier tier
+)
+result = pc(data, knowledge=knowledge)
+```
+
+`allowed` lists the only pairs that may be adjacent; listing a pair permits an edge but does not
+require one. A short list narrows the search, which can make it faster. PC, FCI, and CD-NOD start
+their adjacency search from the allowed pairs, and GFCI's GES phase searches only inside them, so
+you can screen first and then search inside the pairs that survived:
+`Knowledge.from_skeleton(pc(data, max_depth=1))`. `max_depth` is the maximum conditioning-set size
+of those four methods' tests, the cap pcalg names `m.max` and causal-learn's FCI names `depth`.
+
+The result honors every part: a required edge is there and directed, a forbidden one is not, and a
+pair outside `allowed` is not adjacent. In a CPDAG, the edges the knowledge decides are directed
+and Meek's rules direct the edges that follow, which gives the maximally oriented PDAG (MPDAG): the
+DAGs of the equivalence class that satisfy the knowledge. In a PAG, a forbidden `a -> b` puts an
+arrowhead at `a` and can leave a circle at `b`. Knowledge that contradicts itself, such as a
+required edge into an earlier tier, raises a `ValueError` before the search runs. In PC, CD-NOD,
+and FCI, knowledge whose directions close a cycle over the edges the search kept raises one after
+the adjacency search. Labels stay attached to their columns, so the same knowledge fits the table
+in any column order. A label is the column name as text: name a column called `1` with `"1"`, as
+the integer `1` is the second column. On the command line, give a JSON object inline or as a file:
+`andrey run pc --data data.csv knowledge=knowledge.json`.
+
 ## Data types
 
 Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, the experimental `kci`, `rcot`, `cmiknn`, `gpdc` | `local_score_BIC` (the default) |
-| Categorical | `chisq`, `gsq` | `local_score_BDeu`, `local_score_BIC_categorical` |
-| Mixed | `degen_gauss`, `cond_gauss` | `local_score_degen_gauss`, `local_score_cond_gauss` |
+| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, the experimental `kci`, `rcot`, `cmiknn`, `gpdc` | `local_score_BIC` (the default when no column is categorical) |
+| Categorical | `chisq`, `gsq` | `local_score_BDeu` (the default when every column is categorical), `local_score_BIC_categorical` |
+| Mixed | `degen_gauss`, `cond_gauss` | `local_score_cond_gauss` (the default when some columns are categorical), `local_score_degen_gauss` |
 
 `pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, `boss`, `grasp`, and
 `exact_search` take every score, and `tabu` the continuous and categorical ones. `gfci` takes a
@@ -291,6 +326,21 @@ score and a test that read the same kind of data, such as
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole
 numbers, which need not start at 0, or, in a DataFrame, text, booleans, or a pandas `category`.
+
+**The default score.** `ges`, `hc`, `tabu`, `boss`, `grasp`, and `exact_search` pick their score
+from the columns: a DataFrame's `category`, `bool`, or text column, or a column of at most
+`max_categories` distinct whole numbers (10 by default), is categorical. When every column is
+categorical, they score with `local_score_BDeu`; when some are, with `local_score_cond_gauss`, the
+conditional Gaussian score. `tabu` has no mixed-data score and keeps the linear-Gaussian BIC on
+mixed data. Either switch says so with a one-time `DataTypeWarning`, which names the categorical
+columns of mixed data. A column of counts or ratings with that few values counts as categorical too;
+to read such columns as numbers, pass the linear-Gaussian BIC: `score_func="local_score_BIC"` to
+`ges` and `exact_search`, or `score_func="local_score_BIC_from_cov"` to the others. A `score_func`
+you pass is always the one used. To name the categorical columns yourself, pass `categorical=[...]`
+instead of the inference: naming every column picks `local_score_BDeu`, and naming some picks
+`local_score_cond_gauss`, each with the same warning. Data with no categorical column keep the
+linear-Gaussian BIC. The tests do not switch: `pc`, `fci`, `gfci`, and `cdnod` take
+`indep_test="chisq"` or `"gsq"` for categorical data and a mixed-data test for mixed data.
 
 **Mixed data.** With continuous and categorical columns, choose a mixed-data test or score, such as
 `andrey.pc(data, indep_test="cond_gauss")` or
@@ -302,8 +352,9 @@ variable's spread as well as its mean; it needs several rows for each combinatio
 conditions on. Both are experimental. With either score, `hc` gives no categorical column a
 continuous parent.
 
-**Marking the categorical columns.** Name them with `categorical`, by column name or 0-based
-position: `andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without
+**Marking the categorical columns.** Name them with `categorical`, by label (the column name as
+text) or 0-based position:
+`andrey.pc(data, indep_test="cond_gauss", categorical=["smoker", "region"])`. Without
 `categorical`, a mixed-data setting infers them: a DataFrame's `category`, `bool`, and text columns,
 and every column whose values, over all its rows, are at most `max_categories` distinct whole
 numbers (10 by default). pandas does not mark a column as categorical by itself, so this follows
@@ -316,10 +367,10 @@ for none. The result's `metadata["categorical"]` lists the categorical columns i
 form of the partial-correlation test, close to `fisherz`, and the degenerate Gaussian score becomes
 the BIC.
 
-**Integer-coded columns.** The default test and score read a column of codes such as 0, 1, 2 as
-numbers, which assumes the categories are ordered and evenly spaced. When columns of at most
-`max_categories` distinct whole numbers reach them, a one-time `DataTypeWarning` names those
-columns; if they are categories, choose a mixed-data setting.
+**Integer-coded columns.** The default test and the linear-Gaussian BIC read a column of codes
+such as 0, 1, 2 as numbers, which assumes the categories are ordered and evenly spaced. When columns
+of at most `max_categories` distinct whole numbers reach them, a one-time `DataTypeWarning` names
+those columns; if they are categories, choose a mixed-data setting.
 
 From the command line, the same settings are `key=value` arguments, such as
 `andrey run pc --data data.csv indep_test=cond_gauss 'categorical=[smoker,region]'` or
@@ -371,8 +422,14 @@ data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#kno
 - [Spirtes, Glymour, and Scheines (2000), Causation, Prediction, and Search][pc]: the PC algorithm.
 - [Chickering (2002), Optimal Structure Identification With Greedy Search][ges]: GES.
 - [Shimizu et al. (2006), A Linear Non-Gaussian Acyclic Model for Causal Discovery][lingam].
+- [Meek (1995), Causal Inference and Causal Explanation with Background Knowledge][meek]: Meek's
+  rules with background knowledge.
+- [Perkovic, Kalisch, and Maathuis (2017), Interpreting and Using CPDAGs with Background
+  Knowledge][mpdag]: the MPDAG.
 
 [sachs]: https://doi.org/10.1126/science.1105809
 [pc]: https://doi.org/10.7551/mitpress/1754.001.0001
 [ges]: https://jmlr.org/papers/v3/chickering02b.html
 [lingam]: https://www.jmlr.org/papers/v7/shimizu06a.html
+[meek]: https://arxiv.org/abs/1302.4972
+[mpdag]: https://arxiv.org/abs/1707.02171

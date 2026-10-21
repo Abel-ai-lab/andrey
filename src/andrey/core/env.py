@@ -21,6 +21,7 @@ T = TypeVar("T")
 
 BACKENDS = ("auto", "numpy", "cuda", "mps", "cpu")
 BACKEND_ALIASES = {"none": "cpu", "metal": "mps"}
+TIE_BREAKS = ("rank", "position")
 _ON = ("1", "true", "yes", "on")
 _OFF = ("0", "false", "no", "off")
 # scikit-learn's random_state bound, the narrowest range among the seeded methods.
@@ -36,6 +37,14 @@ def parse_backend(value: str, source: str) -> str:
             f"{source} must be one of {'/'.join(BACKENDS)} (or none/metal), got {value!r}"
         )
     return b
+
+
+def parse_tie_break(value: str, source: str) -> str:
+    """Return the tie-break rule ``value`` names, ignoring case."""
+    rule = value.strip().lower()
+    if rule not in TIE_BREAKS:
+        raise ValueError(f"{source} must be one of {'/'.join(TIE_BREAKS)}, got {value!r}")
+    return rule
 
 
 def parse_num_workers(value: int | str, source: str) -> int:
@@ -108,6 +117,7 @@ CMIKNN_GPU_THRESHOLD = Setting("ANDREY_CMIKNN_GPU_THRESHOLD", parse_int)
 PNL_GPU_THRESHOLD = Setting("ANDREY_PNL_GPU_THRESHOLD", parse_int)
 GPU_CALIBRATE = Setting("ANDREY_GPU_CALIBRATE", parse_flag)
 SEED = Setting("ANDREY_SEED", parse_seed)
+TIE_BREAK = Setting("ANDREY_TIE_BREAK", parse_tie_break)
 REQUIRE_GPU = Setting("ANDREY_REQUIRE_GPU", parse_flag)
 DATA_DIR = Setting("ANDREY_DATA_DIR", parse_path)
 
@@ -125,6 +135,7 @@ SETTINGS: dict[str, Setting] = {
         PNL_GPU_THRESHOLD,
         GPU_CALIBRATE,
         SEED,
+        TIE_BREAK,
         REQUIRE_GPU,
         DATA_DIR,
     )

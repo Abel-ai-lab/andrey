@@ -49,6 +49,16 @@ def test_pinned_cpu_overrides_threshold(monkeypatch):
     assert backend.resolve(1, 10**9) == "cpu"  # tiny call, still torch-cpu
 
 
+def test_torch_takes_an_array_with_negative_strides(monkeypatch):
+    # A DataFrame with its columns reversed holds such an array.
+    pytest.importorskip("torch")
+    monkeypatch.setenv("ANDREY_DEVICE", "cpu")
+    x = np.random.default_rng(0).normal(size=(50, 4))
+    assert np.allclose(
+        stats.corrcoef(x[:, ::-1], rowvar=False), np.corrcoef(x[:, ::-1], rowvar=False)
+    )
+
+
 def test_as_tensor_accepts_negative_strides():
     pytest.importorskip("torch")
     data = np.arange(12.0).reshape(4, 3)[:, ::-1]  # torch.as_tensor alone rejects this view
@@ -92,6 +102,36 @@ def test_andrey_device_is_alias_of_andrey_backend(monkeypatch):
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     monkeypatch.setenv("ANDREY_DEVICE", "numpy")
     assert andrey.config.backend == "numpy"
+
+
+def test_tie_break_precedence_context_over_config_over_env(monkeypatch):
+    """Every layer reaches the ranks a fit reads: position ranks are the column positions."""
+    from andrey.search.hc import tie_ranks
+
+    monkeypatch.delenv("ANDREY_TIE_BREAK", raising=False)
+    x = np.random.default_rng(0).standard_normal((50, 4))
+    ranked, by_position = tie_ranks(x), np.arange(4)
+    assert andrey.config.tie_break == "rank" and (ranked != by_position).any()  # default
+    monkeypatch.setenv("ANDREY_TIE_BREAK", "Position")
+    assert andrey.config.tie_break == "position"  # env, any case
+    np.testing.assert_array_equal(tie_ranks(x), by_position)
+    andrey.config.tie_break = "rank"
+    np.testing.assert_array_equal(tie_ranks(x), ranked)  # config object over env
+    with andrey.config(tie_break="position"):
+        np.testing.assert_array_equal(tie_ranks(x), by_position)  # context over config object
+    np.testing.assert_array_equal(tie_ranks(x), ranked)  # context restored
+    andrey.config.tie_break = None
+    assert andrey.config.tie_break == "position"  # back to env
+
+
+def test_unknown_tie_break_names_the_allowed_values(monkeypatch):
+    with pytest.raises(ValueError, match="rank/position"):
+        andrey.config.tie_break = "column"
+    with pytest.raises(ValueError, match="rank/position"), andrey.config(tie_break="column"):
+        pass
+    monkeypatch.setenv("ANDREY_TIE_BREAK", "column")
+    with pytest.raises(ValueError, match="ANDREY_TIE_BREAK.*rank/position"):
+        _ = andrey.config.tie_break
 
 
 def test_num_workers_resolution(monkeypatch):

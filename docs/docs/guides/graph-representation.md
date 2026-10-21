@@ -134,8 +134,8 @@ out.ordering            # (0, 1, 2)
 In a `digraph`, an `ARROW`/`ARROW` pair produces two `directed` rows, lower-to-higher node index
 first, then the reverse. Printed summaries count and list both directions.
 
-Nodes are numbered from 0 for an array. For a pandas DataFrame the column names become the
-structure's `labels`, and `oriented_edges()` returns names instead of indices:
+Nodes are numbered from 0 for an array. For a pandas DataFrame the column names, as text, become
+the structure's `labels`, and `oriented_edges()` returns names instead of indices:
 
 ```python
 import pandas as pd
@@ -146,7 +146,9 @@ andrey.direct_lingam(df).structure.oriented_edges()
 ```
 
 `andrey run` reads a CSV or TSV header row the same way. Its JSON result lists the names in
-`labels`, and each edge's `source` and `target` are indices into that list.
+`labels`, and each edge's `source` and `target` are indices into that list. A first row of numbers
+is data, not a header, so quote a name that is a number, as in `"1","0","2"`; a first row that
+mixes numbers with text is an error.
 
 | Call | Returns |
 |---|---|
@@ -157,9 +159,11 @@ andrey.direct_lingam(df).structure.oriented_edges()
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
 | `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes |
 
-`GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. Pass
-the graph's `kind`: when it is omitted, they infer it from the marks, and the marks alone do not
-always decide it. A `digraph` 2-cycle, for one, comes back as a `pag` with a bidirected edge.
+`GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. They
+take each label or NetworkX node as text, `str(label)`, and raise a `ValueError` when two are the
+same text, such as `1` and `"1"`. Pass the graph's `kind`: when it is omitted, they infer it from
+the marks, and the marks alone do not always decide it. A `digraph` 2-cycle, for one, comes back
+as a `pag` with a bidirected edge.
 
 `to_networkx()` returns a `DiGraph` for `dag`, `cpdag`, and `digraph`, and a `MultiDiGraph` for
 `pag` or `multigraph=True`. Every edge carries `endpoints=(mark_i, mark_j)`. For `dag`, `cpdag`,

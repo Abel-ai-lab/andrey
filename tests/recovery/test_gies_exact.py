@@ -256,13 +256,20 @@ def _symmetric_chain() -> np.ndarray:
 def test_exact_search_reports_one_dag_under_any_column_order(search_method):
     """Exactly tied DAGs of one class resolve the same way whatever the column order."""
     data = _symmetric_chain()
-    expected = exact_module.exact_search(data, search_method=search_method).to_numpy()
-    for seed in range(6):
-        perm = np.random.default_rng(seed).permutation(3)
+
+    def relabeled(perm: np.ndarray) -> np.ndarray:
         found = exact_module.exact_search(data[:, perm], search_method=search_method).to_numpy()
-        relabeled = np.empty_like(found)
-        relabeled[np.ix_(perm, perm)] = found
-        np.testing.assert_array_equal(relabeled, expected)
+        back = np.empty_like(found)
+        back[np.ix_(perm, perm)] = found
+        return back
+
+    expected = exact_module.exact_search(data, search_method=search_method).to_numpy()
+    perms = [np.random.default_rng(seed).permutation(3) for seed in range(6)]
+    for perm in perms:
+        np.testing.assert_array_equal(relabeled(perm), expected)
+    with andrey.config(tie_break="position"):
+        by_position = relabeled(np.arange(3))
+        assert any((relabeled(perm) != by_position).any() for perm in perms)
     other = "dp" if search_method == "astar" else "astar"
     np.testing.assert_array_equal(
         exact_module.exact_search(data, search_method=other).to_numpy(), expected

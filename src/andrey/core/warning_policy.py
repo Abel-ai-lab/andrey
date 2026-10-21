@@ -61,7 +61,8 @@ class DataTypeWarning(AndreyWarning):
 
     A mixed-data test or score warns when it infers the categorical columns or finds none, and so
     runs as its linear-Gaussian form; a continuous one warns once when columns look like category
-    codes.
+    codes. A score search left at ``score_func=None`` warns once when it picks BDeu because every
+    column is categorical, or the conditional Gaussian BIC because some are.
     """
 
 

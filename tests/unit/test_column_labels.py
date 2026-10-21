@@ -1,4 +1,8 @@
-"""A DataFrame's column names become the result's node labels, for every method that takes one."""
+"""A DataFrame's column names become the result's node labels, for every method that takes one.
+
+The labels also name each edge under any column order, which checks the registry's column-order
+fields on every method.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,9 @@ import pandas as pd
 import pytest
 
 import andrey
-from andrey.core import TemporalStructure
+from andrey.core import TemporalStructure, backend
+from andrey.core.knowledge import column_position
+from andrey.core.structure import node_labels
 from andrey.spec import list_specs
 
 COLUMNS = ["x", "y", "z"]
@@ -30,7 +36,7 @@ def inputs(spec, frames) -> list:
             continue
         if inp.kind == "matrix":
             pair = spec.family == "pairwise"
-            args.append(frames[0][COLUMNS[:2]] if pair else frames[0])
+            args.append(frames[0].iloc[:, :2] if pair else frames[0])
         elif inp.kind == "panel":
             args.append(frames)
         elif inp.kind == "context":
@@ -55,17 +61,70 @@ SHORT = {"calm": {"max_outer": 1, "subproblem_iter": 20}}
 
 
 @pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
-def test_dataframe_columns_become_labels(spec):
+def test_dataframe_columns_become_labels_as_text(spec):
     if spec.name == "calm":
         pytest.importorskip("torch")
-    frames = [frame(0), frame(1), frame(2)]
+    # Integer names that are also positions, beside a string: every label is the name as text.
+    frames = [frame(seed).set_axis([1, 0, "z"], axis=1) for seed in range(3)]
     out = getattr(andrey, spec.name)(*inputs(spec, frames), **SHORT.get(spec.name, {}))
     for result in out if isinstance(out, list) else [out]:
         for graph in graphs(result.structure):
             # GIN appends its latents after the observed columns; a pairwise test takes two.
-            columns = COLUMNS[:2] if spec.family == "pairwise" else COLUMNS
-            assert graph.labels[: len(columns)] == tuple(columns)
+            labels = ("1", "0", "z")[: 2 if spec.family == "pairwise" else 3]
+            assert graph.labels[: len(labels)] == labels
             assert graph.labels == result.structure.labels
+
+
+@pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
+def test_columns_named_alike_as_text_raise_before_the_fit(spec):
+    # One row: a fit, or any other check of the rows, would fail on it first.
+    frames = [frame(seed).head(1).set_axis(["1", 1, 0], axis=1) for seed in range(3)]
+    with pytest.raises(ValueError, match=r"'1' names columns \[0, 1\]"):
+        getattr(andrey, spec.name)(*inputs(spec, frames))
+
+
+def named_marks(out) -> list[dict]:
+    """Each graph of a result as ``{(label, label): mark}``, which no column order changes."""
+    found = []
+    for result in out if isinstance(out, list) else [out]:
+        for graph in graphs(result.structure):
+            m, labels = graph.to_numpy(), graph.labels
+            found.append(
+                {(a, b): int(m[i, j]) for i, a in enumerate(labels) for j, b in enumerate(labels)}
+            )
+    return found
+
+
+@pytest.mark.parametrize("spec", TABLE_SPECS, ids=lambda spec: spec.name)
+def test_reordering_the_columns_relabels_the_result(spec, monkeypatch):
+    """A method marked order-free names the same edges under reordered columns, and exactly the
+    methods marked ``tie_break`` read the setting during a fit. A pairwise method's two columns
+    swap."""
+    if spec.name == "calm":
+        pytest.importorskip("torch")
+    reads = []
+    resolve = backend._resolve_tie_break
+    monkeypatch.setattr(backend, "_resolve_tie_break", lambda: reads.append(1) or resolve())
+
+    def fit(columns: list[str], **given):
+        frames = [frame(seed)[columns] for seed in range(3)]
+        return getattr(andrey, spec.name)(
+            *inputs(spec, frames), **SHORT.get(spec.name, {}), **given
+        )
+
+    want = named_marks(fit(COLUMNS))
+    assert bool(reads) == spec.tie_break
+    for given in ({"collider_order": "p_value"}, {"possible_dsep": "order_free"}):
+        if given.keys() <= {param.name for param in spec.params}:
+            # An order given in the call does not consult the setting for that order.
+            read_by_default = len(reads)
+            reads.clear()
+            fit(COLUMNS, **given)
+            assert len(reads) == read_by_default - 1
+    if spec.column_order != "can_change":
+        pair = spec.family == "pairwise"
+        for order in ([1, 0, 2],) if pair else ([1, 2, 0], [2, 0, 1]):
+            assert named_marks(fit([COLUMNS[k] for k in order])) == want
 
 
 @pytest.mark.parametrize("data", [frame().to_numpy(), pd.DataFrame(frame().to_numpy())])
@@ -102,11 +161,67 @@ def test_gin_explicit_labels_beat_columns():
     assert out.structure.labels[:3] == ("a", "b", "c")
 
 
-def test_duplicate_column_names_are_rejected():
-    df = frame()
-    df.columns = ["x", "x", "z"]
-    with pytest.raises(ValueError, match="unique"):
-        andrey.pc(df)
+@pytest.mark.parametrize(
+    ("labels", "message"), [(("a", "a", "b"), r"'a' names columns \[0, 1\]"), ((1, "1", 2), "'1'")]
+)
+def test_gin_explicit_labels_must_differ_as_text(labels, message):
+    with pytest.raises(ValueError, match=message):
+        andrey.gin(frame(), labels=labels)
+
+
+def test_gin_latents_skip_the_names_of_observed_columns():
+    latents = andrey.gin(frame().set_axis(["L1", "x", "L3"], axis=1)).structure.labels[3:]
+    assert latents[0] == "L2" and not set(latents) & {"L1", "x", "L3"}
+    assert andrey.gin(frame(), labels=(1, 2, 3)).structure.labels[:4] == ("1", "2", "3", "L1")
+
+
+@pytest.mark.parametrize(
+    ("names", "labels"),
+    [
+        ([10, 20, 30], ("10", "20", "30")),
+        ([1.5, None, ("a", 1)], ("1.5", "None", "('a', 1)")),
+        ([1, "y", np.str_("z")], ("1", "y", "z")),
+    ],
+)
+def test_node_labels_take_each_name_as_text(names, labels):
+    assert node_labels(names) == labels
+    assert all(type(label) is str for label in node_labels(names))
+
+
+@pytest.mark.parametrize(
+    ("names", "message"),
+    [
+        (["x", "x", "z"], r"'x' names columns \[0, 1\]"),
+        ([1, "1", "z", "z"], r"'1' names columns \[0, 1\]; 'z' names columns \[2, 3\]"),
+    ],
+)
+def test_node_labels_name_every_label_columns_share(names, message):
+    with pytest.raises(ValueError, match=message):
+        node_labels(names)
+
+
+@pytest.mark.parametrize(
+    ("node", "labels", "position"),
+    [("1", ("1", "0", "2"), 0), (1, ("1", "0", "2"), 1), (2, None, 2), ("b", ("a", "b"), 1)],
+)
+def test_column_position_reads_a_string_as_a_label_and_an_integer_as_a_position(
+    node, labels, position
+):
+    assert column_position(node, labels, 3, "categorical") == position
+
+
+@pytest.mark.parametrize(
+    ("node", "labels", "message"),
+    [
+        ("w", ("a", "b", "c"), "names column 'w', which data does not have"),
+        ("a", None, "data has no column names"),
+        (3, ("a", "b", "c"), "lists column 3, but data has 3 columns$"),
+        (10, ("10", "20", "30"), "to name the column '10', pass its label as a string"),
+    ],
+)
+def test_column_position_names_a_missing_column(node, labels, message):
+    with pytest.raises(ValueError, match=message):
+        column_position(node, labels, 3, "categorical")
 
 
 def test_groups_must_name_their_columns_alike():

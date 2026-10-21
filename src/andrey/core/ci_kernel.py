@@ -13,7 +13,8 @@ from functools import lru_cache
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
 from scipy.spatial.distance import pdist, squareform
-from scipy.special import gammaincc
+from scipy.special import gammaincc, ndtri
+from scipy.stats import qmc
 
 from andrey.search.hc import tie_ranks
 
@@ -341,18 +342,33 @@ def _hall_buckley_eagleson_pvalue(statistic: float, weights: np.ndarray) -> floa
     return float(gammaincc(dof / 2.0, max(chi2, 0.0) / 2.0))
 
 
-def _fourier_features(values: np.ndarray, count: int, rng: np.random.Generator) -> np.ndarray:
-    """``count`` random Fourier features of the rows of ``values`` for the Gaussian kernel
-    ``exp(-|a - b|^2 / (2 s^2))``, ``s`` the median pairwise distance over the first 500 rows.
-
-    The average product of two rows' features converges to their kernel value.
-    """
+def _median_distance(values: np.ndarray) -> float:
+    """The median pairwise distance between the first 500 rows of ``values``; 0 below 2 rows."""
     dists = pdist(values[:500], "euclidean")
-    scale = float(np.median(dists)) if dists.size else 0.0
-    weights = rng.standard_normal((values.shape[1], count))
-    offsets = rng.uniform(0.0, 2.0 * np.pi, count)
+    return float(np.median(dists)) if dists.size else 0.0
+
+
+def _fourier_features(
+    values: np.ndarray, count: int, rng: np.random.Generator, scale: float | None = None
+) -> np.ndarray:
+    """``count`` random Fourier features of the rows of ``values`` for the Gaussian kernel
+    ``exp(-|a - b|^2 / (2 s^2))``, ``s`` the median pairwise distance over the first 500 rows, or
+    ``scale`` when given.
+
+    The frequencies and phases come from the points of a scrambled Halton sequence, seeded by
+    ``rng``, with one coordinate per column and one for the phase: the normal quantiles of the
+    first coordinates divided by ``s``, and ``2 pi`` times the last. The average product of two
+    rows' features converges to their kernel value.
+    """
+    if scale is None:
+        scale = _median_distance(values)
+    columns = values.shape[1]
+    points = qmc.Halton(d=columns + 1, scramble=True, seed=rng).random(count)
+    points = np.clip(points, 1e-12, 1.0 - 1e-12)  # finite normal quantiles
+    weights = ndtri(points[:, :columns]).T
+    offsets = 2.0 * np.pi * points[:, columns]
     if scale > 0.0:
-        weights /= scale
+        weights = weights / scale
     return np.sqrt(2.0) * np.cos(values @ weights + offsets)
 
 
@@ -369,9 +385,9 @@ class RCoT:
     data : ndarray of shape (n_samples, n_variables)
         Observed data, one row per sample. Each column is standardized to unit variance.
     n_features : int, default=5
-        Random Fourier features drawn for ``x`` and for ``y``.
+        Random Fourier features sampled for ``x`` and for ``y``.
     n_features_cond : int, default=100
-        Random Fourier features drawn for the conditioning set. More features remove more of the
+        Random Fourier features sampled for the conditioning set. More features remove more of the
         conditioning set's effect, at a cost that grows with their square. The default is four
         times the 25 of [1]_: with 25, two conditioning variables that drive both ``x`` and ``y``
         leave enough of their effect to reject most true independences at 500 rows.
@@ -393,25 +409,37 @@ class RCoT:
     Notes
     -----
     **How it works.** A variable ``v`` with median pairwise distance ``s`` (over its first 500
-    rows) gets features ``sqrt(2) cos(v W + b)`` with ``W`` normal of standard deviation
-    ``1 / s`` and ``b`` uniform on ``[0, 2 pi]``, the random features of the Gaussian kernel
+    rows) gets features ``sqrt(2) cos(v W + b)``, with frequencies ``W`` from the kernel's
+    spectral distribution, normal of standard deviation ``1 / s``, and phases ``b`` uniform on
+    ``[0, 2 pi]``: the random Fourier features [5]_ of the Gaussian kernel
     ``exp(-|v - v'|^2 / (2 s^2))``. The median distance is that kernel's bandwidth, the median
-    heuristic [4]_ that [1]_ uses; [1]_ prints the kernel as ``exp(-|v - v'|^2 / s)``. Every
-    feature is standardized [1]_. With ``A`` and ``B`` the features of ``x`` and ``y``, and ``C``
-    those of the conditioning set, ``A`` and ``B`` are replaced by their residuals on ``C``
-    (ridge ``1e-10``). The statistic is ``n`` times the squared Frobenius norm of the residuals'
+    heuristic [4]_ that [1]_ uses; [1]_ prints the kernel as ``exp(-|v - v'|^2 / s)``. The
+    frequencies and phases are sampled by randomized quasi-Monte Carlo, the quasi-Monte Carlo
+    feature maps of [6]_: the points of a scrambled Halton sequence, one coordinate per variable
+    and one for the phase, give the frequencies through the normal quantile function and the
+    phases as ``2 pi`` times the last coordinate. Each point is uniform on the unit cube, so the
+    features stay unbiased for the kernel, and the points cover the cube more evenly than
+    independent samples, so a few features approximate the kernel more closely [6]_. Every feature
+    is standardized [1]_. With ``A`` and ``B`` the features of ``x`` and ``y``, and ``C`` those of
+    the conditioning set, ``A`` and ``B`` are replaced by their residuals on ``C`` (ridge
+    ``1e-10``). The statistic is ``n`` times the squared Frobenius norm of the residuals'
     cross-covariance matrix, as [1]_ defines it. Under the null it is a weighted sum of
     chi-squared variables whose weights are the eigenvalues of the covariance of the products of
     residuals; the p-value matches the first three cumulants of that sum with a shifted and scaled
     chi-squared law (Hall-Buckley-Eagleson) [2]_ [3]_. An empty conditioning set uses ``A`` and
     ``B``, centered.
 
-    The features of a variable, and those of a conditioning set, are drawn from a generator seeded
-    by ``seed`` and the :func:`~andrey.search.hc.tie_ranks` rank of each of its columns, a rank
-    computed from each column's own data, so every query on the same variable or conditioning set
-    uses the same features, and the test object keeps them, and the residuals, for later queries.
-    A p-value does not depend on the order of the queries, of the arguments, or of the columns, and
-    the same seed reproduces it.
+    The features of ``x`` and of ``y`` are sampled for each conditioning set, from generators
+    seeded by ``seed``, the variable, and the set, and those of the conditioning set from one
+    seeded by ``seed`` and the set; each column enters by its :func:`~andrey.search.hc.tie_ranks`
+    rank, computed from the column's own data. The queries of one pair with different
+    conditioning sets therefore use independent features, as in [1]_, where every test samples its
+    own. PC removes an edge when any conditioning set gives a p-value above ``alpha``, and features
+    shared by those queries would make them reject together, which keeps edges between
+    conditionally independent variables. Queries on the same variable and conditioning set share
+    its features, and the test object keeps them, and the residuals, for later queries. A p-value
+    does not depend on the order of the queries, of the arguments, or of the columns, and the same
+    seed reproduces it.
 
     **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
     variables. Measured on columns independent of each other, its rate of rejecting a true
@@ -422,10 +450,15 @@ class RCoT:
     the threshold. The regression on the conditioning-set features removes a strong nonlinear effect
     of that set only approximately, and what remains reads as dependence: with two or more
     conditioning variables that drive both ``x`` and ``y``, the test rejects a true independence
-    more often than ``alpha``, increasingly so as the rows grow (on simulated draws with three such
+    more often than ``alpha``, increasingly so as the rows grow (on simulated data with three such
     variables and 2,000 rows, nearly always). RCoT tests conditional uncorrelatedness of
     ``n_features`` features per variable, which can miss a dependence the full kernel test finds,
     such as one between an odd and an even function of the same cause on a few hundred rows.
+    Because the features are sampled for each conditioning set, PC tests a weak dependence against
+    every conditioning set with a new chance to miss it. On simulated random graphs of 10, 20, and
+    50 variables with as many edges as variables and additive or nonmonotone noise (3 seeds each),
+    PC with RCoT missed 12 to 22% of the true edges at 500 rows and 0.1 to 8% at 5,000 rows, and
+    added false edges numbering 1 to 8% of the true ones.
 
     References
     ----------
@@ -439,6 +472,11 @@ class RCoT:
     .. [4] Gretton, A., Fukumizu, K., Teo, C. H., Song, L., Scholkopf, B., and Smola, A. J.
        (2007). A kernel statistical test of independence. Advances in Neural Information
        Processing Systems 20, 585-592.
+    .. [5] Rahimi, A., and Recht, B. (2007). Random features for large-scale kernel machines.
+       Advances in Neural Information Processing Systems 20, 1177-1184.
+    .. [6] Yang, J., Sindhwani, V., Avron, H., and Mahoney, M. W. (2014). Quasi-Monte Carlo
+       feature maps for shift-invariant kernels. Proceedings of the 31st International Conference
+       on Machine Learning, PMLR 32(1), 485-493.
     """
 
     pin_blas = True  # read by pins_blas: the skeleton scans run it on one BLAS thread
@@ -464,10 +502,10 @@ class RCoT:
         self._n_features = int(n_features)
         self._n_features_cond = int(n_features_cond)
         self._seed = resolve_seed(seed)
-        # Features and residuals depend only on their columns, so queries share them.
+        # Bandwidths, features, and residuals depend only on their columns, so queries share them.
         n = self._n
-        self._column_features = lru_cache(maxsize=None)(
-            lambda column: self._features((column,), self._n_features)
+        self._scale = lru_cache(maxsize=None)(
+            lambda column: _median_distance(self._data[:, [column]])
         )
         self._residual = lru_cache(_cache_entries(n * self._n_features))(self._fit_residual)
         self._cond_factor = lru_cache(_cache_entries(n * self._n_features_cond))(self._factor)
@@ -490,23 +528,27 @@ class RCoT:
         return _hall_buckley_eagleson_pvalue(statistic, weights)
 
     def _fit_residual(self, column: int, cond: tuple[int, ...]) -> np.ndarray:
-        """The features of ``column`` minus what a ridge regression on the features of ``cond``
-        explains; the standardized features themselves when ``cond`` is empty."""
-        features = self._column_features(column)
+        """Standardized features of ``column``, sampled from a generator seeded by the seed,
+        ``column``, and ``cond``, minus what a ridge regression on the features of ``cond``
+        explains; the features themselves when ``cond`` is empty."""
+        # The leading 1 (0 for a conditioning set) gives a variable's generator and a set's
+        # different seeds.
+        rng = np.random.default_rng([self._seed, 1, self._n_features, column, *cond])
+        values = self._data[:, [column]]
+        features = _standardize(
+            _fourier_features(values, self._n_features, rng, self._scale(column))
+        )
         if not cond:
             return features
         c, factor = self._cond_factor(cond)
         return features - c @ cho_solve(factor, c.T @ features)
 
-    def _features(self, columns: tuple[int, ...], count: int) -> np.ndarray:
-        """Standardized random Fourier features of ``columns``, drawn from a generator seeded by
-        the seed, ``count``, and ``columns``."""
-        rng = np.random.default_rng([self._seed, count, *columns])
-        return _standardize(_fourier_features(self._data[:, list(columns)], count, rng))
-
     def _factor(self, cond: tuple[int, ...]) -> tuple[np.ndarray, tuple]:
-        """The conditioning set's features ``C`` and the Cholesky factor of
-        ``C'C + ridge (n - 1) I``, that is ``(n - 1)(Sigma_CC + ridge I)``."""
-        c = self._features(cond, self._n_features_cond)
+        """The conditioning set's standardized features ``C``, sampled from a generator seeded by
+        the seed and ``cond``, and the Cholesky factor of ``C'C + ridge (n - 1) I``, that is
+        ``(n - 1)(Sigma_CC + ridge I)``."""
+        rng = np.random.default_rng([self._seed, 0, self._n_features_cond, *cond])
+        values = self._data[:, list(cond)]
+        c = _standardize(_fourier_features(values, self._n_features_cond, rng))
         gram = c.T @ c + 1e-10 * (self._n - 1) * np.eye(c.shape[1])
         return c, cho_factor(gram)

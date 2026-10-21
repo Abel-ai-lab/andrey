@@ -15,6 +15,9 @@ Determinism = Literal["deterministic", "stochastic"]
 Accel = Literal["numpy", "torch"]
 # supported: benchmarked and gated before each release. experimental: warns once; API may change.
 Status = Literal["supported", "experimental"]
+# What reordering the input columns does to the result, with the default ``tie_break="rank"``:
+# relabels it and changes nothing else; relabels it where FastICA converges; or can change it.
+ColumnOrder = Literal["relabels", "relabels_if_converged", "can_change"]
 
 # How an array input reaches a method -- the CLI wires each to a --flag, the schema to a type.
 InputKind = Literal[
@@ -23,7 +26,10 @@ InputKind = Literal[
     "context",  # an auxiliary (n_samples, k) matrix aligned to the data rows (cdnod)
 ]
 # Hyperparameter value types -- map to a JSON-schema type and a CLI option.
-ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list"]
+# knowledge: an object with required/forbidden/allowed edge lists and tiers (andrey.Knowledge).
+ParamType = Literal["float", "int", "str", "bool", "int_pair", "str_list", "knowledge"]
+# The parts of an andrey.Knowledge a method honors.
+KnowledgePart = Literal["required", "forbidden", "allowed", "tiers"]
 
 EnvGroup = Literal["backend", "reproducibility", "determinism", "data"]
 
@@ -97,11 +103,15 @@ class MethodSpec(Spec):
     determinism: Determinism
     accel: Accel
     status: Status
+    column_order: ColumnOrder
+    tie_break: bool = False  # follows andrey.config.tie_break (tie_ranks; collider_order)
+    order_note: str = ""  # the column-order guide's note: what still follows the column order
     params: tuple[ParamSpec, ...] = ()
     seeded: bool = False  # honors a seed / random_state (and so ANDREY_SEED)
     passthrough: bool = False  # accepts extra **params (CALM optimizer knobs)
     references: tuple[str, ...] = ()
     aliases: tuple[str, ...] = ()
+    knowledge: tuple[KnowledgePart, ...] = ()  # the Knowledge parts its knowledge= honors
 
 
 class EnvVarSpec(Spec):

@@ -18,10 +18,12 @@ from andrey.api._adapt import (
     checked_data,
     column_labels,
     copies_named,
+    default_score,
     int_in_range,
     json_safe,
     structure_output,
 )
+from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.seeding import resolve_seed
 
 if TYPE_CHECKING:
@@ -35,11 +37,12 @@ if TYPE_CHECKING:
 def boss(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str | None = None,
     lambda_value: float = 1.0,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG with BOSS (Best Order Score Search).
 
@@ -52,12 +55,16 @@ def boss(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : str, default="local_score_BIC_from_cov"
-        Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
-        linear-Gaussian BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the
-        BDeu score and the multinomial BIC for categorical data coded by whole numbers, and
+    score_func : str or None, default=None
+        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
+        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
+        multinomial BIC for categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
+        column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
+        every column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC_from_cov"``. Pass
+        ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
@@ -68,7 +75,7 @@ def boss(
         ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so repeated calls return
         the same graph. Different seeds can reach different graphs.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
@@ -76,7 +83,15 @@ def boss(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        they may be category codes. With ``score_func=None``, the columns it infers pick the default
+        score.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
+        forbidden ones and include the required ones, and every causal order the search visits puts
+        the cause of each required edge, and each earlier tier, first. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -97,20 +112,23 @@ def boss(
         If ``score_func`` names no available score.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``lambda_value`` is negative or non-finite, or if ``data`` or ``categorical`` does not
         suit the score, as for :func:`~andrey.ges`. With the BIC score, also if a column repeats
         another up to scale and shift given more than two rows or, with more rows than columns, is a
         linear function of other columns. One message names every group of copies and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks or contradicts
+        itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
+        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
+        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
+        continuous setting meets columns that look like category codes. Each message warns once per
+        process.
 
     See Also
     --------
@@ -124,9 +142,9 @@ def boss(
     -----
     **When to use it.** BOSS suits the same data as :func:`~andrey.ges`: continuous data with linear
     effects, Gaussian noise, and no unmeasured common causes. It was designed for hundreds of highly
-    connected variables [1]_. For categorical data, use ``"local_score_BDeu"`` or
-    ``"local_score_BIC_categorical"``, and for mixed data ``"local_score_degen_gauss"`` or
-    ``"local_score_cond_gauss"``.
+    connected variables [1]_. When every column is categorical, the default score is
+    ``"local_score_BDeu"``, and on mixed data ``"local_score_cond_gauss"``;
+    ``"local_score_BIC_categorical"`` and ``"local_score_degen_gauss"`` also score those data.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -148,9 +166,9 @@ def boss(
 
     **Column order.** Each column gets a tie rank computed from its own data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: it starts from that order,
-    and the seed shuffles the order in which it visits them. Reordering the columns therefore
-    reorders the graph's nodes and changes nothing else, unless two columns are identical. The rank
-    is arbitrary with respect to causal structure.
+    and the seed shuffles the order in which it visits them. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order and on another machine.
 
     **Categorical data.** ``"local_score_BDeu"`` reads every column as categorical, each distinct
     value one category, and scores a variable given its parents with the BDeu score of
@@ -208,12 +226,20 @@ def boss(
     from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.boss import boss as _boss
 
+    score_func, categorical = default_score(
+        data,
+        score_func,
+        "local_score_BIC_from_cov",
+        categorical=categorical,
+        max_categories=max_categories,
+    )
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(f"BOSS supports {PERMUTATION_SCORES}, not {score_func!r}")
     X, mask = checked_data(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="boss")
     with copies_named(labels):
         cpdag, score = _boss(
             X,
@@ -221,6 +247,7 @@ def boss(
             random_state=resolve_seed(seed),
             score_func=score_func,
             categorical=mask,
+            constraints=constraints,
         )
     metadata = {"algorithm": "BOSS", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)
@@ -229,12 +256,13 @@ def boss(
 def grasp(
     data: npt.ArrayLike,
     *,
-    score_func: str = "local_score_BIC_from_cov",
+    score_func: str | None = None,
     lambda_value: float = 1.0,
     depth: int = 3,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG with GRaSP (Greedy Relaxation of the Sparsest Permutation).
 
@@ -248,12 +276,16 @@ def grasp(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : str, default="local_score_BIC_from_cov"
-        Local score objective, by default ``"local_score_BIC_from_cov"``, the covariance-based
-        linear-Gaussian BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the
-        BDeu score and the multinomial BIC for categorical data coded by whole numbers, and
+    score_func : str or None, default=None
+        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
+        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
+        multinomial BIC for categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
-        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
+        column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
+        every column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC_from_cov"``. Pass
+        ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
@@ -269,7 +301,7 @@ def grasp(
         ``None`` uses the ``ANDREY_SEED`` environment variable, or ``0`` when it is unset, so
         repeated calls return the same graph. Different seeds can reach different graphs.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data score: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
@@ -277,7 +309,15 @@ def grasp(
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
-        they may be category codes.
+        they may be category codes. With ``score_func=None``, the columns it infers pick the default
+        score.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. Each variable's parents exclude the
+        forbidden ones and include the required ones, and every causal order the search visits puts
+        the cause of each required edge, and each earlier tier, first. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes.
 
     Returns
     -------
@@ -298,20 +338,24 @@ def grasp(
         If ``score_func`` names no available score.
     TypeError
         If ``depth`` is not an int, ``categorical`` is not a list of column names and positions, or
-        ``max_categories`` is not an int.
+        ``max_categories`` is not an int. Also if ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``depth`` is less than ``1``, ``lambda_value`` is negative or non-finite, or if ``data``
         or ``categorical`` does not suit the score, as for :func:`~andrey.ges`. With the BIC score,
         also if a column repeats another up to scale and shift given more than two rows or, with
         more rows than columns, is a linear function of other columns. One message names every
-        group of copies and says to keep one column per group.
+        group of copies and says to keep one column per group. Also if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
     DataTypeWarning
-        When a mixed-data score infers the categorical columns, or finds none and so runs as the
-        linear-Gaussian form, or when a continuous setting meets columns that look like category
-        codes; each message warns once per process.
+        When ``score_func`` is ``None`` and the columns are all categorical or mixed, so the search
+        scores with BDeu or the conditional Gaussian BIC; when a mixed-data score infers the
+        categorical columns, or finds none and so runs as the linear-Gaussian form; or when a
+        continuous setting meets columns that look like category codes. Each message warns once per
+        process.
 
     See Also
     --------
@@ -325,9 +369,9 @@ def grasp(
     -----
     **When to use it.** GRaSP suits the same data as :func:`~andrey.ges`: continuous data with
     linear effects, Gaussian noise, and no unmeasured common causes. Its authors report accurate
-    search even on dense graphs [1]_. For categorical data, use ``"local_score_BDeu"`` or
-    ``"local_score_BIC_categorical"``, and for mixed data ``"local_score_degen_gauss"`` or
-    ``"local_score_cond_gauss"``.
+    search even on dense graphs [1]_. When every column is categorical, the default score is
+    ``"local_score_BDeu"``, and on mixed data ``"local_score_cond_gauss"``;
+    ``"local_score_BIC_categorical"`` and ``"local_score_degen_gauss"`` also score those data.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -354,9 +398,9 @@ def grasp(
     **Column order.** Each column gets a tie rank computed from its own data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the seed shuffles the
     sorted columns into the starting order and the order of visiting variables, and ties between
-    candidate parents go to the lowest rank. Reordering the columns therefore reorders the graph's
-    nodes and changes nothing else, unless two columns are identical. The rank is arbitrary with
-    respect to causal structure.
+    candidate parents go to the lowest rank. The
+    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
+    column order and on another machine.
 
     **Categorical data.** ``"local_score_BDeu"`` reads every column as categorical, each distinct
     value one category, and scores a variable given its parents with the BDeu score of
@@ -416,6 +460,13 @@ def grasp(
     from andrey.search.boss import PERMUTATION_SCORES
     from andrey.search.grasp import grasp as _grasp
 
+    score_func, categorical = default_score(
+        data,
+        score_func,
+        "local_score_BIC_from_cov",
+        categorical=categorical,
+        max_categories=max_categories,
+    )
     if score_func not in PERMUTATION_SCORES:
         raise NotImplementedError(f"GRaSP supports {PERMUTATION_SCORES}, not {score_func!r}")
     depth = int_in_range(depth, "depth", 1)
@@ -423,6 +474,7 @@ def grasp(
         data, categorical, "score_func", score_func, max_categories=max_categories
     )
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="grasp")
     with copies_named(labels):
         cpdag, score = _grasp(
             X,
@@ -431,6 +483,7 @@ def grasp(
             random_state=resolve_seed(seed),
             score_func=score_func,
             categorical=mask,
+            constraints=constraints,
         )
     metadata = {"algorithm": "GRaSP", "score": json_safe(score), **categorical_metadata(mask, data)}
     return structure_output(cpdag, labels=labels, metadata=metadata)

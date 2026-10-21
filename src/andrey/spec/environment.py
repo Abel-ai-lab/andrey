@@ -138,6 +138,20 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         group="reproducibility",
     ),
     EnvVarSpec(
+        name="ANDREY_TIE_BREAK",
+        values="rank, position",
+        default="rank",
+        effect=(
+            "How the searches order tied candidates. `rank` orders them by a rank computed from "
+            "each column's own data, so reordering the columns relabels the result. `position` "
+            "orders them by column position, which skips computing the ranks, fires the "
+            "orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order, "
+            "and visits the possible-d-separation step of `fci` and `gfci` in column order; "
+            "the result can then depend on the column order. Also `andrey.config(tie_break=...)`."
+        ),
+        group="reproducibility",
+    ),
+    EnvVarSpec(
         name="ANDREY_REQUIRE_GPU",
         values="1/true/yes/on or 0/false/no/off",
         default="off",
@@ -164,6 +178,8 @@ PRECEDENCE: tuple[str, ...] = (
     "Backend: `with andrey.config(backend=...)` > `andrey.config.backend = ...` > "
     "`ANDREY_BACKEND`/`ANDREY_DEVICE` > default (`auto`).",
     "Seed: explicit `seed=`/`random_state=` argument > `ANDREY_SEED` > `0`.",
+    "Tie break: `with andrey.config(tie_break=...)` > `andrey.config.tie_break = ...` > "
+    "`ANDREY_TIE_BREAK` > default (`rank`).",
     "GPU threshold: manual `ANDREY_*_GPU_THRESHOLD` > `ANDREY_GPU_CALIBRATE` measurement > "
     "per-device default.",
 )

@@ -9,6 +9,15 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `boss`, `grasp`, `ges`, `hc`, `tabu`, and `exact_search` pick their default score from the
+  column types and warn once with a `DataTypeWarning`: BDeu when every column is categorical, and
+  the conditional Gaussian BIC, `"local_score_cond_gauss"`, when some are, except for `tabu`, which
+  has no mixed-data score. Pass `score_func="local_score_BIC_from_cov"` (`"local_score_BIC"` for
+  `ges` and `exact_search`) to keep the linear-Gaussian BIC. Data with no categorical column keep it
+  without a change. ([#237])
+
 ### Added
 
 - `andrey.data.load_dataset("diabetes")`, the bnlearn diabetes network: 413 variables and 602
@@ -32,6 +41,21 @@ change names its pull request.
   partial correlation does not see. ([#209])
 - KCI and CMIknn run on a CUDA GPU, KCI in float64 and CMIknn with the CPU's p-values, from the
   cutoffs `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`. ([#209])
+- `knowledge=` on `pc`, `cdnod`, `fci`, `gfci`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`,
+  `grasp`, `exact_search`, and `direct_lingam` takes `andrey.Knowledge(required=, forbidden=,
+  allowed=, tiers=)`: the edges the graph must have and must not have, the only pairs that may be
+  adjacent, and tiers in time order; knowledge that contradicts itself or names a column the data
+  lack raises a `ValueError`, and the CLI takes `knowledge=` as JSON or a path.
+  `Knowledge.from_skeleton` turns a result's adjacencies into the allowed set. ([#214])
+- `pc`, `fci`, `gfci`, and `cdnod` take `max_depth`, the largest conditioning set any test uses.
+  ([#214])
+- `andrey.config.tie_break`, `andrey.config(tie_break=...)`, and `ANDREY_TIE_BREAK` choose how
+  the searches break ties: `"rank"`, the default, by a rank computed from each column's own data,
+  or `"position"`, by column position. The new Column order and machines guide lists what each
+  method keeps under a new column order and on another machine, and which methods follow the
+  setting. Under `"position"`, `pc`, `cdnod`, `fci`, and `gfci` also fire their orientation rules
+  one at a time in column order instead of in rounds, and `fci` and `gfci` default to
+  `possible_dsep="fast"`. ([#210])
 
 ### Changed
 
@@ -87,6 +111,25 @@ change names its pull request.
   computed from each column's own data instead of by column position, so reordering the columns no
   longer changes the edges it orients, and on data where its tests compete its graph can change.
   ([#228])
+- `"rcot"` samples the random Fourier features of `x` and `y` for each conditioning set, with
+  frequencies and phases from a scrambled Halton sequence (quasi-Monte Carlo feature maps), so one
+  pair's tests over different conditioning sets no longer share features and reject together, and
+  PC with it keeps fewer false edges, misses slightly more true ones, and makes fewer errors in all
+  on graphs of 10 to 50 variables. ([#248])
+- Every method takes a DataFrame's column names as node labels in text, `str(name)`, so
+  `categorical=["1"]` finds a column named `1`, which it reported missing before. Two names that
+  are equal as text, such as `1` and `"1"`, raise a `ValueError` before the fit that names the
+  label and its columns, also in `granger`, `rcd`, and `bottom_up_parce_lingam`, which raised after
+  it. ([#261])
+- `GraphStructure.from_numpy`, `from_edges`, and `from_networkx`, the `TemporalStructure`
+  constructors, and `StructureOutput.load` hold labels as text and raise a `ValueError` on two
+  labels that are equal as text: such a graph was already broken, as a NetworkX round trip merged
+  its nodes, so the error replaces a broken result rather than a working one. `gin` checks its
+  `labels` the same way and names its latents `L1`, `L2`, and so on, skipping a name an observed
+  column has. ([#261])
+- `andrey run` reads a quoted header name that holds a comma, and a first row that mixes numbers
+  with text exits with `bad_data` naming one of each; a first row of numbers is data, so quote a
+  header name that is a number. ([#261])
 
 ## [0.7.0] - 2026-10-19
 
@@ -441,8 +484,10 @@ First alpha release.
 [#207]: https://github.com/Abel-ai-lab/andrey/pull/207
 [#208]: https://github.com/Abel-ai-lab/andrey/pull/208
 [#209]: https://github.com/Abel-ai-lab/andrey/pull/209
+[#210]: https://github.com/Abel-ai-lab/andrey/pull/210
 [#211]: https://github.com/Abel-ai-lab/andrey/pull/211
 [#213]: https://github.com/Abel-ai-lab/andrey/pull/213
+[#214]: https://github.com/Abel-ai-lab/andrey/pull/214
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
 [#220]: https://github.com/Abel-ai-lab/andrey/pull/220
@@ -450,5 +495,8 @@ First alpha release.
 [#228]: https://github.com/Abel-ai-lab/andrey/pull/228
 [#229]: https://github.com/Abel-ai-lab/andrey/pull/229
 [#233]: https://github.com/Abel-ai-lab/andrey/pull/233
+[#237]: https://github.com/Abel-ai-lab/andrey/pull/237
 [#239]: https://github.com/Abel-ai-lab/andrey/pull/239
+[#248]: https://github.com/Abel-ai-lab/andrey/pull/248
 [#251]: https://github.com/Abel-ai-lab/andrey/pull/251
+[#261]: https://github.com/Abel-ai-lab/andrey/pull/261

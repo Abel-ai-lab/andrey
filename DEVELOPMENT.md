@@ -9,7 +9,7 @@ repository's conventions.
 
 - `src/andrey/`: the library and its public API.
 - `tests/`: correctness checks that run on every pull request.
-- `qa/`: the pre-release quality gate, baseline capture, and calibration.
+- `qa/`: the pre-release quality gate, the identity check, baseline capture, and calibration.
 - `benchmarks/`: comparisons with other packages and older Andrey builds.
 - `examples/`: the notebooks.
 - `apps/`: the interactive examples.
@@ -99,7 +99,11 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
    limit, such as an assumption on the data or a cost that grows fast with the size.
 2. Add one `MethodSpec` to `src/andrey/spec/registry.py` (copy the nearest sibling; keep defaults
    identical to the signature), with `status="experimental"`, and call
-   `warn_experimental("<name>")` first in the facade until the method is supported.
+   `warn_experimental("<name>")` first in the facade until the method is supported. Its
+   `column_order`, `tie_break`, and `order_note` fields fill the method's row in the
+   [column-order guide](docs/docs/guides/column-order.md): break ties with
+   `andrey.search.hc.tie_ranks`, which follows `andrey.config.tie_break`, and set `tie_break=True`;
+   `tests/unit/test_column_labels.py` checks both fields on every method.
 3. Run `uv run pytest tests/unit/test_spec_registry.py`, which names whatever is missing. The CLI,
    the schema, and the skill pick up the method on their own.
 4. Test it as [Test a method](#test-a-method) describes.
@@ -109,7 +113,9 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
 Dispatch numeric kernels through `andrey.core.backend` (`docs/docs/configuration.md` gives the
 selection rules) and, for the greedy score-based searches, use the shared worker pool in
 `src/andrey/search/_parallel.py`. Keep the recovery tests passing and the outputs equal across
-Andrey's execution paths, and measure the speedup with a benchmark campaign.
+Andrey's execution paths, and measure the speedup with a benchmark campaign. `qa/identity.py`
+shows the change returns the same bits and makes no more queries: write its manifest on the base
+commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)).
 
 ### Change a parameter or default
 

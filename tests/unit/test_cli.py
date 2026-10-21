@@ -644,7 +644,30 @@ def test_parse_text_keeps_every_numeric_row():
     assert arr.shape == (3, 3) and labels is None  # no row silently dropped
 
 
-@pytest.mark.parametrize(("header", "message"), [("a,b", "names 2 columns"), ("a,a,b", "unique")])
+@pytest.mark.parametrize(
+    ("header", "labels"),
+    [
+        ('"a,b",c,d', ("a,b", "c", "d")),  # a quoted name may hold the delimiter
+        ('"1","0","2"', ("1", "0", "2")),  # quotes make numbers names
+        ('"x ""q""", y ,""', ('x "q"', "y", "")),
+    ],
+)
+def test_parse_text_reads_quoted_header_names(header, labels):
+    from andrey.cli import _parse_text
+
+    arr, read = _parse_text(f"{header}\n1,2,3\n4,5,6\n")
+    assert arr.shape == (2, 3) and read == labels
+
+
+@pytest.mark.parametrize(
+    ("header", "message"),
+    [
+        ("a,b", "names 2 columns"),
+        ("a,a,b", r"'a' names columns \[0, 1\]"),
+        ("a,1,b", "mixes numbers, such as '1', with text, such as 'a'"),
+        ('"a",1,"b"', "mixes numbers, such as '1'"),
+    ],
+)
 def test_parse_text_rejects_a_header_that_cannot_name_the_columns(header, message):
     from andrey.cli import CliError, _parse_text
 
@@ -796,11 +819,16 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
     monkeypatch.setattr("andrey.describe", lambda: state)
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "-1")
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "90000")
+    monkeypatch.setenv("ANDREY_TIE_BREAK", "Position")
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     code, out, err = _run(["config", "--json"], capsys)
     assert code == 0 and not err
     report = json.loads(out)
-    assert report["configuration"] == {"backend": "auto", "num_workers": -1}
+    assert report["configuration"] == {
+        "backend": "auto",
+        "num_workers": -1,
+        "tie_break": "position",
+    }
     assert report["available_backends"] == {
         "numpy": True,
         "cpu": True,

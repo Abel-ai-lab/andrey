@@ -45,7 +45,38 @@ _JSON_TYPES: dict[str, dict] = {
     "bool": {"type": "boolean"},
     "int_pair": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
     "str_list": {"type": "array", "items": {"type": "string"}},
+    "knowledge": {
+        "type": "object",
+        "properties": {
+            **{
+                part: {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {"type": ["string", "integer"]},
+                        "minItems": 2,
+                        "maxItems": 2,
+                    },
+                }
+                for part in ("required", "forbidden", "allowed")
+            },
+            "tiers": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": ["string", "integer"]}},
+            },
+        },
+        "additionalProperties": False,
+    },
 }
+
+#: How `knowledge=` reads on the command line, in the skill and in each method's help.
+KNOWLEDGE_NOTE = (
+    "knowledge= takes a JSON object, inline or as a .json file path: required and forbidden list "
+    "directed edges [cause, effect], allowed lists the only pairs that may be adjacent, and tiers "
+    "lists groups of columns in time order (no edge from a later tier into an earlier one). Name "
+    "columns by the data file's header or by 0-based position, for example, "
+    'knowledge=\'{"forbidden": [["y", "x"]], "tiers": [["age"], ["x", "y"]]}\'.'
+)
 
 
 def _param_schema(p: ParamSpec) -> dict:
@@ -87,6 +118,8 @@ def grammar_example(p: ParamSpec) -> str:
         return "[1,1]"
     if p.type == "str_list":
         return "[a,b]"
+    if p.type == "knowledge":
+        return "knowledge.json"
     if p.default is None and p.type in ("int", "float"):
         return "1" if p.type == "int" else "0.05"
     return grammar_default(p)
@@ -149,6 +182,7 @@ def to_json_schema(spec: MethodSpec) -> dict:
             "multi": spec.output.multi,
             "description": spec.output.doc,
         },
+        "knowledge": list(spec.knowledge),
         "references": list(spec.references),
         "cli": cli_example(spec),
     }
@@ -288,7 +322,11 @@ def _data_types_section() -> str:
         name for name, spec in REGISTRY.items() if any(p.name == "categorical" for p in spec.params)
     ]
     return (
-        "The default tests and scores read every column as continuous. For categorical columns "
+        "The default tests read every column as continuous. A score search left at "
+        "`score_func=null` picks `local_score_BDeu` when every column is categorical and "
+        "`local_score_cond_gauss` when some are (`tabu`, with no mixed-data score, keeps the BIC), "
+        "inferring the columns by the rule below and saying so in a `DataTypeWarning`; otherwise "
+        "it picks the linear-Gaussian BIC. For categorical columns "
         f"coded by whole numbers, choose `indep_test` {code(DISCRETE_INDEP_TESTS)} or `score_func` "
         f"{code(DISCRETE_SCORES)}. For mixed data, choose `indep_test` {code(MIXED_INDEP_TESTS)} "
         f"or `score_func` {code(MIXED_SCORES)} (on {', '.join(f'`{n}`' for n in typed)}), "
@@ -372,6 +410,15 @@ def render_skill() -> str:
     a("## Data types")
     a("")
     a(_data_types_section())
+    a("")
+    a("## Background knowledge")
+    a("")
+    a(
+        KNOWLEDGE_NOTE + " A method honors the parts its schema lists under knowledge and rejects "
+        "the others. Methods that take it: "
+        + ", ".join(f"`{s.name}`" for s in REGISTRY.values() if s.knowledge)
+        + "."
+    )
     a("")
     a("## Choosing a method")
     a("")
