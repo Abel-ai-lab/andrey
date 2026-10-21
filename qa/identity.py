@@ -17,8 +17,9 @@ compare names every row where one rose.
 
 ``--shuffle K`` refits each draw on ``K`` seeded column orders and maps each answer back to the
 original columns before hashing it; ``--workers N`` refits the methods that run worker processes
-or threads (:data:`WORKER_METHODS`) on ``N`` workers, with every GES pass sent to the pool. Both
-report each refit whose answer differs from the first fit.
+or threads (:data:`WORKER_METHODS`) on ``N`` workers, with every GES pass and every skeleton pass of
+conditioning size two or more sent to the pool. Both report each refit whose answer differs from
+the first fit.
 
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
@@ -133,9 +134,10 @@ FITS: dict[str, Fit] = {
     "Granger": Fit(lambda x: andrey.granger(x, maxlag=qg.GRANGER_LAGS, cv=5)),
 }
 
-#: The methods that run on ``andrey.config(num_workers=...)``: GES and GFCI's GES phase in worker
-#: processes, Granger's regressions on threads.
-WORKER_METHODS = ("GES", "GFCI", "Granger")
+#: The methods that run on ``andrey.config(num_workers=...)``: GES, GFCI's GES phase, and the
+#: skeleton searches of PC, FCI, GFCI, and CD-NOD in worker processes, Granger's regressions on
+#: threads.
+WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "GES", "Granger")
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -607,8 +609,9 @@ def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict
             **{name: os.environ.get(name) for name in THREAD_VARIABLES},
         },
         "corpus": {"seeds": seeds, "shuffle": shuffle, "workers": workers},
-        # A refit on more workers sends every GES pass to the worker pool.
+        # A refit on more workers sends every GES pass and every skeleton pass to the worker pool.
         "refit_ges_parallel_min_work": "0" if workers > 1 else None,
+        "refit_skeleton_min_pool_queries": 0 if workers > 1 else None,
     }
 
 
@@ -628,6 +631,19 @@ def _cpu_model() -> str:
     except OSError:
         pass
     return platform.processor() or platform.machine()
+
+
+@contextmanager
+def _skeleton_pool_open() -> Generator[None]:
+    """Send every skeleton pass of conditioning size two or more to the worker pool."""
+    from andrey.constraint import _parallel_skeleton
+
+    old = _parallel_skeleton.MIN_POOL_QUERIES
+    _parallel_skeleton.MIN_POOL_QUERIES = 0
+    try:
+        yield
+    finally:
+        _parallel_skeleton.MIN_POOL_QUERIES = old
 
 
 @contextmanager
@@ -663,7 +679,8 @@ def run(
     Each draw is fitted once with its queries counted. ``shuffle`` refits it on that many column
     orders, the k-th drawn from ``(seed, k)``, and hashes each answer mapped back
     (:func:`unpermute`). ``workers`` above 1 refits :data:`WORKER_METHODS` on that many workers,
-    with every GES pass sent to the worker pool. A refit differs when one of its :func:`parts`
+    with every GES pass and every skeleton pass of conditioning size two or more sent to the worker
+    pool. A refit differs when one of its :func:`parts`
     differs from the first fit's, mapped back the same way for a column order; each difference is
     reported as ``("graph" | "bits", description)``, naming the parts that changed.
     """
@@ -685,6 +702,7 @@ def run(
                 with (
                     andrey.config(num_workers=workers),
                     _environ("ANDREY_GES_PARALLEL_MIN_WORK", "0"),
+                    _skeleton_pool_open(),
                 ):
                     refits.append((0, workers, out, fit.call(x)))
             base = rows[-1]

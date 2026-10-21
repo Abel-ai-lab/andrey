@@ -76,15 +76,16 @@ def reduce_best(
     return best
 
 
-def collect(futures: list) -> list:
+def collect(futures: list, ordered: bool = False) -> list:
     """Collect every chunk result, propagating task exceptions.
 
     A killed worker (``BrokenProcessPool``) raises ``RuntimeError``. Dropping a failed chunk would
-    change the argmin.
+    change the argmin. Results come in completion order, or with ``ordered`` in submission order,
+    where the first failing chunk in that order raises its exception.
     """
     results = []
     try:
-        for fut in as_completed(futures):
+        for fut in futures if ordered else as_completed(futures):
             results.append(fut.result())
     except BrokenProcessPool as exc:
         raise RuntimeError(
