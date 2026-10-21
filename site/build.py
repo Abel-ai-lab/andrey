@@ -355,6 +355,7 @@ def comparisons(summary: dict) -> list[dict]:
             {
                 **method,
                 "spec": spec.name,
+                "release": summary.get("release", RELEASES[0]),
                 "family": spec.family,
                 "status": spec.status,
                 "error_kind": kind,
@@ -1896,8 +1897,7 @@ def coverage_tiles(summaries: list[dict], graphs: str) -> str:
         "wide",
         "Compared with other packages",
         "",
-        comparison_table(summaries)
-        + f'<p class="compare-source">{escape(comparison_source())}</p>',
+        comparison_table(summaries),
     ) + glass_tile(
         "wide",
         graph_title(),
@@ -1936,6 +1936,23 @@ def family_number(info: dict) -> str:
     )
 
 
+def method_bar(points: list[dict]) -> str:
+    """A bar of the family's methods over its figure: choosing one lights its lines and dims the
+    rest (``tiles.js``). Without script it is only a list of the methods."""
+    names = list(dict.fromkeys(p["method"] for p in points))
+    if len(names) < 2:
+        return ""
+    chips = [
+        '<button type="button" class="pf-chip" aria-pressed="true" data-method="">All</button>'
+    ]
+    chips += [
+        f'<button type="button" class="pf-chip" aria-pressed="false" data-method="{slug(n)}">'
+        f"{escape(n)}</button>"
+        for n in names
+    ]
+    return f'<div class="pf-bar" role="group" aria-label="Methods">{"".join(chips)}</div>'
+
+
 def speed_panel(summaries: list[dict]) -> str:
     """The families' speed in one panel: a tab per family, each showing the family's methods on
     one figure (``frontier_chart``) under its best speedup. Without script every family's panel
@@ -1958,6 +1975,7 @@ def speed_panel(summaries: list[dict]) -> str:
             f'aria-labelledby="speed-tab-{key}"><div class="seg-head">'
             f"<div><h3>{escape(info['title'])}</h3>"
             f"<p>{escape(method_names(info['methods']))}</p></div>{family_number(info)}</div>"
+            f"{method_bar(points.get(key, []))}"
             f'{figure}<p class="seg-foot">{escape(family_intro())} '
             '<a href="docs/benchmarks.html">Details in the release cards</a></p></div>'
         )
@@ -2028,7 +2046,8 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
             ]
             d, seconds, share = sizes[-1]
             return {"method": name, "package": package, "ours": ours, "unit": methods[0]["unit"],
-                    "sizes": sizes, "size": d, "seconds": seconds, "share": share}  # fmt: skip
+                    "release": methods[0]["release"], "sizes": sizes, "size": d,
+                    "seconds": seconds, "share": share}  # fmt: skip
 
         lines = [line("Andrey", True, by_size[0])] + [
             line(m["comparator"], False, rows) for m, rows in zip(methods, by_size, strict=True)
@@ -2092,8 +2111,8 @@ def place_labels(
         placed.append((x0, x0 + width, ly))
         tx = x0 + width if anchor == "end" else x0
         out.append(
-            f'<text class="pf-label" x="{tx:.1f}" y="{ly:.1f}" text-anchor="{anchor}">'
-            f"{escape(name)}</text>"
+            f'<text class="pf-label" data-method="{slug(name)}" x="{tx:.1f}" y="{ly:.1f}" '
+            f'text-anchor="{anchor}">{escape(name)}</text>'
         )
     return "".join(out)
 
@@ -2104,6 +2123,29 @@ def key(mark: str, label: str) -> str:
         f'<span class="pf-key"><svg viewBox="0 0 12 12" aria-hidden="true">{mark}</svg>'
         f"{escape(label)}</span>"
     )
+
+
+def card_href(release: str) -> str:
+    """The release card of ``release``, or the release cards' page where it has none."""
+    page = DOCS / "docs" / "benchmarks" / f"{release}.md"
+    return f"docs/benchmarks/{release}.html" if page.exists() else "docs/benchmarks.html"
+
+
+def point_tip(p: dict, d: int, seconds: float, share: float, andrey: dict) -> str:
+    """A point's tooltip, as data the page's script shows on hover (``tiles.js``): its method,
+    package, and size, then its time and errors beside Andrey's, and its release card."""
+    head = f"{p['method']} · {p['package']} · {d:,} {p['unit']}"
+    if p["ours"]:
+        lines = [f"Fit time {seconds_text(seconds)}", f"Errors {share:.2f} (empty graph = 1)"]
+    else:
+        mine = next(e for e in andrey["sizes"] if e[0] == d)
+        lines = [
+            f"Fit time {seconds_text(seconds)}; Andrey {seconds_text(mine[1])}, "
+            f"{ratio_text(seconds / mine[1])} faster",
+            f"Errors {share:.2f}; Andrey {mine[2]:.2f} (empty graph = 1)",
+        ]
+    return escape(json.dumps({"head": head, "lines": lines, "card": card_href(p["release"]),
+                              "release": p["release"]}), quote=True)  # fmt: skip
 
 
 def frontier_frame(points: list[dict]) -> dict:
@@ -2163,42 +2205,43 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
     packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
     shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
     ours = {p["method"]: p for p in points if p["ours"]}
-    # Each line runs through its sizes, smallest to largest.
-    pairs = [
-        f'<polyline class="pf-line{" pf-line--andrey" if p["ours"] else ""}" points="'
-        + " ".join(f"{x(t):.1f},{y(e):.1f}" for _, t, e in p["sizes"])
-        + '"/>'
-        for p in points
-        if len(p["sizes"]) > 1
-    ]
     # The most attractive quadrant, the same in every family's figure.
     mid_x, mid_y = x(frame["corner"][0]), y(frame["corner"][1])
     quadrant = (
         f'<rect class="pf-quadrant" x="{left}" y="{mid_y:.1f}" width="{mid_x - left:.1f}" '
         f'height="{bottom - mid_y:.1f}"/>'
     )
-    # A mark at every size, the largest size's larger; a method's name at Andrey's largest size.
-    marks, labels = [], []
-    for p in points:
+    # A group per method and package, tagged with the method, so the method bar can light one:
+    # its line through its sizes, smallest to largest, and a mark at every size, the largest
+    # size's the larger, each with its tooltip. A method's name sits at Andrey's largest size.
+    series, labels = [], []
+    for p in sorted(points, key=lambda p: p["ours"]):  # Andrey's lines drawn last, on top
+        body = []
+        if len(p["sizes"]) > 1:
+            body.append(
+                f'<polyline class="pf-line{" pf-line--andrey" if p["ours"] else ""}" points="'
+                + " ".join(f"{x(t):.1f},{y(e):.1f}" for _, t, e in p["sizes"])
+                + '"/>'
+            )
         for k, (d, t, e) in enumerate(p["sizes"]):
             cx, cy = x(t), y(e)
             last = k == len(p["sizes"]) - 1
-            tip = escape(
-                f"{p['method']}, {p['package']}, {d:,} {p['unit']}: {seconds_text(t)}, "
-                f"errors {e:.2f} (empty graph = 1)"
-            )
+            tip = f' tabindex="0" data-tip="{point_tip(p, d, t, e, ours[p["method"]])}"'
             if p["ours"]:
-                marks.append(
+                body.append(
                     f'<circle class="pf-andrey" cx="{cx:.1f}" cy="{cy:.1f}" '
-                    f'r="{5 if last else 3}"><title>{tip}</title></circle>'
+                    f'r="{5 if last else 3}"{tip}/>'
                 )
             else:
                 kind = shapes[p["package"]]
-                marks.append(
+                body.append(
                     f'<path class="pf-other pf-{kind}" '
-                    f'd="{shape(kind, cx, cy, 4.5 if last else 3)}">'
-                    f"<title>{tip}</title></path>"
+                    f'd="{shape(kind, cx, cy, 4.5 if last else 3)}"{tip}/>'
                 )
+        who = " pf-series--andrey" if p["ours"] else ""
+        series.append(
+            f'<g class="pf-series{who}" data-method="{slug(p["method"])}">{"".join(body)}</g>'
+        )
         if p["ours"]:
             labels.append((x(p["seconds"]), y(p["share"]), p["method"]))
     centers = [(x(t), y(e)) for p in points for _, t, e in p["sizes"]]
@@ -2222,8 +2265,7 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
         "Fit time, seconds (log)</text>"
         f'<text class="tc-title" transform="translate(12 {(top + bottom) / 2:.1f}) rotate(-90)" '
         'text-anchor="middle">Errors (empty graph = 1)</text>'
-        f"{''.join(pairs)}"
-        f"{''.join(marks)}{place_labels(labels, left, centers)}</svg></figure>"
+        f"{''.join(series)}{place_labels(labels, left, centers)}</svg></figure>"
     )
 
 
@@ -2240,10 +2282,13 @@ MARKS = {
     "part": ("minus", "Partly", "\u25d0"),
     "no": ("x", "No", "\u2717"),
 }
-# (guarantee, one mark per package in PEERS order, a note for every "part" mark by package). A
-# guarantee is a few words; its notes carry the detail.
+# The table's sections, in order, each its measured rows (``measured_rows``) then its marks.
+SECTIONS = ("Causal methods", "Speed", "Agentic")
+# (section, attribute, one mark per package in PEERS order, a note for every "part" mark by
+# package). An attribute is a few words; its notes carry the detail.
 COMPARISON = (
     (
+        "Speed",
         "CPU parallelization",
         ("yes", "part", "part", "part", "part"),
         {
@@ -2254,11 +2299,13 @@ COMPARISON = (
         },
     ),
     (
+        "Speed",
         "GPU acceleration",
         ("yes", "part", "no", "no", "no"),
         {"causal-learn": "CALM only."},
     ),
     (
+        "Causal methods",
         "Permutation invariance",
         ("yes", "no", "part", "no", "no"),
         {
@@ -2267,6 +2314,7 @@ COMPARISON = (
         },
     ),
     (
+        "Agentic",
         "Agent-native interface",
         ("yes", "no", "part", "no", "no"),
         {
@@ -2275,6 +2323,7 @@ COMPARISON = (
         },
     ),
     (
+        "Speed",
         "Open benchmarks",
         ("yes", "no", "no", "no", "no"),
         {},
@@ -2293,8 +2342,26 @@ FIT_BUDGET_S = 1
 METHOD_COUNTS = {"Andrey": 25, "causal-learn": 21, "Tetrad": 21, "pcalg": 8, "bnlearn": 10}
 
 
-def measured_rows(summaries: list[dict]) -> list[tuple[str, list[str]]]:
-    """The measured rows, a value per package in PEERS order, None where a package has none."""
+def scaling(rows: list[tuple[int, float]]) -> float:
+    """The exponent k of time against size, time ~ size^k: the least-squares slope on log scales."""
+    xs = [math.log(d) for d, _ in rows]
+    ys = [math.log(t) for _, t in rows]
+    mx, my = statistics.fmean(xs), statistics.fmean(ys)
+    return sum((a - mx) * (b - my) for a, b in zip(xs, ys, strict=True)) / sum(
+        (a - mx) ** 2 for a in xs
+    )
+
+
+# A comparison gives a scaling exponent from this many sizes up: below it, a fit's fixed cost
+# hides how time grows.
+SCALING_MIN_SIZES = 4
+
+
+def measured_rows(summaries: list[dict]) -> list[tuple[str, str, list[str | None]]]:
+    """The measured rows, (section, label, an HTML value per package in PEERS order, None where
+    a package has none). Each package's scaling exponent is the median over its comparisons with
+    SCALING_MIN_SIZES sizes or more, Andrey's over all of those comparisons."""
+    slopes: dict[str, list[float]] = {p: [] for p in PEERS}
     logs: dict[str, list[float]] = {p: [] for p in PEERS[1:]}
     most = {p: 0 for p in PEERS}
     for m in supported(summaries):
@@ -2302,6 +2369,9 @@ def measured_rows(summaries: list[dict]) -> list[tuple[str, list[str]]]:
         if m["unit"] != "variables" or package not in logs:
             continue
         paired = [r for r in m["rows"] if r["andrey_s"] and r["comparator_s"]]
+        if len(paired) >= SCALING_MIN_SIZES:
+            slopes["Andrey"].append(scaling([(r["d"], r["andrey_s"]) for r in paired]))
+            slopes[package].append(scaling([(r["d"], r["comparator_s"]) for r in paired]))
         if paired:
             top = max(paired, key=lambda r: r["d"])
             logs[package].append(math.log(top["comparator_s"] / top["andrey_s"]))
@@ -2313,20 +2383,22 @@ def measured_rows(summaries: list[dict]) -> list[tuple[str, list[str]]]:
     times = ["1x"] + [
         ratio_text(math.exp(statistics.fmean(logs[p]))) if logs[p] else None for p in PEERS[1:]
     ]
+    grows = [
+        f"V<sup>{statistics.median(slopes[p]):.1f}</sup>" if slopes[p] else None for p in PEERS
+    ]
+    fits = [f"{most[p]:,}" if most[p] else None for p in PEERS]
     return [
-        ("Distinct methods", [str(METHOD_COUNTS[p]) for p in PEERS]),
-        ("Fit time (Andrey = 1x)", times),
-        (
-            f"Variables fit in {FIT_BUDGET_S} s",
-            [f"{most[p]:,}" if most[p] else None for p in PEERS],
-        ),
+        ("Causal methods", "Distinct methods", [str(METHOD_COUNTS[p]) for p in PEERS]),
+        ("Speed", "Fit time (Andrey = 1x)", times),
+        ("Speed", "Time grows with variables as", grows),
+        ("Speed", f"Variables fit in {FIT_BUDGET_S} s", fits),
     ]
 
 
 def comparison_notes() -> list[tuple[str, str, str, str]]:
     """Check the table and number its notes: (feature, package, mark, note) in reading order."""
     notes = []
-    for feature, marks, row_notes in COMPARISON:
+    for _, feature, marks, row_notes in COMPARISON:
         if len(marks) != len(PEERS) or set(marks) - MARKS.keys():
             raise ValueError(f"{feature!r}: give one of {sorted(MARKS)} for each of {PEERS}")
         if set(row_notes) - set(PEERS):
@@ -2351,46 +2423,53 @@ def comparison_table(summaries: list[dict]) -> str:
         f'<th scope="col"{" class=ct-ours" if p == "Andrey" else ""}>{escape(p)}</th>'
         for p in PEERS
     )
+    measured = measured_rows(summaries)
     rows = []
-    for label, values in measured_rows(summaries):
-        cells = "".join(
-            f'<td class="value{" ct-ours" if p == "Andrey" else ""}">{escape(v) if v else "-"}</td>'
-            for p, v in zip(PEERS, values, strict=True)
+    for section in SECTIONS:
+        rows.append(
+            f'<tr class="compare-group"><th scope="colgroup" colspan="{1 + len(PEERS)}">'
+            f"{section}</th></tr>"
         )
-        name = escape(label)
-        if label == "Distinct methods":
-            name = f'<a href="#methods" data-tile="methods">{name}</a>'
-        rows.append(f'<tr class="compare-alone"><th scope="row">{name}</th>{cells}</tr>')
-    for feature, marks, _ in COMPARISON:
-        cells = []
-        for package, mark in zip(PEERS, marks):
-            icon, word, _ = MARKS[mark]
-            note = notes.get((feature, package))
-            said = f"{word}: {escape(note)}" if note else word
-            tip = f' title="{escape(note)}"' if note else ""
-            ours = " ct-ours" if package == "Andrey" else ""
-            cells.append(
-                f'<td class="mark mark--{mark}{ours}"{tip}>{glyph(icon)}'
-                f'<span class="visually-hidden">{said}</span></td>'
+        for _, label, values in (r for r in measured if r[0] == section):
+            cells = "".join(
+                f'<td class="value{" ct-ours" if p == "Andrey" else ""}">{v or "-"}</td>'
+                for p, v in zip(PEERS, values, strict=True)
             )
-        # Where only Andrey has it, its mark is the row's one amber.
-        alone = marks[0] == "yes" and "yes" not in marks[1:]
-        row_class = ' class="compare-alone"' if alone else ""
-        rows.append(f'<tr{row_class}><th scope="row">{escape(feature)}</th>{"".join(cells)}</tr>')
+            name = escape(label)
+            if label == "Distinct methods":
+                name = f'<a href="#methods" data-tile="methods">{name}</a>'
+            rows.append(f'<tr class="compare-alone"><th scope="row">{name}</th>{cells}</tr>')
+        for _, feature, marks, _ in (r for r in COMPARISON if r[0] == section):
+            cells = []
+            for package, mark in zip(PEERS, marks):
+                icon, word, _ = MARKS[mark]
+                note = notes.get((feature, package))
+                said = f"{word}: {escape(note)}" if note else word
+                tip = f' title="{escape(note)}"' if note else ""
+                ours = " ct-ours" if package == "Andrey" else ""
+                cells.append(
+                    f'<td class="mark mark--{mark}{ours}"{tip}>{glyph(icon)}'
+                    f'<span class="visually-hidden">{said}</span></td>'
+                )
+            # Where only Andrey has it, its mark is the row's one amber.
+            alone = marks[0] == "yes" and "yes" not in marks[1:]
+            row_class = ' class="compare-alone"' if alone else ""
+            rows.append(
+                f'<tr{row_class}><th scope="row">{escape(feature)}</th>{"".join(cells)}</tr>'
+            )
     return (
         '<p class="compare-hint">Scroll sideways for every package.</p>'
         '<div class="table-scroll" role="region" aria-label="Feature comparison" tabindex="0">'
         '<table class="compare">'
-        f"<thead><tr><td></td>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+        f"<thead><tr><td></td>{head}</tr></thead><tbody>{''.join(rows)}</tbody>"
+        f'<tfoot><tr><td colspan="{1 + len(PEERS)}">{escape(comparison_source())}</td></tr>'
+        "</tfoot></table></div>"
     )
 
 
 def comparison_source() -> str:
     """What the table's marks were read from."""
-    return (
-        "Times from our published benchmarks; the rest read from each package's released code: "
-        f"{PEER_VERSIONS}."
-    )
+    return f"Speed from our open benchmarks; the rest from each package's code: {PEER_VERSIONS}."
 
 
 # The docs' code colors (pydata-sphinx-theme's defaults), so code reads the same on every page.

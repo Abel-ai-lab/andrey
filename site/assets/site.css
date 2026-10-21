@@ -1347,11 +1347,12 @@
   font-size: 0.8rem;
 }
 
-.andrey-home .compare-source {
-  margin: 0;
-  padding: 0.5rem 1rem 0.8rem;
+.andrey-home .compare tfoot td {
+  padding: 0.7rem 1rem;
+  border: 0;
   color: var(--andrey-muted);
   font-size: 0.72rem;
+  text-align: start;
 }
 
 /* The tiles fly in as they enter the screen, a row at a time with a short stagger across it

@@ -105,6 +105,62 @@
     });
   }
 
+  // A family figure's method bar lights one method's lines and dims the rest.
+  for (const bar of document.querySelectorAll(".pf-bar")) {
+    const figure = bar.nextElementSibling;
+    const chips = [...bar.querySelectorAll(".pf-chip")];
+    for (const chip of chips) {
+      chip.addEventListener("click", () => {
+        for (const each of chips) each.setAttribute("aria-pressed", String(each === chip));
+        if (chip.dataset.method) figure.dataset.focus = chip.dataset.method;
+        else delete figure.dataset.focus;
+        for (const part of figure.querySelectorAll("[data-method]")) {
+          part.classList.toggle("is-on", part.dataset.method === chip.dataset.method);
+        }
+      });
+    }
+  }
+
+  // A figure point's tooltip: its method, package, and size, its numbers in short bullets, and
+  // its release card. It stays while the pointer moves onto it, so its link can be followed.
+  const tip = document.createElement("div");
+  tip.className = "pf-tip";
+  tip.setAttribute("role", "tooltip");
+  tip.hidden = true;
+  document.body.append(tip);
+  let hide;
+  const showTip = (mark) => {
+    clearTimeout(hide);
+    const data = JSON.parse(mark.dataset.tip);
+    tip.replaceChildren();
+    const head = document.createElement("strong");
+    head.textContent = data.head;
+    const list = document.createElement("ul");
+    for (const line of data.lines) {
+      const item = document.createElement("li");
+      item.textContent = line;
+      list.append(item);
+    }
+    const card = document.createElement("a");
+    card.href = data.card;
+    card.textContent = `${data.release} release card`;
+    tip.append(head, list, card);
+    tip.hidden = false;
+    const box = mark.getBoundingClientRect();
+    const left = Math.min(box.right + 10, window.innerWidth - tip.offsetWidth - 12);
+    tip.style.left = `${left + window.scrollX}px`;
+    tip.style.top = `${box.top + window.scrollY - tip.offsetHeight / 2 + box.height / 2}px`;
+  };
+  const later = () => { hide = setTimeout(() => { tip.hidden = true; }, 250); };
+  for (const mark of document.querySelectorAll("[data-tip]")) {
+    mark.addEventListener("pointerenter", () => showTip(mark));
+    mark.addEventListener("focus", () => showTip(mark));
+    mark.addEventListener("pointerleave", later);
+    mark.addEventListener("blur", later);
+  }
+  tip.addEventListener("pointerenter", () => clearTimeout(hide));
+  tip.addEventListener("pointerleave", later);
+
   // An address that ends in a tile's id, such as an old link to #methods, opens that tile; one
   // that ends in a panel's id, such as #speed-score, shows that panel.
   const target = location.hash && document.getElementById(location.hash.slice(1));

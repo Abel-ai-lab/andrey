@@ -896,7 +896,7 @@ def test_every_partial_mark_says_what_it_covers():
     assert table.count(" title=") == len(notes) and "compare-note-" not in table
     for _, _, _, note in notes:
         assert f"Partly: {build.escape(note)}</span>" in table
-    bad = list(build.COMPARISON) + [("Unexplained", ("yes", "part", "no", "no", "no"), {})]
+    bad = list(build.COMPARISON) + [("Speed", "Unexplained", ("yes", "part", "no", "no", "no"), {})]
     original, build.COMPARISON = build.COMPARISON, tuple(bad)
     try:
         with pytest.raises(ValueError, match="in part"):
@@ -907,9 +907,13 @@ def test_every_partial_mark_says_what_it_covers():
 
 def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
     table = build.comparison_table([SUMMARY])
-    # One table, no group rows; each guarantee in a few words, its detail in the notes.
-    assert "compare-group" not in table
-    for feature, marks, _ in build.COMPARISON:
+    # One table in three sections, each heading once; each attribute in a few words, its detail
+    # in the notes.
+    assert re.findall(r'<tr class="compare-group"><th[^>]*>([^<]+)</th>', table) == list(
+        build.SECTIONS
+    )
+    for section, feature, marks, _ in build.COMPARISON:
+        assert section in build.SECTIONS
         assert len(feature.split()) <= 6, feature
         assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
     assert len(re.findall(r'<th scope="col"[ >]', table)) == len(build.PEERS)
@@ -917,7 +921,11 @@ def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
     tiles = build.coverage_tiles([SUMMARY], "")
     # The measured rows: Andrey at 1x and each package's time against it, and the most variables
     # each fit within the budget.
-    rows = dict(build.measured_rows(build.release_summaries(SUMMARY)))
+    rows = {
+        label: values for _, label, values in build.measured_rows(build.release_summaries(SUMMARY))
+    }
+    # Time grows as a power of the variables, each package's exponent from enough sizes.
+    assert all(v is None or v.startswith("V<sup>") for v in rows["Time grows with variables as"])
     times = rows["Fit time (Andrey = 1x)"]
     assert times[0] == "1x" and all(t is None or t.endswith("x") for t in times)
     fits = rows[f"Variables fit in {build.FIT_BUDGET_S} s"]
