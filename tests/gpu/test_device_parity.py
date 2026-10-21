@@ -16,6 +16,7 @@ import andrey
 from andrey.core import backend, stats
 from andrey.core.ci_cmiknn import CMIknn
 from andrey.core.ci_kernel import KCI
+from andrey.irregular.pnl import pnl_pairs
 
 pytest.importorskip("torch")
 
@@ -116,3 +117,37 @@ def test_kci_and_cmiknn_match_the_cpu(device, nonlinear):
     assert np.allclose(got_kci, cpu_kci, rtol=0, atol=1e-9)
     assert got_cmiknn == cpu_cmiknn
     assert [g.oriented_edges() for g in graphs] == [g.oriented_edges() for g in cpu_graphs]
+
+
+def test_pnl_matches_the_cpu(device):
+    """PNL on cuda matches the CPU's p-values and statistics to rounding and makes the same
+    decisions, on 2,000 rows where dependent pairs' p-values are zero and the statistics decide,
+    with one worker or three."""
+    if device != "cuda":
+        pytest.skip("PNL has no mps backend")
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal(2000)
+    y = np.tanh(x + 0.4 * rng.laplace(size=2000)) ** 3
+    u = rng.standard_normal(2000)  # a hidden cause of the last two columns
+    a = u**3 + 0.3 * rng.standard_normal(2000)
+    b = np.sin(2 * u) + 0.3 * rng.standard_normal(2000)
+    table = np.column_stack([x, y, a, b])
+    with andrey.config(backend="numpy"):
+        cpu = pnl_pairs(table)
+    backend.reset_dispatch_stats()
+    with andrey.config(backend=device):
+        got = pnl_pairs(table)
+        threaded = pnl_pairs(table, num_workers=3)
+    assert backend.dispatch_stats() == {("pnl", "cuda"): 2}
+    assert (cpu[:, :2] == 0).all(axis=1).any()  # the statistics decide a pair
+    # The largest difference over 4,490 pairs of up to 5,000 rows was 5e-15 on an A100.
+    for rows in (got, threaded):
+        assert np.allclose(rows[:, :2], cpu[:, :2], rtol=0, atol=1e-12)
+        assert np.allclose(rows[:, 2:], cpu[:, 2:], rtol=1e-12, atol=0)
+
+    def decisions(rows):
+        by_pvalue = np.sign(rows[:, 0] - rows[:, 1])
+        return np.where(by_pvalue != 0, by_pvalue, np.sign(rows[:, 3] - rows[:, 2]))
+
+    assert np.array_equal(decisions(got), decisions(cpu))
+    assert np.array_equal(decisions(threaded), decisions(cpu))

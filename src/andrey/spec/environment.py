@@ -39,7 +39,8 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer >= -1 (-1 = all usable cores)",
         default="1",
         effect=(
-            "Worker processes for GES and GFCI (its GES phase); `0` or `1` runs serially. "
+            "Worker processes for GES and GFCI (its GES phase), and worker threads for the "
+            "regressions of `granger` and the two directions of `pnl`; `0` or `1` runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",
@@ -98,6 +99,17 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         effect=(
             "Smallest distance matrix (rows squared) at which `auto` runs a CMIknn query on a CUDA "
             "GPU. A set value replaces the `cuda` default; CMIknn never runs on `mps`."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_PNL_GPU_THRESHOLD",
+        values="integer (elements: rows squared)",
+        default="cuda 26278, mps never",
+        effect=(
+            "Smallest kernel matrix (rows squared) at which `auto` runs the HSIC tests of PNL's "
+            "pairs on a CUDA GPU, in float64. A set value replaces the `cuda` default; PNL never "
+            "runs on `mps`."
         ),
         group="backend",
     ),
