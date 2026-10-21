@@ -46,9 +46,10 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
 
     Returns an array aligned with ``U``: ``score(i) = -sum_j min(0, diff_mi(i, j))^2`` with
     ``diff_mi(i, j) = (H(x_j) + H(r_{i|j})) - (H(x_i) + H(r_{j|i}))`` on standardized columns.
-    Entropy is batched over a stack of residuals; :func:`pick` chooses the best, MultiGroup sums
-    across groups first. Order-exactness needs the float64 entropy path -- on a float32 device
-    (atol 1e-3) a near-tie could flip the pick, so pin ``ANDREY_DEVICE=numpy`` for exact order.
+    Each ``H(r_{i|j})`` is computed once and serves both ``i`` and ``j``, batched over the residuals
+    of one column on the others; :func:`pick` chooses the best, MultiGroup sums across groups
+    first. Order-exactness needs the float64 entropy path -- on a float32 device (atol 1e-3) a
+    near-tie could flip the pick, so pin ``ANDREY_DEVICE=numpy`` for exact order.
     """
     cols = np.asarray(U)
     if len(cols) < 2:
@@ -59,26 +60,20 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     cov = np.cov(x_std, rowvar=False, ddof=0)  # (m, m), same ddof as var: least-squares slopes
     var = np.var(x_std, axis=0)  # (m,), ddof=0
     n, m = x_std.shape
-    # Residual buffers every candidate reuses: ``r_ij`` column-major like the fancy-indexed ``xj``,
-    # ``r_ji`` row-major. The layout sets the order of the column sums in ``np.std`` and
-    # ``stats.entropy`` (pairwise down a contiguous column, row by row otherwise), so a change of
-    # layout moves the scores in the last bits.
-    r_ij, work_ij = np.empty((n, m - 1), order="F"), np.empty((n, m - 1), order="F")
-    r_ji, work_ji = np.empty((n, m - 1)), np.empty((n, m - 1))
+    # h[i, j] = H(r_{i|j}), computed once per ordered pair: candidate i reads its H(r_{i|j}) terms
+    # from row i and its H(r_{j|i}) terms from column i.
+    h = np.zeros((m, m), dtype=np.float64)
+    r, work = np.empty((n, m - 1), order="F"), np.empty((n, m - 1), order="F")
+    for a in range(m):
+        others = np.arange(m) != a
+        np.multiply(cov[a, others] / var[others], x_std[:, others], out=r)
+        np.subtract(x_std[:, a][:, None], r, out=r)  # residual of i on each j
+        r /= np.std(r, axis=0)
+        h[a, others] = stats.entropy(r, work=work)
     scores = np.empty(m, dtype=np.float64)
     for a in range(m):
         others = np.arange(m) != a
-        xi = x_std[:, a][:, None]  # (n, 1)
-        xj = x_std[:, others]  # (n, m-1)
-        np.multiply(cov[a, others] / var[others], xj, out=r_ij)
-        np.subtract(xi, r_ij, out=r_ij)  # residual of i on each j
-        np.multiply(cov[others, a] / var[a], xi, out=r_ji)
-        np.subtract(xj, r_ji, out=r_ji)  # residual of each j on i
-        r_ij /= np.std(r_ij, axis=0)
-        r_ji /= np.std(r_ji, axis=0)
-        diff = (ent[others] + stats.entropy(r_ij, work=work_ij)) - (
-            ent[a] + stats.entropy(r_ji, work=work_ji)
-        )
+        diff = (ent[others] + h[a, others]) - (ent[a] + h[others, a])
         scores[a] = -np.sum(np.minimum(0.0, diff) ** 2)
     return scores
 
