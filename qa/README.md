@@ -9,9 +9,45 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
 | `reference_parity.py` | Fail a published row where the reference package has fewer errors. |
 | `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
+| `identity.py` | Hash every supported method's full output, to show a change returns the same bits. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
 | `ci_calibration.py` | Measure how often each nonlinear CI test rejects, with and without a dependence. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
+
+## Identity
+
+A speed change must return the same answers. `identity.py` fits every supported method on the
+first two draws of each of its quality-gate datasets and of one larger dataset, on the numpy
+backend with one worker and one BLAS thread, and hashes each fit's full output: the graph, the edge
+weights, the causal order, and every metadata value, such as a score or a p-value. Floats enter as
+their bytes, so equal hashes mean equal bits; a second hash covers only the graphs' endpoint marks.
+The manifest has one row per fit, keyed by method, dataset, seed, permutation, and worker count,
+under a header naming the commit, the Python, NumPy, and SciPy versions, the loaded BLAS, the CPU,
+and the thread settings.
+
+A fit that queries a CI test or a local score also records two counts, which are deterministic, so
+a change can be held to not raising them: the CI-test queries of a pair made after a query of that
+pair first returned `p > alpha`, and the distinct conditioning sets of each size, a CI test's
+conditioning set or a local score's parent set.
+
+```shell
+uv run python -m qa.identity -o before.json   # on the base commit
+uv run python -m qa.identity -o after.json    # on the change
+uv run python -m qa.identity --compare before.json after.json
+```
+
+The compare counts the rows whose graph differs and the rows where only bits differ, and lists them,
+the rows in one manifest only, and every count that changed; it exits 1 when a row differs, is in
+one manifest only, or has a count that rose. Two more options refit each draw and list every refit
+whose answer differs from the first fit, with the parts that differ, exiting 1 if there is one:
+
+- `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
+  columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out.
+- `--workers N` refits GES, GFCI, and Granger on `N` workers, with every GES pass sent to the
+  worker pool.
+
+Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
+sets the draws per dataset.
 
 ## FCI column order
 
