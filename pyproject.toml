@@ -118,7 +118,7 @@ pythonpath = ["src", "."]  # "." for test helpers and QA tools
 python-version = "3.11"
 
 [tool.ty.src]
-include = ["src/andrey", "tests/recovery/helpers", "qa/capture_baselines.py"]
+include = ["src/andrey", "tests/recovery/helpers", "qa/capture_baselines.py", "qa/identity.py"]
 
 # Optional extras are not in the dev env; allow them unresolved only in the files that import them.
 [[tool.ty.overrides]]

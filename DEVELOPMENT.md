@@ -9,7 +9,7 @@ repository's conventions.
 
 - `src/andrey/`: the library and its public API.
 - `tests/`: correctness checks that run on every pull request.
-- `qa/`: the pre-release quality gate, baseline capture, and calibration.
+- `qa/`: the pre-release quality gate, the identity check, baseline capture, and calibration.
 - `benchmarks/`: comparisons with other packages and older Andrey builds.
 - `examples/`: the notebooks.
 - `apps/`: the interactive examples.
@@ -113,7 +113,9 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
 Dispatch numeric kernels through `andrey.core.backend` (`docs/docs/configuration.md` gives the
 selection rules) and, for the greedy score-based searches, use the shared worker pool in
 `src/andrey/search/_parallel.py`. Keep the recovery tests passing and the outputs equal across
-Andrey's execution paths, and measure the speedup with a benchmark campaign.
+Andrey's execution paths, and measure the speedup with a benchmark campaign. `qa/identity.py`
+shows the change returns the same bits and makes no more queries: write its manifest on the base
+commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)).
 
 ### Change a parameter or default
 
