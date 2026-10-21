@@ -11,7 +11,7 @@ variable's index is its tie rank. The algorithm and its reference are described 
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import numpy.typing as npt
@@ -35,6 +35,7 @@ PERMUTATION_SCORES: tuple[str, ...] = (
 
 # Fixed absolute score tolerance for numerical ties.
 _SCORE_EPS = 1e-6
+_EPS = float(np.finfo(np.float64).eps)
 
 
 def ranked_score(
@@ -98,6 +99,140 @@ def parent_knowledge(constraints: Constraints, v: int) -> tuple[list[int], list[
     return [u for u in candidates if u != v], np.flatnonzero(required).tolist()
 
 
+def _near_threshold(
+    values: list[float], bounds: list[float], score: float, bound: float
+) -> tuple[list[int], list[int]]:
+    """Split the candidates that ``-value > score + _SCORE_EPS`` keeps from the ones it could flip.
+
+    ``values`` are local scores (lower is better) within ``bounds`` of their full scores, and
+    ``score`` is within ``bound`` of its own. Returns ``(kept, near)``: ``kept`` passes the test
+    for every value the bounds allow, and ``near`` could fall on either side. A rounding term of a
+    few units in the last place covers the sum and the difference the test computes.
+    """
+    threshold = score + _SCORE_EPS
+    reach = max(bounds, default=0.0) + bound
+    if reach == 0.0:
+        return [k for k, value in enumerate(values) if -value > threshold], []
+    rounding = 8 * _EPS * abs(threshold)
+    low = threshold - reach - rounding
+    kept: list[int] = []
+    near: list[int] = []
+    for k in [k for k, value in enumerate(values) if -value > low]:
+        margin = -values[k] - threshold
+        slack = bounds[k] + bound
+        if slack > 0.0 and abs(margin) <= slack + rounding:
+            near.append(k)
+        elif margin > 0.0:
+            kept.append(k)
+    return kept, near
+
+
+def _settle_groups(
+    values: list[float],
+    bounds: list[float],
+    rescore: Callable[[int], float],
+    *,
+    first_only: bool = False,
+) -> None:
+    """Rescore the candidates whose ``_SCORE_EPS`` tie group full scores could change.
+
+    The candidates sort by value (lower is better) into groups, each holding the candidates within
+    ``_SCORE_EPS`` of its best. Full scores give the same groups when, in each group, every
+    member's highest possible value is within the tolerance of every other member's lowest possible
+    value, and every later candidate's lowest possible value is beyond it from the highest possible
+    best. The candidates of a group that could break this, and the later ones that could join it,
+    are scored in full by ``rescore`` (bound 0), and the check repeats; ``first_only`` checks only
+    the first group. Updates ``values`` and ``bounds`` in place.
+    """
+    while True:
+        order = sorted(range(len(values)), key=values.__getitem__)
+        slack = [bounds[k] + 8 * _EPS * abs(values[k]) if bounds[k] > 0.0 else 0.0 for k in order]
+        lo = [values[k] - e for k, e in zip(order, slack)]
+        hi = [values[k] + e for k, e in zip(order, slack)]
+        later_lo = lo[:]
+        for t in range(len(order) - 2, -1, -1):
+            later_lo[t] = min(later_lo[t], later_lo[t + 1])
+        flagged: set[int] = set()
+        start = 0
+        while start < len(order):
+            best = values[order[start]]
+            end = start + 1
+            while end < len(order) and values[order[end]] - best <= _SCORE_EPS:
+                end += 1
+            group_hi = min(hi[start:end])
+            for t in range(start, end):
+                if any(hi[t] - lo[s] > _SCORE_EPS for s in range(start, end) if s != t):
+                    flagged.update(order[start:end])
+                    break
+            if end < len(order) and later_lo[end] - group_hi <= _SCORE_EPS:
+                flagged.update(order[start:end])
+                flagged.update(
+                    order[t] for t in range(end, len(order)) if lo[t] - group_hi <= _SCORE_EPS
+                )
+            if first_only:
+                break
+            start = end
+        flagged = {k for k in flagged if bounds[k] > 0.0}
+        if not flagged:
+            return
+        for k in flagged:
+            values[k] = rescore(k)
+            bounds[k] = 0.0
+
+
+def _apart(candidates: list[tuple[float, int, float]]) -> bool:
+    """Whether each of the sorted ``(value, variable, bound)`` candidates is a tie group of its own
+    under every value the bounds allow: every gap between neighbors passes the tolerance by more
+    than twice the largest bound. All-zero bounds also pass: the values are full scores."""
+    reach = max(candidate[2] for candidate in candidates)
+    if reach == 0.0:
+        return True
+    reach = 2 * reach + 16 * _EPS * max(abs(candidates[0][0]), abs(candidates[-1][0])) + _SCORE_EPS
+    return all(high[0] - low[0] > reach for low, high in zip(candidates, candidates[1:]))
+
+
+def _settle_kept(
+    kept: list[int],
+    values: list[float],
+    bounds: list[float],
+    rescore: Callable[[int], float],
+    *,
+    first_only: bool = False,
+) -> None:
+    """Run :func:`_settle_groups` over the ``kept`` candidates of ``values`` and ``bounds``."""
+    sub_values = [values[k] for k in kept]
+    sub_bounds = [bounds[k] for k in kept]
+    _settle_groups(sub_values, sub_bounds, lambda j: rescore(kept[j]), first_only=first_only)
+    for j, k in enumerate(kept):
+        values[k] = sub_values[j]
+        bounds[k] = sub_bounds[j]
+
+
+class _Leaf:
+    """A parent set a grow-shrink tree settles on, with its negated local score.
+
+    Every node whose grow path and shrink end at the same parent set shares one leaf, so equal
+    parent sets carry equal scores wherever the search compares them. ``bound`` bounds the score's
+    distance from the full local score: 0 for a full score, the batch's error bound otherwise.
+    """
+
+    __slots__ = ("tree", "parents", "score", "bound")
+
+    def __init__(
+        self, tree: _GrowShrinkTree, parents: tuple[int, ...], score: float, bound: float
+    ) -> None:
+        self.tree = tree
+        self.parents = parents
+        self.score = score
+        self.bound = bound
+
+    def settle(self) -> None:
+        """Make ``score`` the full local score of ``parents``."""
+        if self.bound > 0.0:
+            self.score = -self.tree.score.score(self.tree.vertex, self.parents)
+            self.bound = 0.0
+
+
 class _GSTNode:
     """One node of a grow-shrink tree: a parent set reached along a grow path from the root.
 
@@ -105,37 +240,76 @@ class _GSTNode:
     single-variable additions that improve it by more than ``_SCORE_EPS`` (best tie group first,
     ascending variable index within a group; built lazily by :meth:`_grow`). ``remove`` is the
     shrink sequence -- the variables dropped, best first -- built lazily by :meth:`_shrink`, with
-    ``shrink_score`` the negated score after all removals.
+    ``shrink_score`` the negated score after all removals and ``leaf`` the :class:`_Leaf` of the
+    parent set it ends at. ``grow_bound`` and ``shrink_bound`` bound each score's distance from the
+    full local score: 0 for a full score, the Schur update's error bound for a batched one.
     """
 
-    __slots__ = ("tree", "add", "grow_score", "shrink_score", "branches", "remove")
+    __slots__ = (
+        "tree",
+        "add",
+        "grow_score",
+        "shrink_score",
+        "grow_bound",
+        "shrink_bound",
+        "branches",
+        "remove",
+        "leaf",
+    )
 
-    def __init__(self, tree: _GrowShrinkTree, add: int | None = None, score: float | None = None):
+    def __init__(
+        self,
+        tree: _GrowShrinkTree,
+        add: int | None = None,
+        score: float | None = None,
+        bound: float = 0.0,
+    ):
         if score is None:
             score = tree.empty_score
         self.tree = tree
         self.add = add
         self.grow_score = score
         self.shrink_score = score
+        self.grow_bound = bound
+        self.shrink_bound = bound
         self.branches: list[_GSTNode] | None = None
         self.remove: list[int] | None = None
+        self.leaf: _Leaf | None = None
 
     def _grow(self, available: list[int], parents: list[int]) -> None:
         """Keep additions that improve ``grow_score`` by more than ``_SCORE_EPS``.
 
         Group improving additions within ``_SCORE_EPS`` of each group's best score. Visit groups
-        best first, with ascending variable index within each group.
+        best first, with ascending variable index within each group. A comparison that the score
+        bounds leave open is decided by full scores, of the parent set and of the candidates.
         """
         self.branches = []
-        vertex = self.tree.vertex
+        tree = self.tree
+        vertex = tree.vertex
         base = list(parents)
         deltas = [("add", int(u)) for u in available]
-        values = self.tree.delta.score_many_with_base(vertex, base, deltas)
-        candidates = sorted(
-            (float(value), add)
-            for add, value in zip(available, values)
-            if -float(value) > self.grow_score + _SCORE_EPS
-        )
+        bounds: list[float] = []
+        values = tree.delta.score_many_with_base(vertex, base, deltas, bounds=bounds)
+
+        def rescore(k: int) -> float:
+            return tree.score.score(vertex, [*base, available[k]])
+
+        kept, near = _near_threshold(values, bounds, self.grow_score, self.grow_bound)
+        if near:
+            if self.grow_bound > 0.0:
+                # Grow precedes shrink, so both scores of the node become the full score.
+                self.grow_score = self.shrink_score = -tree.score.score(vertex, base)
+                self.grow_bound = self.shrink_bound = 0.0
+                kept, near = _near_threshold(values, bounds, self.grow_score, 0.0)
+            for k in near:
+                values[k] = rescore(k)
+                bounds[k] = 0.0
+                if -values[k] > self.grow_score + _SCORE_EPS:
+                    kept.append(k)
+        candidates = sorted((values[k], available[k], bounds[k]) for k in kept)
+        if len(candidates) > 1 and not _apart(candidates):
+            _settle_kept(kept, values, bounds, rescore)
+            candidates = sorted((values[k], available[k], bounds[k]) for k in kept)
         # Anchor each tie group to its best score: pairwise approximate comparisons are not
         # transitive. `trace` takes the first allowed branch, so each group uses variable order.
         start = 0
@@ -143,46 +317,66 @@ class _GSTNode:
             end = start + 1
             while end < len(candidates) and candidates[end][0] - candidates[start][0] <= _SCORE_EPS:
                 end += 1
-            for value, add in sorted(candidates[start:end], key=lambda candidate: candidate[1]):
-                self.branches.append(_GSTNode(self.tree, add, -value))
+            for value, add, bound in sorted(candidates[start:end], key=lambda c: c[1]):
+                self.branches.append(_GSTNode(self.tree, add, -value, bound))
             start = end
 
     def _shrink(self, parents: list[int], required: Sequence[int] = ()) -> None:
         """Remove parents while the score improves by more than ``_SCORE_EPS``.
 
         Each step selects the lowest-index parent among improving removals within ``_SCORE_EPS``
-        of the best score. Record the removal order and cache the final score in ``shrink_score``.
-        A ``required`` parent is never removed.
+        of the best score. Record the removal order, cache the final score in ``shrink_score``
+        and the final parent set's :class:`_Leaf` in ``leaf``. A ``required`` parent is never
+        removed. A
+        comparison that the score bounds leave open is decided by full scores.
         """
         self.remove = []
-        vertex = self.tree.vertex
+        tree = self.tree
+        vertex = tree.vertex
         while True:
             current = list(parents)
             removable = [u for u in current if u not in required] if required else current
             if not removable:
                 break
             deltas = [("remove", int(u)) for u in removable]
-            values = self.tree.delta.score_many_with_base(vertex, current, deltas)
-            candidates = [
-                (u, -float(value))
-                for u, value in zip(removable, values)
-                if -float(value) > self.shrink_score + _SCORE_EPS
-            ]
-            if not candidates:
+            bounds: list[float] = []
+            values = tree.delta.score_many_with_base(vertex, current, deltas, bounds=bounds)
+
+            def rescore(k: int, current: list[int] = current, removable: list[int] = removable):
+                return tree.score.score(vertex, [u for u in current if u != removable[k]])
+
+            kept, near = _near_threshold(values, bounds, self.shrink_score, self.shrink_bound)
+            if near and self.shrink_bound > 0.0:
+                self.shrink_score = -tree.score.score(vertex, current)
+                self.shrink_bound = 0.0
+                kept, near = _near_threshold(values, bounds, self.shrink_score, 0.0)
+            for k in near:
+                values[k] = rescore(k)
+                bounds[k] = 0.0
+                if -values[k] > self.shrink_score + _SCORE_EPS:
+                    kept.append(k)
+            if not kept:
                 break
-            best_score = max(gain for _, gain in candidates)
-            best, self.shrink_score = min(
-                (u, gain) for u, gain in candidates if best_score - gain <= _SCORE_EPS
-            )
+            if len(kept) > 1 and not _apart(sorted((values[k], k, bounds[k]) for k in kept)):
+                _settle_kept(kept, values, bounds, rescore, first_only=True)
+            best_value = min(values[k] for k in kept)
+            best, k = min((removable[k], k) for k in kept if values[k] - best_value <= _SCORE_EPS)
+            self.shrink_score = -values[k]
+            self.shrink_bound = bounds[k]
             self.remove.append(best)
             parents.remove(best)
+        key = tuple(sorted(parents))
+        leaf = tree.leaves.get(key)
+        if leaf is None:
+            leaf = tree.leaves[key] = _Leaf(tree, key, self.shrink_score, self.shrink_bound)
+        self.leaf = leaf
 
-    def trace(self, available: list[int], parents: list[int], prefix_set: set[int]) -> float:
-        """Walk the grow path allowed by ``prefix_set``, then shrink; return the node's score.
+    def trace(self, available: list[int], parents: list[int], prefix_set: set[int]) -> _Leaf:
+        """Walk the grow path allowed by ``prefix_set``, then shrink; return the :class:`_Leaf`.
 
         Appends each taken grow variable to ``parents`` and, on reaching the leaf, removes the
-        shrink variables, so ``parents`` ends as the traced parent set. Mutates ``available`` to
-        drop every branch variable it passes.
+        shrink variables, so ``parents`` ends as the traced parent set, the leaf's ``parents``.
+        Mutates ``available`` to drop every branch variable it passes.
         """
         if self.branches is None:
             self._grow(available, parents)
@@ -196,18 +390,19 @@ class _GSTNode:
                 return branch.trace(available, parents, prefix_set)
         if self.remove is None:
             self._shrink(parents, self.tree.required)
-            return self.shrink_score
-        for remove in self.remove:
-            parents.remove(remove)
-        return self.shrink_score
+        else:
+            for remove in self.remove:
+                parents.remove(remove)
+        assert self.leaf is not None  # set by the first shrink
+        return self.leaf
 
 
 class _GrowShrinkTree:
     """A variable's grow-shrink tree: caches the best parent set per allowed prefix.
 
-    :meth:`trace` returns ``vertex``'s best-scoring parent set drawn from ``prefix`` (writing it
-    into the caller's list) and its negated local score. Repeated traces reuse the grow/shrink work
-    cached in the shared node tree.
+    :meth:`trace` returns the :class:`_Leaf` of ``vertex``'s best-scoring parent set drawn from
+    ``prefix`` (writing the set into the caller's list), one per distinct parent set (``leaves``).
+    Repeated traces reuse the grow/shrink work cached in the shared node tree.
 
     ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
     ``required`` parents are in every parent set: the root scores them, grow adds to them, and
@@ -223,6 +418,7 @@ class _GrowShrinkTree:
         "root",
         "candidates",
         "required",
+        "leaves",
     )
 
     def __init__(
@@ -243,6 +439,7 @@ class _GrowShrinkTree:
         self.required = [] if required is None else required
         self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
+        self.leaves: dict[tuple[int, ...], _Leaf] = {}
 
     def _available(self) -> list[int]:
         """Every variable that may parent ``vertex`` -- all others, or the ``candidates``."""
@@ -251,12 +448,184 @@ class _GrowShrinkTree:
         vertex = self.vertex
         return [i for i in range(self.n_features) if i != vertex]
 
-    def trace(self, prefix: Sequence[int], parents: list[int] | None = None) -> float:
-        """Return ``vertex``'s best score for parents drawn from ``prefix``; fill ``parents``."""
+    def trace(self, prefix: Sequence[int], parents: list[int] | None = None) -> _Leaf:
+        """Return the leaf of ``vertex``'s best parents drawn from ``prefix``; fill ``parents``."""
         if parents is None:
             parents = []
         parents.extend(self.required)
         return self.root.trace(self._available(), parents, set(prefix))
+
+
+def _sweep(
+    v: int, i: int, order: list[int], gsts: list[_GrowShrinkTree]
+) -> tuple[list[float], list[_Leaf], list[_Leaf | None], list[_Leaf | None], float, float]:
+    """Score every insertion point of ``v``, keeping the leaves each score adds up.
+
+    Sweeps the prefix scores forward with ``v`` removed and backward with ``v`` reinserted, so each
+    candidate position costs one GST trace per variable; ``scores[j]`` places ``v`` just before
+    ``order[j]``. Returns ``(scores, v_leaves, without, with_v, bound_sum, abs_sum)``:
+    ``v_leaves[j]`` is ``v``'s leaf at position ``j``, ``without[m]`` and ``with_v[m]`` the leaves
+    of ``order[m]`` with ``v`` after it and before it (``None`` at ``v``'s index ``i``), and the
+    sums add every traced leaf's score bound and absolute score.
+    """
+    p = len(order)
+    scores = [0.0] * (p + 1)
+    v_leaves: list[_Leaf] = []
+    without: list[_Leaf | None] = [None] * p
+    with_v: list[_Leaf | None] = [None] * p
+    bound_sum = abs_sum = 0.0
+
+    prefix: list[int] = []
+    acc = 0.0
+    for j in range(0, i):
+        w = order[j]
+        leaf = gsts[v].trace(prefix)
+        v_leaves.append(leaf)
+        scores[j] = leaf.score + acc
+        node = without[j] = gsts[w].trace(prefix)
+        acc += node.score
+        bound_sum += leaf.bound + node.bound
+        abs_sum += abs(leaf.score) + abs(node.score)
+        prefix.append(w)
+    leaf = gsts[v].trace(prefix)
+    v_leaves.append(leaf)
+    scores[i] = leaf.score + acc
+    bound_sum += leaf.bound
+    abs_sum += abs(leaf.score)
+    for j in range(i + 1, p):
+        w = order[j]
+        leaf = gsts[v].trace(prefix)
+        v_leaves.append(leaf)
+        scores[j] = leaf.score + acc
+        node = without[j] = gsts[w].trace(prefix)
+        acc += node.score
+        bound_sum += leaf.bound + node.bound
+        abs_sum += abs(leaf.score) + abs(node.score)
+        prefix.append(w)
+    leaf = gsts[v].trace(prefix)
+    v_leaves.append(leaf)
+    scores[p] = leaf.score + acc
+    bound_sum += leaf.bound
+    abs_sum += abs(leaf.score)
+
+    prefix.append(v)
+    acc = 0.0
+    for j in range(p - 1, i, -1):
+        w = order[j]
+        prefix.pop(j - 1)
+        node = with_v[j] = gsts[w].trace(prefix)
+        acc += node.score
+        bound_sum += node.bound
+        abs_sum += abs(node.score)
+        scores[j] += acc
+    scores[i] += acc
+    for j in range(i - 1, -1, -1):
+        w = order[j]
+        prefix.pop(j)
+        node = with_v[j] = gsts[w].trace(prefix)
+        acc += node.score
+        bound_sum += node.bound
+        abs_sum += abs(node.score)
+        scores[j] += acc
+    return scores, v_leaves, without, with_v, bound_sum, abs_sum
+
+
+def _decided(scores: list[float], i: int, reach: float) -> bool:
+    """Whether every comparison :func:`_better_mutation` makes stays on its side when each score
+    moves by up to ``reach``: a quick check before the per-pair bounds of :func:`_unsettled`.
+
+    Holds when every position is beyond ``reach`` of the current score plus the tolerance, at most
+    one eligible position is within the tolerance of the best, and every other eligible position is
+    beyond ``reach`` of that.
+    """
+    threshold = scores[i] + _SCORE_EPS
+    if min(abs(score - threshold) for score in scores) <= reach:
+        return False
+    best_score = max(scores)
+    if best_score <= threshold:
+        return True
+    near_best = 0
+    for score in scores:
+        if score > threshold:
+            gap = best_score - score - _SCORE_EPS
+            if gap <= 0.0:
+                near_best += 1
+            if abs(gap) <= reach or near_best > 1:
+                return False
+    return True
+
+
+def _unsettled(
+    scores: list[float],
+    i: int,
+    v_leaves: list[_Leaf],
+    without: list[_Leaf | None],
+    with_v: list[_Leaf | None],
+) -> list[_Leaf]:
+    """The leaves to score in full before :func:`_better_mutation` decides, or ``[]``.
+
+    Two positions' scores share every leaf but ``v``'s own and those of the variables between the
+    positions whose leaf changes with ``v`` before them, so their difference is within the bounds
+    of those leaves of the difference full scores give, plus the rounding of the four sums
+    (``2 (p + 2) eps`` times the absolute scores a position adds up). A comparison of the decision
+    -- each position against the current one, and the positions within ``_SCORE_EPS`` of the best
+    against each other and against the other eligible ones -- that this bound leaves open returns
+    the bounded leaves it depends on, or every bounded leaf when only the rounding leaves it open.
+    """
+    p = len(without)
+    changed = [0.0] * (p + 1)  # prefix sums of the bounds of leaves that change with v
+    total = 0.0
+    magnitude = max(abs(leaf.score) for leaf in v_leaves)
+    for m in range(p):
+        a, b = without[m], with_v[m]
+        if a is not None and b is not None:
+            magnitude += max(abs(a.score), abs(b.score))
+            if a is not b:
+                total += a.bound + b.bound
+        changed[m + 1] = total
+    rounding = 2 * (p + 2) * _EPS * magnitude
+
+    def gap_bound(j: int, k: int) -> float:
+        if j > k:
+            j, k = k, j
+        bound = changed[k] - changed[j] + rounding
+        if v_leaves[j] is not v_leaves[k]:
+            bound += v_leaves[j].bound + v_leaves[k].bound
+        return bound
+
+    open_pairs: list[tuple[int, int]] = []
+    threshold = scores[i] + _SCORE_EPS
+    for j, score in enumerate(scores):
+        if score != -np.inf and abs(score - threshold) <= gap_bound(j, i):
+            open_pairs.append((j, i))
+    eligible = [j for j, score in enumerate(scores) if score > threshold]
+    if eligible:
+        best_score = max(scores)
+        anchor = scores.index(best_score)
+        members = [j for j in eligible if best_score - scores[j] <= _SCORE_EPS]
+        for a in members:
+            for m in members:
+                if a != m and abs(scores[a] - scores[m] - _SCORE_EPS) <= gap_bound(a, m):
+                    open_pairs.append((a, m))
+        for r in eligible:
+            if r not in members and abs(scores[anchor] - scores[r] - _SCORE_EPS) <= gap_bound(
+                anchor, r
+            ):
+                open_pairs.append((anchor, r))
+    if not open_pairs:
+        return []
+    nodes: list[_Leaf | None] = []
+    for j, k in open_pairs:
+        j, k = min(j, k), max(j, k)
+        nodes += (v_leaves[j], v_leaves[k])
+        for m in range(j, k):
+            if without[m] is not with_v[m]:
+                nodes += (without[m], with_v[m])
+    unsettled = {id(node): node for node in nodes if node is not None and node.bound > 0}
+    if not unsettled:  # only the rounding leaves a comparison open
+        leaves = [*v_leaves, *without, *with_v]
+        unsettled = {id(node): node for node in leaves if node is not None and node.bound > 0}
+    return list(unsettled.values())
 
 
 def _better_mutation(
@@ -268,51 +637,33 @@ def _better_mutation(
 ) -> bool:
     """Move ``v`` to the order position that most improves the total score; report whether it moved.
 
-    Scores every insertion point for ``v`` by sweeping the prefix scores forward with ``v`` removed
-    and backward with ``v`` reinserted, so each candidate position costs one GST trace per variable.
-    Only positions that improve the total by more than ``_SCORE_EPS`` are eligible. Selects the
-    leftmost eligible position within ``_SCORE_EPS`` of the highest score. Refreshes ``positions``
-    after a move; returns ``False`` when no position improves by more than the tolerance. With
-    ``before`` (``before[a, b]``: ``a`` precedes ``b``), only positions after every predecessor of
-    ``v`` and before every successor are eligible.
+    Scores every insertion point for ``v`` (:func:`_sweep`). Only positions that improve the total
+    by more than ``_SCORE_EPS`` are eligible. Selects the leftmost eligible position within
+    ``_SCORE_EPS`` of the highest score. Refreshes ``positions`` after a move; returns ``False``
+    when no position improves by more than the tolerance. With ``before`` (``before[a, b]``: ``a``
+    precedes ``b``), only positions after every predecessor of ``v`` and before every successor are
+    eligible. When the leaves' score bounds leave a comparison open (:func:`_unsettled`), those
+    leaves are scored in full and the positions scored again, so the move is the one full local
+    scores choose.
     """
     i = positions[v]
     p = len(order)
-    scores = [0.0] * (p + 1)
-
-    prefix: list[int] = []
-    acc = 0.0
-    for j in range(0, i):
-        w = order[j]
-        scores[j] = gsts[v].trace(prefix) + acc
-        acc += gsts[w].trace(prefix)
-        prefix.append(w)
-    scores[i] = gsts[v].trace(prefix) + acc
-    for j in range(i + 1, p):
-        w = order[j]
-        scores[j] = gsts[v].trace(prefix) + acc
-        acc += gsts[w].trace(prefix)
-        prefix.append(w)
-    scores[p] = gsts[v].trace(prefix) + acc
-
-    prefix.append(v)
-    acc = 0.0
-    for j in range(p - 1, i, -1):
-        w = order[j]
-        prefix.pop(j - 1)
-        acc += gsts[w].trace(prefix)
-        scores[j] += acc
-    scores[i] += acc
-    for j in range(i - 1, -1, -1):
-        w = order[j]
-        prefix.pop(j)
-        acc += gsts[w].trace(prefix)
-        scores[j] += acc
-
+    lo, hi = 0, p
     if before is not None:  # scores[j] places v just before order[j]
         lo = max((positions[w] + 1 for w in np.flatnonzero(before[:, v]).tolist()), default=0)
         hi = min((positions[w] for w in np.flatnonzero(before[v]).tolist()), default=p)
-        scores = [s if lo <= j <= hi else -np.inf for j, s in enumerate(scores)]
+    while True:
+        scores, v_leaves, without, with_v, bound_sum, abs_sum = _sweep(v, i, order, gsts)
+        if before is not None:
+            scores = [s if lo <= j <= hi else -np.inf for j, s in enumerate(scores)]
+        if bound_sum == 0.0 or _decided(scores, i, bound_sum + 2 * (p + 2) * _EPS * abs_sum):
+            break
+        unsettled = _unsettled(scores, i, v_leaves, without, with_v)
+        if not unsettled:
+            break
+        for node in unsettled:
+            node.settle()
+
     best_score = max(scores)
     if best_score <= scores[i] + _SCORE_EPS:
         return False

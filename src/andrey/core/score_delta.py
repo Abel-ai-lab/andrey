@@ -10,8 +10,8 @@ O(|S|^3) for two :func:`~andrey.core.score.local_score_bic` calls. With
 
 The delta is ``n * (log R_new - log R_old) +/- log_n * lambda`` (``+`` for an add). A near-singular
 ``cov[S,S]`` falls back to two full scores (:func:`_get_inv_with_cond`), and
-:func:`score_many_with_base` also recomputes any score whose error bound exceeds
-:data:`_SCORE_ERROR_LIMIT`. :func:`local_score_bic_delta` scores one move,
+:func:`score_many_with_base` reports, per move, a bound on how far its score can be from the full
+score (:func:`_add_error_bounds`). :func:`local_score_bic_delta` scores one move,
 :func:`score_many_with_base` many, :func:`add_deltas` and :func:`remove_deltas` every add or every
 removal against one base at once, and :class:`DeltaBICScore` keeps the caches a search reuses.
 :class:`FullScoreDelta` differences two full local scores of any :class:`~andrey.core.score.Score`,
@@ -20,10 +20,11 @@ for a score with no rank-one update, such as BDeu.
 
 from __future__ import annotations
 
+import contextlib
 import math
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, cast
 from weakref import WeakKeyDictionary
 
 import numpy as np
@@ -36,14 +37,8 @@ from .score import ZERO_RESIDUAL, BICScore, LocalScore, Score, local_score_bic
 _COND_THRESHOLD = 1e10
 _ILL = "__ill__"
 
-# A score from :func:`score_many_with_base` whose error bound exceeds this is recomputed as a full
-# score. BOSS and GRaSP compare scores with an absolute tolerance of 1e-6; a tenth of it keeps every
-# score they compare well within that tolerance.
-_SCORE_ERROR_LIMIT = 1e-7
-
-# Bounds on the batched instance-level caches (least-recently-used eviction).
+# Bound on the batched instance-level inv-cov cache (least-recently-used eviction).
 _INV_CACHE_CAP = 200_000
-_RESIDUAL_CACHE_CAP = 1_000_000
 
 # Byte ceiling on the cached dense ``inv(cov[S, S])`` matrices. At large ``d`` an inverse is
 # ``|S|^2 * 8`` bytes, so the entry-count cap alone can pin many gigabytes; this bounds memory in
@@ -67,6 +62,8 @@ class _InvCache(OrderedDict):
     def __init__(self) -> None:
         super().__init__()
         self.nbytes = 0
+        #: ``(min, max)`` of the covariance diagonal, set by the first batch that needs it.
+        self.diag_range: tuple[float, float] | None = None
 
 
 def _evict_inv(cache: OrderedDict) -> None:
@@ -372,120 +369,114 @@ def local_score_bic_delta(
     raise ValueError(f"unknown op: {op!r} (expected 'add' or 'remove')")
 
 
-def _bounded_get(cache: OrderedDict, key: Any) -> Any:
-    """Return ``cache[key]`` and mark it most-recently-used, or ``None`` when absent."""
-    if key not in cache:
-        return None
-    cache.move_to_end(key)
-    return cache[key]
+# Instance-level inv-cov caches keyed by the score object, so the batched surfaces amortize
+# inversions across calls without mutating :class:`BICScore`. Entries are dropped automatically when
+# a score is garbage-collected.
+_INV_CACHES: WeakKeyDictionary[BICScore, _InvCache] = WeakKeyDictionary()
 
 
-def _bounded_put(cache: OrderedDict, key: Any, value: Any, cap: int | None) -> None:
-    """Insert ``key -> value`` as most-recently-used, evicting the oldest past ``cap``."""
-    if cap == 0:
-        return
-    cache[key] = value
-    cache.move_to_end(key)
-    if cap is None:
-        return
-    while len(cache) > cap:
-        cache.popitem(last=False)
-
-
-# Instance-level Schur caches keyed by the score object, so :func:`score_many_with_base` amortizes
-# inversions and residuals across calls without mutating :class:`BICScore`. Entries are dropped
-# automatically when a score is garbage-collected.
-_DELTA_CACHES: WeakKeyDictionary[BICScore, tuple[OrderedDict, OrderedDict]] = WeakKeyDictionary()
-
-
-def _delta_caches(score_obj: BICScore) -> tuple[OrderedDict, OrderedDict]:
-    """Return ``(inv_cov_cache, residual_cache)``, created on first use."""
-    caches = _DELTA_CACHES.get(score_obj)
-    if caches is None:
-        caches = (_InvCache(), OrderedDict())
-        _DELTA_CACHES[score_obj] = caches
-    return caches
+def _inv_cache(score_obj: BICScore) -> _InvCache:
+    """Return the inv-cov cache of ``score_obj``, created on first use."""
+    cache = _INV_CACHES.get(score_obj)
+    if cache is None:
+        cache = _InvCache()
+        _INV_CACHES[score_obj] = cache
+    return cache
 
 
 def _add_error_bounds(
     n: int,
-    var_v: float,
-    abs_cov_SS: np.ndarray,
-    M: np.ndarray,
-    cs_v: np.ndarray,
-    cs_U: np.ndarray,
-    beta_U: np.ndarray,
-    e_vU: np.ndarray,
+    g: float,
+    proxy: float,
+    b_1: float,
+    dR_floor: float,
+    diag_range: tuple[float, float],
+    s: int,
+    t_U: np.ndarray,
     R_uU: np.ndarray,
     R_v_new: np.ndarray,
-) -> np.ndarray:
+) -> tuple[np.ndarray, float]:
     """Bound, per batched add, how far its score is from the exact score and from a full score.
 
     ``M`` is ``inv(A)`` for ``A = cov[S, S]``, solved column by column after an LU factorization:
     column ``j`` solves ``(A + dA_j) x_j = e_j`` with ``|dA_j| <= g |A|``, where
     ``g = 4 (|S| + 2) eps`` covers the factorization, the solves, and each later dot product. A
-    product ``x^T M y`` is then within ``g |M x|^T |A| |M| |y|`` of ``x^T inv(A) y``, which bounds
-    the error of ``R(v | S)`` and of ``e_vu`` componentwise, and of ``R(u | S)`` in norms, to stay
-    ``O(|S|)`` per candidate; ``g cov[v, v]`` adds the rounding of each residual, here and in the
-    full score the result is compared with. These errors move ``t = e_vu^2 / R(u | S)`` by at most
-    ``dt = (2 |e_vu| de + t dR_u) / R(u | S)``. The score is the base's full score plus
-    ``n (log R(v | S + u) - log R(v | S))`` with ``R(v | S + u) = R(v | S) - t``, so to first order
-    it is within ``n (dR_v + dt) / R(v | S + u)`` of both. The bound is ``inf`` where a
-    perturbation reaches half its residual, outside the first-order regime.
+    product ``x^T M y`` is then within ``g |M x|^T |A| |M| |y|`` of ``x^T inv(A) y``, at most
+    ``g proxy ||M x||_1 ||y||_inf`` with ``proxy = ||A||_inf ||M||_inf``, the condition number the
+    inverse cache keeps. No covariance exceeds the largest variance ``c`` in size, so with
+    ``b = M c_v``:
+
+    * ``R(v | S) = cov[v, v] - c_v^T M c_v`` is within ``dR_v = g proxy ||b||_1 c + dR_floor``,
+      where ``dR_floor`` holds the rounding of the residuals and of the scores, here and in the
+      full score the result is compared with;
+    * ``e_vu = cov[v, u] - c_v^T M c_u`` is within ``de = g proxy ||b||_1 c``;
+    * ``R(u | S)`` is within ``dR_u = g proxy sqrt(|S| ||M||_inf c) c``, the same for every
+      candidate, as ``||M c_u||_1^2 <= |S| ||M||_2 c_u^T M c_u <= |S| ||M||_inf c`` and
+      ``||M||_inf <= proxy`` divided by the smallest variance.
+
+    These errors move ``t = e_vu^2 / R(u | S)`` by at most
+    ``dt = 2 sqrt(t / R(u | S)) de + t dR_u / R(u | S)``, as ``|e_vu| / R(u | S) =
+    sqrt(t / R(u | S))``. The score is ``n log R(v | S + u)`` plus the penalty, with
+    ``R(v | S + u) = R(v | S) - t``, so to first order it is within ``n (dR_v + dt) / R(v | S + u)``
+    of both. Returns the bounds and ``dR_u``; a move is in the first-order regime when ``dR_u`` is
+    below half of its ``R(u | S)`` and its bound below ``n / 2``.
 
     References
     ----------
     N. J. Higham. *Accuracy and Stability of Numerical Algorithms*, 2nd ed., SIAM, 2002,
     Sections 3.1, 9.3, and 14.3.
     """
-    g = 4 * (M.shape[0] + 2) * _EPS
-    abs_M = np.abs(M)
-    w = g * (abs_M.T @ (abs_cov_SS @ np.abs(M @ cs_v)))
-    dR_v = float(w @ np.abs(cs_v)) + g * var_v
-    de = w @ np.abs(cs_U)
-    norms = g * float(abs_cov_SS.sum(axis=1).max()) * float(abs_M.sum(axis=1).max())
-    dR_u = norms * np.abs(beta_U).sum(axis=0) * np.abs(cs_U).max(axis=0)
-    with np.errstate(all="ignore"):
-        t = e_vU * (e_vU / R_uU)
-        dt = (2 * np.abs(e_vU) * de + t * dR_u) / R_uU
-        bound = n * (dR_v + dt) / R_v_new
-        first_order = (dR_u < 0.5 * R_uU) & (dR_v + dt < 0.5 * R_v_new)
-    return np.where(first_order, bound, np.inf)
+    var_min, var_max = diag_range
+    de = g * proxy * b_1 * var_max
+    dR_u = (
+        g * proxy * math.sqrt(s * proxy / var_min * var_max) * var_max if var_min > 0 else math.inf
+    )
+    q = t_U / R_uU
+    bound = np.sqrt(q)
+    bound *= 2 * de
+    bound += q * dR_u
+    bound += de + dR_floor
+    bound *= n
+    bound /= R_v_new
+    return bound, dR_u
 
 
 def _remove_error_bounds(
     n: int,
-    var_v: float,
-    abs_cov_SS: np.ndarray,
-    M: np.ndarray,
-    cs_v: np.ndarray,
+    g: float,
+    proxy: float,
+    b_1: float,
+    dR_floor: float,
+    diag_range: tuple[float, float],
     R_v_old: float,
-) -> np.ndarray:
+    b: np.ndarray,
+    m: np.ndarray,
+    t: np.ndarray,
+    R_v_new: np.ndarray,
+) -> tuple[np.ndarray, float, float]:
     """Bound, per member of ``S``, how far the score of removing it is from the exact score and
     from a full score.
 
-    With the errors of :func:`_add_error_bounds`, removing position ``j`` reads ``b = (M^T c_v)_j``
-    and ``m = M_jj``, within ``db = g |M c_v|^T |A| |M_{:, j}|`` and
-    ``dm = g ||A||_inf ||M_{j, :}||_1 max |M_{:, j}|``, and raises ``R(v | S)`` by
-    ``t = b^2 / m``, which moves by at most ``dt = (2 |b| db + t dm) / m``. The base's full score
-    and the ``R(v | S)`` the update starts from are each within ``dR_v`` of exact, so the score is
+    With the norms of :func:`_add_error_bounds`, removing position ``j`` reads ``b_j = (M c_v)_j``
+    within ``db = g proxy ||b||_1`` and ``m = M_jj`` within ``dm = g proxy max |M|``, at most
+    ``g proxy^2 / (smallest variance)``, and raises ``R(v | S)`` by ``t = b_j^2 / m``, which moves
+    by at most ``dt = (2 |b_j| db + t dm) / m``. ``R(v | S)`` is within ``dR_v``, so the score is
     within ``n (2 dR_v / R(v | S) + dt / R(v | S - u))`` of the exact score and of a full score.
-    The bound is ``inf`` where a perturbation reaches half its residual.
+    Returns the bounds, ``dm`` and ``dR_v``; the moves are in the first-order regime where ``dm``
+    is below half of ``m``, ``dR_v`` below half of ``R(v | S)``, and the bound below ``n / 2``.
     """
-    g = 4 * (M.shape[0] + 2) * _EPS
-    abs_M = np.abs(M)
-    b = cs_v @ M
-    w = g * (abs_M.T @ (abs_cov_SS @ np.abs(b)))
-    dR_v = float(w @ np.abs(cs_v)) + g * var_v
-    m = np.diag(M)
-    dm = g * float(abs_cov_SS.sum(axis=1).max()) * abs_M.sum(axis=1) * abs_M.max(axis=0)
-    with np.errstate(all="ignore"):
-        t = b * (b / m)
-        R_v_new = R_v_old + t
-        dt = (2 * np.abs(b) * w + t * dm) / m
-        bound = n * (2 * dR_v / R_v_old + dt / R_v_new)
-        first_order = (m > 0.0) & (dm < 0.5 * m) & (dR_v < 0.5 * R_v_old) & (dt < 0.5 * R_v_new)
-    return np.where(first_order, bound, np.inf)
+    var_min, var_max = diag_range
+    db = g * proxy * b_1
+    dR_v = db * var_max + dR_floor
+    dm = g * proxy * proxy / var_min if var_min > 0 else math.inf
+    bound = np.abs(b)
+    bound *= 2 * db
+    bound += t * dm
+    bound /= m
+    bound /= R_v_new
+    bound += 2 * dR_v / R_v_old
+    bound *= n
+    return bound, dm, dR_v
 
 
 def score_many_with_base(
@@ -495,23 +486,31 @@ def score_many_with_base(
     deltas: Sequence[tuple[str, int]],
     *,
     cond_threshold: float = _COND_THRESHOLD,
+    bounds: list[float] | None = None,
 ) -> list[float]:
     """Return absolute scores ``[score(i, base +/- delta_k)]`` for a batch of single-variable moves.
 
     ``deltas`` is a sequence of ``("add", u)`` / ``("remove", u)`` tuples; results are returned in
-    delta order. Each score is the base's full score plus a Schur update, sharing one
-    ``inv(cov[base, base])`` across the whole batch. Adds are vectorized over candidate ``u`` via
-    ``einsum`` with a ``safe_mask``; removes use the diagonal of ``M_old`` and
-    ``R(u | S_new) = 1 / M_uu``. Candidates masked out by the safety guards, moves not a valid
-    single add/remove of ``base``, and updates whose first-order error bound
-    (:func:`_add_error_bounds`, :func:`_remove_error_bounds`) exceeds :data:`_SCORE_ERROR_LIMIT`
-    fall back to a full ``score`` call, so every returned score is within that limit of the full
-    score. On well-conditioned data the bound stays below it and the update serves every move; on
-    dense data with nearly collinear parent sets, the full score serves more of them. Instance-level
-    inv-cov and residual caches (capped at 200k / 1M entries) are keyed to ``score_obj`` and created
-    on first use; :class:`BICScore` is unchanged.
+    delta order. Each score is ``n log R(i | base +/- u)`` plus the penalty, with the residual
+    updated from ``R(i | base)`` by one rank-one Schur step: adds over the shared
+    ``inv(cov[base, base])`` and ``R(u | base)``, removes over its diagonal. Every score starts
+    from the base's residual, never from another batched score. Candidates
+    masked out by the safety guards, moves not a valid single add/remove of ``base``, and updates
+    outside the first-order regime of their error bound fall back to a full ``score`` call.
+
+    ``bounds`` receives, per move, a bound on how far the score can be from
+    :meth:`BICScore.score` of the same parent set (:func:`_add_error_bounds`,
+    :func:`_remove_error_bounds`), and 0 for a full score. A search that compares these scores
+    with a tolerance decides as full scores would wherever the bounds leave the comparison's side
+    unchanged, and scores the rest in full. The inv-cov cache (capped at 200k entries) is keyed to
+    ``score_obj`` and created on first use; :class:`BICScore` is unchanged.
     """
+    k = len(deltas)
+    results: list[float | None] = [None] * k
+    out_bounds = [0.0] * k
     if not deltas:
+        if bounds is not None:
+            bounds[:] = out_bounds
         return []
 
     cov = score_obj.cov
@@ -519,164 +518,182 @@ def score_many_with_base(
     log_n = score_obj.log_n
     lam = score_obj.lambda_value
     cov_diag = score_obj._cov_diag
-    inv_cov_cache, residual_cache = _delta_caches(score_obj)
+    inv_cov_cache = _inv_cache(score_obj)
 
     i = int(i)
     S_base_sorted: tuple[int, ...] = tuple(sorted(int(x) for x in base_parents))
-    base_score = score_obj.score(i, S_base_sorted)
-
-    derived_parent_sets: list[list[int]] = []
-    for op, u in deltas:
-        u_int = int(u)
-        if op == "add":
-            derived_parent_sets.append(sorted([*S_base_sorted, u_int]))
-        elif op == "remove":
-            derived_parent_sets.append([x for x in S_base_sorted if x != u_int])
-        else:
-            raise ValueError(f"unknown delta op: {op!r} (expected 'add' or 'remove')")
-
-    def _get_obs_inv(S_sorted: tuple[int, ...], S_list: list[int]):
-        M, ill = _get_inv_with_cond(inv_cov_cache, S_sorted, cov, S_list, cond_threshold)
-        if S_sorted in inv_cov_cache:
-            inv_cov_cache.move_to_end(S_sorted)
-            _evict_inv(inv_cov_cache)
-        return M, ill
-
-    results: list[float] = [0.0] * len(deltas)
-    adds: list[tuple[int, int]] = []
-    removes: list[tuple[int, int]] = []
-    for idx, (op, u) in enumerate(deltas):
-        if op == "add":
-            adds.append((idx, int(u)))
-        else:
-            removes.append((idx, int(u)))
-
-    # R(v | base): the shared "subtract" side of every delta in the batch.
-    key_v_old = (i, S_base_sorted)
-    R_v_old = _bounded_get(residual_cache, key_v_old)
-    if R_v_old is None:
-        if not S_base_sorted:
-            R_v_old = float(cov_diag[i])
-        else:
-            S_list = list(S_base_sorted)
-            M_old, ill = _get_obs_inv(S_base_sorted, S_list)
-            if not ill:
-                cs_v = cov[S_list, i]
-                R_v_old = float(cov_diag[i] - cs_v @ (M_old @ cs_v))
-        if R_v_old is not None:
-            _bounded_put(residual_cache, key_v_old, R_v_old, _RESIDUAL_CACHE_CAP)
-    floor = ZERO_RESIDUAL * float(cov_diag[i])
-    if R_v_old is not None and not R_v_old > floor:
-        R_v_old = None  # an unavailable base: every move falls back to full scores
-
-    if adds:
-        add_us = sorted({u for _, u in adds if u != i and u not in S_base_sorted})
-        add_scores: dict[int, float] = {}
-        if add_us and R_v_old is not None and len(S_base_sorted) + 1 <= n - 2:
-            if not S_base_sorted:
-                for u in add_us:
-                    key_u_old = (u, S_base_sorted)
-                    R_u_old = _bounded_get(residual_cache, key_u_old)
-                    if R_u_old is None:
-                        R_u_old = float(cov_diag[u])
-                        _bounded_put(residual_cache, key_u_old, R_u_old, _RESIDUAL_CACHE_CAP)
-                    if R_u_old <= 0.0:
-                        continue
-                    e_vu = float(cov[i, u])
-                    R_v_new = R_v_old - e_vu * (e_vu / R_u_old)
-                    if R_v_new <= floor:
-                        continue
-                    add_scores[u] = float(
-                        base_score + n * (_log(R_v_new) - _log(R_v_old)) + log_n * lam
-                    )
+    s = len(S_base_sorted)
+    S_set = set(S_base_sorted)
+    ops, moves = zip(*deltas)
+    n_add = ops.count("add")
+    add_idx: Sequence[int] = ()
+    add_us: Sequence[int] = ()
+    remove_idx: Sequence[int] = ()
+    remove_us: Sequence[int] = ()
+    if n_add == k and i not in moves and S_set.isdisjoint(moves):
+        add_idx, add_us = range(k), moves
+    elif n_add == 0 and ops.count("remove") == k and S_set.issuperset(moves):
+        remove_idx, remove_us = range(k), moves
+    else:
+        add_idx, add_us, remove_idx, remove_us = [], [], [], []
+        for idx, (op, u) in enumerate(deltas):
+            if op == "add":
+                if u != i and u not in S_set:
+                    add_idx.append(idx)
+                    add_us.append(u)
+            elif op == "remove":
+                if u in S_set:
+                    remove_idx.append(idx)
+                    remove_us.append(u)
             else:
-                S_list = list(S_base_sorted)
-                M_old, ill = _get_obs_inv(S_base_sorted, S_list)
-                if not ill:
-                    cs_v = cov[S_list, i]
-                    us_arr = np.asarray(add_us, dtype=np.intp)
-                    cs_U = cov[S_list][:, us_arr]
-                    beta_U = M_old @ cs_U
-                    e_vU = cov[i, us_arr] - cs_v @ beta_U
-                    R_uU = cov_diag[us_arr] - np.einsum("ij,ij->j", cs_U, beta_U)
-                    safe_mask = R_uU > 0.0
-                    safe_R_u = np.where(safe_mask, R_uU, 1.0)
-                    R_v_new_arr = R_v_old - e_vU * (e_vU / safe_R_u)
-                    safe_mask = safe_mask & (R_v_new_arr > floor)
-                    bound = _add_error_bounds(
-                        n,
-                        float(cov_diag[i]),
-                        np.abs(cov[np.ix_(S_list, S_list)]),
-                        M_old,
-                        cs_v,
-                        cs_U,
-                        beta_U,
-                        e_vU,
-                        safe_R_u,
-                        R_v_new_arr,
-                    )
-                    safe_mask = safe_mask & (bound <= _SCORE_ERROR_LIMIT)
-                    if np.any(safe_mask):
-                        deltas_arr = (
-                            n * (_log(np.where(safe_mask, R_v_new_arr, 1.0)) - _log(R_v_old))
-                            + log_n * lam
-                        )
-                        for pos, u in enumerate(add_us):
-                            if safe_mask[pos]:
-                                add_scores[u] = float(base_score + deltas_arr[pos])
-        for idx, u in adds:
-            score_val = add_scores.get(u)
-            if score_val is None:
-                score_val = score_obj.score(i, derived_parent_sets[idx])
-            results[idx] = score_val
+                raise ValueError(f"unknown delta op: {op!r} (expected 'add' or 'remove')")
 
-    if removes:
-        remove_us = sorted({u for _, u in removes if u in S_base_sorted})
-        remove_scores: dict[int, float] = {}
-        if remove_us and R_v_old is not None:
-            if len(S_base_sorted) == 1:
-                only = S_base_sorted[0]
-                if only in remove_us:
-                    remove_scores[only] = score_obj.score(i, [])
-            elif S_base_sorted:
-                S_list = list(S_base_sorted)
-                M_old, ill = _get_obs_inv(S_base_sorted, S_list)
-                if not ill:
-                    idx_of = {p: pos for pos, p in enumerate(S_base_sorted)}
-                    Mdiag = np.diag(M_old)
-                    cs_v = cov[S_list, i]
-                    log_Rv_old = float(_log(R_v_old))
-                    bound = _remove_error_bounds(
-                        n,
-                        float(cov_diag[i]),
-                        np.abs(cov[np.ix_(S_list, S_list)]),
-                        M_old,
-                        cs_v,
-                        R_v_old,
-                    )
-                    for u in remove_us:
-                        u_idx = idx_of[u]
-                        M_uu = float(Mdiag[u_idx])
-                        if M_uu <= 0.0 or not np.isfinite(M_uu):
-                            continue
-                        if not bound[u_idx] <= _SCORE_ERROR_LIMIT:
-                            continue
-                        R_u_new = 1.0 / M_uu
-                        M_col = M_old[:, u_idx]
-                        num = float(cs_v @ M_col) - float(cs_v[u_idx]) * M_uu
-                        e_vu = float(cov[i, u]) + num / M_uu
-                        R_v_new = R_v_old + e_vu * (e_vu / R_u_new)
-                        if R_v_new <= floor or not np.isfinite(R_v_new):
-                            continue
-                        remove_scores[u] = float(
-                            base_score + n * (_log(R_v_new) - log_Rv_old) - log_n * lam
-                        )
-        for idx, u in removes:
-            score_val = remove_scores.get(u)
-            if score_val is None:
-                score_val = score_obj.score(i, derived_parent_sets[idx])
-            results[idx] = score_val
-    return results
+    # R(v | base), the residual every move updates; None leaves every move to a full score.
+    var_v = float(cov_diag[i])
+    floor = ZERO_RESIDUAL * var_v
+    R_v_old: float | None = var_v
+    if S_base_sorted:
+        S_list = list(S_base_sorted)
+        M, ill = _get_inv_with_cond(inv_cov_cache, S_base_sorted, cov, S_list, cond_threshold)
+        if S_base_sorted in inv_cov_cache:
+            inv_cov_cache.move_to_end(S_base_sorted)
+            _evict_inv(inv_cov_cache)
+        if ill or M is None:
+            R_v_old = None
+        else:
+            proxy = inv_cov_cache[S_base_sorted][1]  # ||A||_inf ||M||_inf
+            rows = cov[S_list]
+            cs_v = rows[:, i]
+            b = cs_v @ M
+            R_v_old = float(var_v - b @ cs_v)
+            g = 4 * (s + 2) * _EPS
+            b_1 = float(np.abs(b).sum())
+    if R_v_old is not None and not R_v_old > floor:
+        R_v_old = None
+    if R_v_old is not None:
+        # A kept residual lies in (floor, var_v], so each score is at most this far from zero; a
+        # few units in its last place cover the rounding of ``n log R + penalty``, here and in a
+        # full score.
+        rounding = 1.01 * 4 * _EPS * (n * (abs(math.log(var_v)) + 28.0) + log_n * (s + 1) * lam)
+        rounding /= n
+    diag_range = inv_cov_cache.diag_range
+    if diag_range is None:
+        diag_range = inv_cov_cache.diag_range = (float(cov_diag.min()), float(cov_diag.max()))
+
+    def _keep(
+        idxs: Sequence[int], values: np.ndarray, bound: np.ndarray, ok: np.ndarray | None
+    ) -> None:
+        """Store the scores and bounds that ``ok`` keeps (every one for ``None``); a guarded-out
+        move stays ``None``."""
+        value_list = values.tolist()
+        bound_list = bound.tolist()
+        if ok is None and len(idxs) == k:
+            results[:] = value_list
+            out_bounds[:] = bound_list
+            return
+        for pos in range(len(idxs)) if ok is None else np.flatnonzero(ok).tolist():
+            results[idxs[pos]] = value_list[pos]
+            out_bounds[idxs[pos]] = bound_list[pos]
+
+    if add_us and R_v_old is not None and s + 1 <= n - 2:
+        us_arr = np.asarray(add_us, dtype=np.intp)
+        if not S_base_sorted:
+            e_vU = cov[i, us_arr]
+            R_uU = cov_diag[us_arr]
+        else:
+            cs_U = rows[:, us_arr]
+            e_vU = cov[i, us_arr] - b @ cs_U
+            R_uU = cov_diag[us_arr] - np.einsum("ij,ij->j", cs_U, M @ cs_U)
+        penalty = log_n * (s + 1) * lam
+        # The first-order bounds and the zero floor need every residual safely positive; a batch
+        # that has one that is not takes the guarded path, where masks drop each such move.
+        R_u_min = float(R_uU.min())
+        safe = R_u_min > 0.0
+        if safe:
+            t_U = e_vU * (e_vU / R_uU)
+            R_v_new = R_v_old - t_U
+            safe = float(R_v_new.min()) > 2 * floor
+        with np.errstate(all="ignore") if not safe else contextlib.nullcontext():
+            if not safe:
+                t_U = e_vU * (e_vU / R_uU)
+                R_v_new = R_v_old - t_U
+            values = np.log(R_v_new)
+            values *= n
+            values += penalty
+            if not S_base_sorted:
+                # One rounding each for the quotient, the product, and the difference.
+                bound = (n * (4 * _EPS + rounding) * var_v) / R_v_new
+                dR_u = 0.0
+            else:
+                bound, dR_u = _add_error_bounds(
+                    n, g, proxy, b_1, (g + rounding) * var_v, diag_range, s, t_U, R_uU, R_v_new
+                )
+            # The bound below n / 2 keeps the residual's error below half of it, so a residual
+            # above twice the floor stays above the floor.
+            if safe and dR_u < 0.5 * R_u_min and float(bound.max()) < 0.5 * n:
+                ok = None
+            else:
+                ok = (R_uU > 2 * dR_u) & (bound < 0.5 * n) & (R_v_new > 2 * floor)
+        _keep(add_idx, values, bound, ok)
+
+    if remove_us and R_v_old is not None:
+        if s == 1:
+            for idx in remove_idx:
+                results[idx] = score_obj.score(i, [])
+        else:
+            assert M is not None  # a base with a residual has an inverse
+            idx_of = {p: pos for pos, p in enumerate(S_base_sorted)}
+            pos_arr = np.asarray([idx_of[u] for u in remove_us], dtype=np.intp)
+            m_all = np.diag(M)
+            penalty = log_n * (s - 1) * lam
+            safe = float(m_all.min()) > 0.0 and R_v_old > 2 * floor
+            with np.errstate(all="ignore") if not safe else contextlib.nullcontext():
+                t_all = b * (b / m_all)
+                R_all = R_v_old + t_all
+                bound_all, dm, dR_v = _remove_error_bounds(
+                    n,
+                    g,
+                    proxy,
+                    b_1,
+                    g * var_v + rounding * R_v_old / 2,
+                    diag_range,
+                    R_v_old,
+                    b,
+                    m_all,
+                    t_all,
+                    R_all,
+                )
+                R_v_new = R_all[pos_arr]
+                bound = bound_all[pos_arr]
+                values = np.log(R_v_new)
+                values *= n
+                values += penalty
+                if (
+                    safe
+                    and dm < 0.5 * float(m_all.min())
+                    and dR_v < 0.5 * R_v_old
+                    and float(bound.max()) < 0.5 * n
+                ):
+                    ok = None
+                else:
+                    ok = (m_all[pos_arr] > 2 * dm) & (bound < 0.5 * n) & (R_v_new > 2 * floor)
+                    ok &= dR_v < 0.5 * R_v_old
+            _keep(remove_idx, values, bound, ok)
+
+    if None in results:
+        for idx, value in enumerate(results):
+            if value is None:
+                op, u = deltas[idx]
+                u = int(u)
+                parents = (
+                    sorted([*S_base_sorted, u])
+                    if op == "add"
+                    else [x for x in S_base_sorted if x != u]
+                )
+                results[idx] = score_obj.score(i, parents)
+    if bounds is not None:
+        bounds[:] = out_bounds
+    return cast("list[float]", results)  # every move now has a score
 
 
 def _delta_two_scores(
@@ -819,7 +836,7 @@ def delta_many_with_base(
     log_n = score_obj.log_n
     lam = score_obj.lambda_value
     cov_diag = score_obj._cov_diag
-    inv_cov_cache = _delta_caches(score_obj)[0]
+    inv_cov_cache = _inv_cache(score_obj)
 
     i = int(i)
     S_base_sorted: tuple[int, ...] = tuple(sorted(int(x) for x in base_parents))
@@ -999,7 +1016,7 @@ def add_deltas(
         e = cov[i]
         R_u = score_obj._cov_diag
     else:
-        inv_cov_cache = _delta_caches(score_obj)[0]
+        inv_cov_cache = _inv_cache(score_obj)
         M, ill = _get_inv_with_cond(inv_cov_cache, S_sorted, cov, S_list, cond_threshold)
         inv_cov_cache.move_to_end(S_sorted)
         _evict_inv(inv_cov_cache)
@@ -1063,7 +1080,7 @@ def remove_deltas(
     out = np.full(cov.shape[0], np.inf)
     if not S_list:
         return out
-    inv_cov_cache = _delta_caches(score_obj)[0]
+    inv_cov_cache = _inv_cache(score_obj)
     M, _ = _get_inv_with_cond(inv_cov_cache, S_sorted, cov, S_list, cond_threshold)
     inv_cov_cache.move_to_end(S_sorted)
     _evict_inv(inv_cov_cache)
@@ -1090,11 +1107,13 @@ def remove_deltas(
 class DeltaBICScore:
     """Stateful companion to :class:`~andrey.core.score.BICScore` for the Schur delta path.
 
-    Wraps a :class:`BICScore` and owns the inv-cov and residual caches that amortize repeated moves,
-    exposing :meth:`delta` (scalar) and :meth:`score_many_with_base` (batched) for HC/GST. All BIC
+    Wraps a :class:`BICScore` and owns the caches that amortize repeated moves: the inv-cov cache
+    that every surface shares, and the residual cache of the scalar :meth:`delta`. It exposes
+    :meth:`delta` (scalar) and :meth:`score_many_with_base` (batched) for HC/GST. All BIC
     constants (covariance, sample count, ``log_n``, ``lambda_value``) are read from the wrapped
-    score. The batched scores are within :data:`_SCORE_ERROR_LIMIT` of :meth:`BICScore.score`; the
-    scalar :meth:`delta` routes only near-singular parent sets to full scores.
+    score. The batched scores come with a bound on their distance from :meth:`BICScore.score`
+    (:func:`score_many_with_base`); the scalar :meth:`delta` routes only near-singular parent sets
+    to full scores.
 
     Parameters
     ----------
@@ -1109,8 +1128,8 @@ class DeltaBICScore:
         self.cond_threshold = float(cond_threshold)
         self.inv_cov_cache: _InvCache = _InvCache()
         self.residual_cache: OrderedDict = OrderedDict()
-        # Route the batched surface's instance-level caches to this companion's caches.
-        _DELTA_CACHES[score] = (self.inv_cov_cache, self.residual_cache)
+        # Route the batched surfaces' inv-cov cache to this companion's cache.
+        _INV_CACHES[score] = self.inv_cov_cache
 
     def delta(self, v: int, S_old_sorted: tuple[int, ...], u: int, op: str) -> float:
         """Return ``score(v, S_new) - score(v, S_old)`` for a single ``add``/``remove`` of ``u``."""
@@ -1133,10 +1152,20 @@ class DeltaBICScore:
         i: int,
         base_parents: Sequence[int],
         deltas: Sequence[tuple[str, int]],
+        *,
+        bounds: list[float] | None = None,
     ) -> list[float]:
-        """Return absolute scores ``[score(i, base +/- delta_k)]`` for a batch of single moves."""
+        """Return absolute scores ``[score(i, base +/- delta_k)]`` for a batch of single moves.
+
+        ``bounds``, when given, receives each score's error bound (:func:`score_many_with_base`).
+        """
         return score_many_with_base(
-            self.score_obj, i, base_parents, deltas, cond_threshold=self.cond_threshold
+            self.score_obj,
+            i,
+            base_parents,
+            deltas,
+            cond_threshold=self.cond_threshold,
+            bounds=bounds,
         )
 
     def delta_many_with_base(
@@ -1202,9 +1231,19 @@ class FullScoreDelta:
         return [float(s - scores[0]) for s in scores[1:]]
 
     def score_many_with_base(
-        self, i: int, base_parents: Sequence[int], deltas: Sequence[tuple[str, int]]
+        self,
+        i: int,
+        base_parents: Sequence[int],
+        deltas: Sequence[tuple[str, int]],
+        *,
+        bounds: list[float] | None = None,
     ) -> list[float]:
-        """Return absolute scores ``[score(i, base +/- u_k)]`` for single moves."""
+        """Return absolute scores ``[score(i, base +/- u_k)]`` for single moves.
+
+        ``bounds``, when given, receives zeros: every score is a full score.
+        """
+        if bounds is not None:
+            bounds[:] = [0.0] * len(deltas)
         base = [int(p) for p in base_parents]
         return self.score_obj.score_many(int(i), _moved(base, deltas))
 

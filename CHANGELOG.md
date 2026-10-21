@@ -127,11 +127,12 @@ change names its pull request.
 - `andrey run` reads a quoted header name that holds a comma, and a first row that mixes numbers
   with text exits with `bad_data` naming one of each; a first row of numbers is data, so quote a
   header name that is a number. ([#261])
-- `boss` and `grasp` with the linear-Gaussian BIC score a move in full wherever the fast update
-  from its base parent set could be off by more than `1e-7`, a tenth of the tolerance they compare
-  scores with, and no longer carry updated scores from one step to the next. On dense data with
-  nearly collinear parent sets, where the update could be off by more than the tolerance, rounding
-  error no longer decides a move, and `boss` can return a different graph. ([#271])
+- `boss` and `grasp` with the linear-Gaussian BIC make every decision as full local scores make
+  it: each fast update from a base parent set comes with a bound on its rounding error, and a
+  comparison the bound leaves open is decided by full scores. Updates no longer build on earlier
+  updates. On dense data with nearly collinear parent sets, where an update could be off by more
+  than the `1e-6` tolerance, rounding error no longer decides a move, and `boss` can return a
+  different graph. ([#271])
 
 ## [0.7.0] - 2026-10-19
 
