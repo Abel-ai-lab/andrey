@@ -29,9 +29,10 @@ def _search_causal_order(matrix: np.ndarray, ranks: np.ndarray) -> list[int] | N
             break
         target_index = row_index_list[np.argmin(ranks[original_index[row_index_list]])]
         causal_order.append(int(original_index[target_index]))
-        original_index = np.delete(original_index, target_index, axis=0)
-        mask = np.delete(np.arange(len(matrix)), target_index, axis=0)
-        matrix = matrix[mask][:, mask]
+        keep = np.ones(len(matrix), dtype=bool)
+        keep[target_index] = False
+        original_index = original_index[keep]
+        matrix = matrix[keep][:, keep]
 
     if len(causal_order) != row_num:
         return None
