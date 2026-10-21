@@ -173,7 +173,7 @@ def test_shrink_rechecks_base_when_no_grow_candidates_remain() -> None:
     tree = grasp_mod._GST(0, score, DeltaBICScore(score), 4)
     node = grasp_mod._GSTNode(tree, score=exact - 5e-10)
 
-    node.trace([], parents, set(parents))
+    node.trace(set(tree.available), parents, set(parents))
 
     assert parents == [1, 2, 3]
     assert node.shrink_score == exact
