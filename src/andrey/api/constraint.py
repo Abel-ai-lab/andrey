@@ -82,7 +82,7 @@ def pc(
         conflict. ``None`` follows ``andrey.config.tie_break``: ``"p_value"`` under ``"rank"``,
         ``"column"`` under ``"position"``. See Notes.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
@@ -360,7 +360,7 @@ def fci(
         fewer than half of the separating subsets (``p >= alpha``) contain ``z`` [4]_; at exactly
         half the triple stays unoriented. Majority runs up to ``2**degree`` extra tests per triple.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
@@ -840,7 +840,7 @@ def cdnod(
         or fire one at a time in column order, as for :func:`~andrey.pc`. Under either order, the
         edges out of the index are directed first, and no collider puts an arrowhead at the index.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The domain index is categorical too, so ``data`` may

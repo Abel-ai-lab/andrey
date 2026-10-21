@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import dataclasses
+import json
+
 import numpy as np
 import pytest
 
-from andrey.core import EDGE_DTYPE, GraphStructure, Structure, TemporalStructure
+from andrey.core import EDGE_DTYPE, GraphStructure, Structure, StructureOutput, TemporalStructure
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
 
 
@@ -560,6 +563,59 @@ def test_stored_arrays_are_read_only():
 def test_labels_length_checked():
     with pytest.raises(ValueError):
         directed([(0, 1)], 2, labels=("only-one",))
+
+
+@pytest.mark.parametrize(
+    ("names", "labels"),
+    [((1, 0, 2), ("1", "0", "2")), ((None, "y", "z, ÿ→é"), ("None", "y", "z, ÿ→é"))],
+)
+def test_labels_are_text_through_every_reader_and_writer(tmp_path, names, labels):
+    g = directed([(0, 1), (2, 1)], 3, labels=names)
+    assert g.labels == labels
+    out = StructureOutput.new(g)
+    out.save(tmp_path / "g.json")
+    out.save(tmp_path / "g.npz", fmt="npz")
+    backs = [
+        GraphStructure.from_networkx(g.to_networkx()),
+        GraphStructure.from_edges(g.to_edges(), n_nodes=3, labels=names),
+        TemporalStructure.from_lag_graphs([g], labels=names).lag(0),
+        StructureOutput.load(tmp_path / "g.json").structure,
+        StructureOutput.load(tmp_path / "g.npz").structure,
+    ]
+    assert all(back == g for back in backs)
+
+
+def test_a_saved_file_with_numeric_labels_loads_them_as_text(tmp_path):
+    path = tmp_path / "g.json"
+    StructureOutput.new(directed([(0, 1)], 2, labels=("a", "b"))).save(path)
+    doc = json.loads(path.read_text())
+    path.write_text(json.dumps({**doc, "labels": [1, 0]}))
+    assert StructureOutput.load(path).structure.labels == ("1", "0")
+
+
+def _networkx_nodes(*nodes):
+    import networkx as nx
+
+    G = nx.DiGraph()
+    G.add_nodes_from(nodes)
+    return G
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: directed([(0, 1)], 3, labels=(1, "1", "z")),
+        lambda: GraphStructure.from_networkx(_networkx_nodes(1, "1", "z")),
+        lambda: TemporalStructure.from_lag_graphs([directed([(0, 1)], 3)], labels=("1", "1", "z")),
+        lambda: dataclasses.replace(
+            directed([(0, 1)], 3, labels=("a", "b", "c")), _labels=("1", 1, "z")
+        ),
+    ],
+    ids=["from_numpy", "from_networkx", "from_lag_graphs", "replace"],
+)
+def test_labels_equal_as_text_raise(build):
+    with pytest.raises(ValueError, match=r"'1' names nodes \[0, 1\]"):
+        build()
 
 
 def test_equality_and_unhashable():
