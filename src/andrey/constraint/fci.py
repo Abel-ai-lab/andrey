@@ -6,7 +6,7 @@ The algorithm, its settings, and its references are described on :func:`andrey.f
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import cache
 from itertools import combinations, islice, permutations
@@ -26,6 +26,7 @@ from andrey.constraint._skeleton import (
 )
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
+from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.search.hc import tie_ranks
 
@@ -427,33 +428,31 @@ def _orient_colliders(
 # ---- possible-d-separation refinement -----------------------------------------------------------
 
 
-def _exists_semidirected_path(marks: np.ndarray, src: int, dst: int) -> bool:
-    """True when a semidirected path ``src o-> ... o-> dst`` exists.
+def _semidirected_reach(marks: np.ndarray) -> Callable[[int], int]:
+    """``reach(src)``: the bitmask of every node ``dst`` with a semidirected path
+    ``src o-> ... o-> dst`` of one or more steps, searched once per ``src``.
 
-    A step ``src -> u`` is allowed when the endpoint at ``src`` is a tail or a circle.
+    A step ``u -> v`` is allowed when the endpoint at ``u`` is a tail or a circle, so ``src`` is in
+    its own set only when such a path returns to it.
     """
-    n = marks.shape[0]
-    seen: set[int] = set()
-    queue: deque[int] = deque()
-    for u in range(n):
-        if marks[src, u] in (TAIL, CIRCLE) and u not in seen:
-            seen.add(u)
-            queue.append(u)
-    while queue:
-        node = queue.popleft()
-        if node == dst:
-            return True
-        for u in range(n):
-            if marks[node, u] in (TAIL, CIRCLE) and u not in seen:
-                seen.add(u)
-                queue.append(u)
-    return False
+    step = (marks == TAIL) | (marks == CIRCLE)
+    succ = row_masks(step)
+    pred = row_masks(step.T)
+
+    @cache
+    def reach(src: int) -> int:
+        seen = semidirected_reach_set(succ, src, 0)
+        # The search counts src as reached; keep it only when a reached node steps back into it.
+        return seen if seen & pred[src] else seen & ~(1 << src)
+
+    return reach
 
 
 def _exists_possible_parent_path(
-    previous: Mapping[int, set[int]], node: int, x: int, marks: np.ndarray
+    previous: Mapping[int, set[int]], node: int, x: int, reach: Callable[[int], int]
 ) -> bool:
-    """The possible-d-sep reachability check over the ``previous`` predecessor sets."""
+    """The possible-d-sep reachability check over the ``previous`` predecessor sets, with the
+    semidirected paths of :func:`_semidirected_reach`."""
     if node == x:
         return True
     preds = previous.get(node)
@@ -462,7 +461,7 @@ def _exists_possible_parent_path(
     for r in preds:
         if r == node or r == x:
             continue
-        if _exists_semidirected_path(marks, r, x) or _exists_semidirected_path(marks, r, node):
+        if reach(r) & (1 << x | 1 << node):
             return True
     return False
 
@@ -477,7 +476,8 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     reasons for keeping it. A node's possible-parent check runs when the frontier reaches it, over
     the predecessors recorded so far, so the set depends on the order of the node indices.
     """
-    n = marks.shape[0]
+    neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
+    reach = _semidirected_reach(marks)
     dsep: set[int] = set()
     queue: deque[tuple[int, int]] = deque()
     visited: set[tuple[int, int]] = set()
@@ -485,8 +485,8 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     first: tuple[int, int] | None = None
     distance = 0
 
-    for b in range(n):
-        if not _adjacent(marks, x, b) or b == y:
+    for b in neighbors[x]:
+        if b == y:
             continue
         edge = (x, b)
         if first is None:
@@ -504,10 +504,10 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
             if distance > _UNBOUNDED_PATH:
                 break
         a, b = t
-        if _exists_possible_parent_path(previous, b, x, marks):
+        if _exists_possible_parent_path(previous, b, x, reach):
             dsep.add(b)
-        for c in range(n):
-            if not _adjacent(marks, b, c) or c in (a, x, y):
+        for c in neighbors[b]:
+            if c in (a, x, y):
                 continue
             previous.setdefault(c, set()).add(b)
             if _is_def_collider(marks, a, b, c) or _adjacent(marks, a, c):
