@@ -19,6 +19,7 @@ import numpy as np
 
 from andrey.core.independence import hsic_gamma_test
 from andrey.lingam.direct import direct_lingam
+from andrey.search.hc import tie_ranks
 
 
 def _check_panel(X_list: list[np.ndarray]) -> tuple[list[np.ndarray], int, int, int]:
@@ -126,8 +127,17 @@ class LongitudinalLiNGAM:
         self._residuals: np.ndarray | None = None
 
     def fit(self, X_list: list[np.ndarray]) -> LongitudinalLiNGAM:
-        """Estimate instantaneous and lagged structure from the panel; return ``self``."""
+        """Estimate instantaneous and lagged structure from the panel; return ``self``.
+
+        The fit runs on the variables sorted by their :func:`~andrey.search.hc.tie_ranks` over all
+        time points, so reordering the columns relabels the result and changes nothing else, unless
+        two columns are identical.
+        """
         X_t, self._T, self._n, self._p = _check_panel(X_list)
+        by_rank = np.argsort(tie_ranks(np.concatenate([X.T for X in X_t])))
+        back = np.argsort(by_rank)
+        # Row k of each time point is the data's column by_rank[k].
+        X_t = [np.ascontiguousarray(X[by_rank]) for X in X_t]
         M_tau, N_t = _compute_residuals(X_t, self._T, self._n, self._p, self.n_lags)
         B_t, causal_orders = _estimate_instantaneous(N_t, self._T, self._p, self.measure)
         B_tau = _estimate_lagged(B_t, M_tau, self._T, self._p, self.n_lags)
@@ -139,13 +149,13 @@ class LongitudinalLiNGAM:
                 if lag >= t:  # the lag-(lag+1) block reaches before the panel start -> uncomputable
                     continue
                 adjacency[t, lag + 1] = B_tau[t, lag]
-        self._adjacency_matrices = adjacency
-        self._causal_orders = causal_orders
+        self._adjacency_matrices = adjacency[..., back, :][..., back]
+        self._causal_orders = [[int(by_rank[i]) for i in order] for order in causal_orders]
 
         residuals = np.zeros((self._T, self._n, self._p))
         for t in range(self._T):
             residuals[t] = N_t[t].T
-        self._residuals = residuals
+        self._residuals = residuals[..., back]
         return self
 
     def get_error_independence_p_values(self) -> np.ndarray:

@@ -133,6 +133,9 @@ change names its pull request.
   updates. On dense data with nearly collinear parent sets, where an update could be off by more
   than the `1e-6` tolerance, rounding error no longer decides a move, and `boss` can return a
   different graph. ([#271])
+- `varma_lingam` and `longitudinal_lingam` fit on the columns sorted by a rank computed from each
+  column's own data instead of in column order, so reordering the columns no longer changes their
+  graphs, and on data where the order mattered their graphs and weights can change. ([#278])
 
 ## [0.7.0] - 2026-10-19
 
@@ -503,3 +506,4 @@ First alpha release.
 [#248]: https://github.com/Abel-ai-lab/andrey/pull/248
 [#261]: https://github.com/Abel-ai-lab/andrey/pull/261
 [#271]: https://github.com/Abel-ai-lab/andrey/pull/271
+[#278]: https://github.com/Abel-ai-lab/andrey/pull/278
