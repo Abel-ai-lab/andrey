@@ -264,6 +264,19 @@ def test_a_family_figure_shows_each_method_once_at_a_size_both_packages_ran():
     assert not any(" on " in n or " without " in n or ", " in n for n in names)
 
 
+def test_the_temporal_figure_scores_links_by_f1():
+    summaries = build.release_summaries(SUMMARY)
+    points = build.frontier_points(summaries)
+    # Temporal methods: 1 minus the link F1, bounded by 0 and 1, whatever the window of lags.
+    assert points["temporal"] and all(p["f1"] for p in points["temporal"])
+    assert all(0 <= e <= 1 for p in points["temporal"] for _, _, e in p["sizes"])
+    assert not any(p["f1"] for family, shown in points.items() if family != "temporal"
+                   for p in shown)  # fmt: skip
+    frame = build.frontier_frame([p for shown in points.values() for p in shown])
+    figure = build.frontier_chart("Time series", points["temporal"], frame)
+    assert "1 − link F1" in figure and "empty graph</text>" not in figure
+
+
 def test_the_panel_number_follows_the_chosen_method():
     summaries = build.release_summaries(SUMMARY)
     points = build.frontier_points(summaries)["constraint"]

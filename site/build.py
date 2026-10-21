@@ -349,6 +349,11 @@ def comparisons(summary: dict) -> list[dict]:
                     # Errors against the empty graph's: a pair's empty graph gets every pair
                     # wrong.
                     "empty_errors": row["paired"] if pairs else row.get(empty) if empty else None,
+                    # A temporal summary's link F1: cross-links, or LPCMCI's adjacencies.
+                    "andrey_f1": row.get("andrey_cross_f1", row.get("andrey_adjacency_f1")),
+                    "comparator_f1": row.get(
+                        "comparator_cross_f1", row.get("comparator_adjacency_f1")
+                    ),
                 }
             )
         out.append(
@@ -1963,7 +1968,9 @@ def speed_panel(summaries: list[dict]) -> str:
     one figure (``frontier_chart``) under its best speedup. Without script every family's panel
     shows in turn; ``tiles.js`` makes the tabs switch them."""
     points = frontier_points(summaries)
-    frame = frontier_frame([p for family in points.values() for p in family])
+    frame = frontier_frame(
+        [p for family, shown in points.items() if family not in F1_FAMILIES for p in shown]
+    )
     tabs, panels = [], []
     for k, info in enumerate(family_tiles(summaries)):
         key = info["family"]
@@ -2008,6 +2015,10 @@ DIALOG_TAIL = "</div></dialog>"
 # method's, "XGES without extended search"), at the largest size where Andrey and every package
 # compared ran and were scored. Errors are a share of the empty graph's, so methods of different
 # sizes share one axis: 0 is the true graph, 1 no better than the empty one.
+# How a family's figure scores a graph: errors over the empty graph's, or, for temporal methods,
+# whose window of lags lets errors far outrun the empty graph's, 1 minus the link F1 (the window
+# graph's links between different variables; LPCMCI's adjacencies).
+F1_FAMILIES = {"temporal"}
 FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star")
 FRONTIER_BAND = 0.25  # the share of the height above the empty graph's errors, when any point is
 
@@ -2027,6 +2038,13 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = {}
     for name, methods in default.values():
         by_size = [{r["d"]: r for r in m["rows"]} for m in methods]
+        f1 = methods[0]["family"] in F1_FAMILIES
+
+        def score(row: dict, who: str) -> float | None:
+            if f1:
+                return None if row[f"{who}_f1"] is None else 1 - row[f"{who}_f1"]
+            return row[f"{who}_errors"] / row["empty_errors"] if row["empty_errors"] else None
+
         scored = [
             d
             for d in by_size[0]
@@ -2034,7 +2052,8 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
                 d in rows
                 and rows[d]["andrey_s"] is not None
                 and rows[d]["comparator_s"] is not None
-                and rows[d]["empty_errors"]
+                and score(rows[d], "andrey") is not None
+                and score(rows[d], "comparator") is not None
                 for rows in by_size
             )
         ]
@@ -2044,13 +2063,10 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
 
         def line(package: str, ours: bool, rows: dict, best: float = 0.0) -> dict:
             who = "andrey" if ours else "comparator"
-            sizes = [
-                (d, rows[d][f"{who}_s"], rows[d][f"{who}_errors"] / rows[d]["empty_errors"])
-                for d in scored
-            ]
+            sizes = [(d, rows[d][f"{who}_s"], score(rows[d], who)) for d in scored]
             d, seconds, share = sizes[-1]
             return {"method": name, "package": package, "ours": ours, "unit": methods[0]["unit"],
-                    "release": methods[0]["release"], "sizes": sizes, "size": d,
+                    "release": methods[0]["release"], "f1": f1, "sizes": sizes, "size": d,
                     "seconds": seconds, "share": share, "ratio": best}  # fmt: skip
 
         # Each package's line keeps its best published speedup, at any size.
@@ -2141,14 +2157,18 @@ def point_tip(p: dict, d: int, seconds: float, share: float, andrey: dict) -> st
     """A point's tooltip, as data the page's script shows on hover (``tiles.js``): its method,
     package, and size, then its time and errors beside Andrey's, and its release card."""
     head = f"{p['method']} · {p['package']} · {d:,} {p['unit']}"
+    if p["f1"]:
+        said = lambda v: f"link F1 {1 - v:.2f}"  # noqa: E731
+    else:
+        said = lambda v: f"errors {v:.2f} (empty graph = 1)"  # noqa: E731
     if p["ours"]:
-        lines = [f"Fit time {seconds_text(seconds)}", f"Errors {share:.2f} (empty graph = 1)"]
+        lines = [f"Fit time {seconds_text(seconds)}", said(share).capitalize()]
     else:
         mine = next(e for e in andrey["sizes"] if e[0] == d)
         lines = [
             f"Fit time {seconds_text(seconds)}; Andrey {seconds_text(mine[1])}, "
             f"{ratio_text(seconds / mine[1])} faster",
-            f"Errors {share:.2f}; Andrey {mine[2]:.2f} (empty graph = 1)",
+            f"{said(share).capitalize()}; Andrey {said(mine[2])}",
         ]
     return escape(json.dumps({"head": head, "lines": lines, "card": card_href(p["release"]),
                               "release": p["release"]}), quote=True)  # fmt: skip
@@ -2199,14 +2219,20 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
         )
     ticks = [round(k * step, 2) for k in range(round(span / step) + 1)]
     ticks += [v for v in ((1.5, 2) if ymax < 3 else (2, 5, 10, 20)) if above and v <= ymax]
+    f1 = any(p["f1"] for p in points)  # 1 - F1 tops out at 1: the band above stays unlabeled
     for v in ticks:
         empty = " pf-empty" if v == 1 else ""
         grid.append(
             f'<line x1="{left}" x2="{right}" y1="{y(v):.1f}" y2="{y(v):.1f}" '
             f'class="tc-grid{empty}"/>'
-            f'<text x="{left - 6}" y="{y(v) + 3:.1f}" text-anchor="end">{v:g}</text>'
+            + (
+                ""
+                if f1 and v > 1
+                else f'<text x="{left - 6}" y="{y(v) + 3:.1f}" text-anchor="end">{v:g}</text>'
+            )
         )
     if span >= 1:
+        if not f1:
         grid.append(f'<text x="{right + 6}" y="{y(1) + 3:.1f}">empty graph</text>')
     packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
     shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
@@ -2270,7 +2296,7 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
         f'<text class="tc-title" x="{(left + right) / 2:.1f}" y="{h - 4}" text-anchor="middle">'
         "Fit time, seconds (log)</text>"
         f'<text class="tc-title" transform="translate(12 {(top + bottom) / 2:.1f}) rotate(-90)" '
-        'text-anchor="middle">Errors (empty graph = 1)</text>'
+        f'text-anchor="middle">{"1 − link F1" if f1 else "Errors (empty graph = 1)"}</text>'
         f"{''.join(series)}{place_labels(labels, left, centers)}</svg></figure>"
     )
 
