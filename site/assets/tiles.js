@@ -117,6 +117,9 @@
         for (const part of figure.querySelectorAll("[data-method]")) {
           part.classList.toggle("is-on", part.dataset.method === chip.dataset.method);
         }
+        // The panel's number follows the choice: the method's own best speedup, or the family's.
+        const head = bar.closest(".seg-panel")?.querySelector(".seg-head");
+        if (head) head.innerHTML = chip.dataset.number;
       });
     }
   }

@@ -264,6 +264,20 @@ def test_a_family_figure_shows_each_method_once_at_a_size_both_packages_ran():
     assert not any(" on " in n or " without " in n or ", " in n for n in names)
 
 
+def test_the_panel_number_follows_the_chosen_method():
+    summaries = build.release_summaries(SUMMARY)
+    points = build.frontier_points(summaries)["constraint"]
+    info = next(i for i in build.family_tiles(summaries) if i["family"] == "constraint")
+    bar = build.method_bar(points, build.family_number(info))
+    numbers = dict(re.findall(r'data-method="([\w-]*)" data-number="([^"]*)"', bar))
+    # "All" shows the family's number; each method its own best published speedup.
+    assert html.unescape(numbers[""]) == build.family_number(info)
+    pc = build.method_ratio(points, "PC")
+    assert pc == max(r["ratio"] or 0 for m in build.supported(summaries)
+                     if m["method"] == "PC" for r in m["rows"])  # fmt: skip
+    assert html.unescape(numbers["pc"]) == build.speed_number(pc)
+
+
 def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
     summaries = build.release_summaries(SUMMARY)
     every = build.frontier_points(summaries)

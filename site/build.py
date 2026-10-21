@@ -1918,29 +1918,40 @@ def tile(key: str, size: str, body: str, *, kind: str = "") -> str:
     )
 
 
-def family_number(info: dict) -> str:
-    """A family's best speedup in words, "more than" its one-digit number or "at least" where
-    nothing is rounded off, or nothing where Andrey is not at least twice as fast."""
-    if not info["number"]:
+def speed_number(ratio: float) -> str:
+    """A best speedup in words: "more than" its one-digit number (``round_down``), or "at least"
+    where nothing is rounded off; nothing where Andrey is not at least twice as fast."""
+    if ratio < 2:
         return ""
-    lead = "more than" if info["best"][1]["ratio"] > info["number"] else "at least"
-    return (
-        f'<p class="tile-number"><span>{lead}</span><b>{info["number"]:,}x</b>'
-        "<span>faster</span></p>"
-    )
+    number = round_down(ratio)
+    lead = "more than" if ratio > number else "at least"
+    return f'<p class="tile-number"><span>{lead}</span><b>{number:,}x</b><span>faster</span></p>'
 
 
-def method_bar(points: list[dict]) -> str:
-    """A bar of the family's methods over its figure: choosing one lights its lines and dims the
-    rest (``tiles.js``). Without script it is only a list of the methods."""
+def family_number(info: dict) -> str:
+    """A family's best speedup in words (``speed_number``)."""
+    return speed_number(info["best"][1]["ratio"]) if info["number"] else ""
+
+
+def method_ratio(points: list[dict], method: str) -> float:
+    """A method's best published speedup over the packages in its figure."""
+    return max((p["ratio"] for p in points if p["method"] == method and not p["ours"]), default=0)
+
+
+def method_bar(points: list[dict], family: str) -> str:
+    """A bar of the family's methods over its figure: choosing one lights its lines, dims the
+    rest, and shows its own best speedup in place of the family's (``tiles.js``). Without script
+    it is only a list of the methods."""
     names = list(dict.fromkeys(p["method"] for p in points))
     if len(names) < 2:
         return ""
     chips = [
-        '<button type="button" class="pf-chip" aria-pressed="true" data-method="">All</button>'
+        '<button type="button" class="pf-chip" aria-pressed="true" data-method="" '
+        f'data-number="{escape(family, quote=True)}">All</button>'
     ]
     chips += [
-        f'<button type="button" class="pf-chip" aria-pressed="false" data-method="{slug(n)}">'
+        f'<button type="button" class="pf-chip" aria-pressed="false" data-method="{slug(n)}" '
+        f'data-number="{escape(speed_number(method_ratio(points, n)), quote=True)}">'
         f"{escape(n)}</button>"
         for n in names
     ]
@@ -1968,7 +1979,7 @@ def speed_panel(summaries: list[dict]) -> str:
             f'<div class="seg-panel" role="tabpanel" id="speed-{key}" '
             f'aria-labelledby="speed-tab-{key}"><div class="seg-head">'
             f"{family_number(info)}</div>"
-            f"{method_bar(points.get(key, []))}"
+            f"{method_bar(points.get(key, []), family_number(info))}"
             f'{figure}<p class="seg-foot">{escape(family_intro())} '
             '<a href="docs/benchmarks.html">Details in the release cards</a></p></div>'
         )
@@ -2031,7 +2042,7 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
             continue
         scored.sort()
 
-        def line(package: str, ours: bool, rows: dict) -> dict:
+        def line(package: str, ours: bool, rows: dict, best: float = 0.0) -> dict:
             who = "andrey" if ours else "comparator"
             sizes = [
                 (d, rows[d][f"{who}_s"], rows[d][f"{who}_errors"] / rows[d]["empty_errors"])
@@ -2040,10 +2051,12 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
             d, seconds, share = sizes[-1]
             return {"method": name, "package": package, "ours": ours, "unit": methods[0]["unit"],
                     "release": methods[0]["release"], "sizes": sizes, "size": d,
-                    "seconds": seconds, "share": share}  # fmt: skip
+                    "seconds": seconds, "share": share, "ratio": best}  # fmt: skip
 
+        # Each package's line keeps its best published speedup, at any size.
         lines = [line("Andrey", True, by_size[0])] + [
-            line(m["comparator"], False, rows) for m, rows in zip(methods, by_size, strict=True)
+            line(m["comparator"], False, rows, max(r["ratio"] or 0 for r in m["rows"]))
+            for m, rows in zip(methods, by_size, strict=True)
         ]
         out.setdefault(methods[0]["family"], []).extend(lines)
     return out
