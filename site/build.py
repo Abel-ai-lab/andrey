@@ -1955,7 +1955,7 @@ def method_bar(points: list[dict], family: str) -> str:
         f'data-number="{escape(family, quote=True)}">All</button>'
     ]
     chips += [
-        f'<button type="button" class="pf-chip" aria-pressed="false" data-method="{slug(n)}" '
+        f'<button type="button" class="pf-chip" aria-pressed="false" data-method="{method_key(n)}" '
         f'data-number="{escape(speed_number(method_ratio(points, n)), quote=True)}">'
         f"{escape(n)}</button>"
         for n in names
@@ -2105,6 +2105,11 @@ def shape(kind: str, cx: float, cy: float, r: float) -> str:
     )
 
 
+def method_key(name: str) -> str:
+    """A method's key in its figure, distinct for every method: PCMCI+ is not PCMCI."""
+    return slug(name.replace("+", " plus"))
+
+
 def place_labels(
     labels: list[tuple[float, float, str]], left: float, marks: list[tuple[float, float]]
 ) -> str:
@@ -2133,7 +2138,7 @@ def place_labels(
         placed.append((x0, x0 + width, ly))
         tx = x0 + width if anchor == "end" else x0
         out.append(
-            f'<text class="pf-label" data-method="{slug(name)}" x="{tx:.1f}" y="{ly:.1f}" '
+            f'<text class="pf-label" data-method="{method_key(name)}" x="{tx:.1f}" y="{ly:.1f}" '
             f'text-anchor="{anchor}">{escape(name)}</text>'
         )
     return "".join(out)
@@ -2200,15 +2205,21 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
     x = log_scale(xr[0], xr[1], left, right)
     # Errors up to the empty graph's take most of the height on a linear scale; any above, where
     # both packages make more errors than the empty graph, share a band at the top on a log scale.
+    # 1 - F1 tops out at 1, so an F1 panel takes the whole height on one linear scale; its shaded
+    # corner keeps the others' place on the page.
+    f1 = any(p["f1"] for p in points)
     ymax = frame["ymax"]
     split = top + (bottom - top) * (FRONTIER_BAND if ymax > 1.05 else 0.0)
     above = log_scale(1, ymax, split, top) if ymax > 1.05 else None
     span, step = 1.0, 0.25
 
-    def y(v: float) -> float:
+    def shared(v: float) -> float:
         if above and v > 1:
             return above(v)
         return bottom - (bottom - split) * v / span
+
+    def y(v: float) -> float:
+        return bottom - (bottom - top) * v if f1 else shared(v)
 
     grid = []
     for k in range(round(math.log10(xr[0])), round(math.log10(xr[1])) + 1):
@@ -2218,27 +2229,22 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
             f'<text x="{x(v):.1f}" y="{bottom + 14}" text-anchor="middle">{seconds_axis(v)}</text>'
         )
     ticks = [round(k * step, 2) for k in range(round(span / step) + 1)]
-    ticks += [v for v in ((1.5, 2) if ymax < 3 else (2, 5, 10, 20)) if above and v <= ymax]
-    f1 = any(p["f1"] for p in points)  # 1 - F1 tops out at 1: the band above stays unlabeled
+    if not f1:
+        ticks += [v for v in ((1.5, 2) if ymax < 3 else (2, 5, 10, 20)) if above and v <= ymax]
     for v in ticks:
-        empty = " pf-empty" if v == 1 else ""
+        empty = " pf-empty" if v == 1 and not f1 else ""
         grid.append(
             f'<line x1="{left}" x2="{right}" y1="{y(v):.1f}" y2="{y(v):.1f}" '
             f'class="tc-grid{empty}"/>'
-            + (
-                ""
-                if f1 and v > 1
-                else f'<text x="{left - 6}" y="{y(v) + 3:.1f}" text-anchor="end">{v:g}</text>'
-            )
+            + f'<text x="{left - 6}" y="{y(v) + 3:.1f}" text-anchor="end">{v:g}</text>'
         )
-    if span >= 1:
-        if not f1:
+    if span >= 1 and not f1:
         grid.append(f'<text x="{right + 6}" y="{y(1) + 3:.1f}">empty graph</text>')
     packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
     shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
     ours = {p["method"]: p for p in points if p["ours"]}
     # The most attractive quadrant, the same in every family's figure.
-    mid_x, mid_y = x(frame["corner"][0]), y(frame["corner"][1])
+    mid_x, mid_y = x(frame["corner"][0]), shared(frame["corner"][1])
     quadrant = (
         f'<rect class="pf-quadrant" x="{left}" y="{mid_y:.1f}" width="{mid_x - left:.1f}" '
         f'height="{bottom - mid_y:.1f}"/>'
@@ -2272,7 +2278,7 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
                 )
         who = " pf-series--andrey" if p["ours"] else ""
         series.append(
-            f'<g class="pf-series{who}" data-method="{slug(p["method"])}">{"".join(body)}</g>'
+            f'<g class="pf-series{who}" data-method="{method_key(p["method"])}">{"".join(body)}</g>'
         )
         if p["ours"]:
             labels.append((x(p["seconds"]), y(p["share"]), p["method"]))

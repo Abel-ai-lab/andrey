@@ -289,6 +289,10 @@ def test_the_panel_number_follows_the_chosen_method():
     assert pc == max(r["ratio"] or 0 for m in build.supported(summaries)
                      if m["method"] == "PC" for r in m["rows"])  # fmt: skip
     assert html.unescape(numbers["pc"]) == build.speed_number(pc)
+    # Each method's key is its own, so choosing PCMCI does not light PCMCI+.
+    for shown in build.frontier_points(summaries).values():
+        names = {p["method"] for p in shown}
+        assert len({build.method_key(n) for n in names}) == len(names)
 
 
 def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
