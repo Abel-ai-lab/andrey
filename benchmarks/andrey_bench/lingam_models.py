@@ -186,11 +186,11 @@ def sample_panel(
         truth[t, 0] = np.where(lower, magnitude * sign * scale, 0.0)
         if t:
             truth[t, 1] = rng.uniform(-model.lagged, model.lagged, size=(d, d)) * scale
-    scale = np.sqrt(rng.uniform(*model.noise_variance, size=d))
+    noise_scale = np.sqrt(rng.uniform(*model.noise_variance, size=d))
     densities = rng.choice(len(DENSITIES), size=d)
     noise = (
         np.stack([_standard_noise(rng, DENSITIES[k], (times, m)) for k in densities], axis=-1)
-        * scale
+        * noise_scale
     )
     hidden = rng.uniform(0.0, 1.0, size=m)
     weights = rng.uniform(0.0, 1.0, size=d)
