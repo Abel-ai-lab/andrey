@@ -562,15 +562,23 @@ THREAD_VARIABLES = (
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def header(seeds: int, shuffle: int, workers: int) -> dict[str, Any]:
-    """Return the commit, the versions, the loaded BLAS, the CPU, and the thread settings."""
+def commit() -> dict[str, Any]:
+    """Return the checked-out commit and whether tracked files differ from it."""
+    return {
+        "commit": _git("rev-parse", "HEAD") or "unknown",
+        "uncommitted_changes": bool(_git("status", "--porcelain", "--untracked-files=no")),
+    }
+
+
+def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict[str, Any]:
+    """Return ``code`` (:func:`commit`, read before the fits), the versions, the BLAS and OpenMP
+    libraries loaded by now, the CPU, and the thread settings."""
     blas = [
         {key: value for key, value in pool.items() if key != "filepath"}
         for pool in threadpoolctl.threadpool_info()
     ]
     return {
-        "commit": _git("rev-parse", "HEAD") or "unknown",
-        "uncommitted_changes": bool(_git("status", "--porcelain", "--untracked-files=no")),
+        **code,
         "andrey": andrey.__version__,
         "python": platform.python_version(),
         "numpy": np.__version__,
@@ -773,10 +781,10 @@ def main(argv: list[str] | None = None) -> int:
     unknown = sorted(set(args.methods) - set(FITS))
     if unknown:
         ap.error(f"unknown methods {unknown}; known: {list(FITS)}")
-    head = header(args.seeds, args.shuffle, args.workers)  # the code as the fits import it
+    code = commit()
     rows, findings = run(args.methods or list(FITS), args.seeds, args.shuffle, args.workers)
     if args.out:
-        write(args.out, head, rows)
+        write(args.out, header(code, args.seeds, args.shuffle, args.workers), rows)
     for kind, line in findings:
         print(f"{'graph differs' if kind == 'graph' else 'only bits differ'}: {line}")
     refits = sum(r["permutation"] > 0 or r["workers"] > 1 for r in rows)
