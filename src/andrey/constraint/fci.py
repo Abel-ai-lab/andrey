@@ -159,9 +159,10 @@ def _fast_adjacency_search(
     When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
     the size-0 and size-1 passes take them instead of the dense scalar scan -- same removals and
     separating sets. With ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of
-    at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests fans out across
-    worker processes; the per-chunk removals are concatenated in pair order, so the skeleton, a
-    raised error included, stays identical to the serial scan.
+    at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
+    ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
+    per-chunk removals are concatenated in pair order, so the skeleton, a raised error included,
+    stays identical to the serial scan.
     """
     d = X.shape[1]
     support = np.ones((d, d), dtype=bool) if support is None else np.array(support, dtype=bool)

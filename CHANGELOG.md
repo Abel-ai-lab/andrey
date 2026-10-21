@@ -56,6 +56,11 @@ change names its pull request.
   setting. Under `"position"`, `pc`, `cdnod`, `fci`, and `gfci` also fire their orientation rules
   one at a time in column order instead of in rounds, and `fci` and `gfci` default to
   `possible_dsep="fast"`. ([#210])
+- `ANDREY_SKELETON_PARALLEL_MIN_WORK` sets the fewest CI tests a conditioning-size pass of the
+  `pc`, `fci`, `gfci`, and `cdnod` skeleton search needs to use the worker processes. The default,
+  500000, was measured on an AMD EPYC 9534 server running Linux; a fit with more than one worker
+  warns once on it when a pass reaches a tenth of it. `andrey calibrate --method skeleton`
+  measures the value for your machine, and `andrey calibrate` now measures it with GES's. ([#290])
 
 ### Changed
 
@@ -500,3 +505,4 @@ First alpha release.
 [#248]: https://github.com/Abel-ai-lab/andrey/pull/248
 [#251]: https://github.com/Abel-ai-lab/andrey/pull/251
 [#261]: https://github.com/Abel-ai-lab/andrey/pull/261
+[#290]: https://github.com/Abel-ai-lab/andrey/pull/290
