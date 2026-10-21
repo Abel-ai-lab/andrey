@@ -50,8 +50,15 @@ requested backend uses `auto`, without a warning.
   default) and `0` run serially; `-1` uses every usable core.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
+- `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
+  GFCI, and CD-NOD uses the workers only when it holds at least this many conditional-independence
+  tests. The default is `500000`, measured on an AMD EPYC 9534 server running Linux; `0` always uses
+  them.
 
-The cutoff matters only with more than one worker. `andrey calibrate` measures it for your machine.
+The cutoffs matter only with more than one worker. `andrey calibrate` measures both for your
+machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
+alone. With more than one worker and a default cutoff, a fit warns once when a pass reaches a tenth
+of it; setting the variable, to any value, silences the warning.
 
 ## GPU dispatch
 

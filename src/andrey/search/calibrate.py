@@ -1,15 +1,18 @@
-"""Measure the GES worker-pool cutoff on this machine (``andrey calibrate``).
+"""Measure the worker-pool cutoffs on this machine (``andrey calibrate``).
 
 A GES pass uses the pool when estimated candidate evaluations exceed
-``ANDREY_GES_PARALLEL_MIN_WORK``. The crossover depends on the machine, worker count, and numerical
-libraries. Fits never calibrate automatically.
+``ANDREY_GES_PARALLEL_MIN_WORK``, and a conditioning-size pass of the PC, FCI, GFCI, and CD-NOD
+skeleton search when its tests reach ``ANDREY_SKELETON_PARALLEL_MIN_WORK``. The crossover depends on
+the machine, worker count, and numerical libraries. Fits never calibrate automatically.
 
 GES is timed on whole fits of sparse linear-Gaussian data over ``d`` variables: serial against every
-pass pooled, pool start included. :func:`bracket` finds sizes around the crossover, extending beyond
-the probe grid when needed. Each size's work is the largest estimated work of a pass in its pooled
-fit, as the gate counts it: a cutoff below it sends that pass, and every forward pass after it, to
-the pool. The process's first pool start occurs before timing, so the value suits many fits in one
-process (:data:`NOTE`).
+pass pooled, pool start included. The skeleton search is timed on one pass over ``d`` variables, at
+each conditioning size in :data:`SKELETON_SIZES`, the pass scanned in this process against the same
+pass on a started pool, with the pool start included; the cutoff is the largest of the sizes'.
+:func:`bracket` finds sizes around the crossover, extending beyond the probe grid when needed. Each
+size's work is the largest estimated work of a pass in its pooled run, as the gate counts it: a
+cutoff below it sends that pass, and every pass after it, to the pool. The process's first pool
+start occurs before timing, so the value suits many fits in one process (:data:`NOTE`).
 """
 
 from __future__ import annotations
@@ -17,13 +20,21 @@ from __future__ import annotations
 import math
 import os
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Generator, Sequence
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from andrey.core.ci import CITest
+
 COMMAND = "andrey calibrate"
-CUTOFFS = {"ges": "ANDREY_GES_PARALLEL_MIN_WORK"}
+CUTOFFS = {
+    "ges": "ANDREY_GES_PARALLEL_MIN_WORK",
+    "skeleton": "ANDREY_SKELETON_PARALLEL_MIN_WORK",
+}
 NOTE = (
     "This value suits many fits in one process. Starting the first pool in a process costs more, "
     "so a single fit gains from the pool only at larger sizes; the default allows for it."
@@ -32,7 +43,11 @@ NOTE = (
 # this fraction of the cutoff. The cutoff measured for many fits per process sits within this factor
 # below the default, so a smaller fit would not use the pool under either value.
 WARN_FRACTION = 0.1
-_DEFAULT_SUITS = {"ges": "which suits one fit per process"}
+_DEFAULT_SUITS = {
+    "ges": "which suits one fit per process",
+    "skeleton": "which suits one fit per process",
+}
+_SEARCHES = {"ges": "GES", "skeleton": "The skeleton search"}
 
 # Probe sizes (variables). Serial GES at d = 256 takes minutes, so the search stops there.
 GRID = (16, 32, 64, 128)
@@ -42,19 +57,22 @@ _REFINE_STEPS = 3
 
 @dataclass(frozen=True)
 class Crossover:
-    """Where the pooled fit starts to beat the serial one, as sizes ``d`` and their pass work.
+    """Where the pooled run starts to beat the serial one, as sizes ``d`` and their pass work.
 
-    ``below`` is the largest measured size where the serial fit was faster, ``above`` the smallest
-    where the pooled fit was. ``None`` marks a side the search could not reach: the pool was faster
+    ``below`` is the largest measured size where the serial run was faster, ``above`` the smallest
+    where the pooled run was. ``None`` marks a side the search could not reach: the pool was faster
     down to the smallest size, or slower up to the largest. ``works`` holds each measured size's
     largest pass work (``d * (d - 1)``, the first pass's, where it is missing). ``cutoff`` is the
-    work to set.
+    work to set, for the ``method`` it was measured on. ``start_s``, where measured, is the seconds
+    a pooled run over the smallest grid size takes, almost all of it starting and closing the pool.
     """
 
     below: int | None
     above: int | None
     timings: tuple[tuple[int, float, float], ...]
     works: tuple[tuple[int, int], ...] = ()
+    method: str = "ges"
+    start_s: float | None = None
 
     def work(self, d: int) -> int:
         """The largest pass work measured at size ``d``."""
@@ -63,14 +81,24 @@ class Crossover:
     @property
     def cutoff(self) -> int:
         if self.above is None:  # never faster: keep the pool off up to the largest size measured
-            from andrey.search._parallel_ges import _DEFAULT_MIN_WORK
-
             return max(
-                self.work(self.below if self.below is not None else _MAX_D), _DEFAULT_MIN_WORK
+                self.work(self.below if self.below is not None else _MAX_D),
+                default_cutoff(self.method),
             )
         if self.below is None:  # faster everywhere measured: use the pool from the smallest size
             return self.work(self.above)
         return _round2(math.sqrt(self.work(self.below) * self.work(self.above)))
+
+
+def default_cutoff(method: str) -> int:
+    """The built-in cutoff of ``method``."""
+    if method == "skeleton":
+        from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES
+
+        return MIN_POOL_QUERIES
+    from andrey.search._parallel_ges import _DEFAULT_MIN_WORK
+
+    return _DEFAULT_MIN_WORK
 
 
 def cutoff_is_default(method: str) -> bool:
@@ -85,7 +113,7 @@ def warn_default_cutoff(method: str, default: int) -> None:
     from andrey.core.warning_policy import PerformanceWarning, warn_once
 
     warn_once(
-        f"{method.upper()} decides when to use its worker pool with the default "
+        f"{_SEARCHES[method]} decides when to use its worker pool with the default "
         f"{CUTOFFS[method]}={default}, {_DEFAULT_SUITS[method]}. If this process runs many fits, "
         f"`{COMMAND}` measures a value for this machine; any explicit value silences this warning.",
         PerformanceWarning,
@@ -99,10 +127,12 @@ def bracket(
     *,
     refine: int = _REFINE_STEPS,
     work: Callable[[int], int] = lambda d: d * (d - 1),
+    method: str = "ges",
 ) -> Crossover:
     """Find the sizes around the serial/pooled crossover from timing functions of ``d``.
 
-    ``work(d)``, called after ``pooled(d)``, gives the largest pass work of the pooled fit at ``d``.
+    ``work(d)``, called after ``pooled(d)``, gives the largest pass work of the pooled run at ``d``.
+    ``method`` names the cutoff the result is for.
 
     Scans ``grid`` upward for the first size where the pooled pass is faster. If that is the first
     grid size, halves ``d`` until the serial pass is faster (or ``d`` reaches 4); if no grid size
@@ -151,7 +181,7 @@ def bracket(
             else:
                 below = mid
     rows = tuple((d, s, p) for d, (s, p) in sorted(timings.items()))
-    return Crossover(below, above, rows, tuple((d, work(d)) for d in sorted(timings)))
+    return Crossover(below, above, rows, tuple((d, work(d)) for d in sorted(timings)), method)
 
 
 def _round2(x: float) -> int:
@@ -187,6 +217,20 @@ def sample(d: int, seed: int = 0) -> np.ndarray:
     return x
 
 
+@contextmanager
+def _cutoff(var: str, value: str | None) -> Generator[None]:
+    """Set the cutoff variable ``var`` to ``value`` (unset it for ``None``), then restore it."""
+    old = os.environ.pop(var, None)
+    try:
+        if value is not None:
+            os.environ[var] = value
+        yield
+    finally:
+        os.environ.pop(var, None)
+        if old is not None:
+            os.environ[var] = old
+
+
 def fit_timers(
     method: str, workers: int, repeats: int = 3
 ) -> tuple[Callable[[int], float], Callable[[int], float], Callable[[int], int]]:
@@ -207,25 +251,106 @@ def fit_timers(
 
     def run(d: int, n_workers: int, cutoff: str | None) -> float:
         x = sample(d)
-        old = os.environ.pop(var, None)
-        try:
-            if cutoff is not None:
-                os.environ[var] = cutoff
-            with andrey.config(num_workers=n_workers):
-                seconds = _time(lambda: fit(x), repeats)
-            if n_workers > 1:
-                works[d] = _parallel_ges.largest_pass_work
-            return seconds
-        finally:
-            os.environ.pop(var, None)
-            if old is not None:
-                os.environ[var] = old
+        with _cutoff(var, cutoff), andrey.config(num_workers=n_workers):
+            seconds = _time(lambda: fit(x), repeats)
+        if n_workers > 1:
+            works[d] = _parallel_ges.largest_pass_work
+        return seconds
 
     return (lambda d: run(d, 1, None)), (lambda d: run(d, workers, "0")), works.__getitem__
 
 
-def calibrate(workers: int, methods: Sequence[str] = ("ges",)) -> dict[str, Crossover]:
+# Neighbors per variable in the skeleton probe at each conditioning size, which gives a pass one to
+# two thousand tests per pair, so the largest probe holds a few million tests.
+SKELETON_SIZES = {2: 40, 3: 20}
+_ALPHA = 0.05
+
+
+@dataclass(frozen=True)
+class SkeletonPass:
+    """One conditioning-size pass of the skeleton search: a test and the snapshot it scans.
+
+    ``tests`` is the pass's CI-test count, the work the cutoff gate counts.
+    """
+
+    test: CITest
+    adjacency: np.ndarray
+    neighbors: list[np.ndarray]
+    pairs: list[tuple[int, int]]
+    size: int
+    tests: int
+
+
+def skeleton_pass(d: int, size: int) -> SkeletonPass:
+    """A pass at conditioning ``size`` over ``d`` variables of :func:`sample` data.
+
+    Each variable is adjacent to its ``SKELETON_SIZES[size]`` nearest neighbors on a ring (all the
+    others when fewer), the start-of-size snapshot of a dense skeleton.
+    """
+    from andrey.constraint._skeleton import adjacent_pairs, pair_queries
+    from andrey.core.ci import make_indep_test
+
+    ring = np.abs(np.arange(d)[:, None] - np.arange(d)[None, :])
+    gap = np.minimum(ring, d - ring)
+    adjacency = (gap > 0) & (gap <= max(1, SKELETON_SIZES[size] // 2))
+    neighbors = [np.flatnonzero(adjacency[i]) for i in range(d)]
+    pairs = adjacent_pairs(adjacency)
+    tests = sum(pair_queries(neighbors, x, y, size) for x, y in pairs)
+    test = make_indep_test("fisherz", sample(d))
+    return SkeletonPass(test, adjacency, neighbors, pairs, size, tests)
+
+
+def skeleton_timers(
+    workers: int, size: int, repeats: int = 3
+) -> tuple[Callable[[int], float], Callable[[int], float], Callable[[int], int]]:
+    """Serial and pooled timing functions for one skeleton pass at conditioning ``size``.
+
+    The pass is :func:`skeleton_pass` over ``d`` variables. The serial arm scans every pair in this
+    process as a fit does. The pooled arm starts a pool of ``workers`` processes with the cutoff set
+    to 0 and scans the same pass on it, so its time includes starting and closing the pool. Times
+    are as in :func:`fit_timers`. The third function gives the pass's tests, the work the gate
+    counts.
+    """
+    from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
+    from andrey.constraint._skeleton import scan_pairs
+    from andrey.core import backend
+    from andrey.core.ci import pins_blas
+
+    passes: dict[int, SkeletonPass] = {}
+
+    def make(d: int) -> SkeletonPass:
+        if d not in passes:
+            passes[d] = skeleton_pass(d, size)
+        return passes[d]
+
+    def serial(d: int) -> float:
+        p = make(d)
+
+        def scan() -> None:
+            with backend.one_blas_thread() if pins_blas(p.test) else nullcontext():
+                scan_pairs(p.test, p.pairs, p.neighbors, size, _ALPHA)
+
+        return _time(scan, repeats)
+
+    def pooled(d: int) -> float:
+        p = make(d)
+
+        def scan() -> None:
+            pool = SkeletonWorkerPool(p.test, workers)
+            try:
+                pool.scan(p.pairs, p.neighbors, p.adjacency, size, _ALPHA)
+            finally:
+                pool.close()
+
+        with _cutoff(CUTOFFS["skeleton"], "0"):
+            return _time(scan, repeats)
+
+    return serial, pooled, lambda d: make(d).tests
+
+
+def calibrate(workers: int, methods: Sequence[str] = tuple(CUTOFFS)) -> dict[str, Crossover]:
     """Measure each method's crossover with ``workers`` pool processes."""
+    import dataclasses
     import warnings
 
     import andrey
@@ -234,7 +359,17 @@ def calibrate(workers: int, methods: Sequence[str] = ("ges",)) -> dict[str, Cros
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", andrey.AndreyWarning)
         for m in methods:
-            serial, pooled, work = fit_timers(m, workers)
-            pooled(8)  # start the process's first pool (the forkserver) before timing
-            out[m] = bracket(serial, pooled, work=work)
+            if m == "skeleton":
+                timers = [skeleton_timers(workers, size) for size in SKELETON_SIZES]
+            else:
+                timers = [fit_timers(m, workers)]
+            # A pooled run with next to no work times starting and closing the pool; its warm-up
+            # call starts the process's first pool (the forkserver) before anything else is timed.
+            start = timers[0][1](GRID[0])
+            runs = [
+                bracket(serial, pooled, GRID, work=work, method=m)
+                for serial, pooled, work in timers
+            ]
+            widest = max(runs, key=lambda c: c.cutoff)
+            out[m] = dataclasses.replace(widest, start_s=start)
     return out
