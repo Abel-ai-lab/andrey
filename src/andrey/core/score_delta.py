@@ -479,6 +479,14 @@ def _remove_error_bounds(
     return bound, dm, dR_v
 
 
+def _score_rounding(n: int, penalty: float, var_v: float) -> float:
+    """The rounding of ``n log R + penalty``, here and in a full score, as a residual error per unit
+    of ``cov[v, v]``. A kept residual lies in ``(1e-12 cov[v, v], cov[v, v]]``, so the score is at
+    most ``n (|log cov[v, v]| + 28) + penalty`` in size; a few units in its last place cover both
+    computations."""
+    return 1.01 * 4 * _EPS * (n * (abs(math.log(var_v)) + 28.0) + penalty) / n
+
+
 def score_many_with_base(
     score_obj: BICScore,
     i: int,
@@ -571,11 +579,7 @@ def score_many_with_base(
     if R_v_old is not None and not R_v_old > floor:
         R_v_old = None
     if R_v_old is not None:
-        # A kept residual lies in (floor, var_v], so each score is at most this far from zero; a
-        # few units in its last place cover the rounding of ``n log R + penalty``, here and in a
-        # full score.
-        rounding = 1.01 * 4 * _EPS * (n * (abs(math.log(var_v)) + 28.0) + log_n * (s + 1) * lam)
-        rounding /= n
+        rounding = _score_rounding(n, log_n * (s + 1) * lam, var_v)
     diag_range = inv_cov_cache.diag_range
     if diag_range is None:
         diag_range = inv_cov_cache.diag_range = (float(cov_diag.min()), float(cov_diag.max()))
@@ -694,6 +698,99 @@ def score_many_with_base(
     if bounds is not None:
         bounds[:] = out_bounds
     return cast("list[float]", results)  # every move now has a score
+
+
+def move_bound(
+    score_obj: BICScore,
+    i: int,
+    base_parents: Sequence[int],
+    op: str,
+    u: int,
+    *,
+    cond_threshold: float = _COND_THRESHOLD,
+) -> float:
+    """A tighter bound on one move's score from :func:`score_many_with_base`: componentwise.
+
+    The batch bounds every move in norms, which costs a few vector operations; this bound follows
+    the same first-order analysis without the norms, at the cost of the base's ``|M| |A|``
+    products, for a search that needs one comparison settled. ``M`` is ``inv(A)`` for
+    ``A = cov[S, S]``, whose column ``j`` solves ``(A + dA_j) x_j = e_j`` with
+    ``|dA_j| <= g |A|``, ``g = 4 (|S| + 2) eps``, so ``x^T M y`` is within
+    ``g |M x|^T |A| |M| |y|`` of ``x^T inv(A) y``. With ``b = M c_v`` and
+    ``w = g |M|^T |A| |b|``, ``R(v | S)`` is within ``w^T |c_v|`` plus the rounding terms of
+    :func:`score_many_with_base`. An add's ``e_vu`` is within ``w^T |c_u|`` and its ``R(u | S)``
+    within ``g |M c_u|^T |A| |M| |c_u|``; a removal's ``b_j`` is within ``w_j`` and its ``M_jj``
+    within ``g |M_{:, j}|^T |A| |M_{:, j}|``. These enter the score as in
+    :func:`_add_error_bounds` and :func:`_remove_error_bounds`. Returns ``inf`` for a move the batch
+    scores in full and outside the first-order regime.
+
+    References
+    ----------
+    N. J. Higham. *Accuracy and Stability of Numerical Algorithms*, 2nd ed., SIAM, 2002,
+    Sections 3.1, 9.3, and 14.3.
+    """
+    cov = score_obj.cov
+    n = score_obj.n
+    cov_diag = score_obj._cov_diag
+    i, u = int(i), int(u)
+    S = tuple(sorted(int(x) for x in base_parents))
+    s = len(S)
+    var_v = float(cov_diag[i])
+    floor = ZERO_RESIDUAL * var_v
+    if not var_v > 0.0:
+        return math.inf
+    penalty = score_obj.log_n * (s + 1) * score_obj.lambda_value
+    rounding = _score_rounding(n, penalty, var_v)
+    with np.errstate(all="ignore"):
+        if not S:
+            if op != "add" or u == i:
+                return math.inf
+            e = float(cov[i, u])
+            R_new = var_v - e * (e / float(cov_diag[u]))
+            bound = n * (4 * _EPS + rounding) * var_v / R_new
+        else:
+            S_list = list(S)
+            M, ill = _get_inv_with_cond(_inv_cache(score_obj), S, cov, S_list, cond_threshold)
+            if ill or M is None:
+                return math.inf
+            g = 4 * (s + 2) * _EPS
+            abs_A = np.abs(cov[np.ix_(S_list, S_list)])
+            abs_M = np.abs(M)
+            c_v = cov[S_list, i]
+            b = c_v @ M
+            R_old = float(var_v - b @ c_v)
+            w = g * (abs_M.T @ (abs_A @ np.abs(b)))
+            dR_v = float(w @ np.abs(c_v))
+            if op == "add" and u != i and u not in S:
+                c_u = cov[S_list, u]
+                beta = M @ c_u
+                e = float(cov[i, u] - b @ c_u)
+                R_u = float(cov_diag[u] - c_u @ beta)
+                t = e * (e / R_u)
+                R_new = R_old - t
+                de = float(w @ np.abs(c_u))
+                dR_u = g * float(np.abs(beta) @ (abs_A @ (abs_M @ np.abs(c_u))))
+                if not dR_u < 0.5 * R_u:
+                    return math.inf
+                dt = (2 * abs(e) * de + t * dR_u) / R_u
+                bound = n * (dR_v + (g + rounding) * var_v + dt) / R_new
+            elif op == "remove" and u in S and s > 1:
+                j = S.index(u)
+                m = float(M[j, j])
+                col = abs_M[:, j]
+                dm = g * float(col @ (abs_A @ col))
+                dR_v += g * var_v + rounding * R_old / 2
+                t = float(b[j]) * (float(b[j]) / m)
+                R_new = R_old + t
+                if not (m > 0.0 and dm < 0.5 * m and dR_v < 0.5 * R_old):
+                    return math.inf
+                dt = (2 * abs(float(b[j])) * float(w[j]) + t * dm) / m
+                bound = n * (2 * dR_v / R_old + dt / R_new)
+            else:
+                return math.inf
+    if not (bound < 0.5 * n and R_new > 2 * floor):
+        return math.inf
+    return float(bound)
 
 
 def _delta_two_scores(
@@ -1168,6 +1265,12 @@ class DeltaBICScore:
             bounds=bounds,
         )
 
+    def move_bound(self, i: int, base_parents: Sequence[int], op: str, u: int) -> float:
+        """Return the componentwise bound of one batched move's score (:func:`move_bound`)."""
+        return move_bound(
+            self.score_obj, i, base_parents, op, u, cond_threshold=self.cond_threshold
+        )
+
     def delta_many_with_base(
         self,
         i: int,
@@ -1246,6 +1349,10 @@ class FullScoreDelta:
             bounds[:] = [0.0] * len(deltas)
         base = [int(p) for p in base_parents]
         return self.score_obj.score_many(int(i), _moved(base, deltas))
+
+    def move_bound(self, i: int, base_parents: Sequence[int], op: str, u: int) -> float:
+        """Return 0: every score is a full score."""
+        return 0.0
 
 
 def _moved(base: list[int], deltas: Sequence[tuple[str, int]]) -> list[list[int]]:

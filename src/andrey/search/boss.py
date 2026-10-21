@@ -131,19 +131,23 @@ def _settle_groups(
     values: list[float],
     bounds: list[float],
     rescore: Callable[[int], float],
+    tighten: Callable[[int], float],
     *,
     first_only: bool = False,
 ) -> None:
-    """Rescore the candidates whose ``_SCORE_EPS`` tie group full scores could change.
+    """Tighten, then rescore, the candidates whose ``_SCORE_EPS`` tie group full scores could
+    change.
 
     The candidates sort by value (lower is better) into groups, each holding the candidates within
     ``_SCORE_EPS`` of its best. Full scores give the same groups when, in each group, every
     member's highest possible value is within the tolerance of every other member's lowest possible
     value, and every later candidate's lowest possible value is beyond it from the highest possible
     best. The candidates of a group that could break this, and the later ones that could join it,
-    are scored in full by ``rescore`` (bound 0), and the check repeats; ``first_only`` checks only
-    the first group. Updates ``values`` and ``bounds`` in place.
+    get their bounds tightened by ``tighten`` first, and are scored in full by ``rescore`` (bound
+    0) if that is not enough; the check repeats after each step. ``first_only`` checks only the
+    first group. Updates ``values`` and ``bounds`` in place.
     """
+    tightened: set[int] = set()
     while True:
         order = sorted(range(len(values)), key=values.__getitem__)
         slack = [bounds[k] + 8 * _EPS * abs(values[k]) if bounds[k] > 0.0 else 0.0 for k in order]
@@ -175,6 +179,11 @@ def _settle_groups(
         flagged = {k for k in flagged if bounds[k] > 0.0}
         if not flagged:
             return
+        if not flagged <= tightened:
+            for k in flagged - tightened:
+                bounds[k] = tighten(k)
+            tightened |= flagged
+            continue
         for k in flagged:
             values[k] = rescore(k)
             bounds[k] = 0.0
@@ -196,16 +205,34 @@ def _settle_kept(
     values: list[float],
     bounds: list[float],
     rescore: Callable[[int], float],
+    tighten: Callable[[int], float],
     *,
     first_only: bool = False,
 ) -> None:
     """Run :func:`_settle_groups` over the ``kept`` candidates of ``values`` and ``bounds``."""
     sub_values = [values[k] for k in kept]
     sub_bounds = [bounds[k] for k in kept]
-    _settle_groups(sub_values, sub_bounds, lambda j: rescore(kept[j]), first_only=first_only)
+    _settle_groups(
+        sub_values,
+        sub_bounds,
+        lambda j: rescore(kept[j]),
+        lambda j: tighten(kept[j]),
+        first_only=first_only,
+    )
     for j, k in enumerate(kept):
         values[k] = sub_values[j]
         bounds[k] = sub_bounds[j]
+
+
+def _tightened(
+    tree: _GrowShrinkTree, base: Sequence[int], op: str, u: int | None, bound: float
+) -> float:
+    """``bound``, or the componentwise bound of the batched move ``(base, op, u)`` that gave the
+    score (:meth:`~andrey.core.score_delta.DeltaBICScore.move_bound`) when it is smaller. No
+    score is computed; a full score (bound 0) stays as it is."""
+    if bound == 0.0 or u is None:
+        return bound
+    return min(bound, tree.delta.move_bound(tree.vertex, base, op, u))
 
 
 class _Leaf:
@@ -214,23 +241,39 @@ class _Leaf:
     Every node whose grow path and shrink end at the same parent set shares one leaf, so equal
     parent sets carry equal scores wherever the search compares them. ``bound`` bounds the score's
     distance from the full local score: 0 for a full score, the batch's error bound otherwise.
+    ``move`` is the batched move ``(base, op, u)`` that gave the score, until :meth:`tighten` has
+    used it.
     """
 
-    __slots__ = ("tree", "parents", "score", "bound")
+    __slots__ = ("tree", "parents", "score", "bound", "move")
 
     def __init__(
-        self, tree: _GrowShrinkTree, parents: tuple[int, ...], score: float, bound: float
+        self,
+        tree: _GrowShrinkTree,
+        parents: tuple[int, ...],
+        score: float,
+        bound: float,
+        move: tuple[list[int], str, int | None] | None = None,
     ) -> None:
         self.tree = tree
         self.parents = parents
         self.score = score
         self.bound = bound
+        self.move = move if bound > 0.0 else None
+
+    def tighten(self) -> None:
+        """Tighten ``bound`` to the componentwise bound of ``move`` (:func:`_tightened`)."""
+        if self.move is not None:
+            base, op, u = self.move
+            self.bound = _tightened(self.tree, base, op, u, self.bound)
+            self.move = None
 
     def settle(self) -> None:
         """Make ``score`` the full local score of ``parents``."""
         if self.bound > 0.0:
             self.score = -self.tree.score.score(self.tree.vertex, self.parents)
             self.bound = 0.0
+            self.move = None
 
 
 class _GSTNode:
@@ -281,7 +324,8 @@ class _GSTNode:
 
         Group improving additions within ``_SCORE_EPS`` of each group's best score. Visit groups
         best first, with ascending variable index within each group. A comparison that the score
-        bounds leave open is decided by full scores, of the parent set and of the candidates.
+        bounds leave open is decided by tighter bounds, or by full scores of the parent set and
+        of the candidates.
         """
         self.branches = []
         tree = self.tree
@@ -294,7 +338,19 @@ class _GSTNode:
         def rescore(k: int) -> float:
             return tree.score.score(vertex, [*base, available[k]])
 
+        def tighten(k: int) -> float:
+            return _tightened(tree, base, "add", available[k], bounds[k])
+
         kept, near = _near_threshold(values, bounds, self.grow_score, self.grow_bound)
+        if near:
+            # Tighten the bounds the comparisons depend on before scoring anything in full: the
+            # candidates' and the node's own, from the move of its parent's batch.
+            for k in near:
+                bounds[k] = tighten(k)
+            own_base = [p for p in base if p != self.add]
+            self.grow_bound = _tightened(tree, own_base, "add", self.add, self.grow_bound)
+            self.shrink_bound = self.grow_bound
+            kept, near = _near_threshold(values, bounds, self.grow_score, self.grow_bound)
         if near:
             if self.grow_bound > 0.0:
                 # Grow precedes shrink, so both scores of the node become the full score.
@@ -308,7 +364,7 @@ class _GSTNode:
                     kept.append(k)
         candidates = sorted((values[k], available[k], bounds[k]) for k in kept)
         if len(candidates) > 1 and not _apart(candidates):
-            _settle_kept(kept, values, bounds, rescore)
+            _settle_kept(kept, values, bounds, rescore, tighten)
             candidates = sorted((values[k], available[k], bounds[k]) for k in kept)
         # Anchor each tie group to its best score: pairwise approximate comparisons are not
         # transitive. `trace` takes the first allowed branch, so each group uses variable order.
@@ -327,12 +383,22 @@ class _GSTNode:
         Each step selects the lowest-index parent among improving removals within ``_SCORE_EPS``
         of the best score. Record the removal order, cache the final score in ``shrink_score``
         and the final parent set's :class:`_Leaf` in ``leaf``. A ``required`` parent is never
-        removed. A
-        comparison that the score bounds leave open is decided by full scores.
+        removed. A comparison that the score bounds leave open is decided by tighter bounds, or
+        by full scores.
         """
         self.remove = []
         tree = self.tree
         vertex = tree.vertex
+        # The batched move that gave ``shrink_score``: the node's own add until a removal, and
+        # whether it can still tighten the bound.
+        removal: tuple[list[int], int] | None = None
+        tightenable = True
+
+        def own_move() -> tuple[list[int], str, int | None]:
+            if removal is not None:
+                return removal[0], "remove", removal[1]
+            return [p for p in parents if p != self.add], "add", self.add
+
         while True:
             current = list(parents)
             removable = [u for u in current if u not in required] if required else current
@@ -345,7 +411,17 @@ class _GSTNode:
             def rescore(k: int, current: list[int] = current, removable: list[int] = removable):
                 return tree.score.score(vertex, [u for u in current if u != removable[k]])
 
+            def tighten(k: int, current: list[int] = current, removable: list[int] = removable):
+                return _tightened(tree, current, "remove", removable[k], bounds[k])
+
             kept, near = _near_threshold(values, bounds, self.shrink_score, self.shrink_bound)
+            if near:
+                for k in near:
+                    bounds[k] = tighten(k)
+                if tightenable:
+                    self.shrink_bound = _tightened(tree, *own_move(), self.shrink_bound)
+                    tightenable = False
+                kept, near = _near_threshold(values, bounds, self.shrink_score, self.shrink_bound)
             if near and self.shrink_bound > 0.0:
                 self.shrink_score = -tree.score.score(vertex, current)
                 self.shrink_bound = 0.0
@@ -358,17 +434,20 @@ class _GSTNode:
             if not kept:
                 break
             if len(kept) > 1 and not _apart(sorted((values[k], k, bounds[k]) for k in kept)):
-                _settle_kept(kept, values, bounds, rescore, first_only=True)
+                _settle_kept(kept, values, bounds, rescore, tighten, first_only=True)
             best_value = min(values[k] for k in kept)
             best, k = min((removable[k], k) for k in kept if values[k] - best_value <= _SCORE_EPS)
             self.shrink_score = -values[k]
             self.shrink_bound = bounds[k]
+            removal, tightenable = (current, best), True
             self.remove.append(best)
             parents.remove(best)
         key = tuple(sorted(parents))
         leaf = tree.leaves.get(key)
         if leaf is None:
-            leaf = tree.leaves[key] = _Leaf(tree, key, self.shrink_score, self.shrink_bound)
+            move = own_move() if tightenable and self.shrink_bound > 0.0 else None
+            leaf = _Leaf(tree, key, self.shrink_score, self.shrink_bound, move)
+            tree.leaves[key] = leaf
         self.leaf = leaf
 
     def trace(self, available: list[int], parents: list[int], prefix_set: set[int]) -> _Leaf:
@@ -643,8 +722,9 @@ def _better_mutation(
     when no position improves by more than the tolerance. With ``before`` (``before[a, b]``: ``a``
     precedes ``b``), only positions after every predecessor of ``v`` and before every successor are
     eligible. When the leaves' score bounds leave a comparison open (:func:`_unsettled`), those
-    leaves are scored in full and the positions scored again, so the move is the one full local
-    scores choose.
+    leaves' bounds are tightened (:meth:`_Leaf.tighten`), then, if that is not enough, the leaves
+    are scored in full, and the positions scored again, so the move is the one full local scores
+    choose.
     """
     i = positions[v]
     p = len(order)
@@ -661,8 +741,12 @@ def _better_mutation(
         unsettled = _unsettled(scores, i, v_leaves, without, with_v)
         if not unsettled:
             break
-        for node in unsettled:
-            node.settle()
+        if any(leaf.move is not None for leaf in unsettled):
+            for leaf in unsettled:
+                leaf.tighten()
+        else:
+            for leaf in unsettled:
+                leaf.settle()
 
     best_score = max(scores)
     if best_score <= scores[i] + _SCORE_EPS:

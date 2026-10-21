@@ -7,6 +7,7 @@ full scores elsewhere, so every decision is the one full scores make.
 
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace
 
 import numpy as np
@@ -113,6 +114,8 @@ def test_boss_grow_decides_an_open_threshold_by_full_scores(
         ]
 
     monkeypatch.setattr(delta, "score_many_with_base", rounded_batch)
+    # The injected errors are not the update's own, so its componentwise bound does not apply.
+    monkeypatch.setattr(delta, "move_bound", lambda vertex, base, op, u: math.inf)
     batched_gain = -rounded_batch(0, parents, [("add", 2)], bounds=[])[0] - node.grow_score
     assert (batched_gain > EPS) != (margin > 0)
 
@@ -128,11 +131,12 @@ def _stub_tree(
     rescored: list,
     *,
     grow: bool,
+    tight: float = math.inf,
 ) -> SimpleNamespace:
     """A tree whose moves gain ``exact``, keyed by the variable a grow adds to no parents or a
     shrink removes from all of ``exact``. The batch returns the gains with ``error``, within
-    ``bound`` (one for all moves or one per variable); the full score returns them exactly and
-    records the variable."""
+    ``bound`` (one for all moves or one per variable), which tightens to ``tight``; the full
+    score returns them exactly and records the variable."""
 
     def score_many_with_base(vertex, parents, moves, *, bounds):
         bounds[:] = [bound[u] if isinstance(bound, dict) else bound for _, u in moves]
@@ -148,7 +152,10 @@ def _stub_tree(
         empty_score=0.0,
         required=[],
         leaves={},
-        delta=SimpleNamespace(score_many_with_base=score_many_with_base),
+        delta=SimpleNamespace(
+            score_many_with_base=score_many_with_base,
+            move_bound=lambda vertex, base, op, u: tight,
+        ),
         score=SimpleNamespace(score=full),
     )
 
@@ -166,6 +173,27 @@ def test_boss_grow_groups_open_ties_by_full_scores() -> None:
 
     assert [branch.add for branch in node.branches] == [0, 1]
     assert sorted(rescored) == [0, 1]
+
+
+def test_boss_grow_tightens_bounds_before_scoring_in_full() -> None:
+    """The batch's bounds leave the tie of 0 and 1 open; their componentwise bounds close it, so
+    no candidate is scored in full."""
+    rescored: list[int] = []
+    tree = _stub_tree(
+        {0: 10.0, 1: 10.0 + 0.5e-6},
+        {0: -0.05e-6, 1: 0.05e-6},
+        0.6e-6,
+        rescored,
+        grow=True,
+        tight=0.06e-6,
+    )
+    node = boss_mod._GSTNode(tree)
+
+    node._grow([1, 0], [])
+
+    assert [branch.add for branch in node.branches] == [0, 1]
+    assert [branch.grow_bound for branch in node.branches] == [0.06e-6, 0.06e-6]
+    assert rescored == []
 
 
 def test_boss_grow_groups_a_full_score_with_a_batched_one() -> None:
@@ -201,7 +229,10 @@ def test_boss_shrink_decides_an_open_threshold_by_full_scores() -> None:
 
 
 class _Leaf:
-    """A traced leaf whose batched score is ``exact + error``, within ``bound``."""
+    """A traced leaf whose batched score is ``exact + error``, within ``bound``; its bound cannot
+    be tightened."""
+
+    move = None
 
     def __init__(self, exact: float, error: float = 0.0, bound: float = 0.0) -> None:
         self.exact = exact
@@ -251,6 +282,7 @@ def test_grasp_grow_rechecks_a_gap_within_the_bounds(
         ]
 
     monkeypatch.setattr(delta, "score_many_with_base", rounded_batch)
+    monkeypatch.setattr(delta, "move_bound", lambda vertex, base, op, u: math.inf)
 
     node.grow([2, 3], parents)
 
@@ -276,7 +308,35 @@ def test_grasp_grow_orders_siblings_within_their_bounds_by_full_scores(
         return [score.score(vertex, [u]) - error[u] for _, u in deltas]
 
     monkeypatch.setattr(delta, "score_many_with_base", rounded_batch)
+    monkeypatch.setattr(delta, "move_bound", lambda vertex, base, op, u: math.inf)
 
     tree.root.grow([1, 2], [])
 
     assert [branch.add for branch in tree.root.branches] == [2, 1]
+
+
+def test_grasp_grow_tightens_bounds_before_rechecking(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Siblings 1 and 2 are 1.5 tolerances apart; the batch's bounds leave their order open and
+    their componentwise bounds close it, so neither is rechecked."""
+    cov = np.array([[1.0, 0.6, 0.6 + 8.1e-9], [0.6, 1.0, 0.2], [0.6 + 8.1e-9, 0.2, 1.0]])
+    score = BICScore.from_cov(cov, 100)
+    delta = DeltaBICScore(score)
+    tree = grasp_mod._GST(0, score, delta, 3)
+    exact = {u: -score.score(0, [u]) for u in (1, 2)}
+    assert EPS < exact[2] - exact[1] < 2 * EPS
+    error = {1: 0.1 * EPS, 2: -0.1 * EPS}
+    full = score.score
+
+    def rounded_batch(vertex, parents, deltas, *, bounds):
+        bounds[:] = [EPS] * len(deltas)
+        return [full(vertex, [u]) - error[u] for _, u in deltas]
+
+    rechecked: list[list[int]] = []
+    monkeypatch.setattr(delta, "score_many_with_base", rounded_batch)
+    monkeypatch.setattr(delta, "move_bound", lambda vertex, base, op, u: 0.2 * EPS)
+    monkeypatch.setattr(score, "score", lambda v, p: rechecked.append(list(p)) or full(v, p))
+
+    tree.root.grow([1, 2], [])
+
+    assert [branch.add for branch in tree.root.branches] == [2, 1]
+    assert rechecked == []
