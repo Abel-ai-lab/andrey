@@ -15,9 +15,9 @@ cumulative share adds the corrected cumulative time of each function it calls, w
 of that function's time spent under this caller; a recursive call is counted once. Times stay on
 screen; the table written by ``-o`` holds shares and call counts only.
 
-    uv run python -m qa.profile PC --list               # the dataset keys PC runs on
-    uv run python -m qa.profile PC linear_gauss_er_d20  # wall time and the top 25 functions
-    uv run python -m qa.profile BOSS linear_gauss_er_d100 --seed 1 --rows 40 -o boss.json
+    uv run python -m qa.profiler PC --list              # the dataset keys PC runs on
+    uv run python -m qa.profiler PC linear_gauss_er_d20 # wall time and the top 25 functions
+    uv run python -m qa.profiler BOSS linear_gauss_er_d100 --seed 1 --rows 40 -o boss.json
 """
 
 from __future__ import annotations
