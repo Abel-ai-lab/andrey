@@ -129,7 +129,7 @@ change names its pull request.
   header name that is a number. ([#261])
 - `varma_lingam` and `longitudinal_lingam` fit on the columns sorted by a rank computed from each
   column's own data instead of in column order, so reordering the columns no longer changes their
-  graphs, and on data where the order mattered their graphs and weights can change. ([#272])
+  graphs, and on data where the order mattered their graphs and weights can change. ([#278])
 
 ## [0.7.0] - 2026-10-19
 
@@ -499,4 +499,4 @@ First alpha release.
 [#239]: https://github.com/Abel-ai-lab/andrey/pull/239
 [#248]: https://github.com/Abel-ai-lab/andrey/pull/248
 [#261]: https://github.com/Abel-ai-lab/andrey/pull/261
-[#272]: https://github.com/Abel-ai-lab/andrey/pull/272
+[#278]: https://github.com/Abel-ai-lab/andrey/pull/278
