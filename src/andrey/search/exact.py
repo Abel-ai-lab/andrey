@@ -53,6 +53,10 @@ EXACT_SCORES: tuple[str, ...] = (
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.
 _ParentEntry = tuple[tuple[int, ...], float, int]
 
+# Parent sets of one size scored per call, which bounds the memory of the BIC score's stacked
+# normal equations.
+_SCORE_BATCH = 4096
+
 
 def _structure_bits(structure: Sequence[int]) -> int:
     """Bitmask of a parent set: bit ``v`` set iff ``v`` is in ``structure``."""
@@ -82,9 +86,9 @@ class _GramBICScore:
     """Linear-Gaussian BIC score on mean-centered data.
 
     Centers each column, then precomputes the Gram matrix ``S = X.T @ X`` and its diagonal once;
-    :meth:`score` regresses a node on its parents through the normal equations on ``S`` to get the
-    residual sum of squares, then applies the ``lambda=1`` BIC penalty. Without the centering, a
-    nonzero mean would count as shared signal and link independent variables. Raises
+    :meth:`score_many` regresses a node on each parent set through the normal equations on ``S`` to
+    get the residual sum of squares, then applies the ``lambda=1`` BIC penalty. Without the
+    centering, a nonzero mean would count as shared signal and link independent variables. Raises
     ``ValueError`` for a column :func:`~andrey.core.score.check_columns` rejects.
     """
 
@@ -98,19 +102,39 @@ class _GramBICScore:
 
     def score(self, node: int, parents: Sequence[int]) -> float:
         """Return the negative local BIC score for ``node`` given ``parents`` (lower is better)."""
-        if len(parents) > self._n - 2:
-            return float("inf")
-        if not parents:
-            resid = self._diag[node]
+        return self.score_many(node, [parents])[0]
+
+    def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
+        """Return the negative local BIC scores for parent sets of one size, in request order.
+
+        Solves the sets' normal equations in one stacked call, or each with
+        :func:`_solve_normal_equations` when one is singular; each score equals the one the set
+        gets alone.
+        """
+        size = len(parent_sets[0])
+        if size > self._n - 2:
+            return [float("inf")] * len(parent_sets)
+        if not size:
+            resids = [self._diag[node]] * len(parent_sets)
         else:
-            pa = list(parents)
-            gram_pa = self._gram[np.ix_(pa, pa)]
+            pa = np.array(parent_sets)
+            gram_pa = self._gram[pa[:, :, None], pa[:, None, :]]
             gram_node_pa = self._gram[node, pa]
-            beta = _solve_normal_equations(gram_pa, gram_node_pa)
-            resid = self._diag[node] - gram_node_pa @ beta
-        if not resid > ZERO_RESIDUAL * self._diag[node]:
-            return float("inf")
-        return float(self._n * np.log(resid / self._n) + len(parents) * self._log_n)
+            try:
+                betas = np.linalg.solve(gram_pa, gram_node_pa[..., None])[..., 0]
+            except np.linalg.LinAlgError:  # one singular set fails the whole stacked call
+                pairs = zip(gram_pa, gram_node_pa, strict=True)
+                betas = [_solve_normal_equations(a, b) for a, b in pairs]
+            resids = [
+                self._diag[node] - b @ beta for b, beta in zip(gram_node_pa, betas, strict=True)
+            ]
+        values = []
+        for resid in resids:
+            if not resid > ZERO_RESIDUAL * self._diag[node]:
+                values.append(float("inf"))
+            else:
+                values.append(float(self._n * np.log(resid / self._n) + size * self._log_n))
+        return values
 
 
 def _solve_normal_equations(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -153,18 +177,23 @@ def _generate_parent_graph(
         candidates = [c for c in np.flatnonzero(legal).tolist() if c != node]
     insert(required, score.score(node, required), _structure_bits(required))
     for size in range(1, len(candidates) + 1):
-        for extra in itertools.combinations(candidates, size):
-            combo = tuple(sorted(required + extra)) if required else extra
-            bits = _structure_bits(combo)
-            value = score.score(node, list(combo))
-            maximal = True
-            for v in extra:  # dropping a required parent leaves no legal subset
-                _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))
-                if sub_value < value:  # a subset already scores lower -- combo is dominated
-                    maximal = False
-                    break
-            if maximal:
-                insert(combo, value, bits)
+        level = itertools.combinations(candidates, size)
+        while extras := list(itertools.islice(level, _SCORE_BATCH)):
+            combos = [tuple(sorted(required + extra)) if required else extra for extra in extras]
+            if isinstance(score, _GramBICScore):  # one stacked solve per batch
+                values = score.score_many(node, combos)
+            else:
+                values = [score.score(node, list(combo)) for combo in combos]
+            for extra, combo, value in zip(extras, combos, values, strict=True):
+                bits = _structure_bits(combo)
+                maximal = True
+                for v in extra:  # dropping a required parent leaves no legal subset
+                    _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))
+                    if sub_value < value:  # a subset already scores lower -- combo is dominated
+                        maximal = False
+                        break
+                if maximal:
+                    insert(combo, value, bits)
     return parent_graph
 
 
