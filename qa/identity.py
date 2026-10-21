@@ -137,8 +137,14 @@ FITS: dict[str, Fit] = {
 #: processes, Granger's regressions on threads.
 WORKER_METHODS = ("GES", "GFCI", "Granger")
 
+#: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
+#: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
+#: step's lagged dynamics stays below 1 and the panel stays bounded.
+PANEL_SCALE = 0.3
+
 #: One dataset per method beyond the gate's sizes, drawn as the gate draws its regime, at a size
-#: that keeps the whole corpus quick on one core.
+#: that keeps the whole corpus quick on one core; the panel's coefficients take
+#: :data:`PANEL_SCALE`.
 LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "linear_gauss_er_d100": functools.partial(qg.regime_draws, "linear_gauss_er", 100, 5000),
     "latent_gauss_er_d100": functools.partial(qg.regime_draws, "latent_gauss_er", 100, 5000),
@@ -155,7 +161,9 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "pcmciplus_paper_d40_n1000": functools.partial(qg.series_draws, "pcmciplus_paper", 40, 1000),
     "lpcmci_paper_d20_n1000": functools.partial(qg.series_draws, "lpcmci_paper", 20, 1000),
     "varma_lingam_paper_d8_n300": functools.partial(qg.series_draws, "varma_lingam_paper", 8, 300),
-    "longitudinal_lingam_paper_d10_n20_m500": functools.partial(qg.panel_draws, 10, 20, 500),
+    "longitudinal_lingam_stable_d10_n20_m500": functools.partial(
+        qg.panel_draws, 10, 20, 500, scale=PANEL_SCALE
+    ),
     "var2_lagged_d10_n1000": functools.partial(qg.granger_draws, 10, 1000),
 }
 LARGER: dict[str, str] = {
@@ -175,7 +183,7 @@ LARGER: dict[str, str] = {
     "PCMCIplus": "pcmciplus_paper_d40_n1000",
     "LPCMCI": "lpcmci_paper_d20_n1000",
     "VARMA-LiNGAM": "varma_lingam_paper_d8_n300",
-    "LongitudinalLiNGAM": "longitudinal_lingam_paper_d10_n20_m500",
+    "LongitudinalLiNGAM": "longitudinal_lingam_stable_d10_n20_m500",
     "Granger": "var2_lagged_d10_n1000",
 }
 

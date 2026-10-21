@@ -304,9 +304,12 @@ def series_draws(regime: str, d: int, n: int) -> tuple[Draw, ...]:
     return tuple(out)
 
 
-def panel_draws(d: int, n: int, m: int) -> tuple[Draw, ...]:
-    """One panel of ``m`` units at ``n`` time points per seed, shaped ``(n, m, d)``."""
-    samples = (lingam_models.sample_panel(PANEL_MODEL, d, n, m, s) for s in SEEDS)
+def panel_draws(d: int, n: int, m: int, scale: float = 1.0) -> tuple[Draw, ...]:
+    """One panel of ``m`` units at ``n`` time points per seed, shaped ``(n, m, d)``.
+
+    ``scale`` multiplies every coefficient of the panel model.
+    """
+    samples = (lingam_models.sample_panel(PANEL_MODEL, d, n, m, s, scale=scale) for s in SEEDS)
     return tuple(Draw(panel, CoefficientStack(stack, kind="panel")) for panel, stack in samples)
 
 
