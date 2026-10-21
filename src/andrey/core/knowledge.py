@@ -64,6 +64,38 @@ def _edges(values: Iterable | None, what: str) -> tuple[tuple[Node, Node], ...]:
     return tuple(edges)
 
 
+def column_position(
+    node: Node,
+    labels: Sequence[str] | None,
+    d: int,
+    what: str,
+    error: type[ValueError] = ValueError,
+) -> int:
+    """Return the 0-based position of the column ``node`` names among ``d`` columns.
+
+    A string is a column label, looked up in ``labels``; an integer is always a position, so a
+    column named ``1`` is named by the label ``"1"``. ``what`` opens each message; ``error`` is the
+    ``ValueError`` class raised when the column is missing.
+    """
+    if isinstance(node, str):
+        if labels is None:
+            raise error(
+                f"{what} names column {node!r}, but data has no column names; give a DataFrame or "
+                "the column's 0-based position"
+            )
+        if node not in labels:
+            raise error(
+                f"{what} names column {node!r}, which data does not have; its columns are "
+                f"{list(labels)}"
+            )
+        return list(labels).index(node)
+    if not 0 <= node < d:
+        named = labels is not None and str(node) in labels
+        hint = f"; to name the column {str(node)!r}, pass its label as a string" if named else ""
+        raise error(f"{what} lists column {node}, but data has {d} columns{hint}")
+    return node
+
+
 class KnowledgeError(ValueError):
     """Background knowledge that names a column the data lacks or that no graph can satisfy.
 
@@ -77,10 +109,12 @@ class Knowledge:
     """Background knowledge a search honors: required and forbidden edges, the pairs that may be
     adjacent, and tiers that order the variables.
 
-    A node is named by a column label (a DataFrame's column name, or the data file's header on the
-    command line) or by its 0-based position. Labels stay attached to their columns, so the same
-    knowledge fits a reordered table; positions follow the column order. Each method's ``knowledge``
-    parameter states the parts it honors and raises ``NotImplementedError`` for another.
+    A node is named by a column label, a string (a DataFrame's column name as text, or the data
+    file's header on the command line), or by its 0-based position, an integer. Labels stay attached
+    to their columns, so the same knowledge fits a reordered table; positions follow the column
+    order. An integer is always a position: a column named ``1`` is named by the label ``"1"``.
+    Each method's ``knowledge`` parameter states the parts it honors and
+    raises ``NotImplementedError`` for another.
 
     Parameters
     ----------
@@ -360,21 +394,7 @@ def resolve(
     names = list(labels) if labels is not None else None
 
     def position(node: Node, what: str) -> int:
-        if isinstance(node, str):
-            if names is None:
-                raise KnowledgeError(
-                    f"knowledge {what} names column {node!r}, but data has no column names; give a "
-                    "DataFrame or the column's 0-based position"
-                )
-            if node not in names:
-                raise KnowledgeError(
-                    f"knowledge {what} names column {node!r}, which data does not have; its "
-                    f"columns are {names}"
-                )
-            return names.index(node)
-        if not 0 <= node < d:
-            raise KnowledgeError(f"knowledge {what} lists column {node}, but data has {d} columns")
-        return node
+        return column_position(node, names, d, f"knowledge {what}", KnowledgeError)
 
     def label(i: int) -> str:
         return repr(names[i]) if names is not None else str(i)

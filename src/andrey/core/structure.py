@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, Literal
 
@@ -96,7 +96,10 @@ class Structure:
             raise TypeError("Structure is abstract; use GraphStructure or TemporalStructure")
         if self._n_nodes < 0:
             raise ValueError(f"n_nodes must be non-negative, got {self._n_nodes}")
-        if self._labels is not None and len(self._labels) != self._n_nodes:
+        if self._labels is None:
+            return
+        object.__setattr__(self, "_labels", node_labels(self._labels, "node"))
+        if len(self._labels) != self._n_nodes:
             raise ValueError(f"labels length {len(self._labels)} != n_nodes {self._n_nodes}")
 
     @property
@@ -106,7 +109,11 @@ class Structure:
 
     @property
     def labels(self) -> tuple[str, ...] | None:
-        """Node names (a DataFrame's column names), or ``None`` when nodes are numbered from 0."""
+        """Node names (a DataFrame's column names), or ``None`` when nodes are numbered from 0.
+
+        Each name is a ``str``, unique among the nodes: a structure built with other names, such
+        as the integers ``(1, 0, 2)``, holds them as text, ``("1", "0", "2")``.
+        """
         return self._labels
 
     def __eq__(self, other: object) -> bool:
@@ -239,7 +246,8 @@ class GraphStructure(Structure):
             so pass it for a graph with 2-cycles. The marks are not checked against ``kind``;
             call ``validate()``.
         labels : tuple[str, ...] or None, default=None
-            Node names, one per node; ``None`` numbers the nodes from 0.
+            Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
+            nodes from 0.
         allow_self_loops : bool, default=False
             Accept self-loops on the diagonal. A self-loop ``M[i, i] = 2`` is a variable's effect
             on its own future, in the graph for a positive lag of a ``TemporalStructure``; ``2`` is
@@ -259,7 +267,8 @@ class GraphStructure(Structure):
             If ``kind`` is not one of the four kinds, ``M`` is not square, has a nonzero diagonal
             without ``allow_self_loops`` or a diagonal value other than ``0`` or ``2`` with it,
             holds a value outside ``0..3``, has a mark in ``M[i, j]`` but not in ``M[j, i]``,
-            ``labels`` does not have ``n`` entries, or ``node_types`` is not shape ``(n,)``.
+            ``labels`` does not have ``n`` entries or has two that are equal as text, such as ``1``
+            and ``"1"``, or ``node_types`` is not shape ``(n,)``.
         """
         if kind is not None and kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS} or None, got {kind!r}")
@@ -309,7 +318,8 @@ class GraphStructure(Structure):
         kind : {"dag", "cpdag", "pag", "digraph"} or None, default=None
             Graph type; ``None`` infers it as ``from_numpy`` does.
         labels : tuple[str, ...] or None, default=None
-            Node names, one per node; ``None`` numbers the nodes from 0.
+            Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
+            nodes from 0.
 
         Returns
         -------
@@ -320,7 +330,7 @@ class GraphStructure(Structure):
         ------
         ValueError
             If a mark is outside ``0..3``, a row has a mark at one end only, or ``labels`` does not
-            have ``n_nodes`` entries.
+            have ``n_nodes`` entries or has two that are equal as text.
         IndexError
             If ``edges`` is not a structured array with those fields, or names a node outside
             ``range(n_nodes)``.
@@ -364,7 +374,8 @@ class GraphStructure(Structure):
         Raises
         ------
         ValueError
-            If an ``endpoints`` mark is outside ``0..3``, or an edge has a mark at one end only.
+            If an ``endpoints`` mark is outside ``0..3``, an edge has a mark at one end only, or two
+            nodes are equal as text, such as ``1`` and ``"1"``.
         """
         nodes = list(g.nodes())
         n = len(nodes)
@@ -909,7 +920,8 @@ class TemporalStructure(Structure):
             weight of ``i -> j`` at moving-average lag ``m + 1``. Stored as a read-only
             ``float64`` copy.
         labels : tuple[str, ...] or None, default=None
-            Node names, one per node; ``None`` numbers the nodes from 0.
+            Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
+            nodes from 0.
 
         Returns
         -------
@@ -920,8 +932,8 @@ class TemporalStructure(Structure):
         ------
         ValueError
             If ``graphs`` is empty, ``lags`` does not have one value per graph or repeats a value,
-            the graphs differ in node count, ``labels`` does not have one entry per node, or a
-            weight array has the wrong shape.
+            the graphs differ in node count, ``labels`` does not have one entry per node or has two
+            that are equal as text, or a weight array has the wrong shape.
         """
         graphs = tuple(graphs)
         if not graphs:
@@ -981,7 +993,8 @@ class TemporalStructure(Structure):
             ``time_graphs[t][k]``, with ``NaN`` for a block that cannot be computed.
             ``lag_weights`` is the last row with ``NaN`` replaced by ``0``.
         labels : tuple[str, ...] or None, default=None
-            Node names, one per node; ``None`` numbers the nodes from 0.
+            Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
+            nodes from 0.
 
         Returns
         -------
@@ -993,8 +1006,8 @@ class TemporalStructure(Structure):
         ValueError
             If the grid is empty or its rows differ in length, ``lags`` or ``times`` does not
             match the grid, ``lags`` repeats a value, ``times`` is not strictly increasing, the
-            graphs differ in node count, ``labels`` does not have one entry per node, or
-            ``time_weights`` has the wrong shape.
+            graphs differ in node count, ``labels`` does not have one entry per node or has two
+            that are equal as text, or ``time_weights`` has the wrong shape.
         """
         rows = tuple(tuple(row) for row in time_graphs)
         if not rows or not rows[0]:
@@ -1330,6 +1343,27 @@ def _frozen(arr: np.ndarray, dtype: npt.DTypeLike) -> np.ndarray:
     out = np.array(arr, dtype=dtype)
     out.setflags(write=False)
     return out
+
+
+def node_labels(names: Iterable[object], what: str = "column") -> tuple[str, ...]:
+    """Return ``names`` as node labels, each name as text: ``str(name)``.
+
+    Raises ``ValueError`` naming each label that two names share, such as ``1`` and ``"1"``, which
+    are both ``"1"`` as text, and the positions of the names; ``what``, such as ``"column"`` or
+    ``"node"``, says what the names belong to.
+    """
+    labels = tuple(str(name) for name in names)
+    if len(set(labels)) == len(labels):
+        return labels
+    positions: dict[str, list[int]] = {}
+    for j, label in enumerate(labels):
+        positions.setdefault(label, []).append(j)
+    clashes = "; ".join(
+        f"{label!r} names {what}s {js}" for label, js in positions.items() if len(js) > 1
+    )
+    raise ValueError(
+        f"{what} names must be unique as text, but {clashes}; give each {what} its own name"
+    )
 
 
 def relabel(structure: Structure, labels: tuple[str, ...]) -> Structure:
