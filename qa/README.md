@@ -46,8 +46,8 @@ whose answer differs from the first fit, with the parts that differ, exiting 1 i
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out.
-- `--workers N` refits GES, GFCI, and Granger on `N` workers, with every GES pass sent to the
-  worker pool.
+- `--workers N` refits PC, FCI, GFCI, CD-NOD, GES, and Granger on `N` workers, with every GES pass
+  and every skeleton pass of conditioning size two or more sent to the worker pool.
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
 sets the draws per dataset.

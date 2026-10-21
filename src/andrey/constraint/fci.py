@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
+from andrey.constraint._parallel_skeleton import SkeletonWorkerPool, pool_capable
 from andrey.constraint._skeleton import (
     adjacent_pairs,
     first_order_removals,
@@ -50,6 +50,7 @@ def fci(
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
+    workers: int | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
 
@@ -71,6 +72,8 @@ def fci(
     (:func:`~andrey.constraint._skeleton.unseparated_triples`).
     An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
     ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
+    ``workers`` worker processes share the adjacency search's larger conditioning-size passes
+    (:func:`_fast_adjacency_search`); ``None`` reads ``andrey.config.num_workers``.
     Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
@@ -84,7 +87,14 @@ def fci(
         keep = constraints.required | constraints.required.T
         apart = ~allowed
     support, sepsets = _fast_adjacency_search(
-        X, test, alpha, support=allowed, keep=keep, apart=apart, max_depth=max_depth
+        X,
+        test,
+        alpha,
+        workers=backend.worker_count(workers),
+        support=allowed,
+        keep=keep,
+        apart=apart,
+        max_depth=max_depth,
     )
 
     marks = _circle_pag(support)
@@ -148,9 +158,10 @@ def _fast_adjacency_search(
 
     When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
     the size-0 and size-1 passes take them instead of the dense scalar scan -- same removals and
-    separating sets. With ``workers > 1`` the ``|S| >= 2`` scan fans out across worker
-    processes, reducing per-chunk removals by union, so the skeleton stays identical to the serial
-    scan.
+    separating sets. With ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of
+    at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests fans out across
+    worker processes; the per-chunk removals are concatenated in pair order, so the skeleton, a
+    raised error included, stays identical to the serial scan.
     """
     d = X.shape[1]
     support = np.ones((d, d), dtype=bool) if support is None else np.array(support, dtype=bool)
@@ -158,9 +169,7 @@ def _fast_adjacency_search(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    seedable = callable(getattr(test, "to_seed", None))
-    parallel = workers > 1 and seedable
-    pool = SkeletonWorkerPool(test, workers) if parallel else None
+    pool = SkeletonWorkerPool(test, workers) if workers > 1 and pool_capable(test) else None
     try:
         size = -1
         while True:
@@ -189,8 +198,15 @@ def _fast_adjacency_search(
                     sepsets[(y, x)] = separating
             else:
                 pairs = adjacent_pairs(testable)
-                if pool is not None:
-                    removals = pool.scan(pairs, support.copy(), size, alpha, record_pvalues=False)
+                pooled = (
+                    None
+                    if pool is None
+                    else pool.scan(
+                        pairs, neighbors, support.copy(), size, alpha, record_pvalues=False
+                    )
+                )
+                if pooled is not None:
+                    removals = pooled
                 else:
                     # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
                     # match the (1-thread) parallel skeleton workers, where it has them, whatever
