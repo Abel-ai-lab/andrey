@@ -91,7 +91,7 @@ Released October 17, 2026
 :::{card}
 :link: benchmarks/0.5.0
 :link-type: doc
-:link-alt: The 0.5.0 release card: time series
+:link-alt: The 0.5.0 release card: temporal causal discovery
 :class-card: release-tile release-art-0-5-0
 :shadow: none
 :margin: 0
@@ -246,7 +246,7 @@ The homepage's speed claim and charts come from these release cards.
 
 0.7.0: permutation invariance <benchmarks/0.7.0>
 0.6.0: mixed and categorical data <benchmarks/0.6.0>
-0.5.0: time series <benchmarks/0.5.0>
+0.5.0: temporal causal discovery <benchmarks/0.5.0>
 0.4.0: pairwise direction <benchmarks/0.4.0>
 0.3.0: score-based search <benchmarks/0.3.0>
 0.2.0: hidden common causes <benchmarks/0.2.0>

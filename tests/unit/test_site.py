@@ -273,7 +273,7 @@ def test_the_temporal_figure_scores_links_by_f1():
     assert not any(p["f1"] for family, shown in points.items() if family != "temporal"
                    for p in shown)  # fmt: skip
     frame = build.frontier_frame([p for shown in points.values() for p in shown])
-    figure = build.frontier_chart("Time series", points["temporal"], frame)
+    figure = build.frontier_chart("Temporal causal discovery", points["temporal"], frame)
     assert "1 − link F1" in figure and "empty graph</text>" not in figure
 
 

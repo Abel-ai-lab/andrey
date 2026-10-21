@@ -77,7 +77,7 @@ SPEC_FAMILIES = {
     "score": "Score-based",
     "permutation": "Permutation-based",
     "lingam": "Linear non-Gaussian",
-    "temporal": "Time series",
+    "temporal": "Temporal causal discovery",
     "latent": "Latent variables",
     "pairwise": "Pairwise direction",
 }
@@ -87,7 +87,7 @@ FAMILY_TERMS = {
     "score": "score-based",
     "permutation": "permutation-based",
     "lingam": "linear non-Gaussian",
-    "temporal": "time-series",
+    "temporal": "temporal",
     "latent": "latent-variable",
     "pairwise": "pairwise",
 }
