@@ -8,6 +8,7 @@ definitions. Each variable's parser is in :mod:`andrey.core.env`. The human-read
 
 from __future__ import annotations
 
+from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES as _SKELETON_MIN_WORK
 from andrey.core.env import SEED_MAX
 from andrey.search._parallel_ges import _DEFAULT_MIN_WORK as _GES_MIN_WORK
 
@@ -57,6 +58,22 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "unless the worker count (`num_workers` / `ANDREY_NUM_WORKERS`) is above 1. A fit with "
             "more than one worker warns once on the default when a pass reaches a tenth of it; "
             "`andrey calibrate` measures a value for a process that runs many fits."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_SKELETON_PARALLEL_MIN_WORK",
+        values="integer (CI tests per conditioning-size pass)",
+        default=str(_SKELETON_MIN_WORK),
+        effect=(
+            "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, and "
+            "CD-NOD with `fisherz` or `student_t`: a conditioning-size pass fans out to the "
+            "worker pool only when it holds at least this many CI tests, else in-process. `0` "
+            "sends every pass to the pool. The default was measured on an AMD EPYC 9534 server "
+            "running Linux. No effect unless the worker count (`num_workers` / "
+            "`ANDREY_NUM_WORKERS`) is above 1. A fit with more than one worker warns once on the "
+            "default when a pass reaches a tenth of it; `andrey calibrate --method skeleton` "
+            "measures a value for your machine."
         ),
         group="backend",
     ),

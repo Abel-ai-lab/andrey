@@ -845,6 +845,22 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
         assert {k: v for k, v in actual.items() if k != "value"} == expected
 
 
+@pytest.mark.parametrize(
+    "args", [["config", "--json"], ["config", "--help", "--json"], ["--help", "--json"]]
+)
+def test_the_json_introspection_lists_the_skeleton_cutoff(args, capsys, monkeypatch):
+    """An agent reads the variable, its default, and the command that measures it, from the CLI."""
+    from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES
+
+    monkeypatch.delenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", raising=False)
+    code, out, err = _run(args, capsys)
+    assert code == 0 and not err
+    variables = {v["name"]: v for v in json.loads(out)["environment"]["variables"]}
+    skeleton = variables["ANDREY_SKELETON_PARALLEL_MIN_WORK"]
+    assert skeleton["default"] == str(MIN_POOL_QUERIES)
+    assert "andrey calibrate --method skeleton" in skeleton["effect"]
+
+
 def test_config_report_is_readable_when_piped(capsys, monkeypatch):
     from andrey.core.backend import Backend
 

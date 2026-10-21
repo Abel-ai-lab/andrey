@@ -47,7 +47,7 @@ def pools(monkeypatch: pytest.MonkeyPatch) -> list[int]:
 @pytest.fixture
 def open_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     """Send every ``|S| >= 2`` pass of a pool-capable test to the pool."""
-    monkeypatch.setattr(_parallel_skeleton, "MIN_POOL_QUERIES", 0)
+    monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0")
 
 
 def _gaussian_dag(seed: int, n: int, d: int, density: float) -> np.ndarray:
@@ -174,7 +174,7 @@ def test_a_pass_above_the_gate_runs_on_the_pool(
     pools: list[int], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Dense enough that the size-2 pass holds more than 10,000 tests; capped there.
-    monkeypatch.setattr(_parallel_skeleton, "MIN_POOL_QUERIES", 10_000)
+    monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", "10000")
     x = _gaussian_dag(4, 800, 40, 0.3)
     serial = andrey.pc(x, max_depth=2)
     with andrey.config(num_workers=2):

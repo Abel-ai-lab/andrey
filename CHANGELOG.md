@@ -9,6 +9,14 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Added
+
+- `ANDREY_SKELETON_PARALLEL_MIN_WORK` sets the fewest CI tests a conditioning-size pass of the
+  `pc`, `fci`, `gfci`, and `cdnod` skeleton search needs to use the worker processes. The default,
+  500000, was measured on an AMD EPYC 9534 server running Linux; a fit with more than one worker
+  warns once on it when a pass reaches a tenth of it. `andrey calibrate --method skeleton`
+  measures the value for your machine, and `andrey calibrate` now measures it with GES's. ([#290])
+
 ### Changed
 
 - `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
@@ -536,4 +544,5 @@ First alpha release.
 [#261]: https://github.com/Abel-ai-lab/andrey/pull/261
 [#271]: https://github.com/Abel-ai-lab/andrey/pull/271
 [#278]: https://github.com/Abel-ai-lab/andrey/pull/278
+[#290]: https://github.com/Abel-ai-lab/andrey/pull/290
 [#299]: https://github.com/Abel-ai-lab/andrey/pull/299

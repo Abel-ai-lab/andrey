@@ -634,19 +634,6 @@ def _cpu_model() -> str:
 
 
 @contextmanager
-def _skeleton_pool_open() -> Generator[None]:
-    """Send every skeleton pass of conditioning size two or more to the worker pool."""
-    from andrey.constraint import _parallel_skeleton
-
-    old = _parallel_skeleton.MIN_POOL_QUERIES
-    _parallel_skeleton.MIN_POOL_QUERIES = 0
-    try:
-        yield
-    finally:
-        _parallel_skeleton.MIN_POOL_QUERIES = old
-
-
-@contextmanager
 def _environ(name: str, value: str) -> Generator[None]:
     old = os.environ.get(name)
     os.environ[name] = value
@@ -702,7 +689,7 @@ def run(
                 with (
                     andrey.config(num_workers=workers),
                     _environ("ANDREY_GES_PARALLEL_MIN_WORK", "0"),
-                    _skeleton_pool_open(),
+                    _environ("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0"),
                 ):
                     refits.append((0, workers, out, fit.call(x)))
             base = rows[-1]
