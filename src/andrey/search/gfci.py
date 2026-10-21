@@ -37,7 +37,7 @@ from andrey.constraint.fci import (
     _validate_collider_rule,
     _validate_possible_dsep,
 )
-from andrey.core import ARROW, NULL, GraphStructure
+from andrey.core import ARROW, NULL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
 from andrey.core.orient import from_structure
 from andrey.search.ges import ges
@@ -59,6 +59,7 @@ def gfci(
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
+    workers: int | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
 
@@ -73,8 +74,12 @@ def gfci(
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
     joins a pair they make non-adjacent, so its colliders over that pair come from the pattern, and
     its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
+    ``workers`` worker processes share the GES passes and the adjacency search's larger
+    conditioning-size passes, each above its own work threshold; ``None`` reads
+    ``andrey.config.num_workers``.
     """
     X = np.asarray(data, dtype=np.float64)
+    workers = backend.worker_count(workers)
 
     _validate_collider_rule(collider_rule)
     _validate_possible_dsep(possible_dsep)
@@ -84,13 +89,14 @@ def gfci(
         lambda_value=lambda_value,
         categorical=categorical,
         constraints=constraints,
+        workers=workers,
     )
     pattern = from_structure(cpdag_structure)
 
     test = make_indep_test(indep_test, X, categorical=categorical)
     keep = None if constraints is None else constraints.required | constraints.required.T
     support, sepsets = _fast_adjacency_search(
-        X, test, alpha, support=pattern != NULL, keep=keep, max_depth=max_depth
+        X, test, alpha, workers=workers, support=pattern != NULL, keep=keep, max_depth=max_depth
     )
     sepsets.update(
         _derive_sepsets(pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order)
