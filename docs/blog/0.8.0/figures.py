@@ -47,9 +47,16 @@ PALETTE = Palette(
 )
 
 
+def listed(names: list[str]) -> str:
+    """Names joined as a sentence lists them: A, B, and C."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + f", and {names[-1]}"
+
+
 def p_text(p: float) -> str:
     """A p-value as the figures print it."""
-    return "p < 0.001" if p < 0.001 else f"p = {p:.2f}"
+    if p < 0.001:
+        return "p < 0.001"
+    return f"p = {p:.3f}" if p < 0.01 else f"p = {p:.2f}"
 
 
 def dependence_figure() -> str:
@@ -63,13 +70,15 @@ def dependence_figure() -> str:
         ("y = cos(x)", np.cos(x)),
         ("y = x²", x**2 / 3 - 1),
     )
-    tests = (("fisherz", "Partial correlation"), ("kci", "KCI"))
+    warnings.simplefilter("ignore", andrey.ExperimentalWarning)
+    tests = (("fisherz", "Partial correlation"), *TESTS.items())
     w, h, pad = 180, 110, 8
-    rows = []
+    rows, results = [], []
     for name, signal in shapes:
         y = signal + noise
         data = np.column_stack([x, y])
         found = {test: make_indep_test(test, data)(0, 1, ()) for test in dict(tests)}
+        results.append(found)
         sx = lambda v: pad + (v + 3) / 6 * (w - 2 * pad)  # noqa: E731
         lo, hi = float(y.min()), float(y.max())
         sy = lambda v: h - pad - (v - lo) / (hi - lo) * (h - 2 * pad)  # noqa: E731
@@ -79,7 +88,8 @@ def dependence_figure() -> str:
         )
         cells = "".join(
             f'<td class="{"dp-seen" if found[t] < 0.05 else "dp-missed"}">'
-            f"<b>{'Finds it' if found[t] < 0.05 else 'Misses it'}</b>"
+            f'<b aria-label="{"finds it" if found[t] < 0.05 else "misses it"}">'
+            f"{'✓' if found[t] < 0.05 else '✗'}</b>"
             f"<small>{escape(p_text(found[t]))}</small></td>"
             for t in dict(tests)
         )
@@ -89,12 +99,13 @@ def dependence_figure() -> str:
             f'<span class="dp-name">{escape(name)}</span></th>{cells}</tr>'
         )
     head = "".join(f'<th scope="col">{label}</th>' for _, label in tests)
+    every = [label for t, label in tests[1:] if all(r[t] < 0.05 for r in results)]
     return (
         '<figure class="dp"><table class="dp-table"><thead><tr><td></td>'
         f"{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
-        "<figcaption>Three ways y depends on x, each with the same noise. Partial correlation "
-        "measures only a straight-line trend, so it misses the cos and the square; KCI finds all "
-        "three.</figcaption></figure>\n"
+        "<figcaption>Three ways y depends on x, each with the same noise; ✓ finds the dependence "
+        "at alpha 0.05. Partial correlation measures only a straight-line trend, so it misses "
+        f"the cos and the square; {listed(every)} find all three.</figcaption></figure>\n"
     )
 
 
