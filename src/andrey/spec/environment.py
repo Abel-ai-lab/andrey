@@ -39,8 +39,10 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer >= -1 (-1 = all usable cores)",
         default="1",
         effect=(
-            "Worker processes for GES and GFCI (its GES phase), and worker threads for the "
+            "Worker processes for GES, GFCI (its GES phase), and the adjacency searches of PC, "
+            "FCI, GFCI, and CD-NOD with `fisherz` or `student_t`, and worker threads for the "
             "regressions of `granger` and the two directions of `pnl`; `0` or `1` runs serially. "
+            "The four constraint methods' `num_workers` argument overrides it for one call. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",

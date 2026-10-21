@@ -16,6 +16,7 @@ from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import partial
 from itertools import combinations, islice
+from math import comb
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -314,6 +315,18 @@ def scan_pairs(
         if found:
             removals.append((x, y, tuple(sorted(separating)), max(largest) if largest else None))
     return removals
+
+
+def pair_queries(neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
+    """The tests :func:`scan_pairs` runs on the adjacent pair ``(x, y)`` at conditioning ``size``.
+
+    It counts the size-``size`` subsets of either endpoint's other neighbors, a subset both offer
+    once.
+    """
+    shared = len(set(neighbors[x].tolist()) & set(neighbors[y].tolist()))
+    return (
+        comb(neighbors[x].size - 1, size) + comb(neighbors[y].size - 1, size) - comb(shared, size)
+    )
 
 
 def separate_apart(

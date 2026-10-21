@@ -119,13 +119,16 @@ large enough to repay the transfer; correlation matrices move too when you set
 ### Can it use more CPU cores?
 
 GES and GFCI (in its GES phase) can spread each pass over worker processes: set
-`ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one. A script that
-does this must put its entry point under `if __name__ == "__main__":`, because starting the workers
-re-imports the script; [Getting started](guides/getting-started.md#backends-and-parallelism) shows
-how. A pass uses the workers only above a work cutoff. GES's default suits one fit per process; for
-a process that runs many fits, `andrey calibrate` measures the cutoff on your machine and prints
-the setting. With the same setting, `granger` fits its variables on worker threads, which need no
-`__main__` guard, and returns the same coefficients.
+`ANDREY_NUM_WORKERS` above 1. GES's parallel result is identical to its serial one. PC, FCI, GFCI,
+and CD-NOD spread the larger passes of their adjacency search over worker processes with the
+`fisherz` and `student_t` tests, from the same setting or their `num_workers` argument, and return
+the same graph as with one worker. A script that does this must put its entry point under
+`if __name__ == "__main__":`, because starting the workers re-imports the script;
+[Getting started](guides/getting-started.md#backends-and-parallelism) shows how. A pass uses the
+workers only above a work cutoff. GES's default suits one fit per process; for a process that runs
+many fits, `andrey calibrate` measures the cutoff on your machine and prints the setting. With the
+same setting, `granger` fits its variables on worker threads, which need no `__main__` guard, and
+returns the same coefficients.
 
 ## Data
 
