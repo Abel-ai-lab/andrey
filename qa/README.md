@@ -10,7 +10,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | `reference_parity.py` | Fail a published row where Andrey makes more errors than the reference package. |
 | `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
 | `identity.py` | Hash every supported method's full output, to show a change returns the same bits. |
-| `profile.py` | Time one method's fit and show where it spends its time. |
+| `profiler.py` | Time one method's fit and show where it spends its time. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
 | `ci_calibration.py` | Measure how often each nonlinear CI test rejects, with and without a dependence. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
@@ -54,7 +54,7 @@ sets the draws per dataset.
 
 ## Profile
 
-A speed change starts from where a fit spends its time. `profile.py` fits one method on one draw
+A speed change starts from where a fit spends its time. `profiler.py` fits one method on one draw
 of one of its identity datasets, with the identity check's call, on the numpy backend with one
 worker and one BLAS thread. After the warm-up fits, it prints the fastest of the timed plain fits
 with the host: the CPU, the Python, NumPy, and SciPy versions, the loaded BLAS, and the thread
@@ -66,9 +66,9 @@ share of the corrected total, which sums to 1 over all functions, its cumulative
 functions it calls, and its call count, which repeats from fit to fit.
 
 ```shell
-uv run python -m qa.profile PC --list                  # the dataset keys PC runs on
-uv run python -m qa.profile PC linear_gauss_er_d20     # wall time and the top 25 functions
-uv run python -m qa.profile BOSS linear_gauss_er_d100 --seed 1 --rows 40 -o boss.json
+uv run python -m qa.profiler PC --list                 # the dataset keys PC runs on
+uv run python -m qa.profiler PC linear_gauss_er_d20    # wall time and the top 25 functions
+uv run python -m qa.profiler BOSS linear_gauss_er_d100 --seed 1 --rows 40 -o boss.json
 ```
 
 `--fits` and `--warmup` set the timed and warm-up fits (3 and 1). `-o` writes every function's
