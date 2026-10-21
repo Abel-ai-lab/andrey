@@ -2270,10 +2270,11 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 
 
 # ---- compared with other packages ------------------------------------------------------------
-# What Andrey guarantees, beside the most used packages. Checked against each package's released
-# code (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1), and
-# py-tetrad's development branch; the column-order row from the 0.7.0 post's measurements; the
-# published-speed row against each package's README, documentation, and release notes.
+# Andrey beside the most used packages. Each mark was read from the package's released code
+# (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1): a hook for a
+# user's own test or score earns no mark, and files only on a development branch count for
+# nothing. Permutation invariance comes from the 0.7.0 post's measurements, open benchmarks from
+# each package's README, documentation, and release notes.
 PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
 PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
@@ -2287,6 +2288,17 @@ SECTIONS = ("Causal methods", "Speed", "Agentic")
 # (section, attribute, one mark per package in PEERS order, a note for every "part" mark by
 # package). An attribute is a few words; its notes carry the detail.
 COMPARISON = (
+    ("Causal methods", "Temporal data", ("yes", "yes", "yes", "no", "no"), {}),
+    (
+        "Causal methods",
+        "Mixed data",
+        ("yes", "part", "yes", "no", "yes"),
+        {
+            "causal-learn": "No mixed-data test or score; only KCI and the generalized score "
+            "take category codes, and neither is built for them.",
+        },
+    ),
+    ("Causal methods", "Nonlinear data", ("yes", "yes", "yes", "no", "no"), {}),
     (
         "Speed",
         "CPU parallelization",
@@ -2315,13 +2327,17 @@ COMPARISON = (
     ),
     (
         "Agentic",
-        "Agent-native interface",
+        "JSON command line",
         ("yes", "no", "part", "no", "no"),
-        {
-            "Tetrad": "causal-cmd writes graphs as JSON, and py-tetrad's development branch adds "
-            "guides for coding agents; no method has a parameter schema.",
-        },
+        {"Tetrad": "causal-cmd writes the graph, and only the graph, to a JSON file."},
     ),
+    (
+        "Agentic",
+        "Schema for every method",
+        ("yes", "no", "part", "no", "no"),
+        {"Tetrad": "Typed parameter defaults and bounds, in an HTML manual."},
+    ),
+    ("Agentic", "Agent skill in the release", ("yes", "no", "no", "no", "no"), {}),
     (
         "Speed",
         "Open benchmarks",
