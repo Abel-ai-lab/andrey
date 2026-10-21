@@ -132,9 +132,10 @@ def test_counting_records_each_outermost_query_and_restores_the_methods(x: np.nd
         test(0, 2, (1,))
         test.batched_call(0, 2, iter([(), (1, 3)]))
         test.first_order_pvalues(0, 1, [2, 3])
+        test._canonical_pvalues(np.array([0, 2]), np.array([3, 3]), np.array([[1, 2], [0, 1]]))
     assert ci.PartialCorrelationTest.__dict__["batched_call"] is original
-    assert counts.summary()["ci_queries"] == 5
-    assert counts.summary()["ci_sets"] == {"0": 1, "1": 3, "2": 1}
+    assert counts.summary()["ci_queries"] == 7
+    assert counts.summary()["ci_sets"] == {"0": 1, "1": 3, "2": 3}
 
 
 def test_counting_wraps_every_name_of_the_score_delta_functions() -> None:

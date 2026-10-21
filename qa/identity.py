@@ -438,6 +438,7 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     ],
     "batched_call": lambda ps, test, x, y, sets: [(x, y, s, p) for s, p in zip(sets, ps)],
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    "_canonical_pvalues": lambda ps, test, xs, ys, sets: list(zip(xs, ys, sets, ps)),
     "marginal_pvalues": lambda ps, test: [
         (x, y, (), ps[x, y]) for x, y in zip(*np.triu_indices(len(ps), 1))
     ],

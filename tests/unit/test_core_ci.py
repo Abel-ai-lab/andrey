@@ -1,11 +1,12 @@
 """Fisher-Z and Student-t conditional-independence tests: equivalence, error, and known values.
 
 Covers the contract both tests share through :class:`PartialCorrelationTest`: exact agreement of
-the scalar, batched, many-query, all-pairs, and first-order paths, argument-order independence, no
-per-query state retained, and fail-fast error paths. :class:`FisherZ` adds an independently derived
-closed-form p-value for the empty conditioning set and a small inline baseline pinning current
-outputs. The numpy path is pinned as the exact float64 oracle. :class:`StudentT` reports the same
-partial correlation with a Student-t p-value, checked against a direct scipy computation.
+the scalar, batched, many-query, canonical, all-pairs, and first-order paths, argument-order
+independence, no per-query state retained, and fail-fast error paths. :class:`FisherZ` adds an
+independently derived closed-form p-value for the empty conditioning set and a small inline
+baseline pinning current outputs. The numpy path is pinned as the exact float64 oracle.
+:class:`StudentT` reports the same partial correlation with a Student-t p-value, checked against a
+direct scipy computation.
 """
 
 from __future__ import annotations
@@ -89,7 +90,8 @@ def test_prescreen_pvalues_match_canonical_scalar_exactly(test_class, seed):
 @pytest.mark.parametrize("seed", range(5))
 def test_many_query_path_matches_scalar_exactly(test_class, seed):
     # Each row has its own pair (in either order) and conditioning set (unsorted); the statistic
-    # and the p-value of row i equal the scalar answer for that row, bit for bit.
+    # and the p-value of row i equal the scalar answer for that row, bit for bit, and so does the
+    # canonical path's p-value given the row's pair ordered and its set sorted.
     data = np.random.default_rng(seed).standard_normal((120, 9))
     test = test_class(data)
     rng = np.random.default_rng(50 + seed)
@@ -102,9 +104,13 @@ def test_many_query_path_matches_scalar_exactly(test_class, seed):
         y = np.array([row[1] for row in rows])
         conditions = np.array([row[2] for row in rows], dtype=np.intp).reshape(len(rows), size)
         statistics, pvalues = test.statistic_pvalues(x, y, conditions)
+        canonical = test._canonical_pvalues(
+            np.minimum(x, y), np.maximum(x, y), np.sort(conditions, axis=1)
+        )
         scalar = [test.statistic_pvalue(*row) for row in rows]
         np.testing.assert_array_equal(statistics, [r for r, _ in scalar])
         np.testing.assert_array_equal(pvalues, [p for _, p in scalar])
+        np.testing.assert_array_equal(canonical, [p for _, p in scalar])
 
 
 @pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
