@@ -917,19 +917,12 @@ def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
         assert len(feature.split()) <= 6, feature
         assert len(marks) == len(build.PEERS) and set(marks) <= build.MARKS.keys(), feature
     assert len(re.findall(r'<th scope="col"[ >]', table)) == len(build.PEERS)
-    # The methods count sits on the same tile, with the way to every method.
     tiles = build.coverage_tiles([SUMMARY], "")
-    # The measured rows: Andrey at 1x and each package's time against it, and the most variables
-    # each fit within the budget.
-    rows = {
-        label: values for _, label, values in build.measured_rows(build.release_summaries(SUMMARY))
-    }
-    # Time grows as a power of the variables, each package's exponent from enough sizes.
-    assert all(v is None or v.startswith("V<sup>") for v in rows["Time grows with variables as"])
-    times = rows["Fit time (Andrey = 1x)"]
-    assert times[0] == "1x" and all(t is None or t.endswith("x") for t in times)
-    fits = rows[f"Variables fit in {build.FIT_BUDGET_S} s"]
-    assert int(fits[0].replace(",", "")) >= max(int(f.replace(",", "")) for f in fits if f)
+    # Only coverage is counted; speed has no pooled number, which would mix different methods.
+    rows = build.measured_rows(build.release_summaries(SUMMARY))
+    assert [(section, label) for section, label, _ in rows] == [("Coverage", "Distinct methods")]
+    # A partial mark has its own symbol, a half-filled circle.
+    assert build.MARKS["part"][0] == "half" and "half" in build.ICON
     assert "Compared with other packages" in tiles and "bento-note" not in tiles
 
 

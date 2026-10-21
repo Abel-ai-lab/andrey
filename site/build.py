@@ -1496,6 +1496,7 @@ ICON = {
     "target": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/>'
     '<circle cx="12" cy="12" r="2"/>',
     "minus": '<line x1="5" y1="12" x2="19" y2="12"/>',
+    "half": '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>',
     "x": '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
 }
 # The documentation pages a first visit wants, in the order the band lists them.
@@ -2280,17 +2281,17 @@ PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
 MARKS = {
     "yes": ("check", "Yes", "\u2713"),
-    "part": ("minus", "Partly", "\u25d0"),
+    "part": ("half", "Partly", "\u25d0"),
     "no": ("x", "No", "\u2717"),
 }
 # The table's sections, in order, each its measured rows (``measured_rows``) then its marks.
-SECTIONS = ("Causal methods", "Speed", "Agentic")
+SECTIONS = ("Coverage", "Speed", "Agentic")
 # (section, attribute, one mark per package in PEERS order, a note for every "part" mark by
 # package). An attribute is a few words; its notes carry the detail.
 COMPARISON = (
-    ("Causal methods", "Temporal data", ("yes", "yes", "yes", "no", "no"), {}),
+    ("Coverage", "Temporal data", ("yes", "yes", "yes", "no", "no"), {}),
     (
-        "Causal methods",
+        "Coverage",
         "Mixed data",
         ("yes", "part", "yes", "no", "yes"),
         {
@@ -2298,7 +2299,7 @@ COMPARISON = (
             "take category codes, and neither is built for them.",
         },
     ),
-    ("Causal methods", "Nonlinear data", ("yes", "yes", "yes", "no", "no"), {}),
+    ("Coverage", "Nonlinear data", ("yes", "yes", "yes", "no", "no"), {}),
     (
         "Speed",
         "CPU parallelization",
@@ -2317,7 +2318,7 @@ COMPARISON = (
         {"causal-learn": "CALM only."},
     ),
     (
-        "Causal methods",
+        "Coverage",
         "Permutation invariance",
         ("yes", "no", "part", "no", "no"),
         {
@@ -2337,7 +2338,12 @@ COMPARISON = (
         ("yes", "no", "part", "no", "no"),
         {"Tetrad": "Typed parameter defaults and bounds, in an HTML manual."},
     ),
-    ("Agentic", "Agent skill in the release", ("yes", "no", "no", "no", "no"), {}),
+    (
+        "Agentic",
+        "Agent skill",
+        ("yes", "no", "part", "no", "no"),
+        {"Tetrad": "py-tetrad's development branch has a skill and guides; no release has them."},
+    ),
     (
         "Speed",
         "Open benchmarks",
@@ -2345,11 +2351,6 @@ COMPARISON = (
         {},
     ),
 )
-# The table's measured rows, from every release's published benchmarks, over the comparisons in
-# variables: each package's fit time against Andrey's, the geometric mean over its comparisons of
-# the ratio at the largest size both finished; and the most variables each fit within
-# FIT_BUDGET_S seconds in any comparison.
-FIT_BUDGET_S = 1
 # Distinct methods per package, each a published algorithm that returns a whole graph, counted
 # once: a variant chosen by an argument, a multi-dataset or instance-specific version, another
 # score or test in the same search, a wrapper, and a search that only orients a given graph count
@@ -2358,57 +2359,11 @@ FIT_BUDGET_S = 1
 METHOD_COUNTS = {"Andrey": 25, "causal-learn": 21, "Tetrad": 21, "pcalg": 8, "bnlearn": 10}
 
 
-def scaling(rows: list[tuple[int, float]]) -> float:
-    """The exponent k of time against size, time ~ size^k: the least-squares slope on log scales."""
-    xs = [math.log(d) for d, _ in rows]
-    ys = [math.log(t) for _, t in rows]
-    mx, my = statistics.fmean(xs), statistics.fmean(ys)
-    return sum((a - mx) * (b - my) for a, b in zip(xs, ys, strict=True)) / sum(
-        (a - mx) ** 2 for a in xs
-    )
-
-
-# A comparison gives a scaling exponent from this many sizes up: below it, a fit's fixed cost
-# hides how time grows.
-SCALING_MIN_SIZES = 4
-
-
 def measured_rows(summaries: list[dict]) -> list[tuple[str, str, list[str | None]]]:
-    """The measured rows, (section, label, an HTML value per package in PEERS order, None where
-    a package has none). Each package's scaling exponent is the median over its comparisons with
-    SCALING_MIN_SIZES sizes or more, Andrey's over all of those comparisons."""
-    slopes: dict[str, list[float]] = {p: [] for p in PEERS}
-    logs: dict[str, list[float]] = {p: [] for p in PEERS[1:]}
-    most = {p: 0 for p in PEERS}
-    for m in supported(summaries):
-        package = m["comparator"]
-        if m["unit"] != "variables" or package not in logs:
-            continue
-        paired = [r for r in m["rows"] if r["andrey_s"] and r["comparator_s"]]
-        if len(paired) >= SCALING_MIN_SIZES:
-            slopes["Andrey"].append(scaling([(r["d"], r["andrey_s"]) for r in paired]))
-            slopes[package].append(scaling([(r["d"], r["comparator_s"]) for r in paired]))
-        if paired:
-            top = max(paired, key=lambda r: r["d"])
-            logs[package].append(math.log(top["comparator_s"] / top["andrey_s"]))
-        for r in m["rows"]:
-            if r["andrey_s"] is not None and r["andrey_s"] <= FIT_BUDGET_S:
-                most["Andrey"] = max(most["Andrey"], r["d"])
-            if r["comparator_s"] is not None and r["comparator_s"] <= FIT_BUDGET_S:
-                most[package] = max(most[package], r["d"])
-    times = ["1x"] + [
-        ratio_text(math.exp(statistics.fmean(logs[p]))) if logs[p] else None for p in PEERS[1:]
-    ]
-    grows = [
-        f"V<sup>{statistics.median(slopes[p]):.1f}</sup>" if slopes[p] else None for p in PEERS
-    ]
-    fits = [f"{most[p]:,}" if most[p] else None for p in PEERS]
-    return [
-        ("Causal methods", "Distinct methods", [str(METHOD_COUNTS[p]) for p in PEERS]),
-        ("Speed", "Fit time (Andrey = 1x)", times),
-        ("Speed", "Time grows with variables as", grows),
-        ("Speed", f"Variables fit in {FIT_BUDGET_S} s", fits),
-    ]
+    """The measured rows, (section, label, a value per package in PEERS order). Speed has none:
+    a number pooled over different methods says little, so the speed figures carry it, each
+    method beside its packages."""
+    return [("Coverage", "Distinct methods", [str(METHOD_COUNTS[p]) for p in PEERS])]
 
 
 def comparison_notes() -> list[tuple[str, str, str, str]]:
@@ -2485,7 +2440,7 @@ def comparison_table(summaries: list[dict]) -> str:
 
 def comparison_source() -> str:
     """What the table's marks were read from."""
-    return f"Speed from our open benchmarks; the rest from each package's code: {PEER_VERSIONS}."
+    return f"Read from each package's released code: {PEER_VERSIONS}."
 
 
 # The docs' code colors (pydata-sphinx-theme's defaults), so code reads the same on every page.
