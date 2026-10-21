@@ -1,18 +1,18 @@
 """Batched conditional-independence scanning for the PC and FCI skeleton searches.
 
 :func:`scan_conditioning_sets` tests one adjacent pair against every size-``k`` subset of a
-candidate neighborhood. It uses the test's vectorized ``batched_call`` when there is one (one
-stacked ``np.linalg.inv`` per chunk for the partial-correlation tests, one count of every chunk's
-contingency tables for the chi-square tests) in place of thousands of scalar calls, and the scalar
-loop otherwise, so a test that implements only :class:`~andrey.core.ci.CITest` still works. Every
-shipped ``batched_call`` returns the scalar p-values exactly, so the skeleton is the same either
-way. Subsets are consumed in fixed-size chunks, so the scan holds
-one chunk in memory however many subsets it visits.
+candidate neighborhood. It uses the test's vectorized path when there is one (one stacked
+``np.linalg.inv`` per chunk for the partial-correlation tests, its subsets canonical as built; one
+count of every chunk's contingency tables for the chi-square tests) in place of thousands of scalar
+calls, and the scalar loop otherwise, so a test that implements only
+:class:`~andrey.core.ci.CITest` still works. Every shipped vectorized path returns the scalar
+p-values exactly, so the skeleton is the same either way. Subsets are consumed in fixed-size
+chunks, so the scan holds one chunk in memory however many subsets it visits.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import nullcontext
 from functools import partial
 from itertools import combinations, islice
@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.core import backend
-from andrey.core.ci import CITest, pins_blas
+from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -61,12 +61,15 @@ def scan_conditioning_sets(
     the candidates the pair's other endpoint already scanned at this size, so each shared subset is
     evaluated once per pair. Skipping a repeat changes neither the union nor the return value.
 
-    When ``test`` exposes ``batched_call(a, b, condition_sets)`` the subsets are evaluated in
-    vectorized, size-bounded chunks; otherwise each is tested with a scalar ``test(a, b, subset)``
-    call, or ``test._bounded_pvalue(a, b, subset, alpha, exact_above)`` where the test has one,
-    with ``exact_above`` true when ``largest`` is given. All paths visit
-    the same subsets in the same order and take the same ``p > alpha`` decisions, so the
-    accumulated ``separating``, the largest p-value, and the return value are identical.
+    ``candidates`` are ascending and exclude ``a`` and ``b``, so every subset is a sorted, distinct
+    conditioning set. A FisherZ or StudentT test evaluates the subsets in size-bounded chunks of
+    canonical query arrays (``_canonical_pvalues``), with no re-sorting. Another test that exposes
+    ``batched_call(a, b, condition_sets)`` evaluates the same chunks through it; otherwise each
+    subset is tested with a scalar ``test(a, b, subset)`` call, or
+    ``test._bounded_pvalue(a, b, subset, alpha, exact_above)`` where the test has one, with
+    ``exact_above`` true when ``largest`` is given. All paths visit the same subsets in the same
+    order and take the same ``p > alpha`` decisions, so the accumulated ``separating``, the largest
+    p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
     runs once per chunk.
@@ -80,9 +83,13 @@ def scan_conditioning_sets(
     scalar = (
         test if bounded is None else partial(bounded, alpha=alpha, exact_above=largest is not None)
     )
-    batched = getattr(test, "batched_call", None) or (
-        lambda a, b, chunk: [scalar(a, b, subset) for subset in chunk]
-    )
+    canonical = _canonical_pvalues(test)
+    if canonical is not None:
+        batched = partial(_canonical_chunk, canonical, size)
+    else:
+        batched = getattr(test, "batched_call", None) or (
+            lambda a, b, chunk: [scalar(a, b, subset) for subset in chunk]
+        )
     found = False
     top = 0.0
     while True:
@@ -101,6 +108,28 @@ def scan_conditioning_sets(
     if found and largest is not None:
         largest.append(top)
     return found
+
+
+def _canonical_pvalues(test: CITest) -> Callable[..., np.ndarray] | None:
+    """The p-values of canonical query arrays for a FisherZ or StudentT test, else ``None``.
+
+    A subclass or a wrapper of either test keeps the ``batched_call`` and ``first_order_pvalues``
+    it may override.
+    """
+    if type(test) in (FisherZ, StudentT):
+        return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
+    return None
+
+
+def _canonical_chunk(
+    pvalues: Callable[..., np.ndarray], size: int, a: int, b: int, chunk: list[tuple[int, ...]]
+) -> np.ndarray:
+    """``pvalues`` of the pair ``(a, b)`` given each subset of ``chunk``: ``size`` members, sorted
+    and distinct, as the subsets of ascending candidates are."""
+    n = len(chunk)
+    x = np.full(n, min(a, b), dtype=np.intp)
+    y = np.full(n, max(a, b), dtype=np.intp)
+    return pvalues(x, y, np.array(chunk, dtype=np.intp).reshape(n, size))
 
 
 def record_tests(
