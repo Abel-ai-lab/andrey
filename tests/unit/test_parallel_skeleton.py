@@ -170,8 +170,11 @@ def test_the_environment_sets_the_workers(
     assert _same_output(pooled, serial)
 
 
-def test_a_pass_above_the_gate_runs_on_the_pool(pools: list[int]) -> None:
-    # Dense enough that the size-2 pass holds more tests than the gate; capped there.
+def test_a_pass_above_the_gate_runs_on_the_pool(
+    pools: list[int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Dense enough that the size-2 pass holds more than 10,000 tests; capped there.
+    monkeypatch.setattr(_parallel_skeleton, "MIN_POOL_QUERIES", 10_000)
     x = _gaussian_dag(4, 800, 40, 0.3)
     serial = andrey.pc(x, max_depth=2)
     with andrey.config(num_workers=2):
