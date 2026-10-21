@@ -6,8 +6,9 @@ independent.
 
 - :func:`hsic_test` z-scores each variable (``ddof=1``; a constant column becomes zero) and sets
   the bandwidth by the empirical rule, or by the median heuristic on request.
-  :func:`hsic_statistic_test`, used by ANM and PNL, runs the same test and returns the statistic,
-  divided by its mean under independence, with the p-value.
+  :func:`hsic_statistic_test`, used by ANM, runs the same test and returns the statistic, divided
+  by its mean under independence, with the p-value. PNL computes the same numbers from kernels it
+  shares across pairs.
 - :func:`hsic_gamma_test`, used by RCD and ParceLiNGAM, sets the bandwidth by the median distance
   over the first rows without z-scoring, corrects the variance for bias, and returns the statistic
   with the p-value.

@@ -70,6 +70,9 @@ change names its pull request.
   finds one. ([#207])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
   same graphs and p-values in less time, because each test answers many queries at once. ([#208])
+- `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
+  built once and in blocks, and its HSIC tests run on a CUDA GPU, in float64, from the cutoff
+  `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
 
 ### Fixed
 
@@ -495,4 +498,5 @@ First alpha release.
 [#237]: https://github.com/Abel-ai-lab/andrey/pull/237
 [#239]: https://github.com/Abel-ai-lab/andrey/pull/239
 [#248]: https://github.com/Abel-ai-lab/andrey/pull/248
+[#251]: https://github.com/Abel-ai-lab/andrey/pull/251
 [#261]: https://github.com/Abel-ai-lab/andrey/pull/261
