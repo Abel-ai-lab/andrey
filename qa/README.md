@@ -59,15 +59,15 @@ workflow; `tests/unit/test_release_gates.py` fails otherwise. Other pull request
 gate. It checks PC, FCI, GFCI, CD-NOD, GES, GIES, XGES, HC, Tabu, exact search, CALM, BOSS, GRaSP,
 DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI,
 PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and Granger on the datasets whose assumptions each
-method needs, and PC with each supported nonlinear conditional-independence test, KCI, CMIknn, and
-GPDC, on nonlinear data:
+method needs, and PC with each supported nonlinear conditional-independence test, KCI, RCoT,
+CMIknn, and GPDC, on nonlinear data:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, GES, XGES, HC, Tabu, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
-| `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with CMIknn and GPDC at `d = 5` |
+| `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
@@ -97,8 +97,8 @@ GPDC, on nonlinear data:
   parents, and `nonmonotone_er` of `cos(z)`, where a child is uncorrelated with its parent, so
   partial correlation misses the edge; both have Gaussian noise. PC with a nonlinear test costs far
   more per test, so they run at `d = 5` and `10`, `n = 50d`, and CMIknn and GPDC, at over half a
-  minute per fit from `d = 10` on one core, at `d = 5` only. A test keeps both in step with the
-  benchmark harness.
+  minute per fit from `d = 10` on one core, at `d = 5` only. RCoT warns under 500 rows, so it runs
+  at `d = 10` only. A test keeps both in step with the benchmark harness.
 - **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
   each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
   they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.

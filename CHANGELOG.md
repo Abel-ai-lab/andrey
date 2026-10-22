@@ -70,10 +70,10 @@ change names its pull request.
   finds one. ([#207])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
   same graphs and p-values in less time, because each test answers many queries at once. ([#208])
-- `indep_test="kci"`, `"cmiknn"`, and `"gpdc"` are supported: on nonlinear data each makes fewer
-  errors on average than its reference package, causal-learn for KCI and tigramite for CMIknn and
-  GPDC, they have checks in the release quality gate, and they no longer warn with
-  `ExperimentalWarning`. `"rcot"` stays experimental. ([#299])
+- `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` are supported: on nonlinear data each
+  makes fewer errors on average than its reference packages, causal-learn for KCI, causal-learn and
+  pcalg for RCoT, and tigramite for CMIknn and GPDC, they have checks in the release quality gate,
+  and they no longer warn with `ExperimentalWarning`. ([#299])
 
 ### Fixed
 

@@ -70,10 +70,9 @@ def pc(
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
         mixed data, continuous and categorical columns, by a likelihood ratio. Four more tests
         detect nonlinear dependence in continuous data, at a far higher cost per test: ``"kci"`` is
-        the kernel test; ``"rcot"`` its random-feature approximation, which is experimental and
-        warns on its first use in a process; ``"cmiknn"`` a nearest-neighbor conditional mutual
-        information test; and ``"gpdc"`` Gaussian-process regression with a distance correlation
-        test. See Notes.
+        the kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a
+        nearest-neighbor conditional mutual information test; and ``"gpdc"`` Gaussian-process
+        regression with a distance correlation test. See Notes.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
@@ -155,7 +154,7 @@ def pc(
     assumes continuous data, where each variable depends linearly on its causes with roughly
     Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, for mixed data
     ``"degen_gauss"`` or ``"cond_gauss"``, and for nonlinear effects in continuous data ``"kci"``,
-    ``"cmiknn"``, ``"gpdc"``, or the experimental ``"rcot"``, at a far higher cost per test.
+    ``"rcot"``, ``"cmiknn"``, or ``"gpdc"``, at a far higher cost per test.
     It is fastest on sparse graphs, where every variable has few neighbors [5]_.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
@@ -349,10 +348,9 @@ def fci(
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
         mixed data, continuous and categorical columns. Four more tests detect nonlinear
         dependence in continuous data, at a far higher cost per test: ``"kci"`` is the kernel
-        test; ``"rcot"`` its random-feature approximation, which is experimental and warns on its
-        first use in a process; ``"cmiknn"`` a nearest-neighbor conditional mutual information
-        test; and ``"gpdc"`` Gaussian-process regression with a distance correlation test. See
-        Notes.
+        test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
+        conditional mutual information test; and ``"gpdc"`` Gaussian-process regression with a
+        distance correlation test. See Notes.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -603,9 +601,8 @@ def gfci(
         ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
         (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
         coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data.
-        ``"kci"``, ``"cmiknn"``, ``"gpdc"``, and the experimental ``"rcot"`` also detect nonlinear
-        dependence in continuous data, at a far higher cost per test. Each as for
-        :func:`~andrey.pc`.
+        ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in
+        continuous data, at a far higher cost per test. Each as for :func:`~andrey.pc`.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
@@ -829,10 +826,9 @@ def cdnod(
         Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
         test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
         ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
-        and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"cmiknn"``,
-        ``"gpdc"``, and the experimental ``"rcot"`` also detect nonlinear dependence in continuous
-        data, at a far higher cost per test. Each as for :func:`~andrey.pc`; see Notes for the
-        index.
+        and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
+        and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
+        test. Each as for :func:`~andrey.pc`; see Notes for the index.
     collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on

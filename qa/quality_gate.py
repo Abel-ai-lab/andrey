@@ -102,7 +102,8 @@ HIDDEN: dict[str, int] = {"latent_gauss_er": 10, "latent_lingam_er": 5}
 SIZES: tuple[tuple[int, int], ...] = ((20, 1000), (50, 2500))
 #: The nonlinear regimes run at ``n = 50d`` on fewer variables: PC with a nonlinear test costs far
 #: more per test, and at ``d = 10`` one fit takes 30 to 50 seconds with GPDC and over three minutes
-#: with CMIknn on one core, so those two run on the smaller size only.
+#: with CMIknn on one core, so those two run on the smaller size only. RCoT warns with
+#: ``SampleSizeWarning`` under 500 rows, so it runs on the larger size only.
 NONLINEAR_SIZES: tuple[tuple[int, int], ...] = ((5, 250), (10, 500))
 #: ``latent_lingam_er`` keeps its benchmark's 2,000 rows; ``d`` counts the hidden nodes. At
 #: ``d = 20`` BottomUpParceLiNGAM's median SHD is no lower than the empty graph's (37.5 and 36 over
@@ -521,8 +522,10 @@ SUPPORTED: dict[str, Method] = {
 NONLINEAR_REGIMES = ("anm_er", "nonmonotone_er")
 NONLINEAR_DATA = tuple(ds for regime in NONLINEAR_REGIMES for ds in _sizes(regime))
 SMALL_NONLINEAR_DATA = tuple(_sizes(regime)[0] for regime in NONLINEAR_REGIMES)
+LARGE_NONLINEAR_DATA = tuple(_sizes(regime)[1] for regime in NONLINEAR_REGIMES)
 SUPPORTED_TESTS: dict[str, Method] = {
     "KCI": Method(lambda x: andrey.pc(x, indep_test="kci"), "cpdag", NONLINEAR_DATA),
+    "RCoT": Method(lambda x: andrey.pc(x, indep_test="rcot"), "cpdag", LARGE_NONLINEAR_DATA),
     "CMIknn": Method(lambda x: andrey.pc(x, indep_test="cmiknn"), "cpdag", SMALL_NONLINEAR_DATA),
     "GPDC": Method(lambda x: andrey.pc(x, indep_test="gpdc"), "cpdag", SMALL_NONLINEAR_DATA),
 }
