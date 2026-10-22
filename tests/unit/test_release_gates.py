@@ -460,12 +460,115 @@ def test_parity_judges_a_method_by_its_newest_summary(tmp_path):
     assert reference_parity.check(rows, [])[0] == []
 
 
-def _column_row(andrey: list, reference: list, **changes) -> dict:
-    """A row of an order-dependent reference whose order-free default passes: Andrey ahead on 2."""
+def _paired_row(interval: list, **changes) -> dict:
+    """A row of a ``paired bootstrap`` summary: 20 paired datasets, the reference fewer on 6."""
     row = {
         "d": 10,
-        "andrey_fewer_errors": 2,
-        "comparator_fewer_errors": 0,
+        "paired": 20,
+        "andrey_fewer_errors": 1,
+        "comparator_fewer_errors": 6,
+        "andrey_shd_mean": 2.5,
+        "comparator_shd_mean": 2.0,
+        "mean_D": 0.5,
+        "bootstrap_95": interval,
+        "above_zero": interval[0] > 0,
+    }
+    return {**row, **changes}
+
+
+def _paired(*rows: dict) -> list:
+    from qa import reference_parity
+
+    summary = {**_summary(*rows), "parity_rule": reference_parity.PAIRED_BOOTSTRAP}
+    return reference_parity.paired_rows("s", summary)
+
+
+def _paired_failures(*rows: dict) -> list[str]:
+    from qa import reference_parity
+
+    return reference_parity.check(_paired(*rows), [])[0]
+
+
+def test_parity_fails_a_paired_row_whose_interval_lies_above_zero():
+    [failure] = _paired_failures(_paired_row([0.05, 0.95]))
+    assert "mean D +0.50" in failure and "[+0.05, +0.95]" in failure and "20 paired" in failure
+
+
+def test_parity_passes_a_near_tie_that_the_count_rule_would_fail():
+    # The reference has fewer errors on 6 datasets and Andrey on 1, but the interval reaches 0.
+    assert _failures(_paired_row([-0.05, 1.05])) != []
+    assert _paired_failures(_paired_row([-0.05, 1.05])) == []
+    assert _paired_failures(_paired_row([0.0, 1.05])) == []
+
+
+def test_parity_reports_a_row_under_ten_pairs_without_gating_it():
+    from qa import reference_parity
+
+    # Five pairs, the reference fewer on 2 and Andrey on 0, and no interval: reported, not judged.
+    row = {"d": 10, "paired": 5, "andrey_fewer_errors": 0, "comparator_fewer_errors": 2}
+    [parsed] = _paired(row)
+    assert parsed.reported and not parsed.failed
+    assert "reported, not gated" in parsed.numbers()
+    assert _paired_failures(row) == []
+    # A row with no paired dataset has no result and is skipped.
+    assert _paired({**row, "paired": 0}) == []
+    rows = (_paired_row([0.05, 0.95], paired=reference_parity.MIN_PAIRS - 1),)
+    assert _paired_failures(*rows) == []
+
+
+def test_parity_judges_a_randomized_test_by_its_draws():
+    multi = {
+        "draws": 4,
+        "paired": 20,
+        "andrey_shd_mean": 1.0,
+        "comparator_shd_mean": 1.2,
+        "mean_D": -0.2,
+        "bootstrap_95": [-0.5, 0.1],
+        "above_zero": False,
+    }
+    # One draw: the interval lies above 0; four draws per dataset: it reaches below 0.
+    row = _paired_row([0.05, 0.95], multi_draw=multi)
+    [parsed] = _paired(row)
+    assert (parsed.draws, parsed.mean_d, parsed.interval) == (4, -0.2, (-0.5, 0.1))
+    assert _paired_failures(row) == []
+    above = {**multi, "bootstrap_95": [0.1, 0.4], "above_zero": True}
+    [failure] = _paired_failures(_paired_row([-0.5, 0.95], multi_draw=above))
+    assert "the mean of 4 draws each" in failure
+
+
+def test_parity_keeps_the_count_rule_for_a_summary_without_a_parity_rule():
+    # The same row: the interval reaches 0, but the reference has fewer errors on more datasets.
+    row = _paired_row([-0.05, 1.05])
+    assert _paired_failures(row) == []
+    [failure] = _failures(row)
+    assert "fewer errors on 6 series, Andrey on 1" in failure
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        {k: v for k, v in _paired_row([0.05, 0.95]).items() if k != "bootstrap_95"},
+        _paired_row([0.05, 0.95], above_zero=False),
+        {k: v for k, v in _paired_row([0.05, 0.95]).items() if k != "paired"},
+        _paired_row([-0.5, 0.95], multi_draw={"draws": 4, "paired": 20, "mean_D": 0.1}),
+    ],
+)
+def test_parity_rejects_a_paired_row_it_cannot_judge(row):
+    with pytest.raises(ValueError):
+        _paired(row)
+
+
+def test_parity_rejects_an_unknown_parity_rule():
+    from qa import reference_parity
+
+    with pytest.raises(ValueError):
+        reference_parity.paired_rows("s", {**_summary(), "parity_rule": "bootstrap"})
+
+
+def _column_row(andrey: list, reference: list, **changes) -> dict:
+    """A paired row whose interval reaches 0, with Andrey's column-order mode beside it."""
+    row = {
+        **_paired_row([-0.05, 1.05]),
         "reference_order_dependent": True,
         "andrey_column_shd_by_seed": andrey,
         "comparator_shd_by_seed": reference,
@@ -473,29 +576,15 @@ def _column_row(andrey: list, reference: list, **changes) -> dict:
     return {**row, **changes}
 
 
-def test_parity_judges_an_order_dependent_reference_by_andrey_in_column_order():
-    from qa import reference_parity
-
+def test_parity_prints_the_column_order_arm_as_context_only():
     # Column order: the reference has fewer errors on seeds 0 and 2, Andrey on seed 3; seed 4 has no
     # result on one side and is not a series.
     row = _column_row([3, 1, 2, 0, None], [2, 1, 1, 1, 5])
-    [parsed] = reference_parity.paired_rows("s", _summary(row))
-    assert (parsed.rule, parsed.andrey, parsed.reference, parsed.default) == (
-        "column-order series",
-        2,
-        1,
-        (0, 2),
-    )
-    [failure] = _failures(row)
-    assert "column-order mode" in failure and "order-free default (not judged)" in failure
-    # A default that fails is not judged when the column-order arm passes.
-    assert _failures(_column_row([1, 1], [2, 1], comparator_fewer_errors=5)) == []
-
-
-def test_parity_judges_an_order_dependent_reference_without_the_arm_by_the_default():
-    row = {"d": 10, "andrey_fewer_errors": 0, "comparator_fewer_errors": 1}
-    assert len(_failures({**row, "reference_order_dependent": True})) == 1
-    assert _failures({**row, "andrey_fewer_errors": 1, "reference_order_dependent": True}) == []
+    [parsed] = _paired(row)
+    assert parsed.column == (2, 1) and not parsed.failed
+    [failure] = _paired_failures({**row, "bootstrap_95": [0.05, 0.95], "above_zero": True})
+    assert "column-order mode (context, not judged)" in failure
+    assert "fewer errors on 2 series, Andrey on 1" in failure
 
 
 @pytest.mark.parametrize(
@@ -507,26 +596,9 @@ def test_parity_judges_an_order_dependent_reference_without_the_arm_by_the_defau
         _column_row([1, 2], [1]),
     ],
 )
-def test_parity_rejects_a_column_order_arm_it_cannot_judge(row):
-    from qa import reference_parity
-
+def test_parity_rejects_a_malformed_column_order_arm(row):
     with pytest.raises(ValueError):
-        reference_parity.paired_rows("s", _summary(row))
-
-
-def test_parity_pins_the_column_order_comparison_of_an_allowlisted_row():
-    row = _column_row([3, 1, 2], [2, 1, 1])  # the reference has fewer errors on 2 series, Andrey 0
-    reversed_order = {"column_order": "reversed", "andrey_errors": 0, "comparator_errors": 1}
-    entry = _entry(
-        row={"d": 10},
-        cause="order-dependent-reference",
-        andrey_errors=2,
-        comparator_errors=0,
-        evidence=reversed_order,
-    )
-    assert _failures(row, allowlist=(entry,)) == []
-    # The order-free default's counts (Andrey ahead on 2) are not what the entry pins.
-    assert len(_failures(row, allowlist=({**entry, "andrey_errors": 0, "comparator_errors": 2},)))
+        _paired(row)
 
 
 def test_parity_keys_a_row_by_regime_when_a_method_has_one_entry_per_regime():
@@ -544,7 +616,7 @@ def test_parity_keys_a_row_by_regime_when_a_method_has_one_entry_per_regime():
         {"regime": "additive", "d": 10, "n": 500},
         {"regime": "nonmonotone", "d": 10, "n": 500},
     ]
-    entry = _entry(row={"regime": "additive", "d": 10, "n": 500}, cause="experimental-test")
+    entry = _entry(row={"regime": "additive", "d": 10, "n": 500})
     failures = reference_parity.check(
         rows, [{**entry, "andrey_errors": 1, "comparator_errors": 0}]
     )[0]
@@ -553,34 +625,3 @@ def test_parity_keys_a_row_by_regime_when_a_method_has_one_entry_per_regime():
         del method["regime"]
     with pytest.raises(ValueError):
         reference_parity.paired_rows("s", summary)
-
-
-def test_parity_allowlist_checks_the_evidence_of_each_cause():
-    row = {"d": 50, "andrey_fewer_errors": 0, "comparator_fewer_errors": 3}
-
-    def entry(cause, evidence=None):
-        return _entry(cause=cause, andrey_errors=3, comparator_errors=0, evidence=evidence)
-
-    draws = {"draws": [{"seed": 1, "andrey_errors": 1, "comparator_errors": 3}] * 2}
-    reversed_order = {"column_order": "reversed", "andrey_errors": 4, "comparator_errors": 12}
-    accepted = (
-        entry("experimental-test"),
-        entry("random-draw", draws),
-        entry("order-dependent-reference", reversed_order),
-    )
-    for good in accepted:
-        assert _failures(row, allowlist=(good,)) == [], good
-    one_draw = {"draws": draws["draws"][:1]}
-    failing_draw = {
-        "draws": [*draws["draws"], {"seed": 3, "andrey_errors": 2, "comparator_errors": 1}]
-    }
-    rejected = (
-        entry("random-draw"),
-        entry("random-draw", one_draw),
-        entry("random-draw", failing_draw),
-        entry("order-dependent-reference"),
-        entry("order-dependent-reference", {**reversed_order, "andrey_errors": 13}),
-    )
-    for bad in rejected:
-        failures = _failures(row, allowlist=(bad,))
-        assert len(failures) == 1 and "allowlist entry rejected" in failures[0], bad

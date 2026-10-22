@@ -219,9 +219,9 @@ tolerance of the recorded baseline in either direction. The gate runs once per r
 release pull request into `main`, which `main` requires to pass; the publish reuses that run when
 the tagged commit has the same tree and runs the gate itself otherwise.
 [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. The gate also fails
-any published benchmark row where the reference package has fewer errors than
-Andrey (in Andrey's column-order mode, where the reference depends on the column order), unless
-`benchmarks/published/parity-allowlist.json` cites the cause
+any published benchmark row where Andrey makes more errors than the reference package (from
+0.8.0, when the paired bootstrap 95% interval of the difference over at least 10 datasets lies
+above 0), unless `benchmarks/published/parity-allowlist.json` cites the cause
 ([reference parity](qa/README.md#reference-parity)).
 
 ### 5. Benchmark campaign

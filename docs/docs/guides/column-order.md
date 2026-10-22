@@ -147,7 +147,7 @@ The methods in the "No" rows have no rank to replace, and the setting does not c
 ## Comparisons with other packages
 
 At the settings the benchmarks use, causal-learn's PC, FCI, BOSS, and GRaSP, pcalg's PC, and
-tigramite's PC give results that depend on the column order. Where a benchmark also runs Andrey in
-its column-order mode on the same datasets, such a package is compared with that mode, like with
-like: for `pc` and `fci`, the search steps that `tie_break="position"` puts in column order. The
-benchmark tables lead with the order-free default.
+tigramite's PC give results that depend on the column order. The benchmark tables compare such a
+package with Andrey's order-free default. Where a benchmark also runs Andrey in its column-order
+mode on the same datasets (for `pc` and `fci`, the search steps that `tie_break="position"` puts in
+column order), the table shows that comparison beside the default, as context.
