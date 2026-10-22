@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import textwrap
 from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
@@ -181,7 +182,13 @@ def test_generated_blog_collections_describe_their_own_titles(html):
             continue
         title = re.search(r'<meta property="og:title" content="([^"]*)"', text)[1]
         description = re.search(r'<meta name="description" content="([^"]*)"', text)[1]
-        assert unescape(description) == f"Andrey blog: {unescape(title)}.", page
+        expected = textwrap.shorten(
+            f"Andrey blog: {unescape(title)}.",
+            DESCRIPTION_LENGTH,
+            placeholder="…",
+            break_on_hyphens=False,
+        )
+        assert unescape(description) == expected, page
         collections.append(page)
     assert collections
 
