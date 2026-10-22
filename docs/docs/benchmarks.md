@@ -38,8 +38,8 @@ Nonlinear tests
 0.8.0 is here: PC and FCI test conditional independence on nonlinear data with KCI, RCoT, CMIknn,
 and GPDC, BOSS and GRaSP score categorical data with BDeu and the categorical BIC, and the
 chi-square and G-square tests answer many queries at once. PC with RCoT runs more than 10x faster
-than causal-learn, and BOSS and GRaSP with BDeu more than 150x faster than causal-learn on
-categorical data.
+than causal-learn at 50 variables, and BOSS and GRaSP with BDeu more than 150x faster than
+causal-learn on categorical data.
 
 :::{div} release-stats
 
