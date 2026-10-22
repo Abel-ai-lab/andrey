@@ -41,8 +41,8 @@ _INDEP_TEST = ParamSpec(
     "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
     "columns named by categorical: degen_gauss = degenerate Gaussian and "
     "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
-    "data, the experimental tests, each far slower per test: kci = kernel test; rcot = its "
-    "random-feature approximation; cmiknn = nearest-neighbor conditional mutual information; "
+    "data, each far slower per test: kci = kernel test; rcot = its random-feature approximation "
+    "(experimental); cmiknn = nearest-neighbor conditional mutual information; "
     "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
     "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
     "order.",

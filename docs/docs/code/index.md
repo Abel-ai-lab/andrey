@@ -54,8 +54,8 @@ single column gives a one-node graph.
 
 `pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
 `"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and
-`"cond_gauss"` for mixed data, and the experimental nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`,
-and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
+`"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"cmiknn"`, `"gpdc"`, and the
+experimental `"rcot"` ([Conditional-independence tests](#conditional-independence-tests)).
 
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
 `exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
@@ -157,15 +157,16 @@ PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_tes
 | `"student_t"` | Partial correlation with a Student-t p-value, exact for Gaussian data at any size | Supported |
 | `"chisq"`, `"gsq"` | Pearson's chi-square and G-square on category codes | Supported |
 | `"degen_gauss"`, `"cond_gauss"` | Degenerate and conditional Gaussian likelihood ratios on mixed data | Experimental |
-| `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Experimental |
+| `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Supported |
 | `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Experimental |
-| `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Experimental |
-| `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Experimental |
+| `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
+| `"gpdc"` | Gaussian-process regression, then a distance-correlation test of the residuals | Supported |
 
-The experimental tests detect nonlinear dependence that partial correlation misses, at a far
-higher cost per test, and have no published benchmark yet. Each warns with
-{py:class}`~andrey.ExperimentalWarning` the first time a process builds it. Inside the search,
-KCI uses every BLAS thread from 2,000 rows and the other tests use one. On every thread,
+The nonlinear tests, the last four, detect nonlinear dependence that partial correlation misses,
+at a far higher cost per test. KCI, CMIknn, and GPDC are benchmarked and checked in the release
+quality gate; RCoT is experimental and warns with {py:class}`~andrey.ExperimentalWarning` the
+first time a process builds it. Inside the search, KCI uses every BLAS thread from 2,000 rows and
+the other tests use one. On every thread,
 a p-value repeats for a fixed thread count and can differ in the last digits between thread counts.
 By name, a test runs with its default settings.
 {py:func}`~andrey.core.ci.make_indep_test` passes keyword settings to the test it builds; to run

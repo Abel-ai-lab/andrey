@@ -214,9 +214,9 @@ of a false one, and report how the graph changes with it.
 ### The test's assumptions
 
 PC's default test, Fisher's z, assumes each variable is a linear function of its causes plus
-Gaussian noise. (For effects that are not linear, `indep_test` also takes experimental nonlinear
-tests; the [API reference](../code/index.md#conditional-independence-tests) lists them.) These
-measurements are far from Gaussian: most are strongly skewed to the right.
+Gaussian noise. (For effects that are not linear, `indep_test` also takes nonlinear tests; the
+[API reference](../code/index.md#conditional-independence-tests) lists them.) These measurements
+are far from Gaussian: most are strongly skewed to the right.
 
 ```{code-cell} ipython3
 sachs.data.skew().round(1)
@@ -315,7 +315,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, the experimental `kci`, `rcot`, `cmiknn`, `gpdc` | `local_score_BIC` (the default when no column is categorical) |
+| Continuous | `fisherz` (the default), `student_t`; for nonlinear effects, `kci`, `cmiknn`, `gpdc`, and the experimental `rcot` | `local_score_BIC` (the default when no column is categorical) |
 | Categorical | `chisq`, `gsq` | `local_score_BDeu` (the default when every column is categorical), `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_cond_gauss` (the default when some columns are categorical), `local_score_degen_gauss` |
 

@@ -43,10 +43,10 @@ step.
 ```{include} ../../_generated/column-order.md
 ```
 
-The experimental CI tests `kci`, `rcot`, `cmiknn`, and `gpdc` are not methods, so the table leaves
-them out. They seed their random draws and order their variables by the same rank, so a p-value
-depends on neither the argument order nor the column order, and `tie_break="position"` ranks their
-columns by position instead. `pc`, `fci`, `gfci`, and `cdnod` follow the setting through them when
+The CI tests `kci`, `rcot`, `cmiknn`, and `gpdc` are not methods, so the table leaves them out.
+They seed their random draws and order their variables by the same rank, so a p-value depends on
+neither the argument order nor the column order, and `tie_break="position"` ranks their columns by
+position instead. `pc`, `fci`, `gfci`, and `cdnod` follow the setting through them when
 `indep_test` names one.
 
 Identical columns are the exception for every method: they rank the same, so position decides which

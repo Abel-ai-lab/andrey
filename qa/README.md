@@ -59,13 +59,15 @@ workflow; `tests/unit/test_release_gates.py` fails otherwise. Other pull request
 gate. It checks PC, FCI, GFCI, CD-NOD, GES, GIES, XGES, HC, Tabu, exact search, CALM, BOSS, GRaSP,
 DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI,
 PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and Granger on the datasets whose assumptions each
-method needs:
+method needs, and PC with each supported nonlinear conditional-independence test, KCI, CMIknn, and
+GPDC, on nonlinear data:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, GES, XGES, HC, Tabu, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
+| `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
@@ -91,6 +93,12 @@ method needs:
   the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
+- **Nonlinear regimes.** `anm_er` adds to each variable a weighted sum of `z + sin(z)` over its
+  parents, and `nonmonotone_er` of `cos(z)`, where a child is uncorrelated with its parent, so
+  partial correlation misses the edge; both have Gaussian noise. PC with a nonlinear test costs far
+  more per test, so they run at `d = 5` and `10`, `n = 50d`, and CMIknn and GPDC, at over half a
+  minute per fit from `d = 10` on one core, at `d = 5` only. A test keeps both in step with the
+  benchmark harness.
 - **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
   each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
   they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.
@@ -126,9 +134,10 @@ method needs:
   from `cmu-phil/example-causal-datasets` (CC0-1.0) at a pinned commit once, checks its SHA-256,
   and caches it, so the first run needs network access.
 
-SHD follows the published summaries: PC, GES, XGES, HC, Tabu, exact search, CALM, BOSS, and GRaSP
-against the truth's CPDAG, the LiNGAM methods, ANM, and PNL against the DAG, MultiGroupDirectLiNGAM
-summed over its groups, and FCI and GFCI by endpoint SHD against the PAG of the observed variables.
+SHD follows the published summaries: PC, with any test, GES, XGES, HC, Tabu, exact search, CALM,
+BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods, ANM, and PNL against the DAG,
+MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by endpoint SHD against the PAG of
+the observed variables.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 and CD-NOD against the CPDAG in which the domain index orients the edges it reaches. GIN's errors
 are the latents it misses: the true latents whose indicators it does not return as one cluster.

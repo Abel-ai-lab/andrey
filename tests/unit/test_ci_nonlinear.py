@@ -635,17 +635,17 @@ def test_rcot_warns_on_a_conditional_query_below_500_rows(n, condition_set, warn
 
 
 @pytest.mark.parametrize("name", TESTS)
-def test_ships_as_experimental(name):
-    """Each nonlinear test is selectable by name in PC and warns that it is experimental."""
+def test_warns_exactly_when_experimental(name):
+    """Each nonlinear test is selectable by name in PC; an experimental one warns that it is."""
     assert name in ci.SHIPPED_INDEP_TESTS
     andrey.core.warning_policy.reset()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         out = andrey.pc(_common_cause(seed=0, n=60, n_cond=1), indep_test=name)
     assert out.structure.kind == "cpdag"
-    experimental = [w for w in caught if w.category is andrey.ExperimentalWarning]
-    assert len(experimental) == 1
-    assert f"indep_test={name!r} is experimental" in str(experimental[0].message)
+    experimental = [str(w.message) for w in caught if w.category is andrey.ExperimentalWarning]
+    assert len(experimental) == (name in ci.EXPERIMENTAL_INDEP_TESTS)
+    assert all(f"indep_test={name!r} is experimental" in m for m in experimental)
 
 
 @pytest.mark.parametrize(
