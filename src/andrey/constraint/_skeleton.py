@@ -7,7 +7,9 @@ count of every chunk's contingency tables for the chi-square tests) in place of 
 calls, and the scalar loop otherwise, so a test that implements only
 :class:`~andrey.core.ci.CITest` still works. Every shipped vectorized path returns the scalar
 p-values exactly, so the skeleton is the same either way. Subsets are consumed in fixed-size
-chunks, so the scan holds one chunk in memory however many subsets it visits.
+chunks, so the scan holds one chunk in memory however many subsets it visits. :func:`scan_pairs`
+scans every pair of one conditioning size; for FisherZ and StudentT it stacks the chunks of
+consecutive pairs into one evaluation, up to ``_STACK_BYTES`` of submatrices.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import partial
-from itertools import combinations, islice
+from itertools import chain, combinations, islice
 from math import comb
 from typing import TYPE_CHECKING
 
@@ -30,11 +32,18 @@ if TYPE_CHECKING:
 #: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
 #: p-value is ``None`` when the scan does not record it.
 Removal = tuple[int, int, tuple[int, ...], float | None]
+# A pair's subsets that one call evaluates: ``(the pair's position, x, y, subsets)``, ``x < y``.
+_Chunk = tuple[int, int, int, list[tuple[int, ...]]]
 
 # One batched_call evaluates a chunk of subsets together; cap how many subsets a chunk holds so a
 # huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
 # is computed independently, so the chunk boundary never changes a result.
 _CHUNK = 4096
+
+# The most bytes of correlation submatrices one stacked evaluation of scan_pairs holds: a stack of
+# B queries of conditioning size k takes 8 * B * (k + 2) ** 2 bytes, and holds at least one chunk.
+# Its inverse and index arrays take about twice as much again, in each process that scans.
+_STACK_BYTES = 1 << 22
 
 
 def scan_conditioning_sets(
@@ -75,9 +84,7 @@ def scan_conditioning_sets(
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
     runs once per chunk.
     """
-    subsets = combinations(candidates, size)
-    if skip_within is not None and len(skip_within) >= size:
-        subsets = (s for s in subsets if not skip_within.issuperset(s))
+    subsets = _subsets(candidates, size, skip_within)
     # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
     # above alpha that `largest` records comes from every shuffle.
     bounded = getattr(test, "_bounded_pvalue", None)
@@ -109,6 +116,17 @@ def scan_conditioning_sets(
     if found and largest is not None:
         largest.append(top)
     return found
+
+
+def _subsets(
+    candidates: list[int], size: int, skip_within: set[int] | None
+) -> Iterator[tuple[int, ...]]:
+    """The size-``size`` subsets of ``candidates`` in ``combinations`` order, less those lying
+    entirely inside ``skip_within`` when it is given."""
+    subsets = combinations(candidates, size)
+    if skip_within is not None and len(skip_within) >= size:
+        subsets = (s for s in subsets if not skip_within.issuperset(s))
+    return subsets
 
 
 def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
@@ -293,21 +311,20 @@ def scan_pairs(
     removals do not depend on column order; a subset both endpoints offer is tested once, from the
     first.
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
-    and the parallel workers share it, so they stay identical. With ``trace`` given, every test is
-    recorded in the order it runs.
+    and the parallel workers share it, so they stay identical. A FisherZ or StudentT test evaluates
+    the chunks of consecutive pairs in one stack (:func:`_stacked_scan`); another test scans each
+    pair with :func:`scan_conditioning_sets`. Both test the same subsets in the same order. With
+    ``trace`` given, every test is recorded in the order it runs.
     """
+    canonical = _canonical_route(test)
+    if canonical is not None:
+        return _stacked_scan(canonical, pairs, neighbors, size, alpha, trace, record_pvalues)
     removals: list[Removal] = []
     for x, y in pairs:
         separating: set[int] = set()
         found = False
         largest: list[float] | None = [] if record_pvalues else None
-        from_x = neighbors[x][neighbors[x] != y].tolist()
-        from_y = neighbors[y][neighbors[y] != x].tolist()
-        # Once the x side has scanned, the y side skips the subsets both sides offer.
-        shared = set(from_x) & set(from_y) if len(from_x) >= size else None
-        for a, b, candidates, seen in ((x, y, from_x, None), (y, x, from_y, shared)):
-            if len(candidates) < size:
-                continue
+        for a, b, candidates, seen in _sides(neighbors, x, y, size):
             if scan_conditioning_sets(
                 test, a, b, candidates, size, alpha, separating, seen, trace, largest
             ):
@@ -315,6 +332,122 @@ def scan_pairs(
         if found:
             removals.append((x, y, tuple(sorted(separating)), max(largest) if largest else None))
     return removals
+
+
+def _sides(
+    neighbors: list[np.ndarray], x: int, y: int, size: int
+) -> Iterator[tuple[int, int, list[int], set[int] | None]]:
+    """The sides :func:`scan_pairs` tests the pair ``(x, y)`` from, as ``(a, b, candidates,
+    skip_within)`` for :func:`scan_conditioning_sets`: ``x`` first, then ``y``, each side's
+    candidates its other neighbors, and a side with fewer than ``size`` of them left out."""
+    from_x = neighbors[x][neighbors[x] != y].tolist()
+    from_y = neighbors[y][neighbors[y] != x].tolist()
+    # Once the x side has scanned, the y side skips the subsets both sides offer.
+    shared = set(from_x) & set(from_y) if len(from_x) >= size else None
+    for a, b, candidates, seen in ((x, y, from_x, None), (y, x, from_y, shared)):
+        if len(candidates) >= size:
+            yield a, b, candidates, seen
+
+
+def _stacked_scan(
+    pvalues: Callable[..., np.ndarray],
+    pairs: list[tuple[int, int]],
+    neighbors: list[np.ndarray],
+    size: int,
+    alpha: float,
+    trace: list[dict] | None,
+    record_pvalues: bool,
+) -> list[Removal]:
+    """:func:`scan_pairs` for a test whose ``pvalues`` take canonical query arrays.
+
+    Each chunk is the one :func:`scan_conditioning_sets` evaluates in one call, in the per-pair
+    order (:func:`_pair_chunks`); :func:`_stacks` evaluates consecutive chunks together. Every
+    p-value is the one its chunk gets alone, and the chunks are read back in order, so the
+    separating sets, the largest p-values, and the trace are those of the per-pair scan.
+    """
+    separated: dict[int, tuple[set[int], list[float]]] = {}
+    for stack, values in _stacks(pvalues, size, _pair_chunks(pairs, neighbors, size)):
+        bounds = np.cumsum([0, *(len(chunk) for _, _, _, chunk in stack)]).tolist()
+        passing = values > alpha
+        if trace is not None:
+            for (_, x, y, chunk), start, stop in zip(stack, bounds, bounds[1:]):
+                record_tests(trace, size, x, y, chunk, values[start:stop], alpha)
+        for k in np.flatnonzero(np.logical_or.reduceat(passing, bounds[:-1])).tolist():
+            i, _, _, chunk = stack[k]
+            rows = np.flatnonzero(passing[bounds[k] : bounds[k + 1]])
+            members, tops = separated.setdefault(i, (set(), []))
+            for row in rows.tolist():
+                members.update(chunk[row])
+            if record_pvalues:
+                tops.append(float(values[bounds[k] + rows].max()))
+    removals: list[Removal] = []
+    for i, (members, tops) in separated.items():
+        x, y = pairs[i]
+        removals.append((x, y, tuple(sorted(members)), max(tops) if record_pvalues else None))
+    return removals
+
+
+def _pair_chunks(
+    pairs: list[tuple[int, int]], neighbors: list[np.ndarray], size: int
+) -> Iterator[_Chunk]:
+    """Yield ``(i, x, y, chunk)``, ``x < y``, for each chunk of subsets the per-pair scan of
+    :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position."""
+    for i, (a, b) in enumerate(pairs):
+        x, y = min(a, b), max(a, b)
+        for _, _, candidates, seen in _sides(neighbors, a, b, size):
+            subsets = _subsets(candidates, size, seen)
+            while chunk := list(islice(subsets, _CHUNK)):
+                yield i, x, y, chunk
+
+
+def _stacks(
+    pvalues: Callable[..., np.ndarray],
+    size: int,
+    chunks: Iterable[_Chunk],
+) -> Iterator[tuple[list[_Chunk], np.ndarray]]:
+    """Yield ``(stack, values)``: consecutive ``chunks``, whole, and the p-values of their queries.
+
+    A stack holds as many chunks as fit in ``_STACK_BYTES`` of correlation submatrices, at least
+    one (:func:`_evaluated`).
+    """
+    limit = max(1, _STACK_BYTES // (8 * (size + 2) ** 2))
+    stack: list[_Chunk] = []
+    rows = 0
+    for item in chunks:
+        if stack and rows + len(item[3]) > limit:
+            yield from _evaluated(pvalues, size, stack, rows)
+            stack, rows = [], 0
+        stack.append(item)
+        rows += len(item[3])
+    if stack:
+        yield from _evaluated(pvalues, size, stack, rows)
+
+
+def _evaluated(
+    pvalues: Callable[..., np.ndarray],
+    size: int,
+    stack: list[_Chunk],
+    rows: int,
+) -> Iterator[tuple[list[_Chunk], np.ndarray]]:
+    """Yield ``(stack, values)`` for the ``rows`` queries of ``stack`` evaluated in one call.
+
+    When that call raises, each chunk is evaluated in a call of its own and yielded alone, so the
+    error comes from the chunk the per-pair scan raises on, after the same calls.
+    """
+    counts = [len(chunk) for _, _, _, chunk in stack]
+    xs = np.repeat(np.array([x for _, x, _, _ in stack], dtype=np.intp), counts)
+    ys = np.repeat(np.array([y for _, _, y, _ in stack], dtype=np.intp), counts)
+    members = chain.from_iterable(subset for _, _, _, chunk in stack for subset in chunk)
+    zs = np.fromiter(members, np.intp, rows * size).reshape(rows, size)
+    try:
+        values = pvalues(xs, ys, zs)
+    except Exception:
+        values = None
+    if values is not None:
+        yield stack, values
+        return
+    for item in stack:
+        yield [item], _canonical_chunk(pvalues, size, *item[1:])
 
 
 def pair_queries(neighbors: list[np.ndarray], x: int, y: int, size: int) -> int:
