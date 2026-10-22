@@ -166,15 +166,15 @@ class KCI:
     noise, with 20 datasets per size on 4 cores. From 5 to 20 variables with 500 to 2,000 rows, and
     at 5 variables with 5,000 rows, its median errors (SHD) stayed below the empty graph's at every
     size. The median fit took 4 to 18 seconds at 500 rows, 37 seconds to 11 minutes at 2,000 rows,
-    and 13 minutes at 5 variables with 5,000 rows; at 20 variables and 2,000 rows, 4 of 40 fits
-    passed a one-hour cap. Each query with a conditioning set costs two products of ``n x n``
-    matrices, plus an eigendecomposition for a conditioning set not seen before and two more
-    products for a new ``y`` with it; the test keeps up to 256 MB of each kind of matrix, at least
-    one. So time grows as the cube of the number of rows and memory as its square: thousands of rows
-    are practical, tens of thousands are not. The kernel widths follow the row count and the size of
-    the conditioning set, not the data. On simulated draws with up to three conditioning variables
-    and 500 rows, it rejected a true independence at rates between ``alpha`` and twice ``alpha``; a
-    test that rejects too often makes PC and FCI keep edges.
+    and 13 minutes at 5 variables with 5,000 rows; at 20 variables and 2,000 rows, on shared nodes,
+    4 of 40 fits passed a one-hour cap. Each query with a conditioning set costs two products of
+    ``n x n`` matrices, plus an eigendecomposition for a conditioning set not seen before and two
+    more products for a new ``y`` with it; the test keeps up to 256 MB of each kind of matrix, at
+    least one. So time grows as the cube of the number of rows and memory as its square: thousands
+    of rows are practical, tens of thousands are not. The kernel widths follow the row count and the
+    size of the conditioning set, not the data. On simulated draws with up to three conditioning
+    variables and 500 rows, it rejected a true independence at rates between ``alpha`` and twice
+    ``alpha``; a test that rejects too often makes PC and FCI keep edges.
 
     References
     ----------
