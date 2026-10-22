@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import textwrap
 from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
@@ -172,6 +173,24 @@ def test_every_page_has_one_short_description_equal_to_its_preview(html):
         elif not unescape(described[0]).strip() or described == project:
             problems.append(f"{name}: its description is empty or only the project's name")
     assert not problems, "\n".join(problems)
+
+
+def test_generated_blog_collections_describe_their_own_titles(html):
+    collections = []
+    for page, text in _pages(html):
+        if 'class="section ablog__collection"' not in text and "ablog__catalog_header" not in text:
+            continue
+        title = re.search(r'<meta property="og:title" content="([^"]*)"', text)[1]
+        description = re.search(r'<meta name="description" content="([^"]*)"', text)[1]
+        expected = textwrap.shorten(
+            f"Andrey blog: {unescape(title)}.",
+            DESCRIPTION_LENGTH,
+            placeholder="…",
+            break_on_hyphens=False,
+        )
+        assert unescape(description) == expected, page
+        collections.append(page)
+    assert collections
 
 
 def test_every_homepage_tile_leads_to_details_that_are_built(html):
