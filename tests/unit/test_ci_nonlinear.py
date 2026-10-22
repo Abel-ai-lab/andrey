@@ -266,15 +266,13 @@ def test_make_indep_test_passes_settings_to_the_test():
     the setting raises ``TypeError``."""
     data = _common_cause(seed=4, n=120, n_cond=1, shared=0.2)
     direct = CMIknn(data, k_cmi=5, n_permutations=50)(0, 1, (2,))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        built = ci.make_indep_test("cmiknn", data, k_cmi=5, n_permutations=50)(0, 1, (2,))
-        variant = partial(ci.make_indep_test, "cmiknn", k_cmi=5, n_permutations=50)
-        ci.register_indep_test("cmiknn_k5", variant)
-        try:
-            registered = ci.make_indep_test("cmiknn_k5", data)(0, 1, (2,))
-        finally:
-            del ci._CI_REGISTRY["cmiknn_k5"]
+    built = ci.make_indep_test("cmiknn", data, k_cmi=5, n_permutations=50)(0, 1, (2,))
+    variant = partial(ci.make_indep_test, "cmiknn", k_cmi=5, n_permutations=50)
+    ci.register_indep_test("cmiknn_k5", variant)
+    try:
+        registered = ci.make_indep_test("cmiknn_k5", data)(0, 1, (2,))
+    finally:
+        del ci._CI_REGISTRY["cmiknn_k5"]
     assert built == registered == direct
     with pytest.raises(TypeError, match="k_cmi"):
         ci.make_indep_test("fisherz", data, k_cmi=5)
@@ -635,17 +633,15 @@ def test_rcot_warns_on_a_conditional_query_below_500_rows(n, condition_set, warn
 
 
 @pytest.mark.parametrize("name", TESTS)
-def test_ships_as_experimental(name):
-    """Each nonlinear test is selectable by name in PC and warns that it is experimental."""
+def test_pc_selects_each_nonlinear_test_by_name(name):
+    """Each nonlinear test is selectable by name in PC, and none warns that it is experimental."""
     assert name in ci.SHIPPED_INDEP_TESTS
     andrey.core.warning_policy.reset()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         out = andrey.pc(_common_cause(seed=0, n=60, n_cond=1), indep_test=name)
     assert out.structure.kind == "cpdag"
-    experimental = [w for w in caught if w.category is andrey.ExperimentalWarning]
-    assert len(experimental) == 1
-    assert f"indep_test={name!r} is experimental" in str(experimental[0].message)
+    assert not [w for w in caught if w.category is andrey.ExperimentalWarning]
 
 
 @pytest.mark.parametrize(
@@ -656,10 +652,8 @@ def test_every_constraint_method_takes_the_nonlinear_tests(method, kind):
     """FCI, GFCI, and CD-NOD select the nonlinear tests by name, as PC does."""
     data = _common_cause(seed=0, n=60, n_cond=1)
     args = (data, np.repeat([0.0, 1.0], 30)) if method == "cdnod" else (data,)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        for name in TESTS:
-            assert getattr(andrey, method)(*args, indep_test=name).structure.kind == kind
+    for name in TESTS:
+        assert getattr(andrey, method)(*args, indep_test=name).structure.kind == kind
 
 
 def _blas_threads() -> int:

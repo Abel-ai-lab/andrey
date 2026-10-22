@@ -16,44 +16,76 @@ rerun the measurements. A card keeps the numbers its release published.
 % release moves to the top of "Earlier releases" (docs/DEVELOPMENT.md, "The release cards").
 :::::{div} release-latest
 
+% Draft (cover art pending): the stipple ground shows until release-cards/0.8.0.jpg and its
+% release-art-0-8-0 rule land (docs/DEVELOPMENT.md, "The release cards").
 :::{card}
-:link: benchmarks/0.7.0
+:link: benchmarks/0.8.0
 :link-type: doc
-:link-alt: The 0.7.0 release card: permutation invariance
-:class-card: release-cover release-art release-art-0-7-0
+:link-alt: The 0.8.0 release card: nonlinear tests
+:class-card: release-cover
 :shadow: none
 :margin: 0
 
 Release card
 
-Permutation invariance
+Nonlinear tests
 
-0.7.0
+0.8.0
 :::
 
 ::::{div} release-tldr
 
-0.7.0 is here: PC, FCI, GFCI, CD-NOD, hill climbing, tabu search, BOSS, GRaSP, and GIN return the
-same graph, up to relabeling the nodes, however you order the columns (Colombo and Maathuis, 2014).
-GIES, exact search, CD-NOD, MultiGroupDirectLiNGAM, GFCI, GIN, and CALM are supported. GES runs more
-than 60x faster than causal-learn at 50 to 150 variables, with the same graph on every dataset at
-those sizes.
+0.8.0 is here: PC and FCI test conditional independence on nonlinear data with KCI, RCoT, CMIknn,
+and GPDC, BOSS and GRaSP score categorical data with BDeu and the categorical BIC, and the
+chi-square and G-square tests answer many queries at once. On an AMD EPYC 7713, PC with RCoT runs
+more than 10x faster than causal-learn at 50 variables, and BOSS and GRaSP with BDeu more than 130x
+faster than causal-learn on random categorical graphs.
 
 :::{div} release-stats
 
-- **More than 60x** GES speedup over causal-learn from 50 to 150 variables
-- **More than 70x** GIN speedup over Tetrad at every size
-- **More than 15x** CD-NOD speedup over causal-learn from 20 variables, with fewer errors
+- **More than 10x** PC with RCoT speedup over causal-learn at 50 variables
+- **More than 130x** BOSS and GRaSP speedup over causal-learn on random categorical graphs
+- **More than 3x** PC with the chi-square test speedup over Andrey 0.7.0 from 40 variables
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.7.0.md)
-[Read the post](../blog/20261019-andrey-0-7-0.md)
+[Read the release card](benchmarks/0.8.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.7.0
+:link-type: doc
+:link-alt: The 0.7.0 release card: permutation invariance
+:class-card: release-tile release-art-0-7-0
+:shadow: none
+:margin: 0
+
+0.7.0
+:::
+
+:::{div} release-body
+<h3>Permutation invariance</h3>
+
+GES and seven newly supported methods, from GIES to CALM, on data whose columns are in a random
+order, compared with causal-learn, lingam, pcalg, and Tetrad.
+
+- **7** methods supported
+- GES **more than 60x** faster than causal-learn from 50 to 150 variables
+:::
+
+:::{div} release-meta
+Released October 19, 2026
+
+- [Release card<span class="visually-hidden"> 0.7.0</span>](benchmarks/0.7.0.md)
+- [Post: Permutation invariance](../blog/20261019-andrey-0-7-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -91,7 +123,7 @@ Released October 17, 2026
 :::{card}
 :link: benchmarks/0.5.0
 :link-type: doc
-:link-alt: The 0.5.0 release card: time series
+:link-alt: The 0.5.0 release card: temporal causal discovery
 :class-card: release-tile release-art-0-5-0
 :shadow: none
 :margin: 0
@@ -244,9 +276,10 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.8.0: nonlinear tests <benchmarks/0.8.0>
 0.7.0: permutation invariance <benchmarks/0.7.0>
 0.6.0: mixed and categorical data <benchmarks/0.6.0>
-0.5.0: time series <benchmarks/0.5.0>
+0.5.0: temporal causal discovery <benchmarks/0.5.0>
 0.4.0: pairwise direction <benchmarks/0.4.0>
 0.3.0: score-based search <benchmarks/0.3.0>
 0.2.0: hidden common causes <benchmarks/0.2.0>

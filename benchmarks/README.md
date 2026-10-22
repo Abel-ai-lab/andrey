@@ -24,8 +24,9 @@ Reproduce ([0.4.0](../docs/docs/benchmarks/0.4.0.md#reproduce),
 [0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
 
 [`published/parity-allowlist.json`](published/parity-allowlist.json) lists the rows where a
-reference package has fewer errors than Andrey, each with its cited cause; any other such row fails
-the quality gate before a release ([reference parity](../qa/README.md#reference-parity)).
+reference package makes fewer errors than Andrey by the parity rule, each with its cited cause; any
+other such row fails the quality gate before a release
+([reference parity](../qa/README.md#reference-parity)).
 
 ## Comparison packages
 
