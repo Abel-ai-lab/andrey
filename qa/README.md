@@ -7,7 +7,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | Tool | Purpose |
 |---|---|
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
-| `reference_parity.py` | Fail a published row where the reference package has fewer errors. |
+| `reference_parity.py` | Fail a published row where Andrey makes more errors than the reference package. |
 | `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
 | `ci_calibration.py` | Measure how often each nonlinear CI test rejects, with and without a dependence. |
@@ -171,14 +171,32 @@ uv run python -m qa.quality_gate --capture  # re-measure; review the diff
 Before any fit, the gate checks the published benchmark summaries
 (`benchmarks/published/*/summary.json`) with `reference_parity.py`, which reads only those files,
 so the reference packages need not be installed. Each row pairs Andrey with one reference package
-at one size, and it fails at any margin:
+at one size. A summary's `parity_rule` sets how its rows are judged.
+
+With `"parity_rule": "paired bootstrap"` (0.8.0 and later), a row is judged by D = SHD(Andrey) -
+SHD(reference) on each of its paired datasets, the datasets both finished (`paired`). The
+summary's builder records the mean of D (`mean_D`) and its percentile bootstrap 95% interval
+(`bootstrap_95`, 10,000 resamples, NumPy's `default_rng(0)`), the interval a CI test's promotion
+to supported also uses. A row with at least 10 paired datasets fails only when that interval lies
+entirely above 0, so a difference within the noise of 20 datasets passes. A row with fewer than 10
+paired datasets is reported, with its counts, and not gated. A randomized test's row is judged by
+its `multi_draw` fields where it has them: each dataset fit several times per package (`draws`),
+and D per dataset the mean over the draws.
+
+A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer
   errors on more series than Andrey;
 - otherwise, when Andrey's errors (the row's mean or median SHD, or directed errors) are higher.
 
 A row where either side has no result is skipped. A released summary never changes, so a method
-re-measured against the same reference in a later summary is judged by the later rows only.
+re-measured against the same reference in a later summary is judged by the later rows only. Where
+a summary has one entry per regime for a method and reference, a row's key names its `regime`.
+
+A row of a reference whose result depends on the column order (`reference_order_dependent`) may
+also hold Andrey's column-order mode on the same datasets (`andrey_column_shd_by_seed`,
+`comparator_shd_by_seed`). It is context: the check prints the datasets on which each side has
+fewer errors in that comparison beside the row, and never judges them.
 
 `benchmarks/published/parity-allowlist.json` exempts a failing row only when it names the cause,
 with a reason and a citation:
@@ -190,8 +208,9 @@ with a reason and a citation:
   reversed order (`"column_order": "reversed"`, `andrey_errors`, `comparator_errors`), where the
   row must pass.
 
-Each entry pins the row's two error values (its two series counts, where the row has them), so a
-re-run that changes the row voids it, and an entry that matches no failing row fails the check.
+Each entry pins the row's two error values (its two series counts, where the row has them, or each
+side's mean SHD over the paired datasets under the paired bootstrap), so a re-run that changes the
+row voids it, and an entry that matches no failing row fails the check.
 
 ```shell
 uv run python -m qa.reference_parity  # exit 1 if any row fails
