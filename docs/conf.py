@@ -513,11 +513,13 @@ def _description(app, context: dict, doctree: nodes.document | None) -> str:  # 
     meta = context.get("meta") or {}
     if (meta.get("description") or "").strip():  # an empty value counts as none
         return meta["description"].strip()
-    paragraph = _first_paragraph(doctree) if doctree is not None else ""
-    if doctree is None and ("catalog" in context or "collection" in context):
-        title = html.unescape(re.sub(r"<[^>]+>", "", context.get("title") or ""))
-        if title := " ".join(title.split()):
-            paragraph = f"{app.config.project} blog: {title}."
+    if doctree is not None:
+        paragraph = _first_paragraph(doctree)
+    elif "catalog" in context or "collection" in context:
+        title = " ".join(html.unescape(re.sub(r"<[^>]+>", "", context.get("title") or "")).split())
+        paragraph = f"{app.config.project} blog: {title}." if title else ""
+    else:
+        paragraph = ""
     if paragraph:
         return textwrap.shorten(
             paragraph, DESCRIPTION_LENGTH, placeholder="…", break_on_hyphens=False

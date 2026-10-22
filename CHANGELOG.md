@@ -41,8 +41,8 @@ change names its pull request.
   priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
 - `boss` and `grasp` take `score_func="local_score_BIC_categorical"`, the multinomial BIC that
   `ges`, `hc`, `tabu`, and `exact_search` take for categorical data. ([#220])
-- `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
-  detect nonlinear dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#209])
+- `pc`, `fci`, `gfci`, and `cdnod` take four conditional-independence tests that detect nonlinear
+  dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#209])
 - The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
   and have reference pages; `make_indep_test` passes settings to them, a variant registered with
   `register_indep_test` is selected by name, `CMIknn(k_cmi=...)` takes a neighbor count or a
@@ -85,6 +85,10 @@ change names its pull request.
   finds one. ([#207])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
   same graphs and p-values in less time, because each test answers many queries at once. ([#208])
+- `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` are supported: on nonlinear data each
+  makes fewer errors on average than its reference packages, causal-learn for KCI, causal-learn and
+  pcalg for RCoT, and tigramite for CMIknn and GPDC, they have checks in the release quality gate,
+  and they no longer warn with `ExperimentalWarning`. ([#299])
 
 ### Fixed
 
@@ -522,3 +526,4 @@ First alpha release.
 [#261]: https://github.com/Abel-ai-lab/andrey/pull/261
 [#271]: https://github.com/Abel-ai-lab/andrey/pull/271
 [#278]: https://github.com/Abel-ai-lab/andrey/pull/278
+[#299]: https://github.com/Abel-ai-lab/andrey/pull/299

@@ -450,6 +450,14 @@ def test_quality_gate_checks_exactly_the_supported_methods():
     assert gated == {_normalized(n) for n in SUPPORTED}, GRADUATE
 
 
+def test_quality_gate_checks_exactly_the_supported_nonlinear_tests():
+    from andrey.core import ci
+    from qa import quality_gate
+
+    gated = {_normalized(n) for n in quality_gate.SUPPORTED_TESTS}
+    assert gated == set(ci.NONLINEAR_INDEP_TESTS), GRADUATE
+
+
 @pytest.mark.parametrize("name", SUPPORTED)
 def test_supported_method_has_an_example(name):
     notebooks = (ROOT / "examples").glob("*.ipynb")

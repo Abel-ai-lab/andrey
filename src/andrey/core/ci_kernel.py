@@ -161,15 +161,20 @@ class KCI:
     backend, or under ``auto`` from ``ANDREY_KCI_GPU_THRESHOLD`` rows squared. Its p-value then
     matches the CPU's to rounding.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
-    variables. Each query with a conditioning set costs two products of ``n x n`` matrices, plus
-    an eigendecomposition for a conditioning set not seen before and two more products for a new
-    ``y`` with it; the test keeps up to 256 MB of each kind of matrix, at least one. So time grows
-    as the cube of the number of rows and memory as its square: thousands of rows are practical,
-    tens of thousands are not. The kernel widths follow the row count and the size of the
-    conditioning set, not the data. On simulated draws with up to three conditioning variables and
-    500 rows, it rejected a true independence at rates between ``alpha`` and twice ``alpha``; a
-    test that rejects too often makes PC and FCI keep edges.
+    **Limitations.** Measured in PC on simulated data from sparse random graphs (mean degree 2),
+    each variable a weighted sum of ``z + sin(z)``, or of ``cos(z)``, over its parents plus Gaussian
+    noise, with 20 datasets per size on 4 cores. From 5 to 20 variables with 500 to 2,000 rows, and
+    at 5 variables with 5,000 rows, its median errors (SHD) stayed below the empty graph's at every
+    size. The median fit took 4 to 18 seconds at 500 rows, 37 seconds to 11 minutes at 2,000 rows,
+    and 13 minutes at 5 variables with 5,000 rows; at 20 variables and 2,000 rows, on shared nodes,
+    4 of 40 fits passed a half-hour cap. Each query with a conditioning set costs two products of
+    ``n x n`` matrices, plus an eigendecomposition for a conditioning set not seen before and two
+    more products for a new ``y`` with it; the test keeps up to 256 MB of each kind of matrix, at
+    least one. So time grows as the cube of the number of rows and memory as its square: thousands
+    of rows are practical, tens of thousands are not. The kernel widths follow the row count and the
+    size of the conditioning set, not the data. On simulated draws with up to three conditioning
+    variables and 500 rows, it rejected a true independence at rates between ``alpha`` and twice
+    ``alpha``; a test that rejects too often makes PC and FCI keep edges.
 
     References
     ----------
@@ -441,8 +446,13 @@ class RCoT:
     does not depend on the order of the queries, of the arguments, or of the columns, and the same
     seed reproduces it.
 
-    **Limitations.** Not benchmarked yet. Its tests run it on up to 500 rows and two conditioning
-    variables. Measured on columns independent of each other, its rate of rejecting a true
+    **Limitations.** Measured in PC on simulated data from sparse random graphs (mean degree 2),
+    each variable a weighted sum of ``z + sin(z)``, or of ``cos(z)``, over its parents plus Gaussian
+    noise, with 20 datasets per size on 4 cores. From 5 to 50 variables with 500 to 5,000 rows, its
+    median errors (SHD) stayed below the empty graph's at every size, such as 9.5 against 50 at 50
+    variables and 5,000 rows. The median fit took 0.2 to 0.5 seconds at 5 variables, 0.4 to 1.2
+    seconds at 10, 0.8 to 3.4 seconds at 20, and 3 to 15 seconds at 50, and the slowest took 70
+    seconds. Measured on columns independent of each other, its rate of rejecting a true
     conditional independence with two conditioning variables was about twice ``alpha`` at 100 rows
     and near ``alpha`` from 500 rows. With three, four, or six conditioning variables the rate
     averaged about 1.3 times ``alpha`` from 500 to 2,000 rows, with no row count from which it held
@@ -455,10 +465,9 @@ class RCoT:
     ``n_features`` features per variable, which can miss a dependence the full kernel test finds,
     such as one between an odd and an even function of the same cause on a few hundred rows.
     Because the features are sampled for each conditioning set, PC tests a weak dependence against
-    every conditioning set with a new chance to miss it. On simulated random graphs of 10, 20, and
-    50 variables with as many edges as variables and additive or nonmonotone noise (3 seeds each),
-    PC with RCoT missed 12 to 22% of the true edges at 500 rows and 0.1 to 8% at 5,000 rows, and
-    added false edges numbering 1 to 8% of the true ones.
+    every conditioning set with a new chance to miss it. On the datasets above, PC with RCoT missed
+    14 to 20% of the true edges at 500 rows and 1.5 to 4% at 5,000 rows, and 2 to 6% of the edges
+    it kept were not true edges.
 
     References
     ----------
