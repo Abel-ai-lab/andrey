@@ -885,7 +885,8 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
         if path.suffix in {".md", ".ipynb"} and GENERATED not in path.parents
     )
     source = included[0] if included else pathlib.Path(app.env.doc2path(pagename))
-    generated = "generated" in source.parts
+    # autosummary writes the API reference's pages into docs/docs/api/, which git ignores.
+    generated = "generated" in source.parts or source.parent == HERE / "docs" / "api"
     context["edit_url"] = None if generated else f"{REPO_URL}/edit/main/{source.relative_to(ROOT)}"
 
 
