@@ -17,7 +17,6 @@ import subprocess
 import sys
 import types
 import warnings
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
@@ -1464,45 +1463,16 @@ def cards():
     return module
 
 
-def test_the_card_shows_its_title_with_the_accent_word_and_no_version(cards):
-    svg = cards.card_svg(cards.TAGLINE, cards.ACCENT)
-    # A card opens the page it previews, and every page's navbar shows the version.
-    assert andrey.__version__ not in svg
-    assert " ".join(word for word, _ in _title_words(svg)) == cards.TAGLINE
-    amber = [word for word, fill in _title_words(svg) if fill == cards.grain.AMBER]
-    assert amber == list(cards.ACCENT)
-    plain = cards.card_svg(cards.TAGLINE)
-    assert {fill for _, fill in _title_words(plain)} == {"#ffffff"}
-
-
-SVG = "{http://www.w3.org/2000/svg}"
-
-
-def _title_words(svg: str) -> list[tuple[str, str]]:
-    """The title's words in reading order, each with its fill."""
-    words = [t for t in ET.fromstring(svg).iter(f"{SVG}text") if t.get("font-weight") == "600"]
-    words.sort(key=lambda t: (round(float(t.get("y"))), float(t.get("x"))))
-    return [(t.text, t.get("fill")) for t in words]
-
-
-def test_a_card_is_a_small_jpeg_the_size_platforms_crop_to(cards):
+def test_the_social_preview_is_a_jpeg_at_githubs_size_that_link_previews_still_show(cards):
     import io
 
     from PIL import Image
 
     pytest.importorskip("resvg_py")  # the docs group's renderer; CI's extras jobs lack it
-    data = cards.card_jpeg("Introducing Andrey")
+    data = cards.social_jpeg()
     with Image.open(io.BytesIO(data)) as image:
-        assert (image.format, image.size) == ("JPEG", (1200, 630))
+        assert (image.format, image.size) == ("JPEG", (1280, 640))
     assert len(data) <= cards.MAX_BYTES == 300 * 1024
-
-
-def test_a_long_card_title_keeps_every_word_or_fails(cards):
-    title = "Learning causal graphs from observational data with hidden confounders"
-    svg = cards.card_svg(title)
-    assert " ".join(word for word, _ in _title_words(svg)) == title
-    with pytest.raises(ValueError, match="needs more than 3 lines"):
-        cards.card_svg("word " * 60)
 
 
 def test_the_card_ground_is_the_same_on_every_build(cards):

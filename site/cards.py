@@ -1,9 +1,8 @@
-"""Link-preview cards (Open Graph, Twitter): 1200 x 630 JPEGs drawn at build time.
+"""Link previews (Open Graph, Twitter), the README banner, release and post art, and the brand kit,
+drawn at build time.
 
-Each card is the stipple ground (``grain.py``), the title, the Andrey wordmark, and "by" with the
-Abel logotype under it. It shows no version: the page a card opens
-does. ``card_svg`` builds the image as SVG; ``card_jpeg`` renders it and compresses it under the
-size WhatsApp still previews.
+The homepage and every page that is not a post share the repository's social preview
+(``social_jpeg``), the one GitHub shows; each post's preview is its banner (``preview_jpeg``).
 """
 
 from __future__ import annotations
@@ -31,11 +30,6 @@ _spec.loader.exec_module(grain)
 
 W, H = 1200, 630
 MAX_BYTES = 300 * 1024  # WhatsApp is widely reported to skip preview images above about 300 KB
-QUALITY = 75  # about 20 KB under MAX_BYTES at 75, 11 KB at 76, 1 KB at 77. No banding at 75.
-# The title's sizes: two lines at 92 px, else three at 72 px, each line no wider than the band.
-# LinkedIn shows a card at 480 px wide, where 92 px becomes about 37.
-TITLE_FITS = ((92, 2), (72, 3))
-TITLE_WIDTH = 1040
 
 
 def _width(text: str, size: int, weight: str) -> float:
@@ -92,29 +86,6 @@ def _lines(title: str, size: int, width: float, most: int) -> list[str] | None:
     return None
 
 
-def _title_lines(title: str) -> tuple[int, list[str]]:
-    """``title`` wrapped by measured width: the largest size in ``TITLE_FITS`` it fits at."""
-    for size, most in TITLE_FITS:
-        if lines := _lines(title, size, TITLE_WIDTH, most):
-            return size, lines
-    size, most = TITLE_FITS[-1]
-    raise ValueError(f"the card title {title!r} needs more than {most} lines at {size} px")
-
-
-def _credit() -> str:
-    """The Andrey wordmark, and under it, small, "by" and the Abel logotype."""
-    wordmark = BRAND / "wordmark-light.svg"
-    logo = BRAND / "abel-logo-white.svg"
-    wy = H - 146
-    by = _width("by", 20, "Regular")
-    x0 = (W - (by + 9 + _scaled_width(logo, 20))) / 2
-    return (
-        _placed(wordmark, (W - _scaled_width(wordmark, 52)) / 2, wy, 52)
-        + f'<text x="{x0:.1f}" y="{wy + 88:.1f}" font-family="Inter" font-size="20" '
-        'fill="#ffffff" opacity="0.72">by</text>' + _placed(logo, x0 + by + 9, wy + 71, 20, 0.72)
-    )
-
-
 def _text(word: str, x: float, y: float, size: int, fill: str) -> str:
     return (
         f'<text x="{x:.1f}" y="{y:.1f}" dominant-baseline="middle" font-family="Inter" '
@@ -145,33 +116,6 @@ def _title(
     return "".join(drawing)
 
 
-def card_svg(title: str, accents: tuple[str, ...] = ()) -> str:
-    """The card as SVG: ``title`` on up to three lines, each word in ``accents`` in amber.
-
-    Raises ``ValueError`` when the title does not fit, rather than dropping any of it.
-    """
-    size, lines = _title_lines(title)
-    lead = size * 1.18
-    middle = H / 2 - 30
-    top = middle - (len(lines) - 1) * lead / 2
-    # Darker bands behind the title and the wordmark keep the white type readable.
-    bands = (
-        grain.Band(600, middle, 520, 70 + 45 * (len(lines) - 1)),
-        grain.Band(600, 540, 220, 62),
-    )
-    buffer = io.BytesIO()
-    grain.stipple(W, H, bands).save(buffer, "PNG")
-    ground = (
-        f'<image href="data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}" '
-        f'width="{W}" height="{H}"/>'
-    )
-    text = _title(lines, size, [top + i * lead for i in range(len(lines))], W / 2, accents)
-    return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}">'
-        f"{ground}{text}{_credit()}</svg>"
-    )
-
-
 def _render(svg: str) -> Image.Image:
     """``svg`` rendered with the brand fonts, transparency kept."""
     import resvg_py  # the docs group's renderer; the rest of the module needs only Pillow
@@ -192,19 +136,13 @@ def _jpeg(svg: str, quality: int) -> bytes:
     return out.getvalue()
 
 
-def card_jpeg(title: str, accents: tuple[str, ...] = (), quality: int = QUALITY) -> bytes:
-    """The card as a JPEG."""
-    return _jpeg(card_svg(title, accents), quality)
-
-
 BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at twice that
 # The README chart's 16-unit corner on its 960-unit width, at the banner's width: both are shown
 # at the README's width, so their corners match.
 BANNER_RADIUS = 27
 BANNER_QUALITY = 65  # its base64 inside the SVG is about 290 KB, under MAX_BYTES
 TAGLINE = "Accelerated, accurate, agentic causal discovery"
-# The tagline's words in amber, on the homepage's card, the banner, and the social preview: the
-# three A's.
+# The tagline's words in amber, on the banner and the social preview: the three A's.
 ACCENT = ("Accelerated,", "accurate,", "agentic")
 
 
@@ -523,7 +461,7 @@ def cover_alt(kind: str) -> str:
 KIT_WORDMARK_H = 256  # the wordmark PNGs' height
 KIT_ICON = 512  # the icon PNGs' side
 KIT_AVATAR = 1024  # the avatar's side
-# The repository's social preview, at GitHub's recommended size; GitHub takes files up to 1 MB.
+# The repository's social preview, at GitHub's recommended size, and the homepage's link preview.
 SOCIAL_W, SOCIAL_H = 1280, 640
 SOCIAL_TITLE = 84  # the tagline's size, on three lines left of the lanes' amber streak
 SOCIAL_TEXT_W = 720
@@ -579,6 +517,11 @@ def social_svg() -> str:
     )
 
 
+def social_jpeg() -> bytes:
+    """The social preview as a JPEG, under ``MAX_BYTES``."""
+    return _jpeg(social_svg(), SOCIAL_QUALITY)
+
+
 def _png(svg: str, **size: int) -> bytes:
     import resvg_py  # the docs group's renderer
 
@@ -599,7 +542,7 @@ def brand_kit() -> dict[str, bytes]:
         files[f"andrey-icon-on-{ground}.svg"] = icon.encode()
         files[f"andrey-icon-on-{ground}.png"] = _png(icon, width=KIT_ICON)
     files["andrey-avatar.png"] = _png(_kit_icon("#ffffff", grain.COBALT), width=KIT_AVATAR)
-    files["andrey-social-preview.jpg"] = _jpeg(social_svg(), SOCIAL_QUALITY)
+    files["andrey-social-preview.jpg"] = social_jpeg()
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as kit:
         for name, data in [("README.txt", KIT_NOTE.encode()), *files.items()]:

@@ -152,6 +152,16 @@ def test_the_reference_documents_every_public_name_and_nothing_else(html):
     assert not extra, f"reference pages for names that are not public: {extra}"
 
 
+def test_the_homepage_preview_is_the_brand_kits_social_preview(html):
+    home = (html / "index.html").read_text(encoding="utf-8")
+    image = re.search(r'<meta property="og:image" content="https://[^/]+/([^"]+)"', home)[1]
+    width = re.search(r'<meta property="og:image:width" content="(\d+)"', home)[1]
+    height = re.search(r'<meta property="og:image:height" content="(\d+)"', home)[1]
+    preview = (html / image).read_bytes()
+    assert preview == (html / "_static" / "brand" / "andrey-social-preview.jpg").read_bytes()
+    assert preview[:2] == b"\xff\xd8" and (width, height) == ("1280", "640")
+
+
 def test_the_homepage_links_its_stylesheets_with_a_content_version(html):
     home = (html / "index.html").read_text(encoding="utf-8")
     for sheet in ("figures.css", "site.css"):

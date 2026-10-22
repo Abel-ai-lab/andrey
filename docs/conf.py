@@ -458,10 +458,9 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     summary = _load_summary(app)
     app.andrey_home = site.homepage_context(summary, placeholder=config.andrey_placeholder)
     config.myst_substitutions = {**config.myst_substitutions, **_methods_text()}
-    # The link-preview card shared by the homepage and every page that is not a post.
     site.fastest(summary)
-    home_card = cards.card_jpeg(cards.TAGLINE, cards.ACCENT)
-    _write_bytes(GENERATED / "extra" / HOME_PREVIEW, home_card)
+    # The link preview of the homepage and every page that is not a post: the social preview.
+    _write_bytes(GENERATED / "extra" / HOME_PREVIEW, cards.social_jpeg())
     # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
     for name, tile in cards.grain.hero_tiles():
         _write_bytes(GENERATED / "static" / name, tile)
@@ -474,8 +473,8 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     _write(GENERATED / "column-order.md", _column_order_table())
 
 
-# Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage's card carries the
-# slogan and each post's its title; every other page shares the first.
+# Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage, and every page
+# that is not a post, shows the repository's social preview; each post shows its banner.
 HOME_PREVIEW = "assets/preview/home.jpg"
 # Search results show about this many characters of a description.
 DESCRIPTION_LENGTH = 160
@@ -539,9 +538,9 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     title = home["title"] if home else html.unescape(heading)
     description = _description(app, context, doctree)
     url = SITE_URL + ("" if pagename == "index" else f"{pagename}.html")
-    image = HOME_PREVIEW
+    image, size = HOME_PREVIEW, (cards.SOCIAL_W, cards.SOCIAL_H)
     if pagename in _blog(app):  # each post's preview is its banner: its art, title, and release
-        image = f"assets/preview/{pagename.removeprefix('blog/')}.jpg"
+        image, size = f"assets/preview/{pagename.removeprefix('blog/')}.jpg", (cards.W, cards.H)
         preview = cards.preview_jpeg(_cover_kind(app, pagename), title, _cover_line(app, pagename))
         _write_bytes(pathlib.Path(app.outdir) / image, preview)
     image = SITE_URL + image
@@ -554,8 +553,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "og:url": url,
         "og:image": image,
         "og:image:type": "image/jpeg",
-        "og:image:width": str(cards.W),
-        "og:image:height": str(cards.H),
+        "og:image:width": str(size[0]),
+        "og:image:height": str(size[1]),
         "twitter:card": "summary_large_image",
     }
     preview = "".join(
