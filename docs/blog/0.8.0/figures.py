@@ -4,12 +4,10 @@
   correlation gives it and the one KCI gives it.
 - ``graphs.html``: the post's example, the true graph beside the graph PC finds with partial
   correlation and with each new test.
-- ``accuracy.html``: PC's errors on nonlinear data with each new test, its reference package's
-  implementation, partial correlation, and the empty graph, by graph size.
-- ``speed.html``: how much faster PC runs with each test than with its reference package, and on
-  how many datasets it makes no more errors.
+- ``comparison.html``: PC and FCI with each test against each reference package: the share of
+  datasets with no more errors, and the speedup on each kind of CPU.
 
-The tables' numbers come from the 0.8.0 release card's summary (``SUMMARY``), so they change only
+The table's numbers come from the 0.8.0 release card's summary (``SUMMARY``), so they change only
 with it; the other two figures are fitted here, on fixed seeds. Every color is an ``--andrey-*``
 token. Run with ``uv run python docs/blog/0.8.0/figures.py [summary.json]``.
 """
@@ -19,7 +17,6 @@ from __future__ import annotations
 import dataclasses
 import json
 import sys
-import warnings
 from html import escape
 from pathlib import Path
 
@@ -70,7 +67,6 @@ def dependence_figure() -> str:
         ("y = cos(x)", np.cos(x)),
         ("y = x²", x**2 / 3 - 1),
     )
-    warnings.simplefilter("ignore", andrey.ExperimentalWarning)
     tests = (("fisherz", "Partial correlation"), *TESTS.items())
     w, h, pad = 180, 110, 8
     rows, results = [], []
@@ -111,7 +107,6 @@ def dependence_figure() -> str:
 
 def graphs_figure() -> str:
     # The post's example: 500 rows of 8 variables, each a weighted sum of the cos of its causes.
-    warnings.simplefilter("ignore", andrey.ExperimentalWarning)
     dataset = sample_scm(
         d=8, n=500, functional="nonmonotone", density=2.0, scale="standardize", seed=0
     )
@@ -203,92 +198,70 @@ def table(title: str, columns: tuple[str, ...], groups: tuple, rank=None, note: 
     )
 
 
-def pc_rows(summary: dict) -> dict[str, dict]:
-    """Each test's PC entry in the summary's ``methods``, keyed by its ``indep_test`` name."""
-    found = {}
-    for method in summary["methods"]:
-        parts = method["solution"].split(".")
-        if parts[:2] == ["andrey", "pc"] and parts[2] in TESTS and method["lane"] == "nonlinear":
-            found[parts[2]] = method
-    missing = set(TESTS) - set(found)
-    if missing:
-        raise ValueError(f"the summary has no PC row for {sorted(missing)}")
-    return found
+# Speedups are compared only on one CPU. AMD EPYC 7713 has no AVX-512, which Andrey's CMIknn uses;
+# the card's other servers have it.
+CPUS = {
+    "AMD EPYC 7713": "AMD EPYC 7713",
+    "AMD EPYC 9534": "AVX-512 CPUs",
+    "AMD EPYC 9555": "AVX-512 CPUs",
+    "Intel Xeon Gold 5418Y": "AVX-512 CPUs",
+    "Intel Xeon Gold 6542Y": "AVX-512 CPUs",
+}
 
 
-def shd(value: float | None) -> str | None:
-    """A median SHD as the table shows it: whole, or with its half."""
-    if value is None:
+def ratios(values: list[float]) -> str | None:
+    """A speedup range as the card writes it, three significant figures."""
+    if not values:
         return None
-    return f"{value:g}"
+    low, high = (f"{v:#.3g}".rstrip(".") for v in (min(values), max(values)))
+    return f"{low}x" if low == high else f"{low}-{high}x"
 
 
-def accuracy_table(summary: dict) -> str:
-    # Median SHD per size, over the datasets both packages finished. The empty graph is a floor
-    # every method should beat, so it is never the row's best.
+def comparison_table(summary: dict) -> str:
+    # One row per search, test, and reference package, from the card's server rows: the share of
+    # paired datasets on which Andrey has no more errors, and the speedup range on each CPU kind.
+    columns = tuple(dict.fromkeys(CPUS.values()))
+    found: dict[tuple[str, str, str], dict] = {}
+    for method in summary["methods"]:
+        search, test = method["solution"].split(".")[1:3]
+        if method["lane"] != "nonlinear" or test not in TESTS:
+            continue
+        entry = found.setdefault(
+            (search, test, method["comparator"]), {"paired": 0, "no_more": 0, "cpu": {}}
+        )
+        for row in method["rows"]:
+            entry["paired"] += row["paired"]
+            entry["no_more"] += row["paired"] - row["comparator_fewer_errors"]
+            if row.get("ratio"):
+                cpu = CPUS[row["hardware"].split(",")[0]]
+                entry["cpu"].setdefault(cpu, []).append(row["ratio"])
     groups = []
-    for key, name in TESTS.items():
-        method = pc_rows(summary)[key]
+    for search in ("pc", "fci"):
         rows = tuple(
             (
-                f"{r['d']} variables",
-                f"{r['n']:,} rows",
+                f"{TESTS[test]}",
+                f"vs {comparator}",
                 (
-                    shd(r["andrey_shd"]),
-                    shd(r["comparator_shd"]),
-                    shd(r.get("fisherz_shd")),
-                    f"{r['empty_shd']:g} *",
+                    f"{round(100 * entry['no_more'] / entry['paired'])}%",
+                    *(ratios(entry["cpu"].get(c, [])) for c in columns),
                 ),
             )
-            for r in method["rows"]
-            if r["paired"]
+            for test in TESTS
+            for (s_, t_, comparator), entry in found.items()
+            if (s_, t_) == (search, test)
         )
-        groups.append((f"{name} vs {method['comparator']}", rows))
+        if rows:
+            groups.append((search.upper(), rows))
     return table(
-        "PC's errors on nonlinear data (median SHD, lower is better)",
-        ("Andrey", "Reference package", "Partial correlation", "Empty graph"),
+        "Against each reference package",
+        ("No more errors", *(f"Faster, {c}" for c in columns)),
         tuple(groups),
-        rank=lambda cell: None if cell.endswith("*") else float(cell),
-        note=(
-            "Median structural Hamming distance between PC's equivalence class and the true one, "
-            "over the datasets both packages finished. Partial correlation is Andrey's PC with "
-            "fisherz on the same datasets. * The empty graph's errors, the floor every test "
-            "should beat."
-        ),
-    )
-
-
-def speed_table(summary: dict) -> str:
-    # Speedup range over the sizes measured (a lower bound where the reference hit the time
-    # cap), and the datasets where Andrey's graph had no more errors than the reference's.
-    rows = []
-    for key, name in TESTS.items():
-        method = pc_rows(summary)[key]
-        measured = [r for r in method["rows"] if r["paired"]]
-        low = min(r["ratio"] for r in measured)
-        high = max(r["ratio"] for r in measured)
-        capped = any(r.get("ratio_is_lower_bound") for r in measured)
-        paired = sum(r["paired"] for r in measured)
-        no_more = paired - sum(r["comparator_fewer_errors"] for r in measured)
-        rows.append(
-            (
-                name,
-                f"vs {method['comparator']}",
-                (
-                    f"{low:.1f}-{high:.1f}x{' +' if capped else ''}",
-                    f"{round(100 * no_more / paired)}% of {paired}",
-                ),
-            )
-        )
-    return table(
-        "PC with each test, against its reference package",
-        ("Faster by", "No more errors"),
-        (("Nonlinear tests", tuple(rows)),),
         rank=lambda cell: None,
         note=(
-            "Median fit time of the reference over Andrey's, per size; + where the reference hit "
-            "the time cap, so the speedup is at least that. No more errors: the datasets where "
-            "Andrey's graph had no more errors than the reference's."
+            "No more errors: the share of datasets, 20 per size, on which Andrey's graph has no "
+            "more errors than the reference's. Faster: the range over sizes of the median "
+            "speedup on 5 datasets, each fit on 4 cores. AVX-512 CPUs: AMD EPYC 9534 and 9555, "
+            "Intel Xeon Gold 5418Y and 6542Y. A dash marks a CPU that timed no size."
         ),
     )
 
@@ -299,8 +272,7 @@ def main() -> None:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else SUMMARY
     if path.exists():  # the release card's summary lands with the card
         summary = json.loads(path.read_text(encoding="utf-8"))
-        (HERE / "accuracy.html").write_text(accuracy_table(summary), encoding="utf-8")
-        (HERE / "speed.html").write_text(speed_table(summary), encoding="utf-8")
+        (HERE / "comparison.html").write_text(comparison_table(summary), encoding="utf-8")
 
 
 if __name__ == "__main__":
