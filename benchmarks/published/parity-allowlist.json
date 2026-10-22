@@ -169,6 +169,36 @@
           {"seed": 4, "andrey": 8, "comparator": 7, "andrey_reversed": 7, "andrey_reversed_is_comparator": true}
         ]
       }
+    },
+    {
+      "summary": "0.8.0",
+      "method": "FCI with the KCI test",
+      "comparator": "causal-learn",
+      "row": {"regime": "anm_er", "mean_degree": 2.0, "d": 10, "n": 500},
+      "andrey_errors": 1,
+      "comparator_errors": 0,
+      "cause": "order-dependent-reference",
+      "reason": "causal-learn's FCI follows the column order in its possible-d-separation step and its orientation rules, so the row compares it with Andrey's FCI in its column-order mode on the same 20 datasets (possible_dsep='fast', the orientation rules one firing at a time in column order). Their errors differ on one dataset, seed 14: on the edge between nodes 1 and 4, Andrey's PAG has a tail at node 4 where the true PAG and causal-learn's have a circle, so causal-learn has fewer errors on one dataset and Andrey on none. With the columns of every dataset in reversed order, Andrey's column-order mode and causal-learn have the same number of errors on all 20, so the row passes. Andrey's order-free default against causal-learn: causal-learn fewer on 2, Andrey on 0.",
+      "citation": "Spirtes, P., Glymour, C., and Scheines, R. (2000). Causation, Prediction, and Search, 2nd ed. MIT Press (Possible-D-Sep). Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the presence of latent confounders and selection bias. Artificial Intelligence 172(16-17), 1873-1896. causal-learn 0.1.4.8 (MIT): causallearn/search/ConstraintBased/FCI.py, getPossibleDsep and the orientation rules.",
+      "evidence": {
+        "column_order": "reversed",
+        "andrey_errors": 0,
+        "comparator_errors": 0
+      }
+    },
+    {
+      "summary": "0.8.0",
+      "method": "PC with the CMIknn test",
+      "comparator": "tigramite",
+      "row": {"regime": "nonmonotone_er", "mean_degree": 2.0, "d": 5, "n": 500},
+      "andrey_errors": 5,
+      "comparator_errors": 2,
+      "cause": "random-draw",
+      "reason": "CMIknn's p-value comes from a local permutation test, and its random draws decide this row. tigramite's PC with contemp_collider_rule='none' depends on the column order, so the row compares it with Andrey's PC in its column-order mode on the same 20 datasets (colliders and Meek's rules in column order): with the benchmarked seeds (Andrey's 0, tigramite's default 42), tigramite has fewer errors on 5 datasets and Andrey on 2. With both packages' CMIknn re-drawn at seeds 1 and 2, on all 20 datasets, the row passes at both seeds: tigramite fewer on 3 and Andrey on 3 each time. The two packages draw differently: tigramite from one generator in query order, Andrey from one generator per conditioning set. Andrey's order-free default against tigramite: tigramite fewer on 3, Andrey on 2.",
+      "citation": "Runge, J. (2018). Conditional independence testing based on a nearest-neighbor estimator of conditional mutual information. AISTATS, PMLR 84, 938-947 (the local permutation test). tigramite 5.2.10.1 (GPL-3.0): CMIknn(seed=...), PCMCI.run_pcalg_non_timeseries_data.",
+      "evidence": {
+        "draws": [{"seed": 1, "andrey_errors": 3, "comparator_errors": 3}, {"seed": 2, "andrey_errors": 3, "comparator_errors": 3}]
+      }
     }
   ]
 }
