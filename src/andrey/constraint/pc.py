@@ -337,9 +337,10 @@ def _discover_skeleton(
     the size-0 and size-1 passes take them (all-pairs marginal threshold, then one first-order
     batch per surviving pair) in place of the dense scalar scan -- same removals, same separating
     sets, same p-values. With ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass
-    of at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests fans out
-    across worker processes; the per-chunk removals are concatenated in pair order, so the result,
-    a raised error included, is identical to the serial scan whatever the partition.
+    of at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
+    ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
+    per-chunk removals are concatenated in pair order, so the result, a raised error included, is
+    identical to the serial scan whatever the partition.
 
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.

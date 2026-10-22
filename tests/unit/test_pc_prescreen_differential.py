@@ -30,7 +30,6 @@ from itertools import combinations
 import numpy as np
 import pytest
 
-from andrey.constraint import _parallel_skeleton
 from andrey.constraint.fci import _fast_adjacency_search
 from andrey.constraint.pc import _discover_skeleton
 from andrey.core import NULL, TAIL
@@ -268,7 +267,7 @@ _PARALLEL_IDS = [f"seed{s}-d{d}-n{n}-p{p}" for (s, d, n, p) in _PARALLEL_CASES]
 
 @pytest.fixture
 def _open_gate(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(_parallel_skeleton, "MIN_POOL_QUERIES", 0)
+    monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0")
 
 
 @pytest.mark.usefixtures("_open_gate")

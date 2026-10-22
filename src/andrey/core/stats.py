@@ -447,11 +447,13 @@ def corrcoef(X: np.ndarray, *, rowvar: bool = True) -> np.ndarray:
     return backend.to_numpy(torch.corrcoef(t))
 
 
-def entropy(U: np.ndarray) -> np.ndarray:
+def entropy(U: np.ndarray, *, work: np.ndarray | None = None) -> np.ndarray:
     """Differential-entropy approximation for each column of ``U`` (shape ``(n_samples, d)``).
 
     The maximum-entropy approximation used by DirectLiNGAM; inputs are assumed standardized. The
-    numpy path is the reference; the torch path matches it within ``atol 1e-3``.
+    numpy path is the reference; the torch path matches it within ``atol 1e-3``. ``work``, a
+    float64 array with ``U``'s shape and memory layout (which sets the order of the column sums),
+    holds the numpy path's intermediate values instead of fresh arrays; the torch path ignores it.
     """
     U = np.asarray(U, dtype=np.float64)
     if U.ndim == 1:
@@ -468,13 +470,18 @@ def entropy(U: np.ndarray) -> np.ndarray:
     # Entropy gates on `U.size = n*B` and may bootstrap the device because it recurs per fit.
     dev = backend.resolve(U.size, thr, amortized=True, op="entropy")
     if dev == "numpy":
-        return _entropy_numpy(U)
+        return _entropy_numpy(U, work)
     return _entropy_torch(U, dev)
 
 
-def _entropy_numpy(U: np.ndarray) -> np.ndarray:
-    t1 = np.mean(np.log(np.cosh(U)), axis=0) - _GAMMA
-    t2 = np.mean(U * np.exp(-(U**2) / 2.0), axis=0)
+def _entropy_numpy(U: np.ndarray, work: np.ndarray | None = None) -> np.ndarray:
+    w = np.empty_like(U) if work is None else work
+    t1 = np.mean(np.log(np.cosh(U, out=w), out=w), axis=0) - _GAMMA
+    np.square(U, out=w)
+    np.negative(w, out=w)
+    np.true_divide(w, 2.0, out=w)
+    np.exp(w, out=w)
+    t2 = np.mean(np.multiply(U, w, out=w), axis=0)  # mean of U * exp(-(U**2) / 2)
     return _HALF_LOG_2PI_E - _K1 * t1**2 - _K2 * t2**2
 
 
