@@ -111,9 +111,9 @@
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
       },
       "ICA-LiNGAM": {
-        "lingam_sf_d20": {"median_shd": 1.5, "empty_median_shd": 19.0, "shd": [2, 0, 1, 2, 1, 10, 8, 0, 0, 7]},
-        "lingam_sf_d50": {"median_shd": 9.5, "empty_median_shd": 49.0, "shd": [10, 3, 5, 9, 17, 73, 30, 17, 1, 4]},
-        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 1, 1, 0, 0, 0, 0]},
+        "lingam_sf_d20": {"median_shd": 1.5, "empty_median_shd": 19.0, "shd": [0, 11, 1, 2, 0, 0, 8, 0, 3, 5]},
+        "lingam_sf_d50": {"median_shd": 14.0, "empty_median_shd": 49.0, "shd": [11, 17, 2, 10, 19, 77, 36, 4, 0, 19]},
+        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 4, 0, 0, 0, 0, 0]},
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
       },
       "MultiGroupDirectLiNGAM": {
