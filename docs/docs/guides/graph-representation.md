@@ -34,6 +34,8 @@ coefficient `0.8` is an illustration, not an estimate from data.
 |---|---|---|
 | Andrey endpoints | `GraphStructure.to_numpy()` | `1`: tail at `i`; reverse cell is `2`: arrowhead at `j` |
 | causal-learn endpoints | `GeneralGraph.graph` | `-1`: tail at `i`; reverse cell is `1`: arrowhead at `j` |
+| pcalg `amat.cpdag` | `as(fit, "amat")` | `0`: tail at `i`; reverse cell is `1`: arrowhead at `j` |
+| pcalg `amat.pag` | `fit@amat` | `2`: arrowhead at `j`; reverse cell is `3`: tail at `i` |
 | Binary directed adjacency | `A` | `1`: edge from row `i` to column `j` |
 | lingam coefficients | `adjacency_matrix_` | Effect of column `j` on row `i`; the coefficient for `i -> j` is in `[j, i]` |
 
@@ -198,18 +200,49 @@ def from_binary_dag(A):
     M = np.zeros(A.shape, dtype=np.int8)
     M[A], M[A.T] = TAIL, ARROW
     return GraphStructure.from_numpy(M, kind="dag")
+
+
+def from_pcalg_pag(amat, kind="pag"):
+    """pcalg `amat.pag` (0 none, 1 circle, 2 arrowhead, 3 tail); amat[i, j] is the mark at j."""
+    A = np.asarray(amat).T
+    if not np.isin(A, (0, 1, 2, 3)).all():
+        raise ValueError("amat.pag holds only the codes 0, 1, 2, 3")
+    M = np.zeros(A.shape, dtype=np.int8)
+    M[A == 1], M[A == 2], M[A == 3] = CIRCLE, ARROW, TAIL
+    return GraphStructure.from_numpy(M, kind=kind)
+
+
+def from_pcalg_cpdag(amat):
+    """pcalg `amat.cpdag`; i -> j is amat[j, i] = 1 and amat[i, j] = 0, i -- j is 1 both ways."""
+    A = np.asarray(amat)
+    if not np.isin(A, (0, 1)).all():
+        raise ValueError("amat.cpdag holds only the codes 0 and 1")
+    A = A != 0
+    M = np.zeros(A.shape, dtype=np.int8)
+    M[A.T] = TAIL
+    M[A & ~A.T] = ARROW
+    return GraphStructure.from_numpy(M, kind="cpdag")
 ```
 
 - **causal-learn** - `G.graph[i, j]` is also the mark at `i`, so `from_signed(G.graph, kind)`
   needs no transpose. Its wildcard and compound codes (3 and above) have no Andrey equivalent.
 - **lingam** - pass `adjacency_matrix_.T` to `from_binary_dag`. Some estimators write `NaN` for
   an unobserved common cause; decide how to encode those pairs first.
+- **pcalg** - `amat.pag` (`fit@amat` from `fci` or `rfci`) holds the mark at the column node, so
+  `from_pcalg_pag` transposes it and swaps pcalg's codes for circle (1) and tail (3). A MAG uses
+  the same coding. `amat.cpdag` (`as(fit, "amat")` from `pc`) writes `i -> j` at `[j, i]`, the
+  child's row, and an undirected edge as `1` in both cells, so `from_pcalg_cpdag` transposes it
+  too. To write a PAG for pcalg, transpose `to_numpy()` and swap the codes 1 and 3.
 
 ## References
 
 - [causal-learn graph implementation][signed-graph]: signed endpoint marks.
 - [LiNGAM model definition](https://lingam.readthedocs.io/en/latest/tutorial/lingam.html):
   the coefficient convention in $x = Bx + e$.
+- [pcalg `amatType`][pcalg-amat-type]: the `amat.cpdag` and `amat.pag` codes, and the row or
+  column the mark belongs to.
 
 [signed-graph]:
   https://github.com/py-why/causal-learn/blob/main/causallearn/graph/GeneralGraph.py
+[pcalg-amat-type]:
+  https://search.r-project.org/CRAN/refmans/pcalg/html/amatType.html
