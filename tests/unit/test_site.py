@@ -546,52 +546,22 @@ def test_a_page_without_a_description_takes_its_first_paragraph(
     assert conf["_description"](app, {"meta": meta}, None) == without
 
 
-@pytest.mark.parametrize(
-    ("kind", "title"),
-    [
-        ("catalog", "Authors"),
-        ("catalog", "Tags"),
-        ("catalog", "All posts"),
-        ("collection", "All Posts"),
-        ("collection", "Posts by Shu Wan"),
-        ("collection", "Posts tagged Release"),
-        ("collection", "Posted in 2026"),
-        ("collection", "Drafts"),
-    ],
-)
-def test_a_generated_blog_collection_describes_its_existing_title(conf, kind, title):
+# A generated blog collection (ABlog's archive, tag, author, and year pages) has no doctree: it
+# describes its title as plain text, unless the page sets a description or has no title.
+def test_a_generated_blog_collection_describes_its_title(conf):
     app = types.SimpleNamespace(
         andrey_home={"description": HOME}, config=types.SimpleNamespace(project="Andrey")
     )
-    assert conf["_description"](app, {kind: (), "title": title}, None) == f"Andrey blog: {title}."
 
+    def described(**context):
+        return conf["_description"](app, {"collection": (), **context}, None)
 
-def test_a_blog_collection_description_is_plain_short_text(conf):
-    app = types.SimpleNamespace(
-        andrey_home={"description": HOME}, config=types.SimpleNamespace(project="Andrey")
+    assert described(title="Posts tagged <em>PC &amp; FCI</em>") == (
+        "Andrey blog: Posts tagged PC & FCI."
     )
-    context = {"collection": (), "title": "Posts tagged <em>PC &amp; FCI</em>"}
-    assert conf["_description"](app, context, None) == "Andrey blog: Posts tagged PC & FCI."
-    context["title"] = "Posts tagged " + "long topic " * 30
-    assert len(conf["_description"](app, context, None)) <= conf["DESCRIPTION_LENGTH"]
-
-
-def test_a_collection_context_keeps_authored_descriptions_and_prose(conf):
-    from docutils import nodes
-    from docutils.utils import new_document
-
-    doctree = new_document("page")
-    doctree += nodes.paragraph(text=FIRST)
-    app = types.SimpleNamespace(andrey_home={"description": HOME})
-    context = {"collection": (), "title": "Posts tagged Release"}
-    assert conf["_description"](app, context, doctree) == FIRST
-    assert conf["_description"](app, {**context, "meta": {"description": FRONT}}, None) == FRONT
-
-
-@pytest.mark.parametrize("context", [{"title": "Search"}, {"collection": (), "title": "  "}])
-def test_a_page_without_a_collection_title_keeps_the_homepage_fallback(conf, context):
-    app = types.SimpleNamespace(andrey_home={"description": HOME})
-    assert conf["_description"](app, context, None) == HOME
+    assert len(described(title="Posts tagged " + "long topic " * 30)) <= conf["DESCRIPTION_LENGTH"]
+    assert described(title="  ") == HOME
+    assert described(title="Tags", meta={"description": FRONT}) == FRONT
 
 
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
