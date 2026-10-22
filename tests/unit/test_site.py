@@ -624,6 +624,54 @@ def test_a_page_without_a_description_takes_its_first_paragraph(
     assert conf["_description"](app, {"meta": meta}, None) == without
 
 
+@pytest.mark.parametrize(
+    ("kind", "title"),
+    [
+        ("catalog", "Authors"),
+        ("catalog", "Tags"),
+        ("catalog", "All posts"),
+        ("collection", "All Posts"),
+        ("collection", "Posts by Shu Wan"),
+        ("collection", "Posts tagged Release"),
+        ("collection", "Posted in 2026"),
+        ("collection", "Drafts"),
+    ],
+)
+def test_a_generated_blog_collection_describes_its_existing_title(conf, kind, title):
+    app = types.SimpleNamespace(
+        andrey_home={"description": HOME}, config=types.SimpleNamespace(project="Andrey")
+    )
+    assert conf["_description"](app, {kind: (), "title": title}, None) == f"Andrey blog: {title}."
+
+
+def test_a_blog_collection_description_is_plain_short_text(conf):
+    app = types.SimpleNamespace(
+        andrey_home={"description": HOME}, config=types.SimpleNamespace(project="Andrey")
+    )
+    context = {"collection": (), "title": "Posts tagged <em>PC &amp; FCI</em>"}
+    assert conf["_description"](app, context, None) == "Andrey blog: Posts tagged PC & FCI."
+    context["title"] = "Posts tagged " + "long topic " * 30
+    assert len(conf["_description"](app, context, None)) <= conf["DESCRIPTION_LENGTH"]
+
+
+def test_a_collection_context_keeps_authored_descriptions_and_prose(conf):
+    from docutils import nodes
+    from docutils.utils import new_document
+
+    doctree = new_document("page")
+    doctree += nodes.paragraph(text=FIRST)
+    app = types.SimpleNamespace(andrey_home={"description": HOME})
+    context = {"collection": (), "title": "Posts tagged Release"}
+    assert conf["_description"](app, context, doctree) == FIRST
+    assert conf["_description"](app, {**context, "meta": {"description": FRONT}}, None) == FRONT
+
+
+@pytest.mark.parametrize("context", [{"title": "Search"}, {"collection": (), "title": "  "}])
+def test_a_page_without_a_collection_title_keeps_the_homepage_fallback(conf, context):
+    app = types.SimpleNamespace(andrey_home={"description": HOME})
+    assert conf["_description"](app, context, None) == HOME
+
+
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
 def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
