@@ -37,14 +37,14 @@ Nonlinear tests
 
 0.8.0 is here: PC and FCI test conditional independence on nonlinear data with KCI, RCoT, CMIknn,
 and GPDC, BOSS and GRaSP score categorical data with BDeu and the categorical BIC, and the
-chi-square and G-square tests answer many queries at once. PC with RCoT runs more than 10x faster
-than causal-learn at 50 variables, and BOSS and GRaSP with BDeu more than 150x faster than
-causal-learn on categorical data.
+chi-square and G-square tests answer many queries at once. On an AMD EPYC 7713, PC with RCoT runs
+more than 10x faster than causal-learn at 50 variables, and BOSS and GRaSP with BDeu more than 130x
+faster than causal-learn on random categorical graphs.
 
 :::{div} release-stats
 
 - **More than 10x** PC with RCoT speedup over causal-learn at 50 variables
-- **More than 150x** BOSS and GRaSP speedup over causal-learn on categorical data
+- **More than 130x** BOSS and GRaSP speedup over causal-learn on random categorical graphs
 - **More than 3x** PC with the chi-square test speedup over Andrey 0.7.0 from 40 variables
 :::
 
@@ -123,7 +123,7 @@ Released October 17, 2026
 :::{card}
 :link: benchmarks/0.5.0
 :link-type: doc
-:link-alt: The 0.5.0 release card: time series
+:link-alt: The 0.5.0 release card: temporal causal discovery
 :class-card: release-tile release-art-0-5-0
 :shadow: none
 :margin: 0
@@ -279,7 +279,7 @@ The homepage's speed claim and charts come from these release cards.
 0.8.0: nonlinear tests <benchmarks/0.8.0>
 0.7.0: permutation invariance <benchmarks/0.7.0>
 0.6.0: mixed and categorical data <benchmarks/0.6.0>
-0.5.0: time series <benchmarks/0.5.0>
+0.5.0: temporal causal discovery <benchmarks/0.5.0>
 0.4.0: pairwise direction <benchmarks/0.4.0>
 0.3.0: score-based search <benchmarks/0.3.0>
 0.2.0: hidden common causes <benchmarks/0.2.0>
