@@ -178,7 +178,16 @@ at one size, and it fails at any margin:
 - otherwise, when Andrey's errors (the row's mean or median SHD, or directed errors) are higher.
 
 A row where either side has no result is skipped. A released summary never changes, so a method
-re-measured against the same reference in a later summary is judged by the later rows only.
+re-measured against the same reference in a later summary is judged by the later rows only. Where
+a summary has one entry per regime for a method and reference, a row's key names its `regime`.
+
+A reference whose result depends on the column order is compared with Andrey in its column-order
+mode, like with like. Such a row sets `reference_order_dependent`, and, where Andrey's
+column-order mode ran on the same datasets, holds both sides' errors per dataset
+(`andrey_column_shd_by_seed`, `comparator_shd_by_seed`). The check then counts the series on
+which each side has fewer errors in that comparison, and prints the order-free default's counts
+beside them without judging them. A row of an order-dependent reference without that arm is
+judged by the default.
 
 `benchmarks/published/parity-allowlist.json` exempts a failing row only when it names the cause,
 with a reason and a citation:
@@ -186,12 +195,21 @@ with a reason and a citation:
 - `correct-by-paper`: Andrey follows the method's paper and the reference does not.
 - `reference-defect`: the reference has a defect.
 - `tie-break`: the two packages end at different local optima after an exact score tie that Andrey
-  breaks by column order. Its `evidence` holds the row's two error values with the columns in
-  reversed order (`"column_order": "reversed"`, `andrey_errors`, `comparator_errors`), where the
-  row must pass.
+  breaks by column order.
+- `order-dependent-reference`: a choice the reference makes in column order, such as which of two
+  conflicting colliders it keeps or the order of its possible-d-separation step, decides the row.
+- `random-draw`: the random draws of the CI test decide the row.
+- `experimental-test`: the row measures an experimental CI test, published as measured.
 
-Each entry pins the row's two error values (its two series counts, where the row has them), so a
-re-run that changes the row voids it, and an entry that matches no failing row fails the check.
+A `tie-break` or `order-dependent-reference` entry's `evidence` holds the row's two error values
+with the columns in reversed order (`"column_order": "reversed"`, `andrey_errors`,
+`comparator_errors`), where the row must pass. A `random-draw` entry's `evidence` holds the row's
+values under at least two other seeds of the draws (`draws`, each with `seed`, `andrey_errors`, and
+`comparator_errors`), where the row must pass on each.
+
+Each entry pins the row's two error values (its two series counts, where the row has them, from the
+column-order comparison where that is the one judged), so a re-run that changes the row voids it,
+and an entry that matches no failing row fails the check.
 
 ```shell
 uv run python -m qa.reference_parity  # exit 1 if any row fails

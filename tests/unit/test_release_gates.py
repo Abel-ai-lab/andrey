@@ -458,3 +458,129 @@ def test_parity_judges_a_method_by_its_newest_summary(tmp_path):
     rows = reference_parity.published_rows(tmp_path)
     assert [r.summary for r in rows] == ["new"]
     assert reference_parity.check(rows, [])[0] == []
+
+
+def _column_row(andrey: list, reference: list, **changes) -> dict:
+    """A row of an order-dependent reference whose order-free default passes: Andrey ahead on 2."""
+    row = {
+        "d": 10,
+        "andrey_fewer_errors": 2,
+        "comparator_fewer_errors": 0,
+        "reference_order_dependent": True,
+        "andrey_column_shd_by_seed": andrey,
+        "comparator_shd_by_seed": reference,
+    }
+    return {**row, **changes}
+
+
+def test_parity_judges_an_order_dependent_reference_by_andrey_in_column_order():
+    from qa import reference_parity
+
+    # Column order: the reference has fewer errors on seeds 0 and 2, Andrey on seed 3; seed 4 has no
+    # result on one side and is not a series.
+    row = _column_row([3, 1, 2, 0, None], [2, 1, 1, 1, 5])
+    [parsed] = reference_parity.paired_rows("s", _summary(row))
+    assert (parsed.rule, parsed.andrey, parsed.reference, parsed.default) == (
+        "column-order series",
+        2,
+        1,
+        (0, 2),
+    )
+    [failure] = _failures(row)
+    assert "column-order mode" in failure and "order-free default (not judged)" in failure
+    # A default that fails is not judged when the column-order arm passes.
+    assert _failures(_column_row([1, 1], [2, 1], comparator_fewer_errors=5)) == []
+
+
+def test_parity_judges_an_order_dependent_reference_without_the_arm_by_the_default():
+    row = {"d": 10, "andrey_fewer_errors": 0, "comparator_fewer_errors": 1}
+    assert len(_failures({**row, "reference_order_dependent": True})) == 1
+    assert _failures({**row, "andrey_fewer_errors": 1, "reference_order_dependent": True}) == []
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        _column_row([1, 2], [1, 2], reference_order_dependent=False),
+        {k: v for k, v in _column_row([1], [1]).items() if k != "reference_order_dependent"},
+        {k: v for k, v in _column_row([1], [1]).items() if k != "comparator_shd_by_seed"},
+        _column_row([1, 2], [1]),
+    ],
+)
+def test_parity_rejects_a_column_order_arm_it_cannot_judge(row):
+    from qa import reference_parity
+
+    with pytest.raises(ValueError):
+        reference_parity.paired_rows("s", _summary(row))
+
+
+def test_parity_pins_the_column_order_comparison_of_an_allowlisted_row():
+    row = _column_row([3, 1, 2], [2, 1, 1])  # the reference has fewer errors on 2 series, Andrey 0
+    reversed_order = {"column_order": "reversed", "andrey_errors": 0, "comparator_errors": 1}
+    entry = _entry(
+        row={"d": 10},
+        cause="order-dependent-reference",
+        andrey_errors=2,
+        comparator_errors=0,
+        evidence=reversed_order,
+    )
+    assert _failures(row, allowlist=(entry,)) == []
+    # The order-free default's counts (Andrey ahead on 2) are not what the entry pins.
+    assert len(_failures(row, allowlist=({**entry, "andrey_errors": 0, "comparator_errors": 2},)))
+
+
+def test_parity_keys_a_row_by_regime_when_a_method_has_one_entry_per_regime():
+    from qa import reference_parity
+
+    row = {"d": 10, "n": 500, "andrey_fewer_errors": 0, "comparator_fewer_errors": 1}
+    summary = {
+        "methods": [
+            {"method": "M", "comparator": "ref", "regime": regime, "rows": [row]}
+            for regime in ("additive", "nonmonotone")
+        ]
+    }
+    rows = reference_parity.paired_rows("s", summary)
+    assert [r.key for r in rows] == [
+        {"regime": "additive", "d": 10, "n": 500},
+        {"regime": "nonmonotone", "d": 10, "n": 500},
+    ]
+    entry = _entry(row={"regime": "additive", "d": 10, "n": 500}, cause="experimental-test")
+    failures = reference_parity.check(
+        rows, [{**entry, "andrey_errors": 1, "comparator_errors": 0}]
+    )[0]
+    assert len(failures) == 1 and "regime=nonmonotone" in failures[0]
+    for method in summary["methods"]:
+        del method["regime"]
+    with pytest.raises(ValueError):
+        reference_parity.paired_rows("s", summary)
+
+
+def test_parity_allowlist_checks_the_evidence_of_each_cause():
+    row = {"d": 50, "andrey_fewer_errors": 0, "comparator_fewer_errors": 3}
+
+    def entry(cause, evidence=None):
+        return _entry(cause=cause, andrey_errors=3, comparator_errors=0, evidence=evidence)
+
+    draws = {"draws": [{"seed": 1, "andrey_errors": 1, "comparator_errors": 3}] * 2}
+    reversed_order = {"column_order": "reversed", "andrey_errors": 4, "comparator_errors": 12}
+    accepted = (
+        entry("experimental-test"),
+        entry("random-draw", draws),
+        entry("order-dependent-reference", reversed_order),
+    )
+    for good in accepted:
+        assert _failures(row, allowlist=(good,)) == [], good
+    one_draw = {"draws": draws["draws"][:1]}
+    failing_draw = {
+        "draws": [*draws["draws"], {"seed": 3, "andrey_errors": 2, "comparator_errors": 1}]
+    }
+    rejected = (
+        entry("random-draw"),
+        entry("random-draw", one_draw),
+        entry("random-draw", failing_draw),
+        entry("order-dependent-reference"),
+        entry("order-dependent-reference", {**reversed_order, "andrey_errors": 13}),
+    )
+    for bad in rejected:
+        failures = _failures(row, allowlist=(bad,))
+        assert len(failures) == 1 and "allowlist entry rejected" in failures[0], bad

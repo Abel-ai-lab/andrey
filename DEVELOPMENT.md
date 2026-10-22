@@ -220,7 +220,8 @@ release pull request into `main`, which `main` requires to pass; the publish reu
 the tagged commit has the same tree and runs the gate itself otherwise.
 [`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. The gate also fails
 any published benchmark row where the reference package has fewer errors than
-Andrey, unless `benchmarks/published/parity-allowlist.json` cites the cause
+Andrey (in Andrey's column-order mode, where the reference depends on the column order), unless
+`benchmarks/published/parity-allowlist.json` cites the cause
 ([reference parity](qa/README.md#reference-parity)).
 
 ### 5. Benchmark campaign

@@ -1,5 +1,5 @@
 {
-  "about": "Published rows where the reference package has fewer errors than Andrey, each with its cause. qa/reference_parity.py accepts an entry only when its cause is correct-by-paper, reference-defect, or tie-break, it gives a reason and a citation, and it pins the row's current error values; a tie-break entry's evidence gives the row's error values with the columns in reversed order, where the row passes.",
+  "about": "Published rows where the reference package has fewer errors than Andrey, each with its cause; a reference whose result depends on the column order is compared with Andrey in its column-order mode where the row has it. qa/reference_parity.py accepts an entry only when its cause is correct-by-paper, reference-defect, tie-break, order-dependent-reference, random-draw, or experimental-test, it gives a reason and a citation, and it pins the row's current error values; a tie-break or order-dependent-reference entry's evidence gives the row's error values with the columns in reversed order, where the row passes, and a random-draw entry's the row's values under at least two other seeds of the draws, where the row passes on each.",
   "entries": [
     {
       "summary": "0.1.0",

@@ -143,3 +143,11 @@ step by the rank, and `"fast"` under `position`, which visits it in column order
 in the call overrides the setting.
 
 The methods in the "No" rows have no rank to replace, and the setting does not change them.
+
+## Comparisons with other packages
+
+At the settings the benchmarks use, causal-learn's PC, FCI, BOSS, and GRaSP, pcalg's PC, and
+tigramite's PC give results that depend on the column order. Where a benchmark also runs Andrey in
+its column-order mode on the same datasets, such a package is compared with that mode, like with
+like: for `pc` and `fci`, the search steps that `tie_break="position"` puts in column order. The
+benchmark tables lead with the order-free default.
