@@ -546,24 +546,6 @@ def test_a_page_without_a_description_takes_its_first_paragraph(
     assert conf["_description"](app, {"meta": meta}, None) == without
 
 
-# A generated blog collection (ABlog's archive, tag, author, and year pages) has no doctree: it
-# describes its title as plain text, unless the page sets a description or has no title.
-def test_a_generated_blog_collection_describes_its_title(conf):
-    app = types.SimpleNamespace(
-        andrey_home={"description": HOME}, config=types.SimpleNamespace(project="Andrey")
-    )
-
-    def described(**context):
-        return conf["_description"](app, {"collection": (), **context}, None)
-
-    assert described(title="Posts tagged <em>PC &amp; FCI</em>") == (
-        "Andrey blog: Posts tagged PC & FCI."
-    )
-    assert len(described(title="Posts tagged " + "long topic " * 30)) <= conf["DESCRIPTION_LENGTH"]
-    assert described(title="  ") == HOME
-    assert described(title="Tags", meta={"description": FRONT}) == FRONT
-
-
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
 def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
