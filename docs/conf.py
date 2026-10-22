@@ -493,14 +493,20 @@ def _first_paragraph(doctree: nodes.document) -> str:
 
 def _description(app, context: dict, doctree: nodes.document | None) -> str:  # noqa: ANN001
     """The page's description: the homepage's sentence, the front matter's ``description``, or the
-    first paragraph cut at a word to ``DESCRIPTION_LENGTH``. A page with neither, such as search or
-    the blog archive, takes the homepage's."""
+    first paragraph cut at a word to ``DESCRIPTION_LENGTH``. A generated blog collection describes
+    its title; other pages with neither, such as search, take the homepage's."""
     if home := context.get("home"):
         return home["description"]
     meta = context.get("meta") or {}
     if (meta.get("description") or "").strip():  # an empty value counts as none
         return meta["description"].strip()
-    paragraph = _first_paragraph(doctree) if doctree is not None else ""
+    if doctree is not None:
+        paragraph = _first_paragraph(doctree)
+    elif "catalog" in context or "collection" in context:
+        title = " ".join(html.unescape(re.sub(r"<[^>]+>", "", context.get("title") or "")).split())
+        paragraph = f"{app.config.project} blog: {title}." if title else ""
+    else:
+        paragraph = ""
     if paragraph:
         return textwrap.shorten(
             paragraph, DESCRIPTION_LENGTH, placeholder="…", break_on_hyphens=False

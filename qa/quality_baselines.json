@@ -29,7 +29,11 @@
       "LPCMCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
       "VARMA-LiNGAM": {"median_shd": 2, "reason": "The likelihood fit ends within rounding of its optimum. Under a relative 1e-12 input perturbation, three times, 4 of 60 draws changed and no median moved. Two covers a moved median with one to spare."},
       "LongitudinalLiNGAM": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline ordering decision to differ on another host."},
-      "Granger": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline lasso selection to differ on another host."}
+      "Granger": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline lasso selection to differ on another host."},
+      "KCI": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "RCoT": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "CMIknn": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."},
+      "GPDC": {"median_shd": 1, "reason": "No draw changed when every input was perturbed by a relative 1e-12, ten times. One allows a single borderline independence decision to differ on another host."}
     },
     "baselines": {
       "PC": {
@@ -111,9 +115,9 @@
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
       },
       "ICA-LiNGAM": {
-        "lingam_sf_d20": {"median_shd": 1.5, "empty_median_shd": 19.0, "shd": [2, 0, 1, 2, 1, 10, 8, 0, 0, 7]},
-        "lingam_sf_d50": {"median_shd": 9.5, "empty_median_shd": 49.0, "shd": [10, 3, 5, 9, 17, 73, 30, 17, 1, 4]},
-        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 1, 1, 0, 0, 0, 0]},
+        "lingam_sf_d20": {"median_shd": 1.5, "empty_median_shd": 19.0, "shd": [0, 11, 1, 2, 0, 0, 8, 0, 3, 5]},
+        "lingam_sf_d50": {"median_shd": 14.0, "empty_median_shd": 49.0, "shd": [11, 17, 2, 10, 19, 77, 36, 4, 0, 19]},
+        "asia_lingam": {"median_shd": 0.0, "empty_median_shd": 8.0, "shd": [1, 1, 0, 0, 4, 0, 0, 0, 0, 0]},
         "sachs": {"median_shd": 14.0, "empty_median_shd": 17.0, "shd": [14]}
       },
       "MultiGroupDirectLiNGAM": {
@@ -161,6 +165,24 @@
       "Granger": {
         "var2_lagged_d5_n1000": {"median_shd": 13.5, "empty_median_shd": 28.5, "shd": [14, 14, 11, 21, 8, 9, 15, 15, 13, 13]},
         "var2_lagged_d5_n2000": {"median_shd": 12.5, "empty_median_shd": 28.5, "shd": [12, 10, 14, 17, 10, 9, 13, 13, 14, 9]}
+      },
+      "KCI": {
+        "anm_er_d5": {"median_shd": 1.0, "empty_median_shd": 5.0, "shd": [0, 0, 0, 1, 1, 1, 1, 3, 0, 2]},
+        "anm_er_d10": {"median_shd": 1.5, "empty_median_shd": 10.0, "shd": [0, 0, 4, 1, 0, 0, 6, 2, 5, 2]},
+        "nonmonotone_er_d5": {"median_shd": 3.5, "empty_median_shd": 5.0, "shd": [3, 2, 4, 5, 3, 2, 4, 4, 3, 5]},
+        "nonmonotone_er_d10": {"median_shd": 5.0, "empty_median_shd": 10.0, "shd": [0, 7, 5, 11, 0, 7, 5, 5, 6, 2]}
+      },
+      "RCoT": {
+        "anm_er_d10": {"median_shd": 2.0, "empty_median_shd": 10.0, "shd": [2, 1, 4, 1, 2, 3, 2, 2, 5, 6]},
+        "nonmonotone_er_d10": {"median_shd": 5.0, "empty_median_shd": 10.0, "shd": [1, 1, 5, 10, 0, 7, 6, 7, 5, 4]}
+      },
+      "CMIknn": {
+        "anm_er_d5": {"median_shd": 1.0, "empty_median_shd": 5.0, "shd": [1, 0, 1, 0, 1, 5, 1, 1, 2, 3]},
+        "nonmonotone_er_d5": {"median_shd": 3.0, "empty_median_shd": 5.0, "shd": [3, 3, 2, 5, 3, 3, 4, 3, 3, 3]}
+      },
+      "GPDC": {
+        "anm_er_d5": {"median_shd": 0.5, "empty_median_shd": 5.0, "shd": [1, 0, 0, 0, 0, 5, 1, 3, 0, 2]},
+        "nonmonotone_er_d5": {"median_shd": 3.0, "empty_median_shd": 5.0, "shd": [3, 3, 3, 6, 3, 3, 2, 4, 3, 3]}
       }
     }
   }

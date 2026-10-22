@@ -174,6 +174,20 @@ def test_every_page_has_one_short_description_equal_to_its_preview(html):
     assert not problems, "\n".join(problems)
 
 
+def test_each_generated_blog_collection_has_its_own_description(html):
+    home = (html / "index.html").read_text(encoding="utf-8")
+    homepage = re.search(r'<meta name="description" content="([^"]*)"', home)[1]
+    seen = {}
+    for page, text in _pages(html):
+        if 'class="section ablog__collection"' not in text and "ablog__catalog_header" not in text:
+            continue
+        description = re.search(r'<meta name="description" content="([^"]*)"', text)[1]
+        assert description != homepage, page
+        assert description not in seen, f"{page} and {seen.get(description)}"
+        seen[description] = page
+    assert seen
+
+
 def test_every_homepage_tile_leads_to_details_that_are_built(html):
     home = (html / "index.html").read_text(encoding="utf-8")
     tiles = re.findall(r'<li class="tile[^"]*"><a class="tile-face" href="([^"]+)"', home)
