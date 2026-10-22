@@ -14,12 +14,10 @@ their default settings, serially, with one BLAS thread.
 
 import argparse
 import time
-import warnings
 
 import numpy as np
 from threadpoolctl import threadpool_limits
 
-import andrey
 from andrey.core.ci import make_indep_test
 
 ALPHA = 0.05
@@ -66,7 +64,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if unknown := sorted(set(args.tests) - set(GRID)):
         parser.error(f"unknown tests {unknown}; the tests are {list(GRID)}")
-    warnings.simplefilter("ignore", andrey.ExperimentalWarning)
     with threadpool_limits(limits=1):
         print("test     rows  |S|  level  (draws)  power  s/query")
         for test in args.tests or list(GRID):
