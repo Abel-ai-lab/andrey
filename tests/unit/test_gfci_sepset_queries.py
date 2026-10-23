@@ -1,19 +1,21 @@
 """GFCI's separating-set search takes the canonical query path with unchanged results.
 
-For FisherZ and StudentT, ``_derive_sepsets`` evaluates each nonempty size's subsets of a pair in
-chunks of canonical query arrays. It asks the queries of the scalar loop, which a subclass of either
-test takes, in the same order, and records the same separating sets; a singular query raises the
-scalar loop's error after the same queries.
+For FisherZ and StudentT, ``_derive_sepsets`` answers the size-0 queries of all the pairs in one
+canonical query array and evaluates each nonempty size's subsets of a pair in chunks of them. It
+asks the queries of the scalar loop, which a subclass of either test takes, and records the same
+separating sets; a singular query raises the scalar loop's error.
 """
 
 from __future__ import annotations
 
+from collections import Counter
+
 import numpy as np
 import pytest
 
+from andrey.constraint import _skeleton
 from andrey.core import TAIL
 from andrey.core.ci import FisherZ, SingularCorrelationError, StudentT
-from andrey.search import gfci
 from andrey.search.gfci import _derive_sepsets
 
 ALPHA = 0.2
@@ -50,8 +52,10 @@ def _case(seed: int, d: int = 12, n: int = 300, p: float = 0.35):
 
 
 def _logged(test):
-    """``test`` with every query it answers appended to the returned log, as ``(x, y, set)``."""
+    """``test`` with every query it answers appended to the returned log, as ``(x, y, set)``, and
+    the conditioning-set size of each canonical call to the returned list of sizes."""
     log: list[tuple[int, int, tuple[int, ...]]] = []
+    batches: list[int] = []
     scalar, canonical = test._partial_correlation, test._canonical_pvalues
 
     def partial_correlation(x, y, cond):
@@ -61,11 +65,12 @@ def _logged(test):
     def canonical_pvalues(xs, ys, conditions):
         values = canonical(xs, ys, conditions)
         log.extend(zip(xs.tolist(), ys.tolist(), map(tuple, conditions.tolist())))
+        batches.append(conditions.shape[1])
         return values
 
     test._partial_correlation = partial_correlation
     test._canonical_pvalues = canonical_pvalues
-    return test, log
+    return test, log, batches
 
 
 @pytest.mark.parametrize(("canonical", "scalar"), TESTS)
@@ -77,17 +82,26 @@ def test_canonical_queries_match_the_scalar_loop(
     monkeypatch: pytest.MonkeyPatch, canonical, scalar, chunk, max_depth, in_column_order, seed
 ) -> None:
     if chunk is not None:
-        monkeypatch.setattr(gfci, "_CHUNK", chunk)
+        monkeypatch.setattr(_skeleton, "_CHUNK", chunk)
     X, cpdag = _case(seed)
     results = []
     for kind in (canonical, scalar):
-        test, log = _logged(kind(X))
+        test, log, _ = _logged(kind(X))
         sepsets = _derive_sepsets(
             cpdag, test, ALPHA, max_depth=max_depth, in_column_order=in_column_order
         )
-        results.append((sepsets, log))
+        results.append((sepsets, sorted(log)))
     assert results[0] == results[1]
     assert any(len(cond) >= 2 for _, _, cond in results[0][1]) or max_depth == 1
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_the_size_zero_queries_come_in_one_canonical_call(seed) -> None:
+    X, cpdag = _case(seed)
+    test, log, batches = _logged(FisherZ(X))
+    _derive_sepsets(cpdag, test, ALPHA)
+    assert batches.count(0) == 1
+    assert sum(cond == () for _, _, cond in log) == np.count_nonzero(np.triu(cpdag == 0, 1))
 
 
 @pytest.mark.parametrize(("canonical", "scalar"), TESTS)
@@ -101,11 +115,15 @@ def test_a_singular_query_raises_the_scalar_error(canonical, scalar) -> None:
             cpdag[u, v] = cpdag[v, u] = TAIL
     errors, logs = [], []
     for kind in (canonical, scalar):
-        test, log = _logged(kind(X))
+        test, log, _ = _logged(kind(X))
         with pytest.raises(SingularCorrelationError) as raised:
             _derive_sepsets(cpdag, test, 1.0)
         errors.append((type(raised.value), str(raised.value)))
         logs.append(log)
     assert errors[0] == errors[1]
-    assert logs[0] == logs[1]
-    assert logs[0], "the singular query must come after other queries"
+    assert logs[1], "the singular query must come after other queries"
+    # The canonical path asks the scalar loop's queries, and the size-0 queries of the pairs the
+    # scalar loop never reached.
+    extra = Counter(logs[0]) - Counter(logs[1])
+    assert not Counter(logs[1]) - Counter(logs[0])
+    assert all(cond == () for _, _, cond in extra)
