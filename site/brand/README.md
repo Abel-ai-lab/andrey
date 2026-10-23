@@ -31,8 +31,9 @@
     order, each card a row of data columns. One card is amber.
   - `art-harmonograph.jpg`: 0.8.0, a harmonograph in engraved lines, its pendulum-driven pen
     tracing a figure of cosine curves that spiral inward on its table. One curve is amber.
-  - `art-balloon.jpg`: 0.10.0, a high-altitude research balloon in engraved lines, at the edge of
-    space above the curve of the Earth. The thin edge of the atmosphere is amber.
+  - `art-ceiling.jpg`: 0.10.0, the rocket of `art-rocket.jpg` later in its flight, its nose
+    against the curved edge of the sky like a glass dome, with stars beyond. The edge is amber, and
+    it cracks where the rocket meets it.
   - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
     fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
     crop to the cover's size, so it is softer than the others until the art is drawn again at

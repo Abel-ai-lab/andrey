@@ -214,7 +214,7 @@ ART = {
         "abacus",
         "punch-cards",
         "harmonograph",
-        "balloon",
+        "ceiling",
     )
 }
 CENTERED = {kind: BRAND / f"art-{kind}-center.jpg" for kind in ("tide",)}

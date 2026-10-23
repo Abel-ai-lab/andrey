@@ -17,7 +17,7 @@ COVERS = {
     "abacus": "an abacus seen at an angle, one bead amber",
     "punch-cards": "a shuffled fan of punch cards, one card amber",
     "harmonograph": "a harmonograph tracing a figure of cosine curves, one curve amber",
-    "balloon": "a high-altitude balloon above the curve of the Earth, the atmosphere's edge amber",
+    "ceiling": "a rocket reaching the curved edge of the sky, the edge amber and cracking",
     "ground": "the stipple ground",
 }
 

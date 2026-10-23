@@ -1,20 +1,26 @@
-"""The 0.10.0 post's boundary figures, written next to it as HTML that the post includes.
+"""The 0.10.0 post's boundary maps, written next to it as HTML that the post includes.
 
-``boundary-<family>.html``: for each method of a family, a heatmap over the number of variables
-(columns) and the four conditions (rows: mean degree 2 or 4, 10 or 50 rows per variable). A cell's
-color is the method's median errors as a share of the empty graph's, the deeper the fewer; a cell
-where it does no better than the empty graph is gray; a mark ends a row where a fit stopped, on
-time or memory, or where it failed. A line before the first size that does not beat the empty
-graph or does not finish marks the row's boundary. Every color is an ``--andrey-*`` token.
+``boundary-<family>.html``: for each method of a family, two maps over the number of variables
+(columns). On the size map, the rows are the number of rows of data, with a mean degree of 2; on the
+density map, the rows are the mean degree, with 2,000 rows. A cell's color is the method's median
+errors as a share of the empty graph's, from the cobalt ramp, the deeper the fewer; a cell where it
+does no better than the empty graph is gray; a mark is a problem where a fit stopped, on time or
+memory, or failed. The outline around the cells inside the boundary is the boundary: in each row,
+the sizes before the first one that does not finish or does not beat the empty graph. Every color is
+an ``--andrey-*`` token.
 
-The cells come from a feasibility file (``feasibility`` lane: one row per method, condition, and
-size). Run with ``uv run python docs/blog/0.10.0/boundary.py <cells.json>``.
+The cells come from a feasibility file (the ``feasibility`` lane of a release card's summary: one
+row per method, regime, and size). Run with
+``uv run python docs/blog/0.10.0/boundary.py <cells.json> [outdir]``.
+
+The maps are a reference for the measured conditions, not a hard limit: another graph generator,
+other data, other settings, or another machine move a boundary.
 """
 
 from __future__ import annotations
 
 import json
-import math
+import re
 import sys
 from html import escape
 from pathlib import Path
@@ -22,13 +28,6 @@ from pathlib import Path
 from andrey.spec import list_specs
 
 HERE = Path(__file__).parent
-# The graph methods' four conditions, in the order the rows show them.
-CONDITIONS = {
-    "deg2-n10d": "degree 2, 10 rows per variable",
-    "deg2-n50d": "degree 2, 50 rows per variable",
-    "deg4-n10d": "degree 4, 10 rows per variable",
-    "deg4-n50d": "degree 4, 50 rows per variable",
-}
 FAMILIES = {
     "constraint": "Constraint-based",
     "score": "Score-based",
@@ -41,110 +40,141 @@ NAMES = {
     "ges": "GES", "gies": "GIES", "xges": "XGES", "hc": "Hill climbing", "tabu": "Tabu search",
     "exact_search": "Exact search", "calm": "CALM", "boss": "BOSS", "grasp": "GRaSP",
     "direct_lingam": "DirectLiNGAM", "ica_lingam": "ICA-LiNGAM",
-    "multi_group_direct_lingam": "MultiGroupDirectLiNGAM",
 }  # fmt: skip
-STOPS = {"time": ("×", "time cap"), "memory": ("■", "memory cap"), "error": ("!", "error")}
-# A cell per measured size, centered on the logarithm of its number of variables (``DECADE`` pixels
-# per tenfold), at most ``CELL`` wide.
-ROW, LABEL, GAP, DECADE, CELL = 18, 250, 14, 220, 40
+STOPS = {"time": ("×", "time cap"), "memory": ("■", "memory cap"), "error": ("!", "failed")}
+# A regime with a fixed number of rows, e.g. ``deg2-n2000``; ``deg2-n10d`` scales them with d.
+FIXED = re.compile(r"deg(\d+)-n(\d+)$")
+SIZE_DEGREE, DENSITY_ROWS = 2, 2000
+# The maps' geometry: a cell's width and height, the row labels' width, the gap between the two
+# maps, and the room for the title above and the column labels below.
+CELL_W, CELL_H, LABEL, GAP, TOP, BOTTOM = 30, 22, 78, 28, 22, 30
 
 
-def place(d: int, low: int) -> float:
-    """A size's center: its number of variables on a log scale from the family's smallest."""
-    return LABEL + CELL / 2 + DECADE * math.log10(d / low)
+def maps(cells: list[dict]) -> dict[str, dict[tuple[int, int], dict]]:
+    """One method's cells on each map, keyed by (row value, variables)."""
+    out: dict[str, dict[tuple[int, int], dict]] = {"size": {}, "density": {}}
+    for cell in cells:
+        fixed = FIXED.match(cell["regime"])
+        if not fixed:
+            continue
+        degree, n = int(fixed[1]), int(fixed[2])
+        if degree == SIZE_DEGREE:
+            out["size"][n, cell["d"]] = cell
+        if n == DENSITY_ROWS:
+            out["density"][degree, cell["d"]] = cell
+    return out
+
+
+def good(cell: dict | None) -> bool:
+    """Inside the boundary: finished every dataset, with fewer errors than the empty graph."""
+    return bool(cell and cell["stop"] == "none" and cell.get("beats_empty"))
 
 
 def shade(share: float) -> str:
-    """A cell's fill: the accent, deeper the fewer errors relative to the empty graph's."""
-    strength = round(15 + 75 * (1 - min(max(share, 0.0), 1.0)))
-    return f"color-mix(in srgb, var(--andrey-accent) {strength}%, var(--andrey-surface))"
+    """A cell's fill from the cobalt ramp: the deeper, the fewer errors than the empty graph's."""
+    return f"var(--andrey-ramp-{1 + min(4, int((1 - min(max(share, 0.0), 1.0)) * 5))})"
 
 
-def method_rows(cells: list[dict], low: int) -> tuple[str, int]:
-    """One method's heatmap rows and their height: a row per condition it was measured in. A row's
-    boundary line sits before the first size that does not beat the empty graph or stops."""
-    out, y = [], 0
-    for key, label in CONDITIONS.items():
-        row = {c["d"]: c for c in cells if c["regime"] == key}
-        if not row:
-            continue
+def grid(cells: dict[tuple[int, int], dict], ys: list[int], ds: list[int], x0: float, label) -> str:
+    """One map: its cells, stop marks, and the outline of the cells inside the boundary."""
+    out, inside = [], set()
+    for row, y in enumerate(reversed(ys)):  # the largest value at the top
+        top = TOP + row * CELL_H
         out.append(
-            f'<text class="bd-cond" x="{LABEL - 8}" y="{y + ROW / 2 + 4}" '
-            f'text-anchor="end">{escape(label)}</text>'
+            f'<text class="bnd-y" x="{x0 + LABEL - 6}" y="{top + CELL_H / 2 + 4}" '
+            f'text-anchor="end">{escape(label(y))}</text>'
         )
-        edge, failed = None, False
-        ds = sorted(row)
-        for i, d in enumerate(ds):
-            # As wide as CELL, or narrower where the next or previous size sits closer.
-            near = [abs(place(o, low) - place(d, low)) for o in ds[max(i - 1, 0) : i + 2] if o != d]
-            w = min([CELL, *near])
-            x = place(d, low) - w / 2
-            cell = row[d]
+        stopped = False
+        for col, d in enumerate(ds):
+            cell = cells.get((y, d))
+            left = x0 + LABEL + col * CELL_W
+            if cell is None:
+                continue
+            stopped = stopped or not good(cell)
+            if not stopped:
+                inside.add((row, col))
             share = cell.get("share_of_empty")
-            good = share is not None and cell["beats_empty"] and cell["stop"] == "none"
-            if not failed and not good:
-                failed, edge = True, x
-            elif not failed:
-                edge = x + w
-            tip = f"d = {d:,}, n = {cell['n']:,}"
+            tip = f"{d:,} variables, {label(y)}"
             if share is not None:
                 tip += f": {share:.0%} of the empty graph's errors"
             if cell["stop"] != "none":
-                tip += f", stopped at the {STOPS[cell['stop']][1]}"
+                tip += f"; stopped: {STOPS[cell['stop']][1]}"
             if share is not None:
-                fill = shade(share) if cell["beats_empty"] else "var(--andrey-line)"
+                fill = shade(share) if cell.get("beats_empty") else "var(--andrey-line)"
                 out.append(
-                    f'<rect x="{x + 1:.1f}" y="{y + 1}" width="{w - 2:.1f}" height="{ROW - 2}" '
-                    f'rx="3" fill="{fill}"><title>{escape(tip)}</title></rect>'
+                    f'<rect x="{left + 1}" y="{top + 1}" width="{CELL_W - 2}" '
+                    f'height="{CELL_H - 2}" rx="2" fill="{fill}">'
+                    f"<title>{escape(tip)}</title></rect>"
                 )
             if cell["stop"] != "none":
-                mark = STOPS[cell["stop"]][0]
                 out.append(
-                    f'<text class="bd-stop" x="{x + w / 2:.1f}" y="{y + ROW / 2 + 4}" '
-                    f'text-anchor="middle">{mark}<title>{escape(tip)}</title></text>'
+                    f'<text class="bnd-stop" x="{left + CELL_W / 2}" y="{top + CELL_H / 2 + 4}" '
+                    f'text-anchor="middle">{STOPS[cell["stop"]][0]}<title>{escape(tip)}</title>'
+                    "</text>"
                 )
-        if edge is not None:
-            out.append(
-                f'<line class="bd-edge" x1="{edge:.1f}" x2="{edge:.1f}" y1="{y}" y2="{y + ROW}"/>'
-            )
-        y += ROW
-    return "".join(out), y
+    # The outline: every side of a cell inside the boundary whose neighbor is outside it.
+    sides = []
+    for row, col in inside:
+        left, top = x0 + LABEL + col * CELL_W, TOP + row * CELL_H
+        right, bottom = left + CELL_W, top + CELL_H
+        if (row - 1, col) not in inside:
+            sides.append(f"M{left} {top}H{right}")
+        if (row + 1, col) not in inside:
+            sides.append(f"M{left} {bottom}H{right}")
+        if (row, col - 1) not in inside:
+            sides.append(f"M{left} {top}V{bottom}")
+        if (row, col + 1) not in inside:
+            sides.append(f"M{right} {top}V{bottom}")
+    if sides:
+        out.append(f'<path class="bnd-edge" d="{"".join(sorted(sides))}"/>')
+    bottom = TOP + len(ys) * CELL_H
+    for col, d in enumerate(ds):
+        out.append(
+            f'<text class="bnd-x" x="{x0 + LABEL + col * CELL_W + CELL_W / 2}" y="{bottom + 14}" '
+            f'text-anchor="middle">{d:,}</text>'
+        )
+    return "".join(out)
+
+
+def panel(method: str, cells: list[dict]) -> str:
+    """A method's two maps side by side, sharing the columns of variables."""
+    both = maps(cells)
+    ds = sorted({d for cells in both.values() for _, d in cells})
+    if not ds:
+        return ""
+    parts, x0 = [], 0.0
+    titles = {"size": "Rows, mean degree 2", "density": "Mean degree, 2,000 rows"}
+    labels = {"size": lambda n: f"{n:,} rows", "density": lambda k: f"degree {k}"}
+    for key in ("size", "density"):
+        ys = sorted({y for y, _ in both[key]})
+        if not ys:
+            continue
+        parts.append(f'<text class="bnd-map" x="{x0 + LABEL}" y="14">{titles[key]}</text>')
+        parts.append(grid(both[key], ys, ds, x0, labels[key]))
+        x0 += LABEL + len(ds) * CELL_W + GAP
+    rows = max(len({y for y, _ in both[key]}) for key in both)
+    width, height = x0 - GAP, TOP + rows * CELL_H + BOTTOM
+    name = NAMES.get(method, method)
+    return (
+        f'<div class="bnd-method"><p>{escape(name)}</p>'
+        f'<svg viewBox="0 0 {width:g} {height}" role="img" aria-label="{escape(name)}: errors '
+        f'relative to the empty graph by variables, rows, and mean degree">{"".join(parts)}</svg>'
+        "</div>"
+    )
 
 
 def family_figure(family: str, cells: list[dict]) -> str:
-    """A family's methods, one heatmap each, sharing the columns of variables."""
+    """A family's methods, two maps each."""
     names = {s.name: s.family for s in list_specs()}
     methods = [m for m in dict.fromkeys(c["method"] for c in cells) if names.get(m) == family]
-    mine = [c for c in cells if c["method"] in methods and c["regime"] in CONDITIONS]
-    sizes = sorted({c["d"] for c in mine})
-    low = sizes[0]
-    ticks = [t for t in (5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000) if low <= t <= sizes[-1]]
-    parts, y = [], 24
-    parts.append(
-        "".join(
-            f'<text class="bd-size" x="{place(t, low):.1f}" y="14" text-anchor="middle">{t:,}'
-            "</text>"
-            for t in ticks
-        )
-    )
-    for method in methods:
-        rows, height = method_rows([c for c in mine if c["method"] == method], low)
-        if not height:
-            continue
-        parts.append(
-            f'<text class="bd-method" x="0" y="{y + 12}">{escape(NAMES.get(method, method))}'
-            f'</text><g transform="translate(0 {y})">{rows}</g>'
-        )
-        y += height + GAP
-    width = place(sizes[-1], low) + CELL / 2
+    panels = "".join(panel(m, [c for c in cells if c["method"] == m]) for m in methods)
     return (
-        f'<figure class="bd"><p class="bd-title">{escape(FAMILIES[family])}</p>'
-        f'<svg viewBox="0 0 {width} {y}" role="img" aria-label="{escape(FAMILIES[family])}: '
-        f'errors relative to the empty graph by number of variables">{"".join(parts)}</svg>'
-        "<figcaption>Columns: variables. Color: errors as a share of the empty graph's, deeper "
-        "is fewer; gray does no better than the empty graph. × stopped at the time cap, ■ at "
-        "the memory cap, ! failed. The line marks the boundary: before the first size that does "
-        "not beat the empty graph or does not finish.</figcaption></figure>\n"
+        f'<figure class="bnd"><p class="bnd-title">{escape(FAMILIES[family])}</p>{panels}'
+        "<figcaption>Columns: the number of variables. Color: errors as a share of the empty "
+        "graph's, deeper is fewer; gray does no better than the empty graph. × stopped at the time "
+        "cap, ■ at the memory cap, ! failed. The outline is the boundary: in each row, the sizes "
+        "before the first that does not finish or does not beat the empty graph.</figcaption>"
+        "</figure>\n"
     )
 
 
