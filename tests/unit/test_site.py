@@ -1232,7 +1232,10 @@ def test_the_sections_follow_the_headline_and_hold_their_evidence(placeholder_pa
     start = {k: placeholder_page.index(f'id="{k}"') for k in sections}
     ends = [*list(start.values())[1:], placeholder_page.index('<div class="tile-details">')]
     held = {
-        "accelerated": ('data-scene="parallel"', 'id="speed-tab-constraint"'),
+        "accelerated": (
+            'id="speed-tab-constraint"',
+            'href="blog/20261008-why-andrey-is-fast.html"',
+        ),
         "accurate": ('class="err-pairs"', 'href="docs/benchmarks.html"'),
         "agentic": ('data-tile="agents"', "andrey run pc --help --json"),
         "all-in-one": (
@@ -1331,23 +1334,16 @@ def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
     assert re.findall(r'<div class="err-bar"><span>([^<]+)</span>', section)
 
 
-def test_the_first_section_shows_why_it_is_fast_as_a_carousel(placeholder_page):
-    # Under the first section's title, on the shared art, a card per scene in order with its title
-    # and narration, played by the carousel: no tile, no opener, no dialog of its own.
+def test_the_first_section_links_why_it_is_fast_under_its_speed_panel(placeholder_page):
+    # The section's title, its speed panel, and one line to the post that explains the speed: no
+    # animation, tile, or dialog of its own.
     section = placeholder_page[placeholder_page.index('id="accelerated"') :]
     section = section[: section.index("</section>")]
-    # The speed panel comes first, then the carousel under it.
-    assert section.index('id="accelerated-title"') < section.index('<div class="run-sheet">')
-    assert section.index('<div class="run-sheet">') < section.index('<div class="wf wf-belt"')
-    section = section[section.index('<div class="wf wf-belt"') :]
-    scenes = build._why_fast["SCENES"]
-    assert re.findall(r'data-scene="(\w+)" data-play="belt"', section) == [s["key"] for s in scenes]
-    titles = re.findall(r'<div class="wf-words"><h3>([^<]+)</h3>', section)
-    assert titles == [html.escape(s["title"]) for s in scenes]
-    assert all(html.escape(s["text"]) in section for s in scenes)
-    assert "data-wf-open" not in placeholder_page and "wf-dialog" not in placeholder_page
+    assert section.index('id="accelerated-title"') < section.index('class="seg"')
+    link = '<a href="blog/20261008-why-andrey-is-fast.html">Explore why Andrey is'
+    assert section.index('class="seg"') < section.index(link)
+    assert "wf-scene" not in placeholder_page and "why-fast.js" not in placeholder_page
     assert '<li class="tile' not in section and "wf-plus" not in section
-    assert "wf-pin" not in placeholder_page and "wf-story" not in placeholder_page
 
 
 def _timed_row(d: int, n: int, ratio: float, hardware: str | None = None) -> dict:

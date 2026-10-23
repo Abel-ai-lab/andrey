@@ -296,9 +296,9 @@
   }
 
   // ---- playing a scene ----------------------------------------------------------------------
-  // Returns controls: done (a promise), pause, resume, stop. With reduced motion, or with last,
-  // the scene jumps to its last frame.
-  function play(figure, { onProgress, entrance = false, hold = false, last = false } = {}) {
+  // Returns controls: done (a promise), pause, resume, stop. With reduced motion the scene jumps to
+  // its last frame.
+  function play(figure, { hold = false } = {}) {
     const data = settings(figure);
     const L = lanes(figure);
     const S = score();
@@ -306,10 +306,6 @@
     fit(figure);
     resizing.observe(figure);
     const end = SCENES[data.key](L, S, W, data);
-    if (entrance) {
-      const items = L.flatMap((lane) => [...lane.track.querySelectorAll(".wf-edge,.wf-station,.wf-bar,.wf-tag")]);
-      S.seq.push([items, { opacity: [0, 1] }, { duration: 0.35, delay: stagger(0.012), at: 0 }]);
-    }
     // A linear clock segment so the sequence lasts the whole scene.
     const clock = make("i", "wf-clock", L[0].track);
     clock.style.cssText = "position:absolute;width:0;height:0";
@@ -338,7 +334,7 @@
     });
 
     const controls = animate(S.seq);
-    const jump = still || last;
+    const jump = still;
     let t = 0;
     let before = performance.now();
     let running = !hold && !jump;
@@ -358,7 +354,6 @@
           setCount(e.lane, e.value);
         }
       }
-      if (onProgress) onProgress(t / end);
     };
     const loop = () => { tick(); raf = requestAnimationFrame(loop); };
     if (jump) {
@@ -396,168 +391,5 @@
       run.done.then(() => { replay.hidden = false; });
     });
     if (!still) inView(figure, () => { start(); }, { amount: 0.6 });
-  }
-
-  // ---- the homepage's carousel: one card at a time --------------------------------------------
-  // The cards sit in a row that scrolls sideways and snaps each card to the center. The current
-  // card plays its scene while its dot fills, rests on the last frame for REST seconds, and hands
-  // over to the next card, the last to the first. The others show their last frame. A card picked
-  // by a dot, an arrow key, a swipe, or a drag plays at once. It waits while keyboard focus is on
-  // the carousel, while it is off the screen, and while the page is hidden. Under reduced motion no
-  // card plays or moves on by itself: each shows its last frame, and the dots still pick one.
-  const REST = 1.6;
-  for (const belt of document.querySelectorAll(".wf-belt")) {
-    const row = belt.querySelector(".wf-cards");
-    const cards = [...row.querySelectorAll(".wf-card")];
-    const figures = cards.map((card) => card.querySelector(".wf-scene"));
-    const tablist = belt.querySelector(".wf-dots");
-    const dots = [...tablist.querySelectorAll(".wf-dot")];
-    tablist.hidden = false;
-    belt.classList.add("is-driven");
-
-    let current = 0;
-    let run = null;
-    let wait = 0;
-    let held = false; // keyboard focus on the carousel
-    let seen = false; // on the screen and the page visible
-    figures.forEach((figure) => play(figure, { last: true }));
-
-    const fill = (value) => dots[current].style.setProperty("--fill", value.toFixed(3));
-    const select = (k) => {
-      cards.forEach((card, i) => card.classList.toggle("is-current", i === k));
-      dots.forEach((dot, i) => {
-        dot.setAttribute("aria-selected", String(i === k));
-        dot.tabIndex = i === k ? 0 : -1;
-        dot.style.setProperty("--fill", i === k && still ? "1" : "0");
-      });
-    };
-    const center = (k, smooth = true) => {
-      const card = cards[k];
-      row.scrollTo({
-        left: card.offsetLeft - (row.clientWidth - card.offsetWidth) / 2,
-        behavior: smooth && !still ? "smooth" : "auto",
-      });
-    };
-    const going = () => seen && !held && !still;
-    const advance = () => go((current + 1) % cards.length);
-    const start = () => {
-      clearTimeout(wait);
-      if (run) run.stop();
-      run = null;
-      if (still) return;
-      run = play(figures[current], { hold: !going(), onProgress: fill });
-      run.done.then(() => {
-        fill(1);
-        if (going()) wait = setTimeout(advance, REST * 1000);
-      });
-    };
-    // Make card k the current one: center it, then play it.
-    function go(k, smooth = true) {
-      if (k === current && run) return center(k, smooth);
-      if (run) {
-        run.stop();
-        play(figures[current], { last: true });
-      }
-      current = k;
-      select(k);
-      center(k, smooth);
-      start();
-    }
-    const pause = () => { clearTimeout(wait); if (run) run.pause(); };
-    const resume = () => {
-      if (!going() || !run) return;
-      run.resume();
-      if (dots[current].style.getPropertyValue("--fill") === "1.000") {
-        wait = setTimeout(advance, REST * 1000);
-      }
-    };
-
-    dots.forEach((dot, k) => dot.addEventListener("click", () => go(k)));
-    tablist.addEventListener("keydown", (event) => {
-      const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
-      if (!step) return;
-      event.preventDefault();
-      go((current + step + cards.length) % cards.length);
-      dots[current].focus();
-    });
-    row.addEventListener("keydown", (event) => {
-      const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
-      if (!step) return;
-      event.preventDefault();
-      go(Math.min(cards.length - 1, Math.max(0, current + step)));
-    });
-    // A click focuses a dot without :focus-visible, so only keyboard focus holds the carousel.
-    belt.addEventListener("focusin", (event) => {
-      if (!event.target.matches(":focus-visible")) return;
-      held = true;
-      pause();
-    });
-    belt.addEventListener("focusout", (event) => {
-      if (!held || belt.contains(event.relatedTarget)) return;
-      held = false;
-      resume();
-    });
-
-    // A swipe or a scroll that settles on another card makes it the current one.
-    let settle = 0;
-    row.addEventListener("scroll", () => {
-      clearTimeout(settle);
-      settle = setTimeout(() => {
-        const middle = row.scrollLeft + row.clientWidth / 2;
-        const nearest = cards.reduce((best, card, k) => {
-          const d = Math.abs(card.offsetLeft + card.offsetWidth / 2 - middle);
-          return d < best.d ? { k, d } : best;
-        }, { k: current, d: Infinity }).k;
-        if (nearest !== current) go(nearest);
-      }, 120);
-    }, { passive: true });
-
-    // A mouse drags the row; a touch scrolls it natively.
-    let drag = null;
-    row.addEventListener("pointerdown", (event) => {
-      if (event.pointerType !== "mouse" || event.button !== 0) return;
-      drag = { x: event.clientX, left: row.scrollLeft, moved: false };
-    });
-    addEventListener("pointermove", (event) => {
-      if (!drag) return;
-      const dx = event.clientX - drag.x;
-      if (!drag.moved && Math.abs(dx) < 6) return;
-      if (!drag.moved) { drag.moved = true; row.classList.add("is-dragging"); }
-      row.scrollLeft = drag.left - dx;
-    });
-    addEventListener("pointerup", () => {
-      if (!drag) return;
-      const moved = drag.moved;
-      const dx = row.scrollLeft - drag.left;
-      drag = null;
-      row.classList.remove("is-dragging");
-      if (!moved) return;
-      // The click that ends a drag follows no link.
-      row.classList.add("was-dragged");
-      setTimeout(() => row.classList.remove("was-dragged"));
-      const k = Math.abs(dx) > row.clientWidth * 0.08 ? current + Math.sign(dx) : current;
-      go(Math.min(cards.length - 1, Math.max(0, k)));
-    });
-    row.addEventListener("click", (event) => {
-      if (row.classList.contains("was-dragged")) event.preventDefault();
-    }, true);
-
-    // Waits off the screen and while the page is hidden.
-    const watch = () => {
-      const was = going();
-      seen = belt.dataset.visible === "1" && !document.hidden;
-      if (going() && !was) resume();
-      else if (!going() && was) pause();
-    };
-    new IntersectionObserver(([entry]) => {
-      belt.dataset.visible = entry.isIntersecting ? "1" : "0";
-      watch();
-    }, { threshold: 0.35 }).observe(belt);
-    document.addEventListener("visibilitychange", watch);
-
-    select(0);
-    start();
-    center(0, false);
-    addEventListener("resize", () => center(current, false));
   }
 })();

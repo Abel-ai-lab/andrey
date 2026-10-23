@@ -715,7 +715,7 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
 
 
 # The pages that show the "Why Andrey is fast" scenes.
-WHY_FAST_PAGES = {"index", "blog/20261008-why-andrey-is-fast"}
+WHY_FAST_PAGES = {"blog/20261008-why-andrey-is-fast"}
 
 
 def _post_key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...]]:
