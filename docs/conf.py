@@ -729,6 +729,36 @@ def _version_assets(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arg
                 path.write_text(new, encoding="utf-8")
 
 
+# A Font Awesome glyph rule in the theme's stylesheet: one or more icon classes and the glyph's
+# code point, as in ``.fa-house,.fa-home{--fa:"\f015"}``.
+ICON_RULE = re.compile(r"((?:\.fa-[\w-]+,?)+)\{--fa:[^}]*\}")
+# The theme's stylesheet, and the files that would name every icon whether used or not: Font
+# Awesome's own script and the source maps.
+THEME_CSS = "_static/styles/pydata-sphinx-theme.css"
+ICON_CATALOGS = ("fontawesome.js",)
+
+
+def _trim_icon_rules(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Drop the glyph rules of the Font Awesome icons no built page or script names from the
+    theme's stylesheet: about 2,000 of them, a third of the file once compressed. Every other
+    rule stays, so an icon a page names keeps its glyph."""
+    if exception is not None or app.builder.name != "html":
+        return
+    outdir = pathlib.Path(app.outdir)
+    named = set()
+    for path in [*outdir.rglob("*.html"), *outdir.rglob("*.js")]:
+        if path.name not in ICON_CATALOGS and "_sources" not in path.parts:
+            named |= set(re.findall(r"\bfa-[a-z0-9-]+", path.read_text(errors="ignore")))
+    css_path = outdir / THEME_CSS
+    css = css_path.read_text(encoding="utf-8")
+
+    def kept(match: re.Match) -> str:
+        names = {name.lstrip(".") for name in match[1].split(",") if name}
+        return match[0] if names & named else ""
+
+    _write(css_path, ICON_RULE.sub(kept, css))
+
+
 def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
     """Write ``llms.txt`` and ``sitemap.xml`` at the site's root from the built pages
     (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt`` lists
@@ -1445,6 +1475,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("html-page-context", _docs_sidebar)
     app.connect("html-collect-pages", _moved_pages)
     app.connect("build-finished", _write_discovery)
+    app.connect("build-finished", _trim_icon_rules)
     app.connect("build-finished", _version_assets)
     app.connect("doctree-resolved", _post_byline)
     app.connect("doctree-resolved", _summary_headers)
