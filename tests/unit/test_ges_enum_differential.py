@@ -94,24 +94,37 @@ def _run(
 ):
     """Run GES with explicit scan, pruning, and CPDAG-rewrite toggles (restored afterwards).
 
-    ``moves``, when given, collects each applied Insert and Delete in order.
+    ``moves``, when given, collects each Insert and Delete the search takes, in order; the moves a
+    cap check applies to a copy to read its CPDAG are left out.
     """
     old_prune = getattr(ops, "_LATTICE_PRUNE", True)
     insert, delete = ops.apply_insert, ops.apply_delete
+    breaks_cap = pg._breaks_cap
     ops._LATTICE_PRUNE = prune
     ops._LOCAL_REFORM = local_reform
     pg._FULL_RESCAN = full_rescan
     if moves is not None:
+        checking = False
 
         def record_insert(adj, x, y, T):
-            moves.append(("insert", x, y, tuple(T)))
+            if not checking:
+                moves.append(("insert", x, y, tuple(T)))
             insert(adj, x, y, T)
 
         def record_delete(adj, x, y, H):
-            moves.append(("delete", x, y, tuple(H)))
+            if not checking:
+                moves.append(("delete", x, y, tuple(H)))
             delete(adj, x, y, H)
 
-        ops.apply_insert, ops.apply_delete = record_insert, record_delete
+        def check_cap(*args):
+            nonlocal checking
+            checking = True
+            try:
+                return breaks_cap(*args)
+            finally:
+                checking = False
+
+        ops.apply_insert, ops.apply_delete, pg._breaks_cap = record_insert, record_delete, check_cap
     try:
         # Pin serial: the toggles are module globals that never reach pool workers, so under
         # ANDREY_NUM_WORKERS > 1 a pooled pass would silently run the live path inside the
@@ -129,6 +142,7 @@ def _run(
         ops._LOCAL_REFORM = True
         pg._FULL_RESCAN = False
         ops.apply_insert, ops.apply_delete = insert, delete
+        pg._breaks_cap = breaks_cap
     return struct.to_numpy(), score
 
 
@@ -294,7 +308,7 @@ def test_kept_scan_matches_full_rescan_on_collinear_columns(
 
 # Random near-collinear cases whose updates can cancel: one without max_parents, one whose
 # max_parents changes the graph.
-_RANDOM_COLLINEAR_SEEDS = [59, 11]
+_RANDOM_COLLINEAR_SEEDS = [59, 71]
 
 
 @pytest.mark.usefixtures("unchecked_columns")
