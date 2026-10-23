@@ -78,6 +78,8 @@ _TYPE_CODE[[a * 4 + b for a, b in _EDGE_TYPES]] = [
     _TYPE_NAMES.index(t) for t, _ in _EDGE_TYPES.values()
 ]
 SUMMARY_EDGES = 30  # edges a printed summary lists before "... and N more"
+# Graphviz arrow shape per endpoint mark.
+_DOT_ARROWS = {TAIL: "none", ARROW: "normal", CIRCLE: "odot"}
 
 
 @dataclass(frozen=True, eq=False, slots=True, kw_only=True, repr=False)
@@ -628,6 +630,43 @@ class GraphStructure(Structure):
         # amat[a, b] = 1 where b is the source of a -> b or an end of a -- b.
         return np.ascontiguousarray((M == TAIL).T, dtype=np.int8)
 
+    def to_dot(self) -> str:
+        """Return the graph as Graphviz DOT text, which Graphviz, DoWhy, and other tools read.
+
+        Each node is named by its label, or by its index when the graph has no labels, in double
+        quotes. A directed edge runs from its tail to its arrowhead, and an undirected edge has
+        ``dir=none``. Any other edge has ``dir=both``, with ``arrowhead`` and ``arrowtail`` the
+        marks at its second and first node: ``normal`` for an arrowhead, ``odot`` for a circle,
+        ``none`` for a tail. A ``digraph`` 2-cycle is two directed edges, and a self-loop an edge
+        from a node to itself. Writing it needs no other package.
+
+        Returns
+        -------
+        str
+            A DOT ``digraph``: one line per node, in node order, then one per edge, in
+            ``to_edges`` order.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> M = np.array([[0, 1], [2, 0]])  # 0 -> 1
+        >>> print(GraphStructure.from_numpy(M, labels=("rain", "wet")).to_dot())
+        digraph {
+          "rain";
+          "wet";
+          "rain" -> "wet";
+        }
+        """
+        names = self._labels if self._labels is not None else range(self._n_nodes)
+        ids = [_dot_id(str(name)) for name in names]
+        lines = ["digraph {", *(f"  {node};" for node in ids)]
+        for i, j, attrs in self._dot_edges():
+            style = ", ".join(f"{key}={value}" for key, value in attrs.items())
+            lines.append(f"  {ids[i]} -> {ids[j]}" + (f" [{style}]" if style else "") + ";")
+        lines.append("}")
+        return "\n".join(lines)
+
     def to_edges(self) -> np.ndarray:
         """Return the derived typed edge list, one row per edge ``i <= j``.
 
@@ -883,6 +922,22 @@ class GraphStructure(Structure):
             names = self._labels
             lines.append("  latent: " + ", ".join(names[i] if names else str(i) for i in latent))
         return lines
+
+    def _dot_edges(self) -> Iterator[tuple[int, int, dict[str, str]]]:
+        """Yield each edge as Graphviz draws it, ``(from, to, attributes)``, as ``to_dot`` says."""
+        for i, j, mark_i, mark_j in self._iter_edges():
+            if i == j or (mark_i, mark_j) == (TAIL, ARROW):
+                yield i, j, {}
+            elif (mark_i, mark_j) == (ARROW, TAIL):
+                yield j, i, {}
+            elif (mark_i, mark_j) == (TAIL, TAIL):
+                yield i, j, {"dir": "none"}
+            elif self._kind == "digraph":  # arrowheads at both ends: a 2-cycle
+                yield i, j, {}
+                yield j, i, {}
+            else:
+                head, tail = _DOT_ARROWS[mark_j], _DOT_ARROWS[mark_i]
+                yield i, j, {"dir": "both", "arrowhead": head, "arrowtail": tail}
 
     def _iter_edges(self):
         """Yield ``(i, j, mark_i, mark_j)`` per edge, ``i <= j`` (self-loop when ``i == j``)."""
@@ -1452,6 +1507,11 @@ class SummaryGraph(GraphStructure):
         return self._edge_lags == other._edge_lags
 
     __hash__ = None  # type: ignore[assignment]
+
+
+def _dot_id(name: str) -> str:
+    """``name`` as a quoted DOT identifier."""
+    return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def _frozen(arr: np.ndarray, dtype: npt.DTypeLike) -> np.ndarray:
