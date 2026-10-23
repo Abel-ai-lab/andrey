@@ -125,7 +125,9 @@ def varma_lingam(
     linear effects and non-Gaussian noise. The likelihood fit can stop before it converges, and
     gives no warning; a larger ``max_iter`` does not prevent this. The result then depends on the
     versions of the numerical libraries, so the same series can give a different graph in another
-    environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid.
+    environment. With ``criterion`` set, it fits one model for every ``(p, q)`` in the grid. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -232,7 +234,8 @@ def longitudinal_lingam(
     median errors (missing and extra cross-links) stayed far below the empty graph's at every size.
     It assumes linear effects and non-Gaussian noise. Each time point's fit uses only the units'
     rows at that time, so its accuracy depends on the number of units, not on the number of time
-    points.
+    points. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -351,7 +354,8 @@ def pcmci(
     same-step (lag 0) links: an effect within one time step is missed and can show up as a false
     lagged link. An MCI test conditions on up to ``2 * n_variables * tau_max - 1`` lagged values, so
     the series needs many more time steps than that. The MCI step alone runs
-    ``n_variables ** 2 * tau_max`` tests.
+    ``n_variables ** 2 * tau_max`` tests. The numbers are a reference, not a hard limit: they change
+    with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -501,7 +505,8 @@ def pcmciplus(
     variable's same-step neighbors, so the number of tests grows exponentially with the number of
     same-step links at one variable. A test conditions on up to
     ``2 * n_variables * tau_max + n_variables - 2`` values, so the series needs many more time steps
-    than that.
+    than that. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -663,7 +668,9 @@ def lpcmci(
     hidden cause that acts through earlier steps can add links within that window. The removal and
     rule steps test subsets of a node's neighbors, so the number of tests grows exponentially with
     the number of links at one node. A test conditions on up to ``n_variables * (tau_max + 1) - 2``
-    values, so the series needs many more time steps than that.
+    values, so the series needs many more time steps than that. The numbers are a reference, not a
+    hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------
@@ -772,7 +779,8 @@ def granger(data: npt.ArrayLike, *, maxlag: int = 2, cv: int = 5) -> StructureOu
     edges) exceeded the empty graph's at every size: on half the series at 10 variables and on all
     of them from 20 on. It assumes linear effects and tests no same-step effects. Each variable's
     regression takes ``maxlag`` lags of every variable as inputs, so the work grows with ``maxlag``
-    and with the square of the number of variables.
+    and with the square of the number of variables. The numbers are a reference, not a hard limit:
+    they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

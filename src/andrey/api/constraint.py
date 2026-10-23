@@ -207,7 +207,8 @@ def pc(
     networks with 2 or 3 categories per variable, of the same sizes and rows, they were 14 with
     ``"chisq"`` and 16 with ``"gsq"`` at 40 variables. The median fit at 40 variables took 0.38 s
     with ``"degen_gauss"``, 0.42 s with ``"cond_gauss"``, and 0.18 s with either categorical test,
-    on 4 cores.
+    on 4 cores. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     **Categorical data.** ``"chisq"`` and ``"gsq"`` take each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -509,7 +510,8 @@ def fci(
     against 676). Rule R5 stops searching a pair after a fixed number of partial paths and leaves
     its circles, so on graphs with many circle-circle edges it can miss an undirected cycle. With
     the mixed-data tests, it is experimental and not benchmarked yet; its tests run it on 5
-    variables with 3,000 rows.
+    variables with 3,000 rows. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -727,7 +729,8 @@ def gfci(
     nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
     variance. Rule R5 has the search bound described under :func:`~andrey.fci`. With the mixed-data
     score and test, it is experimental and not benchmarked yet; its tests run it on 5 variables with
-    3,000 rows.
+    3,000 rows. The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -966,7 +969,9 @@ def cdnod(
     (-2, 2) drawn per domain, it oriented 18 of their 30 edges correctly and 4 against the truth.
     The paper fits the kernel widths, the index kernel, and the ridge of the step by
     Gaussian-process likelihood; Andrey fixes them. With a mixed-data test, it is experimental and
-    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    not benchmarked yet; its tests run it on 5 variables with 3,000 rows. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------

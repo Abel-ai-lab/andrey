@@ -216,7 +216,8 @@ def ges(
     On simulated categorical networks with 2 or 3 categories per variable, of the same sizes and
     rows, ``"local_score_BDeu"`` gave 6 against 40 at 40 variables, in 0.60 s. The multinomial BIC
     is not benchmarked with GES yet: its tests check it against the formula and run GES on small
-    fixed categorical networks.
+    fixed categorical networks. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -386,7 +387,9 @@ def gies(
     grows with the number of intervened variables times the square of the variable count. A parent
     set of ``m - 1`` or more variables, where ``m`` counts the rows without an intervention on the
     child, fits its child exactly, so the search never selects one, nor any parent set that leaves
-    its child a residual variance of at most ``1e-12`` times its variance.
+    its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -508,7 +511,9 @@ def xges(
     Gaussian noise.
     With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
     more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance.
+    leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -673,7 +678,8 @@ def hc(
     12.5 with ``"local_score_degen_gauss"`` and 11 with ``"local_score_cond_gauss"``, against 40. On
     simulated categorical networks with 2 or 3 categories per variable, of the same sizes and rows,
     they were 18 with ``"local_score_BDeu"`` and 20 with ``"local_score_BIC_categorical"``. Every
-    median fit took under 0.2 s at 40 variables, on 4 cores.
+    median fit took under 0.2 s at 40 variables, on 4 cores. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -827,7 +833,8 @@ def tabu(
     columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more variables fits
     its child exactly, so the search never selects one, nor any parent set that leaves its child a
     residual variance of at most ``1e-12`` times its variance. With a categorical score, its tests
-    run it on small fixed categorical networks.
+    run it on small fixed categorical networks. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -1002,7 +1009,9 @@ def exact_search(
     its memory doubles as well.
     With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
     more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance.
+    leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1155,7 +1164,9 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     grows with the cube of the variable count; the defaults allow up to 75,000 steps (``max_outer``
     times ``subproblem_iter``). The fit is nonconvex and can stop at a local optimum: on a collider
     whose two parents are independent, it can return both edges reversed and an edge between the
-    parents, with the defaults and with the paper's schedule alike.
+    parents, with the defaults and with the paper's schedule alike. The numbers are a reference, not
+    a hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

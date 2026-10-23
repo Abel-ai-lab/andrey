@@ -105,7 +105,8 @@ def gin(
     least two variables, so a latent with a single indicator is not found. Each cluster gets one
     latent, so indicators that share two or more latents appear as one. It assumes every observed
     variable measures a latent: variables that depend on no other variable pass the cluster test
-    trivially and are grouped into one cluster.
+    trivially and are grouped into one cluster. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
