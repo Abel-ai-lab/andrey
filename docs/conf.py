@@ -404,6 +404,32 @@ def _load_summary(app) -> dict:  # noqa: ANN001
         raise ConfigError(str(error)) from None
 
 
+def _facts() -> list[str]:
+    """What Andrey covers, one plain sentence each, for llms.txt and the structured data: the kinds
+    of data, every registry family with its methods, and where the measurements are."""
+    families: dict[str, list[str]] = {}
+    for spec in list_specs():
+        families.setdefault(spec.family, []).append(f"`{spec.name}`")
+    return [
+        "Data: continuous, categorical, and mixed columns; independent samples and time series; "
+        "linear and nonlinear relationships; hidden common causes; interventions and several "
+        "domains.",
+        *(
+            f"{label}: {', '.join(families[family])}."
+            for family, label in site.SPEC_FAMILIES.items()
+            if family in families
+        ),
+        "Background knowledge: required and forbidden edges and tiers in time, through "
+        "`knowledge=`.",
+        "Speed: batched array operations, CPU cores, and a GPU for some methods; every method is "
+        f"timed against the packages that implement it in the release cards, {SITE_URL}docs/"
+        "benchmarks.html.",
+        "Open source: the code under the Apache License 2.0, and the benchmark scripts and "
+        "summaries behind every published number, so anyone can rerun them; "
+        "`pip install andrey-core`.",
+    ]
+
+
 def _methods_text() -> dict[str, str]:
     """The method count and tiers, for the FAQ."""
     supported = [f"`{s.name}`" for s in list_specs() if s.status == "supported"]
@@ -618,6 +644,13 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
         "image": SITE_URL + "_static/favicon.svg",
         "alternateName": PACKAGE["name"],
+        # A software application too, for its category, platforms, price, and features.
+        "@type": ["SoftwareSourceCode", "SoftwareApplication"],
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "keywords": ", ".join(PACKAGE["keywords"]),
+        "featureList": [fact.replace("`", "") for fact in _facts()],
         "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/", PACKAGE["urls"]["Source"]],
     }
     return preview + discovery.head_tags(
@@ -710,6 +743,7 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
             site_url=SITE_URL,
             project=app.config.project,
             version=release,
+            facts=_facts(),
         )
     except ValueError as error:
         raise ConfigError(str(error)) from None
