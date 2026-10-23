@@ -155,6 +155,9 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 - [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each.
 - [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
   browser.
+- [What's new in 0.8.0](https://andrey.abel.ai/blog/20261023-andrey-0-8-0.html): KCI, RCoT,
+  CMIknn, and GPDC, four tests for nonlinear dependence, with its
+  [release card](https://andrey.abel.ai/docs/benchmarks/0.8.0.html).
 - [Release cards](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
 - [Launch post](https://andrey.abel.ai/blog/20261008-introducing-andrey.html),
   [FAQ](https://andrey.abel.ai/docs/faq.html), and
