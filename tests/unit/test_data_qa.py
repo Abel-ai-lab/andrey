@@ -6,15 +6,17 @@ import numpy as np
 import pytest
 
 import andrey.data as data
+from andrey.data.functional import UNITLESS_MAX_NODES
 from andrey.data.sortability import directed_adjacency, varsortability
 
 
 def test_report_populated_and_scalable():
-    ds = data.sample_scm(d=40, n=1000, seed=0)
+    ds = data.sample_scm(d=40, n=1000, seed=0, scale="raw")
     assert isinstance(ds.report.varsortability, float)
     assert isinstance(ds.report.r2sortability, float)  # d<=100, n>d -> computed
     assert ds.report.scale == "raw"
-    big = data.sample_scm(d=2000, n=64, seed=0)  # r2 skipped at scale, varsortability still runs
+    # R^2-sortability is skipped at this size; varsortability still runs.
+    big = data.sample_scm(d=2000, n=64, seed=0, scale="raw")
     assert np.isfinite(big.report.varsortability)
     assert np.isnan(big.report.r2sortability)
 
@@ -38,9 +40,82 @@ def test_rescale_mode_kills_varsortability():
     assert abs(ds.report.varsortability - 0.5) < 1e-9
 
 
+def _population_covariance(ds):
+    """The covariance of every node, hidden ones included, implied by the drawn parameters."""
+    d = ds.graph.n_nodes
+    weights = np.zeros((d, d))
+    weights[ds.params.edges[:, 0], ds.params.edges[:, 1]] = ds.params.weights
+    mix = np.linalg.inv(np.eye(d) - weights)  # X = U (I - W)^-1 for row samples X and noise U
+    return mix.T @ np.diag(ds.params.noise_scales**2) @ mix
+
+
+@pytest.mark.parametrize(
+    ("graph", "noise", "density", "latents"),
+    [
+        ("erdos_renyi", "gaussian", 2.0, 0),
+        ("scale_free", "uniform", 4.0, 0),
+        ("hub", "laplace", 3.0, 3),
+    ],
+)
+def test_unitless_gives_every_node_unit_variance(graph, noise, density, latents):
+    """Every node has variance 1 under the drawn weights and noise scales, and the sample
+    variances are 1 up to sampling error."""
+    ds = data.sample_scm(
+        graph=graph,
+        noise=noise,
+        d=25,
+        n=5000,
+        seed=2,
+        density=density,
+        latents=latents,
+        scale="unitless",
+    )
+    assert np.allclose(np.diag(_population_covariance(ds)), 1.0, rtol=0, atol=1e-10)
+    assert np.allclose(ds.data.var(axis=0), 1.0, rtol=0, atol=0.15)
+    assert ds.report.scale == ds.provenance["config"]["scale"] == "unitless"
+
+
+def test_unitless_keeps_the_graph_and_is_deterministic():
+    """A seed draws the same graph and column order at every scale, and the same unitless bytes
+    twice; another seed draws other data."""
+    kwargs = {"d": 15, "n": 300, "density": 3.0, "latents": 2}
+    unitless = data.sample_scm(**kwargs, seed=5, scale="unitless")
+    raw = data.sample_scm(**kwargs, seed=5, scale="raw")
+    assert unitless.graph == raw.graph
+    assert np.array_equal(unitless.params.edges, raw.params.edges)
+    assert unitless.provenance["column_order"] == raw.provenance["column_order"]
+    assert not np.allclose(unitless.params.weights, raw.params.weights)
+    again = data.sample_scm(**kwargs, seed=5, scale="unitless")
+    assert unitless.data.tobytes() == again.data.tobytes()
+    assert not np.allclose(unitless.data, data.sample_scm(**kwargs, seed=6, scale="unitless").data)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"functional": "additive_noise"}, "takes the linear functional"),
+        ({"d": UNITLESS_MAX_NODES + 1, "density": 2.0}, "at most"),
+        ({"scale": "both"}, "scale must be one of"),
+    ],
+)
+def test_unitless_rejects_what_it_cannot_draw(kwargs, match):
+    with pytest.raises(ValueError, match=match):
+        data.sample_scm(**{"d": 6, "n": 10, "seed": 0, "scale": "unitless", **kwargs})
+
+
+def test_unitless_rejects_heteroscedastic_noise():
+    scm = data.SCM(
+        graph=data.graphs.erdos_renyi(6, 2.0),
+        functional=data.functional.linear(),
+        noise=data.noise.gaussian(heteroscedastic=True),
+    )
+    with pytest.raises(ValueError, match="heteroscedastic"):
+        scm.sample(n=10, seed=0, scale="unitless")
+
+
 def test_permuted_truth_sensitivity_control():
     """Varsortability is high for the true graph and near 0.5 for permuted truth."""
-    ds = data.sample_scm(d=10, n=1000, seed=0, density=2.0)
+    ds = data.sample_scm(d=10, n=1000, seed=0, density=2.0, scale="raw")
     x = ds.data.astype(np.float64)
     vs_true = varsortability(x, directed_adjacency(ds.params.edges, 10))
     pi = np.random.default_rng(0).permutation(10)
@@ -55,7 +130,7 @@ def test_faithfulness_screen_accepts_and_records():
         graph=data.graphs.erdos_renyi(8, 2.0),
         functional=data.functional.linear(),
         noise=data.noise.gaussian(),
-    ).sample(n=500, seed=0, screen=screen)
+    ).sample(n=500, seed=0, screen=screen, scale="raw")
     assert ds.report.faithfulness_accept_rate is not None
     assert 0.0 < ds.report.faithfulness_accept_rate <= 1.0
 
@@ -69,19 +144,21 @@ def test_faithfulness_screen_bounded_raises():
         noise=data.noise.gaussian(),
     )
     with pytest.raises(RuntimeError, match="faithfulness screen"):
-        scm.sample(n=500, seed=0, screen=screen)
+        scm.sample(n=500, seed=0, screen=screen, scale="raw")
 
 
-def test_raw_default_unchanged_by_new_params():
-    """Default sampling matches explicit raw scaling for the same seed."""
+def test_the_default_scale_is_standardize():
+    """Without a ``scale``, a sample is the standardized one, and ``"raw"`` is not."""
     scm = data.SCM(
         graph=data.graphs.erdos_renyi(12, 2.0),
         functional=data.functional.linear(),
         noise=data.noise.gaussian(),
     )
-    assert np.array_equal(
-        scm.sample(n=200, seed=3).data, scm.sample(n=200, seed=3, scale="raw").data
-    )
+    default = scm.sample(n=200, seed=3)
+    assert np.array_equal(default.data, scm.sample(n=200, seed=3, scale="standardize").data)
+    assert not np.allclose(default.data, scm.sample(n=200, seed=3, scale="raw").data)
+    assert default.report.scale == default.provenance["config"]["scale"] == "standardize"
+    assert data.sample_scm(d=12, n=200, seed=3).report.scale == "standardize"
 
 
 def test_faithfulness_screen_with_latents_does_not_crash():
@@ -93,6 +170,6 @@ def test_faithfulness_screen_with_latents_does_not_crash():
         noise=data.noise.gaussian(),
         latents=3,
     )
-    ds = scm.sample(n=300, seed=0, screen=screen)
+    ds = scm.sample(n=300, seed=0, screen=screen, scale="raw")
     assert ds.data.shape[1] == 27
     assert ds.report.faithfulness_accept_rate is not None

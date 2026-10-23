@@ -268,7 +268,9 @@ def test_a_fit_converts_to_a_valid_graph(
     import andrey.data as data
 
     _skip_without_package(adapter)
-    x = np.asarray(data.benchmarks.scm(scm, 6).sample(n=200, seed=0).data, dtype=np.float64)
+    x = np.asarray(
+        data.benchmarks.scm(scm, 6).sample(n=200, seed=0, scale="raw").data, dtype=np.float64
+    )
     d = x.shape[1]
     adapter.setup()
     native = np.asarray(adapter.fit(x, adapter.params()))  # what a benchmark runs it with
@@ -293,7 +295,10 @@ def test_the_cuda_direct_lingam_runs_or_falls_back_to_the_numpy_answer() -> None
 
     variants = {a.backend: a for a in andrey_direct_lingam_adapters()}
     cuda, reference = variants["torch-cuda"], variants["numpy"]
-    x = np.asarray(data.benchmarks.scm("lingam_sf", 6).sample(n=200, seed=0).data, dtype=np.float64)
+    x = np.asarray(
+        data.benchmarks.scm("lingam_sf", 6).sample(n=200, seed=0, scale="raw").data,
+        dtype=np.float64,
+    )
     cuda.setup()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)  # the pinned, unavailable device's warning

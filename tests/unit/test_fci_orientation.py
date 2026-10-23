@@ -102,7 +102,9 @@ def test_rules_ignore_node_labels():
 def test_rules_complete_the_true_pag_as_one_firing_at_a_time(monkeypatch):
     """Under exact tests no firings conflict, so the true PAGs the data module builds stay."""
     truths = [
-        data.sample_scm(graph=graph, d=14, n=10, seed=seed, density=3.0, latents=2).graph
+        data.sample_scm(
+            graph=graph, d=14, n=10, seed=seed, density=3.0, latents=2, scale="raw"
+        ).graph
         for graph in ("erdos_renyi", "scale_free")
         for seed in range(6)
     ]

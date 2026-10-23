@@ -9,6 +9,70 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Breaking
+
+- `andrey.data.sample_scm`, `SCM.sample`, and `andrey.data.generate` z-score every column by
+  default, `scale="standardize"`, so no method can read the causal order off the variances the
+  simulation happened to give; VAR and VARMA series take `"standardize"` too. Pass `scale="raw"`
+  for the values these functions returned before. ([#411])
+
+### Added
+
+- Experimental hybrid searches: `mmhc` learns MMPC's skeleton and then hill climbs within it,
+  `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
+  or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
+  parents and children with `target=`, or every variable's set without it. ([#400])
+- `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
+  `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
+  `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
+  pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
+  time-series method on one series resamples blocks of rows; the result is the same at any
+  `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
+- `scale="unitless"` in `andrey.data.sample_scm` and `SCM.sample` draws a linear model's weights
+  and noise so that every variable has variance 1 and its parameters depend only on its number of
+  parents (Herman et al. 2025), so on average neither the variances nor the share of each variable
+  the others explain follows the causal order; it takes up to 1,000 variables.
+  `andrey.data.generate` takes `scale`. For contributors, the benchmark harness has unitless
+  variants of its four linear regimes. ([#411])
+- `pcmci`, `pcmciplus`, `lpcmci`, `varma_lingam`, `longitudinal_lingam`, `ica_lingam`,
+  `multi_group_direct_lingam`, `rcd`, and `bottom_up_parce_lingam` (every part but required edges)
+  take `knowledge`, where a time-series method reads `(cause, effect, lag)` as the link from
+  `cause` at time `t - lag` to `effect` at time `t`, so you can rule links in or out at one lag.
+  ([#410])
+
+### Changed
+
+- Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
+  hard limit: they change with the data generator, the density, the method's settings, and the
+  machine. ([#367])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="cmiknn"` return the same graphs and p-values
+  in less time on CPUs without AVX512_ICL, such as the AMD EPYC 7713, because CMIknn selects each
+  row's `k`-th neighbor distance in 32-bit integers, which NumPy sorts with SIMD on AVX2. On an
+  EPYC 7713 a fit on 10 variables and 1,000 rows took 6.5 minutes instead of 22, and the quality
+  gate's CMIknn fits took half as long. On CPUs with AVX512_ICL, such as the EPYC 9534, the
+  selection is unchanged and the same fits take about 10% less time. ([#391])
+
+### Removed
+
+- `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
+  installed safetensors for them. Nothing in Andrey called them. ([#375])
+
+### Fixed
+
+- `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
+  `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
+  test or score; an empty list now reads as `None` there. ([#395])
+- Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
+  `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
+  `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
+  not change. ([#394])
+- For contributors, the benchmark harness's PCMCI, PCMCI+, and LPCMCI generators no longer fail at
+  large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
+  first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
+  unstable draw. Every draw that was stationary is unchanged. ([#393])
+
+## [0.9.0] - 2026-10-23
+
 ### Highlights
 
 - The same answers in less time: PC, FCI, GFCI, CD-NOD, GES, XGES, BOSS, GRaSP, exact search,
@@ -47,23 +111,9 @@ change names its pull request.
 - For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
   Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
   with the time of Tetrad's JVM reported apart from its search. ([#362])
-- `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
-  `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
-  `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
-  pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
-  time-series method on one series resamples blocks of rows; the result is the same at any
-  `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
-- `pcmci`, `pcmciplus`, `lpcmci`, `varma_lingam`, `longitudinal_lingam`, `ica_lingam`,
-  `multi_group_direct_lingam`, `rcd`, and `bottom_up_parce_lingam` (every part but required edges)
-  take `knowledge`, where a time-series method reads `(cause, effect, lag)` as the link from
-  `cause` at time `t - lag` to `effect` at time `t`, so you can rule links in or out at one lag.
-  ([#410])
 
 ### Changed
 
-- Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
-  hard limit: they change with the data generator, the density, the method's settings, and the
-  machine. ([#367])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` return the same
   graphs and p-values in less time, because their skeleton search hands the test each pair's
   conditioning sets, and those of consecutive pairs, as one stack. ([#280], [#292])
@@ -122,12 +172,6 @@ change names its pull request.
   the last bits. A near-tie between two candidates for the next variable in the causal order can
   then resolve the other way; on the identity check's datasets every output is the same as 0.8.0's.
   ([#288])
-- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="cmiknn"` return the same graphs and p-values
-  in less time on CPUs without AVX512_ICL, such as the AMD EPYC 7713, because CMIknn selects each
-  row's `k`-th neighbor distance in 32-bit integers, which NumPy sorts with SIMD on AVX2. On an
-  EPYC 7713 a fit on 10 variables and 1,000 rows took 6.5 minutes instead of 22, and the quality
-  gate's CMIknn fits took half as long. On CPUs with AVX512_ICL, such as the EPYC 9534, the
-  selection is unchanged and the same fits take about 10% less time. ([#391])
 - `help(andrey)` opens with a quick start and points to `andrey --skill` and
   `andrey --help --json`, and the package summary says the import name is `andrey`, so an agent
   that has only run `pip install andrey-core` finds the command line and its skill. ([#347])
@@ -139,22 +183,6 @@ change names its pull request.
   `andrey.temporal.LongitudinalLiNGAM.get_error_independence_p_values` and `residuals_`,
   `andrey.core.independence.hsic_gamma_test` and `measure_hsic_statistic`, and the bandwidth options
   of `hsic_test` and `hsic_statistic_test`, which no caller passed. ([#371])
-- `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
-  installed safetensors for them. Nothing in Andrey called them. ([#375])
-
-### Fixed
-
-- `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
-  `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
-  test or score; an empty list now reads as `None` there. ([#395])
-- Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
-  `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
-  `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
-  not change. ([#394])
-- For contributors, the benchmark harness's PCMCI, PCMCI+, and LPCMCI generators no longer fail at
-  large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
-  first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
-  unstable draw. Every draw that was stationary is unchanged. ([#393])
 
 ## [0.8.0] - 2026-10-23
 
@@ -616,7 +644,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
@@ -719,4 +748,6 @@ First alpha release.
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#396]: https://github.com/Abel-ai-lab/andrey/pull/396
+[#400]: https://github.com/Abel-ai-lab/andrey/pull/400
 [#410]: https://github.com/Abel-ai-lab/andrey/pull/410
+[#411]: https://github.com/Abel-ai-lab/andrey/pull/411

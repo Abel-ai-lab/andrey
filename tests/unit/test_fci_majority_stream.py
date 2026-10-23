@@ -70,7 +70,7 @@ def test_chunked_decisions_equal_one_call(seed, monkeypatch):
 
 @pytest.mark.parametrize("engine", ["fci", "gfci"])
 def test_public_majority_results_do_not_depend_on_the_chunk(engine, monkeypatch):
-    dataset = data.sample_scm(d=12, n=600, density=3.0, seed=3)
+    dataset = data.sample_scm(d=12, n=600, density=3.0, seed=3, scale="raw")
     fit = getattr(andrey, engine)
     results = []
     for chunk in (2, 10**9):

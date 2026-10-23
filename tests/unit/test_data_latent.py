@@ -16,7 +16,9 @@ from andrey.core.structure import LATENT
 
 def test_latent_indexing_and_dropping():
     d, k = 30, 4
-    ds = data.sample_scm(graph="erdos_renyi", d=d, n=200, seed=0, density=3.0, latents=k)
+    ds = data.sample_scm(
+        graph="erdos_renyi", d=d, n=200, seed=0, density=3.0, latents=k, scale="raw"
+    )
     assert ds.data.shape == (200, d - k)  # latent columns dropped
     types = ds.graph.node_types
     assert types is not None
@@ -29,14 +31,14 @@ def test_latent_indexing_and_dropping():
 def test_latents_are_genuine_confounders():
     """Non-vacuity: every latent has >= 2 children in the full truth (else it projects away)."""
     d, k = 40, 5
-    ds = data.sample_scm(d=d, n=64, seed=1, density=3.0, latents=k)
+    ds = data.sample_scm(d=d, n=64, seed=1, density=3.0, latents=k, scale="raw")
     latent_idx = set(np.flatnonzero(ds.graph.node_types == LATENT).tolist())
     out_degree = np.bincount(ds.params.edges[:, 0], minlength=d)
     assert all(out_degree[i] >= 2 for i in latent_idx)
 
 
 def test_observed_graph_aligns_with_data():
-    ds = data.sample_scm(d=30, n=300, seed=3, density=3.0, latents=4)
+    ds = data.sample_scm(d=30, n=300, seed=3, density=3.0, latents=4, scale="raw")
     og = ds.observed_graph
     n_obs = ds.data.shape[1]
     assert og.n_nodes == n_obs  # scoring target matches the data's columns
@@ -55,7 +57,7 @@ def test_reproducible_with_latents():
         noise=data.noise.gaussian(),
         latents=3,
     )
-    a, b = scm.sample(n=100, seed=5), scm.sample(n=100, seed=5)
+    a, b = scm.sample(n=100, seed=5, scale="raw"), scm.sample(n=100, seed=5, scale="raw")
     assert np.array_equal(a.data, b.data)
     assert a.graph == b.graph
 
@@ -69,7 +71,7 @@ def test_per_node_parameters_follow_the_latent_reindexing():
             functional=data.functional.linear(),
             noise=data.noise.gaussian(heteroscedastic=True),
             latents=latents,
-        ).sample(n=50, seed=2, shuffle=False)
+        ).sample(n=50, seed=2, shuffle=False, scale="raw")
 
     full, hidden = sample(0), sample(3)
     observed = [
@@ -85,18 +87,18 @@ def test_too_few_confounders_raises():
     """A tiny/sparse graph without enough >=2-child nodes raises rather than silently
     degenerating."""
     with pytest.raises(ValueError, match="latent confounder"):
-        data.sample_scm(d=4, n=50, seed=0, density=1.0, latents=3)
+        data.sample_scm(d=4, n=50, seed=0, density=1.0, latents=3, scale="raw")
 
 
 def test_no_latents_unchanged():
     """latents=0 leaves the causally-sufficient path byte-identical."""
-    a = data.sample_scm(d=12, n=200, seed=0)
+    a = data.sample_scm(d=12, n=200, seed=0, scale="raw")
     b = data.SCM(
         graph=data.graphs.erdos_renyi(12, 4.0),
         functional=data.functional.linear(),
         noise=data.noise.gaussian(),
         latents=0,
-    ).sample(n=200, seed=0)
+    ).sample(n=200, seed=0, scale="raw")
     assert np.array_equal(a.data, b.data)
     assert a.graph.node_types is None
 
@@ -141,7 +143,7 @@ def test_mag_nonvacuity_and_roundtrip():
     """A latent SCM's MAG has >= 1 bidirected edge, is kind=pag, and round-trips through the CSR."""
     from andrey.core.structure import GraphStructure
 
-    ds = data.sample_scm(d=20, n=64, seed=3, density=3.0, latents=3)
+    ds = data.sample_scm(d=20, n=64, seed=3, density=3.0, latents=3, scale="raw")
     mag = data.latent.marginal(ds.graph)
     assert mag.kind == "pag"
     assert mag.n_nodes == ds.data.shape[1]  # over observed nodes
@@ -158,12 +160,12 @@ def test_mag_nonvacuity_and_roundtrip():
 
 
 def test_mag_no_latents_is_identity():
-    ds = data.sample_scm(d=12, n=32, seed=0)
+    ds = data.sample_scm(d=12, n=32, seed=0, scale="raw")
     assert data.latent.marginal(ds.graph) is ds.graph  # nothing to project
 
 
 def test_mag_max_nodes_guard_raises():
-    ds = data.sample_scm(d=30, n=32, seed=0, density=3.0, latents=2)
+    ds = data.sample_scm(d=30, n=32, seed=0, density=3.0, latents=2, scale="raw")
     with pytest.raises(ValueError, match="max_nodes"):
         data.latent.marginal(ds.graph, max_nodes=5)
 
@@ -219,7 +221,7 @@ def test_pag_no_tail_tail_invariant():
     from andrey.core.structure import TAIL
 
     for seed in range(5):
-        ds = data.sample_scm(d=15, n=32, seed=seed, density=3.0, latents=2)
+        ds = data.sample_scm(d=15, n=32, seed=seed, density=3.0, latents=2, scale="raw")
         m = data.latent.marginal(ds.graph, target="pag").to_numpy()
         assert not np.any((m == TAIL) & (m.T == TAIL))
 
@@ -234,7 +236,7 @@ def test_pag_invariant_marks_match_the_mag():
     from andrey.core.structure import CIRCLE, NULL
 
     for seed in range(12):
-        ds = data.sample_scm(d=15, n=32, seed=seed, density=3.0, latents=2)
+        ds = data.sample_scm(d=15, n=32, seed=seed, density=3.0, latents=2, scale="raw")
         mag = data.latent.marginal(ds.graph, target="mag").to_numpy()
         pag = data.latent.marginal(ds.graph, target="pag").to_numpy()
         resolved = (pag != CIRCLE) & (pag != NULL)  # invariant (oriented) marks
@@ -243,7 +245,7 @@ def test_pag_invariant_marks_match_the_mag():
 
 def test_pag_permutation_equivariant():
     """Relabeling observed nodes transforms the PAG equivariantly (catches order-dependence)."""
-    ds = data.sample_scm(d=10, n=32, seed=1, density=3.0, latents=2)
+    ds = data.sample_scm(d=10, n=32, seed=1, density=3.0, latents=2, scale="raw")
     base = data.latent.marginal(ds.graph, target="pag").to_numpy()
     n_obs, d = base.shape[0], ds.graph.n_nodes
     lat = set(np.flatnonzero(ds.graph.node_types == LATENT).tolist())
@@ -259,7 +261,7 @@ def test_pag_permutation_equivariant():
 def test_pag_roundtrip_and_gate():
     from andrey.core.structure import GraphStructure
 
-    ds = data.sample_scm(d=12, n=32, seed=0, density=3.0, latents=2)
+    ds = data.sample_scm(d=12, n=32, seed=0, density=3.0, latents=2, scale="raw")
     pag = data.latent.marginal(ds.graph, target="pag")
     assert GraphStructure.from_numpy(pag.to_numpy(), kind="pag") == pag  # lossless CSR round-trip
     with pytest.raises(ValueError, match="max_nodes"):

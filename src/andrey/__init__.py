@@ -32,15 +32,20 @@ from .api import (
     granger,
     grasp,
     hc,
+    iamb,
     ica_lingam,
+    inter_iamb,
     longitudinal_lingam,
     lpcmci,
+    mmhc,
+    mmpc,
     multi_group_direct_lingam,
     pc,
     pcmci,
     pcmciplus,
     pnl,
     rcd,
+    rsmax2,
     tabu,
     varma_lingam,
     xges,
@@ -60,7 +65,7 @@ from .core.warning_policy import (
 )
 from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 __all__ = [
     "__version__",
@@ -92,6 +97,9 @@ __all__ = [
     "fci",
     "gfci",
     "cdnod",
+    "iamb",
+    "inter_iamb",
+    "mmpc",
     "ges",
     "gies",
     "xges",
@@ -99,6 +107,8 @@ __all__ = [
     "tabu",
     "exact_search",
     "calm",
+    "mmhc",
+    "rsmax2",
     "boss",
     "grasp",
     "direct_lingam",
