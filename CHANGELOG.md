@@ -125,6 +125,13 @@ change names its pull request.
 - `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
   installed safetensors for them. Nothing in Andrey called them. ([#375])
 
+### Fixed
+
+- For contributors, the benchmark harness's PCMCI, PCMCI+, and LPCMCI generators no longer fail at
+  large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
+  first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
+  unstable draw. Every draw that was stationary is unchanged. ([#393])
+
 ## [0.8.0] - 2026-10-23
 
 ### Highlights
@@ -683,3 +690,4 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
+[#393]: https://github.com/Abel-ai-lab/andrey/pull/393
