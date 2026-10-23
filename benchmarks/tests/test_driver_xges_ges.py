@@ -204,3 +204,9 @@ def test_a_resume_does_not_turn_a_failed_run_green(
     monkeypatch.setattr(driver, "run_batch", lambda *_a, **_kw: BatchResult(skipped=1))
     assert driver.main([*argv, "--resume"]) == 1
     assert "failed fits : 1" in capsys.readouterr().out
+
+
+def test_andrey_gates_its_parents_where_causal_learn_does() -> None:
+    """The reference limits parents with a gate, so Andrey's arms apply their limit as one."""
+    arms = [a for a in driver.solutions(1.0) if a.name.startswith("andrey.ges")]
+    assert arms and {a.parent_rule for a in arms} == {"gate"}
