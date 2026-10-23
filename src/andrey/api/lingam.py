@@ -161,7 +161,8 @@ def direct_lingam(
     stayed below the empty graph's, 13 against 199 at 200, and the median fit took 0.19 s at 20
     variables and 545 s at 200, on 16 CPU cores. In a separate run on shared nodes, a CPU fit at 300
     variables did not finish its warm-up and timed fit within 3,600 s; with an NVIDIA A100 GPU, a
-    fit took 528 s at 300 variables and 1,410 s at 400.
+    fit took 528 s at 300 variables and 1,410 s at 400. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -271,7 +272,8 @@ def ica_lingam(
     passed the empty graph's at every size, 27 against 19 at 20 variables and 181 against 99 at
     100. The median fit took 0.44 s at 20 variables and 15.8 s at 100, on 16 cores. On Sachs's
     protein-signaling data (853 rows, 11 variables), its errors were below the empty graph's (14
-    against 17).
+    against 17). The numbers are a reference, not a hard limit: they change with the data generator,
+    the density, the method's settings, and the machine.
 
     References
     ----------
@@ -355,7 +357,8 @@ def multi_group_direct_lingam(
     and 10 variables and 1 at 20, against the empty graph's 15, 30, and 60. The median fit took
     1.2 s at 20 variables, on 4 cores. It assumes linear effects and non-Gaussian noise
     in every group, and it gives every group the one shared causal order, even when a group's own
-    order differs.
+    order differs. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

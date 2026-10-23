@@ -94,7 +94,8 @@ def anm(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     in four at 200 rows and on every pair from 4,000 rows. The median fit took over three minutes at
     8,000 rows, on 4 cores. Each regression and HSIC test builds matrices with one row and one
     column per sample, so memory grows with the square of ``n_samples`` and the regression's time
-    with its cube.
+    with its cube. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -212,6 +213,8 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     from 1,000 rows. The median fit took 0.8 s at 5,000 rows, on 4 cores. Each HSIC test builds
     kernel matrices with one row and one column per sample, so time and memory grow with the square
     of the row count: each worker thread holds three such float64 matrices, 600 MB at 5,000 rows.
+    The numbers are a reference, not a hard limit: they change with the data generator, the density,
+    the method's settings, and the machine.
 
     References
     ----------
@@ -314,7 +317,8 @@ def rcd(
     rows, from 4 to 24 observed variables: its median directed-edge errors were below the empty
     graph's at every size but 8 variables, where they equaled it. A fit took about 2 s at 4
     variables and 18 s at 24, on two cores. Larger problems are untested; the work grows with the
-    number of variables and with ``max_explanatory_vars``.
+    number of variables and with ``max_explanatory_vars``. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -394,7 +398,8 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     in five hidden, and 2,000 rows: its median directed-edge errors were below the empty graph's at
     4 observed variables, and above it at every size from 8 to 24. From 16 variables it left none of
     the confounded pairs unordered. A fit took about 2 s at 4 variables and 96 s at 24, on two
-    cores.
+    cores. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
