@@ -47,6 +47,11 @@ change names its pull request.
 - For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
   Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
   with the time of Tetrad's JVM reported apart from its search. ([#362])
+- `pcmci`, `pcmciplus`, `lpcmci`, `varma_lingam`, `longitudinal_lingam`, `ica_lingam`,
+  `multi_group_direct_lingam`, `rcd`, and `bottom_up_parce_lingam` (every part but required edges)
+  take `knowledge`, where a time-series method reads `(cause, effect, lag)` as the link from
+  `cause` at time `t - lag` to `effect` at time `t`, so you can rule links in or out at one lag.
+  ([#410])
 
 ### Changed
 
@@ -683,3 +688,4 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
+[#410]: https://github.com/Abel-ai-lab/andrey/pull/410
