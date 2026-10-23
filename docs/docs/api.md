@@ -72,8 +72,8 @@ and make `z` a collider when none, or fewer than half, of the separating subsets
 triple the vote cannot decide is ambiguous: no rule orients through it, and
 `metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome.
 
-`ges` takes `max_parents`, a gate on its forward phase: a node whose parent count already exceeds it
-gains no new parents.
+`ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
+gives a node more than that many parents, and some graph reaches each node's count.
 
 ```{eval-rst}
 .. currentmodule:: andrey

@@ -12,6 +12,9 @@ _DEFAULT_SCORE_FUNC = "local_score_BIC"
 #: Matches Andrey's 1.0 penalty after conversion to log-likelihood units.
 _DEFAULT_LAMBDA = 0.5
 _DEFAULT_MAX_PARENTS = 4
+#: causal-learn's ``maxP`` stops a node that already holds more than ``maxP`` directed parents from
+#: gaining new ones, which Andrey's adapter names the gate; a paired Andrey arm declares the same.
+_PARENT_RULE = "gate"
 
 
 def _causal_learn_version() -> str:
@@ -52,6 +55,7 @@ class CausalLearnGES:
             "score_func": self.score_func,
             "lambda_value": _DEFAULT_LAMBDA,
             "max_parents": _DEFAULT_MAX_PARENTS,
+            "parent_rule": _PARENT_RULE,
         }
 
     def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
@@ -93,5 +97,9 @@ class CausalLearnGESBDeu(CausalLearnGES):
     score_func: str = "local_score_BDeu"
 
     def params(self) -> dict[str, Any]:
-        """BDeu with at most four parents."""
-        return {"score_func": self.score_func, "max_parents": _DEFAULT_MAX_PARENTS}
+        """BDeu with its parent limit of four, applied as a gate."""
+        return {
+            "score_func": self.score_func,
+            "max_parents": _DEFAULT_MAX_PARENTS,
+            "parent_rule": _PARENT_RULE,
+        }

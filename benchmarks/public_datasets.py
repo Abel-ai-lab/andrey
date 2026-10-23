@@ -62,7 +62,10 @@ def solutions(method: str, d: int) -> list[tuple[object, dict]]:
         "PC": [(AndreyPC(), fz), (CausalLearnPC(), fz)],
         "FCI": [(AndreyFCI(), fz), (CausalLearnFCI(), fz)],
         "GES": [
-            (andrey_ges_adapters()[0], {"lambda_value": 1.0, "max_parents": d / 2}),
+            (
+                andrey_ges_adapters(parent_rule="gate")[0],
+                {"lambda_value": 1.0, "max_parents": d / 2},
+            ),
             (
                 CausalLearnGES(),
                 {"score_func": "local_score_BIC", "lambda_value": 0.5, "max_parents": d / 2},
