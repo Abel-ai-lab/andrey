@@ -290,7 +290,12 @@ def _parents(marks: np.ndarray, b: int) -> set[int]:
 
 def _adjacent_nodes(marks: np.ndarray, b: int) -> list[int]:
     """Ascending list of nodes sharing an edge with ``b``."""
-    return [j for j in range(marks.shape[0]) if marks[b, j] != NULL]
+    return np.flatnonzero(marks[b] != NULL).tolist()
+
+
+def _neighbor_lists(marks: np.ndarray) -> list[list[int]]:
+    """Every node's :func:`_adjacent_nodes`, read from ``marks`` at once."""
+    return [np.flatnonzero(row).tolist() for row in marks != NULL]
 
 
 def _into(marks: np.ndarray, b: int, mark: int) -> list[int]:
@@ -367,7 +372,7 @@ def _majority_sepsets(
     its recorded sets. Subsets are tested in chunks of ``_MAJORITY_CHUNK``, so memory per triple
     stays bounded.
     """
-    neighbors = [_adjacent_nodes(marks, node) for node in range(len(marks))]
+    neighbors = _neighbor_lists(marks)
     ambiguous = set()
     batched = getattr(test, "batched_call", None)
     for b, adjacent in enumerate(neighbors):
@@ -418,9 +423,7 @@ def _orient_colliders(
     does not contain ``b``; the endpoint at ``b`` on both edges is then set to an arrowhead. An
     already-directed tail at ``b`` blocks the orientation.
     """
-    n = marks.shape[0]
-    for b in range(n):
-        adj = _adjacent_nodes(marks, b)
+    for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
@@ -488,7 +491,7 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     reasons for keeping it. A node's possible-parent check runs when the frontier reaches it, over
     the predecessors recorded so far, so the set depends on the order of the node indices.
     """
-    neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
+    neighbors = _neighbor_lists(marks)
     reach = _semidirected_reach(marks)
     dsep: set[int] = set()
     queue: deque[tuple[int, int]] = deque()
@@ -812,9 +815,7 @@ def _rule_r1r2_cycle(
     out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """Sweep R1 and R2 over every node ``b`` and each ordered pair of its neighbors."""
-    n = marks.shape[0]
-    for b in range(n):
-        adj = _adjacent_nodes(marks, b)
+    for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
@@ -1239,10 +1240,9 @@ def _rule_r7(
 def _rule_r8(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | None = None) -> bool:
     """R8: ``a -> b -> c`` (or ``a --o b -> c``) with ``a o-> c``  =>  ``a -> c``."""
     out = marks if out is None else out
-    n = marks.shape[0]
-    for b in range(n):
+    for b, adj in enumerate(_neighbor_lists(marks)):
         # Both orders of each neighbor pair, so the rule does not depend on node labels.
-        for x, z in permutations(_adjacent_nodes(marks, b), 2):
+        for x, z in permutations(adj, 2):
             b_to_z = marks[z, b] == ARROW and marks[b, z] == TAIL
             x_to_b_directed = marks[b, x] == ARROW and marks[x, b] == TAIL
             x_to_b_circle = marks[b, x] == CIRCLE and marks[x, b] == TAIL
@@ -1254,13 +1254,19 @@ def _rule_r8(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | No
     return change
 
 
-def _pd_reaches_target(marks: np.ndarray, target: int, a: int) -> set[int]:
-    """Nodes with a possibly-directed walk to ``target`` that avoids ``a``."""
+def _pd_reaches_target(
+    marks: np.ndarray, target: int, a: int, neighbors: list[list[int]] | None = None
+) -> set[int]:
+    """Nodes with a possibly-directed walk to ``target`` that avoids ``a``.
+
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
+    """
+    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
     reachable = {target}
     queue = deque([target])
     while queue:
         node = queue.popleft()
-        for previous in _adjacent_nodes(marks, node):
+        for previous in neighbors[node]:
             if (
                 previous not in reachable
                 and previous != a
@@ -1278,6 +1284,7 @@ def _exists_uncovered_pd_path(
     first: int,
     target: int,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    neighbors: list[list[int]] | None = None,
 ) -> bool:
     """True when an uncovered possibly-directed simple path ``a, first, ..., target`` exists.
 
@@ -1285,10 +1292,12 @@ def _exists_uncovered_pd_path(
     to each path: reaching a node through one predecessor must not block a different route.
     Reverse reachability prunes branches with no p.d. walk to the target avoiding ``a``.
     Ambiguity checks cover interior triples of the open path, with no wraparound at its target.
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
     """
     if marks[a, first] not in (TAIL, CIRCLE) or marks[first, a] == TAIL:
         return False
-    reachable = _pd_reaches_target(marks, target, a)
+    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
+    reachable = _pd_reaches_target(marks, target, a, neighbors)
     if first not in reachable:
         return False
     stack = [[a, first]]
@@ -1297,7 +1306,7 @@ def _exists_uncovered_pd_path(
         last = path[-1]
         if last == target:
             return True
-        for node in _adjacent_nodes(marks, last):
+        for node in neighbors[last]:
             if (
                 node not in reachable
                 or node in path
@@ -1324,6 +1333,7 @@ def _rule_r9(
     """R9: ``a o-> c`` with an uncovered possibly-directed path ``a .. b .. c``  =>  ``a -> c``."""
     out = marks if out is None else out
     n = marks.shape[0]
+    neighbors = _neighbor_lists(marks)
     for c in range(n):
         for a in _into(marks, c, ARROW):
             if marks[a, c] != CIRCLE:  # need a o-> c
@@ -1334,7 +1344,7 @@ def _rule_r9(
             for b in candidates:
                 if _adjacent(marks, b, c):
                     continue
-                if _exists_uncovered_pd_path(marks, a, b, c, ambiguous):
+                if _exists_uncovered_pd_path(marks, a, b, c, ambiguous, neighbors):
                     out[a, c] = TAIL
                     out[c, a] = ARROW
                     change = True
@@ -1362,6 +1372,7 @@ def _rule_r10(
     """
     out = marks if out is None else out
     n = marks.shape[0]
+    neighbors = _neighbor_lists(marks)
     for c in range(n):
         into_arrows = _into(marks, c, ARROW)
         if len(into_arrows) < 2:
@@ -1378,7 +1389,7 @@ def _rule_r10(
                     b, d = into_arrows[i], into_arrows[k]
                     if marks[b, c] != TAIL or marks[d, c] != TAIL:  # need b -> c <- d
                         continue
-                    if _r10_connects(marks, children, b, d, a, ambiguous):
+                    if _r10_connects(marks, children, b, d, a, ambiguous, neighbors):
                         out[a, c] = TAIL
                         out[c, a] = ARROW
                         change = True
@@ -1392,16 +1403,21 @@ def _r10_connects(
     d: int,
     a: int,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    neighbors: list[list[int]] | None = None,
 ) -> bool:
     """True when uncovered p.d. paths from ``a`` reach ``b``/``d`` via non-adjacent children.
 
     Either child of a pair may lead to either tail. Each child is searched at most once per tail.
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
     """
+    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
     reaches: dict[tuple[int, int], bool] = {}
 
     def reach(child: int, target: int) -> bool:
         if (child, target) not in reaches:
-            reaches[child, target] = _exists_uncovered_pd_path(marks, a, child, target, ambiguous)
+            reaches[child, target] = _exists_uncovered_pd_path(
+                marks, a, child, target, ambiguous, neighbors
+            )
         return reaches[child, target]
 
     for one, two in combinations(children, 2):

@@ -15,7 +15,7 @@ memoized: a test object holds the correlation matrix and the sample size, whatev
 The scalar path, the batched path (:meth:`~PartialCorrelationTest.batched_call`), the all-pairs
 and first-order closed forms, the many-query path
 (:meth:`~PartialCorrelationTest.statistic_pvalues`), and the path for queries already canonical,
-which the skeleton search takes, return the same p-values exactly.
+which the skeleton search and GFCI's separating-set search take, return the same p-values exactly.
 
 The two partial-correlation tests differ only in how a partial correlation ``r`` and its degrees of
 freedom become a p-value. :class:`FisherZ` applies the normal distribution to Fisher's z-transform
@@ -135,8 +135,9 @@ class PartialCorrelationTest:
     visited. Later queries are recomputed.
 
     The scalar path, :meth:`batched_call`, :meth:`statistic_pvalues`, :meth:`marginal_pvalues`,
-    :meth:`first_order_pvalues`, and ``_canonical_pvalues``, which the skeleton search calls with
-    queries canonical as built, use identical partial-correlation, clip, and p-value arithmetic.
+    :meth:`first_order_pvalues`, and ``_canonical_pvalues``, which the skeleton search and GFCI's
+    separating-set search call with queries canonical as built, use identical partial-correlation,
+    clip, and p-value arithmetic.
     Their p-values match exactly, so repeated queries take the same ``p > alpha`` decision across
     call paths, including at the threshold.
     """
@@ -298,8 +299,8 @@ class PartialCorrelationTest:
 
         ``x`` and ``y`` are ``(N,)`` int arrays with ``x[i] < y[i]``, and ``conditions`` the
         ``(N, m)`` int array whose row ``i`` is sorted and distinct and excludes ``x[i]`` and
-        ``y[i]``, as the skeleton search builds its queries. Nothing is reordered or checked; entry
-        ``i`` matches ``self(x[i], y[i], conditions[i])`` exactly.
+        ``y[i]``, as the skeleton searches build their queries. Nothing is reordered or checked;
+        entry ``i`` matches ``self(x[i], y[i], conditions[i])`` exactly.
         """
         return self._canonical_statistic_pvalues(x, y, conditions)[1]
 
