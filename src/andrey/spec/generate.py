@@ -55,7 +55,7 @@ _JSON_TYPES: dict[str, dict] = {
                         "type": "array",
                         "items": {"type": ["string", "integer"]},
                         "minItems": 2,
-                        "maxItems": 2,
+                        "maxItems": 2 if part == "allowed" else 3,
                     },
                 }
                 for part in ("required", "forbidden", "allowed")
@@ -73,8 +73,9 @@ _JSON_TYPES: dict[str, dict] = {
 KNOWLEDGE_NOTE = (
     "knowledge= takes a JSON object, inline or as a .json file path: required and forbidden list "
     "directed edges [cause, effect], allowed lists the only pairs that may be adjacent, and tiers "
-    "lists groups of columns in time order (no edge from a later tier into an earlier one). Name "
-    "columns by the data file's header or by 0-based position, for example, "
+    "lists groups of columns in time order (no edge from a later tier into an earlier one). For a "
+    "time-series method, [cause, effect, lag] is the link from cause at time t - lag to effect at "
+    "time t. Name columns by the data file's header or by 0-based position, for example, "
     'knowledge=\'{"forbidden": [["y", "x"]], "tiers": [["age"], ["x", "y"]]}\'.'
 )
 

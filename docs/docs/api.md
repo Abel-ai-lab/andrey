@@ -58,9 +58,11 @@ single column gives a one-node graph.
 ([Conditional-independence tests](#conditional-independence-tests)).
 
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
-`exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
-and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
-`knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
+`exact_search`, `direct_lingam`, `pcmci`, `pcmciplus`, and `lpcmci` take `knowledge`, a
+{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent,
+and temporal tiers; each method's `knowledge` parameter says how it honors them. For the
+time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to
+`effect` at time `t`. `pc`, `fci`, `gfci`, and `cdnod` also take
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 

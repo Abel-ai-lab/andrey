@@ -3,8 +3,9 @@ tiers that order the variables.
 
 :class:`Knowledge` is the public value a search takes as ``knowledge=``. :func:`resolve` turns it
 into :class:`Constraints`, two positional ``(d, d)`` boolean matrices the engines read, against the
-data's column labels. :func:`orient` and :func:`admits` apply the constraints to an equivalence
-class.
+data's column labels; :func:`resolve_lagged` turns it into :class:`LaggedConstraints`, one such
+pair of matrices per time lag, for the time-series searches. :func:`orient` and :func:`admits`
+apply the constraints to an equivalence class.
 """
 
 from __future__ import annotations
@@ -27,13 +28,17 @@ __all__ = [
     "Knowledge",
     "KnowledgeError",
     "Constraints",
+    "LaggedConstraints",
     "KnowledgePart",
     "KNOWLEDGE_PARTS",
     "resolve",
+    "resolve_lagged",
 ]
 
 #: A node, by column label or 0-based position.
 Node = str | int
+#: A directed edge ``(cause, effect)``, or a time-series link ``(cause, effect, lag)``.
+Edge = tuple[Node, Node] | tuple[Node, Node, int]
 #: The parts of a :class:`Knowledge`, as a method's spec lists the ones it honors.
 KnowledgePart = Literal["required", "forbidden", "allowed", "tiers"]
 KNOWLEDGE_PARTS: tuple[KnowledgePart, ...] = ("required", "forbidden", "allowed", "tiers")
@@ -48,19 +53,29 @@ def _node(value: object, what: str) -> Node:
     return value if isinstance(value, str) else int(value)
 
 
-def _edges(values: Iterable | None, what: str) -> tuple[tuple[Node, Node], ...]:
+def _edges(values: Iterable | None, what: str, *, lagged: bool = False) -> tuple[Edge, ...]:
+    """Check ``values`` as ``(a, b)`` pairs, or with ``lagged`` also ``(a, b, lag)`` triples."""
     if values is None:
         return ()
+    shape = "(a, b) pairs or (a, b, lag) triples" if lagged else "(a, b) pairs"
     if isinstance(values, (str, bytes)):
-        raise TypeError(f"{what} must be an iterable of (a, b) pairs, got {values!r}")
-    edges = []
+        raise TypeError(f"{what} must be an iterable of {shape}, got {values!r}")
+    edges: list[Edge] = []
     for pair in values:
-        if isinstance(pair, (str, bytes)) or len(pair) != 2:
-            raise TypeError(f"{what} must be an iterable of (a, b) pairs, got {pair!r}")
+        if isinstance(pair, (str, bytes)) or len(pair) not in ((2, 3) if lagged else (2,)):
+            raise TypeError(f"{what} must be an iterable of {shape}, got {pair!r}")
         a, b = _node(pair[0], what), _node(pair[1], what)
-        if a == b:
-            raise ValueError(f"{what} lists the self-loop ({a!r}, {b!r})")
-        edges.append((a, b))
+        if len(pair) == 2:
+            if a == b:
+                raise ValueError(f"{what} lists the self-loop ({a!r}, {b!r})")
+            edges.append((a, b))
+            continue
+        lag = pair[2]
+        if isinstance(lag, (bool, np.bool_)) or not isinstance(lag, (int, np.integer)) or lag < 0:
+            raise TypeError(f"{what} names a lag by an integer at least 0, got {lag!r} in {pair!r}")
+        if a == b and lag == 0:
+            raise ValueError(f"{what} lists the self-loop ({a!r}, {b!r}, 0)")
+        edges.append((a, b, int(lag)))
     return tuple(edges)
 
 
@@ -118,12 +133,15 @@ class Knowledge:
 
     Parameters
     ----------
-    required : iterable of (cause, effect) pairs, optional
-        Directed edges ``cause -> effect`` the result must have.
-    forbidden : iterable of (cause, effect) pairs, optional
+    required : iterable of (cause, effect) pairs or (cause, effect, lag) triples, optional
+        Directed edges ``cause -> effect`` the result must have. A triple is a time-series link:
+        ``cause`` at time ``t - lag`` to ``effect`` at time ``t``, with ``lag`` at least ``0``; a
+        link with ``lag`` at least ``1`` may join a variable to its own past.
+    forbidden : iterable of (cause, effect) pairs or (cause, effect, lag) triples, optional
         Directed edges ``cause -> effect`` the result must not have. Forbidding ``a -> b`` forbids
         that edge only, not a directed path from ``a`` to ``b`` through other variables. Forbid both
-        directions to make two variables non-adjacent.
+        directions to make two variables non-adjacent. A triple forbids the time-series link at
+        that lag only; a pair forbids it at every lag.
     allowed : iterable of (a, b) pairs or None, optional
         The only pairs that may be adjacent, in either direction. Listing a pair permits an edge
         but does not require one, and does not override ``forbidden`` or ``tiers``. ``None`` allows
@@ -137,18 +155,23 @@ class Knowledge:
     Raises
     ------
     TypeError
-        If ``required``, ``forbidden``, or ``allowed`` is not an iterable of (a, b) pairs, ``tiers``
-        is not an iterable of node iterables, or a node is neither a column label nor a 0-based
-        position.
+        If ``required`` or ``forbidden`` is not an iterable of (a, b) pairs and (a, b, lag)
+        triples, ``allowed`` is not an iterable of (a, b) pairs, ``tiers`` is not an iterable of
+        node iterables, a node is neither a column label nor a 0-based position, or a lag is not
+        an integer at least ``0``.
     ValueError
-        If an edge is a self-loop or a node is in two tiers. A method raises ``ValueError`` when the
-        knowledge names a column the data lacks, or contradicts itself: a required edge that is
-        forbidden, directly, by the tiers, or by ``allowed``, or required edges forming a cycle.
-        ``boss``, ``grasp``, and ``direct_lingam`` also raise it when the required edges and the
-        tiers admit no causal order, through a column in no tier. ``pc`` and ``cdnod`` raise it when
-        the edges the knowledge orients form a directed cycle over the adjacencies the search kept;
-        ``fci`` when a directed path of required edges leads from ``a`` to ``b`` while ``forbidden``
-        or ``tiers`` put an arrowhead at ``a`` on the edge between them.
+        If an edge is a self-loop at lag ``0`` or a node is in two tiers. A method raises
+        ``ValueError`` when the knowledge names a column the data lacks, or contradicts itself: a
+        required edge that is forbidden, directly, by the tiers, or by ``allowed``, or required
+        edges forming a cycle. ``boss``, ``grasp``, and ``direct_lingam`` also raise it when the
+        required edges and the tiers admit no causal order, through a column in no tier. ``pc``,
+        ``cdnod``, and ``pcmciplus`` raise it when the edges the knowledge orients form a directed
+        cycle over the adjacencies the search kept; ``fci`` when a directed path of required edges
+        leads from ``a`` to ``b`` while ``forbidden`` or ``tiers`` put an arrowhead at ``a`` on the
+        edge between them. A time-series search raises it for a required link without a lag, or at
+        a lag the search does not learn.
+    NotImplementedError
+        A method that learns no time lags raises it for an edge with a lag.
 
     Notes
     -----
@@ -165,6 +188,8 @@ class Knowledge:
     stands for the DAGs of the equivalence class that satisfy the knowledge; it keeps the ``cpdag``
     tag. On sample data the tests can disagree with the knowledge; the rules then skip the
     orientations that conflict, so the result can leave undirected an edge the MPDAG would direct.
+    ``pcmciplus`` applies its rules R1-R3 only, so its lag-0 graph can also leave undirected an
+    edge R4 would direct.
 
     In a PAG, the edges are those of an ancestral graph over the measured variables, where
     ``a -> b`` says that ``a`` is an ancestor of ``b``, not necessarily its direct cause. A
@@ -172,6 +197,11 @@ class Knowledge:
     ``b``, and a required ``a -> b`` is ``a -> b``. The methods that search over causal orders
     (``boss``, ``grasp``, ``direct_lingam``) also keep each variable of a tier after those of
     earlier tiers; with every variable in a tier, this is the same as forbidding the edges.
+
+    The time-series searches read the knowledge per lag. Tiers and ``allowed`` hold at every lag:
+    no link runs from a later tier into an earlier one, and a pair outside ``allowed`` has no link
+    at any lag, while a variable's links to its own past stay allowed. A required link names its
+    lag. Each method's ``knowledge`` parameter says how it applies the knowledge.
 
     References
     ----------
@@ -193,8 +223,8 @@ class Knowledge:
     [('x', 'y', 'directed')]
     """
 
-    required: tuple[tuple[Node, Node], ...] = field(default=())
-    forbidden: tuple[tuple[Node, Node], ...] = field(default=())
+    required: tuple[Edge, ...] = field(default=())
+    forbidden: tuple[Edge, ...] = field(default=())
     allowed: tuple[tuple[Node, Node], ...] | None = field(default=None)
     tiers: tuple[tuple[Node, ...], ...] = field(default=())
 
@@ -206,8 +236,8 @@ class Knowledge:
         allowed: Iterable[Sequence[Node]] | None = None,
         tiers: Iterable[Iterable[Node]] | None = None,
     ) -> None:
-        object.__setattr__(self, "required", _edges(required, "required"))
-        object.__setattr__(self, "forbidden", _edges(forbidden, "forbidden"))
+        object.__setattr__(self, "required", _edges(required, "required", lagged=True))
+        object.__setattr__(self, "forbidden", _edges(forbidden, "forbidden", lagged=True))
         object.__setattr__(self, "allowed", None if allowed is None else _edges(allowed, "allowed"))
         if tiers is None:
             tiers = ()
@@ -364,6 +394,22 @@ def _has_cycle(edges: np.ndarray) -> bool:
     return seen < edges.shape[0]
 
 
+def _given(knowledge: object) -> bool:
+    """Whether ``knowledge``, a :class:`Knowledge` or a ``TypeError``, sets any part."""
+    if not isinstance(knowledge, Knowledge):
+        raise TypeError(f"knowledge must be an andrey.Knowledge, got {type(knowledge).__name__}")
+    return bool(knowledge.parts())
+
+
+def _check_parts(knowledge: Knowledge, method: str, honors: Sequence[KnowledgePart]) -> None:
+    """Raise ``NotImplementedError`` when ``knowledge`` sets a part not in ``honors``."""
+    unsupported = [part for part in knowledge.parts() if part not in honors]
+    if unsupported:
+        raise NotImplementedError(
+            f"{method} does not honor the knowledge part(s) {unsupported}; it honors {list(honors)}"
+        )
+
+
 def resolve(
     knowledge: Knowledge | None,
     d: int,
@@ -379,17 +425,14 @@ def resolve(
     :class:`Knowledge`, and :class:`KnowledgeError` when it names a missing column or contradicts
     itself.
     """
-    if knowledge is None:
+    if knowledge is None or not _given(knowledge):
         return None
-    if not isinstance(knowledge, Knowledge):
-        raise TypeError(f"knowledge must be an andrey.Knowledge, got {type(knowledge).__name__}")
-    parts = knowledge.parts()
-    if not parts:
-        return None
-    unsupported = [part for part in parts if part not in honors]
-    if unsupported:
+    _check_parts(knowledge, method, honors)
+    lagged = [edge for edge in (*knowledge.required, *knowledge.forbidden) if len(edge) == 3]
+    if lagged:
         raise NotImplementedError(
-            f"{method} does not honor the knowledge part(s) {unsupported}; it honors {list(honors)}"
+            f"{method} learns no time lags, but knowledge gives the lagged link {lagged[0]!r}; "
+            "give its edges as (cause, effect) pairs"
         )
     names = list(labels) if labels is not None else None
 
@@ -402,8 +445,8 @@ def resolve(
     forbidden = np.zeros((d, d), dtype=bool)
     required = np.zeros((d, d), dtype=bool)
     tier = np.full(d, -1, dtype=np.intp)
-    for a, b in knowledge.forbidden:
-        forbidden[position(a, "forbidden"), position(b, "forbidden")] = True
+    for edge in knowledge.forbidden:
+        forbidden[position(edge[0], "forbidden"), position(edge[1], "forbidden")] = True
     for k, nodes in enumerate(knowledge.tiers):
         for v in nodes:
             i = position(v, "tiers")
@@ -419,8 +462,8 @@ def resolve(
             allowed[i, j] = allowed[j, i] = True
         forbidden |= ~allowed
     np.fill_diagonal(forbidden, False)
-    for a, b in knowledge.required:
-        i, j = position(a, "required"), position(b, "required")
+    for edge in knowledge.required:
+        i, j = position(edge[0], "required"), position(edge[1], "required")
         if forbidden[i, j]:
             raise KnowledgeError(
                 f"knowledge requires the edge {label(i)} -> {label(j)}, which it also forbids "
@@ -431,6 +474,108 @@ def resolve(
         raise KnowledgeError("knowledge requires edges that form a directed cycle")
     forbidden |= required.T
     return Constraints(forbidden, required, tier)
+
+
+@dataclass(frozen=True)
+class LaggedConstraints:
+    """Knowledge resolved against ``d`` time series over lags ``0`` to ``tau_max``.
+
+    ``forbidden[lag, i, j]`` forbids the link from ``i`` at time ``t - lag`` to ``j`` at ``t``: it
+    holds the forbidden links, the links from a later tier into an earlier one, both directions of
+    every pair outside the allowed set at every lag (a variable's links to its own past stay), and
+    at lag ``0`` the reverse of every required link. ``required[lag, i, j]`` requires that link.
+    ``tier[i]`` is column ``i``'s tier, ``-1`` for none.
+    """
+
+    forbidden: np.ndarray
+    required: np.ndarray
+    tier: np.ndarray
+
+    def contemporaneous(self) -> Constraints:
+        """The lag-0 constraints, as :class:`Constraints` over the ``d`` series."""
+        return Constraints(self.forbidden[0], self.required[0], self.tier)
+
+
+def resolve_lagged(
+    knowledge: Knowledge | None,
+    d: int,
+    labels: Sequence[str] | None,
+    tau_max: int,
+    *,
+    method: str,
+    contemporaneous: bool = True,
+    honors: Sequence[KnowledgePart] = KNOWLEDGE_PARTS,
+) -> LaggedConstraints | None:
+    """Resolve ``knowledge`` against ``d`` series named ``labels`` and lags ``0`` to ``tau_max``.
+
+    Returns ``None`` when it sets nothing. An edge without a lag is forbidden at every lag; a
+    forbidden link beyond ``tau_max`` constrains nothing the method learns and is dropped. A
+    required link needs its lag, at most ``tau_max``, and above ``0`` when ``contemporaneous`` is
+    false (a method that learns no lag-0 links). ``method`` and ``honors`` act as for
+    :func:`resolve`. Raises :class:`KnowledgeError` when the knowledge names a missing column,
+    contradicts itself, or requires a link the method does not learn.
+    """
+    if knowledge is None or not _given(knowledge):
+        return None
+    _check_parts(knowledge, method, honors)
+    names = list(labels) if labels is not None else None
+
+    def position(node: Node, what: str) -> int:
+        return column_position(node, names, d, f"knowledge {what}", KnowledgeError)
+
+    def label(i: int) -> str:
+        return repr(names[i]) if names is not None else str(i)
+
+    lags = tau_max + 1
+    forbidden = np.zeros((lags, d, d), dtype=bool)
+    required = np.zeros((lags, d, d), dtype=bool)
+    tier = np.full(d, -1, dtype=np.intp)
+    for edge in knowledge.forbidden:
+        i, j = position(edge[0], "forbidden"), position(edge[1], "forbidden")
+        if len(edge) == 2:
+            forbidden[:, i, j] = True
+        elif edge[2] <= tau_max:
+            forbidden[edge[2], i, j] = True
+    for k, nodes in enumerate(knowledge.tiers):
+        for v in nodes:
+            i = position(v, "tiers")
+            if tier[i] >= 0:
+                raise KnowledgeError(f"knowledge tiers list column {label(i)} more than once")
+            tier[i] = k
+    tiered = tier >= 0
+    forbidden |= tiered[:, None] & tiered[None, :] & (tier[:, None] > tier[None, :])
+    if knowledge.allowed is not None:
+        allowed = np.eye(d, dtype=bool)
+        for a, b in knowledge.allowed:
+            i, j = position(a, "allowed"), position(b, "allowed")
+            allowed[i, j] = allowed[j, i] = True
+        forbidden |= ~allowed
+    np.fill_diagonal(forbidden[0], False)
+    for edge in knowledge.required:
+        i, j = position(edge[0], "required"), position(edge[1], "required")
+        link = f"{label(i)} -> {label(j)}"
+        if len(edge) == 2:
+            raise KnowledgeError(
+                f"knowledge requires the edge {link} without a lag; {method} needs the lag of each "
+                "required link, as (cause, effect, lag)"
+            )
+        lag = edge[2]
+        if lag > tau_max or (lag == 0 and not contemporaneous):
+            learned = f"1 to {tau_max}" if not contemporaneous else f"0 to {tau_max}"
+            raise KnowledgeError(
+                f"knowledge requires the link {link} at lag {lag}, but {method} learns the links "
+                f"at lags {learned}"
+            )
+        if forbidden[lag, i, j]:
+            raise KnowledgeError(
+                f"knowledge requires the link {link} at lag {lag}, which it also forbids "
+                "(directly, by the tiers, or by leaving the pair out of allowed)"
+            )
+        required[lag, i, j] = True
+    if (required[0] & required[0].T).any() or _has_cycle(required[0]):
+        raise KnowledgeError("knowledge requires lag-0 links that form a directed cycle")
+    forbidden[0] |= required[0].T
+    return LaggedConstraints(forbidden, required, tier)
 
 
 # ---- applying constraints to an equivalence class -----------------------------------------------

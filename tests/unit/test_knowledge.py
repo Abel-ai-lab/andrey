@@ -15,13 +15,24 @@ from andrey import Knowledge
 from andrey.cli import main
 from andrey.constraint.fci import _fci_orient, _remove_by_possible_dsep
 from andrey.core import ARROW, NULL, TAIL
-from andrey.core.knowledge import KnowledgeError, admits, resolve
+from andrey.core.knowledge import KnowledgeError, admits, resolve, resolve_lagged
 from andrey.core.orient import dag2cpdag, from_structure, meek
 from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
 
-METHODS = [name for name, spec in REGISTRY.items() if spec.knowledge]
+# The searches that take knowledge and return one graph over the columns of one table.
+METHODS = [
+    name
+    for name, spec in REGISTRY.items()
+    if spec.knowledge and spec.output.structure_type == "graph" and not spec.output.multi
+]
+# The time-series searches that take knowledge, over the links between lagged variables.
+TEMPORAL = [
+    name
+    for name, spec in REGISTRY.items()
+    if spec.knowledge and spec.output.structure_type == "temporal"
+]
 PAGS = {"fci", "gfci"}
 DEPTH = ["pc", "fci", "gfci", "cdnod"]
 LABELS = list("abcdef")
@@ -274,6 +285,13 @@ def test_knowledge_checks_its_shape():
         Knowledge(required=["ab"])
     with pytest.raises(ValueError, match="self-loop"):
         Knowledge(forbidden=[("a", "a")])
+    with pytest.raises(ValueError, match="self-loop"):
+        Knowledge(forbidden=[("a", "a", 0)])
+    with pytest.raises(TypeError, match="lag"):
+        Knowledge(required=[("a", "b", -1)])
+    with pytest.raises(TypeError, match="pairs"):
+        Knowledge(allowed=[("a", "b", 1)])
+    assert Knowledge(forbidden=[("a", "a", 1)]).forbidden == (("a", "a", 1),)
     with pytest.raises(ValueError, match="more than once"):
         Knowledge(tiers=[["a"], ["a", "b"]])
     with pytest.raises(TypeError, match="label or 0-based position"):
@@ -444,7 +462,7 @@ def test_cli_reads_knowledge_from_a_file_and_inline(tmp_path, capsys, data):
 def test_schema_lists_the_parts_each_method_honors():
     from andrey.spec.generate import to_json_schema
 
-    for name in METHODS:
+    for name in (*METHODS, *TEMPORAL):
         schema = to_json_schema(REGISTRY[name])
         assert schema["knowledge"] == list(REGISTRY[name].knowledge)
         assert schema["params"]["properties"]["knowledge"]["type"] == ["object", "null"]
@@ -542,3 +560,187 @@ def test_fci_reads_a_cycle_of_arrowheads_as_a_pag():
     marks, labels = _marks(_fit("fci", _triangle(), knowledge=CYCLE))
     a, b, c = (labels.index(v) for v in "abc")
     assert marks[b, a] == ARROW and marks[c, b] == ARROW and marks[a, c] == ARROW
+
+
+# ---- time series --------------------------------------------------------------------------------
+
+SERIES = ["x", "y", "z"]
+# x -> x and y -> y at lag 1, x -> y at lags 1 and 2, y -> z at lag 0.
+SERIES_TRUTH = {("x", "x", 1), ("y", "y", 1), ("x", "y", 1), ("x", "y", 2), ("y", "z", 0)}
+
+
+def _series(seed: int = 0, n: int = 1000) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    e = rng.standard_normal((n, 3))
+    x, y, z = np.zeros(n), np.zeros(n), np.zeros(n)
+    for t in range(2, n):
+        x[t] = 0.5 * x[t - 1] + e[t, 0]
+        y[t] = 0.5 * x[t - 1] + 0.4 * x[t - 2] + 0.3 * y[t - 1] + e[t, 1]
+        z[t] = 0.7 * y[t] + e[t, 2]
+    return pd.DataFrame({"x": x, "y": y, "z": z})
+
+
+@pytest.fixture(scope="module")
+def series() -> pd.DataFrame:
+    return _series()
+
+
+def _links(out) -> dict[tuple[str, str, int], str]:
+    """Every link ``(a, b, lag)``, ``a`` at ``t - lag``, as its marks: ``"-->"``, ``"o->"``, ...
+
+    A same-step link appears in both orders, ``"-->"`` and ``"<--"``; an undirected one is
+    ``"---"``. A PAG lists every link with all its marks in ``metadata["links"]``.
+    """
+    names = list(out.structure.labels)
+    if "links" in out.metadata:
+        return {
+            (names[i], names[j], lag): link
+            for lag, rows in enumerate(out.metadata["links"])
+            for i, row in enumerate(rows)
+            for j, link in enumerate(row)
+            if link
+        }
+    found = {}
+    for lag in out.structure.lags:
+        for a, b, kind in out.structure.lag(lag).oriented_edges():
+            found[(a, b, lag)] = "-->" if kind == "directed" else "---"
+            if lag == 0:
+                found[(b, a, 0)] = "<--" if kind == "directed" else "---"
+    return found
+
+
+def _cause(links: dict, a: str, b: str, lag: int) -> bool:
+    return links.get((a, b, lag)) == "-->"
+
+
+def _may_cause(links: dict, a: str, b: str, lag: int) -> bool:
+    """Whether the link leaves ``a`` open to be a cause of ``b``: a tail or a circle at ``a``."""
+    return links.get((a, b, lag), "<")[0] in "-o"
+
+
+@pytest.mark.parametrize("name", TEMPORAL)
+def test_a_forbidden_lagged_link_is_absent_at_its_lag_only(name, series):
+    plain = _links(_fit(name, series, tau_max=2))
+    assert ("x", "y", 1) in plain and ("x", "y", 2) in plain
+    links = _links(_fit(name, series, tau_max=2, knowledge=Knowledge(forbidden=[("x", "y", 1)])))
+    assert ("x", "y", 1) not in links
+    assert ("x", "y", 2) in links
+
+
+@pytest.mark.parametrize("name", TEMPORAL)
+def test_a_forbidden_pair_is_no_cause_at_any_lag(name, series):
+    links = _links(_fit(name, series, tau_max=2, knowledge=Knowledge(forbidden=[("y", "z")])))
+    assert not any(_may_cause(links, "y", "z", lag) for lag in (0, 1, 2))
+
+
+@pytest.mark.parametrize("name", TEMPORAL)
+def test_a_required_lagged_link_is_a_cause(name, series):
+    # z does not drive x; the required link holds anyway.
+    knowledge = Knowledge(required=[("z", "x", 2)])
+    assert _cause(_links(_fit(name, series, tau_max=2, knowledge=knowledge)), "z", "x", 2)
+
+
+@pytest.mark.parametrize("name", TEMPORAL)
+@pytest.mark.parametrize("edge", [("a", "b"), ("b", "a")])
+def test_a_required_same_step_link_keeps_its_direction(name, edge):
+    # Two series that depend on each other within a step: either direction fits the data.
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal(1000)
+    data = pd.DataFrame({"a": a, "b": 0.8 * a + rng.standard_normal(1000)})
+    knowledge = Knowledge(required=[(*edge, 0)])
+    if 0 not in _fit(name, data).structure.lags:
+        with pytest.raises(KnowledgeError, match="lags 1 to"):
+            _fit(name, data, knowledge=knowledge)
+        return
+    assert _cause(_links(_fit(name, data, knowledge=knowledge)), *edge, 0)
+
+
+@pytest.mark.parametrize("name", TEMPORAL)
+def test_tiers_hold_at_every_lag(name, series):
+    # z first: no link runs into z from x or y, at any lag; the true y -> z at lag 0 included.
+    out = _fit(name, series, tau_max=2, knowledge=Knowledge(tiers=[["z"], ["x", "y"]]))
+    links = _links(out)
+    assert ("y", "z", 0) in links or 0 not in out.structure.lags
+    for later in ("x", "y"):
+        assert not any(_may_cause(links, later, "z", lag) for lag in (0, 1, 2)), links
+
+
+@pytest.mark.parametrize("name", TEMPORAL)
+def test_knowledge_that_fits_the_truth_does_not_add_errors(name, series):
+    def errors(out) -> int:
+        lags = out.structure.lags
+        truth = {(a, b, lag, "-->") for a, b, lag in SERIES_TRUTH if lag in lags}
+        truth |= {(b, a, 0, "<--") for a, b, lag in SERIES_TRUTH if lag == 0 and 0 in lags}
+        found = {(a, b, lag, kind) for (a, b, lag), kind in _links(out).items()}
+        return len(truth ^ found)
+
+    knowledge = Knowledge(
+        tiers=[["x"], ["y"], ["z"]], required=[("x", "y", 2)], forbidden=[("z", "z", 1)]
+    )
+    plain = errors(_fit(name, series, tau_max=2))
+    assert errors(_fit(name, series, tau_max=2, knowledge=knowledge)) <= plain
+
+
+@pytest.mark.parametrize("name", TEMPORAL)
+def test_reordered_series_relabel_the_result_with_knowledge(name, series):
+    knowledge = Knowledge(forbidden=[("x", "y", 1)], required=[("z", "x", 2)], tiers=[["x"]])
+
+    def links(frame):
+        return _links(_fit(name, frame, tau_max=2, knowledge=knowledge))
+
+    assert links(series[["z", "x", "y"]]) == links(series)
+
+
+@pytest.mark.parametrize("name", TEMPORAL)
+def test_empty_knowledge_is_no_knowledge_for_a_series(name, series):
+    kept = _fit(name, series, tau_max=2, knowledge=Knowledge())
+    assert _links(kept) == _links(_fit(name, series, tau_max=2))
+
+
+@pytest.mark.parametrize(
+    ("knowledge", "message"),
+    [
+        (Knowledge(required=[("x", "y")]), "without a lag"),
+        (Knowledge(required=[("x", "y", 3)]), "lags"),
+        (Knowledge(required=[("x", "y", 1)], forbidden=[("x", "y")]), "also forbids"),
+        (Knowledge(required=[("x", "y", 0), ("y", "x", 0)]), "cycle"),
+    ],
+)
+def test_resolve_lagged_rejects_what_no_series_graph_can_hold(knowledge, message):
+    with pytest.raises(KnowledgeError, match=message):
+        resolve_lagged(knowledge, 3, SERIES, 2, method="pcmciplus")
+
+
+def test_resolve_lagged_holds_tiers_and_allowed_at_every_lag_but_not_the_own_past():
+    c = resolve_lagged(
+        Knowledge(tiers=[["x"], ["y"]], allowed=[("x", "y")]), 3, SERIES, 2, method="m"
+    )
+    for lag in range(3):
+        assert c.forbidden[lag, 1, 0] and not c.forbidden[lag, 0, 1]
+        assert c.forbidden[lag, 0, 2] and c.forbidden[lag, 2, 1]
+    assert not c.forbidden[1:, [0, 1, 2], [0, 1, 2]].any()
+
+
+def test_a_method_without_lags_rejects_a_lagged_link():
+    with pytest.raises(NotImplementedError, match="learns no time lags"):
+        andrey.pc(_sample(), knowledge=Knowledge(forbidden=[("a", "b", 1)]))
+
+
+@pytest.mark.parametrize("collider_rule", ["majority", "none"])
+def test_pcmciplus_orients_a_collider_over_a_pair_kept_apart_only_from_a_test(collider_rule):
+    # x -> y <- z within one step, with x and z kept apart. The majority rule tests them for the
+    # sets that separate them and finds the collider; "none" reads the separating set of the
+    # skeleton phase, which never tested them, so the triple stays ambiguous.
+    rng = np.random.default_rng(0)
+    x, z, noise = rng.standard_normal((3, 1000))
+    data = pd.DataFrame({"x": x, "y": 0.8 * x + 0.8 * z + noise, "z": z})
+    knowledge = Knowledge(forbidden=[("x", "z"), ("z", "x")])
+    out = andrey.pcmciplus(data, collider_rule=collider_rule, knowledge=knowledge)
+    kinds = {kind for _, _, kind in out.structure.lag(0).oriented_edges()}
+    if collider_rule == "majority":
+        assert set(out.structure.lag(0).oriented_edges()) == {
+            ("x", "y", "directed"),
+            ("z", "y", "directed"),
+        }
+    else:
+        assert [0, 0, 1, 2] in out.metadata["ambiguous_triples"] and kinds == {"undirected"}

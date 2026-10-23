@@ -1433,6 +1433,11 @@ _MOVE_RULE = (
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
+_LINK_RULE = (
+    "An edge [cause, effect, lag] is the link from cause at time t - lag to effect at time t; a "
+    "forbidden [cause, effect] pair forbids it at every lag, and a required link names its lag. "
+    "Tiers and allowed hold at every lag; a variable's links to its own past stay allowed. "
+)
 _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
@@ -1449,6 +1454,14 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "exact_search": _PARENT_RULE,
     "direct_lingam": _ORDER_RULE + "The regression drops forbidden parents and does not penalize "
     "required ones; every required edge is in the DAG.",
+    "pcmci": _LINK_RULE + "No test runs on a forbidden or a required link: a forbidden link is not "
+    "in the graph, and a required one is.",
+    "pcmciplus": _LINK_RULE + "The lagged and skeleton phases test no forbidden or required link: "
+    "a forbidden link is never linked, and a required one stays. Same-step links the knowledge "
+    "decides are directed before the colliders, which never reverse them; rules R1-R3 follow.",
+    "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
+    "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
+    "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
 #: The Knowledge parts each method honors (every part, for every method that takes knowledge).
 _KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
