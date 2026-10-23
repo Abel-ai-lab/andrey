@@ -329,6 +329,17 @@ def test_indep_test_choices_track_the_tests_each_method_dispatches():
         assert p.choices == expected, name
 
 
+def test_every_score_search_offers_both_names_of_the_linear_gaussian_bic():
+    """One name means the same score in every search that takes a score, so the schema and the
+    command line offer both names of the linear-Gaussian BIC."""
+    from andrey.core.score import LINEAR_SCORES
+
+    params = {s.name: p for s in REGISTRY.values() for p in s.params if p.name == "score_func"}
+    assert params
+    for name, p in params.items():
+        assert set(LINEAR_SCORES) <= set(p.choices), name
+
+
 # --- support status -------------------------------------------------------------------------------
 #
 # Supported methods meet every criterion in docs/docs/api.md's "Experimental methods" section.

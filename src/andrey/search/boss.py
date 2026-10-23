@@ -20,18 +20,19 @@ from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, BICScore, LocalScore, make_score
+from andrey.core.score import (
+    DISCRETE_SCORES,
+    MIXED_SCORES,
+    SCORES,
+    BICScore,
+    LocalScore,
+    make_score,
+)
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`boss` and :func:`~andrey.search.grasp.grasp` accept.
-PERMUTATION_SCORES: tuple[str, ...] = (
-    "local_score_BIC_from_cov",
-    "local_score_BDeu",
-    "local_score_BIC_categorical",
-    "local_score_degen_gauss",
-    "local_score_cond_gauss",
-)
+PERMUTATION_SCORES: tuple[str, ...] = SCORES
 
 # Fixed absolute score tolerance for numerical ties.
 _SCORE_EPS = 1e-6
@@ -781,8 +782,9 @@ def boss(
     random_state : int
         Seed for the sweep-order RNG.
     score_func : str
-        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC, BDeu or the
-        multinomial BIC on category codes (:class:`~andrey.core.score.BDeuScore`,
+        Local score, one of :data:`PERMUTATION_SCORES`: the linear-Gaussian BIC
+        (``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``), BDeu or the multinomial BIC on
+        category codes (:class:`~andrey.core.score.BDeuScore`,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC
         (:class:`~andrey.core.score.DGScore`, :class:`~andrey.core.score.CGScore`).
     categorical : ndarray of bool or None
