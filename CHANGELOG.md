@@ -35,6 +35,10 @@ change names its pull request.
 - For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
   can show that it returns the same bits at any worker count and column order, and
   `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
+- `ges` takes `max_parents`, a gate on its forward phase: a node whose parent count already
+  exceeds it gains no new parents. `None`, the default, keeps the gate of `n_variables / 2` and
+  every result. A lower value makes GES faster on large graphs and can lower its errors, but it
+  can stop short of the lowest-scoring graph. ([#350])
 - `GraphStructure.to_pcalg()` and `GraphStructure.from_pcalg(amat, kind)` convert to and from the
   adjacency matrix of R's pcalg, `amat.pag` for a PAG and `amat.cpdag` for a CPDAG or DAG, so
   exchanging a graph with R needs no transpose or code swap of your own. ([#351])
@@ -613,4 +617,5 @@ First alpha release.
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
 [#347]: https://github.com/Abel-ai-lab/andrey/pull/347
+[#350]: https://github.com/Abel-ai-lab/andrey/pull/350
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
