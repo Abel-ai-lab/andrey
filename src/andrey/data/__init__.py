@@ -22,7 +22,7 @@ for the mixed-data tests and scores.
 
 from __future__ import annotations
 
-from . import benchmarks, functional, graphs, latent, noise, qa, sortability, storage, temporal
+from . import benchmarks, functional, graphs, latent, noise, qa, sortability, temporal
 from .dataset import CausalDataset, QAReport, SCMParams
 from .discrete import sample_discrete
 from .generate import Ensemble, generate
@@ -51,7 +51,6 @@ __all__ = [
     "latent",
     "sortability",
     "qa",
-    "storage",
     "benchmarks",
     "temporal",
 ]
