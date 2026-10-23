@@ -68,7 +68,8 @@ change names its pull request.
   search starts from a snapshot that no longer matches the graph; `ges` starts its reach cache from
   the empty graph's successor masks. The returned graphs are unchanged. ([#361])
 - `boss` and `grasp` return the same graphs in less time, because each grow-shrink tree keeps one
-  tuple of candidate parents instead of copying the list on every trace. ([#267])
+  tuple of candidate parents instead of copying the list on every trace, and the order sweeps keep
+  the set of allowed parents between traces instead of building it for each one. ([#267], [#368])
 - `exact_search` returns the same graphs in less time, because its linear-Gaussian BIC solves the
   normal equations of a size's parent sets in stacks of up to 4,096. ([#273])
 - `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
@@ -651,3 +652,4 @@ First alpha release.
 [#359]: https://github.com/Abel-ai-lab/andrey/pull/359
 [#361]: https://github.com/Abel-ai-lab/andrey/pull/361
 [#363]: https://github.com/Abel-ai-lab/andrey/pull/363
+[#368]: https://github.com/Abel-ai-lab/andrey/pull/368
