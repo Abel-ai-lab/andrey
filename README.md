@@ -36,6 +36,8 @@ uv add andrey-core
 pip install andrey-core
 ```
 
+You install andrey-core and then `import andrey`.
+
 - **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
   layouts
 - **Development version**: `uv add git+https://github.com/Abel-ai-lab/andrey`
