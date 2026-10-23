@@ -1,14 +1,14 @@
-"""Native on-disk storage for generated datasets (safetensors + JSON manifest).
+"""Native on-disk storage for generated datasets (safetensors).
 
 A dataset serializes to one ``.safetensors`` file: the data matrix and the truth's **symmetric** CSR
 as named tensors, with ``kind``, labels, provenance, the QA report, and the structural-param names
-in the string-only metadata header (so a whole collection can be scanned without reading a data
+in the string-only metadata header (so a file's provenance can be read without reading a data
 buffer). safetensors is an optional dependency (the ``andrey[data]`` extra) and is imported
 lazily, so importing ``andrey`` -- or ``andrey.data`` -- never requires it.
 
-Collections write one file per dataset plus a ``collection.json`` manifest. The HF-datasets
-porting surface (parquet, ``x_ref`` streaming) and X row-sharding are not implemented here; a single
-file per dataset is the K=1 fast path that covers sparse graphs at benchmark ``n``.
+The HF-datasets porting surface (parquet, ``x_ref`` streaming) and X row-sharding are not
+implemented here; a single file per dataset is the K=1 fast path that covers sparse graphs at
+benchmark ``n``.
 """
 
 from __future__ import annotations
@@ -143,40 +143,3 @@ def load(path: str | Path) -> CausalDataset:
         provenance=json.loads(meta["provenance"]),
         params=params,
     )
-
-
-def save_collection(datasets: list[CausalDataset], directory: str | Path) -> None:
-    """Write each dataset to ``directory`` plus a ``collection.json`` manifest.
-
-    The manifest denormalizes each file's header (d, n, nnz, kind, varsortability, scale) so a
-    grid is filterable without opening any data buffer; it is a cache, rebuildable from the
-    per-file headers.
-    """
-    directory = Path(directory)
-    directory.mkdir(parents=True, exist_ok=True)
-    manifest = []
-    for i, ds in enumerate(datasets):
-        filename = f"dataset-{i:05d}.safetensors"
-        save(ds, directory / filename)
-        manifest.append(
-            {
-                "file": filename,
-                "d": ds.graph.n_nodes,
-                "n": int(ds.data.shape[0]),
-                "n_obs": int(ds.data.shape[1]),
-                "nnz": int(ds.params.edges.shape[0]),
-                "kind": ds.graph.kind,
-                "varsortability": ds.report.varsortability,
-                "scale": ds.report.scale,
-            }
-        )
-    (directory / "collection.json").write_text(
-        json.dumps({"format": _FORMAT, "format_version": _VERSION, "datasets": manifest}, indent=2)
-    )
-
-
-def load_collection(directory: str | Path) -> list[CausalDataset]:
-    """Load every dataset in a collection written by :func:`save_collection`."""
-    directory = Path(directory)
-    manifest = json.loads((directory / "collection.json").read_text())
-    return [load(directory / entry["file"]) for entry in manifest["datasets"]]

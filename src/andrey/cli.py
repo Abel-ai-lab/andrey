@@ -398,16 +398,6 @@ def render_human(
 
 # --- run: `key=value` overrides + `--config`, coerced against the spec ---------------------
 
-# Input names are a closed set (the InputSpec names in the registry); a drift test pins the CLI's
-# input flags to them. Everything else is a hyperparameter, passed as `key=value` or via `--config`.
-_INPUT_FLAGS = ("data", "domain_index", "interventions", "data_groups", "data_list")
-
-# A ParamSpec may not shadow a CLI flag or a reserved-for-future flag; a drift guard enforces it.
-_RESERVED_PARAM_NAMES = frozenset(
-    {"method", "config", "output", "json", "full", "help", "version", "debug", *_INPUT_FLAGS}
-    | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
-)
-
 
 def _unquote(raw: str) -> tuple[str, bool]:
     """Strip one matched pair of double quotes; a quoted value is a literal string (no coercion)."""

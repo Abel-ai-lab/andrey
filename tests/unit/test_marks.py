@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from andrey.api._marks import directed_marks, marks_from_signed, set_bidirected, set_circle
+from andrey.api._marks import directed_marks, marks_from_signed
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure
 
 
@@ -39,40 +39,9 @@ def test_directed_drops_diagonal_and_nonfinite():
     assert g.endpoints(0, 1) == (TAIL, ARROW)
 
 
-def test_set_bidirected_confounder():
-    M = directed_marks(np.zeros((3, 3)))
-    set_bidirected(M, 0, 2)
-    g = GraphStructure.from_numpy(M, kind="pag")
-    assert g.endpoints(0, 2) == (ARROW, ARROW)
-    assert g.kind == "pag"
-
-
-def test_set_circle_order_unknown():
-    M = directed_marks(np.zeros((3, 3)))
-    set_circle(M, 1, 2)
-    g = GraphStructure.from_numpy(M)  # CIRCLE forces inferred kind "pag"
-    assert g.kind == "pag"
-    assert g.endpoints(1, 2) == (CIRCLE, CIRCLE)
-
-
-def test_directed_plus_confounder_mixed():
-    # A directed edge alongside a confounded pair: the common adapter shape (RCD).
-    B = np.zeros((3, 3))
-    B[1, 0] = 0.9  # edge 0 -> 1
-    M = directed_marks(B)
-    set_bidirected(M, 1, 2)
-    g = GraphStructure.from_numpy(M, kind="pag")
-    assert g.endpoints(0, 1) == (TAIL, ARROW)
-    assert g.endpoints(1, 2) == (ARROW, ARROW)
-
-
 def test_marks_reject_bad_input():
     with pytest.raises(ValueError):
         directed_marks(np.zeros((2, 3)))  # non-square
-    with pytest.raises(ValueError):
-        set_bidirected(directed_marks(np.zeros((2, 2))), 0, 0)  # self-loop
-    with pytest.raises(ValueError):
-        set_circle(directed_marks(np.zeros((2, 2))), 1, 1)
 
 
 def test_marks_from_signed_directed_plus_nan_pair():

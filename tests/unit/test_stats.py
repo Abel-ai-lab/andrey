@@ -165,19 +165,19 @@ def test_direct_lingam_batches_reach_the_gpu_under_auto(monkeypatch):
     cut = stats._ENTROPY_GPU_THRESHOLDS["cuda"]
     X = np.random.default_rng(0).standard_normal((1000, 60))
     assert 1000 * 59 > cut  # the tall-batch case is above the gate
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     score_candidates(X, list(range(60)))
     assert backend.dispatch_stats().get(("entropy", "cuda"), 0) > 0
 
     small_n = max(20, cut // (12 * 4))  # batches near a quarter of the cutoff: clearly below it
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     score_candidates(X[:small_n, :12], list(range(12)))
     counts = backend.dispatch_stats()
     assert counts.get(("entropy", "cuda"), 0) == 0 and counts[("entropy", "numpy")] > 0
 
 
 def test_stats_ops_record_dispatch(force_numpy, data, standardized):
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     cov(data)
     corrcoef(data)
     entropy(standardized)
@@ -353,7 +353,7 @@ def test_calibration_probes_stay_out_of_the_dispatch_counts(monkeypatch, tmp_pat
     monkeypatch.setattr(stats, "_timed", _fake_clock(4_000))
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "numpy"))
     monkeypatch.setattr(stats, "_entropy_torch", lambda U, dev: stats._entropy_numpy(U))
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     stats._crossover("cuda", stats._entropy_probe, stats.entropy, stats._ENTROPY_PROBE_START)
     assert backend.dispatch_stats() == {}
 
