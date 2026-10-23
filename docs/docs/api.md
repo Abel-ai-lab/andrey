@@ -125,6 +125,10 @@ does from 20 series at 1,000 time steps, and GES does at 200 variables with ten 
    granger
 ```
 
+CALM is a continuous-optimization method in the line of NOTEARS ({py:func}`~andrey.notears`,
+{py:func}`~andrey.dagma`): it minimizes a Gaussian likelihood with L0 gates under a smooth
+acyclicity constraint, within an estimated moral graph.
+
 FCI and GFCI use uncovered paths for their R5, R9, and R10 tail orientations: nodes two steps
 apart on each path must be non-adjacent. R5 considers every circle path, up to a fixed search
 bound. R8 checks each pair of endpoints in both orders, so it does not depend on the node labels.
@@ -154,6 +158,8 @@ its first call in a process.
    mmpc
    mmhc
    rsmax2
+   notears
+   dagma
 ```
 
 IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
@@ -162,6 +168,11 @@ each is in the other's set. MMHC learns a skeleton with MMPC's conditional-indep
 runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase
 keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and
 its maximize phase runs hill climbing or tabu search among them.
+
+NOTEARS and DAGMA are continuous-optimization learners that fit a weighted DAG by minimizing a loss
+under a smooth acyclicity constraint, with NumPy and SciPy only. `robust=True` follows the first fit
+with a refit under the Gaussian likelihood, which does not depend on the scale of the columns
+(Deng et al. 2024).
 
 A method becomes supported once it has:
 

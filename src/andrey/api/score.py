@@ -1087,8 +1087,10 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     CALM (Continuous and Acyclicity-constrained L0-penalized likelihood with an estimated Moral
     graph) [1]_ fits a linear-Gaussian DAG with torch. By default it keeps only the candidate edges
     of an estimated moral graph, then minimizes the Gaussian likelihood plus a penalty per edge
-    under an acyclicity constraint. The optimizer draws random numbers and is seeded on every call;
-    see ``seed``.
+    under an acyclicity constraint. It is a continuous-optimization method in the line of NOTEARS
+    (:func:`~andrey.notears`), with a likelihood in place of least squares, gates that count edges
+    in place of an ``l1`` penalty, and a candidate set restricted to the moral graph. The optimizer
+    draws random numbers and is seeded on every call; see ``seed``.
 
     Parameters
     ----------
