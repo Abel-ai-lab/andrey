@@ -12,10 +12,11 @@ change names its pull request.
 ### Highlights
 
 - The same answers in less time: PC, FCI, GFCI, CD-NOD, GES, XGES, BOSS, GRaSP, exact search,
-  ICA-LiNGAM, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of the
-  identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
-  scores change in their last bits, with the same output on those datasets. ([#251], [#265],
-  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#365])
+  ICA-LiNGAM, LPCMCI, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of
+  the identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
+  scores change in their last bits, with the same output on those datasets. ([#251], [#265], [#267],
+  [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#364], [#365],
+  [#368])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -42,6 +43,9 @@ change names its pull request.
 - `GraphStructure.to_pcalg()` and `GraphStructure.from_pcalg(amat, kind)` convert to and from the
   adjacency matrix of R's pcalg, `amat.pag` for a PAG and `amat.cpdag` for a CPDAG or DAG, so
   exchanging a graph with R needs no transpose or code swap of your own. ([#351])
+- For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
+  Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
+  with the time of Tetrad's JVM reported apart from its search. ([#362])
 
 ### Changed
 
@@ -67,8 +71,12 @@ change names its pull request.
   and raises `RuntimeError` instead of building a different graph if a branch of its extended
   search starts from a snapshot that no longer matches the graph; `ges` starts its reach cache from
   the empty graph's successor masks. The returned graphs are unchanged. ([#361])
+- `lpcmci` returns the same graphs in less time, because it keeps each node's sorted neighbors, its
+  parent, child, and neighbor sets, and its path steps for each version of the graph instead of
+  building them again for every query. ([#364])
 - `boss` and `grasp` return the same graphs in less time, because each grow-shrink tree keeps one
-  tuple of candidate parents instead of copying the list on every trace. ([#267])
+  tuple of candidate parents instead of copying the list on every trace, and the order sweeps keep
+  the set of allowed parents between traces instead of building it for each one. ([#267], [#368])
 - `exact_search` returns the same graphs in less time, because its linear-Gaussian BIC solves the
   normal equations of a size's parent sets in stacks of up to 4,096. ([#273])
 - `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
@@ -647,7 +655,10 @@ First alpha release.
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
 [#353]: https://github.com/Abel-ai-lab/andrey/pull/353
-[#365]: https://github.com/Abel-ai-lab/andrey/pull/365
 [#359]: https://github.com/Abel-ai-lab/andrey/pull/359
 [#361]: https://github.com/Abel-ai-lab/andrey/pull/361
+[#362]: https://github.com/Abel-ai-lab/andrey/pull/362
 [#363]: https://github.com/Abel-ai-lab/andrey/pull/363
+[#364]: https://github.com/Abel-ai-lab/andrey/pull/364
+[#365]: https://github.com/Abel-ai-lab/andrey/pull/365
+[#368]: https://github.com/Abel-ai-lab/andrey/pull/368
