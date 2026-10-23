@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core.independence import hsic_gamma_test
 from andrey.lingam.direct import direct_lingam
 from andrey.search.hc import tie_ranks
 
@@ -124,7 +123,6 @@ class LongitudinalLiNGAM:
         self._p = 0
         self._adjacency_matrices: np.ndarray | None = None
         self._causal_orders: list[list[int]] | None = None
-        self._residuals: np.ndarray | None = None
 
     def fit(self, X_list: list[np.ndarray]) -> LongitudinalLiNGAM:
         """Estimate instantaneous and lagged structure from the panel; return ``self``.
@@ -151,36 +149,7 @@ class LongitudinalLiNGAM:
                 adjacency[t, lag + 1] = B_tau[t, lag]
         self._adjacency_matrices = adjacency[..., back, :][..., back]
         self._causal_orders = [[int(by_rank[i]) for i in order] for order in causal_orders]
-
-        residuals = np.zeros((self._T, self._n, self._p))
-        for t in range(self._T):
-            residuals[t] = N_t[t].T
-        self._residuals = residuals[..., back]
         return self
-
-    def get_error_independence_p_values(self) -> np.ndarray:
-        """Pairwise HSIC p-values between instantaneous error variables, per time point.
-
-        Returns an array of shape ``(T, p, p)``; entry ``[t, i, j]`` is the gamma-HSIC p-value of
-        independence between errors ``i`` and ``j`` at time ``t``. Time point 0 is ``NaN``. A larger
-        p-value means more independent.
-        """
-        if self._adjacency_matrices is None or self._residuals is None:
-            raise ValueError("call fit before get_error_independence_p_values")
-        p = self._p
-        p_values = np.full((self._T, p, p), np.nan)
-        eye = np.eye(p)
-        for t in range(1, self._T):
-            B_t = self._adjacency_matrices[t, 0]
-            errors = ((eye - B_t) @ self._residuals[t].T).T
-            table = np.zeros((p, p))
-            for i in range(p):
-                for j in range(i + 1, p):
-                    _, pval = hsic_gamma_test(errors[:, i], errors[:, j])
-                    table[i, j] = pval
-                    table[j, i] = pval
-            p_values[t] = table
-        return p_values
 
     @property
     def adjacency_matrices_(self) -> np.ndarray:
@@ -199,13 +168,6 @@ class LongitudinalLiNGAM:
         if self._causal_orders is None:
             raise ValueError("call fit before accessing causal_orders_")
         return self._causal_orders
-
-    @property
-    def residuals_(self) -> np.ndarray:
-        """Lag-removed residuals of shape ``(T, n_samples, n_features)``."""
-        if self._residuals is None:
-            raise ValueError("call fit before accessing residuals_")
-        return self._residuals
 
 
 def longitudinal_lingam(

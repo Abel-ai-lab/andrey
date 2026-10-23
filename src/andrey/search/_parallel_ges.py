@@ -36,15 +36,9 @@ from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP, stable_key
-from andrey.search.ges import _reachable, _reform_cpdag
+from andrey.search.ges import _reachable
 
-# Shared helpers re-exported for GES callers and tests.
-even_chunks = par.even_chunks
-balanced_chunks = par.balanced_chunks
-_collect = par.collect
-_fork_safe = par.fork_safe
 _pick_context = par.pick_context
-_StableWorkerSet = par.StableWorkerSet
 
 # A chunk best, or ``None`` when the chunk has no improving operator. ``key`` is the total-order
 # reduce key from :func:`move_key`; ``T`` / ``H`` carry the move to apply.
@@ -550,50 +544,6 @@ class _ForwardScan:
         return exact, passing
 
 
-def _forward_inprocess(
-    adj: np.ndarray,
-    delta_engine: DeltaEngine,
-    n: int,
-    max_parents: float | None,
-    n_chunks: int,
-    ranks: Sequence[int],
-) -> np.ndarray:
-    """Forward phase over an in-process N-chunk decomposition (no pool; the chunk-invariance guard).
-
-    Returns only the CPDAG; the objective is recomputed once from the final structure by ``ges()``,
-    so no per-move total is threaded here.
-    """
-    scans = [
-        _ForwardScan(chunk, delta_engine, n, max_parents, ranks)
-        for chunk in even_chunks(n, n_chunks)
-    ]
-    while True:
-        best = reduce_best([scan.best(adj) for scan in scans])
-        if best is None:
-            return adj
-        _key, x, y, T = best
-        ops.apply_insert(adj, x, y, T)
-        adj = _reform_cpdag(adj)
-
-
-def _backward_inprocess(
-    adj: np.ndarray, delta_engine: DeltaEngine, n: int, n_chunks: int, ranks: Sequence[int]
-) -> np.ndarray:
-    """Backward phase over an in-process N-chunk decomposition (no pool; chunk-invariance guard)."""
-    while True:
-        state = neighborhood_state(adj)
-        results = [
-            backward_chunk_best(chunk, adj, delta_engine, n, state, ranks)
-            for chunk in even_chunks(n, n_chunks)
-        ]
-        best = reduce_best(results)
-        if best is None:
-            return adj
-        _key, x, y, H = best
-        ops.apply_delete(adj, x, y, H)
-        adj = _reform_cpdag(adj)
-
-
 # ---- GES worker glue (module-level so forkserver/spawn can pickle it by name) --------------------
 #
 # Each worker is seeded with the read-only ``cov`` once (via the initializer) and owns a fixed
@@ -746,16 +696,6 @@ def backward_work_per_target(n: int, state: NeighborState) -> list[int]:
     """Estimated candidate evals per backward target ``y``: ``n_adj(y) * 2^min(deg(y), CAP)``."""
     adj_sets, _par_of, nbr = state
     return [len(adj_sets[y]) * (1 << min(len(nbr[y]), _DEGREE_CAP)) for y in range(n)]
-
-
-def estimate_forward_work(n: int, state: NeighborState, max_parents: float | None) -> int:
-    """An O(n) upper bound on the forward pass's candidate-eval count (the gate's predictor)."""
-    return sum(forward_work_per_target(n, state, max_parents))
-
-
-def estimate_backward_work(n: int, state: NeighborState) -> int:
-    """An O(n) upper bound on the backward pass's candidate-eval count (the gate's predictor)."""
-    return sum(backward_work_per_target(n, state))
 
 
 def _create_pool(

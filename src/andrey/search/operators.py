@@ -3,7 +3,7 @@
 Every function reads a dense ``(d, d)`` ``int8`` mark matrix in the convention of
 :mod:`andrey.core.orient`. An Insert is valid when ``NA union T`` is a clique and every
 semi-directed path from ``y`` to ``x`` meets it; a Delete is valid when ``NA`` without ``H`` is a
-clique. Scores are differenced from two full local scores of a :class:`~andrey.core.score.Score`.
+clique.
 
 References
 ----------
@@ -21,7 +21,6 @@ import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near
-from andrey.core.score import Score
 
 
 def adjacent(adj: np.ndarray, node: int) -> np.ndarray:
@@ -234,36 +233,6 @@ def blocks_semi_directed_paths(
             visited.add(c)
             stack.append(c)
     return True
-
-
-def insert_delta(
-    score: Score, x: int, y: int, na: Iterable[int], T: Iterable[int], paj: Iterable[int]
-) -> float:
-    """Local-score change of inserting ``x -> y`` with subset ``T``: ``score1 - score2``.
-
-    ``score1`` adds ``x`` to ``y``'s parents; both scores condition ``y`` on ``NA union T`` and
-    ``y``'s current parents. Lower is better, so an improving Insert has a negative delta.
-    """
-    base = set(int(v) for v in na) | set(int(v) for v in T) | set(int(v) for v in paj)
-    parents_without = tuple(sorted(base))
-    parents_with = tuple(sorted(base | {int(x)}))
-    return score.score(y, parents_with) - score.score(y, parents_without)
-
-
-def delete_delta(
-    score: Score, x: int, y: int, na: Iterable[int], H: Iterable[int], paj: Iterable[int]
-) -> float:
-    """Local-score change of deleting edge ``x - y`` with subset ``H``: ``score1 - score2``.
-
-    ``score2`` conditions ``y`` on ``(NA \\ H) union Pa(y) union {x}``; ``score1`` drops ``x``.
-    Lower is better, so an improving Delete has a negative delta.
-    """
-    residual = set(int(v) for v in na) - set(int(v) for v in H)
-    parents_with = residual | set(int(v) for v in paj) | {int(x)}
-    parents_without = parents_with - {int(x)}
-    return score.score(y, tuple(sorted(parents_without))) - score.score(
-        y, tuple(sorted(parents_with))
-    )
 
 
 def apply_insert(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> None:
