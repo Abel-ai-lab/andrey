@@ -20,6 +20,7 @@ from itertools import chain, combinations
 import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL
+from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near
 from andrey.core.score import Score
 
 
@@ -283,3 +284,51 @@ def apply_delete(adj: np.ndarray, x: int, y: int, H: Iterable[int]) -> None:
         adj[h, y] = ARROW
         adj[x, h] = TAIL
         adj[h, x] = ARROW
+
+
+# Whether :func:`insert_cpdag` and :func:`delete_cpdag` rewrite only the part of the graph a move
+# can change. When False they rebuild the whole CPDAG; the tests compare the two.
+_LOCAL_REFORM = True
+
+# A move that can change more than this share of the nodes rebuilds the whole CPDAG.
+_REGION_SHARE = 0.25
+
+
+def _shared_children(adj: np.ndarray, x: int, y: int) -> list[int]:
+    """The nodes that are a child of both ``x`` and ``y``."""
+    both = (adj[x] == TAIL) & (adj[:, x] == ARROW) & (adj[y] == TAIL) & (adj[:, y] == ARROW)
+    return np.flatnonzero(both).tolist()
+
+
+def _reform(adj: np.ndarray, touched: list[int]) -> np.ndarray:
+    """The CPDAG of ``adj``, a CPDAG changed by one move that touched the nodes ``touched``."""
+    if _LOCAL_REFORM:
+        out = _cpdag_of_pdag_near(adj, touched, int(_REGION_SHARE * adj.shape[0]))
+        if out is not None:
+            return out
+    return _cpdag_of_pdag(adj)
+
+
+def insert_cpdag(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> np.ndarray:
+    """Apply ``Insert(x, y, T)`` to the CPDAG ``adj`` and return the CPDAG of the result.
+
+    ``adj`` is rewritten in place and returned unless the whole CPDAG is rebuilt. The result is
+    the CPDAG of the extension of :func:`apply_insert`'s graph; only the edges the move can reach
+    are derived again (:func:`~andrey.core.orient._cpdag_of_pdag_near`).
+    """
+    T = tuple(T)
+    shared = _shared_children(adj, x, y)
+    apply_insert(adj, x, y, T)
+    return _reform(adj, [x, y, *T, *shared])
+
+
+def delete_cpdag(adj: np.ndarray, x: int, y: int, H: Iterable[int]) -> np.ndarray:
+    """Apply ``Delete(x, y, H)`` to the CPDAG ``adj`` and return the CPDAG of the result.
+
+    ``adj`` is rewritten in place and returned unless the whole CPDAG is rebuilt; see
+    :func:`insert_cpdag`.
+    """
+    H = tuple(H)
+    shared = _shared_children(adj, x, y)
+    apply_delete(adj, x, y, H)
+    return _reform(adj, [x, y, *H, *shared])
