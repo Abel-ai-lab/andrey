@@ -91,7 +91,7 @@ def test_worker_threads_are_capped_by_a_byte_budget(monkeypatch):
         assert len(runs) == 4
         for budget, threads in ((2 * per_thread, 2), (per_thread // 2, 1)):
             runs.clear()
-            warning_policy.reset()
+            warning_policy._warned.clear()
             monkeypatch.setattr(_pnl, "_THREAD_BYTES", budget)
             with pytest.warns(andrey.PerformanceWarning, match=f"runs {threads} of the 4 worker"):
                 capped = _pnl.pnl_pairs(X, num_workers=4)
@@ -168,7 +168,7 @@ def test_torch_path_matches_numpy(n):
     pairs = [(0, 1), (1, 0), (2, 3), (3, 3), (0, 3), (1, 2)]
     with andrey.config(backend="numpy"):
         expected = _pnl.pnl_pairs(X, pairs)
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     with andrey.config(backend="cpu"):
         got = _pnl.pnl_pairs(X, pairs)
         with mock.patch.object(_pnl, "_DEVICE_BATCH_BYTES", 8 * n * n):  # one kernel per batch

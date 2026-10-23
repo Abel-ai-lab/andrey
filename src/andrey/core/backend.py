@@ -59,11 +59,6 @@ _tie_break_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 )
 
 
-def _reset_warnings() -> None:
-    """Clear the package's warn-once memory (test isolation)."""
-    warning_policy.reset()
-
-
 def _warn_once(message: str) -> None:
     warning_policy.warn_once(message, warning_policy.BackendFallbackWarning)
 
@@ -343,12 +338,6 @@ def dispatch_stats() -> dict[tuple[str, str], int]:
         return dict(_dispatch_counts)
 
 
-def reset_dispatch_stats() -> None:
-    """Clear the dispatch counts (test isolation / scoping a measurement)."""
-    with _dispatch_lock:
-        _dispatch_counts.clear()
-
-
 def select(
     pinnable: tuple[str, ...],
     auto_order: tuple[str, ...],
@@ -564,22 +553,6 @@ def one_blas_thread() -> contextlib.AbstractContextManager:
     The libraries are found once per process; one loaded after the first call is not limited.
     """
     return _thread_pools().limit(limits=1)
-
-
-def parallel_map(fn, items, *, num_workers: int | None = None) -> list:
-    """Map ``fn`` over ``items`` serially or with a process pool.
-
-    ``num_workers <= 1`` runs serially; ``-1`` uses all usable CPUs. Input order is preserved.
-    ``fn`` and ``items`` must be picklable.
-    """
-    n = worker_count(num_workers)
-    items = list(items)
-    if n <= 1 or len(items) <= 1:
-        return [fn(x) for x in items]
-    import concurrent.futures as cf
-
-    with cf.ProcessPoolExecutor(max_workers=min(n, len(items))) as pool:
-        return list(pool.map(fn, items))
 
 
 # ---- tensor transfer (torch backends) -----------------------------------------------------------
