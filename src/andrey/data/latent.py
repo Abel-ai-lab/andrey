@@ -55,47 +55,6 @@ def latent_order(edges: np.ndarray, d: int, n_latent: int, rng: np.random.Genera
     return np.concatenate([np.flatnonzero(~is_latent), np.flatnonzero(is_latent)])
 
 
-def with_latents(
-    data: np.ndarray, edges: np.ndarray, d: int, n_latent: int, rng: np.random.Generator
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Hide ``n_latent`` confounders: drop their columns, re-index observed-first, flag them.
-
-    Parameters
-    ----------
-    data : np.ndarray of shape (n, d)
-        Full data over all nodes, node-label columns.
-    edges : np.ndarray of shape (m, 2)
-        Directed edges ``(parent, child)`` in the full node-label space.
-    d : int
-        Total node count.
-    n_latent : int
-        Number of latent confounders to hide.
-    rng : np.random.Generator
-        Stream for choosing which qualifying nodes become latent.
-
-    Returns
-    -------
-    data_observed : np.ndarray of shape (n, d - n_latent)
-        Data over the observed nodes, columns in the re-indexed observed order (``0 .. n_obs-1``).
-    new_edges : np.ndarray of shape (m, 2)
-        Edges re-indexed so observed nodes are ``0 .. n_obs-1`` and latents are last.
-    node_types : np.ndarray of shape (d,)
-        OBSERVED / LATENT code per (re-indexed) node.
-
-    Raises
-    ------
-    ValueError
-        If fewer than ``n_latent`` nodes have >= 2 children (no genuine confounder to hide).
-    """
-    order = latent_order(edges, d, n_latent, rng)  # new index -> old label (observed first)
-    n_obs = d - n_latent
-    new_label = np.empty(d, dtype=np.int64)
-    new_label[order] = np.arange(d)  # old label -> new index
-    node_types = np.full(d, OBSERVED, dtype=np.int8)
-    node_types[n_obs:] = LATENT
-    return data[:, order[:n_obs]], new_label[edges], node_types
-
-
 def marginal(graph: GraphStructure, target: str = "mag", *, max_nodes: int = 500) -> GraphStructure:
     """Project a latent-confounded DAG truth onto its observed nodes as a MAG or a PAG.
 

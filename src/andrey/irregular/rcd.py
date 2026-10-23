@@ -39,15 +39,13 @@ _GramMemo = dict[int, tuple[np.ndarray, float]]
 
 @dataclass(frozen=True)
 class RcdResult:
-    """Fitted RCD weights and ancestor sets.
+    """Fitted RCD weights.
 
     ``adjacency_matrix_`` is the ``(d, d)`` weight matrix (``B[i, j]`` weights edge ``j -> i``) with
-    ``NaN`` on confounded pairs; ``ancestors_list_[i]`` is the recovered ancestor set of variable
-    ``i``.
+    ``NaN`` on confounded pairs.
     """
 
     adjacency_matrix_: np.ndarray
-    ancestors_list_: list[set[int]]
 
 
 @dataclass
@@ -415,4 +413,4 @@ def fit_rcd(
     )
     P = extract_parents(X, M, caches, cor_alpha=cor_alpha)
     C = extract_confounded_pairs(X, P, caches, cor_alpha=cor_alpha)
-    return RcdResult(adjacency_matrix_=estimate_adjacency(X, P, C, caches), ancestors_list_=M)
+    return RcdResult(adjacency_matrix_=estimate_adjacency(X, P, C, caches))

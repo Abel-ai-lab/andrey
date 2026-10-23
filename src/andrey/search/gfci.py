@@ -13,13 +13,13 @@ conditional-independence tests, and mark convention.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Mapping
-from itertools import combinations, islice
+from collections.abc import Mapping
+from itertools import combinations
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._skeleton import _CHUNK, _canonical_chunk, _canonical_route
+from andrey.constraint._skeleton import marginal_separated, separating_subsets
 from andrey.constraint.fci import (
     _adjacent,
     _arrow_allowed,
@@ -184,53 +184,30 @@ def _derive_sepsets(
     subset found in column order is recorded instead, and no subset after it is tested. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
 
-    A FisherZ or StudentT test evaluates each nonempty size's subsets in chunks of canonical query
-    arrays (:func:`_separating_subsets`), with the p-values of the scalar calls; the size-0 query
-    and every query of another test, or of ``in_column_order``, is a scalar call.
+    A FisherZ or StudentT test answers the size-0 query of every pair in one canonical query array
+    (:func:`~andrey.constraint._skeleton.marginal_separated`) and evaluates each nonempty size's
+    subsets in chunks of them (:func:`~andrey.constraint._skeleton.separating_subsets`), with the
+    p-values of the scalar calls. Every query of another test, or of ``in_column_order``, is a
+    scalar call.
     """
     adjacent = cpdag != NULL
-    canonical = None if in_column_order else _canonical_route(test)
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     xs, ys = np.nonzero(np.triu(~adjacent, 1))
-    for x, y in zip(xs.tolist(), ys.tolist()):
+    marginal = None if in_column_order else marginal_separated(test, xs, ys, alpha)
+    for k, (x, y) in enumerate(zip(xs.tolist(), ys.tolist())):
         pool = [v for v in np.flatnonzero(adjacent[x] | adjacent[y]).tolist() if v != x and v != y]
         for size in range(_largest_size(len(pool), max_depth) + 1):
             subsets = combinations(pool, size)
             if in_column_order:
                 first = next((cond for cond in subsets if test(x, y, cond) > alpha), None)
                 found = [] if first is None else [first]
-            elif canonical is None or size == 0:
-                found = [cond for cond in subsets if test(x, y, cond) > alpha]
+            elif size == 0 and marginal is not None:
+                found = [()] if marginal[k] else []
             else:
-                found = _separating_subsets(canonical, test, x, y, size, subsets, alpha)
+                found = separating_subsets(test, x, y, size, subsets, alpha)
             if found:
                 union = tuple(sorted(set().union(*found)))
                 sepsets[(x, y)] = union
                 sepsets[(y, x)] = union
                 break
     return sepsets
-
-
-def _separating_subsets(
-    canonical: Callable[..., np.ndarray],
-    test: CITest,
-    x: int,
-    y: int,
-    size: int,
-    subsets: Iterator[tuple[int, ...]],
-    alpha: float,
-) -> list[tuple[int, ...]]:
-    """The ``subsets`` (sorted, distinct, of ``size`` members) whose test separates ``x < y``.
-
-    The subsets are evaluated in chunks of ``_CHUNK`` canonical queries, in order. A chunk whose
-    evaluation raises is tested again subset by subset with scalar ``test`` calls, so the error is
-    the one the scalar loop raises, after the same queries.
-    """
-    found: list[tuple[int, ...]] = []
-    while chunk := list(islice(subsets, _CHUNK)):
-        try:
-            pvalues = _canonical_chunk(canonical, size, x, y, chunk)
-        except Exception:
-            pvalues = [test(x, y, cond) for cond in chunk]
-        found.extend(cond for cond, p in zip(chunk, pvalues) if p > alpha)
-    return found

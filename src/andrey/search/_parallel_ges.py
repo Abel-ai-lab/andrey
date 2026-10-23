@@ -36,15 +36,9 @@ from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search import operators as ops
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP, stable_key
-from andrey.search.ges import _reachable, _reform_cpdag
+from andrey.search.ges import _reachable
 
-# Shared helpers re-exported for GES callers and tests.
-even_chunks = par.even_chunks
-balanced_chunks = par.balanced_chunks
-_collect = par.collect
-_fork_safe = par.fork_safe
 _pick_context = par.pick_context
-_StableWorkerSet = par.StableWorkerSet
 
 # A chunk best, or ``None`` when the chunk has no improving operator. ``key`` is the total-order
 # reduce key from :func:`move_key`; ``T`` / ``H`` carry the move to apply.
@@ -111,12 +105,12 @@ class DeltaEngine(Protocol):
 NeighborState = tuple[list[set[int]], list[np.ndarray], list[set[int]]]
 
 
-def neighborhood_state(adj: np.ndarray, n: int) -> NeighborState:
+def neighborhood_state(adj: np.ndarray) -> NeighborState:
     """The per-node adjacency sets, directed parents, and undirected neighbors for a graph state.
 
     Computed once per graph state and shared read-only across chunks. Each chunk reads all node
     arrays but iterates only its targets ``[y0, y1)``. Node ``v``'s entries equal ``ops.adjacent``,
-    ``ops.parents``, and ``ops.undirected_neighbors`` of ``v``; ``n`` is the node count of ``adj``.
+    ``ops.parents``, and ``ops.undirected_neighbors`` of ``v``.
     """
     adj_sets = [set(row.tolist()) for row in _rows(adj != ops.NULL)]
     par_of = _rows(adj == ops.ARROW)
@@ -390,14 +384,14 @@ class _ForwardScan:
         self.screened: dict[int, list[_Screened]] = {}
         self.exact: dict[int, dict[tuple[int, ...], tuple[int, dict[int, float]]]] = {}
         # Each (target, clique mask)'s semi-directed reach set on the kept graph, and the graph's
-        # semi-directed successor masks.
+        # semi-directed successor masks, those of the empty graph before the first pass.
         self.reach: dict[tuple[int, int], int] = {}
-        self.succ: list[int] = []
+        self.succ: list[int] = [0] * n
 
     def best(self, adj: np.ndarray, excluded: Excluded = None) -> ForwardResult:
         """The best-improving Insert into the targets not in ``excluded``, by :func:`move_key`."""
         if _FULL_RESCAN:
-            state = neighborhood_state(adj, self.n)
+            state = neighborhood_state(adj)
             reachable = _reachable(adj)
             return forward_chunk_best(
                 self.targets,
@@ -550,50 +544,6 @@ class _ForwardScan:
         return exact, passing
 
 
-def _forward_inprocess(
-    adj: np.ndarray,
-    delta_engine: DeltaEngine,
-    n: int,
-    max_parents: float | None,
-    n_chunks: int,
-    ranks: Sequence[int],
-) -> np.ndarray:
-    """Forward phase over an in-process N-chunk decomposition (no pool; the chunk-invariance guard).
-
-    Returns only the CPDAG; the objective is recomputed once from the final structure by ``ges()``,
-    so no per-move total is threaded here.
-    """
-    scans = [
-        _ForwardScan(chunk, delta_engine, n, max_parents, ranks)
-        for chunk in even_chunks(n, n_chunks)
-    ]
-    while True:
-        best = reduce_best([scan.best(adj) for scan in scans])
-        if best is None:
-            return adj
-        _key, x, y, T = best
-        ops.apply_insert(adj, x, y, T)
-        adj = _reform_cpdag(adj)
-
-
-def _backward_inprocess(
-    adj: np.ndarray, delta_engine: DeltaEngine, n: int, n_chunks: int, ranks: Sequence[int]
-) -> np.ndarray:
-    """Backward phase over an in-process N-chunk decomposition (no pool; chunk-invariance guard)."""
-    while True:
-        state = neighborhood_state(adj, n)
-        results = [
-            backward_chunk_best(chunk, adj, delta_engine, n, state, ranks)
-            for chunk in even_chunks(n, n_chunks)
-        ]
-        best = reduce_best(results)
-        if best is None:
-            return adj
-        _key, x, y, H = best
-        ops.apply_delete(adj, x, y, H)
-        adj = _reform_cpdag(adj)
-
-
 # ---- GES worker glue (module-level so forkserver/spawn can pickle it by name) --------------------
 #
 # Each worker is seeded with the read-only ``cov`` once (via the initializer) and owns a fixed
@@ -680,7 +630,7 @@ def _backward_task(
         raise RuntimeError("GES worker pool reused across runs (cov/token mismatch)")
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     n = _WORKER_N
-    state = neighborhood_state(adj, n)
+    state = neighborhood_state(adj)
     return backward_chunk_best(
         targets,
         adj,
@@ -746,16 +696,6 @@ def backward_work_per_target(n: int, state: NeighborState) -> list[int]:
     """Estimated candidate evals per backward target ``y``: ``n_adj(y) * 2^min(deg(y), CAP)``."""
     adj_sets, _par_of, nbr = state
     return [len(adj_sets[y]) * (1 << min(len(nbr[y]), _DEGREE_CAP)) for y in range(n)]
-
-
-def estimate_forward_work(n: int, state: NeighborState, max_parents: float | None) -> int:
-    """An O(n) upper bound on the forward pass's candidate-eval count (the gate's predictor)."""
-    return sum(forward_work_per_target(n, state, max_parents))
-
-
-def estimate_backward_work(n: int, state: NeighborState) -> int:
-    """An O(n) upper bound on the backward pass's candidate-eval count (the gate's predictor)."""
-    return sum(backward_work_per_target(n, state))
 
 
 def _create_pool(
@@ -890,7 +830,7 @@ def run_ges(
                 # The in-process scan enumerates again every target touched since the graph it
                 # kept, which after pooled passes is an older one (none before its first pass).
                 touched = _touched(scan.adj, adj)
-                per_target = forward_work_per_target(n, neighborhood_state(adj, n), max_parents)
+                per_target = forward_work_per_target(n, neighborhood_state(adj), max_parents)
                 work = [w for w, redo in zip(per_target, touched, strict=True) if redo]
             largest = max(largest, sum(work))
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
@@ -914,15 +854,13 @@ def run_ges(
                 break
             key, x, y, T = best
             if constraints is None:
-                ops.apply_insert(adj, x, y, T)
-                adj = _reform_cpdag(adj)
+                adj = ops.insert_cpdag(adj, x, y, T)
             else:
-                moved = adj.copy()
-                ops.apply_insert(moved, x, y, T)
-                adj = _admitted(_reform_cpdag(moved), adj, constraints, excluded, key)
+                moved = ops.insert_cpdag(adj.copy(), x, y, T)
+                adj = _admitted(moved, adj, constraints, excluded, key)
         excluded.clear()  # forward and backward moves share the key shape
         while True:  # backward phase
-            state = neighborhood_state(adj, n)
+            state = neighborhood_state(adj)
             work = backward_work_per_target(n, state) if workers > 1 else [0]
             largest = max(largest, sum(work))
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
@@ -941,12 +879,10 @@ def run_ges(
                 break
             key, x, y, H = best
             if constraints is None:
-                ops.apply_delete(adj, x, y, H)
-                adj = _reform_cpdag(adj)
+                adj = ops.delete_cpdag(adj, x, y, H)
             else:
-                moved = adj.copy()
-                ops.apply_delete(moved, x, y, H)
-                adj = _admitted(_reform_cpdag(moved), adj, constraints, excluded, key)
+                moved = ops.delete_cpdag(adj.copy(), x, y, H)
+                adj = _admitted(moved, adj, constraints, excluded, key)
     finally:
         if lazy is not None:
             lazy.close()

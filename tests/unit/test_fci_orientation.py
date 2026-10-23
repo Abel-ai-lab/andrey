@@ -14,6 +14,7 @@ from andrey.constraint.fci import (
     _circle_pag,
     _exists_uncovered_pd_path,
     _fci_orient,
+    _neighbor_lists,
     _orient_colliders,
     _rule_r7,
     _rule_r9,
@@ -204,23 +205,23 @@ def test_pd_path_rejects_backward_marks(edge, blocking_end):
         marks[u, v] = ARROW
     else:
         marks[v, u] = TAIL
-    assert not _exists_uncovered_pd_path(marks, 0, 1, 3)
+    assert not _exists_uncovered_pd_path(marks, 0, 1, 3, _neighbor_lists(marks))
 
 
 def test_pd_path_rejects_covered_interior_triple():
     marks = _circle_graph(5, [(0, 1), (1, 2), (2, 3), (3, 4), (1, 3)])
     marks[1, 3] = ARROW  # No shortcut 1 -> 3; the longer route is covered.
-    assert not _exists_uncovered_pd_path(marks, 0, 1, 4)
+    assert not _exists_uncovered_pd_path(marks, 0, 1, 4, _neighbor_lists(marks))
 
 
 def test_pd_path_cannot_revisit_a():
     marks = _circle_graph(3, [(0, 1), (0, 2)])
-    assert not _exists_uncovered_pd_path(marks, 0, 1, 2)
+    assert not _exists_uncovered_pd_path(marks, 0, 1, 2, _neighbor_lists(marks))
 
 
 def test_pd_path_accepts_direct_target():
     marks = _circle_graph(2, [(0, 1)])
-    assert _exists_uncovered_pd_path(marks, 0, 1, 1)
+    assert _exists_uncovered_pd_path(marks, 0, 1, 1, _neighbor_lists(marks))
 
 
 def test_r10_accepts_paths_with_one_edge():
@@ -282,5 +283,5 @@ def test_r10_skips_path_searches_for_adjacent_children(monkeypatch):
     calls = []
     monkeypatch.setattr(fci, "_exists_uncovered_pd_path", lambda *args: calls.append(args) or True)
 
-    assert fci._r10_connects(marks, [x, y], b, d, a) is False
+    assert fci._r10_connects(marks, [x, y], b, d, a, _neighbor_lists(marks)) is False
     assert calls == []
