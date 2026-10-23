@@ -42,6 +42,9 @@ change names its pull request.
 - `GraphStructure.to_pcalg()` and `GraphStructure.from_pcalg(amat, kind)` convert to and from the
   adjacency matrix of R's pcalg, `amat.pag` for a PAG and `amat.cpdag` for a CPDAG or DAG, so
   exchanging a graph with R needs no transpose or code swap of your own. ([#351])
+- For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
+  Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
+  with the time of Tetrad's JVM reported apart from its search. ([#362])
 
 ### Changed
 
@@ -626,3 +629,4 @@ First alpha release.
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
 [#353]: https://github.com/Abel-ai-lab/andrey/pull/353
+[#362]: https://github.com/Abel-ai-lab/andrey/pull/362
