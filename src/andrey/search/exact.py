@@ -190,10 +190,11 @@ def _generate_parent_graph(
         legal = ~constraints.forbidden[:, node] & ~constraints.required[:, node]
         candidates = [c for c in np.flatnonzero(legal).tolist() if c != node]
     required_value = score.score(node, required)
-    insert(required, required_value, _structure_bits(required))
+    required_bits = _structure_bits(required)
+    insert(required, required_value, required_bits)
     # Each enumerated set's bitmask -> the lowest score of a retained set within it.
     lowest = np.full(1 << n_vars, np.inf)
-    lowest[_structure_bits(required)] = required_value
+    lowest[required_bits] = required_value
     for size in range(1, len(candidates) + 1):
         level = itertools.combinations(candidates, size)
         while extras := list(itertools.islice(level, _SCORE_BATCH)):
@@ -202,9 +203,11 @@ def _generate_parent_graph(
                 values = score.score_many(node, combos)
             else:
                 values = [score.score(node, list(combo)) for combo in combos]
-            bits = np.bitwise_or.reduce(1 << np.array(combos), axis=1)
+            added = np.fromiter(itertools.chain.from_iterable(extras), np.int64, len(extras) * size)
+            added_bits = 1 << added.reshape(len(extras), size)
+            bits = np.bitwise_or.reduce(added_bits, axis=1) | required_bits
             # Each set less one added parent; dropping a required parent leaves no legal subset.
-            subsets = bits[:, None] & ~(1 << np.array(extras))
+            subsets = bits[:, None] ^ added_bits
             sub_values = lowest[subsets].min(axis=1)
             dominated = sub_values < values  # a subset already scores lower
             lowest[bits] = np.where(dominated, sub_values, values)
