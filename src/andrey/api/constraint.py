@@ -590,8 +590,9 @@ def gfci(
         become the structure's ``labels``.
     score_func : str, default="local_score_BIC"
         Local score driving the GES skeleton phase, as for :func:`~andrey.ges`:
-        ``"local_score_BIC"``, the linear-Gaussian BIC; ``"local_score_BDeu"`` or
-        ``"local_score_BIC_categorical"`` for categorical data, coded by whole numbers; or
+        ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the linear-Gaussian BIC;
+        ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"`` for categorical data, coded by
+        whole numbers; or
         ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or conditional
         Gaussian BIC for mixed data.
     lambda_value : float, default=1.0

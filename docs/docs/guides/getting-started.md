@@ -337,9 +337,9 @@ categorical, they score with `local_score_BDeu`; when some are, with `local_scor
 conditional Gaussian score. `tabu` has no mixed-data score and keeps the linear-Gaussian BIC on
 mixed data. Either switch says so with a one-time `DataTypeWarning`, which names the categorical
 columns of mixed data. A column of counts or ratings with that few values counts as categorical too;
-to read such columns as numbers, pass the linear-Gaussian BIC: `score_func="local_score_BIC"` to
-`ges` and `exact_search`, or `score_func="local_score_BIC_from_cov"` to the others. A `score_func`
-you pass is always the one used. To name the categorical columns yourself, pass `categorical=[...]`
+to read such columns as numbers, pass the linear-Gaussian BIC, `score_func="local_score_BIC"` or
+`"local_score_BIC_from_cov"`; every one of these searches takes both names. A `score_func` you pass
+is always the one used. To name the categorical columns yourself, pass `categorical=[...]`
 instead of the inference: naming every column picks `local_score_BDeu`, and naming some picks
 `local_score_cond_gauss`, each with the same warning. Data with no categorical column keep the
 linear-Gaussian BIC. The tests do not switch: `pc`, `fci`, `gfci`, and `cdnod` take

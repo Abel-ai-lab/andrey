@@ -62,9 +62,10 @@ def ges(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC"``, the linear-Gaussian BIC, for continuous data.
-        ``"local_score_BDeu"`` is the BDeu score [3]_ and ``"local_score_BIC_categorical"`` the
-        multinomial BIC [7]_, for categorical data coded by whole numbers.
+        Local score objective: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the
+        linear-Gaussian BIC, for continuous data. ``"local_score_BDeu"`` is the BDeu score [3]_ and
+        ``"local_score_BIC_categorical"`` the multinomial BIC [7]_, for categorical data coded by
+        whole numbers.
         ``"local_score_degen_gauss"`` (degenerate Gaussian) [4]_ and ``"local_score_cond_gauss"``
         (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous and categorical
         columns. ``None`` reads the column types from ``categorical``, or infers them, and picks
@@ -449,8 +450,8 @@ def xges(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC"}, default="local_score_BIC"
-        Only the Gaussian BIC score is supported.
+    score_func : {"local_score_BIC", "local_score_BIC_from_cov"}, default="local_score_BIC"
+        Two names of the Gaussian BIC, the only score XGES supports.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
@@ -583,14 +584,15 @@ def hc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
-        continuous data; ``"local_score_BDeu"``, the BDeu score, or
-        ``"local_score_BIC_categorical"``, the multinomial BIC, for categorical data coded by whole
-        numbers; or ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"``, the degenerate
-        and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
-        column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
-        every column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
-        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC_from_cov"``. Pass
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, a
+        covariance-based Gaussian BIC for continuous data; ``"local_score_BDeu"``, the BDeu score,
+        or ``"local_score_BIC_categorical"``, the multinomial BIC, for categorical data coded by
+        whole numbers; or ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"``, the
+        degenerate and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        ``None`` reads the column types from ``categorical``, or infers them, and picks
+        ``"local_score_BDeu"`` when every column is categorical or ``"local_score_cond_gauss"``
+        when some are, each with a ``DataTypeWarning``; otherwise it picks
+        ``"local_score_BIC_from_cov"``. Pass
         ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
@@ -755,8 +757,9 @@ def tabu(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
-        continuous data, or ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, the BDeu
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, a
+        covariance-based Gaussian BIC for continuous data, or ``"local_score_BDeu"`` or
+        ``"local_score_BIC_categorical"``, the BDeu
         score or the multinomial BIC for categorical data coded by whole numbers, as for
         :func:`~andrey.ges`. ``None`` picks ``"local_score_BDeu"`` when every column is categorical
         (a DataFrame's ``category``, ``bool``, or text column, or a column of at most 10 distinct
@@ -918,14 +921,15 @@ def exact_search(
     search_method : {"astar", "dp"}, default="astar"
         Exact search strategy: A* search or dynamic programming.
     score_func : str or None, default=None
-        Local score: ``"local_score_BIC"``, the linear-Gaussian BIC; ``"local_score_BDeu"`` or
-        ``"local_score_BIC_categorical"``, the BDeu score or the multinomial BIC for categorical
-        data coded by whole numbers; or ``"local_score_degen_gauss"`` or
-        ``"local_score_cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed data, as
-        for :func:`~andrey.ges`. Each BIC uses the standard penalty, ``lambda_value=1``. ``None``
-        reads the column types from ``categorical``, or infers them, and picks
-        ``"local_score_BDeu"`` when every column is categorical or ``"local_score_cond_gauss"`` when
-        some are, each with a ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
+        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the linear-Gaussian
+        BIC; ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, the BDeu score or the
+        multinomial BIC for categorical data coded by whole numbers; or
+        ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or
+        conditional Gaussian BIC for mixed data, as for :func:`~andrey.ges`. Each BIC uses the
+        standard penalty, ``lambda_value=1``. ``None`` reads the column types from
+        ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when every column is
+        categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
         ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
