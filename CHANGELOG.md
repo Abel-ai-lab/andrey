@@ -127,6 +127,9 @@ change names its pull request.
 
 ### Fixed
 
+- `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
+  `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
+  test or score; an empty list now reads as `None` there. ([#395])
 - Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
   `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
   `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
@@ -696,3 +699,4 @@ First alpha release.
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
 [#393]: https://github.com/Abel-ai-lab/andrey/pull/393
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
+[#395]: https://github.com/Abel-ai-lab/andrey/pull/395
