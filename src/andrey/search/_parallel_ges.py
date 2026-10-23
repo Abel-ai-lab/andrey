@@ -296,7 +296,8 @@ def backward_chunk_best(
 # hold against any other batch over the same base. So a target enumerated again keeps a base's
 # last batch while that batch covers the base's sources, and a delta whose bound is 0 is exact in
 # every batch. The nodes a target reaches around a clique depend only on those nodes' successors,
-# so a reach set is kept until a move changes the marks of one of its nodes.
+# so a reach set is kept while no successor change among its nodes can cut a path inside it or
+# open one out of it (:func:`_kept_reach`).
 
 # The scan the forward phase uses in-process: ``True`` runs forward_chunk_best over every target at
 # every pass; ``False`` keeps each target's candidates until a move touches it. Tests flip it to
@@ -325,6 +326,35 @@ def _touched(before: np.ndarray | None, after: np.ndarray) -> np.ndarray:
     changed = diff.any(axis=0) | diff.any(axis=1)
     lines = (after == ops.TAIL) & (after.T == ops.TAIL)
     return changed | lines[changed].any(axis=0)
+
+
+def _kept_reach(
+    reach: dict[tuple[int, int], int], before: list[int], after: list[int]
+) -> dict[tuple[int, int], int]:
+    """The entries of ``reach`` whose reach set is the same under the successor masks ``after``.
+
+    ``reach`` maps ``(start, clique)`` to :func:`~andrey.core._bitset.semidirected_reach_set` of
+    ``before`` around that clique. A reach set ``R`` stays when each of its nodes whose successors
+    changed loses no successor in ``R`` and gains none outside ``R`` and the clique: every path
+    inside ``R`` remains, and no path leaves it. Every other entry is dropped.
+    """
+    if not reach:
+        return reach
+    changed = 0
+    for u, (old, new) in enumerate(zip(before, after, strict=True)):
+        if old != new:
+            changed |= 1 << u
+    if not changed:
+        return reach
+    kept = {}
+    for key, seen in reach.items():
+        hit = seen & changed
+        if hit:
+            outside = ~(seen | key[1])
+            if any(before[u] & ~after[u] & seen or after[u] & outside for u in _bitset.nodes(hit)):
+                continue
+        kept[key] = seen
+    return kept
 
 
 class _ForwardScan:
@@ -360,9 +390,9 @@ class _ForwardScan:
         self.screened: dict[int, list[_Screened]] = {}
         self.exact: dict[int, dict[tuple[int, ...], tuple[int, dict[int, float]]]] = {}
         # Each (target, clique mask)'s semi-directed reach set on the kept graph, and the graph's
-        # semi-directed successor masks once a reach set is computed on it.
+        # semi-directed successor masks.
         self.reach: dict[tuple[int, int], int] = {}
-        self.succ: list[int] | None = None
+        self.succ: list[int] = []
 
     def best(self, adj: np.ndarray, excluded: Excluded = None) -> ForwardResult:
         """The best-improving Insert into the targets not in ``excluded``, by :func:`move_key`."""
@@ -413,9 +443,8 @@ class _ForwardScan:
 
     def _refresh(self, adj: np.ndarray) -> None:
         """Enumerate again the targets whose candidates differ from the kept graph's."""
-        if self.adj is not None:
-            moved = _bitset.bitmask(np.flatnonzero((self.adj != adj).any(axis=1)).tolist())
-            self.reach = {key: reach for key, reach in self.reach.items() if not reach & moved}
+        succ = _bitset.row_masks(adj == ops.TAIL)
+        self.reach = _kept_reach(self.reach, self.succ, succ)
         touched = _touched(self.adj, adj)
         redo = [y for y in self.targets if touched[y]]
         if redo:
@@ -424,7 +453,7 @@ class _ForwardScan:
             for y in redo:
                 self._enumerate(y, adj, adjacent, lines)
         self.adj = adj.copy()
-        self.succ = None
+        self.succ = succ
 
     def _enumerate(self, y: int, adj: np.ndarray, adjacent: list[int], lines: list[int]) -> None:
         """Group ``y``'s clique-valid candidates by base and score each group in one batch.
@@ -502,9 +531,6 @@ class _ForwardScan:
         clique, sources, batch, deltas, bounds = self.groups[y][base]
         reach = self.reach.get((y, clique))
         if reach is None:
-            if self.succ is None:
-                assert self.adj is not None  # _refresh keeps the graph before any visit
-                self.succ = _bitset.row_masks(self.adj == ops.TAIL)
             reach = self.reach[(y, clique)] = _bitset.semidirected_reach_set(self.succ, y, clique)
         passing = sources & ~reach
         if passing.bit_count() == len(batch):

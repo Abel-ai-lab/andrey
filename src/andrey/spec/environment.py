@@ -8,6 +8,7 @@ definitions. Each variable's parser is in :mod:`andrey.core.env`. The human-read
 
 from __future__ import annotations
 
+from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES as _SKELETON_MIN_WORK
 from andrey.core.env import SEED_MAX
 from andrey.search._parallel_ges import _DEFAULT_MIN_WORK as _GES_MIN_WORK
 
@@ -39,7 +40,9 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         values="integer >= -1 (-1 = all usable cores)",
         default="1",
         effect=(
-            "Worker processes for GES and GFCI (its GES phase); `0` or `1` runs serially. "
+            "Worker processes for GES, GFCI (its GES phase), and the skeleton searches of PC, "
+            "FCI, GFCI, and CD-NOD with `fisherz` or `student_t`, and worker threads for the "
+            "regressions of `granger` and the two directions of `pnl`; `0` or `1` runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
         ),
         group="backend",
@@ -55,6 +58,22 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "unless the worker count (`num_workers` / `ANDREY_NUM_WORKERS`) is above 1. A fit with "
             "more than one worker warns once on the default when a pass reaches a tenth of it; "
             "`andrey calibrate` measures a value for a process that runs many fits."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_SKELETON_PARALLEL_MIN_WORK",
+        values="integer (CI tests per conditioning-size pass)",
+        default=str(_SKELETON_MIN_WORK),
+        effect=(
+            "Per-pass crossover gate for the parallel skeleton search of PC, FCI, GFCI, and "
+            "CD-NOD with `fisherz` or `student_t`: a conditioning-size pass fans out to the "
+            "worker pool only when it holds at least this many CI tests, else in-process. `0` "
+            "sends every pass to the pool. The default was measured on an AMD EPYC 9534 server "
+            "running Linux. No effect unless the worker count (`num_workers` / "
+            "`ANDREY_NUM_WORKERS`) is above 1. A fit with more than one worker warns once on the "
+            "default when a pass reaches a tenth of it; `andrey calibrate --method skeleton` "
+            "measures a value for your machine."
         ),
         group="backend",
     ),
@@ -98,6 +117,17 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         effect=(
             "Smallest distance matrix (rows squared) at which `auto` runs a CMIknn query on a CUDA "
             "GPU. A set value replaces the `cuda` default; CMIknn never runs on `mps`."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_PNL_GPU_THRESHOLD",
+        values="integer (elements: rows squared)",
+        default="cuda 26278, mps never",
+        effect=(
+            "Smallest kernel matrix (rows squared) at which `auto` runs the HSIC tests of PNL's "
+            "pairs on a CUDA GPU, in float64. A set value replaces the `cuda` default; PNL never "
+            "runs on `mps`."
         ),
         group="backend",
     ),

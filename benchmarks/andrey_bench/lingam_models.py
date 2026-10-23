@@ -166,11 +166,14 @@ def _standard_noise(rng: np.random.Generator, density: str, size: tuple[int, ...
     raise ValueError(f"unknown density {density!r}")
 
 
-def sample_panel(name: str, d: int, times: int, m: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+def sample_panel(
+    name: str, d: int, times: int, m: int, seed: int, *, scale: float = 1.0
+) -> tuple[np.ndarray, np.ndarray]:
     """Return ``(data, truth)``: ``m`` units of ``d`` variables at ``times`` time points.
 
     ``data`` has shape ``(times, m, d)``. ``truth`` has shape ``(times, 2, d, d)``: ``truth[t, 0]``
-    is ``B(t,t)`` and ``truth[t, 1]`` is ``B(t,t-1)``, zero at the first time point.
+    is ``B(t,t)`` and ``truth[t, 1]`` is ``B(t,t-1)``, zero at the first time point. ``scale``
+    multiplies every drawn ``B(t,t)`` and ``B(t,t-1)`` entry and leaves every other draw as it is.
     """
     model = MODELS[name]
     assert isinstance(model, PanelModel)
@@ -179,14 +182,15 @@ def sample_panel(name: str, d: int, times: int, m: int, seed: int) -> tuple[np.n
     truth = np.zeros((times, 2, d, d))
     for t in range(times):
         magnitude = rng.uniform(*model.instantaneous, size=(d, d))
-        truth[t, 0] = np.where(lower, magnitude * rng.choice([-1.0, 1.0], size=(d, d)), 0.0)
+        sign = rng.choice([-1.0, 1.0], size=(d, d))
+        truth[t, 0] = np.where(lower, magnitude * sign * scale, 0.0)
         if t:
-            truth[t, 1] = rng.uniform(-model.lagged, model.lagged, size=(d, d))
-    scale = np.sqrt(rng.uniform(*model.noise_variance, size=d))
+            truth[t, 1] = rng.uniform(-model.lagged, model.lagged, size=(d, d)) * scale
+    noise_scale = np.sqrt(rng.uniform(*model.noise_variance, size=d))
     densities = rng.choice(len(DENSITIES), size=d)
     noise = (
         np.stack([_standard_noise(rng, DENSITIES[k], (times, m)) for k in densities], axis=-1)
-        * scale
+        * noise_scale
     )
     hidden = rng.uniform(0.0, 1.0, size=m)
     weights = rng.uniform(0.0, 1.0, size=d)

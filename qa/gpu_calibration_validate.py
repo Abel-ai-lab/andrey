@@ -7,12 +7,14 @@ is available.
 
 For each operation, the report shows the measured crossover next to this device's shipped default,
 so the user can decide whether to set a cutoff. It also validates the disk-cache round trip and
-confirms that the device runtime is live. KCI and CMIknn have no runtime calibration: their
-crossovers set `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`, both in rows squared.
+confirms that the device runtime is live. KCI, CMIknn, and PNL have no runtime calibration: their
+crossovers set `ANDREY_KCI_GPU_THRESHOLD`, `ANDREY_CMIKNN_GPU_THRESHOLD`, and
+`ANDREY_PNL_GPU_THRESHOLD`, all in rows squared.
 """
 
 from __future__ import annotations
 
+import importlib
 import math
 import os
 import tempfile
@@ -21,6 +23,9 @@ import time
 import numpy as np
 
 from andrey.core import backend, ci_cmiknn, ci_kernel, stats
+
+# `andrey.irregular.pnl` is also the name of the function the package exports.
+pnl = importlib.import_module("andrey.irregular.pnl")
 
 # Past this factor from the shipped default, the report suggests setting a cutoff for this machine.
 _TOLERANCE = 4.0
@@ -46,6 +51,10 @@ def _cmiknn_probe(metric: int) -> ci_cmiknn.CMIknn:
 
 def _query(test) -> float:
     return test(0, 1, [2, 3])
+
+
+def _pnl_query(table: np.ndarray) -> np.ndarray:
+    return pnl.pnl_pairs(table)
 
 
 def _device() -> str | None:
@@ -116,12 +125,13 @@ def main() -> None:
         stats._COV_GPU_THRESHOLDS[device],
     )
 
-    if device == "cuda":  # KCI and CMIknn have no mps backend
-        for op, make, default in (
-            ("kci", _kci_probe, ci_kernel._KCI_GPU_THRESHOLDS["cuda"]),
-            ("cmiknn", _cmiknn_probe, ci_cmiknn._CMIKNN_GPU_THRESHOLDS["cuda"]),
+    if device == "cuda":  # KCI, CMIknn, and PNL have no mps backend
+        for op, make, call, default in (
+            ("kci", _kci_probe, _query, ci_kernel._KCI_GPU_THRESHOLDS["cuda"]),
+            ("cmiknn", _cmiknn_probe, _query, ci_cmiknn._CMIKNN_GPU_THRESHOLDS["cuda"]),
+            ("pnl", _ci_probe, _pnl_query, pnl._PNL_GPU_THRESHOLDS["cuda"]),
         ):
-            ok &= _report(op, device, make, _query, 250_000, default)
+            ok &= _report(op, device, make, call, 250_000, default)
 
     # Use an isolated cache to exercise measure, persist, clear, and reload without affecting the
     # user's calibration data.
