@@ -1,2 +1,1 @@
-400 of 400 true edges found
 same graph with 1 and 4 workers: True
