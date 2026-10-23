@@ -159,6 +159,7 @@ mixes numbers with text is an error.
 | `oriented_edges()` | list of `(source, target, type)`, named by `labels` when set |
 | `to_edges()` | structured array with fields `i`, `j`, `mark_i`, `mark_j` |
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
+| `to_pcalg()` | dense `int8` `(n, n)` pcalg `amat`, for a `dag`, `cpdag`, or `pag` |
 | `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes |
 
 `GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. They
@@ -174,6 +175,13 @@ direction, so read `endpoints` or `oriented_edges()` rather than the arc. A `Mul
 reverse arc for `<->` and `o-o`. A `digraph` emits each arc from tail to arrowhead, so NetworkX's
 cycle functions see its cycles. `from_networkx` reads `endpoints`; an edge without it is read as
 `u -> v`.
+
+For pcalg, `GraphStructure.from_pcalg(amat, kind)` reads its `amat` and `to_pcalg()` writes one for
+the graph's kind. `amat.pag` (`fit@amat` from `fci` or `rfci`; `kind="pag"`, a MAG too) holds the
+mark at the column node, coded `1` circle, `2` arrowhead, `3` tail, so the methods transpose it and
+swap pcalg's codes for circle and tail. `amat.cpdag` (`as(fit, "amat")` from `pc`; `kind="cpdag"`
+or `"dag"`) writes `i -> j` at `[j, i]`, the child's row, and an undirected edge as `1` in both
+cells, so the methods transpose it too. A `digraph` has no pcalg matrix.
 
 Andrey has no converters for other packages' objects. Build their matrices into a `GraphStructure`
 with `from_numpy`:
@@ -200,39 +208,12 @@ def from_binary_dag(A):
     M = np.zeros(A.shape, dtype=np.int8)
     M[A], M[A.T] = TAIL, ARROW
     return GraphStructure.from_numpy(M, kind="dag")
-
-
-def from_pcalg_pag(amat, kind="pag"):
-    """pcalg `amat.pag` (0 none, 1 circle, 2 arrowhead, 3 tail); amat[i, j] is the mark at j."""
-    A = np.asarray(amat).T
-    if not np.isin(A, (0, 1, 2, 3)).all():
-        raise ValueError("amat.pag holds only the codes 0, 1, 2, 3")
-    M = np.zeros(A.shape, dtype=np.int8)
-    M[A == 1], M[A == 2], M[A == 3] = CIRCLE, ARROW, TAIL
-    return GraphStructure.from_numpy(M, kind=kind)
-
-
-def from_pcalg_cpdag(amat):
-    """pcalg `amat.cpdag`; i -> j is amat[j, i] = 1 and amat[i, j] = 0, i -- j is 1 both ways."""
-    A = np.asarray(amat)
-    if not np.isin(A, (0, 1)).all():
-        raise ValueError("amat.cpdag holds only the codes 0 and 1")
-    A = A != 0
-    M = np.zeros(A.shape, dtype=np.int8)
-    M[A.T] = TAIL
-    M[A & ~A.T] = ARROW
-    return GraphStructure.from_numpy(M, kind="cpdag")
 ```
 
 - **causal-learn** - `G.graph[i, j]` is also the mark at `i`, so `from_signed(G.graph, kind)`
   needs no transpose. Its wildcard and compound codes (3 and above) have no Andrey equivalent.
 - **lingam** - pass `adjacency_matrix_.T` to `from_binary_dag`. Some estimators write `NaN` for
   an unobserved common cause; decide how to encode those pairs first.
-- **pcalg** - `amat.pag` (`fit@amat` from `fci` or `rfci`) holds the mark at the column node, so
-  `from_pcalg_pag` transposes it and swaps pcalg's codes for circle (1) and tail (3). A MAG uses
-  the same coding. `amat.cpdag` (`as(fit, "amat")` from `pc`) writes `i -> j` at `[j, i]`, the
-  child's row, and an undirected edge as `1` in both cells, so `from_pcalg_cpdag` transposes it
-  too. To write a PAG for pcalg, transpose `to_numpy()` and swap the codes 1 and 3.
 
 ## References
 

@@ -54,8 +54,9 @@ class AndreyGES:
     lambda_value: float = _DEFAULT_LAMBDA
     #: The local score. A variant with another score needs its own ``name``, as a weight does.
     score_func: str = _DEFAULT_SCORE_FUNC
-    #: Most directed parents a node may hold and still gain one; ``None`` lifts the cap, as the
-    #: public ``andrey.ges`` does. A benchmark that changes it gives the arm its own ``name``.
+    #: A node whose directed parent count already exceeds this gains no new parents in the forward
+    #: phase; ``None`` keeps the default gate of half the variables, as the public ``andrey.ges``
+    #: does. A benchmark that changes it gives the arm its own ``name``.
     max_parents: float | None = _DEFAULT_MAX_PARENTS
 
     def setup(self) -> None:
