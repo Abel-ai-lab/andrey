@@ -46,6 +46,9 @@ change names its pull request.
 - For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
   Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
   with the time of Tetrad's JVM reported apart from its search. ([#362])
+- `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule="conservative"` or `"majority"`, which decide
+  each collider by a vote over the separating subsets of its ends' neighbors and list the triples
+  the vote leaves undecided in `metadata["ambiguous_triples"]`. ([#397])
 
 ### Changed
 
@@ -681,3 +684,4 @@ First alpha release.
 [#369]: https://github.com/Abel-ai-lab/andrey/pull/369
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
+[#397]: https://github.com/Abel-ai-lab/andrey/pull/397
