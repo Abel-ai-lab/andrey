@@ -31,9 +31,21 @@ if TYPE_CHECKING:
     from andrey.core.ci import CITest
 
 COMMAND = "andrey calibrate"
-CUTOFFS = {
-    "ges": "ANDREY_GES_PARALLEL_MIN_WORK",
-    "skeleton": "ANDREY_SKELETON_PARALLEL_MIN_WORK",
+
+
+@dataclass(frozen=True)
+class Method:
+    """A worker-pool cutoff: its environment variable, how the default-cutoff warning names the
+    search, and whether the gate sends a pass of exactly the cutoff's work to the pool."""
+
+    variable: str
+    search: str
+    at_cutoff: bool
+
+
+METHODS = {
+    "ges": Method("ANDREY_GES_PARALLEL_MIN_WORK", "GES", at_cutoff=False),
+    "skeleton": Method("ANDREY_SKELETON_PARALLEL_MIN_WORK", "The skeleton search", at_cutoff=True),
 }
 NOTE = (
     "This value suits many fits in one process. Starting the first pool in a process costs more, "
@@ -43,11 +55,6 @@ NOTE = (
 # this fraction of the cutoff. The cutoff measured for many fits per process sits within this factor
 # below the default, so a smaller fit would not use the pool under either value.
 WARN_FRACTION = 0.1
-_DEFAULT_SUITS = {
-    "ges": "which suits one fit per process",
-    "skeleton": "which suits one fit per process",
-}
-_SEARCHES = {"ges": "GES", "skeleton": "The skeleton search"}
 
 # Probe sizes (variables). Serial GES at d = 256 takes minutes, so the search stops there.
 GRID = (16, 32, 64, 128)
@@ -81,10 +88,8 @@ class Crossover:
     @property
     def cutoff(self) -> int:
         if self.above is None:  # never faster: keep the pool off up to the largest size measured
-            return max(
-                self.work(self.below if self.below is not None else _MAX_D),
-                default_cutoff(self.method),
-            )
+            slowest = self.work(self.below if self.below is not None else _MAX_D)
+            return max(slowest + METHODS[self.method].at_cutoff, default_cutoff(self.method))
         if self.below is None:  # faster everywhere measured: use the pool from the smallest size
             return self.work(self.above)
         return _round2(math.sqrt(self.work(self.below) * self.work(self.above)))
@@ -105,17 +110,19 @@ def cutoff_is_default(method: str) -> bool:
     """Whether ``method``'s cutoff is its built-in default: the variable is unset or blank."""
     from andrey.core import env
 
-    return env.SETTINGS[CUTOFFS[method]].read() is None
+    return env.SETTINGS[METHODS[method].variable].read() is None
 
 
 def warn_default_cutoff(method: str, default: int) -> None:
     """Warn once that a ``method`` fit with more than one worker runs on the default cutoff."""
     from andrey.core.warning_policy import PerformanceWarning, warn_once
 
+    entry = METHODS[method]
     warn_once(
-        f"{_SEARCHES[method]} decides when to use its worker pool with the default "
-        f"{CUTOFFS[method]}={default}, {_DEFAULT_SUITS[method]}. If this process runs many fits, "
-        f"`{COMMAND}` measures a value for this machine; any explicit value silences this warning.",
+        f"{entry.search} decides when to use its worker pool with the default "
+        f"{entry.variable}={default}, which suits one fit per process. If this process runs many "
+        f"fits, `{COMMAND}` measures a value for this machine; any explicit value silences this "
+        "warning.",
         PerformanceWarning,
     )
 
@@ -246,7 +253,7 @@ def fit_timers(
     from andrey.search import _parallel_ges
 
     fit = getattr(andrey, method)
-    var = CUTOFFS[method]
+    var = METHODS[method].variable
     works: dict[int, int] = {}
 
     def run(d: int, n_workers: int, cutoff: str | None) -> float:
@@ -342,13 +349,13 @@ def skeleton_timers(
             finally:
                 pool.close()
 
-        with _cutoff(CUTOFFS["skeleton"], "0"):
+        with _cutoff(METHODS["skeleton"].variable, "0"):
             return _time(scan, repeats)
 
     return serial, pooled, lambda d: make(d).tests
 
 
-def calibrate(workers: int, methods: Sequence[str] = tuple(CUTOFFS)) -> dict[str, Crossover]:
+def calibrate(workers: int, methods: Sequence[str] = tuple(METHODS)) -> dict[str, Crossover]:
     """Measure each method's crossover with ``workers`` pool processes."""
     import dataclasses
     import warnings

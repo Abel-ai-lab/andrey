@@ -30,10 +30,6 @@ import numpy as np
 from andrey.constraint._skeleton import Removal, pair_queries, scan_pairs
 from andrey.core import env
 from andrey.core.ci import CITest, PartialCorrelationTest
-
-# The start-method policy, the work-balanced chunking, and the fail-loud collect are the same
-# primitives the parallel greedy search uses, so the skeleton reuses those helpers rather than
-# redefining them; only the correlation-seeded worker glue below is skeleton-specific.
 from andrey.search import _parallel as par
 from andrey.search import calibrate
 from andrey.search._parallel import balanced_chunks as _balanced_chunks
@@ -43,9 +39,7 @@ from andrey.search._parallel import pick_context as _pick_context
 #: The default for the fewest tests a conditioning-size pass needs to run on the worker pool; a
 #: smaller pass scans in the caller's process. ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` overrides it
 #: (0 sends every pass to the pool), and a fit with workers warns once on the default when a pass
-#: nears it. Measured on an AMD EPYC 9534 server running Linux, where starting the pool costs about
-#: 0.6 s per fit, which a pass of this size repays at 4 to 8 workers; ``andrey calibrate --method
-#: skeleton`` measures the value for another machine.
+#: nears it; ``andrey calibrate --method skeleton`` measures the value for a machine.
 MIN_POOL_QUERIES: int = 500_000
 
 # Per-worker state installed once by _init_worker and reused across every task and size pass.

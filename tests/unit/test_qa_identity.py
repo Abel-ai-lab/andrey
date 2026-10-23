@@ -181,13 +181,39 @@ def _manifest(**changes: object) -> dict:
         ({"hash": "h2"}, 1, "0 with a different graph, 1 with only different bits"),
         ({"hash": "h2", "graph_hash": "g2"}, 1, "1 with a different graph"),
         ({"ci_queries": 11}, 1, "1 counts rose"),
-        ({"ci_queries": 9}, 0, "1 fell"),
+        ({"ci_queries": 9}, 1, "1 fell"),
         ({"seed": 1}, 1, "2 in one only"),
     ],
 )
 def test_compare_counts_the_rows_that_differ(changes, status, message, capsys) -> None:
     assert identity.compare(_manifest(), _manifest(**changes)) == status
     assert message in capsys.readouterr().out
+
+
+def test_a_fall_in_a_count_passes_only_when_allowed(capsys) -> None:
+    fewer = _manifest(ci_queries=9)
+    assert identity.compare(_manifest(), fewer) == 1
+    assert identity.compare(_manifest(), fewer, allow_fewer=True) == 0
+    assert identity.compare(_manifest(), _manifest(ci_queries=11), allow_fewer=True) == 1
+    assert "count fell: PC d 0 0 1 ci_queries: 10 -> 9" in capsys.readouterr().out
+
+
+def test_counting_records_the_exact_search_scores(x: np.ndarray) -> None:
+    gram = importlib.import_module("andrey.search.exact")._GramBICScore(x)
+    with identity.counting(None) as counts:
+        gram.score_many(0, [(1,), (2,), (3,)])
+        gram.score(1, (0, 2))  # calls score_many, which is part of the call
+    assert counts.summary() == {
+        "score_queries": 4,
+        "score_sets": {"1": 3, "2": 1},
+    }
+
+
+def test_pnl_is_refitted_on_workers_and_gives_the_same_bits() -> None:
+    assert "PNL" in identity.WORKER_METHODS
+    rows, findings = identity.run(["PNL"], seeds=1, workers=2)
+    assert findings == []
+    assert {r["workers"] for r in rows} == {1, 2}
 
 
 def test_the_header_names_the_imported_package_and_its_tree(tmp_path, monkeypatch) -> None:
