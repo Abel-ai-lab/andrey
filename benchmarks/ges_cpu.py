@@ -41,8 +41,9 @@ from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores
 
 #: ``andrey_ges_adapters()`` supplies serial and parallel GES with the same ``numpy`` backend and
-#: score settings. Every solution runs on every dataset.
-SOLUTIONS = [*andrey_ges_adapters(), CausalLearnGES(), BaselineEmpty()]
+#: score settings; causal-learn limits parents too, so Andrey applies its limit as a gate. Every
+#: solution runs on every dataset.
+SOLUTIONS = [*andrey_ges_adapters(parent_rule="gate"), CausalLearnGES(), BaselineEmpty()]
 
 #: The solutions the work gate reaches: parallel-mode Andrey only. A serial fit is pinned to one
 #: worker and never consults the gate, and no competitor reads it, so declaring it on them would
