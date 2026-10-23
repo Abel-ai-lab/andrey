@@ -16,9 +16,18 @@ banner links the website's homepage. -->
     src="https://img.shields.io/badge/license-Apache%202.0-3b5bdb"></a>
 </p>
 
-**What's new in 0.8.0:** KCI, RCoT, CMIknn, and GPDC, four tests for nonlinear dependence.
-[Read the post](https://andrey.abel.ai/blog/20261023-andrey-0-8-0.html) or see the
-[release card](https://andrey.abel.ai/docs/benchmarks/0.8.0.html).
+---
+
+## ⭐ What's new in 0.8.0: nonlinear dependence
+
+PC, FCI, GFCI, and CD-NOD test independence with KCI, RCoT, CMIknn, and GPDC, four tests that
+detect the nonlinear effects partial correlation misses. Each runs faster than the package we
+measured it against, at the same level of accuracy.
+
+**[Read the post](https://andrey.abel.ai/blog/20261023-andrey-0-8-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.8.0.html)**
+
+---
 
 Andrey is a causal discovery package for Python.
 
