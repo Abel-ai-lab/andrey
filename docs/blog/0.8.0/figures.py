@@ -4,8 +4,7 @@
   correlation gives it and the one KCI gives it.
 - ``graphs.html``: the post's example, the true graph beside the graph PC finds with partial
   correlation and with each new test.
-- ``comparison.html``: PC and FCI with each test against each reference package: the share of
-  datasets with no more errors, and the speedup on each kind of CPU.
+- ``comparison.html``: PC and FCI with each test against each reference package: the speedup.
 
 The table's numbers come from the 0.8.0 release card's summary (``SUMMARY``), so they change only
 with it; the other two figures are fitted here, on fixed seeds. Every color is an ``--andrey-*``
@@ -206,8 +205,7 @@ def floored(value: float) -> str:
 
 def comparison_table(summary: dict) -> str:
     # One row per test and reference package, over every size we measured, PC and FCI together:
-    # the mean errors Andrey saves per graph, from the card's promotion rule, and the speedup
-    # range of the median fit time, smallest cut down and largest rounded.
+    # the speedup range of the median fit time, smallest cut down and largest rounded.
     ratios: dict[tuple[str, str], list[float]] = {}
     for method in summary["methods"]:
         test = method["solution"].split(".")[2]
@@ -215,31 +213,16 @@ def comparison_table(summary: dict) -> str:
             ratios.setdefault((TESTS[test], method["comparator"]), []).extend(
                 row["ratio"] for row in method["rows"] if row.get("ratio")
             )
-    rows = []
-    for name, references in summary["promotion"]["tests"].items():
-        for reference, result in references["references"].items():
-            speeds = ratios[(name, reference)]
-            rows.append(
-                (
-                    name,
-                    f"vs {reference}",
-                    (
-                        f"{-result['pooled_mean_D']:.2f}",
-                        f"{floored(min(speeds))}-{max(speeds):.2g}x",
-                    ),
-                )
-            )
+    rows = tuple(
+        (name, f"vs {reference}", (f"{floored(min(speeds))}-{max(speeds):.2g}x",))
+        for (name, reference), speeds in ratios.items()
+    )
     return table(
         "Each test against its reference package",
-        ("Fewer errors per graph", "Faster by"),
-        (("PC and FCI", tuple(rows)),),
+        ("Faster by",),
+        (("PC and FCI", rows),),
         rank=lambda cell: None,
-        note=(
-            "Errors are the structural Hamming distance to the true graph: the edges missing, "
-            "extra, or misdirected. Fewer errors per graph is the mean over every dataset we ran, "
-            "20 per size. Faster by is the range over sizes of the reference's median fit time "
-            "over Andrey's."
-        ),
+        note="The range over sizes of the reference's median fit time over Andrey's.",
     )
 
 
