@@ -364,9 +364,10 @@ Each test and score reads the columns as one kind of data:
 | Categorical | `chisq`, `gsq` | `local_score_BDeu` (the default when every column is categorical), `local_score_BIC_categorical` |
 | Mixed | `degen_gauss`, `cond_gauss` | `local_score_cond_gauss` (the default when some columns are categorical), `local_score_degen_gauss` |
 
-`pc`, `fci`, `gfci`, and `cdnod` take the tests; `ges`, `gfci`, `hc`, `boss`, `grasp`, and
-`exact_search` take every score, and `tabu` the continuous and categorical ones. `gfci` takes a
-score and a test that read the same kind of data, such as
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the tests;
+`ges`, `gfci`, `hc`, `mmhc`, `rsmax2`, `boss`, `grasp`, and `exact_search` take every score, and
+`tabu` the continuous and categorical ones. `gfci`, `mmhc`, and `rsmax2` take a score and a test
+that read the same kind of data, such as
 `andrey.gfci(data, score_func="local_score_BDeu", indep_test="chisq")`.
 
 **Categorical data.** Each distinct value of a column is one category. A column may hold whole

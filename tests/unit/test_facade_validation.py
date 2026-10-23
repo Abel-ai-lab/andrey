@@ -59,11 +59,16 @@ SINGLE = {
     "fci": andrey.fci,
     "gfci": andrey.gfci,
     "cdnod": lambda data, **kw: andrey.cdnod(data, domain_index=np.arange(len(data)) % 2, **kw),
+    "iamb": andrey.iamb,
+    "inter_iamb": andrey.inter_iamb,
+    "mmpc": andrey.mmpc,
     "ges": andrey.ges,
     "gies": andrey.gies,
     "xges": andrey.xges,
     "hc": andrey.hc,
     "tabu": andrey.tabu,
+    "mmhc": andrey.mmhc,
+    "rsmax2": andrey.rsmax2,
     "exact_search": andrey.exact_search,
     "calm": andrey.calm,
     "boss": andrey.boss,
@@ -194,7 +199,20 @@ def _two_groups_of_copies():
 
 # The searches that reject copies before the fit: the BIC searches, the partial-correlation
 # constraint searches, and the lagged partial-correlation searches.
-COPY_CHECKED = [*BIC, "pc", "fci", "cdnod", "pcmci", "pcmciplus", "lpcmci"]
+COPY_CHECKED = [
+    *BIC,
+    "pc",
+    "fci",
+    "cdnod",
+    "iamb",
+    "inter_iamb",
+    "mmpc",
+    "mmhc",
+    "rsmax2",
+    "pcmci",
+    "pcmciplus",
+    "lpcmci",
+]
 
 
 @pytest.mark.parametrize("method", COPY_CHECKED)
@@ -495,7 +513,7 @@ def test_hc_stops_at_max_iter_and_warns():
 
 def test_hc_sets_no_move_limit_by_default():
     # This dense graph takes over 200 moves: a limit of 200 stops the search, the default does not.
-    x = sample_scm(d=30, n=800, seed=0, density=16.0).data
+    x = sample_scm(d=30, n=800, seed=0, density=16.0, scale="raw").data
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=200"):
         andrey.hc(x, max_iter=200)
     with warnings.catch_warnings():

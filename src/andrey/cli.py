@@ -796,9 +796,9 @@ def _load_method_inputs(
 
 
 def column_positions(
-    columns: list[str] | tuple[str, ...], labels: tuple[str, ...] | None
+    columns: list[str] | tuple[str, ...], labels: tuple[str, ...] | None, name: str = "categorical"
 ) -> list[int]:
-    """Turn ``categorical=`` entries into 0-based column positions the facade reads.
+    """Turn ``categorical=`` or ``target=`` entries into 0-based column positions the facade reads.
 
     An entry names a column of the data file's header, or else gives a position as digits.
     """
@@ -812,7 +812,7 @@ def column_positions(
             known = f"; the header names {list(labels)}" if labels is not None else ""
             raise CliError(
                 "unknown_column",
-                f"categorical names column {column!r}, which the data file does not have{known}",
+                f"{name} names column {column!r}, which the data file does not have{known}",
                 EXIT_USAGE,
             )
     return positions
@@ -840,6 +840,8 @@ def _prepare_call(
         labels = None
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
+    if fkwargs.get("target") is not None:
+        fkwargs = {**fkwargs, "target": column_positions([fkwargs["target"]], labels, "target")[0]}
     if fkwargs.get("knowledge") is not None:
         try:
             fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}

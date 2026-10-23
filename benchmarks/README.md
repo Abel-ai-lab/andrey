@@ -239,6 +239,30 @@ order drawn from the seed rather than the file's order, often a causal one; each
 `shuffle`. Sachs keeps its file's order, which does not follow its network. The public-datasets
 rows published with 0.1.0 were measured on the file's order and stay as recorded.
 
+### Scale
+
+A key's `standardize` coordinate sets how `andrey.data` scales the values, and it enters the
+generator call, so each scale is a dataset of its own. The linear and nonlinear regimes are
+`standardized`: every column is z-scored, so no solution can order the variables by their variances
+(var-sortability, Reisach et al. 2021). Z-scoring leaves each variable's R², the share of its
+variance the other variables explain, as it was, and in linear data that share still grows down the
+causal order (R²-sortability, Reisach et al. 2023).
+
+The `_unitless` regimes, `linear_gauss_er_unitless`, `lingam_sf_unitless`,
+`latent_gauss_er_unitless`, and `latent_lingam_er_unitless`, are the four linear regimes with the
+weights and noise of Herman et al. (2025): every variable has variance 1 in the population, and a
+variable's weights depend only on its number of parents. Their R²-sortability is close to chance as
+well. Over 20 seeds at `d = 10, 20, 50` and `n = 10 d`, its mean is 0.46 to 0.62 against 0.65 to
+0.76 for the standardized regimes; the hidden-confounder ones sit at the top of that range, since
+hiding a node changes what the others explain. The generator keeps the variables' dense correlation
+matrix, so a unitless key takes at most 1,000 variables and raises above that; run these regimes
+at small sizes. A unitless key's data are not z-scored, so its sample variances differ from 1 by
+sampling error.
+
+Every record carries its dataset's `varsortability` and `r2_sortability` under the truth, over all
+directed paths between observed variables, computed once per dataset in the parent; a time series
+has neither. A solution's fit receives the data matrix alone.
+
 ### Hidden confounders
 
 `latent_gauss_er` hides one node in ten, at least one, from an Erdos-Renyi linear-Gaussian graph.

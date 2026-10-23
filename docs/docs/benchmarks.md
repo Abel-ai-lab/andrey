@@ -17,42 +17,72 @@ rerun the measurements. A card keeps the numbers its release published.
 :::::{div} release-latest
 
 :::{card}
-:link: benchmarks/0.8.0
+:link: benchmarks/0.9.0
 :link-type: doc
-:link-alt: The 0.8.0 release card: nonlinear tests
-:class-card: release-cover release-art release-art-0-8-0
+:link-alt: The 0.9.0 release card: acceleration
+:class-card: release-cover release-art release-art-0-9-0
 :shadow: none
 :margin: 0
 
 Release card
 
-Nonlinear tests
+Acceleration
 
-0.8.0
+0.9.0
 :::
 
 ::::{div} release-tldr
 
-0.8.0 is here: PC and FCI test conditional independence on nonlinear data with KCI, RCoT, CMIknn,
-and GPDC, BOSS and GRaSP score categorical data with BDeu and the categorical BIC, and the
-chi-square and G-square tests answer many queries at once. On an AMD EPYC 7713, PC with RCoT runs
-more than 10x faster than causal-learn at 50 variables, and BOSS and GRaSP with BDeu more than 130x
-faster than causal-learn on random categorical graphs.
+0.9.0 is here: the same answers as 0.8.0, in less time. With one worker, BOSS runs up to 8.19x
+faster than 0.8.0, exact search 5.29x, and FCI and GFCI more than 3x; with four workers, CD-NOD runs
+4.62x faster and PC 2.60x. On an AMD EPYC 7713, GES runs more than 5x faster than pcalg at 400
+variables, with the same or fewer errors.
 
 :::{div} release-stats
 
-- **More than 10x** PC with RCoT speedup over causal-learn at 50 variables
-- **More than 130x** BOSS and GRaSP speedup over causal-learn on random categorical graphs
-- **More than 3x** PC with the chi-square test speedup over Andrey 0.7.0 from 40 variables
+- **More than 8x** BOSS speedup over Andrey 0.8.0 at 400 variables
+- **More than 5x** exact search speedup over Andrey 0.8.0
+- **More than 5x** GES speedup over pcalg at 400 variables
 :::
 
 :::{div} release-actions
-[Read the release card](benchmarks/0.8.0.md)
+[Read the release card](benchmarks/0.9.0.md)
 :::
 ::::
 :::::
 
 ## Earlier releases
+
+::::{div} release-row
+
+:::{card}
+:link: benchmarks/0.8.0
+:link-type: doc
+:link-alt: The 0.8.0 release card: nonlinear tests
+:class-card: release-tile release-art-0-8-0
+:shadow: none
+:margin: 0
+
+0.8.0
+:::
+
+:::{div} release-body
+<h3>Nonlinear tests</h3>
+
+PC and FCI with four tests for nonlinear dependence, KCI, RCoT, CMIknn, and GPDC, and BOSS and
+GRaSP on categorical data, compared with causal-learn, pcalg, and tigramite.
+
+- **4** nonlinear tests supported
+- PC with RCoT **more than 10x** faster than causal-learn at 50 variables
+:::
+
+:::{div} release-meta
+Released October 23, 2026
+
+- [Release card<span class="visually-hidden"> 0.8.0</span>](benchmarks/0.8.0.md)
+- [Post: Nonlinear dependence](../blog/20261023-andrey-0-8-0.md)
+:::
+::::
 
 ::::{div} release-row
 
@@ -274,6 +304,7 @@ The homepage's speed claim and charts come from these release cards.
 ```{toctree}
 :hidden:
 
+0.9.0: acceleration <benchmarks/0.9.0>
 0.8.0: nonlinear tests <benchmarks/0.8.0>
 0.7.0: permutation invariance <benchmarks/0.7.0>
 0.6.0: mixed and categorical data <benchmarks/0.6.0>

@@ -25,7 +25,7 @@ def models():
                 for seed in range(10):
                     try:
                         ds = data.sample_scm(
-                            graph=graph, d=d, n=n, seed=seed, density=2.0, latents=1
+                            graph=graph, d=d, n=n, seed=seed, density=2.0, latents=1, scale="raw"
                         )
                     except ValueError as exc:
                         if "children" not in str(exc):

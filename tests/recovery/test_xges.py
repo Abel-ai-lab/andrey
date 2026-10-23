@@ -48,7 +48,7 @@ def _er_sample(d: int, avg_degree: float, n: int, seed: int) -> data.CausalDatas
         functional=data.functional.linear(),
         noise=data.noise.gaussian(),
     )
-    return scm.sample(n=n, seed=seed)
+    return scm.sample(n=n, seed=seed, scale="raw")
 
 
 # ---- fixed cases ---------------------------------------------------------------------------------

@@ -52,14 +52,15 @@ to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 rep
 data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
 
-`pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
-`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and
-`"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
+`indep_test` choices: `"fisherz"`, the default, and `"student_t"` for continuous data, `"chisq"`
+and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the
+nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)).
 
-`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
-`exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
-and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
+`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
+`grasp`, `exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of
+required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
 `knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
@@ -137,10 +138,32 @@ default under `andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
-Every method is supported. A new method ships as experimental: it passes recovery tests but has no
-published benchmark, its API may change without deprecation, and it warns with
-{py:class}`~andrey.ExperimentalWarning` on its first call in a process. It becomes supported once it
-has:
+A new method ships as experimental: it passes recovery tests but has no published benchmark, its
+API may change without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on
+its first call in a process.
+
+```{eval-rst}
+.. currentmodule:: andrey
+
+.. autosummary::
+   :toctree: api
+   :nosignatures:
+
+   iamb
+   inter_iamb
+   mmpc
+   mmhc
+   rsmax2
+```
+
+IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
+`target`; without one, they return every variable's set as undirected edges, joining a pair when
+each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then
+runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase
+keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and
+its maximize phase runs hill climbing or tabu search among them.
+
+A method becomes supported once it has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
   in its release's [release card](benchmarks.md);
@@ -152,7 +175,8 @@ has:
 
 ### Conditional-independence tests
 
-PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_test`:
+PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, MMHC, and RSMAX2 take their conditional-independence
+test as `indep_test`:
 
 | `indep_test` | Test | Status |
 |---|---|---|
@@ -369,11 +393,14 @@ argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andre
 
 ### Simulators
 
-`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
-scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
-for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
-an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
-the causal order; `shuffle=False` keeps the order in which the graph was drawn.
+`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form,
+and noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
+time-series model. `andrey.data.sample_discrete` samples a discrete network, the data for the
+categorical tests and scores, and `andrey.data.sample_mixed` a network of categorical and
+continuous variables, the data for the mixed-data tests and scores. Each returns the data with the
+true graph. The columns come in an order shuffled from the seed, with the graph relabeled to match,
+so the order says nothing about the causal order; `shuffle=False` keeps the order in which the
+graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
@@ -382,9 +409,37 @@ the causal order; `shuffle=False` keeps the order in which the graph was drawn.
    :toctree: api
    :nosignatures:
 
+   sample_scm
+   SCM
    sample_discrete
    sample_mixed
 ```
+
+#### Scale
+
+In linear data drawn with the usual weights, a variable's variance grows down the causal order, so
+sorting the columns by variance recovers much of that order (var-sortability, Reisach et al., 2021).
+The share of a variable's variance that the others explain, its $R^2$, grows down the order too, and
+no rescaling of the columns changes it ($R^2$-sortability, Reisach et al., 2023). The `scale`
+argument of `sample_scm` and `SCM.sample` sets how the values are scaled; the graph is the same in
+every mode. Its default, `"standardize"`, z-scores every column, which works for every model at any
+size, so no method can win by the variances. Pass `scale="raw"` for the values as generated.
+
+| `scale` | Values | Var-sortability | $R^2$-sortability |
+|---|---|---|---|
+| `"standardize"` (default) | each column z-scored after generation | 0.5 | as in the raw data |
+| `"unitless"` | weights and noise drawn so every variable has variance 1 (Herman et al., 2025) | about 0.5 | about 0.5 |
+| `"rescale"` | each variable divided by its standard deviation as it is generated | 0.5 | about 0.5 on sparse graphs |
+| `"raw"` | as generated | high | high |
+
+`"unitless"` follows Algorithm 1 of Herman et al. (2025): a variable's weights and noise depend only
+on its number of parents, and the ratio of a parent's share of its variance to the noise's has no
+bound. It takes the linear functional, up to 1,000 variables, since it keeps their correlation
+matrix. A sample's `report` holds its var-sortability and, up to 100 variables, its
+$R^2$-sortability, and `andrey.data.sortability.varsortability` and `r2sortability` compute them
+for any data and graph. On 30 random graphs of 20 variables at mean degree 2, with 1,000 rows,
+$R^2$-sortability averages 0.74 raw or standardized, 0.52 with `"rescale"`, and 0.51 with
+`"unitless"`.
 
 ## Metrics
 

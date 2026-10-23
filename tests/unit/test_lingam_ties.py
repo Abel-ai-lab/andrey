@@ -129,13 +129,16 @@ _SHARED_ORDERS = {0: [2, 6, 1, 4, 0, 5, 3], 1: [3, 4, 5, 0, 1, 6, 2]}
 
 @pytest.mark.parametrize(("d", "noise", "seed"), list(_CONTINUOUS_ORDERS))
 def test_continuous_orders_are_unchanged(d: int, noise: str, seed: int) -> None:
-    X = sample_scm(noise=noise, d=d, n=500, seed=seed).data
+    X = sample_scm(noise=noise, d=d, n=500, seed=seed, scale="raw").data
     assert pwling.find_causal_order(X) == _CONTINUOUS_ORDERS[d, noise, seed]
 
 
 @pytest.mark.parametrize("seed", list(_SHARED_ORDERS))
 def test_continuous_shared_orders_are_unchanged(seed: int) -> None:
-    groups = [sample_scm(noise="uniform", d=7, n=300 + 100 * g, seed=seed).data for g in range(2)]
+    groups = [
+        sample_scm(noise="uniform", d=7, n=300 + 100 * g, seed=seed, scale="raw").data
+        for g in range(2)
+    ]
     assert _shared(groups) == _SHARED_ORDERS[seed]
 
 
