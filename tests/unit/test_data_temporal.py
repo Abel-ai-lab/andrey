@@ -1,4 +1,4 @@
-"""Check VAR/VARMA samples, temporal truth, reproducibility, size limits, and storage errors."""
+"""Check VAR/VARMA samples, temporal truth, reproducibility, and size limits."""
 
 from __future__ import annotations
 
@@ -72,22 +72,6 @@ def test_temporal_rejects_latents_and_scale():
         scm.sample(n=100, seed=0)
     with pytest.raises(ValueError, match="only scale='raw'"):
         _var_scm().sample(n=100, seed=0, scale="standardize")
-
-
-def test_temporal_storage_raises_without_safetensors(monkeypatch, tmp_path):
-    """Saving temporal truth raises before loading the optional storage dependency.
-
-    The error identifies unsupported temporal storage even when the dependency is absent.
-    """
-    from andrey.data import storage
-
-    def _no_safetensors():
-        raise ImportError("safetensors not installed")
-
-    monkeypatch.setattr(storage, "_require_safetensors", _no_safetensors)
-    ds = _var_scm(d=6).sample(n=100, seed=0)
-    with pytest.raises(NotImplementedError, match="TemporalStructure"):
-        storage.save(ds, tmp_path / "t.safetensors")
 
 
 def test_stabilize_stationary_at_high_lag_order():

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from andrey.core import backend, stats
+from andrey.core import backend, stats, warning_policy
 
 
 @pytest.fixture(autouse=True)
@@ -16,13 +16,13 @@ def _reset_backend_state():
     otherwise leak into later tests in the session. Warn-once memory is also cleared on entry, so
     warnings raised by tests outside this directory do not hide a first warning here.
     """
-    backend._reset_warnings()
+    warning_policy._warned.clear()
     yield
     backend.config._backend = None
     backend.config._num_workers = None
     backend.config._tie_break = None
-    backend._reset_warnings()
-    backend.reset_dispatch_stats()
+    warning_policy._warned.clear()
+    backend._dispatch_counts.clear()
     stats._CALIBRATED.clear()
 
 

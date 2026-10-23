@@ -1618,14 +1618,26 @@ TILE_SIZES = {"4": (768, 416), "6": (1168, 416)}
 PRIORITY = ' fetchpriority="high"'
 
 
+def picture(path: str, attrs: str) -> str:
+    """A brand JPEG (``_static/<path>.jpg``) with its AVIF copy first, which a browser that reads
+    AVIF loads instead (``docs/conf.py`` writes the copies); ``attrs`` are the image's."""
+    return (
+        f'<picture><source type="image/avif" srcset="_static/{path}.avif">'
+        f'<img src="_static/{path}.jpg" {attrs}></picture>'
+    )
+
+
 def cover_frame(art: str, *, priority: bool = False) -> str:
     """An art in a frame of its own proportions, with the sweep where its art has one, so the
     sweep lies on the art at every crop. Only the first screen's art loads before the rest."""
     load = PRIORITY if priority else ' loading="lazy"'
     return (
-        f'<div class="cover-frame"><img src="_static/art-{art}.jpg" '
-        f'alt="{escape(cover_alt(art), quote=True)}" width="1600" height="640"{load}>'
-        f"{sweep(art) if art in SWEPT else ''}</div>"
+        '<div class="cover-frame">'
+        + picture(
+            f"art-{art}",
+            f'alt="{escape(cover_alt(art), quote=True)}" width="1600" height="640"{load}',
+        )
+        + f"{sweep(art) if art in SWEPT else ''}</div>"
     )
 
 
@@ -1638,10 +1650,10 @@ def hero_art() -> str:
 def tile_art(name: str, size: str) -> str:
     """A tile's art, behind its text: a crop of the art of the same name."""
     width, height = TILE_SIZES[size]
-    return (
-        f'<img class="tile-art" src="_static/bento/{name}.jpg" '
-        f'alt="{escape(cover_alt(name), quote=True)}" width="{width}" height="{height}" '
-        'loading="lazy">'
+    return picture(
+        f"bento/{name}",
+        f'class="tile-art" alt="{escape(cover_alt(name), quote=True)}" width="{width}" '
+        f'height="{height}" loading="lazy"',
     )
 
 
@@ -1800,10 +1812,13 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
 def act_cards(claims: dict[str, tuple[str, str]]) -> str:
     """The hero's four cards, one per section: its art, its title, and its claim's short form."""
     return "".join(
-        f'<li class="act-card"><a href="#{key}"><img src="_static/{picture}" '
-        f'alt="{escape(cover_alt(art), quote=True)}" width="{width}" height="{height}">'
-        f"<b>{title}</b><span>{escape(claims[key][0])}</span></a></li>"
-        for key, title, art, (picture, (width, height)) in ACTS
+        f'<li class="act-card"><a href="#{key}">'
+        + picture(
+            image.removesuffix(".jpg"),
+            f'alt="{escape(cover_alt(art), quote=True)}" width="{width}" height="{height}"',
+        )
+        + f"<b>{title}</b><span>{escape(claims[key][0])}</span></a></li>"
+        for key, title, art, (image, (width, height)) in ACTS
     )
 
 
@@ -2662,6 +2677,8 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "banner": banner if placeholder else "",
         "lede": escape(lede()),
         "agent_pill": agent_pill(),
+        # The first screen's art, which the page asks for before its stylesheets load.
+        "hero_image": f"_static/art-{HERO_ART}.avif",
         "hero_chips": hero_chips(),
         "hero_art": hero_art(),
         "tile_art": tile_art,

@@ -5,13 +5,12 @@ the HSIC statistic to a gamma distribution for a closed-form p-value; a larger p
 independent.
 
 - :func:`hsic_test` z-scores each variable (``ddof=1``; a constant column becomes zero) and sets
-  the bandwidth by the empirical rule, or by the median heuristic on request.
-  :func:`hsic_statistic_test`, used by ANM, runs the same test and returns the statistic, divided
-  by its mean under independence, with the p-value. PNL computes the same numbers from kernels it
-  shares across pairs.
-- :func:`hsic_gamma_test`, used by RCD and ParceLiNGAM, sets the bandwidth by the median distance
-  over the first rows without z-scoring, corrects the variance for bias, and returns the statistic
-  with the p-value.
+  the bandwidth by the empirical rule. :func:`hsic_statistic_test`, used by ANM, runs the same test
+  and returns the statistic, divided by its mean under independence, with the p-value. PNL computes
+  the same numbers from kernels it shares across pairs.
+- :func:`hsic_gamma_from_grams`, used by RCD and ParceLiNGAM with the grams of :func:`gamma_gram`,
+  sets the bandwidth by the median distance over the first rows without z-scoring, corrects the
+  variance for bias, and returns the statistic with the p-value.
 
 References
 ----------
@@ -63,21 +62,6 @@ def _empirical_bandwidth(data: np.ndarray) -> float:
     return precision * data.shape[1]
 
 
-def _median_bandwidth(data: np.ndarray) -> float:
-    """Return the Gaussian ``width`` (the ``1/sigma**2`` precision) from the median heuristic.
-
-    ``sigma`` is ``sqrt(2)`` times the median of the positive pairwise Euclidean distances; for more
-    than 1000 rows a uniform 1000-row subsample is drawn first.
-    """
-    n = data.shape[0]
-    if n > 1000:
-        data = data[np.random.permutation(n)[:1000], :]
-    dists = squareform(pdist(data, "euclidean"))
-    median_dist = np.median(dists[dists > 0])
-    sigma = np.sqrt(2.0) * median_dist
-    return 1.0 / sigma**2
-
-
 def _gaussian_kernel(data: np.ndarray, width: float) -> np.ndarray:
     """Return the Gaussian (RBF) kernel matrix ``exp(-0.5 * ||x_i - x_j||**2 * width)``."""
     sq_dists = squareform(pdist(data, "sqeuclidean"))
@@ -96,73 +80,83 @@ def _center_kernel(matrix: np.ndarray) -> np.ndarray:
     return matrix - (col_sums[None, :] + col_sums[:, None]) / n + (total / n**2)
 
 
-def _resolve_bandwidth(raw: np.ndarray, est_width: str, manual_width: float | None) -> float:
-    """Return the Gaussian ``width`` precision for one variable under the chosen estimator."""
-    if manual_width is not None:
-        return 1.0 / manual_width**2
-    if est_width == "empirical":
-        return _empirical_bandwidth(raw)
-    if est_width == "median":
-        return _median_bandwidth(raw)
-    raise ValueError(f"unknown est_width {est_width!r}; expected 'empirical' or 'median'")
+# Kernel elements computed per block (rows times columns), so a block's elementwise steps run in
+# cache.
+_BLOCK_ELEMENTS = 32768
 
 
-def _centered_kernel(raw: np.ndarray, est_width: str, manual_width: float | None) -> np.ndarray:
-    """Build a centered kernel with raw-data bandwidth and z-scored inputs."""
-    width = _resolve_bandwidth(raw, est_width, manual_width)
-    return _center_kernel(_gaussian_kernel(_standardize(raw), width))
+def _block_rows(n: int) -> int:
+    """Rows of the block :func:`_kernel_into` builds at a time for ``n`` samples."""
+    return max(1, min(n, _BLOCK_ELEMENTS // max(n, 1)))
 
 
-def measure_hsic_statistic(
-    x: np.ndarray,
-    y: np.ndarray,
-    *,
-    est_width: str = "empirical",
-    kernel_width_x: float | None = None,
-    kernel_width_y: float | None = None,
-) -> float:
-    """Return the HSIC V-statistic between ``x`` and ``y``.
+def _kernel_into(z: np.ndarray, width: float, out: np.ndarray, block: np.ndarray) -> np.ndarray:
+    """Write the centered Gaussian kernel of the standardized 1-D ``z`` into ``out`` and return it.
 
-    The statistic is the Frobenius inner product ``sum(Kxc * Kyc)`` of the two centered Gaussian
-    kernel matrices. ``est_width`` selects the bandwidth rule (``'empirical'`` or ``'median'``);
-    a per-variable ``kernel_width_*`` overrides it with an explicit ``sigma``.
+    Every element takes ``exp(-0.5 * d**2 * width)``, then ``K - (col_sum_j + col_sum_i) / n +
+    total / n**2``, as :func:`_gaussian_kernel` and :func:`_center_kernel` do, but in row blocks of
+    ``block``'s size written into ``out``, so no ``n x n`` temporary is allocated.
     """
-    kxc = _centered_kernel(_as_columns(x), est_width, kernel_width_x)
-    kyc = _centered_kernel(_as_columns(y), est_width, kernel_width_y)
-    return float(np.sum(kxc * kyc))
+    n = z.shape[0]
+    rows = block.shape[0]
+    for start in range(0, n, rows):
+        part = out[start : start + rows]
+        np.subtract(z[start : start + rows, None], z[None, :], out=part)
+        np.square(part, out=part)
+        np.multiply(part, -0.5, out=part)
+        np.multiply(part, width, out=part)
+        np.exp(part, out=part)
+    col_sums = out.sum(axis=0)
+    shift = col_sums.sum() / n**2
+    for start in range(0, n, rows):
+        part = out[start : start + rows]
+        offsets = block[: part.shape[0]]
+        np.add(col_sums[None, :], col_sums[start : start + rows, None], out=offsets)
+        np.divide(offsets, n, out=offsets)
+        np.subtract(part, offsets, out=part)
+        np.add(part, shift, out=part)
+    return out
 
 
-def hsic_test(
-    x: np.ndarray,
-    y: np.ndarray,
-    *,
-    est_width: str = "empirical",
-    kernel_width_x: float | None = None,
-    kernel_width_y: float | None = None,
-) -> float:
+def _gamma_test(
+    statistic: float, trace_x: float, sumsq_x: float, trace_y: float, sumsq_y: float, n: int
+) -> tuple[float, float]:
+    """Return ``(statistic / mean, p_value)`` of the HSIC test from its two kernels' sums.
+
+    ``trace_*`` and ``sumsq_*`` are each centered kernel's trace and sum of squared entries; the
+    gamma null's mean and variance are those of :func:`hsic_statistic_test`.
+    """
+    mean_appr = trace_x * trace_y / n
+    var_appr = 2 * sumsq_x * sumsq_y / n / n
+    shape = mean_appr**2 / var_appr
+    scale = var_appr / mean_appr
+    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
+
+
+def _centered_kernel(raw: np.ndarray) -> np.ndarray:
+    """Build a centered kernel with raw-data bandwidth and z-scored inputs."""
+    width = _empirical_bandwidth(raw)
+    z = _standardize(raw)
+    if z.shape[1] > 1:
+        return _center_kernel(_gaussian_kernel(z, width))
+    n = z.shape[0]
+    return _kernel_into(z[:, 0], width, np.empty((n, n)), np.empty((_block_rows(n), n)))
+
+
+def hsic_test(x: np.ndarray, y: np.ndarray) -> float:
     """Return the gamma-approximation p-value of the HSIC independence test between ``x`` and ``y``.
 
-    The p-value of :func:`hsic_statistic_test`, which describes the test and its settings.
+    The p-value of :func:`hsic_statistic_test`, which describes the test.
     """
-    return hsic_statistic_test(
-        x, y, est_width=est_width, kernel_width_x=kernel_width_x, kernel_width_y=kernel_width_y
-    )[1]
+    return hsic_statistic_test(x, y)[1]
 
 
-def hsic_statistic_test(
-    x: np.ndarray,
-    y: np.ndarray,
-    *,
-    est_width: str = "empirical",
-    kernel_width_x: float | None = None,
-    kernel_width_y: float | None = None,
-) -> tuple[float, float]:
+def hsic_statistic_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
     """Return ``(T / mean, p_value)`` of the HSIC independence test between ``x`` and ``y``.
 
     Each variable is z-scored (``ddof=1``), mapped through a Gaussian kernel whose bandwidth follows
-    the empirical rule (``est_width='empirical'``, the ANM default) or the median heuristic, and
-    centered. The HSIC V-statistic ``T = sum(Kxc * Kyc)`` is compared against a gamma distribution
-    matched to its null mean and variance,
+    the empirical rule, and centered. The HSIC V-statistic ``T = sum(Kxc * Kyc)`` is compared
+    against a gamma distribution matched to its null mean and variance,
 
         mean = tr(Kxc) tr(Kyc) / n,   var = 2 sum(Kxc^2) sum(Kyc^2) / n^2,
         shape = mean^2 / var,         scale = var / mean,
@@ -175,15 +169,11 @@ def hsic_statistic_test(
     Accepts 1-D vectors or ``(n, d)`` matrices.
     """
     n = _as_columns(x).shape[0]
-    kxc = _centered_kernel(_as_columns(x), est_width, kernel_width_x)
-    kyc = _centered_kernel(_as_columns(y), est_width, kernel_width_y)
+    kxc = _centered_kernel(_as_columns(x))
+    kyc = _centered_kernel(_as_columns(y))
 
     statistic = np.sum(kxc * kyc)
-    mean_appr = np.trace(kxc) * np.trace(kyc) / n
-    var_appr = 2 * np.sum(kxc**2) * np.sum(kyc**2) / n / n
-    shape = mean_appr**2 / var_appr
-    scale = var_appr / mean_appr
-    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
+    return _gamma_test(statistic, np.trace(kxc), np.sum(kxc**2), np.trace(kyc), np.sum(kyc**2), n)
 
 
 # ---- LiNGAM-family HSIC (median-distance bandwidth, biased V-statistic) --------------------------
@@ -242,8 +232,7 @@ def gamma_gram(column: np.ndarray) -> tuple[np.ndarray, float]:
     """Return one variable's ``(centered_gram, off_diagonal_kernel_mean)`` for the gamma HSIC.
 
     These are the only per-variable quantities the test needs, so a caller that scores one column
-    against many others (RCD, ParceLiNGAM) computes this once per column and reuses it. Bit-for-bit
-    identical to the grams :func:`hsic_gamma_test` builds inline.
+    against many others (RCD, ParceLiNGAM) computes this once per column and reuses it.
     """
     col = _as_columns(column)
     n = col.shape[0]
@@ -278,17 +267,3 @@ def hsic_gamma_from_grams(
     shape = mean**2 / var
     scale = var * n / mean
     return float(statistic), float(1.0 - gammainc(shape, statistic / scale))
-
-
-def hsic_gamma_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
-    """Return ``(statistic, p_value)`` of the LiNGAM-family HSIC gamma-approximation test.
-
-    The bandwidth is the median-distance heuristic over the first rows; the biased HSIC V-statistic
-    ``T = sum(Kxc.T * Kyc) / n`` is compared against a gamma law matched to the finite-sample null
-    mean and bias-corrected variance, and the p-value is the gamma upper tail ``1 - P(shape,
-    T / scale)``. A larger p-value means more independent. Accepts 1-D vectors or ``(n, 1)`` inputs.
-    Callers scoring one variable against many should cache :func:`gamma_gram` and combine
-    with :func:`hsic_gamma_from_grams` instead.
-    """
-    xc = _as_columns(x)
-    return hsic_gamma_from_grams(gamma_gram(xc), gamma_gram(_as_columns(y)), xc.shape[0])

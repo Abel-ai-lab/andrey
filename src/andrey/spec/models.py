@@ -110,7 +110,6 @@ class MethodSpec(Spec):
     seeded: bool = False  # honors a seed / random_state (and so ANDREY_SEED)
     passthrough: bool = False  # accepts extra **params (CALM optimizer knobs)
     references: tuple[str, ...] = ()
-    aliases: tuple[str, ...] = ()
     knowledge: tuple[KnowledgePart, ...] = ()  # the Knowledge parts its knowledge= honors
 
 

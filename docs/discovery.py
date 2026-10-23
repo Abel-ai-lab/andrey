@@ -164,6 +164,7 @@ def llms_index(
     site_url: str,
     project: str,
     version: str,
+    facts: Sequence[str] = (),
 ) -> str:
     """``llms.txt``: the project's name and summary, the current release, then each section's
     pages as links under its heading, each with the title and description its page carries
@@ -181,6 +182,8 @@ def llms_index(
         "`andrey run <method> --help --json` returns a method's JSON contract, and",
         "`andrey --skill` prints Andrey's agent skill.",
     ]
+    if facts:
+        lines += ["", "## At a glance", "", *(f"- {fact}" for fact in facts)]
     listed = set()
     for heading, documents in sections:
         lines += ["", f"## {heading}", ""]
