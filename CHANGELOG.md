@@ -69,6 +69,15 @@ change names its pull request.
   `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
 - `anm` returns the same results with less memory, because it builds its kernel's distance matrix
   directly. ([#294])
+- `anm` and the `kci` test without conditioning variables return the same p-values with less
+  memory, because their HSIC test builds each kernel in blocks into one reused matrix, as `pnl`
+  does. ([#363])
+- `andrey calibrate` sets the skeleton search's cutoff one past the slowest pass it measured when
+  the worker pool never won, because the search uses the pool for a pass of exactly the cutoff's
+  size. ([#363])
+- For contributors, `qa/identity.py --compare` fails when a count falls as well as when one rises
+  (`--allow-fewer-queries` accepts a fall), counts the exact search's score evaluations, and
+  refits `pnl` on workers. ([#363])
 - `ica_lingam` returns the same results in less time, because its causal-order search drops each
   placed row with a mask. ([#275])
 - `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` compute
@@ -626,3 +635,4 @@ First alpha release.
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
 [#353]: https://github.com/Abel-ai-lab/andrey/pull/353
+[#363]: https://github.com/Abel-ai-lab/andrey/pull/363
