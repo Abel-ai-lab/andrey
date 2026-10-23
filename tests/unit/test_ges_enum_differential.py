@@ -1,7 +1,8 @@
 """Test that GES's forward scans and subset enumerations return one CPDAG and score.
 
 The kept forward scan is compared with the full rescan (``_FULL_RESCAN``), pruned enumeration
-with unpruned subset lattices (``_LATTICE_PRUNE``), and serial GES with two-chunk decomposition.
+with unpruned subset lattices (``_LATTICE_PRUNE``), the CPDAG rewritten around a move with the
+CPDAG rebuilt whole (``_LOCAL_REFORM``), and serial GES with two-chunk decomposition.
 """
 
 from __future__ import annotations
@@ -13,9 +14,9 @@ import numpy as np
 import pytest
 from threadpoolctl import threadpool_limits
 
-from andrey.core import backend
+from andrey.core import ARROW, TAIL, backend
 from andrey.core import score as score_module
-from andrey.core.orient import to_structure
+from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near, dag2cpdag, to_structure
 from andrey.core.score import BICScore
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
@@ -84,15 +85,17 @@ def _run(
     maxP: float | None,
     lambda_value: float = 1.0,
     full_rescan: bool = False,
+    local_reform: bool = True,
     moves: list[tuple] | None = None,
 ):
-    """Run GES with explicit scan and pruning toggles (restored afterwards).
+    """Run GES with explicit scan, pruning, and CPDAG-rewrite toggles (restored afterwards).
 
     ``moves``, when given, collects each applied Insert and Delete in order.
     """
     old_prune = getattr(ops, "_LATTICE_PRUNE", True)
     insert, delete = ops.apply_insert, ops.apply_delete
     ops._LATTICE_PRUNE = prune
+    ops._LOCAL_REFORM = local_reform
     pg._FULL_RESCAN = full_rescan
     if moves is not None:
 
@@ -113,6 +116,7 @@ def _run(
             struct, score = ges(x, lambda_value=lambda_value, maxP=maxP)
     finally:
         ops._LATTICE_PRUNE = old_prune
+        ops._LOCAL_REFORM = True
         pg._FULL_RESCAN = False
         ops.apply_insert, ops.apply_delete = insert, delete
     return struct.to_numpy(), score
@@ -154,6 +158,101 @@ def test_kept_scan_matches_full_rescan(
     """The kept forward scan applies the full rescan's moves and returns its CPDAG and score."""
     x = _gaussian_sem(seed, n, d, p)
     _assert_kept_matches_full(x, None, lambda_value, f"seed={seed}, d={d}")
+
+
+def _valid_moves(adj: np.ndarray) -> list[tuple[str, int, int, tuple[int, ...]]]:
+    """Every valid Insert and Delete of the CPDAG ``adj``, as GES enumerates them."""
+    n = adj.shape[0]
+    state = pg.neighborhood_state(adj, n)
+    reachable = pg._reachable(adj)
+    moves = []
+    for y in range(n):
+        for x, _t_index, T, clique in pg._insert_candidates(y, adj, state):
+            if not reachable(y, x, clique):
+                moves.append(("insert", x, y, T))
+    adj_sets, _parents, undirected = state
+    for y in range(n):
+        for x in sorted(adj_sets[y]):
+            if adj[y, x] == ARROW or (adj[y, x] == TAIL and adj[x, y] == TAIL):
+                for _h_index, H in ops.clique_residuals(adj, sorted(undirected[y] & adj_sets[x])):
+                    moves.append(("delete", x, y, H))
+    return moves
+
+
+@pytest.mark.parametrize(
+    "seed,d,steps,p",
+    [
+        (0, 6, 40, 0.40),
+        (1, 10, 60, 0.20),
+        (2, 16, 80, 0.12),
+        (3, 30, 80, 0.07),
+        (4, 8, 60, 0.50),
+        (5, 12, 80, 0.35),
+    ],
+)
+def test_cpdag_after_a_move_matches_a_full_rebuild(
+    seed: int, d: int, steps: int, p: float, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A walk of valid Inserts and Deletes gives, after each, the CPDAG a full rebuild gives.
+
+    The region limit is lifted, so every move takes the rewrite of the nodes it can reach. The
+    walk starts from the CPDAG of a random DAG of edge density ``p``, so it begins with directed
+    and undirected edges; the denser rows put triangles and long undirected chains in the way.
+    """
+    monkeypatch.setattr(ops, "_REGION_SHARE", 1.0)
+    rng = np.random.default_rng(seed)
+    dag = np.zeros((d, d), dtype=np.int8)
+    order = rng.permutation(d)
+    for lo in range(d):
+        for hi in range(lo + 1, d):
+            if rng.random() < p:
+                dag[order[lo], order[hi]], dag[order[hi], order[lo]] = TAIL, ARROW
+    adj = dag2cpdag(dag)
+    kinds = set()
+    for _ in range(steps):
+        moves = _valid_moves(adj)
+        kind, x, y, subset = moves[int(rng.integers(len(moves)))]
+        kinds.add(kind)
+        moved = adj.copy()
+        apply = ops.apply_insert if kind == "insert" else ops.apply_delete
+        apply(moved, x, y, subset)
+        expected = _cpdag_of_pdag(moved)
+        change = ops.insert_cpdag if kind == "insert" else ops.delete_cpdag
+        adj = change(adj, x, y, subset)
+        assert np.array_equal(adj, expected), (kind, x, y, subset)
+    assert kinds == {"insert", "delete"}
+
+
+def test_cpdag_rewrite_declines_a_region_past_its_limit() -> None:
+    """A move that can reach more nodes than the limit leaves the matrix as it was."""
+    adj = np.zeros((6, 6), dtype=np.int8)
+    for a, b in [(0, 1), (1, 2), (2, 3), (3, 4)]:
+        adj[a, b] = adj[b, a] = TAIL
+    before = adj.copy()
+    assert _cpdag_of_pdag_near(adj, [0], 2) is None
+    assert np.array_equal(adj, before)
+    assert _cpdag_of_pdag_near(adj, [0], 5) is adj
+
+
+@pytest.mark.parametrize("seed,d,n,p,lambda_value", _SCAN_GRID[:3] + _SCAN_GRID[4:5])
+def test_local_reform_matches_full_rebuild(
+    seed: int, d: int, n: int, p: float, lambda_value: float, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GES applies the same moves and returns the same CPDAG and score when each move rewrites
+    only the nodes it can reach as when each move rebuilds the whole CPDAG."""
+    monkeypatch.setattr(ops, "_REGION_SHARE", 1.0)
+    x = _gaussian_sem(seed, n, d, p)
+    local_moves: list[tuple] = []
+    full_moves: list[tuple] = []
+    local_adj, local_score = _run(
+        x, maxP=None, lambda_value=lambda_value, local_reform=True, moves=local_moves
+    )
+    full_adj, full_score = _run(
+        x, maxP=None, lambda_value=lambda_value, local_reform=False, moves=full_moves
+    )
+    assert local_moves == full_moves
+    assert np.array_equal(local_adj, full_adj)
+    assert local_score.hex() == full_score.hex()
 
 
 # Duplicate columns make families unavailable, so their adds score an infinite delta;
