@@ -13,15 +13,15 @@ conditional-independence tests, and mark convention.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from itertools import combinations
+from collections.abc import Callable, Iterator, Mapping
+from itertools import combinations, islice
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.constraint._skeleton import _CHUNK, _canonical_chunk, _canonical_route
 from andrey.constraint.fci import (
     _adjacent,
-    _adjacent_nodes,
     _arrow_allowed,
     _circle_pag,
     _fast_adjacency_search,
@@ -30,6 +30,7 @@ from andrey.constraint.fci import (
     _knowledge_marks,
     _largest_size,
     _majority_sepsets,
+    _neighbor_lists,
     _remove_by_possible_dsep,
     _sepset,
     _test_in_rank_order,
@@ -145,9 +146,7 @@ def _orient_colliders_from_pattern(
     ``a`` and ``c`` is recorded and does not contain ``b``, and the triple is not ``ambiguous``. An
     already-directed tail at ``b`` blocks the orientation.
     """
-    n = marks.shape[0]
-    for b in range(n):
-        adj = _adjacent_nodes(marks, b)
+    for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
@@ -177,30 +176,61 @@ def _derive_sepsets(
 ) -> dict[tuple[int, int], tuple[int, ...]]:
     """Separating sets for every non-adjacent CPDAG pair, from the pooled two-endpoint adjacency.
 
-    For each non-adjacent ``(x, y)`` (``x < y``), searches subsets of ``adj(x) | adj(y) - {x, y}``,
-    of at most ``max_depth`` members when one is given, by increasing size and records, both ways,
-    the union of every subset of the first size that makes the pair independent, as the adjacency
-    search records its sets; a pair with no such subset gets no entry. The union does not depend on
-    the order of the tests. With ``in_column_order``, the first subset found in column order is
-    recorded instead. The
+    For each non-adjacent ``(x, y)`` (``x < y``, row-major), searches subsets of
+    ``adj(x) | adj(y) - {x, y}``, of at most ``max_depth`` members when one is given, by increasing
+    size and records, both ways, the union of every subset of the first size that makes the pair
+    independent, as the adjacency search records its sets; a pair with no such subset gets no
+    entry. The union does not depend on the order of the tests. With ``in_column_order``, the first
+    subset found in column order is recorded instead, and no subset after it is tested. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
+
+    A FisherZ or StudentT test evaluates each nonempty size's subsets in chunks of canonical query
+    arrays (:func:`_separating_subsets`), with the p-values of the scalar calls; the size-0 query
+    and every query of another test, or of ``in_column_order``, is a scalar call.
     """
-    n = cpdag.shape[0]
+    adjacent = cpdag != NULL
+    canonical = None if in_column_order else _canonical_route(test)
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
-    for x, y in combinations(range(n), 2):
-        if _adjacent(cpdag, x, y):
-            continue
-        pool = sorted((set(_adjacent_nodes(cpdag, x)) | set(_adjacent_nodes(cpdag, y))) - {x, y})
+    xs, ys = np.nonzero(np.triu(~adjacent, 1))
+    for x, y in zip(xs.tolist(), ys.tolist()):
+        pool = [v for v in np.flatnonzero(adjacent[x] | adjacent[y]).tolist() if v != x and v != y]
         for size in range(_largest_size(len(pool), max_depth) + 1):
-            separating = (cond for cond in combinations(pool, size) if test(x, y, cond) > alpha)
+            subsets = combinations(pool, size)
             if in_column_order:
-                first = next(separating, None)
+                first = next((cond for cond in subsets if test(x, y, cond) > alpha), None)
                 found = [] if first is None else [first]
+            elif canonical is None or size == 0:
+                found = [cond for cond in subsets if test(x, y, cond) > alpha]
             else:
-                found = list(separating)
+                found = _separating_subsets(canonical, test, x, y, size, subsets, alpha)
             if found:
                 union = tuple(sorted(set().union(*found)))
                 sepsets[(x, y)] = union
                 sepsets[(y, x)] = union
                 break
     return sepsets
+
+
+def _separating_subsets(
+    canonical: Callable[..., np.ndarray],
+    test: CITest,
+    x: int,
+    y: int,
+    size: int,
+    subsets: Iterator[tuple[int, ...]],
+    alpha: float,
+) -> list[tuple[int, ...]]:
+    """The ``subsets`` (sorted, distinct, of ``size`` members) whose test separates ``x < y``.
+
+    The subsets are evaluated in chunks of ``_CHUNK`` canonical queries, in order. A chunk whose
+    evaluation raises is tested again subset by subset with scalar ``test`` calls, so the error is
+    the one the scalar loop raises, after the same queries.
+    """
+    found: list[tuple[int, ...]] = []
+    while chunk := list(islice(subsets, _CHUNK)):
+        try:
+            pvalues = _canonical_chunk(canonical, size, x, y, chunk)
+        except Exception:
+            pvalues = [test(x, y, cond) for cond in chunk]
+        found.extend(cond for cond, p in zip(chunk, pvalues) if p > alpha)
+    return found
