@@ -106,3 +106,13 @@ def test_row_masks_across_word_boundary(d):
     matrix = np.random.default_rng(d).random((d, d)) < 0.3
     for i, mask in enumerate(_bitset.row_masks(matrix)):
         assert _bitset.nodes(mask) == np.flatnonzero(matrix[i]).tolist(), (d, i)
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_nodes_inverts_bitmask(seed):
+    """``nodes`` lists a mask's nodes in ascending order, for sparse and dense masks alike."""
+    rng = np.random.default_rng(seed)
+    d = int(rng.integers(1, 300))
+    for size in {0, 1, min(d, 24), min(d, 25), int(rng.integers(0, d + 1)), d}:
+        chosen = sorted(rng.choice(d, size=size, replace=False).tolist())
+        assert _bitset.nodes(_bitset.bitmask(chosen)) == chosen, (seed, d, size)
