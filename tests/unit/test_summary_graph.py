@@ -187,6 +187,7 @@ def test_serialization_is_rejected_as_a_derived_projection(tmp_path):
         lambda: SummaryGraph.from_numpy(np.array([[0, TAIL], [ARROW, 0]]), kind="digraph"),
         lambda: SummaryGraph.from_edges(np.zeros(0, dtype=EDGE_DTYPE), n_nodes=2),
         lambda: SummaryGraph.from_networkx(pytest.importorskip("networkx").DiGraph([(0, 1)])),
+        lambda: SummaryGraph.from_pcalg(np.array([[0, 0], [1, 0]]), "dag"),
     ],
 )
 def test_a_summary_graph_comes_only_from_a_temporal_structure(build):
