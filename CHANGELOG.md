@@ -45,6 +45,9 @@ change names its pull request.
 
 ### Changed
 
+- Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
+  hard limit: they change with the data generator, the density, the method's settings, and the
+  machine. ([#367])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` return the same
   graphs and p-values in less time, because their skeleton search hands the test each pair's
   conditioning sets, and those of consecutive pairs, as one stack. ([#280], [#292])
@@ -626,3 +629,4 @@ First alpha release.
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
 [#353]: https://github.com/Abel-ai-lab/andrey/pull/353
+[#367]: https://github.com/Abel-ai-lab/andrey/pull/367
