@@ -209,7 +209,7 @@ LATENT_REGIMES: dict[str, int] = {"latent_gauss_er": 10, "latent_lingam_er": 5}
 DEFAULT_REGIME = "linear_gauss_er"
 
 # The canonical generated edge density: the degree-2 slice, the sparse regime the GES adapters'
-# maxP=4 parent cap is sized for. Density travels on the key, so a denser run is a different
+# limit of 4 parents is sized for. Density travels on the key, so a denser run is a different
 # dataset, a different file, and a different digest.
 CANONICAL_DENSITY = 2.0
 

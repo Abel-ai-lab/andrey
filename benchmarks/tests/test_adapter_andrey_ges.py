@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -38,3 +42,22 @@ def test_the_adapter_applies_the_rule_it_records(parent_rule: str, neighbors: in
     adapter = _adapter(parent_rule)
     marks = adapter.fit(_fan_in(2), adapter.params())
     assert int((marks[2] != 0).sum()) == neighbors
+
+
+def test_the_ges_lane_gives_both_packages_one_limit_and_one_rule() -> None:
+    """`ges_cpu.py` limits causal-learn's parents, so each Andrey arm declares the same limit as a
+    gate, causal-learn's rule."""
+    path = Path(__file__).resolve().parents[1] / "ges_cpu.py"
+    spec = importlib.util.spec_from_file_location("ges_cpu_driver", path)
+    lane = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = lane
+    spec.loader.exec_module(lane)
+    reference = next(s for s in lane.SOLUTIONS if s.name == "causal-learn.ges").params()
+    arms = [s for s in lane.SOLUTIONS if s.name.startswith("andrey.ges")]
+    assert arms
+    for arm in arms:
+        params = arm.params()
+        assert (params["max_parents"], params["parent_rule"]) == (
+            reference["max_parents"],
+            reference["parent_rule"],
+        )

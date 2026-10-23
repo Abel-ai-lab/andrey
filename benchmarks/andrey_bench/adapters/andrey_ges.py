@@ -159,6 +159,8 @@ def andrey_ges_bdeu() -> AndreyGES:
     """GES with the BDeu score for categorical data, using the ``numpy`` backend serially.
 
     BDeu moves are scored in the calling process, so a parallel variant would run the same code.
+    Its reference, causal-learn's BDeu GES, limits parents too, so Andrey applies its limit as a
+    gate.
     """
     return AndreyGES(
         name="andrey.ges.bdeu",
@@ -166,4 +168,5 @@ def andrey_ges_bdeu() -> AndreyGES:
         mode="serial",
         package_version=_andrey_version(),
         score_func="local_score_BDeu",
+        parent_rule="gate",
     )
