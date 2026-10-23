@@ -16,6 +16,10 @@ keywords = [
   "ges",
   "fci",
   "lingam",
+  "time series",
+  "mixed data",
+  "pcmci",
+  "boss",
   "gpu",
 ]
 classifiers = [
@@ -43,9 +47,8 @@ dependencies = [
 
 [project.optional-dependencies]
 torch = ["torch>=2.2"]     # GPU primitives and CALM; the build (CPU/CUDA/ROCm) is picked at install
-data  = ["safetensors>=0.4"]  # andrey.data save/load
 viz   = ["matplotlib>=3.7", "pygraphviz>=2"]  # andrey.viz.mpl; Graphviz layouts
-all   = ["andrey-core[torch,data,viz]"]
+all   = ["andrey-core[torch,viz]"]
 
 [project.scripts]
 andrey = "andrey.cli:main"
@@ -145,8 +148,3 @@ analysis = { allowed-unresolved-imports = ["matplotlib", "matplotlib.**", "cycle
 [[tool.ty.overrides]]
 include = ["src/andrey/viz/_graphviz.py"]
 analysis = { allowed-unresolved-imports = ["pygraphviz", "pygraphviz.**"] }
-
-[[tool.ty.overrides]]
-include = ["src/andrey/data/storage.py"]
-analysis = { allowed-unresolved-imports = ["safetensors", "safetensors.**"] }
-

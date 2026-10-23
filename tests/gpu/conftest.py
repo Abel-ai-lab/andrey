@@ -20,7 +20,7 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 import pytest  # noqa: E402
 
-from andrey.core import backend, env  # noqa: E402
+from andrey.core import backend, env, warning_policy  # noqa: E402
 
 
 def accelerator() -> str | None:
@@ -78,4 +78,4 @@ def _deterministic_and_isolated():
         torch.use_deterministic_algorithms(prev)
     backend.config._backend = None
     backend.config._num_workers = None
-    backend._reset_warnings()
+    warning_policy._warned.clear()

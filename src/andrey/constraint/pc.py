@@ -363,7 +363,6 @@ def _discover_skeleton(
     *,
     categorical: np.ndarray | None = None,
     record_pvalues: bool = True,
-    prescreen: bool = True,
     workers: int = 1,
     warn_expensive: bool = False,
     max_depth: int | None = None,
@@ -390,11 +389,11 @@ def _discover_skeleton(
     (:func:`~andrey.constraint._skeleton.separate_apart`), so colliders over it are oriented as
     usual; a pair no tested conditioning set separates gets neither.
 
-    When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
-    the size-0 and size-1 passes take them (all-pairs marginal threshold, then one first-order
-    batch per surviving pair) in place of the dense scalar scan -- same removals, same separating
-    sets, same p-values. With ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass
-    of at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
+    When the test exposes the vectorized marginal and first-order paths, the size-0 and size-1
+    passes take them (all-pairs marginal threshold, then one first-order batch per surviving pair)
+    in place of the dense scalar scan -- same removals, same separating sets, same p-values. With
+    ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of at least
+    :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
     ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
     per-chunk removals are concatenated in pair order, so the result, a raised error included, is
     identical to the serial scan whatever the partition.
@@ -419,7 +418,7 @@ def _discover_skeleton(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     pvalues: dict[tuple[int, int], float] = {}
 
-    can_prescreen = prescreen and prescreen_capable(test)
+    can_prescreen = prescreen_capable(test)
     parallel = workers > 1 and canonical_capable(test) and _trace is None
     pool = SkeletonWorkerPool(test, workers) if parallel else None
     try:

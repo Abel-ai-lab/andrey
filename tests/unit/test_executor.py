@@ -1,4 +1,4 @@
-"""Executor axis: ``num_workers`` over a process pool. The serial and parallel paths agree."""
+"""The worker count and the CPU budget it is read against."""
 
 from __future__ import annotations
 
@@ -13,21 +13,10 @@ import andrey
 from andrey.core import backend
 
 
-def _square(x):  # top-level so it is picklable for the process pool
-    return x * x
-
-
 def test_num_workers_invalid_env_names_the_variable(monkeypatch):
     monkeypatch.setenv("ANDREY_NUM_WORKERS", "four")
     with pytest.raises(ValueError, match="ANDREY_NUM_WORKERS"):
         backend.worker_count()
-
-
-def test_parallel_map_serial_matches_process():
-    items = list(range(20))
-    serial = backend.parallel_map(_square, items, num_workers=1)
-    parallel = backend.parallel_map(_square, items, num_workers=2)
-    assert serial == parallel == [x * x for x in items]  # same values, input order preserved
 
 
 def test_worker_count_resolution(monkeypatch):
@@ -36,11 +25,6 @@ def test_worker_count_resolution(monkeypatch):
     assert backend.worker_count(-1) == backend.usable_cpus()
     with andrey.config(num_workers=3):
         assert backend.worker_count() == 3
-
-
-def test_parallel_map_single_item_stays_serial():
-    # A lone item never spawns a pool (no pickling / start-up cost for trivial work).
-    assert backend.parallel_map(_square, [7], num_workers=4) == [49]
 
 
 # ---- usable_cpus: the machine is not the budget ----------------------------------------------

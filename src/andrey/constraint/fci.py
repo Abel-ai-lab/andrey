@@ -144,7 +144,6 @@ def _fast_adjacency_search(
     test: CITest,
     alpha: float,
     *,
-    prescreen: bool = True,
     workers: int = 1,
     support: np.ndarray | None = None,
     keep: np.ndarray | None = None,
@@ -168,10 +167,10 @@ def _fast_adjacency_search(
     Either endpoint supplies the conditioning candidates, so a separating set is reachable wherever
     it lives and the skeleton does not depend on how the caller ordered the columns.
 
-    When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
-    the size-0 and size-1 passes take them instead of the dense scalar scan -- same removals and
-    separating sets. With ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of
-    at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
+    When the test exposes the vectorized marginal and first-order paths, the size-0 and size-1
+    passes take them instead of the dense scalar scan -- same removals and separating sets. With
+    ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of at least
+    :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
     ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
     per-chunk removals are concatenated in pair order, so the skeleton, a raised error included,
     stays identical to the serial scan.
@@ -181,7 +180,7 @@ def _fast_adjacency_search(
     np.fill_diagonal(support, False)
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
-    can_prescreen = prescreen and prescreen_capable(test)
+    can_prescreen = prescreen_capable(test)
     pool = SkeletonWorkerPool(test, workers) if workers > 1 and canonical_capable(test) else None
     try:
         size = -1

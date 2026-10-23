@@ -3,7 +3,7 @@
 Every function reads a dense ``(d, d)`` ``int8`` mark matrix in the convention of
 :mod:`andrey.core.orient`. An Insert is valid when ``NA union T`` is a clique and every
 semi-directed path from ``y`` to ``x`` meets it; a Delete is valid when ``NA`` without ``H`` is a
-clique. Scores are differenced from two full local scores of a :class:`~andrey.core.score.Score`.
+clique.
 
 References
 ----------
@@ -21,7 +21,6 @@ import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL
 from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near
-from andrey.core.score import Score
 
 
 def adjacent(adj: np.ndarray, node: int) -> np.ndarray:
@@ -55,16 +54,12 @@ def is_clique(adj: np.ndarray, nodes: Iterable[int]) -> bool:
     return True
 
 
-# Whether the subset-validity scans (clique_extensions/clique_residuals) collapse the 2^deg lattice
-# via precomputed adjacency bitmasks. When False they reproduce the naive per-subset ``is_clique``
-# scan verbatim; the differential test flips it to prove bit-identity.
-_LATTICE_PRUNE = True
-
-# Neighborhood size below which the bitmask precompute is skipped for the plain per-subset scan.
-# The lattice pruning only repays its fixed setup cost (submatrix extraction, conflict masks) once
-# the subset count 2^m is large; for a handful of subsets -- the overwhelmingly common sparse case,
-# where nearly every (x, y) has an empty or tiny t0 -- the naive scan is cheaper, so gating on m
-# keeps the fast path from ever regressing below the naive-scan cost.
+# Neighborhood size below which the subset-validity scans (clique_extensions/clique_residuals) take
+# the plain per-subset ``is_clique`` scan instead of the adjacency bitmasks that collapse the 2^m
+# lattice. The bitmasks only repay their fixed setup cost (submatrix extraction, conflict masks)
+# once the subset count 2^m is large; for a handful of subsets -- the overwhelmingly common sparse
+# case, where nearly every (x, y) has an empty or tiny t0 -- the plain scan is cheaper, so gating
+# on m keeps the fast path from ever regressing below the plain-scan cost.
 _LATTICE_MIN_M = 4
 
 # |t0| ceiling below which the position-subset plan is materialized and cached (2^15 = 32768 tuples
@@ -119,9 +114,9 @@ def clique_extensions(
     t0 = list(t0)
     m = len(t0)
 
-    if not _LATTICE_PRUNE or m < _LATTICE_MIN_M:
-        # Small (the common sparse case) or pruning disabled: the plain per-subset is_clique scan,
-        # cheaper here than the bitmask precompute -- and byte-for-byte the naive scan.
+    if m < _LATTICE_MIN_M:
+        # Small (the common sparse case): the plain per-subset is_clique scan, cheaper here than
+        # the bitmask precompute.
         na_set = set(na_list)
         for t_index, T in enumerate(subsets(t0)):
             if is_clique(adj, na_set | set(T)):
@@ -166,9 +161,9 @@ def clique_residuals(adj: np.ndarray, h0: Sequence[int]) -> Iterable[tuple[int, 
     h0 = list(h0)
     m = len(h0)
 
-    if not _LATTICE_PRUNE or m < _LATTICE_MIN_M:
-        # Small (the common sparse case) or pruning disabled: the plain per-subset residual-clique
-        # scan, cheaper here than the bitmask precompute -- and byte-for-byte the naive scan.
+    if m < _LATTICE_MIN_M:
+        # Small (the common sparse case): the plain per-subset residual-clique scan, cheaper here
+        # than the bitmask precompute.
         h0_set = set(h0)
         for h_index, H in enumerate(subsets(h0)):
             if is_clique(adj, h0_set - set(H)):
@@ -236,36 +231,6 @@ def blocks_semi_directed_paths(
     return True
 
 
-def insert_delta(
-    score: Score, x: int, y: int, na: Iterable[int], T: Iterable[int], paj: Iterable[int]
-) -> float:
-    """Local-score change of inserting ``x -> y`` with subset ``T``: ``score1 - score2``.
-
-    ``score1`` adds ``x`` to ``y``'s parents; both scores condition ``y`` on ``NA union T`` and
-    ``y``'s current parents. Lower is better, so an improving Insert has a negative delta.
-    """
-    base = set(int(v) for v in na) | set(int(v) for v in T) | set(int(v) for v in paj)
-    parents_without = tuple(sorted(base))
-    parents_with = tuple(sorted(base | {int(x)}))
-    return score.score(y, parents_with) - score.score(y, parents_without)
-
-
-def delete_delta(
-    score: Score, x: int, y: int, na: Iterable[int], H: Iterable[int], paj: Iterable[int]
-) -> float:
-    """Local-score change of deleting edge ``x - y`` with subset ``H``: ``score1 - score2``.
-
-    ``score2`` conditions ``y`` on ``(NA \\ H) union Pa(y) union {x}``; ``score1`` drops ``x``.
-    Lower is better, so an improving Delete has a negative delta.
-    """
-    residual = set(int(v) for v in na) - set(int(v) for v in H)
-    parents_with = residual | set(int(v) for v in paj) | {int(x)}
-    parents_without = parents_with - {int(x)}
-    return score.score(y, tuple(sorted(parents_without))) - score.score(
-        y, tuple(sorted(parents_with))
-    )
-
-
 def apply_insert(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> None:
     """Insert ``x -> y`` and orient every ``t -- y`` (``t`` in ``T``) as ``t -> y``, in place."""
     adj[x, y] = TAIL
@@ -286,10 +251,6 @@ def apply_delete(adj: np.ndarray, x: int, y: int, H: Iterable[int]) -> None:
         adj[h, x] = ARROW
 
 
-# Whether :func:`insert_cpdag` and :func:`delete_cpdag` rewrite only the part of the graph a move
-# can change. When False they rebuild the whole CPDAG; the tests compare the two.
-_LOCAL_REFORM = True
-
 # A move that can change more than this share of the nodes rebuilds the whole CPDAG.
 _REGION_SHARE = 0.25
 
@@ -302,11 +263,8 @@ def _shared_children(adj: np.ndarray, x: int, y: int) -> list[int]:
 
 def _reform(adj: np.ndarray, touched: list[int]) -> np.ndarray:
     """The CPDAG of ``adj``, a CPDAG changed by one move that touched the nodes ``touched``."""
-    if _LOCAL_REFORM:
-        out = _cpdag_of_pdag_near(adj, touched, int(_REGION_SHARE * adj.shape[0]))
-        if out is not None:
-            return out
-    return _cpdag_of_pdag(adj)
+    out = _cpdag_of_pdag_near(adj, touched, int(_REGION_SHARE * adj.shape[0]))
+    return _cpdag_of_pdag(adj) if out is None else out
 
 
 def insert_cpdag(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> np.ndarray:

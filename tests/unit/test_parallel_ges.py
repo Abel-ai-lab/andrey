@@ -9,12 +9,12 @@ import numpy as np
 import pytest
 from threadpoolctl import threadpool_limits
 
-from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
+from andrey.search import _parallel as par
 from andrey.search import _parallel_ges as pg
-from andrey.search.ges import _recompute_objective, ges
-from andrey.search.hc import tie_ranks
+from andrey.search.ges import ges
+from tests.unit.ges_chunks import backward_inprocess, forward_inprocess, ges_inprocess
 
 # Random linear-Gaussian datasets spanning sparse/dense and small/large graphs (the test_pc_ges
 # sweep): the general-input regime a single fixed baseline cannot reach.
@@ -40,36 +40,14 @@ def _gaussian_sem(seed: int, n: int, d: int, p: float) -> np.ndarray:
     return x
 
 
-def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None = None):
-    """Full GES via the in-process N-chunk decomposition, mirroring ``ges()``'s serial setup.
-
-    Drives the PURE Schur delta engine through ``forward_chunk_best`` / ``backward_chunk_best`` and
-    the :func:`~andrey.search._parallel_ges.move_key` reduce, then recomputes the objective from the
-    final CPDAG exactly as ``ges()`` does.
-    """
-    X = np.asarray(x, dtype=np.float64)
-    n = X.shape[1]
-    max_parents = n / 2 if maxP is None else maxP
-    score = BICScore(X, lambda_value=1.0)
-    engine = DeltaBICScore(score)
-    adj = np.zeros((n, n), dtype=np.int8)
-    # Match ges()'s BLAS pin so the in-process vs serial comparison is thread-count-invariant.
-    with threadpool_limits(limits=1):
-        ranks = tie_ranks(X).tolist()
-        adj = pg._forward_inprocess(adj, engine, n, max_parents, n_chunks, ranks)
-        adj = pg._backward_inprocess(adj, engine, n, n_chunks, ranks)
-        total = _recompute_objective(adj, score, n)
-    return to_structure(adj, kind="cpdag"), total
-
-
 @pytest.mark.parametrize("seed,d,n,p", _SWEEP)
 @pytest.mark.parametrize("n_chunks", [2, 3, 8])
 def test_decomposition_bit_identical_to_serial(seed, d, n, p, n_chunks):
     """The N-chunk in-process reduce reproduces serial GES's CPDAG and score exactly."""
     x = _gaussian_sem(seed, n, d, p)
     serial_struct, serial_score = ges(x)
-    decomp_struct, decomp_score = _ges_decomposed(x, n_chunks)
-    assert np.array_equal(serial_struct.to_numpy(), decomp_struct.to_numpy()), (
+    decomp_marks, decomp_score = ges_inprocess(x, n_chunks)
+    assert np.array_equal(serial_struct.to_numpy(), decomp_marks), (
         f"CPDAG differs at seed={seed}, d={d}, n_chunks={n_chunks}"
     )
     assert serial_score == decomp_score  # bit-identical accumulated BIC
@@ -79,9 +57,9 @@ def test_decomposition_bit_identical_to_serial(seed, d, n, p, n_chunks):
 def test_chunk_count_invariance(seed, d, n, p):
     """Every chunk count (2, 3, one-per-target, more-than-targets) gives the identical result."""
     x = _gaussian_sem(seed, n, d, p)
-    reference = _ges_decomposed(x, 2)[0].to_numpy()
+    reference = ges_inprocess(x, 2)[0]
     for n_chunks in (3, d, d + 5):
-        assert np.array_equal(_ges_decomposed(x, n_chunks)[0].to_numpy(), reference), (
+        assert np.array_equal(ges_inprocess(x, n_chunks)[0], reference), (
             f"chunk count {n_chunks} changed the result at seed={seed}, d={d}"
         )
 
@@ -123,8 +101,8 @@ def _move_sequence(x: np.ndarray, n_chunks: int):
     try:
         adj = np.zeros((n, n), dtype=np.int8)
         with threadpool_limits(limits=1):
-            adj = pg._forward_inprocess(adj, engine, n, n / 2, n_chunks, range(n))
-            pg._backward_inprocess(adj, engine, n, n_chunks, range(n))
+            adj = forward_inprocess(adj, engine, n, n / 2, n_chunks, range(n))
+            backward_inprocess(adj, engine, n, n_chunks, range(n))
     finally:
         pg.ops.apply_insert, pg.ops.apply_delete = orig_ins, orig_del
     return seq
@@ -177,7 +155,9 @@ def test_ties_are_exercised_by_the_sweep():
             na = nbrs_y & state[0][xx]
             for T in pg.ops.subsets(sorted(nbrs_y - state[0][xx])):
                 if pg.ops.is_clique(adj, na | set(T)) and not reachable(y, xx, na | set(T)):
-                    deltas.append(round(pg.ops.insert_delta(score, xx, y, na, T, state[1][y]), 12))
+                    base = na | set(T) | set(state[1][y])
+                    with_x, without_x = tuple(sorted(base | {xx})), tuple(sorted(base))
+                    deltas.append(round(score.score(y, with_x) - score.score(y, without_x), 12))
     assert len(deltas) - len(set(deltas)) > 0  # at least one delta tie (to 1e-12) exists to break
 
 
@@ -260,13 +240,13 @@ import types  # noqa: E402
 def test_fork_context_policy(monkeypatch):
     """``fork`` only when no CUDA context exists; a live CUDA context rules ``fork`` out."""
     monkeypatch.delitem(sys.modules, "torch", raising=False)
-    assert pg._fork_safe() is True  # torch not imported
+    assert par.fork_safe() is True  # torch not imported
     uninit = types.SimpleNamespace(cuda=types.SimpleNamespace(is_initialized=lambda: False))
     monkeypatch.setitem(sys.modules, "torch", uninit)
-    assert pg._fork_safe() is True  # torch present, CUDA cold
+    assert par.fork_safe() is True  # torch present, CUDA cold
     initialized = types.SimpleNamespace(cuda=types.SimpleNamespace(is_initialized=lambda: True))
     monkeypatch.setitem(sys.modules, "torch", initialized)
-    assert pg._fork_safe() is False  # a live CUDA context -> never fork
+    assert par.fork_safe() is False  # a live CUDA context -> never fork
 
 
 def test_spawn_context_parity(monkeypatch):
@@ -334,7 +314,7 @@ def test_collect_reraises_worker_exception():
     fut: Future = Future()
     fut.set_exception(ValueError("worker boom"))
     with pytest.raises(ValueError, match="worker boom"):
-        pg._collect([fut])
+        par.collect([fut])
 
 
 def test_collect_wraps_broken_pool():
@@ -345,7 +325,7 @@ def test_collect_wraps_broken_pool():
     fut: Future = Future()
     fut.set_exception(BrokenProcessPool("worker died"))
     with pytest.raises(RuntimeError, match="ANDREY_NUM_WORKERS=1"):
-        pg._collect([fut])
+        par.collect([fut])
 
 
 # --- the measured density-aware crossover gate ----------------------------------------------------
@@ -393,8 +373,8 @@ def test_forward_work_estimate_is_density_aware():
     for i in range(8):  # an undirected clique among the first 8 nodes
         for j in range(i + 1, 8):
             dense[i, j] = dense[j, i] = TAIL
-    w_sparse = pg.estimate_forward_work(n, pg.neighborhood_state(sparse), None)
-    w_dense = pg.estimate_forward_work(n, pg.neighborhood_state(dense), None)
+    w_sparse = sum(pg.forward_work_per_target(n, pg.neighborhood_state(sparse), None))
+    w_dense = sum(pg.forward_work_per_target(n, pg.neighborhood_state(dense), None))
     assert w_dense > 10 * w_sparse  # 2^7 per clique candidate dwarfs the sparse all-singleton scan
 
 
@@ -404,8 +384,8 @@ def test_work_estimate_never_overflows_at_high_degree():
     adj = np.ones((n, n), dtype=np.int8)  # every off-diagonal TAIL -> undirected near-clique
     np.fill_diagonal(adj, 0)
     state = pg.neighborhood_state(adj)
-    assert isinstance(pg.estimate_forward_work(n, state, None), int)
-    assert isinstance(pg.estimate_backward_work(n, state), int)
+    assert isinstance(sum(pg.forward_work_per_target(n, state, None)), int)
+    assert isinstance(sum(pg.backward_work_per_target(n, state)), int)
 
 
 # --- load-balanced degree-aware chunking + cross-pass cache ---------------------------------------
@@ -420,7 +400,7 @@ def test_balanced_chunks_exact_cover():
         n = int(rng.integers(1, 60))
         work = rng.integers(0, 1000, size=n).tolist()
         for k in (1, 2, 3, 7, n, n + 3):
-            chunks = pg.balanced_chunks(work, k)
+            chunks = par.balanced_chunks(work, k)
             assert sorted(chain.from_iterable(chunks)) == list(range(n))
             assert all(chunks)  # no empty chunk
 
@@ -433,7 +413,7 @@ def test_balanced_chunks_reduce_skew():
     def heaviest(chunks):
         return max(sum(work[y] for y in c) for c in chunks)
 
-    assert heaviest(pg.balanced_chunks(work, 4)) < heaviest(pg.even_chunks(n, 4))
+    assert heaviest(par.balanced_chunks(work, 4)) < heaviest(par.even_chunks(n, 4))
 
 
 def test_forward_scan_rescores_group_with_mixed_bounds():
@@ -504,8 +484,6 @@ def test_gies_gfci_transitive_parity(facade_name):
 
 import importlib.util  # noqa: E402
 import multiprocessing as mp  # noqa: E402
-
-from andrey.search import _parallel as par  # noqa: E402
 
 
 def test_forkserver_template_preloads_worker_modules():

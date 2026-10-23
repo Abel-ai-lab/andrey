@@ -16,7 +16,7 @@ change names its pull request.
   the identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
   scores change in their last bits, with the same output on those datasets. ([#251], [#265], [#267],
   [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#364], [#365],
-  [#368])
+  [#368], [#369])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -81,7 +81,9 @@ change names its pull request.
   tuple of candidate parents instead of copying the list on every trace, and the order sweeps keep
   the set of allowed parents between traces instead of building it for each one. ([#267], [#368])
 - `exact_search` returns the same graphs in less time, because its linear-Gaussian BIC solves the
-  normal equations of a size's parent sets in stacks of up to 4,096. ([#273])
+  normal equations of a size's parent sets in stacks of up to 4,096, and it finds each variable's
+  best parent set within a candidate set from a table built once per fit instead of scanning its
+  sorted parent sets. ([#273], [#369])
 - `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
   built once and in blocks, and its HSIC tests run on a CUDA GPU, in float64, from the cutoff
   `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
@@ -111,6 +113,16 @@ change names its pull request.
 - `help(andrey)` opens with a quick start and points to `andrey --skill` and
   `andrey --help --json`, and the package summary says the import name is `andrey`, so an agent
   that has only run `pip install andrey-core` finds the command line and its skill. ([#347])
+
+### Removed
+
+- Names that only tests used: `andrey.core.backend.parallel_map`,
+  `andrey.data.storage.save_collection` and `load_collection`,
+  `andrey.temporal.LongitudinalLiNGAM.get_error_independence_p_values` and `residuals_`,
+  `andrey.core.independence.hsic_gamma_test` and `measure_hsic_statistic`, and the bandwidth options
+  of `hsic_test` and `hsic_statistic_test`, which no caller passed. ([#371])
+- `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
+  installed safetensors for them. Nothing in Andrey called them. ([#375])
 
 ## [0.8.0] - 2026-10-23
 
@@ -666,3 +678,6 @@ First alpha release.
 [#365]: https://github.com/Abel-ai-lab/andrey/pull/365
 [#367]: https://github.com/Abel-ai-lab/andrey/pull/367
 [#368]: https://github.com/Abel-ai-lab/andrey/pull/368
+[#369]: https://github.com/Abel-ai-lab/andrey/pull/369
+[#371]: https://github.com/Abel-ai-lab/andrey/pull/371
+[#375]: https://github.com/Abel-ai-lab/andrey/pull/375

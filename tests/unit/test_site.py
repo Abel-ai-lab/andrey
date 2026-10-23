@@ -643,6 +643,23 @@ def test_a_page_ablog_generates_has_a_catalog_or_collection_and_no_document(
     assert conf["_blog_collection"](context, doctree) is generated
 
 
+def test_the_theme_stylesheet_keeps_only_the_icons_a_page_names(conf, tmp_path):
+    styles = tmp_path / "_static" / "styles"
+    styles.mkdir(parents=True)
+    (styles / "pydata-sphinx-theme.css").write_text(
+        '.fa-lg{font-size:1.25em}.fa-house,.fa-home{--fa:"\\f015"}.fa-user{--fa:"\\f007"}'
+        '.fa-sun{--fa:"\\f185"}'
+    )
+    (tmp_path / "page.html").write_text('<i class="fa-solid fa-home"></i>')
+    (tmp_path / "theme.js").write_text('icon.className = "fa-solid fa-sun"')
+    # Font Awesome's own script names every icon, so it does not count.
+    (tmp_path / "fontawesome.js").write_text("fa-user")
+    app = types.SimpleNamespace(outdir=str(tmp_path), builder=types.SimpleNamespace(name="html"))
+    conf["_trim_icon_rules"](app, None)
+    css = (styles / "pydata-sphinx-theme.css").read_text()
+    assert css == '.fa-lg{font-size:1.25em}.fa-house,.fa-home{--fa:"\\f015"}.fa-sun{--fa:"\\f185"}'
+
+
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
 def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
@@ -1280,6 +1297,7 @@ def test_the_hero_and_the_first_section_share_one_art(placeholder_page):
     assert 'class="cover-sweep"' in art
     first = run[run.index('id="accelerated"') : run.index('id="accurate"')]
     assert "<img" not in first[: first.index('class="seg"')]
+    assert "<picture" not in first[: first.index('class="seg"')]
     assert first.index('<div class="run-sheet">') < first.index('class="seg"')
     css = (ROOT / "site" / "assets" / "site.css").read_text(encoding="utf-8")
     rule = css[css.index(".andrey-home .run-art {") :]
@@ -1292,7 +1310,12 @@ def test_the_hero_and_the_first_section_share_one_art(placeholder_page):
     example = placeholder_page[placeholder_page.index('id="data-to-graph"') :]
     example = example[: example.index('id="example"')]
     assert f'src="_static/art-{build.EXAMPLE_ART}.jpg"' in example and 'loading="lazy"' in example
-    assert placeholder_page.count('fetchpriority="high"') == 1
+    # The hero's art is the one image fetched first: its <img>, and the preload of its AVIF.
+    assert placeholder_page.count('fetchpriority="high"') == 2
+    preload = (
+        f'<link rel="preload" as="image" type="image/avif" href="_static/art-{build.HERO_ART}.avif"'
+    )
+    assert preload in placeholder_page
 
 
 def test_the_accuracy_bars_draw_only_the_methods_with_fewer_errors():
@@ -1435,7 +1458,9 @@ def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeh
     # The hero's art, which the first section shares, each other section's, the example's, and the
     # documentation's are stored series art, each shown once.
     covers = re.findall(
-        r'<div class="cover-frame"><img src="_static/(art-[\w-]+\.jpg)"', placeholder_page
+        r'<div class="cover-frame"><picture><source type="image/avif" '
+        r'srcset="_static/art-[\w-]+\.avif"><img src="_static/(art-[\w-]+\.jpg)"',
+        placeholder_page,
     )
     arts = {f"art-{art}.jpg" for _, _, art, _ in build.ACTS}
     arts |= {f"art-{build.EXAMPLE_ART}.jpg", f"art-{build.DOCS_ART}.jpg"}
@@ -1443,11 +1468,18 @@ def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeh
     assert all((brand / c) in cards.ART.values() for c in covers)
     # The tiles' art, the hero cards' pictures, and the section covers, each at its stored size.
     tiles = re.findall(
-        r'<img (?:class="tile-art" )?src="_static/((?:bento/)?[\w-]+\.jpg)" alt="Cover: [^"]+" '
+        r'<img src="_static/((?:bento/)?[\w-]+\.jpg)" (?:class="tile-art" )?alt="Cover: [^"]+" '
         r'width="(\d+)" height="(\d+)"',
         placeholder_page,
     )
     assert len(tiles) >= 2 * len(build.ACTS)
+    # Each image offers its AVIF copy first, of the same picture.
+    offered = re.findall(
+        r'<source type="image/avif" srcset="_static/([\w/-]+)\.avif">'
+        r'<img src="_static/([\w/-]+)\.jpg"',
+        placeholder_page,
+    )
+    assert len(offered) >= len(tiles) and all(a == j for a, j in offered)
     for path, width, height in tiles:
         with Image.open(brand / path) as image:
             assert image.size == (int(width), int(height)), path

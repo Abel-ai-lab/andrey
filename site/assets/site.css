@@ -1697,7 +1697,12 @@
   aspect-ratio: 1600 / 640;
 }
 
-.andrey-home .cover-frame > img,
+/* A brand image's <picture> adds no box: its <img> sits where it would without it. */
+.andrey-home picture {
+  display: contents;
+}
+
+.andrey-home .cover-frame img,
 .andrey-home .cover-frame > svg {
   position: absolute;
   inset: 0;
