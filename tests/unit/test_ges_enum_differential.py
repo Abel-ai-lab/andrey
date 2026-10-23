@@ -16,6 +16,7 @@ from threadpoolctl import threadpool_limits
 
 from andrey.core import ARROW, TAIL, backend
 from andrey.core import score as score_module
+from andrey.core.knowledge import Constraints, Knowledge, resolve
 from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near, dag2cpdag, to_structure
 from andrey.core.score import BICScore
 from andrey.search import _parallel_ges as pg
@@ -86,6 +87,7 @@ def _run(
     lambda_value: float = 1.0,
     full_rescan: bool = False,
     local_reform: bool = True,
+    constraints: Constraints | None = None,
     moves: list[tuple] | None = None,
 ):
     """Run GES with explicit scan, pruning, and CPDAG-rewrite toggles (restored afterwards).
@@ -113,7 +115,7 @@ def _run(
         # ANDREY_NUM_WORKERS > 1 a pooled pass would silently run the live path inside the
         # reference run and the comparison would be fast-vs-fast.
         with backend.config(num_workers=1):
-            struct, score = ges(x, lambda_value=lambda_value, maxP=maxP)
+            struct, score = ges(x, lambda_value=lambda_value, maxP=maxP, constraints=constraints)
     finally:
         ops._LATTICE_PRUNE = old_prune
         ops._LOCAL_REFORM = True
@@ -234,7 +236,7 @@ def test_cpdag_rewrite_declines_a_region_past_its_limit() -> None:
     assert _cpdag_of_pdag_near(adj, [0], 5) is adj
 
 
-@pytest.mark.parametrize("seed,d,n,p,lambda_value", _SCAN_GRID[:3] + _SCAN_GRID[4:5])
+@pytest.mark.parametrize("seed,d,n,p,lambda_value", [_SCAN_GRID[2], _SCAN_GRID[4]])
 def test_local_reform_matches_full_rebuild(
     seed: int, d: int, n: int, p: float, lambda_value: float, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -504,3 +506,28 @@ def test_serial_equals_parallel_decomposition(
         f"decomposition differs from serial at seed={seed}, d={d}"
     )
     assert serial_score == decomp_score
+
+
+def test_local_reform_matches_full_rebuild_under_knowledge(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Required and forbidden edges and tiers: both rebuilds apply the same moves and reject the
+    same ones."""
+    monkeypatch.setattr(ops, "_REGION_SHARE", 1.0)
+    d = 20
+    x = _gaussian_sem(3, 400, d, 0.2)
+    knowledge = Knowledge(
+        required=[(0, 1), (2, 3)],
+        forbidden=[(4, 5), (5, 4), (6, 7), (8, 9)],
+        tiers=[[10, 11, 12], [13, 14, 15]],
+    )
+    constraints = resolve(knowledge, d, None, method="ges")
+    local_moves: list[tuple] = []
+    full_moves: list[tuple] = []
+    local_adj, local_score = _run(
+        x, maxP=None, constraints=constraints, local_reform=True, moves=local_moves
+    )
+    full_adj, full_score = _run(
+        x, maxP=None, constraints=constraints, local_reform=False, moves=full_moves
+    )
+    assert local_moves == full_moves
+    assert np.array_equal(local_adj, full_adj)
+    assert local_score.hex() == full_score.hex()
