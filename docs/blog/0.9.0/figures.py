@@ -1,12 +1,13 @@
 """The 0.9.0 post's speed figure, saved as HTML beside this script for inclusion in the post.
 
-``ranges.html``: each sped-up method against Andrey 0.8.0, grouped by family, as a bar on a
-logarithmic axis that starts at 1x, as fast as 0.8.0: the range over the measured sizes of 0.8.0's
-median fit time over 0.9.0's, with one worker. The release card has every size.
+``ranges.html``: each method that is faster than Andrey 0.8.0 at every measured size, by at least
+``FASTER``, grouped by family, as a bar on a logarithmic axis that starts at 1x, as fast as 0.8.0:
+the range over the measured sizes of 0.8.0's median fit time over 0.9.0's, with one worker. The
+release card has every size and every method.
 
-The numbers come from the 0.9.0 release card's summary (``SUMMARY``), its ``speed`` lane: one row
-per method, regime, size, and worker count. Every color is an ``--andrey-*`` token. The script
-runs with ``uv run python docs/blog/0.9.0/figures.py [summary.json]``.
+The numbers come from the 0.9.0 release card's summary (``SUMMARY``), the rows of its ``speed``
+lane: one per method, regime, size, and worker count. Every color is an ``--andrey-*`` token. The
+script runs with ``uv run python docs/blog/0.9.0/figures.py [summary.json]``.
 """
 
 from __future__ import annotations
@@ -34,11 +35,14 @@ FAMILIES = {
 NAMES = {
     "pc": "PC", "fci": "FCI", "gfci": "GFCI", "cdnod": "CD-NOD", "ges": "GES", "xges": "XGES",
     "exact_search": "Exact search", "boss": "BOSS", "grasp": "GRaSP",
-    "direct_lingam": "DirectLiNGAM", "ica_lingam": "ICA-LiNGAM", "anm": "ANM", "pnl": "PNL",
-    "lpcmci": "LPCMCI",
+    "direct_lingam": "DirectLiNGAM", "multi_group_direct_lingam": "MultiGroupDirectLiNGAM",
+    "pnl": "PNL", "lpcmci": "LPCMCI", "longitudinal_lingam": "LongitudinalLiNGAM",
 }  # fmt: skip
+# A method enters the chart when it is at least this much faster at every measured size: below it,
+# a size's difference is within the run-to-run spread.
+FASTER = 1.1
 # The chart: a row's height, the method labels' width, and the bars' width; the axis's ticks.
-ROW, LABEL, PLOT = 22, 110, 400
+ROW, LABEL, PLOT = 22, 170, 400
 TICKS = (1, 2, 5, 10, 20, 50, 100, 200, 500, 1000)
 
 
@@ -49,17 +53,25 @@ def floored(value: float) -> str:
 
 
 def ranges(summary: dict) -> list[tuple[str, list[tuple[str, float, float, bool]]]]:
-    """Per family, each method's slowest and fastest speedup with one worker, and same output."""
+    """Per family, each method's smallest and largest speedup with one worker, and same output, for
+    the methods faster at every size by at least ``FASTER``."""
     family = {s.name: s.family for s in list_specs()}
     speeds: dict[str, list[float]] = {}
     same: dict[str, bool] = {}
-    for row in summary["speed"]:
+    for row in summary["speed"]["rows"]:
         if row.get("workers", 1) != 1 or not row.get("speedup"):
             continue
         speeds.setdefault(row["method"], []).append(row["speedup"])
         same[row["method"]] = same.get(row["method"], True) and bool(row["same_output"])
     groups = [
-        (label, [(m, min(speeds[m]), max(speeds[m]), same[m]) for m in speeds if family[m] == key])
+        (
+            label,
+            [
+                (m, min(speeds[m]), max(speeds[m]), same[m])
+                for m in speeds
+                if family[m] == key and min(speeds[m]) >= FASTER
+            ],
+        )
         for key, label in FAMILIES.items()
     ]
     return [(label, methods) for label, methods in groups if methods]
@@ -80,14 +92,14 @@ def ranges_chart(summary: dict) -> str:
         parts.append(f'<text class="sr-family" x="0" y="{y + 12}">{escape(label)}</text>')
         y += ROW
         for m, lo, hi, _ in methods:
-            tip = f"{NAMES.get(m, m)}: {floored(lo)}x to {hi:.2g}x faster than 0.8.0"
+            tip = f"{NAMES.get(m, m)}: {floored(lo)}x to {floored(hi)}x faster than 0.8.0"
             parts.append(
                 f'<text class="sr-method" x="{LABEL - 8}" y="{y + 14}" text-anchor="end">'
                 f"{escape(NAMES.get(m, m))}</text>"
                 f'<rect class="sr-bar" x="{x(lo):.1f}" y="{y + 5}" '
                 f'width="{max(x(hi) - x(lo), 4):.1f}" height="{ROW - 10}" rx="6">'
                 f"<title>{escape(tip)}</title></rect>"
-                f'<text class="sr-value" x="{x(hi) + 6:.1f}" y="{y + 15}">{hi:.2g}x</text>'
+                f'<text class="sr-value" x="{x(hi) + 6:.1f}" y="{y + 15}">{floored(hi)}x</text>'
             )
             y += ROW
         y += 6
