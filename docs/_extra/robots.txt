@@ -1,7 +1,7 @@
 User-agent: *
 Allow: /
 
-# Search and answer engines, and the agents that read pages for their users, are welcome.
+# All crawlers may access every page, including the named search, AI, and agent crawlers.
 User-agent: GPTBot
 User-agent: OAI-SearchBot
 User-agent: ChatGPT-User

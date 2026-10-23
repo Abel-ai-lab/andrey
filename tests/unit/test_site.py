@@ -475,8 +475,7 @@ def test_the_lede_names_every_registry_family_in_one_sentence(placeholder_page):
 
 
 def test_the_page_title_names_what_people_search_for(placeholder_page):
-    # The name, then "fast", "causal discovery", "Python", and "agents", short enough that a
-    # search result shows it whole.
+    # The title includes the product name and search terms within the length limit.
     assert f"<title>{build.SEARCH_TITLE}</title>" in placeholder_page
     assert len(build.SEARCH_TITLE) <= 60
     for words in ("Andrey", "fast", "causal discovery", "Python", "agents"):

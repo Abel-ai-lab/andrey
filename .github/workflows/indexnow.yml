@@ -1,9 +1,9 @@
 name: Tell search engines about a release
 
-# IndexNow (Bing, Yandex, Seznam, Naver, and the engines that share its list) learns of every page
-# in the sitemap as soon as a release is live, instead of on its next crawl. Google does not take
-# IndexNow; it reads the sitemap that robots.txt names. The key is public by design: the engines
-# check it against docs/_extra/<key>.txt on the site.
+# The workflow submits every sitemap URL to IndexNow once a release is live.
+# Bing, Yandex, Seznam, Naver, and other participating engines receive the submission.
+# Google reads the sitemap named in robots.txt. The key is public by design: engines
+# verify it against docs/_extra/<key>.txt on the site.
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # A tag is live once llms.txt names its version; a manual run submits what is live now.
+          # A tagged release is live when llms.txt names its version; manual runs submit the live site.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version=${GITHUB_REF_NAME#v}
             for _ in $(seq 100); do

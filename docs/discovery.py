@@ -176,9 +176,9 @@ def llms_index(
         "",
         f"Version: {version}.",
         "",
-        "Install: `pip install andrey-core`. From a shell or an agent, `andrey list` prints the",
-        "methods as JSON, `andrey run <method> --data data.csv` prints the learned graph as JSON,",
-        "`andrey run <method> --help --json` gives a method's parameters as JSON Schema, and",
+        "Install with `pip install andrey-core`. When output is piped, `andrey list` prints the",
+        "methods as JSON, and `andrey run <method> --data data.csv` prints the graph as JSON.",
+        "`andrey run <method> --help --json` returns a method's JSON contract, and",
         "`andrey --skill` prints Andrey's agent skill.",
     ]
     listed = set()

@@ -147,8 +147,8 @@ MEAN_DEGREE = 2.0
 DEMO_URL: str | None = None  # the live demo; link it once its Space is public
 # The one-line description, as pyproject.toml and the README give it.
 DESCRIPTION = "Andrey: accelerated, accurate, agentic causal discovery."
-# The homepage's title in search results and link previews: the name with the words people search
-# for, "fast", "causal discovery", "Python", and "agents".
+# The homepage's search and link-preview title includes "fast", "causal discovery", "Python",
+# and "agents" alongside the product name.
 SEARCH_TITLE = "Andrey: fast causal discovery in Python, built for AI agents"
 
 # Graph colors resolve through the page's tokens, so the drawing follows the light or dark theme.

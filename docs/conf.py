@@ -558,7 +558,7 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     )
     if not unindexed:
         preview += f'<link rel="canonical" href="{html.escape(url, quote=True)}">\n'
-    # The page's Markdown source, which an agent reads more easily than the page.
+    # A link to the page's Markdown source for agents.
     if source := context.get("sourcename"):
         markdown = html.escape(f"{SITE_URL}_sources/{source}", quote=True)
         preview += f'<link rel="alternate" type="text/markdown" href="{markdown}">\n'

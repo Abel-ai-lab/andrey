@@ -493,7 +493,7 @@ def test_llms_txt_links_public_pages_by_section_with_their_preview_text(html):
 
 def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html):
     robots = (html / "robots.txt").read_text()
-    # Every crawler may read every page, the answer engines' and agents' by name too.
+    # All crawlers may access every page; named AI crawlers are explicitly allowed.
     assert robots.startswith("User-agent: *\nAllow: /\n")
     assert "Disallow" not in robots
     for agent in ("GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended"):
