@@ -73,6 +73,23 @@ For continuous data with no hidden variables, start with `pc` or `ges`; both ret
 `fci` when hidden variables may confound the data; it returns a PAG. Use `direct_lingam` when the
 relationships are linear and the noise is not Gaussian; it returns a DAG with edge weights.
 
+### Does it have neural methods?
+
+No, and none are planned. Every method in Andrey decides from statistical tests and scores, and
+that is the work we make fast:
+
+- You can trace each edge to the test, separating set or score change behind it.
+- A result depends only on the data, the settings and the seed. There is no training run, learning
+  rate or network size to tune.
+- These methods spend their time on tests, scores and graph bookkeeping, which is where Andrey's
+  speed comes from. Neural methods spend theirs on training, which deep-learning frameworks
+  already optimize.
+
+Simulated benchmarks can also flatter continuous-optimization methods. On data that is not
+standardized, the variance often grows along the causal order, and these methods can recover the
+order from that alone ([Reisach et al. 2021](https://arxiv.org/abs/2102.13647)). CALM is the one
+continuous-optimization method in Andrey; it fits a linear model, not a neural network.
+
 ### Are the classic methods accurate on very large graphs?
 
 Not always. In the release cards, which use sparse simulated graphs with ten samples per variable,
