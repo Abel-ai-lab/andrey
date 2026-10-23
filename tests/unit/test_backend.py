@@ -332,20 +332,20 @@ def test_dispatch_counts_record_choices(monkeypatch):
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "numpy"))
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     backend.resolve(10, 100, op="cov")
     backend.resolve(10, 100, op="cov")
     backend.resolve(10**9, {"cuda": 25_000, "mps": None}, amortized=True, op="entropy")
     stats = backend.dispatch_stats()
     assert stats[("cov", "numpy")] == 2  # below the cutoff, twice
     assert stats[("entropy", "cuda")] == 1  # above the cutoff, offloaded (fake cuda)
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     assert backend.dispatch_stats() == {}
 
 
 def test_dispatch_counts_record_pins(monkeypatch):
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "numpy"))
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     with andrey.config(backend="cuda"):
         backend.resolve(1, {"cuda": 25_000, "mps": None}, op="cov")
     assert backend.dispatch_stats() == {("cov", "cuda"): 1}
@@ -380,7 +380,7 @@ def test_auto_never_selects_mps(fake_mps, monkeypatch, op, env, cutoff):
         monkeypatch.delenv(env, raising=False)
         monkeypatch.setenv("ANDREY_GPU_CALIBRATE", "1")
         monkeypatch.setattr(stats, "_calibrate", lambda *a, **k: pytest.fail("auto calibrated mps"))
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     getattr(stats, op)(np.random.default_rng(0).standard_normal((8, 2)))
     assert backend.dispatch_stats() == {(op, "numpy"): 1}
 

@@ -24,6 +24,16 @@ from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
 from andrey.spec.models import Status
 
+# Input names are a closed set (the InputSpec names in the registry), each a `cmd_run` option.
+# Everything else is a hyperparameter, passed as `key=value` or via `--config`.
+_INPUT_FLAGS = ("data", "domain_index", "interventions", "data_groups", "data_list")
+
+# A ParamSpec may not shadow a CLI flag or a reserved-for-future flag.
+_RESERVED_PARAM_NAMES = frozenset(
+    {"method", "config", "output", "json", "full", "help", "version", "debug", *_INPUT_FLAGS}
+    | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
+)
+
 _SPEC_NAMES = sorted(REGISTRY)
 
 
@@ -130,8 +140,6 @@ def test_param_type_is_consistent_with_default():
 def test_param_and_input_names_avoid_cli_reserved():
     """A param may not shadow a CLI/reserved flag or a grammar literal; inputs and params are
     disjoint per method; and the CLI's input flags cover every input name in the registry."""
-    from andrey.cli import _INPUT_FLAGS, _RESERVED_PARAM_NAMES
-
     literals = {"null", "true", "false"}
     for spec in REGISTRY.values():
         param_names = {p.name for p in spec.params}
@@ -247,7 +255,7 @@ def test_public_core_methods_document_their_parameters(cls_name):
 def test_cmd_run_wires_every_input_flag():
     """Every `_INPUT_FLAGS` entry is an actual `cmd_run` option, so an input added to the registry
     and `_INPUT_FLAGS` but not to `cmd_run` fails here instead of being unreachable at runtime."""
-    from andrey.cli import _INPUT_FLAGS, cmd_run
+    from andrey.cli import cmd_run
 
     params = set(inspect.signature(cmd_run).parameters)
     missing = set(_INPUT_FLAGS) - params

@@ -22,11 +22,11 @@ def directed_marks(B: np.ndarray, *, allow_self_loops: bool = False) -> np.ndarr
     """Endpoint-mark matrix for the directed support of ``B`` (``B[i, j] != 0`` is edge ``j -> i``).
 
     Accepts a boolean or float support/coefficient matrix. Non-finite entries (``NaN`` / ``inf``)
-    are treated as *no* directed edge -- confounded / order-unknown pairs are added afterwards with
-    :func:`set_bidirected` / :func:`set_circle` (or in one step via :func:`marks_from_signed`). A
-    single direction becomes ``TAIL``/``ARROW``; when both ``B[i, j]`` and ``B[j, i]`` are nonzero
-    the pair is a double arrowhead ``ARROW``/``ARROW`` (a bidirected edge under ``kind="pag"``, a
-    2-cycle under ``kind="digraph"`` -- the caller's kind decides which).
+    are treated as *no* directed edge; :func:`marks_from_signed` adds the confounded or
+    order-unknown pairs in the same step. A single direction becomes ``TAIL``/``ARROW``; when both
+    ``B[i, j]`` and ``B[j, i]`` are nonzero the pair is a double arrowhead ``ARROW``/``ARROW`` (a
+    bidirected edge under ``kind="pag"``, a 2-cycle under ``kind="digraph"`` -- the caller's kind
+    decides which).
 
     ``allow_self_loops`` keeps the diagonal: off by default (static graphs are self-loop free); a
     lag>=1 graph sets it so an autoregressive edge ``X(t-k) -> X(t)`` survives as ``M[i][i]=ARROW``.
@@ -47,32 +47,6 @@ def directed_marks(B: np.ndarray, *, allow_self_loops: bool = False) -> np.ndarr
     # bidirected).
     M[sup.T] = TAIL
     M[sup] = ARROW
-    return M
-
-
-def set_bidirected(M: np.ndarray, i: int, j: int) -> np.ndarray:
-    """Mark the pair ``i <-> j`` bidirected (``ARROW``/``ARROW``); mutates and returns ``M``.
-
-    For latent-confounder edges (for example, RCD's ``NaN`` sentinel). Requires ``kind="pag"``
-    downstream.
-    """
-    if i == j:
-        raise ValueError("cannot set a self-loop mark")
-    M[i, j] = ARROW
-    M[j, i] = ARROW
-    return M
-
-
-def set_circle(M: np.ndarray, i: int, j: int) -> np.ndarray:
-    """Mark the pair ``i o-o j`` with circles (``CIRCLE``/``CIRCLE``); mutates and returns ``M``.
-
-    For order-unknown edges (for example, BottomUpParceLiNGAM's ``NaN`` sentinel). Requires
-    ``kind="pag"``.
-    """
-    if i == j:
-        raise ValueError("cannot set a self-loop mark")
-    M[i, j] = CIRCLE
-    M[j, i] = CIRCLE
     return M
 
 
