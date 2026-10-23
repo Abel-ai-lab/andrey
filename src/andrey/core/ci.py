@@ -32,8 +32,8 @@ mask, by the likelihood ratio of the degenerate Gaussian and the conditional Gau
 queries' sets together, with the scalar p-values exactly; :class:`DGTest` answers one query at a
 time.
 
-The registry at the end maps each ``indep_test`` name to a factory. The experimental nonlinear
-tests live in their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
+The registry at the end maps each ``indep_test`` name to a factory. The nonlinear tests live in
+their own modules (KCI and RCoT in :mod:`andrey.core.ci_kernel`, CMIknn in
 :mod:`andrey.core.ci_cmiknn`, GPDC in :mod:`andrey.core.ci_gpdc`) and are imported when first
 built.
 
@@ -69,7 +69,6 @@ from scipy.special import chdtrc, ndtr, stdtr
 from . import categorical, stats
 from .mixed import ConditionalGaussian, DegenerateGaussian
 from .score import copies_error, copies_message, copy_groups
-from .warning_policy import ExperimentalWarning, warn_once
 
 __all__ = [
     "CITest",
@@ -959,14 +958,9 @@ NONLINEAR_INDEP_TESTS: tuple[str, ...] = tuple(_NONLINEAR_CLASSES)
 
 
 def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
-    """Build the experimental nonlinear test ``name`` with ``options``, warning once per process."""
+    """Build the nonlinear test ``name`` over ``data`` with ``options``."""
     module, cls = _NONLINEAR_CLASSES[name]
     test = getattr(importlib.import_module(f"{__package__}.{module}"), cls)
-    warn_once(
-        f"indep_test={name!r} is experimental: it has no published benchmark, and its settings "
-        "may change without deprecation.",
-        ExperimentalWarning,
-    )
     return test(data, **options)
 
 
@@ -974,8 +968,7 @@ def _nonlinear(name: str, data: np.ndarray, **options: Any) -> CITest:
 # constraint facades resolve their ``indep_test`` argument through :func:`make_indep_test`, and
 # :func:`register_indep_test` lets a downstream test or plugin add another under the same Protocol.
 # The discrete tests read category codes and the mixed tests a mask of the categorical columns as
-# well; the facades check both before a fit. The nonlinear tests are experimental and warn when
-# built.
+# well; the facades check both before a fit.
 SHIPPED_INDEP_TESTS: tuple[str, ...] = (
     "fisherz",
     "student_t",

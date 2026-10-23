@@ -162,7 +162,8 @@ def boss(
     A move or parent change must improve the score by more than ``1e-6``, a fixed absolute tolerance
     shared with :func:`~andrey.grasp`. Scores within this tolerance of the best count as ties. The
     earliest order position wins; among candidate parents, the column with the lowest tie rank
-    wins.
+    wins. Under the linear-Gaussian BIC each comparison is decided as full local scores decide it:
+    a fast update whose rounding-error bound could change the comparison is scored in full.
 
     **Column order.** Each column gets a tie rank computed from its own data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: it starts from that order,
@@ -393,7 +394,9 @@ def grasp(
     a DAG, which is reduced to its CPDAG.
 
     Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
-    :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged.
+    :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged. Under
+    the linear-Gaussian BIC each comparison is decided as full local scores decide it, as for
+    :func:`~andrey.boss`.
 
     **Column order.** Each column gets a tie rank computed from its own data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the seed shuffles the

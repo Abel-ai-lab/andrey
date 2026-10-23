@@ -113,6 +113,10 @@ def varma_lingam(
     first steps serve only as lagged values. No lagged value wraps around from the end of the
     series, so no step is regressed on a later one.
 
+    **Column order.** The fit runs on the columns sorted by a rank computed from each column's own
+    data, as for :func:`~andrey.hc`, so reordering the columns relabels the result and changes
+    nothing else, unless two columns are identical.
+
     **Limitations.** Measured on simulated linear series with non-Gaussian noise, one autoregressive
     and one moving-average lag, from 3 to 20 variables with 100 to 1,000 time steps, with
     ``order=(1, 1)`` and ``prune=True``. Its median errors (missing and extra cross-links) stayed
@@ -217,6 +221,10 @@ def longitudinal_lingam(
     regression in its ordering takes the least-squares slope, so every residual it scores is
     uncorrelated with its regressor in the sample, and listing every unit twice leaves the causal
     orders unchanged.
+
+    **Column order.** The fit runs on the variables sorted by a rank computed from each column's own
+    data over all time points, as for :func:`~andrey.hc`, so reordering the columns relabels the
+    result and changes nothing else, unless two columns are identical.
 
     **Limitations.** Measured on simulated panels with non-Gaussian noise, a dense same-step DAG and
     a dense lag-1 matrix drawn anew at every time point, and a hidden common cause at the first,
