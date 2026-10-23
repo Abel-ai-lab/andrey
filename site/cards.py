@@ -13,6 +13,7 @@ import importlib.util
 import io
 import itertools
 import re
+import runpy
 from pathlib import Path
 
 import numpy as np
@@ -216,22 +217,9 @@ ART = {
     )
 }
 CENTERED = {kind: BRAND / f"art-{kind}-center.jpg" for kind in ("tide",)}
-COVERS = {
-    "pair": "portraits of Andrey Markov and Andrey Kolmogorov, side by side",
-    "lanes": "lanes rising into the sky, one amber streak far ahead",
-    "iceberg": "an iceberg whose two peaks join into one faint mass under the waterline",
-    "contour": "two summits drawn in contour lines, one dotted trail ending on each",
-    "hourglass": "an hourglass whose sand falls one way only",
-    "agentic": "an orrery whose rings carry a graph, one amber arm steering it",
-    "start": "a cloud of data points gathering into a small graph, one arrow amber",
-    "docs": "the pages of a vast atlas fanning open, one edge amber like a bookmark",
-    "methods": "a prism fanning one beam into many rays, one amber",
-    "tide": "the moon over a swelling sea, its light an amber path on the waves",
-    "abacus": "an abacus seen at an angle, one bead amber",
-    "punch-cards": "a shuffled fan of punch cards, one card amber",
-    "harmonograph": "a harmonograph tracing a figure of cosine curves, one curve amber",
-    "ground": "the stipple ground",
-}
+# Each art's description, and the alt text drawn from it (covers.py, which needs no Pillow).
+_covers = runpy.run_path(str(HERE / "covers.py"))
+COVERS, cover_alt = _covers["COVERS"], _covers["cover_alt"]
 BANNER_LEFT = 104  # the text column's left edge, at the cover's height
 BANNER_FADE = 0.55  # the navy fade behind the text ends at this share of the width
 BANNER_FADE_PEAK = 0.6  # its opacity at the left edge
@@ -444,13 +432,6 @@ def thumb_jpeg(kind: str) -> bytes:
     out = io.BytesIO()
     thumb.save(out, "JPEG", quality=THUMB_QUALITY, subsampling=0, optimize=True)
     return out.getvalue()
-
-
-def cover_alt(kind: str) -> str:
-    """The cover's alt text: its art, in a sentence."""
-    if kind not in COVERS:
-        raise ValueError(f"unknown cover {kind!r}; expected one of {sorted(COVERS)}")
-    return f"Cover: {COVERS[kind]}, drawn in navy lines"
 
 
 # ---- the brand kit -----------------------------------------------------------------------------

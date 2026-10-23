@@ -68,8 +68,8 @@ palette_block = runpy.run_path(str(DOCS / "palette_css.py"))["palette_block"]
 # The number formats the live demo shares.
 _formatting = runpy.run_path(str(SITE / "formatting.py"))
 _why_fast = runpy.run_path(str(SITE / "why_fast.py"))
-# Each art's description, its images' alt text (site/cards.py).
-cover_alt = runpy.run_path(str(SITE / "cards.py"))["cover_alt"]
+# Each art's description, its images' alt text (site/covers.py).
+cover_alt = runpy.run_path(str(SITE / "covers.py"))["cover_alt"]
 ratio_text, seconds_text, number_text = (
     _formatting[name] for name in ("ratio_text", "seconds_text", "number_text")
 )
