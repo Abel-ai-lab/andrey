@@ -38,6 +38,15 @@ def parents(adj: np.ndarray, node: int) -> np.ndarray:
     return np.nonzero(adj[node] == ARROW)[0]
 
 
+def parent_counts(adj: np.ndarray) -> np.ndarray:
+    """Each node's parents plus undirected neighbors in the CPDAG ``adj``.
+
+    These are the nodes that are a parent of the node in some DAG of the class, so no DAG of the
+    class gives a node more parents than its count.
+    """
+    return (adj == ARROW).sum(axis=1) + ((adj == TAIL) & (adj.T == TAIL)).sum(axis=1)
+
+
 def subsets(elements: Sequence[int]) -> Iterable[tuple[int, ...]]:
     """Every subset of ``elements`` as a tuple, empty set first."""
     return chain.from_iterable(combinations(elements, r) for r in range(len(elements) + 1))

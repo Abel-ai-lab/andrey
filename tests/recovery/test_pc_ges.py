@@ -6,6 +6,9 @@ import pytest
 import andrey
 from andrey import data
 from andrey.constraint.pc import pc as pc_engine
+from andrey.core import ARROW
+from andrey.search.ges import ges as search_ges
+from andrey.search.operators import parent_counts
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -136,27 +139,52 @@ def in_degree(out: andrey.StructureOutput, node: int) -> int:
 
 
 def test_ges_max_parents_stops_a_variable_short_of_all_its_causes():
-    # Three causes of the last variable: the default limit of 4 / 2 = 2 admits the third.
-    # Past one parent the variable gets no new edges, and the graph scores worse.
+    # Three causes of the last variable: the default limit of 4 / 2 = 2 admits the third. A cap of
+    # 2 holds it at two parents, and the graph scores worse.
     x = fan_in(3)
-    full, limited = andrey.ges(x), andrey.ges(x, max_parents=1)
+    full, capped = andrey.ges(x), andrey.ges(x, max_parents=2)
     assert in_degree(full, 3) == 3
-    assert in_degree(limited, 3) < 3
-    assert limited.metadata["score"] > full.metadata["score"]
+    assert in_degree(capped, 3) == 2
+    assert capped.metadata["score"] > full.metadata["score"]
 
 
-def test_ges_max_parents_replaces_the_default_limit_of_half_the_variables():
-    # Five causes of the last of six variables: the default limit of 3 lets it reach four parents,
-    # exactly as max_parents=3 does, and a larger value lifts the limit.
+def test_ges_max_parents_caps_the_graph_where_the_default_limit_does_not():
+    # Five causes of the last of six variables: the default limit of 3 lets it reach four parents.
+    # A cap of 3 holds it at three; a cap of 4 returns the default graph, and a cap of 5 lifts the
+    # limit.
     x = fan_in(5)
-    default = andrey.ges(x)
-    same = andrey.ges(x, max_parents=3)
-    lifted = andrey.ges(x, max_parents=4)
+    default, capped = andrey.ges(x), andrey.ges(x, max_parents=3)
+    same, lifted = andrey.ges(x, max_parents=4), andrey.ges(x, max_parents=5)
     assert in_degree(default, 5) == 4
+    assert in_degree(capped, 5) == 3
+    assert capped.metadata["score"] > default.metadata["score"]
     assert same.structure.oriented_edges() == default.structure.oriented_edges()
     assert same.metadata["score"] == default.metadata["score"]
     assert in_degree(lifted, 5) == 5
     assert lifted.metadata["score"] < default.metadata["score"]
+
+
+def test_ges_max_parents_of_one_refuses_the_collider_the_gate_admitted():
+    # Two causes of one variable, three variables, a limit of 1: the gate admits the collider in
+    # one move, because the variable's directed parents are 0 until it is made. The cap refuses it,
+    # and no node of the result has a parent plus a neighbor to spare.
+    x = fan_in(2)
+    capped = andrey.ges(x, max_parents=1).structure.to_numpy()
+    gated = search_ges(x, max_parents=1, _parent_rule="gate")[0].to_numpy()
+    assert parent_counts(capped).max() == 1
+    assert (gated[2] == ARROW).sum() == 2
+    assert parent_counts(gated).max() == 2
+
+
+def test_ges_max_parents_zero_returns_the_empty_graph():
+    assert andrey.ges(fan_in(3), max_parents=0).structure.oriented_edges() == []
+
+
+def test_ges_rejects_required_edges_the_cap_cannot_hold():
+    knowledge = andrey.Knowledge(required=[(0, 2), (1, 2)])
+    with pytest.raises(ValueError, match="max_parents"):
+        andrey.ges(fan_in(2), max_parents=1, knowledge=knowledge)
+    assert in_degree(andrey.ges(fan_in(2), max_parents=2, knowledge=knowledge), 2) == 2
 
 
 @pytest.mark.parametrize(

@@ -18,7 +18,7 @@ two knobs numerically matches the two penalties. XGES's own default is ``alpha=2
 Andrey's; :data:`DEFAULT_ALPHA` here is the matched value, not the package's.
 
 **No parent cap.** XGES has no ``maxP`` and no equivalent - its search is bounded by the score
-alone, while Andrey's GES adapter passes ``maxP=4``. ``params`` records ``max_parents: None`` so
+alone, while Andrey's GES adapter passes ``max_parents=4``. ``params`` records ``max_parents: None`` so
 the asymmetry is in every row rather than in a footnote. It is a difference between the algorithms
 as offered, not a setting left unmatched.
 

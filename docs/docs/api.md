@@ -64,8 +64,9 @@ and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each 
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
-`ges` takes `max_parents`, a gate on its forward phase: a node whose parent count already exceeds it
-gains no new parents.
+`ges` takes `max_parents`, a cap on every node's parents: no node of the returned CPDAG has more
+than that many parents plus undirected neighbors, so no graph the CPDAG represents gives a node
+more.
 
 ```{eval-rst}
 .. currentmodule:: andrey
