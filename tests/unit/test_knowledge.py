@@ -764,3 +764,24 @@ def test_pcmciplus_orients_a_collider_over_a_pair_kept_apart_only_from_a_test(co
         }
     else:
         assert [0, 0, 1, 2] in out.metadata["ambiguous_triples"] and kinds == {"undirected"}
+
+
+def test_cli_reads_lagged_links(tmp_path, capsys, series):
+    path = tmp_path / "series.csv"
+    series.to_csv(path, index=False)
+    knowledge = 'knowledge={"required": [["z", "x", 2]], "forbidden": [["x", "y", 1]]}'
+    code = main(["run", "pcmci", "--data", str(path), "tau_max=2", knowledge, "--json"])
+    out, _ = capsys.readouterr()
+    assert code == 0
+    env = json.loads(out)
+    names = env["structure"]["labels"]
+    links = {
+        (names[e["source"]], names[e["target"]], lag["lag"])
+        for lag in env["structure"]["lags"]
+        for e in lag["edges"]
+    }
+    assert ("z", "x", 2) in links and ("x", "y", 1) not in links
+    assert env["run"]["params"]["knowledge"]["required"] == [["z", "x", 2]]
+    code = main(["run", "pc", "--data", str(path), knowledge, "--json"])
+    _, err = capsys.readouterr()
+    assert code == 2 and "time lags" in err
