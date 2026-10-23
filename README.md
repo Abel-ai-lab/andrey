@@ -16,6 +16,19 @@ banner links the website's homepage. -->
     src="https://img.shields.io/badge/license-Apache%202.0-3b5bdb"></a>
 </p>
 
+---
+
+## ⭐ What's new in 0.8.0
+
+PC, FCI, GFCI, and CD-NOD now detect nonlinear dependence, which partial correlation misses, with
+four new independence tests: KCI, RCoT, CMIknn, and GPDC. Each runs faster than the package we
+measured it against, at the same level of accuracy.
+
+**[Read the post](https://andrey.abel.ai/blog/20261023-andrey-0-8-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.8.0.html)**
+
+---
+
 Andrey is a causal discovery package for Python.
 
 <!-- PITCH:START -->
@@ -24,6 +37,7 @@ Andrey is a causal discovery package for Python.
 - **Fast**: The fastest causal discovery package.
 - **Accurate**: more than 80% fewer errors than other popular packages.
 - **One API**: 27 methods, each one function call.
+- **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden confounders.
 - **Agent-ready**: a command line that answers in JSON, and a skill for coding agents.
 
 <!-- PITCH:END -->
@@ -155,9 +169,6 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 - [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each.
 - [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
   browser.
-- [What's new in 0.8.0](https://andrey.abel.ai/blog/20261023-andrey-0-8-0.html): KCI, RCoT,
-  CMIknn, and GPDC, four tests for nonlinear dependence, with its
-  [release card](https://andrey.abel.ai/docs/benchmarks/0.8.0.html).
 - [Release cards](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
 - [Launch post](https://andrey.abel.ai/blog/20261008-introducing-andrey.html),
   [FAQ](https://andrey.abel.ai/docs/faq.html), and
