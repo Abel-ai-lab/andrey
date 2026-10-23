@@ -1443,7 +1443,7 @@ def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeh
     assert all((brand / c) in cards.ART.values() for c in covers)
     # The tiles' art, the hero cards' pictures, and the section covers, each at its stored size.
     tiles = re.findall(
-        r'<img (?:class="tile-art" )?src="_static/((?:bento/)?[\w-]+\.jpg)" alt="" '
+        r'<img (?:class="tile-art" )?src="_static/((?:bento/)?[\w-]+\.jpg)" alt="Cover: [^"]+" '
         r'width="(\d+)" height="(\d+)"',
         placeholder_page,
     )

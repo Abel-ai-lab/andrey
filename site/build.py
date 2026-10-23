@@ -68,6 +68,8 @@ palette_block = runpy.run_path(str(DOCS / "palette_css.py"))["palette_block"]
 # The number formats the live demo shares.
 _formatting = runpy.run_path(str(SITE / "formatting.py"))
 _why_fast = runpy.run_path(str(SITE / "why_fast.py"))
+# Each art's description, its images' alt text (site/cards.py).
+cover_alt = runpy.run_path(str(SITE / "cards.py"))["cover_alt"]
 ratio_text, seconds_text, number_text = (
     _formatting[name] for name in ("ratio_text", "seconds_text", "number_text")
 )
@@ -1613,8 +1615,9 @@ def cover_frame(art: str, *, priority: bool = False) -> str:
     sweep lies on the art at every crop. Only the first screen's art loads before the rest."""
     load = PRIORITY if priority else ' loading="lazy"'
     return (
-        f'<div class="cover-frame"><img src="_static/art-{art}.jpg" alt="" width="1600" '
-        f'height="640"{load}>{sweep(art) if art in SWEPT else ""}</div>'
+        f'<div class="cover-frame"><img src="_static/art-{art}.jpg" '
+        f'alt="{escape(cover_alt(art), quote=True)}" width="1600" height="640"{load}>'
+        f"{sweep(art) if art in SWEPT else ''}</div>"
     )
 
 
@@ -1625,11 +1628,12 @@ def hero_art() -> str:
 
 
 def tile_art(name: str, size: str) -> str:
-    """A tile's art, behind its text; decorative, so it has no text alternative."""
+    """A tile's art, behind its text: a crop of the art of the same name."""
     width, height = TILE_SIZES[size]
     return (
-        f'<img class="tile-art" src="_static/bento/{name}.jpg" alt="" width="{width}" '
-        f'height="{height}" loading="lazy">'
+        f'<img class="tile-art" src="_static/bento/{name}.jpg" '
+        f'alt="{escape(cover_alt(name), quote=True)}" width="{width}" height="{height}" '
+        'loading="lazy">'
     )
 
 
@@ -1788,10 +1792,10 @@ def act_claims(summaries: list[dict]) -> dict[str, tuple[str, str]]:
 def act_cards(claims: dict[str, tuple[str, str]]) -> str:
     """The hero's four cards, one per section: its art, its title, and its claim's short form."""
     return "".join(
-        f'<li class="act-card"><a href="#{key}"><img src="_static/{picture}" alt="" '
-        f'width="{width}" height="{height}">'
+        f'<li class="act-card"><a href="#{key}"><img src="_static/{picture}" '
+        f'alt="{escape(cover_alt(art), quote=True)}" width="{width}" height="{height}">'
         f"<b>{title}</b><span>{escape(claims[key][0])}</span></a></li>"
-        for key, title, _, (picture, (width, height)) in ACTS
+        for key, title, art, (picture, (width, height)) in ACTS
     )
 
 

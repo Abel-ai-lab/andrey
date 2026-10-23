@@ -1131,7 +1131,8 @@ def _newest_post_card(app) -> str:  # noqa: ANN001
     description = html.escape((app.env.metadata[docname].get("description") or "").strip())
     return (
         f'<a class="band-post" href="{app.builder.get_relative_uri("index", docname)}">'
-        f'<img src="{image}" alt="" width="{cards.COVER_W}" height="{cards.COVER_H}" '
+        f'<img src="{image}" alt="{html.escape(cards.cover_alt(_cover_kind(app, docname)))}" '
+        f'width="{cards.COVER_W}" height="{cards.COVER_H}" '
         'loading="lazy"><span class="band-post-body"><span class="band-post-kicker">Latest post · '
         f'<time datetime="{post.date:%Y-%m-%d}">{post.date.strftime(app.config.post_date_format)}'
         f'</time></span><span class="band-post-title">{html.escape(post.title)}</span>'
@@ -1210,7 +1211,8 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             image, _ = _cover_file(app, name)
             cover = (
                 f'{link}<img class="dark-light" '
-                f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
+                f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" '
+                f'alt="{html.escape(cards.cover_alt(_cover_kind(app, name)))}" '
                 f'width="{cards.COVER_W}" height="{cards.COVER_H}"></a>'
             )
             latest = (
@@ -1224,7 +1226,8 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
         width, height = cards.THUMB_W, cards.THUMB_W * cards.COVER_H // cards.COVER_W
         cover = (
             f'{link}<img class="dark-light" '
-            f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
+            f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" '
+            f'alt="{html.escape(cards.cover_alt(_cover_kind(app, name)))}" '
             f'width="{width}" height="{height}" loading="lazy" decoding="async"></a>'
         )
         rows.append(
