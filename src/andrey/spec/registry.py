@@ -312,6 +312,67 @@ _add(
     )
 )
 
+# --- local structure: one variable's Markov blanket or parents and children ----------------------
+
+_TARGET = ParamSpec(
+    name="target",
+    type="str",
+    default=None,
+    doc="The variable whose set to learn: a column name from the data file's header or a 0-based "
+    "position. null learns every variable's set and keeps a pair when each is in the other's set.",
+    nullable=True,
+)
+_LOCAL_OUTPUT_DOC = (
+    "undirected edges only, from target to each member, or between each pair in each other's "
+    "set when target is null; metadata['target'] names the target and metadata['{key}'] lists the "
+    "members in the order they joined"
+)
+for _name, _summary, _key, _refs in (
+    (
+        "iamb",
+        "One variable's Markov blanket (its parents, children, and children's other parents) by "
+        "incremental association: grow by conditional-independence tests, then shrink. With "
+        "target=null, the moral graph of every variable's blanket.",
+        "markov_blanket",
+        ("Tsamardinos, Aliferis & Statnikov 2003",),
+    ),
+    (
+        "inter_iamb",
+        "One variable's Markov blanket by interleaved IAMB, which shrinks after every addition. "
+        "With target=null, the moral graph of every variable's blanket.",
+        "markov_blanket",
+        ("Tsamardinos, Aliferis & Statnikov 2003",),
+    ),
+    (
+        "mmpc",
+        "One variable's parents and children, undirected, by max-min parents and children: "
+        "conditional-independence tests over subsets of the members so far, with a symmetry "
+        "check. With target=null, the skeleton that mmhc searches.",
+        "parents_and_children",
+        ("Tsamardinos, Brown & Aliferis 2006",),
+    ),
+):
+    _add(
+        MethodSpec(
+            name=_name,
+            family="constraint",
+            summary=_summary,
+            data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+            output=OutputSpec(
+                structure_type="graph",
+                graph_kind="cpdag",
+                doc=_LOCAL_OUTPUT_DOC.format(key=_key),
+            ),
+            determinism="deterministic",
+            accel="numpy",
+            status="experimental",
+            column_order="relabels",
+            tie_break=True,
+            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
+            references=_refs,
+        )
+    )
+
 # --- score-based ----------------------------------------------------------------------------------
 
 _add(

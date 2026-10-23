@@ -106,6 +106,9 @@ FITS: dict[str, Fit] = {
     "XGES": Fit(andrey.xges),
     "HC": Fit(andrey.hc),
     "Tabu": Fit(andrey.tabu),
+    "IAMB": Fit(functools.partial(andrey.iamb, alpha=ALPHA), alpha=ALPHA),
+    "InterIAMB": Fit(functools.partial(andrey.inter_iamb, alpha=ALPHA), alpha=ALPHA),
+    "MMPC": Fit(functools.partial(andrey.mmpc, alpha=ALPHA), alpha=ALPHA),
     "MMHC": Fit(functools.partial(andrey.mmhc, alpha=ALPHA), alpha=ALPHA),
     "RSMAX2": Fit(
         functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
@@ -147,7 +150,9 @@ FITS: dict[str, Fit] = {
 WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "Granger", "PNL")
 
 #: The gate datasets of the experimental methods, which the quality gate does not fit.
-EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = dict.fromkeys(("MMHC", "RSMAX2"), qg.CPDAG_DATA)
+EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = dict.fromkeys(
+    ("IAMB", "InterIAMB", "MMPC", "MMHC", "RSMAX2"), qg.CPDAG_DATA
+)
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -180,7 +185,20 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
 }
 LARGER: dict[str, str] = {
     **dict.fromkeys(
-        ("PC", "GES", "XGES", "HC", "Tabu", "MMHC", "RSMAX2", "BOSS", "GRaSP"),
+        (
+            "PC",
+            "GES",
+            "XGES",
+            "HC",
+            "Tabu",
+            "IAMB",
+            "InterIAMB",
+            "MMPC",
+            "MMHC",
+            "RSMAX2",
+            "BOSS",
+            "GRaSP",
+        ),
         "linear_gauss_er_d100",
     ),
     **dict.fromkeys(("FCI", "GFCI"), "latent_gauss_er_d100"),

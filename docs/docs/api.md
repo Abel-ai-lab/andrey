@@ -52,9 +52,10 @@ to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 rep
 data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
 
-`pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
-`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and
-`"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
+`indep_test` choices: `"fisherz"`, the default, and `"student_t"` for continuous data, `"chisq"`
+and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the
+nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)).
 
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
@@ -148,11 +149,16 @@ its first call in a process.
    :toctree: api
    :nosignatures:
 
+   iamb
+   inter_iamb
+   mmpc
    mmhc
    rsmax2
 ```
 
-MMHC learns a skeleton with MMPC's conditional-independence tests, then runs hill climbing that
+IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given
+as `target`; without one, they return every variable's set as undirected edges, joining a pair
+when each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then runs hill climbing that
 joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase keeps the pairs of MMPC's
 skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and its maximize phase runs
 hill climbing or tabu search among them.

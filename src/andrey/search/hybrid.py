@@ -13,10 +13,21 @@ from contextlib import nullcontext
 
 import numpy as np
 
-from andrey.constraint.blanket import blanket_graph, mmpc_skeleton
+from andrey.constraint.blanket import (
+    blanket_graph,
+    markov_blanket,
+    mmpc_skeleton,
+    parents_children,
+)
 from andrey.constraint.pc import _discover_skeleton
 from andrey.core import NULL, GraphStructure, backend
-from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, make_indep_test, pins_blas
+from andrey.core.ci import (
+    DISCRETE_INDEP_TESTS,
+    MIXED_INDEP_TESTS,
+    CITest,
+    make_indep_test,
+    pins_blas,
+)
 from andrey.core.knowledge import Constraints
 from andrey.core.mixed import column_mask
 from andrey.search.hc import hc, tie_ranks
@@ -45,7 +56,6 @@ def candidate_graph(
     (:func:`~andrey.constraint.pc._discover_skeleton`). Each runs the ``indep_test`` test at level
     ``alpha``; ``categorical`` marks the categorical columns for a mixed-data test.
     """
-    d = X.shape[1]
     if restrict == "pc":
         adj, _, _ = _discover_skeleton(
             X,
@@ -57,6 +67,15 @@ def candidate_graph(
             warn_expensive=True,
         )
         return adj != NULL
+    return local_graph(X, restrict, alpha=alpha, indep_test=indep_test, categorical=categorical)
+
+
+def _ranked_test(
+    X: np.ndarray, indep_test: str, categorical: np.ndarray | None
+) -> tuple[CITest, list[int]]:
+    """The ``indep_test`` test over ``X`` and each column's :func:`~andrey.search.hc.tie_ranks`,
+    its categorical columns read as categories."""
+    d = X.shape[1]
     test = make_indep_test(indep_test, X, categorical=categorical)
     if indep_test in DISCRETE_INDEP_TESTS:
         mask = np.ones(d, dtype=bool)
@@ -64,11 +83,49 @@ def candidate_graph(
         mask = column_mask(categorical, d)
     else:
         mask = None
-    ranks = tie_ranks(X, mask).tolist()
+    return test, tie_ranks(X, mask).tolist()
+
+
+def local_graph(
+    X: np.ndarray,
+    method: str,
+    *,
+    alpha: float,
+    indep_test: str,
+    categorical: np.ndarray | None = None,
+) -> np.ndarray:
+    """Every variable's MMPC (``"mmpc"``), IAMB (``"iamb"``), or Inter-IAMB (``"inter_iamb"``) set
+    under the AND rule: MMPC's skeleton or the moral graph, a symmetric boolean matrix."""
+    test, ranks = _ranked_test(X, indep_test, categorical)
+    d = X.shape[1]
     with backend.one_blas_thread() if pins_blas(test) else nullcontext():
-        if restrict == "mmpc":
+        if method == "mmpc":
             return mmpc_skeleton(test, d, alpha, ranks)
-        return blanket_graph(test, d, alpha, ranks, interleaved=restrict == "inter_iamb")
+        return blanket_graph(test, d, alpha, ranks, interleaved=method == "inter_iamb")
+
+
+def local_set(
+    X: np.ndarray,
+    method: str,
+    target: int,
+    *,
+    alpha: float,
+    indep_test: str,
+    categorical: np.ndarray | None = None,
+) -> list[int]:
+    """``target``'s set in the order its members joined, by MMPC (``"mmpc"``), IAMB (``"iamb"``),
+    or Inter-IAMB (``"inter_iamb"``).
+
+    MMPC keeps the members of ``target``'s parents and children whose own set holds ``target``
+    (the symmetry check); IAMB and Inter-IAMB return the Markov blanket.
+    """
+    test, ranks = _ranked_test(X, indep_test, categorical)
+    d = X.shape[1]
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        if method == "mmpc":
+            found = parents_children(test, target, d, alpha, ranks)
+            return [x for x in found if target in parents_children(test, x, d, alpha, ranks)]
+        return markov_blanket(test, target, d, alpha, ranks, interleaved=method == "inter_iamb")
 
 
 def restricted(constraints: Constraints | None, candidates: np.ndarray) -> Constraints:
