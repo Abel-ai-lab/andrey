@@ -38,6 +38,72 @@ def parents(adj: np.ndarray, node: int) -> np.ndarray:
     return np.nonzero(adj[node] == ARROW)[0]
 
 
+def _largest_clique(masks: list[int], stop: int) -> int:
+    """The size of the largest clique of a graph given as neighbor bitmasks, or ``stop`` if larger.
+
+    ``masks[i]`` holds the neighbors of node ``i``. The search adds the lowest remaining candidate
+    to the clique in turn and drops a branch that cannot beat the best clique found, so the answer
+    does not depend on the order; it stops once a clique of ``stop`` nodes is found.
+    """
+    best = 0
+
+    def grow(size: int, candidates: int) -> None:
+        nonlocal best
+        best = max(best, size)
+        while candidates and best < stop and size + candidates.bit_count() > best:
+            low = candidates & -candidates
+            candidates ^= low
+            grow(size + 1, candidates & masks[low.bit_length() - 1])
+
+    grow(0, (1 << len(masks)) - 1)
+    return best
+
+
+def _undirected_clique(lines: np.ndarray, node: int, stop: int) -> int:
+    """The largest clique among the undirected neighbors of ``node`` (``lines`` marks the
+    undirected edges), or ``stop`` if larger; 0 for a node with none."""
+    neighbors = np.flatnonzero(lines[node])
+    if neighbors.size == 0:
+        return 0
+    among = lines[np.ix_(neighbors, neighbors)]
+    masks = [sum(1 << j for j in np.flatnonzero(row).tolist()) for row in among]
+    return _largest_clique(masks, stop)
+
+
+def max_parents_in_class(adj: np.ndarray) -> np.ndarray:
+    """The most parents each node has in any DAG of the class of the CPDAG ``adj``.
+
+    A DAG of the class gives a node its parents in ``adj`` and a subset of its undirected neighbors;
+    two of those neighbors that are not adjacent would add a v-structure, so the subset is a clique,
+    and some DAG of the class directs the largest clique into the node. A node's most parents are
+    so its directed parents plus the size of the largest clique among its undirected neighbors.
+    """
+    out = (adj == ARROW).sum(axis=1)
+    lines = (adj == TAIL) & (adj.T == TAIL)
+    for node in np.flatnonzero(lines.any(axis=1)).tolist():
+        out[node] += _undirected_clique(lines, node, adj.shape[0])
+    return out
+
+
+def exceeds_parent_cap(adj: np.ndarray, cap: float) -> bool:
+    """Whether some DAG of the class of the CPDAG ``adj`` gives a node more than ``cap`` parents.
+
+    The same test as ``max_parents_in_class(adj).max() > cap``, in less work: a node's most parents
+    lie between its directed parents plus one, when it has an undirected neighbor, and its directed
+    parents plus all its undirected neighbors, so only a node between the two needs a clique.
+    """
+    parents = (adj == ARROW).sum(axis=1)
+    lines = (adj == TAIL) & (adj.T == TAIL)
+    neighbors = lines.sum(axis=1)
+    if (parents + (neighbors > 0) > cap).any():
+        return True
+    for node in np.flatnonzero(parents + neighbors > cap).tolist():
+        room = cap - int(parents[node])
+        if _undirected_clique(lines, node, int(room) + 1) > room:
+            return True
+    return False
+
+
 def subsets(elements: Sequence[int]) -> Iterable[tuple[int, ...]]:
     """Every subset of ``elements`` as a tuple, empty set first."""
     return chain.from_iterable(combinations(elements, r) for r in range(len(elements) + 1))
@@ -54,16 +120,12 @@ def is_clique(adj: np.ndarray, nodes: Iterable[int]) -> bool:
     return True
 
 
-# Whether the subset-validity scans (clique_extensions/clique_residuals) collapse the 2^deg lattice
-# via precomputed adjacency bitmasks. When False they reproduce the naive per-subset ``is_clique``
-# scan verbatim; the differential test flips it to prove bit-identity.
-_LATTICE_PRUNE = True
-
-# Neighborhood size below which the bitmask precompute is skipped for the plain per-subset scan.
-# The lattice pruning only repays its fixed setup cost (submatrix extraction, conflict masks) once
-# the subset count 2^m is large; for a handful of subsets -- the overwhelmingly common sparse case,
-# where nearly every (x, y) has an empty or tiny t0 -- the naive scan is cheaper, so gating on m
-# keeps the fast path from ever regressing below the naive-scan cost.
+# Neighborhood size below which the subset-validity scans (clique_extensions/clique_residuals) take
+# the plain per-subset ``is_clique`` scan instead of the adjacency bitmasks that collapse the 2^m
+# lattice. The bitmasks only repay their fixed setup cost (submatrix extraction, conflict masks)
+# once the subset count 2^m is large; for a handful of subsets -- the overwhelmingly common sparse
+# case, where nearly every (x, y) has an empty or tiny t0 -- the plain scan is cheaper, so gating
+# on m keeps the fast path from ever regressing below the plain-scan cost.
 _LATTICE_MIN_M = 4
 
 # |t0| ceiling below which the position-subset plan is materialized and cached (2^15 = 32768 tuples
@@ -118,9 +180,9 @@ def clique_extensions(
     t0 = list(t0)
     m = len(t0)
 
-    if not _LATTICE_PRUNE or m < _LATTICE_MIN_M:
-        # Small (the common sparse case) or pruning disabled: the plain per-subset is_clique scan,
-        # cheaper here than the bitmask precompute -- and byte-for-byte the naive scan.
+    if m < _LATTICE_MIN_M:
+        # Small (the common sparse case): the plain per-subset is_clique scan, cheaper here than
+        # the bitmask precompute.
         na_set = set(na_list)
         for t_index, T in enumerate(subsets(t0)):
             if is_clique(adj, na_set | set(T)):
@@ -165,9 +227,9 @@ def clique_residuals(adj: np.ndarray, h0: Sequence[int]) -> Iterable[tuple[int, 
     h0 = list(h0)
     m = len(h0)
 
-    if not _LATTICE_PRUNE or m < _LATTICE_MIN_M:
-        # Small (the common sparse case) or pruning disabled: the plain per-subset residual-clique
-        # scan, cheaper here than the bitmask precompute -- and byte-for-byte the naive scan.
+    if m < _LATTICE_MIN_M:
+        # Small (the common sparse case): the plain per-subset residual-clique scan, cheaper here
+        # than the bitmask precompute.
         h0_set = set(h0)
         for h_index, H in enumerate(subsets(h0)):
             if is_clique(adj, h0_set - set(H)):
@@ -255,10 +317,6 @@ def apply_delete(adj: np.ndarray, x: int, y: int, H: Iterable[int]) -> None:
         adj[h, x] = ARROW
 
 
-# Whether :func:`insert_cpdag` and :func:`delete_cpdag` rewrite only the part of the graph a move
-# can change. When False they rebuild the whole CPDAG; the tests compare the two.
-_LOCAL_REFORM = True
-
 # A move that can change more than this share of the nodes rebuilds the whole CPDAG.
 _REGION_SHARE = 0.25
 
@@ -271,11 +329,8 @@ def _shared_children(adj: np.ndarray, x: int, y: int) -> list[int]:
 
 def _reform(adj: np.ndarray, touched: list[int]) -> np.ndarray:
     """The CPDAG of ``adj``, a CPDAG changed by one move that touched the nodes ``touched``."""
-    if _LOCAL_REFORM:
-        out = _cpdag_of_pdag_near(adj, touched, int(_REGION_SHARE * adj.shape[0]))
-        if out is not None:
-            return out
-    return _cpdag_of_pdag(adj)
+    out = _cpdag_of_pdag_near(adj, touched, int(_REGION_SHARE * adj.shape[0]))
+    return _cpdag_of_pdag(adj) if out is None else out
 
 
 def insert_cpdag(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> np.ndarray:

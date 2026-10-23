@@ -1,8 +1,8 @@
 """Test that GES's forward scans and subset enumerations return one CPDAG and score.
 
-The kept forward scan is compared with the full rescan (``_FULL_RESCAN``), pruned enumeration
-with unpruned subset lattices (``_LATTICE_PRUNE``), the CPDAG rewritten around a move with the
-CPDAG rebuilt whole (``_LOCAL_REFORM``), and serial GES with two-chunk decomposition.
+The kept forward scan is compared with the full rescan, pruned enumeration with the per-subset
+clique scans, the CPDAG rewritten around a move with the CPDAG rebuilt whole, and serial GES with
+two-chunk decomposition. ``ges_reference.py`` holds the reference paths.
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from threadpoolctl import threadpool_limits
 from andrey.core import ARROW, TAIL, backend
 from andrey.core import score as score_module
 from andrey.core.knowledge import Constraints, Knowledge, resolve
-from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near, dag2cpdag, to_structure
+from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near, dag2cpdag
 from andrey.core.score import BICScore
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
-from andrey.search.ges import ges
-from andrey.search.hc import tie_ranks
-from tests.unit.ges_chunks import backward_inprocess, forward_inprocess
+from andrey.search.ges import _reachable, ges
+from tests.unit.ges_chunks import forward_inprocess, ges_inprocess
+from tests.unit.ges_reference import insert_candidates, reference_paths
 
 
 @pytest.fixture
@@ -65,9 +65,9 @@ def _collinear_sem(seed: int, n: int, d: int, p: float, k: int, noise: float) ->
 
 
 def _random_collinear_case(seed: int) -> tuple[np.ndarray, int | None, float]:
-    """Near-collinear data with size, density, ``maxP``, penalty, and noise drawn from ``seed``.
+    """Near-collinear data with size, density, ``max_parents``, penalty, and noise from ``seed``.
 
-    Returns the data, ``maxP``, and ``lambda_value``.
+    Returns the data, ``max_parents``, and ``lambda_value``.
     """
     rng = np.random.default_rng(seed)
     d = int(rng.integers(5, 26))
@@ -84,44 +84,62 @@ def _run(
     x: np.ndarray,
     *,
     prune: bool = True,
-    maxP: float | None,
+    max_parents: float | None,
+    parent_rule: str = "cap",
     lambda_value: float = 1.0,
     full_rescan: bool = False,
     local_reform: bool = True,
     constraints: Constraints | None = None,
     moves: list[tuple] | None = None,
 ):
-    """Run GES with explicit scan, pruning, and CPDAG-rewrite toggles (restored afterwards).
+    """Run GES, taking the reference path for each ``prune=False``, ``full_rescan``, and
+    ``local_reform=False``: the per-subset clique scans, a scan of every target at every pass, and
+    a whole-CPDAG rebuild after every move.
 
-    ``moves``, when given, collects each applied Insert and Delete in order.
+    ``moves``, when given, collects each Insert and Delete the search takes, in order; the moves a
+    cap check applies to a copy to read its CPDAG are left out.
     """
-    old_prune = getattr(ops, "_LATTICE_PRUNE", True)
     insert, delete = ops.apply_insert, ops.apply_delete
-    ops._LATTICE_PRUNE = prune
-    ops._LOCAL_REFORM = local_reform
-    pg._FULL_RESCAN = full_rescan
-    if moves is not None:
+    breaks_cap = pg._breaks_cap
+    with (
+        reference_paths(naive_lattice=not prune, full_rescan=full_rescan, rebuild=not local_reform),
+        pytest.MonkeyPatch.context() as patch,
+    ):
+        if moves is not None:
+            checking = False
 
-        def record_insert(adj, x, y, T):
-            moves.append(("insert", x, y, tuple(T)))
-            insert(adj, x, y, T)
+            def record_insert(adj, x, y, T):
+                if not checking:
+                    moves.append(("insert", x, y, tuple(T)))
+                insert(adj, x, y, T)
 
-        def record_delete(adj, x, y, H):
-            moves.append(("delete", x, y, tuple(H)))
-            delete(adj, x, y, H)
+            def record_delete(adj, x, y, H):
+                if not checking:
+                    moves.append(("delete", x, y, tuple(H)))
+                delete(adj, x, y, H)
 
-        ops.apply_insert, ops.apply_delete = record_insert, record_delete
-    try:
-        # Pin serial: the toggles are module globals that never reach pool workers, so under
-        # ANDREY_NUM_WORKERS > 1 a pooled pass would silently run the live path inside the
-        # reference run and the comparison would be fast-vs-fast.
+            def check_cap(*args):
+                nonlocal checking
+                checking = True
+                try:
+                    return breaks_cap(*args)
+                finally:
+                    checking = False
+
+            patch.setattr(ops, "apply_insert", record_insert)
+            patch.setattr(ops, "apply_delete", record_delete)
+            patch.setattr(pg, "_breaks_cap", check_cap)
+        # Pin serial: the reference paths never reach pool workers, so under ANDREY_NUM_WORKERS > 1
+        # a pooled pass would silently run the kept path inside the reference run and the
+        # comparison would be kept-vs-kept.
         with backend.config(num_workers=1):
-            struct, score = ges(x, lambda_value=lambda_value, maxP=maxP, constraints=constraints)
-    finally:
-        ops._LATTICE_PRUNE = old_prune
-        ops._LOCAL_REFORM = True
-        pg._FULL_RESCAN = False
-        ops.apply_insert, ops.apply_delete = insert, delete
+            struct, score = ges(
+                x,
+                lambda_value=lambda_value,
+                max_parents=max_parents,
+                constraints=constraints,
+                _parent_rule=parent_rule,
+            )
     return struct.to_numpy(), score
 
 
@@ -140,14 +158,16 @@ _SCAN_GRID = [
 
 
 def _assert_kept_matches_full(
-    x: np.ndarray, maxP: float | None, lambda_value: float, label: str
+    x: np.ndarray, max_parents: float | None, lambda_value: float, label: str
 ) -> None:
     """The kept scan and the full rescan apply the same moves and return one CPDAG and score."""
     kept_moves: list[tuple] = []
     full_moves: list[tuple] = []
-    kept_adj, kept_score = _run(x, maxP=maxP, lambda_value=lambda_value, moves=kept_moves)
+    kept_adj, kept_score = _run(
+        x, max_parents=max_parents, lambda_value=lambda_value, moves=kept_moves
+    )
     full_adj, full_score = _run(
-        x, maxP=maxP, lambda_value=lambda_value, full_rescan=True, moves=full_moves
+        x, max_parents=max_parents, lambda_value=lambda_value, full_rescan=True, moves=full_moves
     )
     assert kept_moves == full_moves, f"move sequences differ at {label}"
     assert np.array_equal(kept_adj, full_adj)
@@ -167,10 +187,10 @@ def _valid_moves(adj: np.ndarray) -> list[tuple[str, int, int, tuple[int, ...]]]
     """Every valid Insert and Delete of the CPDAG ``adj``, as GES enumerates them."""
     n = adj.shape[0]
     state = pg.neighborhood_state(adj)
-    reachable = pg._reachable(adj)
+    reachable = _reachable(adj)
     moves = []
     for y in range(n):
-        for x, _t_index, T, clique in pg._insert_candidates(y, adj, state):
+        for x, _t_index, T, clique in insert_candidates(y, adj, state):
             if not reachable(y, x, clique):
                 moves.append(("insert", x, y, T))
     adj_sets, _parents, undirected = state
@@ -248,10 +268,10 @@ def test_local_reform_matches_full_rebuild(
     local_moves: list[tuple] = []
     full_moves: list[tuple] = []
     local_adj, local_score = _run(
-        x, maxP=None, lambda_value=lambda_value, local_reform=True, moves=local_moves
+        x, max_parents=None, lambda_value=lambda_value, local_reform=True, moves=local_moves
     )
     full_adj, full_score = _run(
-        x, maxP=None, lambda_value=lambda_value, local_reform=False, moves=full_moves
+        x, max_parents=None, lambda_value=lambda_value, local_reform=False, moves=full_moves
     )
     assert local_moves == full_moves
     assert np.array_equal(local_adj, full_adj)
@@ -283,9 +303,9 @@ def test_kept_scan_matches_full_rescan_on_collinear_columns(
     _assert_kept_matches_full(x, None, 1.0, f"seed={seed}, d={d}, noise={noise}")
 
 
-# Random near-collinear cases whose updates can cancel: one without maxP, one whose maxP changes
-# the graph.
-_RANDOM_COLLINEAR_SEEDS = [59, 131]
+# Random near-collinear cases whose updates can cancel: one without max_parents, one whose
+# max_parents changes the graph.
+_RANDOM_COLLINEAR_SEEDS = [59, 71]
 
 
 @pytest.mark.usefixtures("unchecked_columns")
@@ -311,9 +331,9 @@ def test_kept_scan_matches_full_rescan_on_random_collinear_data(
     _assert_kept_matches_full(x, max_p, lambda_value, f"seed={seed}")
     assert infinite_bounds, "no update could cancel"
     if max_p is not None:
-        capped, _ = _run(x, maxP=max_p, lambda_value=lambda_value)
-        uncapped, _ = _run(x, maxP=None, lambda_value=lambda_value)
-        assert not np.array_equal(capped, uncapped), "maxP does not change the graph"
+        capped, _ = _run(x, max_parents=max_p, lambda_value=lambda_value)
+        uncapped, _ = _run(x, max_parents=None, lambda_value=lambda_value)
+        assert not np.array_equal(capped, uncapped), "max_parents does not change the graph"
 
 
 @pytest.mark.usefixtures("unchecked_columns")
@@ -431,9 +451,8 @@ def test_kept_scan_honors_any_engine_bounds(
             moves.append((x, y, tuple(T)))
             insert(adj, x, y, T)
 
-        with monkeypatch.context() as patch:
+        with monkeypatch.context() as patch, reference_paths(full_rescan=full_rescan):
             patch.setattr(ops, "apply_insert", record_insert)
-            patch.setattr(pg, "_FULL_RESCAN", full_rescan)
             adj = forward_inprocess(np.zeros((d, d), dtype=np.int8), engine, d, 3, 1, range(d))
         return adj, moves
 
@@ -445,64 +464,47 @@ def test_kept_scan_honors_any_engine_bounds(
 
 
 # Every row reaches the pruned subset lattice (a t0 of at least ``ops._LATTICE_MIN_M`` nodes), so
-# the pruning toggle changes the path taken; the d = 66 row crosses a 64-bit word. maxP bounds
-# density so the reference per-candidate set BFS stays cheap.
+# the reference's per-subset scan takes another path; the d = 66 row crosses a 64-bit word.
+# max_parents bounds density so the reference per-candidate set BFS stays cheap, as a cap and, in
+# the last row, as a gate.
 _GRID = [
-    # (seed, d, n, p, maxP)
-    (0, 15, 300, 0.40, None),
-    (0, 40, 240, 0.18, 6),
-    (1, 40, 240, 0.18, 6),
-    (0, 66, 180, 0.05, 3),
+    # (seed, d, n, p, max_parents, parent_rule)
+    (0, 15, 300, 0.40, None, "cap"),
+    (0, 40, 240, 0.18, 6, "cap"),
+    (1, 40, 240, 0.18, 6, "cap"),
+    (0, 66, 180, 0.05, 3, "cap"),
+    (0, 40, 240, 0.18, 6, "gate"),
 ]
 
 
-@pytest.mark.parametrize("seed,d,n,p,maxP", _GRID)
+@pytest.mark.parametrize("seed,d,n,p,max_parents,parent_rule", _GRID)
 def test_fast_enum_matches_reference(
-    seed: int, d: int, n: int, p: float, maxP: float | None
+    seed: int, d: int, n: int, p: float, max_parents: float | None, parent_rule: str
 ) -> None:
     """Pruned and unpruned enumeration return the same CPDAG and score below and above 64 nodes."""
     x = _gaussian_sem(seed, n, d, p)
-    live_adj, live_score = _run(x, prune=True, maxP=maxP)
-    ref_adj, ref_score = _run(x, prune=False, maxP=maxP, full_rescan=True)
+    live_adj, live_score = _run(x, prune=True, max_parents=max_parents, parent_rule=parent_rule)
+    ref_adj, ref_score = _run(
+        x, prune=False, max_parents=max_parents, parent_rule=parent_rule, full_rescan=True
+    )
     assert np.array_equal(live_adj, ref_adj), (
         f"CPDAG differs from the reference at seed={seed}, d={d}"
     )
     assert live_score == ref_score, f"score differs from the reference at seed={seed}, d={d}"
 
 
-def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None):
-    """Full GES via the in-process N-chunk decomposition, mirroring ``ges()``'s serial setup.
-
-    Drives the fast enumerator through ``forward_chunk_best`` / ``backward_chunk_best`` and the
-    ``move_key`` reduce -- the path the subset pruning must leave bit-identical --
-    then recomputes the objective from the final CPDAG as ``ges()`` does.
-    """
-    from andrey.core.score_delta import DeltaBICScore
-    from andrey.search.ges import _recompute_objective
-
-    X = np.asarray(x, dtype=np.float64)
-    n = X.shape[1]
-    max_parents = n / 2 if maxP is None else maxP
-    score = BICScore(X, lambda_value=1.0)
-    engine = DeltaBICScore(score)
-    adj = np.zeros((n, n), dtype=np.int8)
-    with threadpool_limits(limits=1):
-        ranks = tie_ranks(X).tolist()
-        adj = forward_inprocess(adj, engine, n, max_parents, n_chunks, ranks)
-        adj = backward_inprocess(adj, engine, n, n_chunks, ranks)
-        total = _recompute_objective(adj, score, n)
-    return to_structure(adj, kind="cpdag").to_numpy(), total
-
-
 # Chunk counts and the d > 64 traversals have their own tests.
-@pytest.mark.parametrize("seed,d,n,p,maxP", [(0, 20, 200, 0.30, None), (1, 40, 240, 0.18, 6)])
+@pytest.mark.parametrize(
+    "seed,d,n,p,max_parents,parent_rule",
+    [(0, 20, 200, 0.30, None, "cap"), (1, 40, 240, 0.18, 6, "cap"), (1, 40, 240, 0.18, 6, "gate")],
+)
 def test_serial_equals_parallel_decomposition(
-    seed: int, d: int, n: int, p: float, maxP: float | None
+    seed: int, d: int, n: int, p: float, max_parents: float | None, parent_rule: str
 ) -> None:
     """Serial GES and two-chunk decomposition return the same CPDAG and score."""
     x = _gaussian_sem(seed, n, d, p)
-    serial_adj, serial_score = _run(x, prune=True, maxP=maxP)
-    decomp_adj, decomp_score = _ges_decomposed(x, 2, maxP)
+    serial_adj, serial_score = _run(x, prune=True, max_parents=max_parents, parent_rule=parent_rule)
+    decomp_adj, decomp_score = ges_inprocess(x, 2, max_parents, parent_rule=parent_rule)
     assert np.array_equal(serial_adj, decomp_adj), (
         f"decomposition differs from serial at seed={seed}, d={d}"
     )
@@ -524,10 +526,10 @@ def test_local_reform_matches_full_rebuild_under_knowledge(monkeypatch: pytest.M
     local_moves: list[tuple] = []
     full_moves: list[tuple] = []
     local_adj, local_score = _run(
-        x, maxP=None, constraints=constraints, local_reform=True, moves=local_moves
+        x, max_parents=None, constraints=constraints, local_reform=True, moves=local_moves
     )
     full_adj, full_score = _run(
-        x, maxP=None, constraints=constraints, local_reform=False, moves=full_moves
+        x, max_parents=None, constraints=constraints, local_reform=False, moves=full_moves
     )
     assert local_moves == full_moves
     assert np.array_equal(local_adj, full_adj)

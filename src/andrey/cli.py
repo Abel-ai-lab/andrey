@@ -937,7 +937,6 @@ EXTRAS = {
         "`andrey.viz.mpl` chart styling (matplotlib) and Graphviz layouts for `andrey.viz.draw` "
         "(pygraphviz)"
     ),
-    "data": "`andrey.data` save and load",
 }
 SUPPORT = {
     "linux": "supported",

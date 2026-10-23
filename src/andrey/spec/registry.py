@@ -11,6 +11,7 @@ from __future__ import annotations
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
+from andrey.core.score import LINEAR_SCORES
 from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
 from andrey.search.ges import GES_SCORES
@@ -56,7 +57,7 @@ _CATEGORICAL = ParamSpec(
     "file's header or 0-based positions, for example, categorical=[smoker,region]; [] marks none. "
     "null infers them: every column of at most max_categories distinct whole numbers, named in a "
     "DataTypeWarning; with none, the setting runs as its linear-Gaussian form and warns. Other "
-    "tests and scores reject it.",
+    "tests and scores take only null or [].",
     nullable=True,
 )
 _MAX_CATEGORIES = ParamSpec(
@@ -233,7 +234,8 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score for the GES phase: local_score_BIC = linear-Gaussian BIC; "
+                doc="Local score for the GES phase: local_score_BIC or local_score_BIC_from_cov = "
+                "linear-Gaussian BIC; "
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
                 "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
@@ -339,7 +341,8 @@ _add(
                 name="score_func",
                 type="str",
                 default=None,
-                doc="Local score objective: local_score_BIC = linear-Gaussian BIC; "
+                doc="Local score objective: local_score_BIC or local_score_BIC_from_cov = "
+                "linear-Gaussian BIC; "
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
                 "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
@@ -357,13 +360,12 @@ _add(
                 name="max_parents",
                 type="int",
                 default=None,
-                doc="A gate on the forward phase, at least 0: a node whose parent count already "
-                "exceeds max_parents gains no new parents in it. It does not cap the finished "
-                "graph: one move can give a node several parents at once, so a node can end with "
-                "more than max_parents. null keeps the default gate of n_variables / 2, and a "
-                "larger integer lifts it. A lower value makes the search faster on large graphs "
-                "and can lower the errors, but it can stop the search short of the "
-                "lowest-scoring graph, which GES otherwise finds.",
+                doc="A cap on every node's parents, at least 0: no DAG the returned CPDAG "
+                "represents gives a node more than max_parents parents, and some DAG reaches each "
+                "node's count. A move whose CPDAG would "
+                "break the cap, in either phase, is skipped for the next best move. A cap can "
+                "stop the search short of the lowest-scoring graph, which GES otherwise finds. "
+                "null sets no cap; the forward phase then keeps its gate of n_variables / 2.",
                 nullable=True,
             ),
             _CATEGORICAL,
@@ -426,8 +428,9 @@ _add(
                 name="score_func",
                 type="str",
                 default="local_score_BIC",
-                doc="Local score objective.",
-                choices=("local_score_BIC",),
+                doc="Local score objective: local_score_BIC or local_score_BIC_from_cov = "
+                "linear-Gaussian BIC, the only score XGES supports.",
+                choices=LINEAR_SCORES,
             ),
             ParamSpec(
                 name="lambda_value",
@@ -475,7 +478,8 @@ _add(
                 name="score_func",
                 type="str",
                 default=None,
-                doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+                doc="Local score objective: local_score_BIC_from_cov or local_score_BIC = "
+                "covariance-based BIC; "
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
                 "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
@@ -527,7 +531,8 @@ _add(
                 name="score_func",
                 type="str",
                 default=None,
-                doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+                doc="Local score objective: local_score_BIC_from_cov or local_score_BIC = "
+                "covariance-based BIC; "
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
                 "categorical data coded by whole numbers; "
                 "null picks local_score_BDeu, with a DataTypeWarning, when every column is "
@@ -597,7 +602,8 @@ _add(
                 name="score_func",
                 type="str",
                 default=None,
-                doc="Local score: local_score_BIC = linear-Gaussian BIC; local_score_BDeu = BDeu "
+                doc="Local score: local_score_BIC or local_score_BIC_from_cov = linear-Gaussian "
+                "BIC; local_score_BDeu = BDeu "
                 "and local_score_BIC_categorical = multinomial BIC, for categorical data coded by "
                 "whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
                 "and conditional Gaussian BIC, for mixed data; "
@@ -660,7 +666,8 @@ _BOSS_SCORE = ParamSpec(
     name="score_func",
     type="str",
     default=None,
-    doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+    doc="Local score objective: local_score_BIC_from_cov or local_score_BIC = covariance-based "
+    "BIC; "
     "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for categorical "
     "data coded by whole numbers; "
     "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional Gaussian BIC, "

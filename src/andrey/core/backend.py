@@ -160,7 +160,7 @@ class _Config:
     @property
     def backend(self) -> str:
         """The backend preference in effect; assigning an unknown name raises ``ValueError``."""
-        return _resolve_backend(None)
+        return _resolve_backend()
 
     @backend.setter
     def backend(self, value: str | None) -> None:
@@ -244,10 +244,8 @@ def _scope(backend: str | None, num_workers: int | None, tie_break: str | None):
 # ---- resolution ---------------------------------------------------------------------------------
 
 
-def _resolve_backend(kwarg: str | None) -> str:
-    """Resolve the backend preference by precedence: kwarg > context > config > env > ``auto``."""
-    if kwarg is not None:
-        return env.parse_backend(kwarg, "backend")
+def _resolve_backend() -> str:
+    """Resolve the backend preference by precedence: context > config > env > ``auto``."""
     scoped = _backend_var.get()
     if scoped is not None:
         return scoped
@@ -344,16 +342,14 @@ def select(
     *,
     metric: int | None = None,
     thresholds: dict[str, int | None] | None = None,
-    backend: str | None = None,
     amortized: bool = True,
     op: str | None = None,
 ) -> str:
     """Pick the backend an op should run on, from the ``pinnable`` set it supports.
 
-    ``backend`` overrides the active preference for this call. A pinned preference the op supports
-    and is available wins (a device pin overrides the size threshold *and* the bootstrap rule
-    below). A preference the op does not support falls back to ``auto`` silently; a
-    supported-but-unavailable one warns once and falls back.
+    A pinned preference the op supports and is available wins (a device pin overrides the size
+    threshold *and* the bootstrap rule below). A preference the op does not support falls back to
+    ``auto`` silently; a supported-but-unavailable one warns once and falls back.
 
     ``auto`` picks the first device in ``auto_order`` that clears *its own* ``thresholds`` entry
     (when ``metric`` is given; a ``None`` cutoff means the device never auto-offloads), else the
@@ -364,7 +360,7 @@ def select(
     (:func:`_is_live`), so a single millisecond-scale call can never pay the multi-second
     torch/CUDA start-up inside a fit. ``op`` labels the decision in :func:`dispatch_stats`.
     """
-    pref = _resolve_backend(backend)
+    pref = _resolve_backend()
     if pref != "auto":
         if pref in pinnable:
             if _is_available(pref):
@@ -675,7 +671,7 @@ def describe() -> Backend:
     has_torch = _installed("torch")
     cuda_build = has_torch and ("torch" in sys.modules or _torch_gpu_build())
     return Backend(
-        backend=_resolve_backend(None),
+        backend=_resolve_backend(),
         num_workers=_resolve_num_workers(None),
         torch=has_torch,
         cuda=cuda_build and _is_available("cuda"),

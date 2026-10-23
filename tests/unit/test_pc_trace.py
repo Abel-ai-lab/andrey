@@ -1,6 +1,7 @@
 """PC traces replay to the returned graph, match the untraced run, and repeat exactly."""
 
 import hashlib
+import importlib
 import json
 import os
 import subprocess
@@ -130,11 +131,13 @@ def test_trace_is_identical_across_runs():
     assert fresh.stdout.strip() == digest(first)
 
 
-def test_closed_form_passes_record_the_same_tests_as_the_scan():
+def test_closed_form_passes_record_the_same_tests_as_the_scan(monkeypatch):
     X = observations(25, 4.0, 2)
     fast, scanned = [], []
     fast_result = _discover_skeleton(X, ALPHA, _trace=fast)
-    scanned_result = _discover_skeleton(X, ALPHA, prescreen=False, _trace=scanned)
+    pc_module = importlib.import_module("andrey.constraint.pc")
+    monkeypatch.setattr(pc_module, "prescreen_capable", lambda test: False)
+    scanned_result = _discover_skeleton(X, ALPHA, _trace=scanned)
     np.testing.assert_array_equal(fast_result[0], scanned_result[0])
 
     def keyed(trace):

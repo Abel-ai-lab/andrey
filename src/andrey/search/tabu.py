@@ -14,7 +14,7 @@ import numpy as np
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import DISCRETE_SCORES, BICScore, LocalScore, make_score
+from andrey.core.score import DISCRETE_SCORES, LINEAR_SCORES, BICScore, LocalScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE
@@ -23,11 +23,7 @@ from andrey.search.hc import MoveScanner, StructureKey, _apply_move, start_dag, 
 __all__ = ["tabu"]
 
 #: The local scores :func:`tabu` accepts.
-TABU_SCORES: tuple[str, ...] = (
-    "local_score_BIC_from_cov",
-    "local_score_BDeu",
-    "local_score_BIC_categorical",
-)
+TABU_SCORES: tuple[str, ...] = (*LINEAR_SCORES, *DISCRETE_SCORES)
 
 
 def _search(
@@ -108,8 +104,9 @@ def tabu(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score, one of :data:`TABU_SCORES`: ``"local_score_BIC_from_cov"`` (linear-Gaussian
-        BIC), ``"local_score_BDeu"`` (:class:`~andrey.core.score.BDeuScore` with its default
+        Local score, one of :data:`TABU_SCORES`: ``"local_score_BIC_from_cov"`` or
+        ``"local_score_BIC"`` (linear-Gaussian BIC), ``"local_score_BDeu"``
+        (:class:`~andrey.core.score.BDeuScore` with its default
         priors), or ``"local_score_BIC_categorical"``
         (:class:`~andrey.core.score.CategoricalBICScore`), both on category codes.
     lambda_value : float

@@ -31,6 +31,8 @@
     order, each card a row of data columns. One card is amber.
   - `art-harmonograph.jpg`: 0.8.0, a harmonograph in engraved lines, its pendulum-driven pen
     tracing a figure of cosine curves that spiral inward on its table. One curve is amber.
+  - `art-rocket.jpg`: 0.9.0, a rocket in engraved lines, climbing steeply out of a bank of clouds.
+    Its engine flare and trail are amber.
   - `art-ceiling.jpg`: 0.10.0, the rocket of `art-rocket.jpg` later in its flight, its nose
     against the curved edge of the sky like a glass dome, with stars beyond. The edge is amber, and
     it cracks where the rocket meets it.

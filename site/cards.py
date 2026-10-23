@@ -214,6 +214,7 @@ ART = {
         "abacus",
         "punch-cards",
         "harmonograph",
+        "rocket",
         "ceiling",
     )
 }

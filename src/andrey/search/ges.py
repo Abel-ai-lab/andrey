@@ -14,7 +14,7 @@ from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, Score, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, SCORES, Score, make_score
 from andrey.search import operators as ops
 from andrey.search.hc import tie_ranks
 
@@ -56,14 +56,27 @@ def _recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
     return float(sum(score.score(v, ops.parents(dag, v).tolist()) for v in range(n)))
 
 
+#: How :func:`ges` applies ``max_parents``: ``"cap"`` on the most parents any DAG of the class gives
+#: a node, in every CPDAG of the search, ``"gate"`` on its directed parents in the forward phase.
+PARENT_RULES: tuple[str, ...] = ("cap", "gate")
+
+
+def _parent_limits(
+    n: int, max_parents: float | None, rule: str
+) -> tuple[float | None, float | None]:
+    """The forward phase's gate and the cap that ``max_parents`` sets under ``rule``.
+
+    No ``max_parents`` leaves the gate of ``n / 2`` and no cap, under either rule.
+    """
+    if rule not in PARENT_RULES:
+        raise ValueError(f"unsupported _parent_rule {rule!r}; use one of {PARENT_RULES}")
+    if max_parents is None:
+        return n / 2, None
+    return (max_parents, None) if rule == "gate" else (None, max_parents)
+
+
 #: The local scores :func:`ges` accepts.
-GES_SCORES: tuple[str, ...] = (
-    "local_score_BIC",
-    "local_score_BDeu",
-    "local_score_BIC_categorical",
-    "local_score_degen_gauss",
-    "local_score_cond_gauss",
-)
+GES_SCORES: tuple[str, ...] = SCORES
 
 
 def ges(
@@ -71,11 +84,11 @@ def ges(
     *,
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
-    maxP: float | None = None,
+    max_parents: float | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     workers: int | None = None,
-    _full_scores: bool = False,
+    _parent_rule: str = "cap",
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
 
@@ -93,17 +106,22 @@ def ges(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC"`` (linear-Gaussian BIC), ``"local_score_BDeu"`` (BDeu on
-        category codes, :class:`~andrey.core.score.BDeuScore` with its default priors),
+        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC),
+        ``"local_score_BDeu"`` (BDeu on category codes,
+        :class:`~andrey.core.score.BDeuScore` with its default priors),
         ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
         ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
         ``"local_score_cond_gauss"`` (:class:`~andrey.core.score.CGScore`).
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
-    maxP : float or None
-        Maximum directed-parent count a node may already hold to remain an eligible Insert target in
-        the forward phase; ``None`` defaults to ``n_features / 2``. The backward phase is uncapped.
+    max_parents : float or None
+        A cap on the most parents any DAG of the class gives a node, in the returned CPDAG and in
+        the CPDAG after each move (:func:`~andrey.search.operators.max_parents_in_class`): an Insert
+        or Delete whose CPDAG breaks it is skipped for the next best move. ``None`` sets no cap and
+        keeps the forward phase's gate on a node that already holds more than ``n_features / 2``
+        directed parents, which the backward phase lacks. With a cap, ``constraints`` may not
+        require edges that already break it.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
     constraints : Constraints or None
@@ -114,10 +132,11 @@ def ges(
     workers : int or None
         Worker processes for the BIC passes above the work threshold; ``None`` reads
         ``andrey.config.num_workers``.
-    _full_scores : bool
-        Private test lever: score every candidate by two full local scores (the pre-Schur reference)
-        instead of the Schur delta. Tests compare the two scoring paths; this option is not part of
-        the public contract.
+    _parent_rule : {"cap", "gate"}
+        Private lever for the benchmark harness: ``"gate"`` reads ``max_parents`` as the forward
+        phase's gate, the rule of the default of ``n_features / 2``: a node that holds more than
+        ``max_parents`` directed parents gains no new ones, and a move can still leave a node above
+        it. Not part of the public contract.
 
     Returns
     -------
@@ -126,7 +145,7 @@ def ges(
     """
     X = np.asarray(data, dtype=np.float64)
     n = X.shape[1]
-    max_parents = n / 2 if maxP is None else maxP
+    gate, cap = _parent_limits(n, max_parents, _parent_rule)
     if score_func not in GES_SCORES:
         raise NotImplementedError(f"unsupported score_func {score_func!r}; use one of {GES_SCORES}")
     score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
@@ -134,6 +153,11 @@ def ges(
     adj = np.zeros((n, n), dtype=np.int8)
     if constraints is not None and constraints.required.any():
         adj = _cpdag_of_pdag(required_dag(constraints))
+    if cap is not None and ops.exceeds_parent_cap(adj, cap):
+        raise ValueError(
+            f"the required edges give a node more than max_parents={max_parents} parents "
+            "in some graph of their class"
+        )
     # Local import breaks the ges <-> _parallel_ges cycle.
     from andrey.search import _parallel_ges
 
@@ -150,11 +174,11 @@ def ges(
             adj,
             score,
             n,
-            max_parents,
+            gate,
             workers=workers,
             ranks=ranks,
-            full_scores=_full_scores,
             constraints=constraints,
+            cap=cap,
         )
         total = _recompute_objective(adj, score, n)
     if constraints is not None:

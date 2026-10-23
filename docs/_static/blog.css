@@ -1040,6 +1040,55 @@ ul.ablog-archive {
   line-height: 1.45;
 }
 
+/* The 0.9.0 post's speedup ranges (docs/blog/0.9.0/figures.py): one accent bar per method on a
+   log axis from 1x. */
+.sr {
+  margin: 1.5rem 0;
+}
+
+.sr .sr-title {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.sr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.sr .sr-family {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--andrey-muted);
+}
+
+.sr .sr-method {
+  font-size: 12px;
+  fill: var(--andrey-ink);
+}
+
+.sr .sr-bar {
+  fill: var(--andrey-accent);
+}
+
+.sr .sr-value,
+.sr .sr-tick {
+  font-size: 11px;
+  fill: var(--andrey-muted);
+}
+
+.sr .sr-grid {
+  stroke: var(--andrey-line);
+  stroke-width: 1;
+}
+
+.sr figcaption {
+  font-size: 0.8rem;
+  color: var(--andrey-muted);
+}
+
 /* The 0.10.0 post's boundary maps (docs/blog/0.10.0/boundary.py): two maps per method, the
    cells from the cobalt ramp and the boundary as an ink outline. */
 .bnd {

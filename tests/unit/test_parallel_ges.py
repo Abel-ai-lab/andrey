@@ -9,14 +9,13 @@ import numpy as np
 import pytest
 from threadpoolctl import threadpool_limits
 
-from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search import _parallel as par
 from andrey.search import _parallel_ges as pg
-from andrey.search.ges import _recompute_objective, ges
-from andrey.search.hc import tie_ranks
-from tests.unit.ges_chunks import backward_inprocess, forward_inprocess
+from andrey.search import operators as ops
+from andrey.search.ges import ges
+from tests.unit.ges_chunks import backward_inprocess, forward_inprocess, ges_inprocess
 
 # Random linear-Gaussian datasets spanning sparse/dense and small/large graphs (the test_pc_ges
 # sweep): the general-input regime a single fixed baseline cannot reach.
@@ -42,36 +41,14 @@ def _gaussian_sem(seed: int, n: int, d: int, p: float) -> np.ndarray:
     return x
 
 
-def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None = None):
-    """Full GES via the in-process N-chunk decomposition, mirroring ``ges()``'s serial setup.
-
-    Drives the PURE Schur delta engine through ``forward_chunk_best`` / ``backward_chunk_best`` and
-    the :func:`~andrey.search._parallel_ges.move_key` reduce, then recomputes the objective from the
-    final CPDAG exactly as ``ges()`` does.
-    """
-    X = np.asarray(x, dtype=np.float64)
-    n = X.shape[1]
-    max_parents = n / 2 if maxP is None else maxP
-    score = BICScore(X, lambda_value=1.0)
-    engine = DeltaBICScore(score)
-    adj = np.zeros((n, n), dtype=np.int8)
-    # Match ges()'s BLAS pin so the in-process vs serial comparison is thread-count-invariant.
-    with threadpool_limits(limits=1):
-        ranks = tie_ranks(X).tolist()
-        adj = forward_inprocess(adj, engine, n, max_parents, n_chunks, ranks)
-        adj = backward_inprocess(adj, engine, n, n_chunks, ranks)
-        total = _recompute_objective(adj, score, n)
-    return to_structure(adj, kind="cpdag"), total
-
-
 @pytest.mark.parametrize("seed,d,n,p", _SWEEP)
 @pytest.mark.parametrize("n_chunks", [2, 3, 8])
 def test_decomposition_bit_identical_to_serial(seed, d, n, p, n_chunks):
     """The N-chunk in-process reduce reproduces serial GES's CPDAG and score exactly."""
     x = _gaussian_sem(seed, n, d, p)
     serial_struct, serial_score = ges(x)
-    decomp_struct, decomp_score = _ges_decomposed(x, n_chunks)
-    assert np.array_equal(serial_struct.to_numpy(), decomp_struct.to_numpy()), (
+    decomp_marks, decomp_score = ges_inprocess(x, n_chunks)
+    assert np.array_equal(serial_struct.to_numpy(), decomp_marks), (
         f"CPDAG differs at seed={seed}, d={d}, n_chunks={n_chunks}"
     )
     assert serial_score == decomp_score  # bit-identical accumulated BIC
@@ -81,9 +58,9 @@ def test_decomposition_bit_identical_to_serial(seed, d, n, p, n_chunks):
 def test_chunk_count_invariance(seed, d, n, p):
     """Every chunk count (2, 3, one-per-target, more-than-targets) gives the identical result."""
     x = _gaussian_sem(seed, n, d, p)
-    reference = _ges_decomposed(x, 2)[0].to_numpy()
+    reference = ges_inprocess(x, 2)[0]
     for n_chunks in (3, d, d + 5):
-        assert np.array_equal(_ges_decomposed(x, n_chunks)[0].to_numpy(), reference), (
+        assert np.array_equal(ges_inprocess(x, n_chunks)[0], reference), (
             f"chunk count {n_chunks} changed the result at seed={seed}, d={d}"
         )
 
@@ -207,10 +184,10 @@ def _force_pool():
             os.environ["ANDREY_GES_PARALLEL_MIN_WORK"] = prev
 
 
-def _parallel(x: np.ndarray, workers: int, maxP: float | None = None):
+def _parallel(x: np.ndarray, workers: int, max_parents: float | None = None):
     """Run ``ges`` on the pool-backed path (gate forced open) via the ``num_workers`` axis."""
     with _force_pool(), backend.config(num_workers=workers):
-        return ges(x, maxP=maxP)
+        return ges(x, max_parents=max_parents)
 
 
 # Exhaustive exactness across the sweep is the in-process tests' job (cheap); the pool tests only
@@ -225,6 +202,17 @@ def test_pool_parallel_bit_identical_to_serial(seed, workers):
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy()), (
         f"CPDAG differs at seed={seed}, workers={workers}"
     )
+    assert serial_score == par_score
+
+
+def test_pool_parallel_matches_serial_under_a_cap():
+    """Workers test the cap on their own candidates and return serial's CPDAG where it binds."""
+    x = _gaussian_sem(0, 400, 30, 0.2)
+    serial_struct, serial_score = ges(x, max_parents=2)
+    par_struct, par_score = _parallel(x, 4, 2)
+    assert ops.max_parents_in_class(ges(x)[0].to_numpy()).max() > 2, "the cap does not bind"
+    assert not ops.exceeds_parent_cap(par_struct.to_numpy(), 2)
+    assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())
     assert serial_score == par_score
 
 
