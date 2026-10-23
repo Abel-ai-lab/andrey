@@ -35,6 +35,9 @@ change names its pull request.
 - For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
   can show that it returns the same bits at any worker count and column order, and
   `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
+- For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
+  Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
+  with the time of Tetrad's JVM reported apart from its search. ([#362])
 
 ### Changed
 
@@ -606,3 +609,4 @@ First alpha release.
 [#311]: https://github.com/Abel-ai-lab/andrey/pull/311
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#362]: https://github.com/Abel-ai-lab/andrey/pull/362
