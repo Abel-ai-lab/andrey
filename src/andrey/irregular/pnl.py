@@ -57,7 +57,7 @@ _PNL_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 26_278, "mps": None}
 _DEVICE_BATCH_BYTES = 2**30
 
 # Host memory the worker threads' kernel buffers may hold together (three n x n float64 matrices
-# each); the CPU path runs fewer threads than asked for when they would hold more. It allows four
+# each); the CPU path runs fewer threads than asked for when they would hold more. It allows seven
 # threads at 5,000 rows.
 _THREAD_BYTES = 4 * 2**30
 
