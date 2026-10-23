@@ -43,7 +43,7 @@ def _partition_dtype(features: Mapping[str, bool]) -> type[np.integer]:
     the CPU features NumPy reports.
 
     NumPy selects 16-bit integers with SIMD only where the CPU has AVX512_ICL, and 32-bit integers
-    with AVX2 or AVX-512. Without AVX512_ICL a 16-bit selection runs scalar, 4 to 7 times slower
+    with AVX2 or AVX-512. Without AVX512_ICL a 16-bit selection runs scalar, several times slower
     than the same values as 32-bit integers, so those CPUs widen. Where NumPy reports no AVX2, as
     on ARM, widening gains nothing. The values are integers below the rows, so the ``k``-th
     smallest is the same in either type.
