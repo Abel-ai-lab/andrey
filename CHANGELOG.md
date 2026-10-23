@@ -35,6 +35,10 @@ change names its pull request.
 - For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
   can show that it returns the same bits at any worker count and column order, and
   `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
+- `ges` takes `max_parents`, the parent count above which a variable gets no new edges in the
+  forward phase. `None`, the default, keeps the limit of `n_variables / 2` and every result. A
+  lower limit makes GES faster on large graphs and can lower its errors, but it can stop short of
+  the lowest-scoring graph. ([#350])
 
 ### Changed
 
@@ -606,3 +610,4 @@ First alpha release.
 [#311]: https://github.com/Abel-ai-lab/andrey/pull/311
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#350]: https://github.com/Abel-ai-lab/andrey/pull/350
