@@ -12,6 +12,7 @@ threshold and cycle repair that turn weights into a DAG. The solvers are in
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy.linalg
@@ -20,6 +21,9 @@ import scipy.optimize
 from andrey.core import ARROW, TAIL, GraphStructure
 from andrey.core.orient import to_structure
 from andrey.search.hc import tie_ranks
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 # --------------------------------------------------------------------------------------------
 # Loss and acyclicity
@@ -58,20 +62,36 @@ class Canonical:
     ``cov`` is the covariance of the columns taken in order of their
     :func:`~andrey.search.hc.tie_ranks`: fit column ``k`` is the data's column ``order[k]``. A
     matrix ``fit`` in that order maps back to the data's order with ``fit[np.ix_(back, back)]``.
+    ``forbidden[i, j]`` fixes ``W[i, j]`` at zero and ``required[i, j]`` keeps edge ``i -> j``
+    without a penalty or a threshold; both are in the fit's column order.
     """
 
     cov: np.ndarray
     order: np.ndarray
     back: np.ndarray
+    forbidden: np.ndarray
+    required: np.ndarray
 
 
-def canonicalize(data: np.ndarray) -> Canonical:
-    """Order the columns of ``data`` by their ranks, center them, and form their covariance."""
+def canonicalize(data: np.ndarray, constraints: Constraints | None = None) -> Canonical:
+    """Order the columns of ``data`` by their ranks, center them, and form their covariance.
+
+    ``constraints`` (background knowledge in the data's column order) is carried into the fit's
+    column order; ``None`` forbids and requires nothing.
+    """
     samples = np.asarray(data, dtype=np.float64)
+    d = samples.shape[1]
     order = np.argsort(tie_ranks(samples))
     samples = samples[:, order]
     centered = samples - samples.mean(axis=0, keepdims=True)
-    return Canonical(centered.T @ centered / samples.shape[0], order, np.argsort(order))
+    if constraints is None:
+        forbidden = required = np.zeros((d, d), dtype=bool)
+    else:
+        forbidden = constraints.forbidden[np.ix_(order, order)]
+        required = constraints.required[np.ix_(order, order)]
+    return Canonical(
+        centered.T @ centered / samples.shape[0], order, np.argsort(order), forbidden, required
+    )
 
 
 # --------------------------------------------------------------------------------------------
@@ -80,17 +100,21 @@ def canonicalize(data: np.ndarray) -> Canonical:
 
 
 def augmented_lagrangian(
-    cov: np.ndarray, *, lambda1: float, max_iter: int, h_tol: float, rho_max: float
+    canonical: Canonical, *, lambda1: float, max_iter: int, h_tol: float, rho_max: float
 ) -> np.ndarray:
     """Minimize ``loss(W) + lambda1 * |W|_1`` subject to ``h(W) = 0``; return the weights.
 
-    Writes ``W = W+ - W-`` with both parts non-negative and zero on the diagonal. The inner problem
+    The loss is over ``canonical.cov``. Entries the knowledge forbids stay at zero, and entries it
+    requires leave the ``l1`` term. Writes ``W = W+ - W-`` with both parts non-negative and zero
+    on the diagonal and on the forbidden entries. The inner problem
     ``loss + 0.5 * rho * h**2 + alpha * h + lambda1 * sum(W+ + W-)`` is solved by L-BFGS-B from the
     previous solution. After each solve, ``rho`` grows tenfold while ``h`` has not fallen to a
     quarter of its previous value; then ``alpha`` takes a dual step ``alpha += rho * h``. The loop
     stops when ``h <= h_tol``, ``rho >= rho_max``, or after ``max_iter`` dual steps.
     """
+    cov = canonical.cov
     d = cov.shape[0]
+    penalty = lambda1 * (~canonical.required).astype(np.float64)
 
     def split_to_weights(w: np.ndarray) -> np.ndarray:
         return (w[: d * d] - w[d * d :]).reshape(d, d)
@@ -99,11 +123,14 @@ def augmented_lagrangian(
         weights = split_to_weights(w)
         loss, grad_loss = least_squares(cov, weights)
         h, grad_h = trace_exponential(weights)
-        value = loss + 0.5 * rho * h * h + alpha * h + lambda1 * w.sum()
+        value = loss + 0.5 * rho * h * h + alpha * h + penalty.ravel() @ (w[: d * d] + w[d * d :])
         smooth = grad_loss + (rho * h + alpha) * grad_h
-        return value, np.concatenate((smooth + lambda1, -smooth + lambda1), axis=None)
+        return value, np.concatenate((smooth + penalty, -smooth + penalty), axis=None)
 
-    bounds = [(0, 0) if i == j else (0, None) for _ in range(2) for i in range(d) for j in range(d)]
+    fixed = canonical.forbidden | np.eye(d, dtype=bool)
+    bounds = [
+        (0, 0) if fixed[i, j] else (0, None) for _ in range(2) for i in range(d) for j in range(d)
+    ]
     w_est, rho, alpha, h = np.zeros(2 * d * d), 1.0, 0.0, np.inf
     for _ in range(max_iter):
         w_new, h_new = w_est, h
@@ -145,15 +172,20 @@ def has_cycle(support: np.ndarray) -> bool:
     return visited < d
 
 
-def break_cycles(weighted: np.ndarray, support: np.ndarray) -> np.ndarray:
-    """Drop the weakest edges until ``support`` is acyclic; return the pruned DAG mask."""
+def break_cycles(
+    weighted: np.ndarray, support: np.ndarray, keep: np.ndarray | None = None
+) -> np.ndarray:
+    """Drop the weakest edges until ``support`` is acyclic; return the pruned DAG mask.
+
+    An edge marked in ``keep`` is never dropped, so ``keep`` must itself be acyclic.
+    """
     mask = support.copy()
     edges = sorted(
         (
             (abs(weighted[i, j]), i, j)
             for i in range(mask.shape[0])
             for j in range(mask.shape[1])
-            if mask[i, j]
+            if mask[i, j] and (keep is None or not keep[i, j])
         ),
         key=lambda e: e[0],
     )
@@ -204,14 +236,16 @@ def finish(
 ) -> ContinuousResult:
     """Threshold ``weights`` (fit in the canonical order), repair cycles, and map back.
 
-    An entry is kept when its magnitude reaches ``threshold``. Edges are then dropped in order of
-    increasing magnitude until no cycle remains, with ties in the canonical column order, so the
-    result does not depend on the order the data came in.
+    An entry is kept when its magnitude reaches ``threshold``, and a required entry is kept at any
+    magnitude. Edges are then dropped in order of increasing magnitude until no cycle remains,
+    never a required one, with ties in the canonical column order, so the result does not depend
+    on the order the data came in.
     """
     h_final, _ = trace_exponential(weights)
-    support = (np.abs(weights) >= threshold).astype(np.int8)
-    np.fill_diagonal(support, 0)
-    repaired = break_cycles(weights, support)
+    kept = canonical.required | ((np.abs(weights) >= threshold) & ~canonical.forbidden)
+    np.fill_diagonal(kept, False)
+    support = kept.astype(np.int8)
+    repaired = break_cycles(weights, support, canonical.required)
     back = canonical.back
     weighted = (weights * repaired)[np.ix_(back, back)]
     dag = to_structure(endpoint_marks(repaired[np.ix_(back, back)]), kind="dag", labels=labels)
@@ -227,10 +261,11 @@ def notears(
     h_tol: float,
     rho_max: float,
     labels: tuple[str, ...] | None = None,
+    constraints: Constraints | None = None,
 ) -> ContinuousResult:
     """Linear NOTEARS (Zheng et al. 2018) with the least-squares loss, on the canonical columns."""
-    canonical = canonicalize(data)
+    canonical = canonicalize(data, constraints)
     weights = augmented_lagrangian(
-        canonical.cov, lambda1=lambda1, max_iter=max_iter, h_tol=h_tol, rho_max=rho_max
+        canonical, lambda1=lambda1, max_iter=max_iter, h_tol=h_tol, rho_max=rho_max
     )
     return finish(weights, canonical, threshold=w_threshold, labels=labels)
