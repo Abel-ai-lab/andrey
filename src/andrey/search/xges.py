@@ -58,8 +58,6 @@ _ADD_UNDIRECTED, _ADD_DIRECTED, _DROP_UNDIRECTED, _ORIENT, _DROP_DIRECTED, _UNOR
     range(1, 8)
 )
 
-PathMap = defaultdict[tuple[int, int], set[tuple[int, int]]]
-
 
 def _move_key(
     delta: float, n: int, x: int, y: int, subset: Collection[int], ranks: list[int]
@@ -139,9 +137,12 @@ class _Graph:
     """A PDAG as per-node sets of parents, children, undirected neighbors, and adjacent nodes.
 
     ``forbidden`` holds the ``(x, y)`` pairs whose Insert ``x -> y`` the extended search forbids.
+    A :meth:`branch` shares a snapshot's sets until it changes a node: its first change copies
+    that node's four sets from ``source``, the graph it branched from, and adds the node to
+    ``copied``.
     """
 
-    __slots__ = ("pa", "ch", "ne", "ad", "forbidden")
+    __slots__ = ("pa", "ch", "ne", "ad", "forbidden", "source", "copied")
 
     def __init__(self, d: int) -> None:
         self.pa: list[set[int]] = [set() for _ in range(d)]
@@ -149,6 +150,8 @@ class _Graph:
         self.ne: list[set[int]] = [set() for _ in range(d)]
         self.ad: list[set[int]] = [set() for _ in range(d)]
         self.forbidden: set[tuple[int, int]] = set()
+        self.source: _Graph | None = None
+        self.copied: set[int] = set()
 
     def copy(self) -> _Graph:
         out = _Graph.__new__(_Graph)
@@ -157,7 +160,32 @@ class _Graph:
         out.ne = [set(s) for s in self.ne]
         out.ad = [set(s) for s in self.ad]
         out.forbidden = set(self.forbidden)
+        out.source, out.copied = None, set()
         return out
+
+    def branch(self, snapshot: _Graph) -> _Graph:
+        """A copy of this graph that shares the sets of ``snapshot``, a :meth:`copy` of this graph
+        that neither graph has changed since.
+
+        A set's iteration order depends on its history, and the search's ties follow that order.
+        The snapshot's sets iterate as fresh copies do, and the branch copies a node's sets from
+        this graph, as :meth:`copy` does, before changing them.
+        """
+        out = _Graph.__new__(_Graph)
+        out.pa, out.ch = snapshot.pa.copy(), snapshot.ch.copy()
+        out.ne, out.ad = snapshot.ne.copy(), snapshot.ad.copy()
+        out.forbidden = set(self.forbidden)
+        out.source, out.copied = self, set()
+        return out
+
+    def detach(self) -> None:
+        """Stop copying from ``source``; the caller drops ``source`` and the snapshot."""
+        self.source, self.copied = None, set()
+
+    def _own(self, v: int, source: _Graph) -> None:
+        self.pa[v], self.ch[v] = set(source.pa[v]), set(source.ch[v])
+        self.ne[v], self.ad[v] = set(source.ne[v]), set(source.ad[v])
+        self.copied.add(v)
 
     def state(self, a: int, b: int) -> int:
         """The state of the pair ``(a, b)``, ``a < b``."""
@@ -171,6 +199,12 @@ class _Graph:
 
     def set_state(self, a: int, b: int, state: int) -> None:
         """Replace the edge between ``a < b`` by ``state``."""
+        source = self.source
+        if source is not None:
+            if a not in self.copied:
+                self._own(a, source)
+            if b not in self.copied:
+                self._own(b, source)
         self.ne[a].discard(b)
         self.ne[b].discard(a)
         self.ch[a].discard(b)
@@ -217,6 +251,44 @@ class _Graph:
             for y in self.ne[x]:
                 adj[x, y] = TAIL
         return adj
+
+
+class _Paths(dict[tuple[int, int], set[tuple[int, int]]]):
+    """Per edge ``(u, v)``, the Inserts ``(x, y)`` whose recorded open path uses it.
+
+    A :meth:`branch` shares a snapshot's sets until it adds to one: its first :meth:`add` to an
+    edge copies that edge's set from ``source``, the records it branched from, and adds the edge to
+    ``copied``. As for :meth:`_Graph.branch`, the snapshot is a :meth:`copy` of ``source`` and
+    neither has changed since.
+    """
+
+    __slots__ = ("source", "copied")
+
+    def __init__(self, items: dict | None = None, source: _Paths | None = None) -> None:
+        super().__init__(items or {})
+        self.source = source
+        self.copied: set[tuple[int, int]] = set()
+
+    def add(self, edge: tuple[int, int], insert: tuple[int, int]) -> None:
+        inserts = self.get(edge)
+        if inserts is None:
+            inserts = self[edge] = set()
+            if self.source is not None:
+                self.copied.add(edge)
+        elif self.source is not None and edge not in self.copied:
+            inserts = self[edge] = set(self.source[edge])
+            self.copied.add(edge)
+        inserts.add(insert)
+
+    def copy(self) -> _Paths:
+        return _Paths({k: set(v) for k, v in self.items()})
+
+    def branch(self, snapshot: _Paths) -> _Paths:
+        return _Paths(snapshot, source=self)
+
+    def detach(self) -> None:
+        """Stop copying from ``source``; the caller drops ``source`` and the snapshot."""
+        self.source, self.copied = None, set()
 
 
 def _extension_parents(
@@ -390,7 +462,7 @@ def _apply_delete(g: _Graph, x: int, y: int, C: frozenset[int], log: _Changes) -
 
 
 def _blocks_paths(
-    g: _Graph, y: int, x: int, blocked: set[int], paths: PathMap, skip_direct: bool
+    g: _Graph, y: int, x: int, blocked: set[int], paths: _Paths, skip_direct: bool
 ) -> bool:
     """True when every semi-directed path from ``y`` to ``x`` passes through ``blocked``.
 
@@ -411,7 +483,7 @@ def _blocks_paths(
             if nxt == x:
                 cur = x
                 while cur != y:
-                    paths[(parent[cur], cur)].add((x, y))
+                    paths.add((parent[cur], cur), (x, y))
                     cur = parent[cur]
                 return False
             visited.add(nxt)
@@ -425,7 +497,7 @@ def _insert_valid(
     y: int,
     T: frozenset[int],
     E: frozenset[int],
-    paths: PathMap,
+    paths: _Paths,
     reverse: bool = False,
 ) -> bool:
     """Whether Insert ``x -> y`` with ``T`` applies to ``g`` and still has effective parents ``E``.
@@ -538,21 +610,22 @@ class _Search:
             else [set(np.flatnonzero(constraints.forbidden[:, y]).tolist()) for y in range(d)]
         )
         self.g = _Graph(d)
-        self.paths: PathMap = defaultdict(set)
+        self.paths = _Paths()
         self.fingerprint = 0  # the XOR of _edge_key over the edges of g
         self.inserts: list[tuple] = []
         self.reverses: list[tuple] = []
         self.deletes: list[tuple] = []
         self.seq = count()
 
-    def branch(self) -> _Search:
-        """A copy of the graph and path records, with empty queues and the same score cache."""
+    def branch(self, snapshot: tuple[_Graph, _Paths]) -> _Search:
+        """A copy of the graph and of the path records, each branched from its ``snapshot``, with
+        empty queues and the same score cache."""
         out = _Search.__new__(_Search)
         out.add_deltas, out.d, out.seq = self.add_deltas, self.d, self.seq
         out.n_samples, out.tie_gap, out.ranks = self.n_samples, self.tie_gap, self.ranks
         out.constraints, out.into = self.constraints, self.into
-        out.g = self.g.copy()
-        out.paths = defaultdict(set, {k: set(v) for k, v in self.paths.items()})
+        out.g = self.g.branch(snapshot[0])
+        out.paths = self.paths.branch(snapshot[1])
         out.fingerprint = self.fingerprint
         out.inserts, out.reverses, out.deletes = [], [], []
         return out
@@ -932,6 +1005,7 @@ class _Search:
         total = sum(local)
         pending: list[tuple] = []
         fresh = False
+        snapshot: tuple[_Graph, _Paths] | None = None  # copies of self.g and self.paths
         while pending or not fresh:
             if not pending:
                 for y in range(self.d):
@@ -946,7 +1020,9 @@ class _Search:
             _, _, x, y, C, E = entry
             if not _delete_valid(self.g, x, y, C, E, self.constraints):
                 continue
-            trial = self.branch()
+            if snapshot is None:
+                snapshot = self.g.copy(), self.paths.copy()
+            trial = self.branch(snapshot)
             log = _Changes()
             _apply_delete(trial.g, x, y, C, log)
             if self.constraints is not None and not admits(trial.g.marks(), self.constraints):
@@ -956,13 +1032,17 @@ class _Search:
             trial.update(log)
             trial.base_search()
             g, h = self.g, trial.g
-            changed = [v for v in range(self.d) if h.pa[v] != g.pa[v] or h.ne[v] != g.ne[v]]
+            # A node the branch never changed keeps its parents and neighbors.
+            changed = [v for v in sorted(h.copied) if h.pa[v] != g.pa[v] or h.ne[v] != g.ne[v]]
             trial_local = local.copy()
             for v, value in _extension_scores(h.pa, h.ne, changed, score).items():
                 trial_local[v] = value
             trial_total = sum(trial_local)
             if trial_total < total - tolerance:
+                h.detach()
+                trial.paths.detach()
                 self.g, self.paths, self.fingerprint = h, trial.paths, trial.fingerprint
+                snapshot = None
                 local, total = trial_local, trial_total
                 fresh = False
         return total
