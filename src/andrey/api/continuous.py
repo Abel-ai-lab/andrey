@@ -50,18 +50,18 @@ def _non_negative(value: object, name: str) -> float:
 
 def _path(
     robust: object, mcp_lambda: object, mcp_delta: object, mcp_decay: object, max_path: object
-) -> dict:
-    """Check the settings of the likelihood path and return them as keyword arguments."""
+) -> tuple[bool, float, float, float, int]:
+    """Check the settings of the likelihood path and return them in the order given."""
     decay = _positive(mcp_decay, "mcp_decay")
     if decay >= 1:
         raise ValueError(f"mcp_decay must be in (0, 1), got {mcp_decay}")
-    return {
-        "robust": flag(robust, "robust"),
-        "mcp_lambda": _positive(mcp_lambda, "mcp_lambda"),
-        "mcp_delta": _positive(mcp_delta, "mcp_delta"),
-        "mcp_decay": decay,
-        "max_path": int_in_range(max_path, "max_path", 1),
-    }
+    return (
+        flag(robust, "robust"),
+        _positive(mcp_lambda, "mcp_lambda"),
+        _positive(mcp_delta, "mcp_delta"),
+        decay,
+        int_in_range(max_path, "max_path", 1),
+    )
 
 
 def _output(
@@ -228,19 +228,33 @@ def notears(
     from andrey.search.continuous import notears as _notears
 
     X = data_matrix(data)
-    settings = {
-        "lambda1": _non_negative(lambda1, "lambda1"),
-        "w_threshold": _non_negative(w_threshold, "w_threshold"),
-        "max_iter": int_in_range(max_iter, "max_iter", 1),
-        "h_tol": _positive(h_tol, "h_tol"),
-        "rho_max": _positive(rho_max, "rho_max"),
-        **_path(robust, mcp_lambda, mcp_delta, mcp_decay, max_path),
-    }
+    lambda1 = _non_negative(lambda1, "lambda1")
+    w_threshold = _non_negative(w_threshold, "w_threshold")
+    max_iter = int_in_range(max_iter, "max_iter", 1)
+    h_tol = _positive(h_tol, "h_tol")
+    rho_max = _positive(rho_max, "rho_max")
+    robust, mcp_lambda, mcp_delta, mcp_decay, max_path = _path(
+        robust, mcp_lambda, mcp_delta, mcp_decay, max_path
+    )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="notears")
     with copies_named(labels), one_blas_thread():
-        result = _notears(X, labels=labels, constraints=constraints, **settings)
-    return _output("NOTEARS", result, labels, settings["robust"])
+        result = _notears(
+            X,
+            lambda1=lambda1,
+            w_threshold=w_threshold,
+            max_iter=max_iter,
+            h_tol=h_tol,
+            rho_max=rho_max,
+            robust=robust,
+            mcp_lambda=mcp_lambda,
+            mcp_delta=mcp_delta,
+            mcp_decay=mcp_decay,
+            max_path=max_path,
+            labels=labels,
+            constraints=constraints,
+        )
+    return _output("NOTEARS", result, labels, robust)
 
 
 def dagma(
@@ -394,17 +408,32 @@ def dagma(
     from andrey.search.continuous import dagma as _dagma
 
     X = data_matrix(data)
-    settings = {
-        "lambda1": _non_negative(lambda1, "lambda1"),
-        "w_threshold": _non_negative(w_threshold, "w_threshold"),
-        "stages": int_in_range(stages, "stages", 1),
-        "warm_iter": int_in_range(warm_iter, "warm_iter", 1),
-        "max_iter": int_in_range(max_iter, "max_iter", 1),
-        "lr": _positive(lr, "lr"),
-        **_path(robust, mcp_lambda, mcp_delta, mcp_decay, max_path),
-    }
+    lambda1 = _non_negative(lambda1, "lambda1")
+    w_threshold = _non_negative(w_threshold, "w_threshold")
+    stages = int_in_range(stages, "stages", 1)
+    warm_iter = int_in_range(warm_iter, "warm_iter", 1)
+    max_iter = int_in_range(max_iter, "max_iter", 1)
+    lr = _positive(lr, "lr")
+    robust, mcp_lambda, mcp_delta, mcp_decay, max_path = _path(
+        robust, mcp_lambda, mcp_delta, mcp_decay, max_path
+    )
     labels = column_labels(data)
     constraints = resolve(knowledge, X.shape[1], labels, method="dagma")
     with copies_named(labels), one_blas_thread():
-        result = _dagma(X, labels=labels, constraints=constraints, **settings)
-    return _output("DAGMA", result, labels, settings["robust"])
+        result = _dagma(
+            X,
+            lambda1=lambda1,
+            w_threshold=w_threshold,
+            stages=stages,
+            warm_iter=warm_iter,
+            max_iter=max_iter,
+            lr=lr,
+            robust=robust,
+            mcp_lambda=mcp_lambda,
+            mcp_delta=mcp_delta,
+            mcp_decay=mcp_decay,
+            max_path=max_path,
+            labels=labels,
+            constraints=constraints,
+        )
+    return _output("DAGMA", result, labels, robust)
