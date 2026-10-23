@@ -21,7 +21,6 @@ import numpy as np
 
 from andrey.constraint.fci import (
     _adjacent,
-    _adjacent_nodes,
     _arrow_allowed,
     _circle_pag,
     _fast_adjacency_search,
@@ -30,6 +29,7 @@ from andrey.constraint.fci import (
     _knowledge_marks,
     _largest_size,
     _majority_sepsets,
+    _neighbor_lists,
     _remove_by_possible_dsep,
     _sepset,
     _test_in_rank_order,
@@ -145,9 +145,7 @@ def _orient_colliders_from_pattern(
     ``a`` and ``c`` is recorded and does not contain ``b``, and the triple is not ``ambiguous``. An
     already-directed tail at ``b`` blocks the orientation.
     """
-    n = marks.shape[0]
-    for b in range(n):
-        adj = _adjacent_nodes(marks, b)
+    for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
@@ -177,27 +175,26 @@ def _derive_sepsets(
 ) -> dict[tuple[int, int], tuple[int, ...]]:
     """Separating sets for every non-adjacent CPDAG pair, from the pooled two-endpoint adjacency.
 
-    For each non-adjacent ``(x, y)`` (``x < y``), searches subsets of ``adj(x) | adj(y) - {x, y}``,
-    of at most ``max_depth`` members when one is given, by increasing size and records, both ways,
-    the union of every subset of the first size that makes the pair independent, as the adjacency
-    search records its sets; a pair with no such subset gets no entry. The union does not depend on
-    the order of the tests. With ``in_column_order``, the first subset found in column order is
-    recorded instead. The
+    For each non-adjacent ``(x, y)`` (``x < y``, row-major), searches subsets of
+    ``adj(x) | adj(y) - {x, y}``, of at most ``max_depth`` members when one is given, by increasing
+    size and records, both ways, the union of every subset of the first size that makes the pair
+    independent, as the adjacency search records its sets; a pair with no such subset gets no
+    entry. The union does not depend on the order of the tests. With ``in_column_order``, the first
+    subset found in column order is recorded instead, and no subset after it is tested. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
     """
-    n = cpdag.shape[0]
+    adjacent = cpdag != NULL
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
-    for x, y in combinations(range(n), 2):
-        if _adjacent(cpdag, x, y):
-            continue
-        pool = sorted((set(_adjacent_nodes(cpdag, x)) | set(_adjacent_nodes(cpdag, y))) - {x, y})
+    xs, ys = np.nonzero(np.triu(~adjacent, 1))
+    for x, y in zip(xs.tolist(), ys.tolist()):
+        pool = [v for v in np.flatnonzero(adjacent[x] | adjacent[y]).tolist() if v != x and v != y]
         for size in range(_largest_size(len(pool), max_depth) + 1):
-            separating = (cond for cond in combinations(pool, size) if test(x, y, cond) > alpha)
+            subsets = combinations(pool, size)
             if in_column_order:
-                first = next(separating, None)
+                first = next((cond for cond in subsets if test(x, y, cond) > alpha), None)
                 found = [] if first is None else [first]
             else:
-                found = list(separating)
+                found = [cond for cond in subsets if test(x, y, cond) > alpha]
             if found:
                 union = tuple(sorted(set().union(*found)))
                 sepsets[(x, y)] = union
