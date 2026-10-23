@@ -165,7 +165,7 @@ def test_kept_scan_matches_full_rescan(
 def _valid_moves(adj: np.ndarray) -> list[tuple[str, int, int, tuple[int, ...]]]:
     """Every valid Insert and Delete of the CPDAG ``adj``, as GES enumerates them."""
     n = adj.shape[0]
-    state = pg.neighborhood_state(adj, n)
+    state = pg.neighborhood_state(adj)
     reachable = pg._reachable(adj)
     moves = []
     for y in range(n):
