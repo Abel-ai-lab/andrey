@@ -7,6 +7,7 @@ import pytest
 
 import andrey
 from andrey import data
+from andrey.constraint import _skeleton
 from andrey.constraint import fci as fci_module
 from andrey.core import CIRCLE
 from andrey.core.ci import make_indep_test
@@ -41,10 +42,10 @@ class _Recording:
 
 
 def _vote(monkeypatch, chunk: int, x: np.ndarray, marks: np.ndarray):
-    monkeypatch.setattr(fci_module, "_MAJORITY_CHUNK", chunk)
+    monkeypatch.setattr(_skeleton, "_VOTE_CHUNK", chunk)
     test = _Recording(x)
     sepsets: dict = {}
-    ambiguous = fci_module._majority_sepsets(marks.copy(), test, 0.05, sepsets)
+    ambiguous = fci_module._vote_sepsets(marks.copy(), test, 0.05, sepsets, rule="majority")
     return test.sizes, ambiguous, sepsets
 
 
@@ -74,6 +75,6 @@ def test_public_majority_results_do_not_depend_on_the_chunk(engine, monkeypatch)
     fit = getattr(andrey, engine)
     results = []
     for chunk in (2, 10**9):
-        monkeypatch.setattr(fci_module, "_MAJORITY_CHUNK", chunk)
+        monkeypatch.setattr(_skeleton, "_VOTE_CHUNK", chunk)
         results.append(fit(dataset.data, collider_rule="majority").structure.to_numpy())
     np.testing.assert_array_equal(*results)

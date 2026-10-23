@@ -127,7 +127,9 @@ how much a dataset's column order reveals of its causal order.
 
 For `pc` and `cdnod`, the setting chooses the order in which conflicting colliders are oriented:
 by the p-value that separated each pair under `rank`, in column order under `position`. Their
-`collider_order` argument, `"p_value"` or `"column"`, overrides it for one call.
+`collider_order` argument, `"p_value"` or `"column"`, overrides it for one call. Their
+`collider_rule="conservative"` and `"majority"`, and those of `fci` and `gfci`, decide each
+collider by a vote over the final skeleton's adjacencies, which does not read the column order.
 
 The orientation rules of `pc`, `cdnod`, `fci`, and `gfci`, Meek's rules and FCI's R1-R10, run in
 rounds under `rank`: each round sets together everything the rules imply on the graph as it stands,

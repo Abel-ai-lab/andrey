@@ -9,7 +9,7 @@ from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import cache
-from itertools import combinations, islice, permutations
+from itertools import combinations, permutations
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -18,12 +18,14 @@ from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
     adjacent_pairs,
     canonical_capable,
+    check_collider_rule,
     first_order_removals,
     marginal_removals,
     prescreen_capable,
     scan_pairs,
     separate_apart,
     unseparated_triples,
+    vote_triples,
 )
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
@@ -52,19 +54,24 @@ def fci(
     constraints: Constraints | None = None,
     in_column_order: bool = False,
     workers: int | None = None,
+    _ambiguous: set[tuple[int, int, int]] | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
 
     ``data`` is an ``(n_samples, n_features)`` array; ``alpha`` is the independence-test
     significance level in ``(0, 1)``. Skeleton pruning requires a p-value above ``alpha``;
-    the optional majority collider rule also counts equality as a separating vote.
+    the conservative and majority collider rules also count equality as a separating vote.
+    ``collider_rule`` (``"sepsets"``, ``"conservative"``, or ``"majority"``) decides the unshielded
+    triples after the possible-d-sep step: by the recorded separating sets, or by a vote over the
+    subsets of either endpoint's neighbors (:func:`_vote_sepsets`), which leaves some triples
+    ambiguous.
     ``categorical``, a boolean mask of the categorical columns, reaches a mixed-data test.
     ``possible_dsep`` (``"order_free"`` or ``"fast"``) selects the order the possible-d-sep step
     visits the nodes in: the :func:`~andrey.search.hc.tie_ranks` order or the column order.
     ``in_column_order`` applies the orientation rules one firing at a time in column order instead
     of in order-free rounds (:func:`_fci_orient`).
     ``max_depth`` caps the size of every conditioning set a test uses: the adjacency search, the
-    possible-d-sep subsets, the majority votes, and the discriminating-path tests. With
+    possible-d-sep subsets, the collider votes, and the discriminating-path tests. With
     ``constraints``, the adjacency search starts from the pairs they allow, no step tests or removes
     a required pair, a pair they make non-adjacent gets a separating set when the search finds one
     (:func:`_fast_adjacency_search`), and :func:`_knowledge_marks` sets their endpoints before the
@@ -75,11 +82,13 @@ def fci(
     ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
     ``workers`` worker processes share the adjacency search's larger conditioning-size passes
     (:func:`_fast_adjacency_search`); ``None`` reads ``andrey.config.num_workers``.
-    Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
+    Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all). The private
+    ``_ambiguous`` sink receives the triples no orientation rule reads as a collider or a
+    non-collider, keyed ``(a, b, c)`` with ``a < c``.
     """
     X = np.asarray(data, dtype=np.float64)
 
-    _validate_collider_rule(collider_rule)
+    check_collider_rule(collider_rule)
     _validate_possible_dsep(possible_dsep)
     test = make_indep_test(indep_test, X, categorical=categorical)
     allowed = keep = apart = None
@@ -113,10 +122,12 @@ def fci(
     if constraints is not None:
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
     ambiguous = unseparated_triples(marks != NULL, sepsets, constraints)
-    if collider_rule == "majority":
-        ambiguous |= _majority_sepsets(
-            marks, test, alpha, sepsets, max_depth=max_depth, skip=ambiguous
+    if collider_rule != "sepsets":
+        ambiguous |= _vote_sepsets(
+            marks, test, alpha, sepsets, rule=collider_rule, max_depth=max_depth, skip=ambiguous
         )
+    if _ambiguous is not None:
+        _ambiguous.update(ambiguous)
     _orient_colliders(marks, sepsets, ambiguous)
     _fci_orient(
         marks, test, alpha, sepsets, ambiguous, max_depth=max_depth, in_column_order=in_column_order
@@ -327,11 +338,6 @@ def _fits(cond: list[int], max_depth: int | None) -> bool:
 # ---- R0: unshielded colliders -------------------------------------------------------------------
 
 
-def _validate_collider_rule(collider_rule: str) -> None:
-    if collider_rule not in ("sepsets", "majority"):
-        raise ValueError(f"collider_rule must be 'sepsets' or 'majority', got {collider_rule!r}")
-
-
 def _validate_possible_dsep(possible_dsep: str) -> None:
     if possible_dsep not in ("order_free", "fast"):
         raise ValueError(f"possible_dsep must be 'order_free' or 'fast', got {possible_dsep!r}")
@@ -342,69 +348,28 @@ def _triple(a: int, b: int, c: int) -> tuple[int, int, int]:
     return (a, b, c) if a < c else (c, b, a)
 
 
-# Conditioning sets per test call in the majority vote. The vote needs only two counts, so a
-# triple's memory is bounded by one chunk however large the endpoint degrees are.
-_MAJORITY_CHUNK = 64
-
-
-def _majority_sepsets(
+def _vote_sepsets(
     marks: np.ndarray,
-    test: CITest,
+    test: Callable[..., float],
     alpha: float,
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     *,
+    rule: str,
     max_depth: int | None = None,
     skip: frozenset[tuple[int, int, int]] = frozenset(),
 ) -> frozenset[tuple[int, int, int]]:
-    """Rewrite separating sets by majority vote on the final skeleton; return ambiguous triples.
+    """Decide every unshielded triple of ``marks`` by ``rule``, ``"conservative"`` or
+    ``"majority"``; rewrite ``sepsets`` to match and return the ambiguous triples.
 
-    Every subset of each endpoint's adjacency votes separately, including the empty set and
-    subsets shared by both endpoints. Independence is ``p >= alpha``. The recorded sets do not
-    vote. A missing key direction inherits the reverse entry before membership is rewritten.
-    Fewer than half containing the middle node (or no separating subset) makes a collider;
-    more than half makes a noncollider. An exact half leaves both recorded sets unchanged.
-    Cost grows exponentially with endpoint degree; the subsets are capped at ``max_depth`` members
-    when one is given, and have no size cap otherwise. A triple in ``skip`` holds no vote and keeps
-    its recorded sets. Subsets are tested in chunks of ``_MAJORITY_CHUNK``, so memory per triple
-    stays bounded.
+    The vote of :func:`~andrey.constraint._skeleton.vote_triples`, on the final skeleton. A pair no
+    subset of either endpoint's neighbors separates keeps its recorded separating set, which then
+    decides its triples as under ``"sepsets"``: the search separated the pair given nodes beyond
+    the final neighbors, as the possible-d-separation step does, and with exact tests that set
+    holds the middle node exactly when it is a non-collider.
     """
-    neighbors = _neighbor_lists(marks)
-    ambiguous = set()
-    batched = getattr(test, "batched_call", None)
-    for b, adjacent in enumerate(neighbors):
-        for a, c in combinations(adjacent, 2):
-            if _adjacent(marks, a, c) or _triple(a, b, c) in skip:
-                continue
-            subsets = (
-                subset
-                for endpoint in (a, c)
-                for size in range(_largest_size(len(neighbors[endpoint]), max_depth) + 1)
-                for subset in combinations(neighbors[endpoint], size)
-            )
-            separating = containing = 0
-            while chunk := list(islice(subsets, _MAJORITY_CHUNK)):
-                pvalues = (
-                    batched(a, c, chunk)
-                    if callable(batched)
-                    else [test(a, c, subset) for subset in chunk]
-                )
-                for subset, p in zip(chunk, pvalues):
-                    if p >= alpha:
-                        separating += 1
-                        containing += b in subset
-            if separating and 2 * containing == separating:
-                ambiguous.add(_triple(a, b, c))
-                continue
-            noncollider = 2 * containing > separating
-            for pair in ((a, c), (c, a)):
-                recorded = sepsets.get(pair)
-                if recorded is None:
-                    recorded = sepsets.get(pair[::-1], ())
-                if noncollider:
-                    sepsets[pair] = recorded if b in recorded else (*recorded, b)
-                else:
-                    sepsets[pair] = tuple(node for node in recorded if node != b)
-    return frozenset(ambiguous)
+    return vote_triples(
+        marks, test, alpha, sepsets, rule, unseparated="recorded", max_depth=max_depth, skip=skip
+    )
 
 
 def _orient_colliders(

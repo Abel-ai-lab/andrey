@@ -8,6 +8,7 @@ display the parameter defaults defined here.
 
 from __future__ import annotations
 
+from andrey.constraint._skeleton import COLLIDER_RULES
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
 from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
@@ -71,11 +72,13 @@ _COLLIDER_RULE = ParamSpec(
     name="collider_rule",
     type="str",
     default="sepsets",
-    choices=("sepsets", "majority"),
+    choices=COLLIDER_RULES,
     doc="How colliders are decided on x - z - y: sepsets = z is a collider when it is not in the "
-    "separating set of x and y; majority = test x and y given every subset of each one's "
-    "neighbors, and z is a collider when fewer than half of the separating subsets contain it "
-    "(exactly half: unoriented). Majority costs up to 2**degree tests per triple.",
+    "separating set of x and y; conservative and majority = test x and y given every subset of "
+    "each one's neighbors, and z is a collider when none (conservative) or fewer than half "
+    "(majority) of the separating subsets contain it, a non-collider when all or more than half "
+    "do, and ambiguous otherwise, never oriented through. Both cost up to 2**degree tests per "
+    "pair.",
 )
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
@@ -147,7 +150,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -158,12 +163,20 @@ _add(
             '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
             '`collider_order="column"` orients colliders in column order.'
         ),
-        params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            _COLLIDER_ORDER,
+            _COLLIDER_RULE,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
         references=(
             "Spirtes & Glymour 1991",
             "Spirtes, Glymour & Scheines 2000",
             "Colombo & Maathuis 2014",
             "Meek 1995",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -178,7 +191,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -202,6 +217,7 @@ _add(
             "Spirtes, Glymour & Scheines 2000",
             "Zhang 2008",
             "Colombo & Maathuis 2014",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -216,7 +232,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="pag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -254,6 +272,7 @@ _add(
             "Zhang 2008",
             "Colombo & Maathuis 2014",
             "Spirtes, Glymour & Scheines 2000",
+            "Ramsey, Zhang & Spirtes 2006",
         ),
     )
 )
@@ -280,7 +299,9 @@ _add(
         output=OutputSpec(
             structure_type="graph",
             graph_kind="cpdag",
-            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read; "
+            "under collider_rule=conservative or majority, metadata['ambiguous_triples'] lists the "
+            "[x, z, y] triples the rule left ambiguous, by 0-based position",
         ),
         determinism="deterministic",
         accel="numpy",
@@ -295,6 +316,7 @@ _add(
             _ALPHA,
             _INDEP_TEST,
             _COLLIDER_ORDER,
+            _COLLIDER_RULE,
             _CATEGORICAL,
             _MAX_CATEGORIES,
             ParamSpec(
@@ -307,7 +329,7 @@ _add(
                 nullable=True,
             ),
         ),
-        references=("Huang et al. 2020",),
+        references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
     )
 )
 

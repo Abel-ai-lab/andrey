@@ -49,6 +49,7 @@ from itertools import combinations
 
 import numpy as np
 
+from andrey.constraint._skeleton import collider_verdict
 from andrey.core import backend
 from andrey.core.structure import ARROW, NULL, TAIL
 from andrey.search.hc import tie_ranks
@@ -321,16 +322,6 @@ def colliders(
                         ambiguous.add((j, 0, k, i))
     apply_orientations(marks, requests)
     return marks, frozenset(ambiguous)
-
-
-def collider_verdict(separating: list[frozenset[int]], k: int, collider_rule: str) -> str:
-    """``"collider"``, ``"non-collider"``, or ``"ambiguous"``, by the share of subsets with k."""
-    if not separating:
-        return "ambiguous"
-    share = sum(k in subset for subset in separating) / len(separating)
-    if collider_rule == "conservative":
-        return "collider" if share == 0 else "non-collider" if share == 1 else "ambiguous"
-    return "collider" if share < 0.5 else "non-collider" if share > 0.5 else "ambiguous"
 
 
 def _directed(marks: np.ndarray, a: int, b: int) -> bool:

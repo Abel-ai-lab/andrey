@@ -10,11 +10,13 @@ p-values exactly, so the skeleton is the same either way. Subsets are consumed i
 chunks, so the scan holds one chunk in memory however many subsets it visits. :func:`scan_pairs`
 scans every pair of one conditioning size; for FisherZ and StudentT it stacks the chunks of
 consecutive pairs into one evaluation, up to ``_STACK_BYTES`` of submatrices.
+:func:`vote_triples` decides the unshielded triples of a final skeleton by the conservative or
+majority collider rule.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from functools import partial
 from itertools import chain, combinations, islice
@@ -23,7 +25,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.core import backend
+from andrey.core import NULL, backend
 from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
 
 if TYPE_CHECKING:
@@ -39,6 +41,13 @@ _Chunk = tuple[int, int, int, Sequence[tuple[int, ...]]]
 # huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
 # is computed independently, so the chunk boundary never changes a result.
 _CHUNK = 4096
+
+# Conditioning sets per test call in a collider vote (:func:`vote_triples`). A vote keeps only the
+# separating subsets, so the tests of a pair hold one chunk however large the endpoint degrees are.
+_VOTE_CHUNK = 64
+
+#: How PC, CD-NOD, FCI, and GFCI decide an unshielded triple (:func:`vote_triples`).
+COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
 
 # The most bytes of correlation submatrices one stacked evaluation of scan_pairs holds: a stack of
 # B queries of conditioning size k takes 8 * B * (k + 2) ** 2 bytes, and holds at least one chunk.
@@ -581,6 +590,119 @@ def unseparated_triples(
             if apart[a, c] and (a, c) not in sepsets and (c, a) not in sepsets:
                 triples.add((a, b, c))
     return frozenset(triples)
+
+
+def check_collider_rule(collider_rule: str) -> None:
+    """Raise ``ValueError`` unless ``collider_rule`` is one of :data:`COLLIDER_RULES`."""
+    if collider_rule not in COLLIDER_RULES:
+        raise ValueError(
+            f"collider_rule must be 'sepsets', 'conservative', or 'majority', got {collider_rule!r}"
+        )
+
+
+def collider_verdict(separating: Sequence[Iterable[int]], b: int, rule: str) -> str:
+    """``"collider"``, ``"non-collider"``, or ``"ambiguous"``: what ``rule`` makes of middle node
+    ``b`` from the ``separating`` subsets of its endpoints.
+
+    ``"conservative"`` makes ``b`` a collider when no subset contains it and a non-collider when
+    every subset does. ``"majority"`` makes it a collider when fewer than half contain it and a
+    non-collider when more than half do. Any other share, an exact half under ``"majority"``
+    included, is ambiguous, and so is an empty ``separating``.
+    """
+    if not separating:
+        return "ambiguous"
+    share = sum(b in subset for subset in separating) / len(separating)
+    if rule == "conservative":
+        return "collider" if share == 0 else "non-collider" if share == 1 else "ambiguous"
+    return "collider" if share < 0.5 else "non-collider" if share > 0.5 else "ambiguous"
+
+
+def vote_triples(
+    marks: np.ndarray,
+    test: Callable[..., float],
+    alpha: float,
+    sepsets: dict[tuple[int, int], tuple[int, ...]],
+    rule: str,
+    *,
+    unseparated: str,
+    max_depth: int | None = None,
+    skip: Collection[tuple[int, int, int]] = frozenset(),
+) -> frozenset[tuple[int, int, int]]:
+    """Decide every unshielded triple of ``marks`` by ``rule``; rewrite ``sepsets`` to match and
+    return the ambiguous triples.
+
+    ``marks`` is the final skeleton, a pair adjacent where its entry is not ``NULL``. For each
+    unshielded triple ``(a, b, c)``, ``a < c``, the pair ``(a, c)`` is tested given every subset of
+    ``a``'s neighbors, then every subset of ``c``'s, the empty set included, up to ``max_depth``
+    members when one is given: a subset both endpoints offer is tested and counted twice. A subset
+    separates the pair when its p-value is at least ``alpha``. :func:`collider_verdict` decides the
+    triple from the separating subsets. A pair no subset separates leaves its triples ambiguous
+    when ``unseparated`` is ``"ambiguous"``, and with ``"recorded"`` leaves them to the separating
+    set already recorded, neither voted nor returned. A collider removes ``b`` from the pair's
+    separating sets and a non-collider adds it, under both key orders, a missing order taking the
+    other's set first; an ambiguous triple leaves them as they are. The separating sets already
+    recorded do not vote. A triple in ``skip``, keyed ``(a, b, c)`` with ``a < c``, is neither
+    voted nor returned.
+
+    Each pair is tested once, however many middle nodes it has, in chunks of ``_VOTE_CHUNK``
+    subsets, through the test's ``batched_call`` when it has one; BLAS is pinned to one thread for
+    a test :func:`~andrey.core.ci.pins_blas` names, as in the skeleton search. The cost grows as
+    ``2**degree`` per pair.
+    """
+    neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
+    votes: dict[tuple[int, int], list[tuple[int, ...]]] = {}
+    ambiguous = set()
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        for b, adjacent in enumerate(neighbors):
+            for a, c in combinations(adjacent, 2):
+                if marks[a, c] != NULL or (a, b, c) in skip:
+                    continue
+                if (a, c) not in votes:
+                    votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
+                separating = votes[a, c]
+                if not separating and unseparated == "recorded":
+                    continue
+                verdict = collider_verdict(separating, b, rule)
+                if verdict == "ambiguous":
+                    ambiguous.add((a, b, c))
+                    continue
+                for pair in ((a, c), (c, a)):
+                    recorded = sepsets.get(pair)
+                    if recorded is None:
+                        recorded = sepsets.get(pair[::-1], ())
+                    if verdict == "non-collider":
+                        sepsets[pair] = recorded if b in recorded else (*recorded, b)
+                    else:
+                        sepsets[pair] = tuple(node for node in recorded if node != b)
+    return frozenset(ambiguous)
+
+
+def _separating_votes(
+    test: Callable[..., float],
+    a: int,
+    c: int,
+    neighbors: list[list[int]],
+    alpha: float,
+    max_depth: int | None,
+) -> list[tuple[int, ...]]:
+    """The subsets of ``a``'s neighbors, then of ``c``'s, that separate ``a`` and ``c``
+    (``p >= alpha``), each endpoint's by increasing size, as :func:`vote_triples` counts them."""
+    subsets = (
+        subset
+        for endpoint in (a, c)
+        for size in range(
+            len(neighbors[endpoint]) + 1
+            if max_depth is None
+            else min(len(neighbors[endpoint]), max_depth) + 1
+        )
+        for subset in combinations(neighbors[endpoint], size)
+    )
+    batched = getattr(test, "batched_call", None)
+    found: list[tuple[int, ...]] = []
+    while chunk := list(islice(subsets, _VOTE_CHUNK)):
+        pvalues = batched(a, c, chunk) if callable(batched) else [test(a, c, s) for s in chunk]
+        found.extend(subset for subset, p in zip(chunk, pvalues) if p >= alpha)
+    return found
 
 
 def adjacent_pairs(adjacency: np.ndarray) -> list[tuple[int, int]]:

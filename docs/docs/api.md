@@ -64,6 +64,14 @@ and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each 
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
+`pc`, `cdnod`, `fci`, and `gfci` take `collider_rule`, which decides whether the middle node of
+an unshielded triple `x - z - y` is a collider. `"sepsets"`, the default, reads the separating set
+that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang, and Spirtes 2006) and `"majority"`
+(Colombo and Maathuis 2014) test `x` and `y` again given every subset of either one's neighbors
+and make `z` a collider when none, or fewer than half, of the separating subsets contain it. A
+triple the vote cannot decide is ambiguous: no rule orients through it, and
+`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome.
+
 `ges` takes `max_parents`, a gate on its forward phase: a node whose parent count already exceeds it
 gains no new parents.
 
