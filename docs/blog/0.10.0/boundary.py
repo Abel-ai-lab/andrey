@@ -11,7 +11,9 @@ the sizes before the first one that does not finish or does not beat the empty g
 an ``--andrey-*`` token.
 
 The cells come from a feasibility file (the ``feasibility`` lane of a release card's summary: one
-row per method, regime, and size). Run with
+row per method, regime, and size), whose ``stop`` comes from that size's fits. How each row ended,
+including the ``accuracy`` stop, comes from its sibling ``<name>-stops.csv`` (method, regime, stop,
+d, ...): the mark goes on the row's last size. Run with
 ``uv run python docs/blog/0.10.0/boundary.py <cells.json> [outdir]``.
 
 The maps are a reference for the measured conditions, not a hard limit: another graph generator,
@@ -20,6 +22,7 @@ other data, other settings, or another machine move a boundary.
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 import sys
@@ -186,7 +189,18 @@ def family_figure(family: str, cells: list[dict]) -> str:
 
 
 def main() -> None:
-    cells = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+    path = Path(sys.argv[1])
+    cells = json.loads(path.read_text(encoding="utf-8"))
+    stops = path.with_name(f"{path.stem}-stops.csv")
+    if stops.exists():  # a row that ended past the accuracy boundary: marked on its last size
+        ended = {
+            (r["method"], r["regime"], int(r["d"]))
+            for r in csv.DictReader(stops.open(encoding="utf-8"))
+            if r["stop"] == "accuracy"
+        }
+        for cell in cells:
+            if (cell["method"], cell["regime"], cell["d"]) in ended:
+                cell["stop"] = "accuracy"
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE
     for family in FAMILIES:
         (out / f"boundary-{family}.html").write_text(family_figure(family, cells), encoding="utf-8")
