@@ -6,10 +6,8 @@
 {%- block extrahead %}
 {{ super() }}
 {{ home.robots }}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="_static/fonts/inter-latin.woff2" crossorigin>
 <noscript><style>.andrey-home .tile-dialog { display: block; position: static; margin: 2rem auto; } .andrey-home .tile-dialog .wf-close { display: none; }</style></noscript>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap">
 <style>{{ home.style }}</style>
 {%- endblock extrahead %}
 {%- block content %}
