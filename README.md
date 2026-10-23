@@ -54,7 +54,7 @@ You install andrey-core and then `import andrey`.
 
 - **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
   layouts
-- **Development version**: `uv add git+https://github.com/Abel-ai-lab/andrey`
+- **Development version**: `uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"`
 - **[Installation guide](https://andrey.abel.ai/docs/guides/getting-started.html#install)**: the
   extras, a PyTorch build for your GPU, and building Andrey from source
 

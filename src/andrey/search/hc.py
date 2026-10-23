@@ -20,7 +20,7 @@ from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, to_structure
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, BICScore, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, SCORES, BICScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
 from andrey.core.warning_policy import SearchLimitWarning, warn_once
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
@@ -41,13 +41,7 @@ from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 __all__ = ["hc"]
 
 #: The local scores :func:`hc` accepts.
-HC_SCORES: tuple[str, ...] = (
-    "local_score_BIC_from_cov",
-    "local_score_BDeu",
-    "local_score_BIC_categorical",
-    "local_score_degen_gauss",
-    "local_score_cond_gauss",
-)
+HC_SCORES: tuple[str, ...] = SCORES
 
 
 # (delta, u, v, op_rank, (op, u, v)). op_rank: remove 0 < reverse 1; add is 0 and never shares
@@ -466,8 +460,9 @@ def hc(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC), ``"local_score_BDeu"``
-        (BDeu on category codes, :class:`~andrey.core.score.BDeuScore` with its default priors),
+        Local score: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"`` (linear-Gaussian BIC),
+        ``"local_score_BDeu"`` (BDeu on category codes,
+        :class:`~andrey.core.score.BDeuScore` with its default priors),
         ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
         ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or
