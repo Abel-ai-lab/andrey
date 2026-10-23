@@ -212,9 +212,13 @@ ABEL_URL = "https://abel.ai/"
 ABEL_GITHUB = "https://github.com/Abel-ai-lab"
 # Abel's logomark in Night Teal, for light backgrounds, from Abel's brand kit: the structured
 # data's organization logo, drawn at the build as a PNG wide enough for search results.
-ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
+BRAND = ROOT / "site" / "brand"
+ABEL_SYMBOL = BRAND / "abel-symbol-night.svg"
 ABEL_LOGO = "_static/abel-symbol.png"
 ABEL_LOGO_WIDTH = 600
+# The brand art's AVIF copies: 60% smaller than the JPEGs in all, with no visible change at twice
+# the size (WebP came out larger than the JPEGs on the art's grain).
+AVIF_QUALITY = 50
 # The icon's PNGs at the site's root, by name, each its side in pixels (_write_discovery).
 FAVICONS = {"favicon-96.png": 96, "apple-touch-icon.png": 180}
 # Pages a search engine should not list: the search page, and the page the server shows for a
@@ -495,6 +499,12 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     site.fastest(summary)
     # The homepage and non-post pages share the repository's social preview.
     _write_bytes(GENERATED / "extra" / HOME_PREVIEW, cards.social_jpeg())
+    # An AVIF copy of each brand art and tile crop, which the homepage offers before the JPEG;
+    # one already written from the same JPEG is kept, since encoding takes seconds.
+    for jpeg in [*BRAND.glob("art-*.jpg"), *(BRAND / "bento").glob("*.jpg")]:
+        avif = GENERATED / "static" / jpeg.relative_to(BRAND).with_suffix(".avif")
+        if not avif.exists() or avif.stat().st_mtime < jpeg.stat().st_mtime:
+            _write_bytes(avif, _avif(jpeg))
     # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
     for name, tile in cards.grain.hero_tiles():
         _write_bytes(GENERATED / "static" / name, tile)
@@ -674,13 +684,14 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
 # (a CSS `url()`, an `src`, the favicon link) gets its content's hash as a query, so a changed file
 # gets a new address; then each page's stylesheet links take the hash of the rewritten stylesheet,
 # since Sphinx hashed it before. Download links keep their addresses.
-ASSET_TYPES = "svg|jpg|jpeg|png|webp|gif"
+ASSET_TYPES = "svg|jpg|jpeg|png|webp|avif|gif"
 ASSET_REFS = (
     (".css", re.compile(rf'(url\("?)([^")?#:]+\.(?:{ASSET_TYPES}))(?="?\))')),
     (
         ".html",
         re.compile(
-            rf'((?:\bsrc|<link rel="icon"[^>]*?\bhref)=")([^"?#:]+\.(?:{ASSET_TYPES}))(?=")'
+            rf'((?:\bsrc|\bsrcset|<link rel="(?:icon|preload)"[^>]*?\bhref)=")'
+            rf'([^"?#:]+\.(?:{ASSET_TYPES}))(?=")'
         ),
     ),
     (
@@ -1385,6 +1396,16 @@ def _notebook_thumbnail(app, doctree) -> None:  # noqa: ANN001
             f"{docname} shows no figure; name its data in NOTEBOOK_DATA for a thumbnail"
         )
     _write(THUMBS / f"{stem}.svg", build_assets.graph_thumbnail(NOTEBOOK_DATA[stem]().graph))
+
+
+def _avif(jpeg: pathlib.Path) -> bytes:
+    """``jpeg`` as an AVIF at ``AVIF_QUALITY``, its size unchanged."""
+    from PIL import Image
+
+    out = io.BytesIO()
+    with Image.open(jpeg) as image:
+        image.save(out, "AVIF", quality=AVIF_QUALITY)
+    return out.getvalue()
 
 
 def _write_bytes(path: pathlib.Path, data: bytes) -> None:
