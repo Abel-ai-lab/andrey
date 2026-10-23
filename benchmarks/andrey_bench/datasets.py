@@ -256,7 +256,7 @@ def latents_for(regime: str, d: int) -> int:
 def latent_node_types(d: int, latents: int) -> np.ndarray | None:
     """Return node types for a truth with `d` nodes and the last `latents` nodes hidden.
 
-    Return `None` when no nodes are hidden. `andrey.data.latent.with_latents` puts hidden nodes
+    Return `None` when no nodes are hidden. `andrey.data.latent.latent_order` puts hidden nodes
     last, as `marginal` requires.
     """
     if not latents:

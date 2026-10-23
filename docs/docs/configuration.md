@@ -47,7 +47,11 @@ requested backend uses `auto`, without a warning.
   per-variable regressions of `granger` and the two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
   also use the worker processes for their skeleton search with the `fisherz` and `student_t` tests,
   and send a conditioning-set size to them only when it has enough tests to repay them. `1` (the
-  default) and `0` run serially; `-1` uses every usable core.
+  default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
+  threads unlimited and with several limits each thread to one, so on a machine with several cores
+  its p-values and statistics can differ in the last digits between one worker and several. Each
+  `pnl` thread holds three n x n float64 matrices; when the threads you ask for would hold more than
+  4 GiB, fewer run, with a `PerformanceWarning`.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,

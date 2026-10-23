@@ -45,6 +45,7 @@ def ges(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
+    max_parents: int | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     knowledge: Knowledge | None = None,
@@ -75,6 +76,14 @@ def ges(
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must
         be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
         per free parameter of a variable's conditional probability table.
+    max_parents : int or None, default=None
+        A gate on the forward phase, at least ``0``: a node whose parent count already exceeds
+        ``max_parents`` gains no new parents in it. It does not cap the finished graph: one move
+        can give a node several parents at once, so a node can end with more than ``max_parents``.
+        ``None`` keeps the default gate of ``n_variables / 2``, and a larger integer lifts it. A
+        lower value makes the search faster on large graphs and can lower the errors, but it can
+        stop the search short of the lowest-scoring graph, which GES otherwise finds. The
+        backward phase has no gate.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -111,17 +120,18 @@ def ges(
         If ``score_func`` names no available score.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_parents`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if ``max_categories`` is less than ``2``,
-        with a categorical score, if ``data`` holds a number that is not whole, or, with a
-        mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
-        column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another score. With the BIC score, also if a column repeats another up to scale and
-        shift given more than two rows or, with more rows than columns, is a linear function of
-        other columns. One message names every group of copies and says to keep one column per
-        group. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        If ``lambda_value`` is negative or non-finite, if a given ``max_parents`` is negative, if
+        ``max_categories`` is less than ``2``, with a categorical score, if ``data`` holds a number
+        that is not whole, or, with a mixed-data score, if ``categorical`` names a column ``data``
+        lacks, or if a categorical column holds a number that is not whole or a missing value. Also
+        if ``categorical`` is given with another score. With the BIC score, also if a column
+        repeats another up to scale and shift given more than two rows or, with more rows than
+        columns, is a linear function of other columns. One message names every group of copies and
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -154,11 +164,11 @@ def ges(
     on the published benchmarks. FGES, a fast GES, multiplied the BIC penalty by 4 when searching
     continuous data on graphs of up to a million variables [2]_.
 
-    **How it works.** In the forward phase, a variable with more than ``n_variables / 2`` parents
-    gets no new edges. The backward phase has no cap. Moves whose score changes are equal after
-    rounding are chosen by each column's rank, as in :func:`~andrey.hc`; the
-    :doc:`column-order guide </docs/guides/column-order>` says what the rank keeps under a new
-    column order and on another machine.
+    **How it works.** In the forward phase, a variable whose parent count already exceeds
+    ``max_parents`` (``n_variables / 2`` for ``None``) gains no new parents. The backward phase has
+    no such gate. Moves whose score changes are equal after rounding are chosen by each column's
+    rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says
+    what the rank keeps under a new column order and on another machine.
 
     **Categorical data.** ``"local_score_BDeu"`` takes each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
@@ -190,12 +200,12 @@ def ges(
     constant per variable, so it finds the same graph. Moves are scored in this process.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 200 variables with ten rows per variable and parents capped at 4 per
-    variable rather than ``n_variables / 2``. At ``lambda_value=1.0`` its median errors (SHD) stayed
+    degree 2), from 20 to 200 variables with ten rows per variable and ``max_parents=4`` rather
+    than ``n_variables / 2``. At ``lambda_value=1.0`` its median errors (SHD) stayed
     below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against
     200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
     and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
-    the default parent cap, its median errors passed the empty graph's (612 against 338). With
+    the default limit, its median errors passed the empty graph's (612 against 338). With
     fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more
     variables fits its child exactly, so the search never selects one, nor any parent set that
     leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated
@@ -206,7 +216,8 @@ def ges(
     On simulated categorical networks with 2 or 3 categories per variable, of the same sizes and
     rows, ``"local_score_BDeu"`` gave 6 against 40 at 40 variables, in 0.60 s. The multinomial BIC
     is not benchmarked with GES yet: its tests check it against the formula and run GES on small
-    fixed categorical networks.
+    fixed categorical networks. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -259,6 +270,7 @@ def ges(
     """
     from andrey.search.ges import ges as _ges
 
+    max_parents = None if max_parents is None else int_in_range(max_parents, "max_parents", 0)
     score_func, categorical = default_score(
         data, score_func, "local_score_BIC", categorical=categorical, max_categories=max_categories
     )
@@ -272,6 +284,7 @@ def ges(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
+            maxP=max_parents,
             categorical=mask,
             constraints=constraints,
         )
@@ -374,7 +387,9 @@ def gies(
     grows with the number of intervened variables times the square of the variable count. A parent
     set of ``m - 1`` or more variables, where ``m`` counts the rows without an intervention on the
     child, fits its child exactly, so the search never selects one, nor any parent set that leaves
-    its child a residual variance of at most ``1e-12`` times its variance.
+    its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -496,7 +511,9 @@ def xges(
     Gaussian noise.
     With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
     more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance.
+    leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -661,7 +678,8 @@ def hc(
     12.5 with ``"local_score_degen_gauss"`` and 11 with ``"local_score_cond_gauss"``, against 40. On
     simulated categorical networks with 2 or 3 categories per variable, of the same sizes and rows,
     they were 18 with ``"local_score_BDeu"`` and 20 with ``"local_score_BIC_categorical"``. Every
-    median fit took under 0.2 s at 40 variables, on 4 cores.
+    median fit took under 0.2 s at 40 variables, on 4 cores. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -815,7 +833,8 @@ def tabu(
     columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more variables fits
     its child exactly, so the search never selects one, nor any parent set that leaves its child a
     residual variance of at most ``1e-12`` times its variance. With a categorical score, its tests
-    run it on small fixed categorical networks.
+    run it on small fixed categorical networks. The numbers are a reference, not a hard limit: they
+    change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------
@@ -990,7 +1009,9 @@ def exact_search(
     its memory doubles as well.
     With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
     more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance.
+    leaves its child a residual variance of at most ``1e-12`` times its variance. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -1143,7 +1164,9 @@ def calm(data: npt.ArrayLike, *, seed: int | None = None, **params: Any) -> Stru
     grows with the cube of the variable count; the defaults allow up to 75,000 steps (``max_outer``
     times ``subproblem_iter``). The fit is nonconvex and can stop at a local optimum: on a collider
     whose two parents are independent, it can return both edges reversed and an edge between the
-    parents, with the defaults and with the paper's schedule alike.
+    parents, with the defaults and with the paper's schedule alike. The numbers are a reference, not
+    a hard limit: they change with the data generator, the density, the method's settings, and the
+    machine.
 
     References
     ----------

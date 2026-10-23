@@ -139,10 +139,11 @@ class _Graph:
     ``forbidden`` holds the ``(x, y)`` pairs whose Insert ``x -> y`` the extended search forbids.
     A :meth:`branch` shares a snapshot's sets until it changes a node: its first change copies
     that node's four sets from ``source``, the graph it branched from, and adds the node to
-    ``copied``.
+    ``copied``. ``version`` counts the changes to the graph's edges, so a branch can check that its
+    snapshot still matches the graph.
     """
 
-    __slots__ = ("pa", "ch", "ne", "ad", "forbidden", "source", "copied")
+    __slots__ = ("pa", "ch", "ne", "ad", "forbidden", "source", "copied", "version")
 
     def __init__(self, d: int) -> None:
         self.pa: list[set[int]] = [set() for _ in range(d)]
@@ -152,6 +153,7 @@ class _Graph:
         self.forbidden: set[tuple[int, int]] = set()
         self.source: _Graph | None = None
         self.copied: set[int] = set()
+        self.version = 0
 
     def copy(self) -> _Graph:
         out = _Graph.__new__(_Graph)
@@ -161,6 +163,7 @@ class _Graph:
         out.ad = [set(s) for s in self.ad]
         out.forbidden = set(self.forbidden)
         out.source, out.copied = None, set()
+        out.version = self.version
         return out
 
     def branch(self, snapshot: _Graph) -> _Graph:
@@ -169,13 +172,17 @@ class _Graph:
 
         A set's iteration order depends on its history, and the search's ties follow that order.
         The snapshot's sets iterate as fresh copies do, and the branch copies a node's sets from
-        this graph, as :meth:`copy` does, before changing them.
+        this graph, as :meth:`copy` does, before changing them. A snapshot taken at another version
+        than this graph's now, or changed since, raises ``RuntimeError``.
         """
+        if snapshot.version != self.version:
+            raise RuntimeError("the snapshot no longer matches the graph it was copied from")
         out = _Graph.__new__(_Graph)
         out.pa, out.ch = snapshot.pa.copy(), snapshot.ch.copy()
         out.ne, out.ad = snapshot.ne.copy(), snapshot.ad.copy()
         out.forbidden = set(self.forbidden)
         out.source, out.copied = self, set()
+        out.version = self.version
         return out
 
     def detach(self) -> None:
@@ -199,6 +206,7 @@ class _Graph:
 
     def set_state(self, a: int, b: int, state: int) -> None:
         """Replace the edge between ``a < b`` by ``state``."""
+        self.version += 1
         source = self.source
         if source is not None:
             if a not in self.copied:
@@ -337,10 +345,11 @@ def _extension_scores(
     """The memoized local score of each node :func:`_extension_parents` covers.
 
     The sum over all nodes is the CPDAG's total score, independent of the moves that reached it,
-    even when singular parent sets make Schur updates and full-score differences disagree.
+    even when singular parent sets make Schur updates and full-score differences disagree. A
+    singular parent set divides by zero on purpose, so the caller runs this under
+    ``np.errstate(divide="ignore", invalid="ignore")``, once for all the calls of a search.
     """
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return {v: score.score(v, tuple(ps)) for v, ps in _extension_parents(pa, ne, nodes).items()}
+    return {v: score.score(v, tuple(ps)) for v, ps in _extension_parents(pa, ne, nodes).items()}
 
 
 # ---- local CPDAG completion ---------------------------------------------------------------------
@@ -998,54 +1007,55 @@ class _Search:
         lowers it and no graph is kept twice. A branch rescores only the chain components of the
         nodes whose parents or neighbors it changed; the other nodes keep their extension parents.
         """
-        tolerance = _ACCEPT_PER_SAMPLE * n_samples
-        score = self.add_deltas.score
-        scores = _extension_scores(self.g.pa, self.g.ne, range(self.d), score)
-        local = [scores[v] for v in range(self.d)]
-        total = sum(local)
-        pending: list[tuple] = []
-        fresh = False
-        snapshot: tuple[_Graph, _Paths] | None = None  # copies of self.g and self.paths
-        while pending or not fresh:
-            if not pending:
-                for y in range(self.d):
-                    for x in self.g.pa[y] | self.g.ne[y]:
-                        self.find_delete(y, x, pending)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            tolerance = _ACCEPT_PER_SAMPLE * n_samples
+            score = self.add_deltas.score
+            scores = _extension_scores(self.g.pa, self.g.ne, range(self.d), score)
+            local = [scores[v] for v in range(self.d)]
+            total = sum(local)
+            pending: list[tuple] = []
+            fresh = False
+            snapshot: tuple[_Graph, _Paths] | None = None  # copies of self.g and self.paths
+            while pending or not fresh:
                 if not pending:
-                    return total
-                fresh = True
-            entry = heapq.heappop(pending)
-            if pending and pending[0][0] - entry[0] < self.tie_gap:
-                entry = self.tied(pending, entry)
-            _, _, x, y, C, E = entry
-            if not _delete_valid(self.g, x, y, C, E, self.constraints):
-                continue
-            if snapshot is None:
-                snapshot = self.g.copy(), self.paths.copy()
-            trial = self.branch(snapshot)
-            log = _Changes()
-            _apply_delete(trial.g, x, y, C, log)
-            if self.constraints is not None and not admits(trial.g.marks(), self.constraints):
-                continue
-            trial.g.forbidden.add((x, y))
-            trial.fingerprint = log.rekey(trial.fingerprint)
-            trial.update(log)
-            trial.base_search()
-            g, h = self.g, trial.g
-            # A node the branch never changed keeps its parents and neighbors.
-            changed = [v for v in sorted(h.copied) if h.pa[v] != g.pa[v] or h.ne[v] != g.ne[v]]
-            trial_local = local.copy()
-            for v, value in _extension_scores(h.pa, h.ne, changed, score).items():
-                trial_local[v] = value
-            trial_total = sum(trial_local)
-            if trial_total < total - tolerance:
-                h.detach()
-                trial.paths.detach()
-                self.g, self.paths, self.fingerprint = h, trial.paths, trial.fingerprint
-                snapshot = None
-                local, total = trial_local, trial_total
-                fresh = False
-        return total
+                    for y in range(self.d):
+                        for x in self.g.pa[y] | self.g.ne[y]:
+                            self.find_delete(y, x, pending)
+                    if not pending:
+                        return total
+                    fresh = True
+                entry = heapq.heappop(pending)
+                if pending and pending[0][0] - entry[0] < self.tie_gap:
+                    entry = self.tied(pending, entry)
+                _, _, x, y, C, E = entry
+                if not _delete_valid(self.g, x, y, C, E, self.constraints):
+                    continue
+                if snapshot is None:
+                    snapshot = self.g.copy(), self.paths.copy()
+                trial = self.branch(snapshot)
+                log = _Changes()
+                _apply_delete(trial.g, x, y, C, log)
+                if self.constraints is not None and not admits(trial.g.marks(), self.constraints):
+                    continue
+                trial.g.forbidden.add((x, y))
+                trial.fingerprint = log.rekey(trial.fingerprint)
+                trial.update(log)
+                trial.base_search()
+                g, h = self.g, trial.g
+                # A node the branch never changed keeps its parents and neighbors.
+                changed = [v for v in sorted(h.copied) if h.pa[v] != g.pa[v] or h.ne[v] != g.ne[v]]
+                trial_local = local.copy()
+                for v, value in _extension_scores(h.pa, h.ne, changed, score).items():
+                    trial_local[v] = value
+                trial_total = sum(trial_local)
+                if trial_total < total - tolerance:
+                    h.detach()
+                    trial.paths.detach()
+                    self.g, self.paths, self.fingerprint = h, trial.paths, trial.fingerprint
+                    snapshot = None
+                    local, total = trial_local, trial_total
+                    fresh = False
+            return total
 
 
 # ---- the rescanning reference -------------------------------------------------------------------
@@ -1228,7 +1238,8 @@ def _marks_total(adj: np.ndarray, score: BICScore) -> float:
     """The total of :func:`_extension_scores` for a CPDAG given as a mark matrix."""
     d = adj.shape[0]
     sets = [_sets(adj, v) for v in range(d)]
-    scores = _extension_scores([s[0] for s in sets], [s[1] for s in sets], range(d), score)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        scores = _extension_scores([s[0] for s in sets], [s[1] for s in sets], range(d), score)
     return sum(scores[v] for v in range(d))
 
 

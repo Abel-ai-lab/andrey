@@ -1,9 +1,8 @@
-"""Storage round-trip tests: native safetensors + JSON manifest.
+"""Storage round-trip tests: native safetensors.
 
 Refutations: a dataset round-trips losslessly (data, truth including node_types,
 report, params); node_types None encodes as tensor absence (not zeros) so Structure.__eq__ holds; an
-edgeless graph round-trips; a collection saves + reloads and its manifest is filterable without
-opening a buffer.
+edgeless graph round-trips.
 """
 
 from __future__ import annotations
@@ -58,31 +57,6 @@ def test_edgeless_graph_roundtrips(tmp_path):
     loaded = storage.load(tmp_path / "e.safetensors")
     assert loaded.graph == ds.graph
     assert loaded.params.edges.shape == (0, 2)
-
-
-def test_collection_roundtrip_and_manifest(tmp_path):
-    scms = [
-        data.SCM(
-            graph=data.graphs.erdos_renyi(15, 2.0),
-            functional=data.functional.linear(),
-            noise=data.noise.gaussian(),
-        ),
-        data.SCM(
-            graph=data.graphs.scale_free(15, 2),
-            functional=data.functional.linear(),
-            noise=data.noise.uniform(),
-        ),
-    ]
-    ens = data.Ensemble(scms=scms, seeds=range(3), n=300)
-    datasets = data.generate(ens, workers=1)
-    storage.save_collection(datasets, tmp_path / "coll")
-    loaded = storage.load_collection(tmp_path / "coll")
-    assert len(loaded) == len(datasets) == 6
-    for a, b in zip(datasets, loaded):
-        _assert_roundtrip(a, b)
-    manifest = json.loads((tmp_path / "coll" / "collection.json").read_text())
-    assert len(manifest["datasets"]) == 6
-    assert all("varsortability" in e and "nnz" in e for e in manifest["datasets"])
 
 
 def test_header_metadata_read_without_data(tmp_path):

@@ -620,7 +620,7 @@ def test_rejects_bad_settings(cls, kwargs, match):
 def test_rcot_warns_on_a_conditional_query_below_500_rows(n, condition_set, warns):
     """Below 500 rows RCoT warns on a query with a conditioning set, and still answers; an
     unconditional query, or 500 rows, does not warn."""
-    andrey.core.warning_policy.reset()
+    andrey.core.warning_policy._warned.clear()
     test = RCoT(np.random.default_rng(0).standard_normal((n, 3)))
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -636,7 +636,7 @@ def test_rcot_warns_on_a_conditional_query_below_500_rows(n, condition_set, warn
 def test_pc_selects_each_nonlinear_test_by_name(name):
     """Each nonlinear test is selectable by name in PC, and none warns that it is experimental."""
     assert name in ci.SHIPPED_INDEP_TESTS
-    andrey.core.warning_policy.reset()
+    andrey.core.warning_policy._warned.clear()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         out = andrey.pc(_common_cause(seed=0, n=60, n_cond=1), indep_test=name)

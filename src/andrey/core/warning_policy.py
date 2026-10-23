@@ -90,12 +90,6 @@ if hasattr(os, "register_at_fork"):
     os.register_at_fork(after_in_child=_reset_after_fork)
 
 
-def reset() -> None:
-    """Forget which messages have warned (test isolation)."""
-    with _lock:
-        _warned.clear()
-
-
 def _caller_stacklevel() -> int:
     """The ``stacklevel``, counted from ``warn_once``, of the first frame outside the package."""
     frame = sys._getframe(2)

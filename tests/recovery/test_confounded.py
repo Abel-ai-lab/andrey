@@ -128,7 +128,10 @@ def test_hsic_gamma_separates_dependence_from_independence():
 
     Repeated calls on the same input must return the same result.
     """
-    from andrey.core.independence import hsic_gamma_test
+    from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
+
+    def hsic_gamma_test(x, y):
+        return hsic_gamma_from_grams(gamma_gram(x), gamma_gram(y), len(x))
 
     rng = np.random.default_rng(0)
     for _ in range(6):

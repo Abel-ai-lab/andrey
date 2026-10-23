@@ -230,7 +230,9 @@ class CMIknn:
     ``n_permutations + 1`` estimates, each over ``n x n`` distance matrices, so its time grows with
     the square of the number of rows times the permutations, and its memory with the square of the
     rows: hundreds of rows take seconds per query, and tens of thousands do not fit. The p-value
-    moves with ``seed``, is a multiple of ``1 / (n_permutations + 1)``, and is at least that.
+    moves with ``seed``, is a multiple of ``1 / (n_permutations + 1)``, and is at least that. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------

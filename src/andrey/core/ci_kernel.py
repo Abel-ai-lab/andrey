@@ -174,7 +174,9 @@ class KCI:
     of rows are practical, tens of thousands are not. The kernel widths follow the row count and the
     size of the conditioning set, not the data. On simulated draws with up to three conditioning
     variables and 500 rows, it rejected a true independence at rates between ``alpha`` and twice
-    ``alpha``; a test that rejects too often makes PC and FCI keep edges.
+    ``alpha``; a test that rejects too often makes PC and FCI keep edges. The numbers are a
+    reference, not a hard limit: they change with the data generator, the density, the method's
+    settings, and the machine.
 
     References
     ----------
@@ -467,7 +469,8 @@ class RCoT:
     Because the features are sampled for each conditioning set, PC tests a weak dependence against
     every conditioning set with a new chance to miss it. On the datasets above, PC with RCoT missed
     14 to 20% of the true edges at 500 rows and 1.5 to 4% at 5,000 rows, and 2 to 6% of the edges
-    it kept were not true edges.
+    it kept were not true edges. The numbers are a reference, not a hard limit: they change with the
+    data generator, the density, the method's settings, and the machine.
 
     References
     ----------

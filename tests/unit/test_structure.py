@@ -710,3 +710,105 @@ def test_a_self_loop_reads_the_same_in_the_lag_graph_and_the_summary():
         == summary.oriented_edges(index=True)
         == [(0, 0, "directed")]
     )
+
+
+# --- pcalg's amat -----------------------------------------------------------------------------
+# pcalg's amat.pag puts the mark of edge a-b at the column node, in amat[a, b], coded 0 none,
+# 1 circle, 2 arrowhead, 3 tail; its amat.cpdag writes a -> b at the child's row, amat[b, a] = 1
+# (pcalg's amatType help page).
+
+PCALG_PAG_CODE = {TAIL: 3, ARROW: 2, CIRCLE: 1}
+
+
+@pytest.mark.parametrize(("mark_0", "mark_1", "row"), ORIENTED)
+def test_pcalg_pag_puts_each_mark_at_its_column_node(mark_0, mark_1, row):
+    M = np.array([[0, mark_0], [mark_1, 0]], dtype=np.int8)
+    pag = GraphStructure.from_numpy(M, kind="pag")
+    amat = np.array([[0, PCALG_PAG_CODE[mark_1]], [PCALG_PAG_CODE[mark_0], 0]])
+    assert np.array_equal(pag.to_pcalg(), amat)
+    assert GraphStructure.from_pcalg(amat, "pag") == pag
+    assert GraphStructure.from_pcalg(amat, "pag").oriented_edges() == [row]
+
+
+@pytest.mark.parametrize("kind", ["dag", "cpdag"])
+def test_pcalg_cpdag_writes_a_directed_edge_at_the_childs_row(kind):
+    # 0 -> 2 <- 1, and 2 -- 3 when the kind allows an undirected edge.
+    pairs = [(0, 2), (1, 2)]
+    g = directed(pairs, 4, kind=kind)
+    amat = np.zeros((4, 4), dtype=np.int8)
+    amat[2, 0] = amat[2, 1] = 1
+    if kind == "cpdag":
+        g = GraphStructure.from_numpy(g.to_numpy() + _undirected([(2, 3)], 4), kind=kind)
+        amat[2, 3] = amat[3, 2] = 1
+    assert np.array_equal(g.to_pcalg(), amat) and g.to_pcalg().dtype == np.int8
+    assert GraphStructure.from_pcalg(amat, kind) == g
+
+
+def _random_graph(kind, seed, n=6):
+    """Edges between random pairs, each of a type the kind allows, with labels."""
+    rng = np.random.default_rng(seed)
+    allowed = {
+        "dag": [(TAIL, ARROW)],
+        "cpdag": [(TAIL, ARROW), (TAIL, TAIL)],
+        "pag": [(a, b) for a in (TAIL, ARROW, CIRCLE) for b in (TAIL, ARROW, CIRCLE)],
+    }[kind]
+    M = np.zeros((n, n), dtype=np.int8)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if rng.random() < 0.5:
+                M[i, j], M[j, i] = allowed[rng.integers(len(allowed))]
+    return GraphStructure.from_numpy(M, kind=kind, labels=tuple("abcdef"[:n]))
+
+
+@pytest.mark.parametrize("kind", ["dag", "cpdag", "pag"])
+@pytest.mark.parametrize("seed", range(3))
+def test_pcalg_amat_round_trips_with_labels(kind, seed):
+    g = _random_graph(kind, seed)
+    amat = g.to_pcalg()
+    assert amat.shape == (6, 6) and amat.dtype == np.int8
+    back = GraphStructure.from_pcalg(amat, kind, labels=g.labels)
+    assert back == g and back.labels == g.labels
+    assert np.array_equal(back.to_pcalg(), amat)
+
+
+def test_pcalg_amat_from_r_may_be_float_or_bool():
+    # rpy2 hands R's numeric matrix over as float64, and a logical one as bool.
+    amat = np.array([[0, 0, 0], [0, 0, 0], [1, 1, 0]])
+    want = GraphStructure.from_pcalg(amat, "cpdag")
+    assert GraphStructure.from_pcalg(amat.astype(float), "cpdag") == want
+    assert GraphStructure.from_pcalg(amat.astype(bool), "cpdag") == want
+
+
+@pytest.mark.parametrize(
+    ("amat", "kind", "message"),
+    [
+        (np.zeros((2, 3)), "pag", "square"),
+        (np.array([[0, 2], [0, 0]]), "cpdag", "codes"),  # a PAG code in a CPDAG's matrix
+        (np.array([[0, 4], [4, 0]]), "pag", "codes"),
+        (np.array([[0, 0.5], [0, 0]]), "cpdag", "codes"),
+        (np.array([[0, 2], [0, 0]]), "pag", "symmetric"),  # a mark at one end only
+        (np.array([[1, 0], [0, 0]]), "cpdag", "diagonal"),
+        (np.array([[0, 1], [1, 0]]), "dag", "undirected"),  # an undirected edge in a DAG
+        (np.array([[0, 1], [0, 0]]), "digraph", "kind"),
+    ],
+)
+def test_from_pcalg_rejects_what_pcalg_cannot_have_written(amat, kind, message):
+    with pytest.raises(ValueError, match=message):
+        GraphStructure.from_pcalg(amat, kind)
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [
+        directed([(0, 1), (1, 0)], 2, kind="digraph"),  # a 2-cycle
+        GraphStructure.from_numpy(np.array([[0, CIRCLE], [ARROW, 0]]), kind="cpdag"),
+        GraphStructure.from_numpy(np.array([[0, ARROW], [ARROW, 0]]), kind="dag"),
+        GraphStructure.from_numpy(
+            np.array([[ARROW, 0], [0, 0]]), kind="pag", allow_self_loops=True
+        ),
+    ],
+    ids=["digraph", "circle in a cpdag", "double arrowhead in a dag", "self-loop"],
+)
+def test_to_pcalg_rejects_a_graph_pcalg_cannot_write(graph):
+    with pytest.raises(ValueError):
+        graph.to_pcalg()

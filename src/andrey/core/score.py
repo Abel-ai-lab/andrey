@@ -595,7 +595,8 @@ class CategoricalBICScore(_CountScore):
     and the score prefers fewer parents than the data support. Its tests check it against the
     formula on fixed tables. Hill climbing was measured with it on simulated categorical networks
     of 10 to 40 variables with 2,000 rows (``andrey.hc``); the other searches that take it are not
-    benchmarked on it yet.
+    benchmarked on it yet. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

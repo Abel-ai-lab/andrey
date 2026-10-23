@@ -42,6 +42,10 @@ LATENT = 1
 Kind = Literal["dag", "cpdag", "pag", "digraph"]
 KINDS: tuple[Kind, ...] = ("dag", "cpdag", "pag", "digraph")
 
+# pcalg's ``amat.pag`` codes (0 none, 1 circle, 2 arrowhead, 3 tail) by Andrey mark, and back.
+_PCALG_PAG_CODE = np.array([0, 3, 2, 1], dtype=np.int8)  # indexed by NULL, TAIL, ARROW, CIRCLE
+_PCALG_PAG_MARK = np.array([NULL, CIRCLE, ARROW, TAIL], dtype=np.int8)  # indexed by pcalg code
+
 # Structured dtype for the derived edge-list view (one row per edge, ``i <= j``).
 EDGE_DTYPE = np.dtype([("i", "i4"), ("j", "i4"), ("mark_i", "i1"), ("mark_j", "i1")])
 
@@ -152,8 +156,9 @@ class Structure:
 class GraphStructure(Structure):
     """A learned graph: its nodes, and a mark at each end of every edge.
 
-    A method returns one as ``StructureOutput.structure``; ``from_numpy``, ``from_edges``, and
-    ``from_networkx`` build one from an existing graph. ``kind`` says how to read the edges:
+    A method returns one as ``StructureOutput.structure``; ``from_numpy``, ``from_edges``,
+    ``from_networkx``, and ``from_pcalg`` build one from an existing graph. ``kind`` says how to
+    read the edges:
 
     - ``"dag"``: every edge is directed, with no directed cycles.
     - ``"cpdag"``: an equivalence class of DAGs; an undirected edge ``--`` can point either way.
@@ -401,6 +406,75 @@ class GraphStructure(Structure):
         self_loops = bool(M.size and np.diagonal(M).any())
         return cls.from_numpy(M, kind=kind, labels=labels, allow_self_loops=self_loops)
 
+    @classmethod
+    def from_pcalg(
+        cls,
+        amat: npt.ArrayLike,
+        kind: Literal["dag", "cpdag", "pag"],
+        *,
+        labels: tuple[str, ...] | None = None,
+    ) -> GraphStructure:
+        """Build a graph from the adjacency matrix ``amat`` that R's pcalg package uses.
+
+        pcalg records a PAG, and a MAG, as ``amat.pag``: ``amat[a, b]`` is the mark at the column
+        node ``b`` on the edge between ``a`` and ``b``, ``0`` no edge, ``1`` circle, ``2``
+        arrowhead, ``3`` tail. It records a DAG or CPDAG as ``amat.cpdag``: ``a -> b`` is
+        ``amat[b, a] = 1`` with ``amat[a, b] = 0``, at the child's row, and ``a -- b`` is ``1`` in
+        both cells. This reads either, the inverse of ``to_pcalg``.
+
+        Parameters
+        ----------
+        amat : array-like of shape (n, n)
+            The pcalg matrix, such as ``fit@amat`` from ``fci`` or ``as(fit, "amat")`` from ``pc``.
+        kind : {"dag", "cpdag", "pag"}
+            How pcalg coded the graph: ``"pag"`` reads ``amat.pag`` (a MAG too), and ``"cpdag"``
+            and ``"dag"`` read ``amat.cpdag``.
+        labels : tuple[str, ...] or None, default=None
+            Node names, one per node, each taken as text, ``str(label)``; ``None`` numbers the
+            nodes from 0.
+
+        Returns
+        -------
+        GraphStructure
+            The graph, of ``kind``.
+
+        Raises
+        ------
+        ValueError
+            If ``kind`` is not ``"dag"``, ``"cpdag"``, or ``"pag"``, ``amat`` is not square, has a
+            nonzero diagonal, holds a value other than ``0``, ``1``, ``2``, ``3`` for a ``"pag"``
+            or ``0`` and ``1`` otherwise, or, for a ``"pag"``, has a mark in ``amat[a, b]`` but
+            not in ``amat[b, a]``. Also if the edges are not allowed for ``kind``, such as an
+            undirected edge in a ``"dag"``, or ``labels`` does not have ``n`` entries or has two
+            that are equal as text.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from andrey import GraphStructure
+        >>> amat = np.array([[0, 0, 0], [0, 0, 0], [1, 1, 0]])  # 0 -> 2 <- 1, child's row 2
+        >>> GraphStructure.from_pcalg(amat, "cpdag").oriented_edges()
+        [(0, 2, 'directed'), (1, 2, 'directed')]
+        """
+        if kind not in ("dag", "cpdag", "pag"):
+            raise ValueError(f"kind must be 'dag', 'cpdag', or 'pag', got {kind!r}")
+        A = np.asarray(amat)
+        if A.ndim != 2 or A.shape[0] != A.shape[1]:
+            raise ValueError(f"expected a square (n, n) matrix, got shape {A.shape}")
+        codes = (0, 1, 2, 3) if kind == "pag" else (0, 1)
+        if not np.isin(A, codes).all():
+            raise ValueError(f"amat for kind={kind!r} holds only the codes {codes}")
+        if kind == "pag":
+            M = _PCALG_PAG_MARK[A.astype(np.intp)].T  # amat[a, b] marks b; M[i, j] marks i
+        else:
+            child_row = A != 0
+            M = np.zeros(A.shape, dtype=np.int8)
+            M[child_row.T] = TAIL  # the source's end, or both ends of an undirected edge
+            M[child_row & ~child_row.T] = ARROW  # the child's end of a directed edge
+        graph = cls.from_numpy(M, kind=kind, labels=labels)
+        graph.validate()
+        return graph
+
     # ---- store surface --------------------------------------------------------------------
 
     @property
@@ -511,6 +585,48 @@ class GraphStructure(Structure):
             if emit_reciprocal and i != j and mi == mj and mi in (ARROW, CIRCLE):
                 g.add_edge(ids[j], ids[i], endpoints=(int(mj), int(mi)))
         return g
+
+    def to_pcalg(self) -> np.ndarray:
+        """Return the adjacency matrix ``amat`` that R's pcalg package uses for this kind of graph.
+
+        A ``pag`` is written as pcalg's ``amat.pag``: ``amat[a, b]`` is the mark at the column node
+        ``b`` on the edge between ``a`` and ``b``, ``0`` no edge, ``1`` circle, ``2`` arrowhead,
+        ``3`` tail. A ``dag`` or ``cpdag`` is written as ``amat.cpdag``: ``a -> b`` is
+        ``amat[b, a] = 1`` with ``amat[a, b] = 0``, at the child's row, and ``a -- b`` is ``1`` in
+        both cells. ``from_pcalg`` reads the result back. Each call builds a new array.
+
+        Returns
+        -------
+        np.ndarray of shape (n, n)
+            The pcalg matrix, ``int8``.
+
+        Raises
+        ------
+        ValueError
+            If the graph is a ``digraph``, which pcalg has no matrix for, has a self-loop, or has
+            an edge its ``kind`` does not allow (``validate()`` lists them).
+
+        Examples
+        --------
+        >>> from andrey import GraphStructure
+        >>> import numpy as np
+        >>> M = np.array([[0, 1], [2, 0]])  # 0 -> 1
+        >>> GraphStructure.from_numpy(M, kind="dag").to_pcalg().tolist()
+        [[0, 0], [1, 0]]
+        """
+        if self._kind == "digraph":
+            raise ValueError(
+                "pcalg has no adjacency matrix for a digraph; use a dag, cpdag, or pag"
+            )
+        self.validate()
+        M = self.to_numpy()
+        if M.size and np.diagonal(M).any():
+            raise ValueError("pcalg's adjacency matrix has no self-loops")
+        if self._kind == "pag":
+            # M[i, j] marks i, and amat[a, b] marks b.
+            return np.ascontiguousarray(_PCALG_PAG_CODE[M].T)
+        # amat[a, b] = 1 where b is the source of a -> b or an end of a -- b.
+        return np.ascontiguousarray((M == TAIL).T, dtype=np.int8)
 
     def to_edges(self) -> np.ndarray:
         """Return the derived typed edge list, one row per edge ``i <= j``.
@@ -1267,9 +1383,9 @@ class SummaryGraph(GraphStructure):
     ``kind="digraph"``: ``i -> j`` means ``X_i`` affects ``X_j`` at one or more lags, so ``i -> j``
     at one lag and ``j -> i`` at another form a 2-cycle, and a variable's effect on its own future
     is a self-loop. ``lags_of(i, j)`` and ``edge_lags`` give the lags behind each edge. Every
-    ``GraphStructure`` view applies. ``from_numpy``, ``from_edges``, and ``from_networkx`` raise
-    ``TypeError``, because a plain graph carries no lags; build a plain graph with
-    ``GraphStructure``'s. ``StructureOutput.save`` raises ``TypeError`` for a ``SummaryGraph``;
+    ``GraphStructure`` view applies. ``from_numpy``, ``from_edges``, ``from_networkx``, and
+    ``from_pcalg`` raise ``TypeError``, because a plain graph carries no lags; build a plain graph
+    with ``GraphStructure``'s. ``StructureOutput.save`` raises ``TypeError`` for a ``SummaryGraph``;
     save the ``TemporalStructure`` and call ``summary_graph()`` again after loading.
     """
 

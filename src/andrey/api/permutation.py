@@ -198,7 +198,9 @@ def boss(
     categorical networks, with BDeu or the multinomial BIC, BOSS stopped at a DAG that scores worse
     than the optimum on some draws; comparing a few seeds shows whether a result depends on the
     seed. Neither categorical score is benchmarked with BOSS yet. The mixed-data scores are
-    experimental and not benchmarked yet; their tests run BOSS on 5 variables with 3,000 rows.
+    experimental and not benchmarked yet; their tests run BOSS on 5 variables with 3,000 rows. The
+    numbers are a reference, not a hard limit: they change with the data generator, the density, the
+    method's settings, and the machine.
 
     References
     ----------
@@ -434,7 +436,8 @@ def grasp(
     comparing a few seeds shows whether a result depends on the seed. Neither categorical score is
     benchmarked with GRaSP yet. The
     mixed-data scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables
-    with 3,000 rows.
+    with 3,000 rows. The numbers are a reference, not a hard limit: they change with the data
+    generator, the density, the method's settings, and the machine.
 
     References
     ----------

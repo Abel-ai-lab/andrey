@@ -3,7 +3,7 @@
 Every function reads a dense ``(d, d)`` ``int8`` mark matrix in the convention of
 :mod:`andrey.core.orient`. An Insert is valid when ``NA union T`` is a clique and every
 semi-directed path from ``y`` to ``x`` meets it; a Delete is valid when ``NA`` without ``H`` is a
-clique. Scores are differenced from two full local scores of a :class:`~andrey.core.score.Score`.
+clique.
 
 References
 ----------
@@ -20,7 +20,7 @@ from itertools import chain, combinations
 import numpy as np
 
 from andrey.core import ARROW, NULL, TAIL
-from andrey.core.score import Score
+from andrey.core.orient import _cpdag_of_pdag, _cpdag_of_pdag_near
 
 
 def adjacent(adj: np.ndarray, node: int) -> np.ndarray:
@@ -235,36 +235,6 @@ def blocks_semi_directed_paths(
     return True
 
 
-def insert_delta(
-    score: Score, x: int, y: int, na: Iterable[int], T: Iterable[int], paj: Iterable[int]
-) -> float:
-    """Local-score change of inserting ``x -> y`` with subset ``T``: ``score1 - score2``.
-
-    ``score1`` adds ``x`` to ``y``'s parents; both scores condition ``y`` on ``NA union T`` and
-    ``y``'s current parents. Lower is better, so an improving Insert has a negative delta.
-    """
-    base = set(int(v) for v in na) | set(int(v) for v in T) | set(int(v) for v in paj)
-    parents_without = tuple(sorted(base))
-    parents_with = tuple(sorted(base | {int(x)}))
-    return score.score(y, parents_with) - score.score(y, parents_without)
-
-
-def delete_delta(
-    score: Score, x: int, y: int, na: Iterable[int], H: Iterable[int], paj: Iterable[int]
-) -> float:
-    """Local-score change of deleting edge ``x - y`` with subset ``H``: ``score1 - score2``.
-
-    ``score2`` conditions ``y`` on ``(NA \\ H) union Pa(y) union {x}``; ``score1`` drops ``x``.
-    Lower is better, so an improving Delete has a negative delta.
-    """
-    residual = set(int(v) for v in na) - set(int(v) for v in H)
-    parents_with = residual | set(int(v) for v in paj) | {int(x)}
-    parents_without = parents_with - {int(x)}
-    return score.score(y, tuple(sorted(parents_without))) - score.score(
-        y, tuple(sorted(parents_with))
-    )
-
-
 def apply_insert(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> None:
     """Insert ``x -> y`` and orient every ``t -- y`` (``t`` in ``T``) as ``t -> y``, in place."""
     adj[x, y] = TAIL
@@ -283,3 +253,51 @@ def apply_delete(adj: np.ndarray, x: int, y: int, H: Iterable[int]) -> None:
         adj[h, y] = ARROW
         adj[x, h] = TAIL
         adj[h, x] = ARROW
+
+
+# Whether :func:`insert_cpdag` and :func:`delete_cpdag` rewrite only the part of the graph a move
+# can change. When False they rebuild the whole CPDAG; the tests compare the two.
+_LOCAL_REFORM = True
+
+# A move that can change more than this share of the nodes rebuilds the whole CPDAG.
+_REGION_SHARE = 0.25
+
+
+def _shared_children(adj: np.ndarray, x: int, y: int) -> list[int]:
+    """The nodes that are a child of both ``x`` and ``y``."""
+    both = (adj[x] == TAIL) & (adj[:, x] == ARROW) & (adj[y] == TAIL) & (adj[:, y] == ARROW)
+    return np.flatnonzero(both).tolist()
+
+
+def _reform(adj: np.ndarray, touched: list[int]) -> np.ndarray:
+    """The CPDAG of ``adj``, a CPDAG changed by one move that touched the nodes ``touched``."""
+    if _LOCAL_REFORM:
+        out = _cpdag_of_pdag_near(adj, touched, int(_REGION_SHARE * adj.shape[0]))
+        if out is not None:
+            return out
+    return _cpdag_of_pdag(adj)
+
+
+def insert_cpdag(adj: np.ndarray, x: int, y: int, T: Iterable[int]) -> np.ndarray:
+    """Apply ``Insert(x, y, T)`` to the CPDAG ``adj`` and return the CPDAG of the result.
+
+    ``adj`` is rewritten in place and returned unless the whole CPDAG is rebuilt. The result is
+    the CPDAG of the extension of :func:`apply_insert`'s graph; only the edges the move can reach
+    are derived again (:func:`~andrey.core.orient._cpdag_of_pdag_near`).
+    """
+    T = tuple(T)
+    shared = _shared_children(adj, x, y)
+    apply_insert(adj, x, y, T)
+    return _reform(adj, [x, y, *T, *shared])
+
+
+def delete_cpdag(adj: np.ndarray, x: int, y: int, H: Iterable[int]) -> np.ndarray:
+    """Apply ``Delete(x, y, H)`` to the CPDAG ``adj`` and return the CPDAG of the result.
+
+    ``adj`` is rewritten in place and returned unless the whole CPDAG is rebuilt; see
+    :func:`insert_cpdag`.
+    """
+    H = tuple(H)
+    shared = _shared_children(adj, x, y)
+    apply_delete(adj, x, y, H)
+    return _reform(adj, [x, y, *H, *shared])
