@@ -29,7 +29,7 @@ def _scm(d=12, density=2.0, heteroscedastic=False):
 
 
 def test_shape_and_kind():
-    ds = _scm(d=12).sample(n=200, seed=0)
+    ds = _scm(d=12).sample(n=200, seed=0, scale="raw")
     assert ds.data.shape == (200, 12)
     assert isinstance(ds.graph, GraphStructure)
     assert ds.graph.kind == "dag"
@@ -38,7 +38,7 @@ def test_shape_and_kind():
 def test_reproducible_same_object():
     """Same SCM, same seed -> byte-identical data and equal truth."""
     scm = _scm()
-    a, b = scm.sample(n=300, seed=7), scm.sample(n=300, seed=7)
+    a, b = scm.sample(n=300, seed=7, scale="raw"), scm.sample(n=300, seed=7, scale="raw")
     assert np.array_equal(a.data, b.data)
     assert a.graph == b.graph
     assert np.array_equal(a.params.weights, b.params.weights)
@@ -50,31 +50,31 @@ def test_config_rebuild_no_eager_draw():
     Refutes a hidden construction-time RNG (the eager-draw trap the same-object test cannot catch):
     if the graph were drawn at SCM construction, two separate constructions would diverge.
     """
-    a = _scm(d=20).sample(n=150, seed=3)
-    b = _scm(d=20).sample(n=150, seed=3)
+    a = _scm(d=20).sample(n=150, seed=3, scale="raw")
+    b = _scm(d=20).sample(n=150, seed=3, scale="raw")
     assert np.array_equal(a.data, b.data)
     assert a.graph == b.graph
 
 
 def test_component_stream_isolation():
     """Changing only the noise axis leaves the graph and weight streams byte-identical."""
-    a = _scm(d=16, heteroscedastic=False).sample(n=200, seed=1)
-    b = _scm(d=16, heteroscedastic=True).sample(n=200, seed=1)
+    a = _scm(d=16, heteroscedastic=False).sample(n=200, seed=1, scale="raw")
+    b = _scm(d=16, heteroscedastic=True).sample(n=200, seed=1, scale="raw")
     assert a.graph == b.graph  # graph stream independent of the noise axis
     assert np.array_equal(a.params.weights, b.params.weights)  # weight stream too
     assert not np.array_equal(a.data, b.data)  # but the noise differs -> data differs
 
 
 def test_seed_variation_changes_data():
-    a = _scm().sample(n=200, seed=0)
-    b = _scm().sample(n=200, seed=1)
+    a = _scm().sample(n=200, seed=0, scale="raw")
+    b = _scm().sample(n=200, seed=1, scale="raw")
     assert not np.array_equal(a.data, b.data)
 
 
 @pytest.mark.parametrize("d", [10, 100, 1000])
 def test_truth_is_acyclic_and_valid(d):
     """Truth is an acyclic, valid GraphStructure of kind 'dag'."""
-    ds = _scm(d=d, density=2.0).sample(n=32, seed=5)
+    ds = _scm(d=d, density=2.0).sample(n=32, seed=5, scale="raw")
     ds.graph.validate()  # raises if malformed
     assert ds.graph.kind == "dag"
     # acyclicity on the directed parent->child edges (to_networkx's i<j view is trivially acyclic)
@@ -87,7 +87,7 @@ def test_truth_is_acyclic_and_valid(d):
 def test_labels_not_causal_order():
     """The random relabeling breaks the index==topological-order correlation (else methods can
     cheat)."""
-    ds = _scm(d=200, density=3.0).sample(n=16, seed=2)
+    ds = _scm(d=200, density=3.0).sample(n=16, seed=2, scale="raw")
     parents, children = ds.params.edges[:, 0], ds.params.edges[:, 1]
     # If index order were topological, every parent label would be < its child label.
     assert np.any(parents > children)
@@ -95,7 +95,7 @@ def test_labels_not_causal_order():
 
 def test_dtype_and_nbytes():
     """Data is float64 by default (no lossy f64->f32->f64 round-trip for f64 consumers)."""
-    ds = _scm(d=12).sample(n=100, seed=0)
+    ds = _scm(d=12).sample(n=100, seed=0, scale="raw")
     assert ds.data.dtype == np.float64
     assert ds.data.nbytes == 100 * 12 * 8
     assert np.all(np.isfinite(ds.data))
@@ -104,8 +104,8 @@ def test_dtype_and_nbytes():
 def test_dtype_float32_opt_in():
     """dtype=np.float32 still works (half footprint) and equals the f64 output cast to f32."""
     scm = _scm(d=12)
-    f64 = scm.sample(n=200, seed=0)
-    f32 = scm.sample(n=200, seed=0, dtype=np.float32)
+    f64 = scm.sample(n=200, seed=0, scale="raw")
+    f32 = scm.sample(n=200, seed=0, dtype=np.float32, scale="raw")
     assert f64.data.dtype == np.float64
     assert f32.data.dtype == np.float32
     assert f32.data.nbytes == 200 * 12 * 4
@@ -117,7 +117,7 @@ def test_dtype_float32_opt_in():
 def test_truth_is_sparse_not_dense():
     """Structural no-dense proxy: edge count is O(d), never O(d^2)."""
     d = 1000
-    ds = _scm(d=d, density=2.0).sample(n=8, seed=0)
+    ds = _scm(d=d, density=2.0).sample(n=8, seed=0, scale="raw")
     assert ds.graph.to_edges().shape[0] < 5 * d
 
 
@@ -142,7 +142,7 @@ def test_no_dense_allocation_at_10k():
 
     tracemalloc.start()
     tracemalloc.reset_peak()
-    ds = _scm(d=10_000, density=2.0).sample(n=64, seed=0)
+    ds = _scm(d=10_000, density=2.0).sample(n=64, seed=0, scale="raw")
     _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     # Legit peak is O(n*d) data (~5 MB) + O(edges) CSR (~KB). A dense (10k,10k) would be
@@ -154,7 +154,7 @@ def test_no_dense_allocation_at_10k():
 
 def test_h2_dataset_contract():
     """Every CausalDataset field is present and typed, including provenance."""
-    ds = _scm(d=10).sample(n=50, seed=0)
+    ds = _scm(d=10).sample(n=50, seed=0, scale="raw")
     assert isinstance(ds.data, np.ndarray)
     assert isinstance(ds.graph, GraphStructure)
     assert isinstance(ds.report, data.QAReport)
@@ -167,11 +167,11 @@ def test_h2_dataset_contract():
 
 
 def test_sample_scm_convenience():
-    ds = data.sample_scm(d=15, n=120, seed=4)
+    ds = data.sample_scm(d=15, n=120, seed=4, scale="raw")
     assert ds.data.shape == (120, 15)
     assert ds.graph.kind == "dag"
     with pytest.raises(ValueError):
-        data.sample_scm(graph="nope", d=5, n=5, seed=0)
+        data.sample_scm(graph="nope", d=5, n=5, seed=0, scale="raw")
 
 
 # ---- column shuffle -----------------------------------------------------------------------------
@@ -209,8 +209,8 @@ def _assert_relabeled(plain, shuffled):
 def test_shuffle_relabels_an_scm_sample(latents):
     """Shuffling permutes the observed columns and the truth together and changes nothing else."""
     kwargs = {"d": 14, "n": 200, "seed": 3, "density": 4.0, "latents": latents}
-    plain = data.sample_scm(**kwargs, shuffle=False)
-    shuffled = data.sample_scm(**kwargs)
+    plain = data.sample_scm(**kwargs, shuffle=False, scale="raw")
+    shuffled = data.sample_scm(**kwargs, scale="raw")
     _assert_relabeled(plain, shuffled)
     assert shuffled.provenance["column_order"] != list(range(14 - latents))
     assert shuffled.report.varsortability == pytest.approx(plain.report.varsortability)
@@ -258,10 +258,13 @@ def test_shuffle_relabels_a_mixed_sample():
 
 def test_the_column_order_comes_from_its_own_stream_of_the_seed():
     """The same seed gives the same order whatever the noise; another seed gives another order."""
-    order = data.sample_scm(d=20, n=10, seed=4).provenance["column_order"]
-    assert data.sample_scm(d=20, n=10, seed=4).provenance["column_order"] == order
-    assert data.sample_scm(d=20, n=10, seed=4, noise="laplace").provenance["column_order"] == order
-    assert data.sample_scm(d=20, n=10, seed=5).provenance["column_order"] != order
+    order = data.sample_scm(d=20, n=10, seed=4, scale="raw").provenance["column_order"]
+    assert data.sample_scm(d=20, n=10, seed=4, scale="raw").provenance["column_order"] == order
+    assert (
+        data.sample_scm(d=20, n=10, seed=4, noise="laplace", scale="raw").provenance["column_order"]
+        == order
+    )
+    assert data.sample_scm(d=20, n=10, seed=5, scale="raw").provenance["column_order"] != order
     discrete = data.sample_discrete(d=20, n=10, seed=4).provenance["column_order"]
     assert data.sample_discrete(d=20, n=10, seed=4).provenance["column_order"] == discrete
 
@@ -290,7 +293,7 @@ _LISTED = data.graphs.FixedDAG(
 
 def _listed(*, seed: int, shuffle: bool, **_) -> data.CausalDataset:
     scm = data.SCM(graph=_LISTED, functional=data.functional.linear(), noise=data.noise.gaussian())
-    return scm.sample(n=5, seed=seed, shuffle=shuffle)
+    return scm.sample(n=5, seed=seed, shuffle=shuffle, scale="raw")
 
 
 #: Each generator, its arguments beyond the size, seed, and shuffle, and whether its drawn order

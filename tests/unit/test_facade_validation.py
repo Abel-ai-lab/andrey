@@ -495,7 +495,7 @@ def test_hc_stops_at_max_iter_and_warns():
 
 def test_hc_sets_no_move_limit_by_default():
     # This dense graph takes over 200 moves: a limit of 200 stops the search, the default does not.
-    x = sample_scm(d=30, n=800, seed=0, density=16.0).data
+    x = sample_scm(d=30, n=800, seed=0, density=16.0, scale="raw").data
     with pytest.warns(andrey.SearchLimitWarning, match="max_iter=200"):
         andrey.hc(x, max_iter=200)
     with warnings.catch_warnings():

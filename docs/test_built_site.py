@@ -29,6 +29,7 @@ import andrey.core.ci_kernel
 import andrey.data.discrete
 import andrey.data.mixed
 import andrey.data.real
+import andrey.data.scm
 import andrey.metrics
 import andrey.viz
 import andrey.viz.mpl  # importable without matplotlib (it is imported lazily, inside the functions)
@@ -58,6 +59,7 @@ PUBLIC_MODULES = (
     (andrey.data.real, "data."),
     (andrey.data.discrete, "data."),
     (andrey.data.mixed, "data."),
+    (andrey.data.scm, "data."),
     (andrey.metrics, "metrics."),
     (andrey.viz, "viz."),
     (andrey.viz.mpl, "viz.mpl."),

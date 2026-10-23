@@ -72,7 +72,7 @@ def sample(d: int, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
         functional=var(n_lags=LAGS, lag_density=min(1.0, LAG_DEGREE / (d - 1))),
         noise=gaussian(),
     )
-    ds = scm.sample(n=n, seed=seed, shuffle=SHUFFLE)
+    ds = scm.sample(n=n, seed=seed, shuffle=SHUFFLE, scale="raw")
     weights = np.asarray(ds.graph.lag_weights)  # (1 + LAGS, d, d), [cause, effect], lag 0 first
     if weights[0].any():
         raise AssertionError("the process has instantaneous effects")

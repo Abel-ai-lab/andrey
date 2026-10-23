@@ -35,16 +35,20 @@ def _hashes(datasets):
     return [ds.data.tobytes() for ds in datasets]
 
 
-def test_task_regenerates_from_scm_and_seed():
+@pytest.mark.parametrize("scale", [None, "raw", "unitless"])
+def test_task_regenerates_from_scm_and_seed(scale):
+    """A task is the sample of its scm and seed, at the default scale or the one given."""
     scm = data.SCM(
         graph=data.graphs.erdos_renyi(10, 2.0),
         functional=data.functional.linear(),
         noise=data.noise.gaussian(),
     )
-    a = scm.sample(n=200, seed=3)
-    b = data.generate(data.Ensemble(scms=[scm], seeds=[3], n=200))[0]
+    kwargs = {} if scale is None else {"scale": scale}
+    a = scm.sample(n=200, seed=3, **kwargs)
+    b = data.generate(data.Ensemble(scms=[scm], seeds=[3], n=200), **kwargs)[0]
     assert np.array_equal(a.data, b.data)
     assert a.graph == b.graph
+    assert b.provenance["config"]["scale"] == (scale or "standardize")
 
 
 def test_serial_equals_parallel():
@@ -91,7 +95,7 @@ def test_fork_and_spawn_identical(method):
 
     from andrey.data.generate import _run
 
-    tasks = [(scm, ens.n, s, np.float64) for scm, s in ens.tasks]
+    tasks = [(scm, ens.n, s, np.float64, "standardize") for scm, s in ens.tasks]
     with ProcessPoolExecutor(max_workers=2, mp_context=ctx) as pool:
         got = [ds.data.tobytes() for ds in pool.map(_run, tasks)]
     assert got == baseline
