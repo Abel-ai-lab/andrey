@@ -353,6 +353,19 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            ParamSpec(
+                name="max_parents",
+                type="int",
+                default=None,
+                doc="A gate on the forward phase, at least 0: a node whose parent count already "
+                "exceeds max_parents gains no new parents in it. It does not cap the finished "
+                "graph: one move can give a node several parents at once, so a node can end with "
+                "more than max_parents. null keeps the default gate of n_variables / 2, and a "
+                "larger integer lifts it. A lower value makes the search faster on large graphs "
+                "and can lower the errors, but it can stop the search short of the "
+                "lowest-scoring graph, which GES otherwise finds.",
+                nullable=True,
+            ),
             _CATEGORICAL,
             _MAX_CATEGORIES,
         ),

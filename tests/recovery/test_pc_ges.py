@@ -120,6 +120,53 @@ def test_ges_does_not_depend_on_the_data_scale():
     np.testing.assert_array_equal(andrey.ges(x * 1e-85).structure.to_numpy(), want)
 
 
+def fan_in(causes: int, n: int = 2000) -> np.ndarray:
+    """``causes`` independent standard-normal variables and a last one, their noisy sum."""
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((n, causes))
+    return np.column_stack([x, x.sum(axis=1) + 0.5 * rng.standard_normal(n)])
+
+
+def in_degree(out: andrey.StructureOutput, node: int) -> int:
+    return sum(
+        1
+        for _, head, kind in out.structure.oriented_edges(index=True)
+        if head == node and kind == "directed"
+    )
+
+
+def test_ges_max_parents_stops_a_variable_short_of_all_its_causes():
+    # Three causes of the last variable: the default limit of 4 / 2 = 2 admits the third.
+    # Past one parent the variable gets no new edges, and the graph scores worse.
+    x = fan_in(3)
+    full, limited = andrey.ges(x), andrey.ges(x, max_parents=1)
+    assert in_degree(full, 3) == 3
+    assert in_degree(limited, 3) < 3
+    assert limited.metadata["score"] > full.metadata["score"]
+
+
+def test_ges_max_parents_replaces_the_default_limit_of_half_the_variables():
+    # Five causes of the last of six variables: the default limit of 3 lets it reach four parents,
+    # exactly as max_parents=3 does, and a larger value lifts the limit.
+    x = fan_in(5)
+    default = andrey.ges(x)
+    same = andrey.ges(x, max_parents=3)
+    lifted = andrey.ges(x, max_parents=4)
+    assert in_degree(default, 5) == 4
+    assert same.structure.oriented_edges() == default.structure.oriented_edges()
+    assert same.metadata["score"] == default.metadata["score"]
+    assert in_degree(lifted, 5) == 5
+    assert lifted.metadata["score"] < default.metadata["score"]
+
+
+@pytest.mark.parametrize(
+    ("value", "error"), [(-1, ValueError), (2.5, TypeError), (True, TypeError)]
+)
+def test_ges_rejects_a_bad_max_parents(value, error):
+    with pytest.raises(error, match="max_parents"):
+        andrey.ges(fan_in(3), max_parents=value)
+
+
 def test_pc_output_contract():
     out = andrey.pc(datagen.generate("gauss_5v"))
     assert out.structure.kind == "cpdag"
