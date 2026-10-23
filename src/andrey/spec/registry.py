@@ -725,7 +725,8 @@ _add(
 # --- hybrid: a restrict phase of CI tests, then a score search among its pairs ------------------
 
 _HYBRID_SCORE_DOC = (
-    "Local score of the maximize phase: local_score_BIC_from_cov = covariance-based BIC; "
+    "Local score of the maximize phase: local_score_BIC_from_cov or local_score_BIC = "
+    "covariance-based BIC; "
     "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for categorical "
     "data coded by whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
     "and conditional Gaussian BIC, for mixed data (not with maximize=tabu). It must read the same "

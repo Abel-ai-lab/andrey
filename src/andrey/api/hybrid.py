@@ -142,9 +142,10 @@ def mmhc(
         same kind of data as ``score_func``.
     score_func : str, default="local_score_BIC_from_cov"
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s:
-        ``"local_score_BIC_from_cov"`` (Gaussian BIC) for continuous data, ``"local_score_BDeu"``
-        or ``"local_score_BIC_categorical"`` for categorical data, ``"local_score_degen_gauss"`` or
-        ``"local_score_cond_gauss"`` for mixed data.
+        ``"local_score_BIC_from_cov"`` or its other name ``"local_score_BIC"`` (Gaussian BIC) for
+        continuous data, ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"`` for
+        categorical data, ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"`` for mixed
+        data.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     max_iter : int or None, default=None
