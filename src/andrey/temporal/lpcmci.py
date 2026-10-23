@@ -179,7 +179,11 @@ def _add_middle(current: str, letter: str) -> str:
 class _Search:
     """The state of one LPCMCI run: the graph, the test memories, and the separating sets.
 
-    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`.
+    ``ranks`` holds each variable's :func:`~andrey.search.hc.tie_ranks`. The search keeps what it
+    reads often until a change can alter it: each node's neighbors until a link is removed, its
+    parents and children until an edge mark changes or a link is removed, its path steps until any
+    mark changes or a link is removed, and the stored separating sets moved into a frame until a
+    set is stored. Callers read these and do not change them.
     """
 
     def __init__(
@@ -190,6 +194,10 @@ class _Search:
         self.window = [(v, lag) for lag in range(tau_max + 1) for v in range(n_vars)]
         self.edges: dict[Key, Edge] = {}
         self.neighbors_of: dict[int, set[tuple[int, int]]] = {}
+        self.near: dict[Node, tuple[list[Node], frozenset[Node]]] = {}
+        self.roles_of: dict[Node, tuple[set[Node], list[Node], list[Node], list[Node]]] = {}
+        self.steps_of: dict[Node, list[Node]] = {}
+        self.shifted: dict[tuple[Key, int], list[frozenset[Node]]] = {}
         self.imin: dict[Key, float] = {}
         self.best: dict[Key, tuple[float, float]] = {}
         self.sepsets: dict[Key, list[frozenset[Node]]] = {}
@@ -221,9 +229,11 @@ class _Search:
         for i, j, lag in self.edges:
             self.neighbors_of[j].add((i, lag))
             self.neighbors_of[i].add((j, -lag))
-        self.imin, self.best, self.sepsets = {}, {}, {}
+        self.imin, self.best, self.sepsets, self.shifted = {}, {}, {}, {}
         self.ever_directed = set()
         self.version += 1
+        self.near = {}
+        self._marks_changed()
         self._record_directed()
 
     def remove(self, key: Key) -> None:
@@ -233,34 +243,89 @@ class _Search:
         self.neighbors_of[j].discard((i, lag))
         self.neighbors_of[i].discard((j, -lag))
         self.version += 1
+        self.near = {}
+        self._marks_changed()
+
+    def _marks_changed(self) -> None:
+        """Drop the parents, children, and path steps kept for the old edge marks."""
+        self.roles_of, self.steps_of = {}, {}
+
+    def set_middle(self, key: Key, middle: str) -> None:
+        """Set the middle mark of the link ``key``."""
+        self.edges[key][1] = middle
+        self.steps_of = {}
 
     def adjacent(self, a: Node, b: Node) -> bool:
-        key, _ = _key(a, b)
-        return key[2] <= self.tau_max and key in self.edges
+        (va, la), (vb, lb) = a, b  # the link as ``_key`` finds it
+        if la > lb or (la == lb and va < vb):
+            return la - lb <= self.tau_max and (va, vb, la - lb) in self.edges
+        return lb - la <= self.tau_max and (vb, va, lb - la) in self.edges
 
     def mark(self, a: Node, b: Node) -> int:
         """The edge mark at ``a`` on its link with ``b``."""
-        key, a_start = _key(a, b)
-        edge = self.edges[key]
-        return edge[0] if a_start else edge[2]
+        (va, la), (vb, lb) = a, b  # the link as ``_key`` finds it
+        if la > lb or (la == lb and va < vb):
+            return self.edges[(va, vb, la - lb)][0]
+        return self.edges[(vb, va, lb - la)][2]
 
     def middle(self, a: Node, b: Node) -> str:
         """The middle mark of the link between ``a`` and ``b``, read for the earlier node first."""
         return self.edges[_key(a, b)[0]][1]
 
+    def link(self, a: Node, b: Node) -> tuple[int, str, int]:
+        """The mark at ``a``, the middle mark, and the mark at ``b`` of their link."""
+        key, a_start = _key(a, b)
+        start, middle, end = self.edges[key]
+        return (start, middle, end) if a_start else (end, middle, start)
+
     def neighbors(self, a: Node) -> list[Node]:
-        """The nodes linked to ``a`` within the window ``t - tau_max .. t``."""
+        """The nodes linked to ``a`` within the window ``t - tau_max .. t``, in the total order."""
+        found = self.near.get(a)
+        return (found if found is not None else self._near(a))[0]
+
+    def linked(self, a: Node) -> frozenset[Node]:
+        """The nodes linked to ``a`` within the window, as a set."""
+        found = self.near.get(a)
+        return (found if found is not None else self._near(a))[1]
+
+    def _near(self, a: Node) -> tuple[list[Node], frozenset[Node]]:
         v, lag = a
         found = [(k, lag + s) for k, s in self.neighbors_of[v] if 0 <= lag + s <= self.tau_max]
-        return sorted(found, key=_order)
+        found.sort(key=_order)
+        self.near[a] = kept = (found, frozenset(found))
+        return kept
 
     def directed(self, a: Node, b: Node) -> bool:
         """``a -> b``: a tail at ``a`` and an arrowhead at ``b``."""
-        return self.mark(a, b) == TAIL and self.mark(b, a) == ARROW
+        key, a_start = _key(a, b)
+        edge = self.edges[key]
+        if a_start:
+            return edge[0] == TAIL and edge[2] == ARROW
+        return edge[2] == TAIL and edge[0] == ARROW
+
+    def _roles(self, a: Node) -> tuple[set[Node], list[Node], list[Node], list[Node]]:
+        """The neighbors of ``a`` by their marks, each list in the order of :meth:`neighbors`.
+
+        Return the parents of ``a`` as a set and as a list, its children, and the neighbors with no
+        arrowhead at themselves.
+        """
+        found = self.roles_of.get(a)
+        if found is None:
+            parents, children, open_ends = [], [], []
+            for b in self.neighbors(a):
+                at_b, _, at_a = self.link(b, a)
+                if at_b == TAIL and at_a == ARROW:
+                    parents.append(b)
+                elif at_b == ARROW and at_a == TAIL:
+                    children.append(b)
+                if at_b != ARROW:
+                    open_ends.append(b)
+            found = self.roles_of[a] = ({b for b in parents}, parents, children, open_ends)
+        return found
 
     def parents(self, a: Node) -> set[Node]:
         """The parents of ``a`` within the window."""
-        return {b for b in self.neighbors(a) if self.directed(b, a)}
+        return self._roles(a)[0]
 
     def ancestors(self, nodes: Iterable[Node]) -> set[Node]:
         """The known ancestors of ``nodes`` within the window: directed paths into them."""
@@ -276,7 +341,7 @@ class _Search:
 
     def apds(self, b: Node, a: Node) -> set[Node]:
         """``apds_t(b, a)``: the neighbors of ``b`` but ``a`` with no arrowhead at themselves."""
-        return {c for c in self.neighbors(b) if c != a and self.mark(c, b) != ARROW}
+        return {c for c in self._roles(b)[3] if c != a}
 
     def _record_directed(self) -> None:
         for key, (start, _, end) in self.edges.items():
@@ -387,12 +452,17 @@ class _Search:
         found = self.sepsets.setdefault(key, [])
         if stored not in found:
             found.append(stored)
+            self.shifted = {}
 
     def stored_sepsets(self, a: Node, c: Node) -> list[frozenset[Node]]:
         """The stored separating sets of ``a`` and ``c``, in the frame of the window."""
         key, _ = _key(a, c)
         frame = min(a[1], c[1])
-        return [_shift(s, frame) for s in self.sepsets.get(key, [])]
+        found = self.shifted.get((key, frame))
+        if found is None:
+            found = [_shift(s, frame) for s in self.sepsets.get(key, [])]
+            self.shifted[(key, frame)] = found
+        return found
 
     # ---- separating-set queries -------------------------------------------------------------
 
@@ -473,17 +543,25 @@ class _Search:
             groups.append(lambda key, m=m: key[2] == m and key[0] != key[1])
         return groups
 
-    def _sorted(self, nodes: set[Node], anchor: Node, imin: dict[Key, float]) -> list[Node]:
-        """``nodes`` by the smallest statistic of their link with ``anchor``, largest first.
+    def _ranking(self) -> Callable[[set[Node], Node], list[Node]]:
+        """A sort of candidates by the smallest statistics as they stand now.
 
-        Statistics equal to ``_KEY_DP`` decimals go to the earlier node, then to the lower rank.
+        The sort puts ``nodes`` in order of the smallest statistic of their link with ``anchor``,
+        largest first. Statistics equal to ``_KEY_DP`` decimals go to the earlier node, then to
+        the lower rank. Each node's sort key is computed once per anchor.
         """
+        imin = dict(self.imin)
+        keys: dict[Node, dict[Node, tuple[float, int, int]]] = {}
 
-        def key(c: Node) -> tuple[float, int, int]:
-            statistic = round(float(imin.get(_key(anchor, c)[0], np.inf)), _KEY_DP)
-            return (-statistic, -c[1], self.ranks[c[0]])
+        def ranked(nodes: set[Node], anchor: Node) -> list[Node]:
+            known = keys.setdefault(anchor, {})
+            for c in nodes:
+                if c not in known:
+                    statistic = round(float(imin.get(_key(anchor, c)[0], np.inf)), _KEY_DP)
+                    known[c] = (-statistic, -c[1], self.ranks[c[0]])
+            return sorted(nodes, key=known.__getitem__)
 
-        return sorted(nodes, key=key)
+        return ranked
 
     def ancestral_phase(self, rules: list[Callable[[], tuple[dict, dict, dict]]]) -> None:
         """Algorithm S2, then the full rule list."""
@@ -491,7 +569,7 @@ class _Search:
         while True:
             removed = False
             for in_group in self._groups():
-                imin = dict(self.imin)
+                ranked = self._ranking()
                 marked = []
                 for key in sorted(k for k in self.edges if in_group(k)):
                     i, j, lag = key
@@ -503,12 +581,12 @@ class _Search:
                         if self.edges[key][1] not in letters:
                             continue
                         anchor, other = (end, start) if forward else (start, end)
-                        search = self._sorted(self.apds(anchor, other) - sdef, anchor, imin)
+                        search = ranked(self.apds(anchor, other) - sdef, anchor)
                         if not forward and lag > 0:
                             search = search[:0]  # time order: the later node is no ancestor
                         if len(search) < p:
-                            edge = self.edges[key]
-                            edge[1] = _add_middle(edge[1], "R" if forward else "L")
+                            letter = "R" if forward else "L"
+                            self.set_middle(key, _add_middle(self.edges[key][1], letter))
                             continue
                         sets = (frozenset(s) | sdef for s in combinations(search, p))
                         found = self.separating(start, end, sets)
@@ -590,7 +668,7 @@ class _Search:
         while True:
             removed = False
             for in_group in self._groups():
-                imin = dict(self.imin)
+                ranked = self._ranking()
                 marked = []
                 for key in sorted(k for k in self.edges if in_group(k)):
                     if self.edges[key][1] == "":
@@ -601,10 +679,10 @@ class _Search:
                     sdef2 = (self.ever_parents(start) | self.ever_parents(end)) - {start, end}
                     near_end = self.napds(end, start)
                     near_start = self.napds(start, end)
-                    search1 = self._sorted(near_end - sdef1 - sdef2, end, imin)
-                    search2 = self._sorted(near_start - sdef1 - sdef2, start, imin)
+                    search1 = ranked(near_end - sdef1 - sdef2, end)
+                    search2 = ranked(near_start - sdef1 - sdef2, start)
                     if len(search1) < p or (lag == 0 and len(search2) < p):
-                        self.edges[key][1] = ""
+                        self.set_middle(key, "")
                         continue
                     separated = False
                     sides = [(search1, near_end)] + ([(search2, near_start)] if lag == 0 else [])
@@ -675,12 +753,13 @@ class _Search:
                 new = CONFLICT
             if new != current:
                 edge[position] = new
+                self._marks_changed()
                 changed = True
         for key, middle in middles.items():
             if lagged_only and key[2] == 0 or key not in self.edges:
                 continue
             if self.edges[key][1] != middle:
-                self.edges[key][1] = middle
+                self.set_middle(key, middle)
                 changed = True
         for key, found in removals.items():
             if lagged_only and key[2] == 0 or key not in self.edges:
@@ -762,8 +841,9 @@ class _Search:
         for b in self.window:
             around = self.neighbors(b)
             for a in around:
+                near_a = self.linked(a)
                 for c in around:
-                    if a != c and not self.adjacent(a, c) and min(a[1], b[1], c[1]) == 0:
+                    if a != c and c not in near_a and min(a[1], b[1], c[1]) == 0:
                         yield a, b, c
 
     def rule_apr(self) -> tuple[dict, dict, dict]:
@@ -888,17 +968,19 @@ class _Search:
         """R2': ``A -> B *-> C`` or ``A *-> B -> C`` with ``A *-o C``: ``A *-> C``."""
         marks: dict = {}
         for a in self.window:
-            for c in self.neighbors(a):
+            around = self.neighbors(a)
+            sides: list[tuple[Node, bool, bool]] | None = None  # b, b <-* a, a -> b
+            for c in around:
                 if self.mark(c, a) != CIRCLE or self.mark(a, c) == CONFLICT:
                     continue
-                for b in self.neighbors(a):
-                    if b == c or not self.adjacent(b, c):
+                if sides is None:
+                    sides = [(b, self.mark(b, a) == ARROW, self.directed(a, b)) for b in around]
+                near_c = self.linked(c)
+                for b, into_b, a_to_b in sides:
+                    if b == c or b not in near_c:
                         continue
-                    if self.mark(b, a) != ARROW and self.mark(c, b) != ARROW:
-                        continue
-                    first = self.directed(a, b) and self.mark(c, b) == ARROW
-                    second = self.mark(b, a) == ARROW and self.directed(b, c)
-                    if first or second:
+                    into_c = self.mark(c, b) == ARROW
+                    if (a_to_b and into_c) or (into_b and self.directed(b, c)):
                         self._propose(marks, a, c, None, ARROW)
         return marks, {}, {}
 
@@ -980,34 +1062,41 @@ class _Search:
             for c in self.neighbors(a):
                 if self.mark(a, c) != CIRCLE or self.mark(c, a) == CONFLICT:
                     continue
-                if any(
-                    self.directed(a, b) and self.adjacent(b, c) and self.directed(b, c)
-                    for b in self.neighbors(a)
-                    if b != c
-                ):
+                near_c = self.linked(c)
+                if any(b != c and b in near_c and self.directed(b, c) for b in self._roles(a)[2]):
                     self._propose(marks, a, c, TAIL, ARROW)
         return marks, {}, {}
 
-    def _potentially_directed(self, a: Node, b: Node) -> bool:
-        """The link ``a - b`` is not into ``a`` and not out of ``b``."""
-        return self.mark(a, b) in (CIRCLE, TAIL) and self.mark(b, a) in (CIRCLE, ARROW)
-
     def _paths(self, start: Node, step_ok: Callable[[list[Node], Node], bool]) -> Iterable[list]:
-        """Uncovered potentially directed paths from ``start``; every step passes ``step_ok``."""
+        """Uncovered potentially directed paths from ``start``; every step passes ``step_ok``.
+
+        A step ``last - node`` is potentially directed: not into ``last`` and not out of ``node``.
+        """
         stack = [[start]]
         while stack:
             path = stack.pop()
             yield path
             last = path[-1]
-            for node in self.neighbors(last):
-                if node in path or not self._potentially_directed(last, node):
-                    continue
-                if self.middle(last, node) == "?":
-                    continue
-                if len(path) >= 2 and self.adjacent(path[-2], node):
-                    continue
-                if step_ok(path, node):
+            near_before = self.linked(path[-2]) if len(path) >= 2 else frozenset()
+            for node in self._steps(last):
+                if node not in path and node not in near_before and step_ok(path, node):
                     stack.append(path + [node])
+
+    def _steps(self, a: Node) -> list[Node]:
+        """The neighbors ``b`` of ``a``, in order, whose link can be a path step ``a - b``.
+
+        The link is potentially directed, not into ``a`` and not out of ``b``, and its middle mark
+        is not ``"?"``.
+        """
+        found = self.steps_of.get(a)
+        if found is None:
+            found = []
+            for b in self.neighbors(a):
+                at_a, middle, at_b = self.link(a, b)
+                if at_a in (CIRCLE, TAIL) and at_b in (CIRCLE, ARROW) and middle != "?":
+                    found.append(b)
+            self.steps_of[a] = found
+        return found
 
     def rule_r9(self) -> tuple[dict, dict, dict]:
         """R9': ``A1 o-> An`` with an uncovered potentially directed path ``A1, ..., An``."""
@@ -1043,7 +1132,7 @@ class _Search:
             for d in self.neighbors(a):
                 if self.mark(a, d) != CIRCLE or self.mark(d, a) != ARROW:
                     continue
-                into = [x for x in self.neighbors(d) if x != a and self.directed(x, d)]
+                into = [x for x in self._roles(d)[1] if x != a]
                 if len(into) < 2:
                     continue
 
