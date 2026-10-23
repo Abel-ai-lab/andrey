@@ -22,6 +22,13 @@ change names its pull request.
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
   ([#282], [#289], [#290])
 
+### Breaking
+
+- `andrey.data.sample_scm`, `SCM.sample`, and `andrey.data.generate` z-score every column by
+  default, `scale="standardize"`, so no method can read the causal order off the variances the
+  simulation happened to give; VAR and VARMA series take `"standardize"` too. Pass `scale="raw"`
+  for the values these functions returned before. ([#411])
+
 ### Added
 
 - With more than one worker (`ANDREY_NUM_WORKERS` or `andrey.config(num_workers=...)`), `pc`,
@@ -53,6 +60,12 @@ change names its pull request.
   pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
   time-series method on one series resamples blocks of rows; the result is the same at any
   `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
+- `scale="unitless"` in `andrey.data.sample_scm` and `SCM.sample` draws a linear model's weights
+  and noise so that every variable has variance 1 and its parameters depend only on its number of
+  parents (Herman et al. 2025), so on average neither the variances nor the share of each variable
+  the others explain follows the causal order; it takes up to 1,000 variables.
+  `andrey.data.generate` takes `scale`. For contributors, the benchmark harness has unitless
+  variants of its four linear regimes. ([#411])
 
 ### Changed
 
@@ -714,3 +727,4 @@ First alpha release.
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#396]: https://github.com/Abel-ai-lab/andrey/pull/396
+[#411]: https://github.com/Abel-ai-lab/andrey/pull/411
