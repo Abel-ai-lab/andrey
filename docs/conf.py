@@ -212,9 +212,13 @@ ABEL_URL = "https://abel.ai/"
 ABEL_GITHUB = "https://github.com/Abel-ai-lab"
 # Abel's logomark in Night Teal, for light backgrounds, from Abel's brand kit: the structured
 # data's organization logo, drawn at the build as a PNG wide enough for search results.
-ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
+BRAND = ROOT / "site" / "brand"
+ABEL_SYMBOL = BRAND / "abel-symbol-night.svg"
 ABEL_LOGO = "_static/abel-symbol.png"
 ABEL_LOGO_WIDTH = 600
+# The brand art's AVIF copies: 60% smaller than the JPEGs in all, with no visible change at twice
+# the size (WebP came out larger than the JPEGs on the art's grain).
+AVIF_QUALITY = 50
 # The icon's PNGs at the site's root, by name, each its side in pixels (_write_discovery).
 FAVICONS = {"favicon-96.png": 96, "apple-touch-icon.png": 180}
 # Pages a search engine should not list: the search page, and the page the server shows for a
@@ -404,6 +408,32 @@ def _load_summary(app) -> dict:  # noqa: ANN001
         raise ConfigError(str(error)) from None
 
 
+def _facts() -> list[str]:
+    """What Andrey covers, one plain sentence each, for llms.txt and the structured data: the kinds
+    of data, every registry family with its methods, and where the measurements are."""
+    families: dict[str, list[str]] = {}
+    for spec in list_specs():
+        families.setdefault(spec.family, []).append(f"`{spec.name}`")
+    return [
+        "Data: continuous, categorical, and mixed columns; independent samples and time series; "
+        "linear and nonlinear relationships; hidden common causes; interventions and several "
+        "domains.",
+        *(
+            f"{label}: {', '.join(families[family])}."
+            for family, label in site.SPEC_FAMILIES.items()
+            if family in families
+        ),
+        "Background knowledge: required and forbidden edges and tiers in time, through "
+        "`knowledge=`.",
+        "Speed: batched array operations, CPU cores, and a GPU for some methods; every method is "
+        f"timed against the packages that implement it in the release cards, {SITE_URL}docs/"
+        "benchmarks.html.",
+        "Open source: the code under the Apache License 2.0, and the benchmark scripts and "
+        "summaries behind every published number, so anyone can rerun them; "
+        "`pip install andrey-core`.",
+    ]
+
+
 def _methods_text() -> dict[str, str]:
     """The method count and tiers, for the FAQ."""
     supported = [f"`{s.name}`" for s in list_specs() if s.status == "supported"]
@@ -469,6 +499,12 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     site.fastest(summary)
     # The homepage and non-post pages share the repository's social preview.
     _write_bytes(GENERATED / "extra" / HOME_PREVIEW, cards.social_jpeg())
+    # An AVIF copy of each brand art and tile crop, which the homepage offers before the JPEG;
+    # one already written from the same JPEG is kept, since encoding takes seconds.
+    for jpeg in [*BRAND.glob("art-*.jpg"), *(BRAND / "bento").glob("*.jpg")]:
+        avif = GENERATED / "static" / jpeg.relative_to(BRAND).with_suffix(".avif")
+        if not avif.exists() or avif.stat().st_mtime < jpeg.stat().st_mtime:
+            _write_bytes(avif, _avif(jpeg))
     # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
     for name, tile in cards.grain.hero_tiles():
         _write_bytes(GENERATED / "static" / name, tile)
@@ -618,6 +654,13 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
         "image": SITE_URL + "_static/favicon.svg",
         "alternateName": PACKAGE["name"],
+        # A software application too, for its category, platforms, price, and features.
+        "@type": ["SoftwareSourceCode", "SoftwareApplication"],
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "keywords": ", ".join(PACKAGE["keywords"]),
+        "featureList": [fact.replace("`", "") for fact in _facts()],
         "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/", PACKAGE["urls"]["Source"]],
     }
     return preview + discovery.head_tags(
@@ -641,13 +684,14 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
 # (a CSS `url()`, an `src`, the favicon link) gets its content's hash as a query, so a changed file
 # gets a new address; then each page's stylesheet links take the hash of the rewritten stylesheet,
 # since Sphinx hashed it before. Download links keep their addresses.
-ASSET_TYPES = "svg|jpg|jpeg|png|webp|gif"
+ASSET_TYPES = "svg|jpg|jpeg|png|webp|avif|gif"
 ASSET_REFS = (
     (".css", re.compile(rf'(url\("?)([^")?#:]+\.(?:{ASSET_TYPES}))(?="?\))')),
     (
         ".html",
         re.compile(
-            rf'((?:\bsrc|<link rel="icon"[^>]*?\bhref)=")([^"?#:]+\.(?:{ASSET_TYPES}))(?=")'
+            rf'((?:\bsrc|\bsrcset|<link rel="(?:icon|preload)"[^>]*?\bhref)=")'
+            rf'([^"?#:]+\.(?:{ASSET_TYPES}))(?=")'
         ),
     ),
     (
@@ -685,6 +729,36 @@ def _version_assets(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arg
                 path.write_text(new, encoding="utf-8")
 
 
+# A Font Awesome glyph rule in the theme's stylesheet: one or more icon classes and the glyph's
+# code point, as in ``.fa-house,.fa-home{--fa:"\f015"}``.
+ICON_RULE = re.compile(r"((?:\.fa-[\w-]+,?)+)\{--fa:[^}]*\}")
+# The theme's stylesheet, and the files that would name every icon whether used or not: Font
+# Awesome's own script and the source maps.
+THEME_CSS = "_static/styles/pydata-sphinx-theme.css"
+ICON_CATALOGS = ("fontawesome.js",)
+
+
+def _trim_icon_rules(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
+    """Drop the glyph rules of the Font Awesome icons no built page or script names from the
+    theme's stylesheet: about 2,000 of them, a third of the file once compressed. Every other
+    rule stays, so an icon a page names keeps its glyph."""
+    if exception is not None or app.builder.name != "html":
+        return
+    outdir = pathlib.Path(app.outdir)
+    named = set()
+    for path in [*outdir.rglob("*.html"), *outdir.rglob("*.js")]:
+        if path.name not in ICON_CATALOGS and "_sources" not in path.parts:
+            named |= set(re.findall(r"\bfa-[a-z0-9-]+", path.read_text(errors="ignore")))
+    css_path = outdir / THEME_CSS
+    css = css_path.read_text(encoding="utf-8")
+
+    def kept(match: re.Match) -> str:
+        names = {name.lstrip(".") for name in match[1].split(",") if name}
+        return match[0] if names & named else ""
+
+    _write(css_path, ICON_RULE.sub(kept, css))
+
+
 def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event arguments
     """Write ``llms.txt`` and ``sitemap.xml`` at the site's root from the built pages
     (``docs/discovery.py``), and the organization's logo (``ABEL_LOGO``). ``llms.txt`` lists
@@ -710,6 +784,7 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
             site_url=SITE_URL,
             project=app.config.project,
             version=release,
+            facts=_facts(),
         )
     except ValueError as error:
         raise ConfigError(str(error)) from None
@@ -1353,6 +1428,16 @@ def _notebook_thumbnail(app, doctree) -> None:  # noqa: ANN001
     _write(THUMBS / f"{stem}.svg", build_assets.graph_thumbnail(NOTEBOOK_DATA[stem]().graph))
 
 
+def _avif(jpeg: pathlib.Path) -> bytes:
+    """``jpeg`` as an AVIF at ``AVIF_QUALITY``, its size unchanged."""
+    from PIL import Image
+
+    out = io.BytesIO()
+    with Image.open(jpeg) as image:
+        image.save(out, "AVIF", quality=AVIF_QUALITY)
+    return out.getvalue()
+
+
 def _write_bytes(path: pathlib.Path, data: bytes) -> None:
     if path.exists() and path.read_bytes() == data:
         return
@@ -1390,6 +1475,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("html-page-context", _docs_sidebar)
     app.connect("html-collect-pages", _moved_pages)
     app.connect("build-finished", _write_discovery)
+    app.connect("build-finished", _trim_icon_rules)
     app.connect("build-finished", _version_assets)
     app.connect("doctree-resolved", _post_byline)
     app.connect("doctree-resolved", _summary_headers)

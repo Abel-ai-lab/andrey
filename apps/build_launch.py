@@ -54,8 +54,8 @@ def markers(name):
 
 
 def pitch_block(summary):
-    """The four one-line claims under the badges, the homepage's, their numbers from every
-    release's summary and the registry."""
+    """The one-line claims under the badges, the homepage's, their numbers from every release's
+    summary and the registry, and the kinds of data the methods cover."""
     builder = site_builder()
     summaries = builder.release_summaries(summary)
     accuracy, fewer = builder.more_than(builder.fewest_errors(summaries))
@@ -69,6 +69,8 @@ def pitch_block(summary):
             f"- **Accurate**: {accuracy.lower()} {fewer}% fewer errors than other popular"
             " packages.",
             f"- **One API**: {len(list_specs())} methods, each one function call.",
+            "- **Any data**: continuous, categorical, mixed, time series, nonlinear, hidden"
+            " confounders.",
             "- **Agent-ready**: a command line that answers in JSON, and a skill for coding"
             " agents.",
             "",
