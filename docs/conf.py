@@ -12,6 +12,7 @@ from __future__ import annotations
 import html
 import importlib.util
 import inspect
+import io
 import json
 import pathlib
 import posixpath
@@ -214,6 +215,8 @@ ABEL_GITHUB = "https://github.com/Abel-ai-lab"
 ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
 ABEL_LOGO = "_static/abel-symbol.png"
 ABEL_LOGO_WIDTH = 600
+# The icon's PNGs at the site's root, by name, each its side in pixels (_write_discovery).
+FAVICONS = {"favicon-96.png": 96, "apple-touch-icon.png": 180}
 # Pages a search engine should not list: the search page, and the page the server shows for a
 # missing address (404.md). The blog's generated pages (All Posts, the years, the archive, the tags,
 # and the authors) only list the posts again, so they are not listed either (`_blog_collection`).
@@ -711,10 +714,20 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
 
     logo = resvg_py.svg_to_bytes(svg_string=ABEL_SYMBOL.read_text(), width=ABEL_LOGO_WIDTH)
     _write_bytes(outdir / ABEL_LOGO, bytes(logo))
+    # The icon at the root too, where crawlers and browsers look first: favicon.ico, a PNG at a
+    # multiple of 48 px for search results, and the home-screen icon.
+    from PIL import Image
+
+    icon = (HERE / html_favicon).read_text()
+    for name, side in FAVICONS.items():
+        _write_bytes(outdir / name, bytes(resvg_py.svg_to_bytes(svg_string=icon, width=side)))
+    ico = io.BytesIO()
+    with Image.open(outdir / "favicon-96.png") as image:
+        image.save(ico, "ICO", sizes=[(16, 16), (32, 32), (48, 48)])
+    _write_bytes(outdir / "favicon.ico", ico.getvalue())
     _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
 
 
-# The pages that show the "Why Andrey is fast" scenes.
 # The documents' own files, by name before the first dot, which the homepage does not use.
 DOCS_ONLY = {
     "pygments",
@@ -730,6 +743,7 @@ DOCS_ONLY = {
     "clipboard",
     "design-tabs",
 }
+# The pages that show the "Why Andrey is fast" scenes.
 WHY_FAST_PAGES = {"blog/20261008-why-andrey-is-fast"}
 
 

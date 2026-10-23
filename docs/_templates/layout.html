@@ -1,6 +1,7 @@
 {#- The theme's layout, without the search scripts it loads on every page for its search-as-you-type
     option, which this site leaves off: the search box sends the reader to the search page, which
-    loads them itself. On every other page they would only block its first paint. -#}
+    loads them itself. On every other page they would only block its first paint. It adds the
+    icon's PNGs at the site's root (conf.py, _write_discovery). -#}
 {%- extends "!layout.html" %}
 {%- block extrahead %}
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -9,4 +10,6 @@
   {%- if last_updated %}
     <meta name="docbuild:last-update" content="{{ last_updated | e }}"/>
   {%- endif %}
+  <link rel="icon" type="image/png" sizes="96x96" href="{{ pathto('favicon-96.png', 1) }}"/>
+  <link rel="apple-touch-icon" href="{{ pathto('apple-touch-icon.png', 1) }}"/>
 {%- endblock extrahead %}
