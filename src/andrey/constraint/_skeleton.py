@@ -636,44 +636,40 @@ def vote_triples(
     ``a``'s neighbors, then every subset of ``c``'s, the empty set included, up to ``max_depth``
     members when one is given: a subset both endpoints offer is tested and counted twice. A subset
     separates the pair when its p-value is at least ``alpha``. :func:`collider_verdict` decides the
-    triple from the separating subsets. A pair no subset separates leaves its triples ambiguous
-    when ``unseparated`` is ``"ambiguous"``, and with ``"recorded"`` leaves them to the separating
-    set already recorded, neither voted nor returned. A collider removes ``b`` from the pair's
+    triple from the separating subsets; a pair no subset separates takes the verdict
+    ``unseparated``, ``"collider"`` or ``"ambiguous"``. A collider removes ``b`` from the pair's
     separating sets and a non-collider adds it, under both key orders, a missing order taking the
     other's set first; an ambiguous triple leaves them as they are. The separating sets already
     recorded do not vote. A triple in ``skip``, keyed ``(a, b, c)`` with ``a < c``, is neither
     voted nor returned.
 
     Each pair is tested once, however many middle nodes it has, in chunks of ``_VOTE_CHUNK``
-    subsets, through the test's ``batched_call`` when it has one; BLAS is pinned to one thread for
-    a test :func:`~andrey.core.ci.pins_blas` names, as in the skeleton search. The cost grows as
-    ``2**degree`` per pair.
+    subsets, through the test's ``batched_call`` when it has one. The chunks do not depend on the
+    middle node, so every middle node counts the p-values one test of the pair gives. The cost
+    grows as ``2**degree`` per pair.
     """
     neighbors = [np.flatnonzero(row).tolist() for row in marks != NULL]
     votes: dict[tuple[int, int], list[tuple[int, ...]]] = {}
     ambiguous = set()
-    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
-        for b, adjacent in enumerate(neighbors):
-            for a, c in combinations(adjacent, 2):
-                if marks[a, c] != NULL or (a, b, c) in skip:
-                    continue
-                if (a, c) not in votes:
-                    votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
-                separating = votes[a, c]
-                if not separating and unseparated == "recorded":
-                    continue
-                verdict = collider_verdict(separating, b, rule)
-                if verdict == "ambiguous":
-                    ambiguous.add((a, b, c))
-                    continue
-                for pair in ((a, c), (c, a)):
-                    recorded = sepsets.get(pair)
-                    if recorded is None:
-                        recorded = sepsets.get(pair[::-1], ())
-                    if verdict == "non-collider":
-                        sepsets[pair] = recorded if b in recorded else (*recorded, b)
-                    else:
-                        sepsets[pair] = tuple(node for node in recorded if node != b)
+    for b, adjacent in enumerate(neighbors):
+        for a, c in combinations(adjacent, 2):
+            if marks[a, c] != NULL or (a, b, c) in skip:
+                continue
+            if (a, c) not in votes:
+                votes[a, c] = _separating_votes(test, a, c, neighbors, alpha, max_depth)
+            separating = votes[a, c]
+            verdict = collider_verdict(separating, b, rule) if separating else unseparated
+            if verdict == "ambiguous":
+                ambiguous.add((a, b, c))
+                continue
+            for pair in ((a, c), (c, a)):
+                recorded = sepsets.get(pair)
+                if recorded is None:
+                    recorded = sepsets.get(pair[::-1], ())
+                if verdict == "non-collider":
+                    sepsets[pair] = recorded if b in recorded else (*recorded, b)
+                else:
+                    sepsets[pair] = tuple(node for node in recorded if node != b)
     return frozenset(ambiguous)
 
 

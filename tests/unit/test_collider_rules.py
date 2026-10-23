@@ -74,7 +74,7 @@ def test_vote_decides_the_middle_node_by_its_share(engine, rule, case):
 
 @pytest.mark.parametrize("rule", VOTING)
 def test_no_separating_subset(rule):
-    """PC leaves the triple ambiguous; FCI lets the recorded separating set decide."""
+    """PC leaves the triple ambiguous; FCI makes it a collider, as the recorded sets do not vote."""
     edges = [(0, 1), (1, 2)]
     sepsets = {(0, 2): (1,)}
     ambiguous = pc_module.vote_colliders(
@@ -86,7 +86,7 @@ def test_no_separating_subset(rule):
         _skeleton(3, edges, CIRCLE), lambda *args: 0.0, 0.5, fci_sepsets, rule=rule
     )
     assert not ambiguous
-    assert fci_sepsets == sepsets
+    assert fci_sepsets == {(0, 2): (), (2, 0): ()}
 
 
 def _scripted(name: str, separations: dict[tuple[int, int], set[tuple[int, ...]]]):

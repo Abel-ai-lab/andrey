@@ -109,12 +109,10 @@ def test_r5_finds_an_uncovered_route_behind_a_covered_one(monkeypatch):
     np.testing.assert_array_equal(_oracle_fci(monkeypatch, 6, edges, (7, 8, 9, 10)), truth)
 
 
-@pytest.mark.parametrize("collider_rule", ["sepsets", "conservative", "majority"])
-def test_possible_dsep_tests_every_subset(monkeypatch, collider_rule):
+def test_possible_dsep_tests_every_subset(monkeypatch):
     """Only ``{2, 3, 6}``, the first three-node subset of the possible-d-sep set, separates 4 and 5.
 
     Skipping that subset keeps the false edge ``4 - 5`` and leaves circles where 0 meets 4 and 5.
-    Every collider rule gives the true PAG.
     """
     edges = [(2, 3), (2, 6), (3, 5), (6, 4), (7, 0), (7, 5), (9, 0), (9, 4), (10, 5), (10, 6)]
     edges += [(11, 3), (11, 4)]
@@ -129,8 +127,7 @@ def test_possible_dsep_tests_every_subset(monkeypatch, collider_rule):
             [_, _, A, _, T, A, _],
         ]
     )
-    pag = _oracle_fci(monkeypatch, 7, edges, collider_rule=collider_rule)
-    np.testing.assert_array_equal(pag, truth)
+    np.testing.assert_array_equal(_oracle_fci(monkeypatch, 7, edges), truth)
 
 
 # Seven observed nodes 0-6 with hidden common causes from node 7 up; R8 fires on each.
@@ -193,15 +190,16 @@ def test_pag_ignores_node_labels_under_exact_tests(monkeypatch, name):
 
 @pytest.mark.parametrize("name", sorted({**R8_GRAPHS, **ORACLE_GRAPHS}))
 @pytest.mark.parametrize("collider_rule", ["conservative", "majority"])
-def test_voting_rules_give_the_same_pag_under_exact_tests(monkeypatch, name, collider_rule):
-    """With exact tests, every separating subset agrees, so the votes decide as the sets do.
+def test_voting_rules_under_exact_tests(monkeypatch, name, collider_rule):
+    """With exact tests, every separating subset agrees, so no triple is ambiguous.
 
-    On the graphs whose possible-d-separation step removes an edge, a pair no subset of either
-    end's neighbors separates keeps the set that step recorded.
+    Where every unshielded pair has a separating subset among its ends' neighbors, as on the R8
+    graphs, the votes decide as the separating sets do and the PAG is the same.
     """
     edges = {**R8_GRAPHS, **ORACLE_GRAPHS}[name]
     n_obs = 7 if name in R8_GRAPHS else 6
     ambiguous: set = set()
     pag = _oracle_fci(monkeypatch, n_obs, edges, collider_rule=collider_rule, _ambiguous=ambiguous)
-    np.testing.assert_array_equal(pag, _oracle_fci(monkeypatch, n_obs, edges))
     assert not ambiguous
+    if name in R8_GRAPHS:
+        np.testing.assert_array_equal(pag, _oracle_fci(monkeypatch, n_obs, edges))

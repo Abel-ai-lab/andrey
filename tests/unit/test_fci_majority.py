@@ -23,7 +23,7 @@ def circle_graph(n, edges):
 @pytest.mark.parametrize(
     "separating,decision",
     [
-        ([], "recorded"),
+        ([], "collider"),
         ([()], "collider"),
         ([(1,)], "noncollider"),
         ([(), (1, 3)], "collider"),
@@ -34,8 +34,7 @@ def circle_graph(n, edges):
 )
 @pytest.mark.parametrize("batched", [False, True])
 def test_majority_decisions(separating, decision, batched):
-    """Shared subsets count twice; p == alpha passes; recorded sets vote only when no subset
-    separates, and then decide alone."""
+    """Shared subsets count twice; p == alpha passes; recorded sets never vote."""
     marks = circle_graph(5, [(0, 1), (1, 2), (0, 3), (2, 4)])
     before = marks.copy()
     sepsets = {(0, 2): (1, 3), (2, 0): (4,)}
@@ -294,10 +293,9 @@ def test_missing_recorded_sets(pvalue):
     )
     fci_module._orient_colliders(marks, sepsets, ambiguous)
     if pvalue == 0.0:
-        # No subset separates and none is recorded: no rule reads the triple as a collider.
-        assert sepsets == {}
+        assert sepsets == {(0, 2): (), (2, 0): ()}
         assert not ambiguous
-        assert marks[1, 0] == marks[1, 2] == CIRCLE
+        assert marks[1, 0] == marks[1, 2] == ARROW
     else:
         assert sepsets == {}
         assert ambiguous == frozenset([(0, 1, 2)])
@@ -314,7 +312,7 @@ def test_majority_preserves_members_of_one_way_recorded_set(pair, decision):
     def oracle(a, c, subset):
         if decision == "ambiguous":
             return 1.0
-        return float((1 in subset) == (decision == "noncollider"))
+        return float(decision == "noncollider" and 1 in subset)
 
     ambiguous = fci_module._vote_sepsets(marks, oracle, 0.05, sepsets, rule="majority")
     if decision == "ambiguous":

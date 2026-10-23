@@ -362,13 +362,11 @@ def _vote_sepsets(
     ``"majority"``; rewrite ``sepsets`` to match and return the ambiguous triples.
 
     The vote of :func:`~andrey.constraint._skeleton.vote_triples`, on the final skeleton. A pair no
-    subset of either endpoint's neighbors separates keeps its recorded separating set, which then
-    decides its triples as under ``"sepsets"``: the search separated the pair given nodes beyond
-    the final neighbors, as the possible-d-separation step does, and with exact tests that set
-    holds the middle node exactly when it is a non-collider.
+    subset of either endpoint's neighbors separates makes its triples colliders: no separating
+    subset holds the middle node, and the recorded sets do not vote.
     """
     return vote_triples(
-        marks, test, alpha, sepsets, rule, unseparated="recorded", max_depth=max_depth, skip=skip
+        marks, test, alpha, sepsets, rule, unseparated="collider", max_depth=max_depth, skip=skip
     )
 
 

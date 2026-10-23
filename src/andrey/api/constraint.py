@@ -556,13 +556,14 @@ def fci(
     ``"conservative"``, ``z`` is a collider when no kept subset contains it, a non-collider when
     every one does, and ambiguous otherwise. Under ``"majority"``, ``z`` is a collider when fewer
     than half contain it, a non-collider when more than half do, and ambiguous at exactly half. A
-    triple whose ends no subset separates is decided by the separating set that removed their
-    edge, as under ``"sepsets"``: the search separated them given nodes beyond both ends' final
-    neighbors, as the possible-d-separation step does, and with exact tests that set holds ``z``
-    exactly when ``z`` is a non-collider. An ambiguous triple is never oriented as a collider, and
-    rules R1-R10 do not read it as a non-collider, so endpoints around it can stay circles. A vote
-    reads only the skeleton and the tests, so the rules keep the result independent of the column
-    order wherever ``"sepsets"`` does.
+    triple whose ends no subset separates is a collider under both: no kept subset contains ``z``,
+    and the separating set that removed the edge, from a possible-d-separation set or an earlier
+    neighborhood, does not vote. With exact tests this can be wrong where only nodes beyond both
+    ends' neighbors separate them and ``z`` is a non-collider, so on such graphs the voting rules
+    can orient a collider that ``"sepsets"`` does not. An ambiguous triple is never oriented as a
+    collider, and rules R1-R10 do not read it as a non-collider, so endpoints around it can stay
+    circles. A vote reads only the skeleton and the tests, so the rules keep the result independent
+    of the column order wherever ``"sepsets"`` does.
 
     **Separating sets.** When several conditioning sets of the same size make a pair independent
     in the first step, FCI records their union as the pair's separating set. FCI keeps the union
