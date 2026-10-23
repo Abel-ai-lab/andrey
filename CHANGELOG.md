@@ -109,6 +109,14 @@ change names its pull request.
   `andrey --help --json`, and the package summary says the import name is `andrey`, so an agent
   that has only run `pip install andrey-core` finds the command line and its skill. ([#347])
 
+### Removed
+
+- Names that only tests used: `andrey.core.backend.parallel_map`,
+  `andrey.data.storage.save_collection` and `load_collection`,
+  `andrey.temporal.LongitudinalLiNGAM.get_error_independence_p_values` and `residuals_`,
+  `andrey.core.independence.hsic_gamma_test` and `measure_hsic_statistic`, and the bandwidth options
+  of `hsic_test` and `hsic_statistic_test`, which no caller passed. ([#371])
+
 ## [0.8.0] - 2026-10-23
 
 ### Highlights
@@ -662,3 +670,4 @@ First alpha release.
 [#364]: https://github.com/Abel-ai-lab/andrey/pull/364
 [#365]: https://github.com/Abel-ai-lab/andrey/pull/365
 [#368]: https://github.com/Abel-ai-lab/andrey/pull/368
+[#371]: https://github.com/Abel-ai-lab/andrey/pull/371
