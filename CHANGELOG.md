@@ -9,6 +9,33 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Changed
+
+- Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
+  hard limit: they change with the data generator, the density, the method's settings, and the
+  machine. ([#367])
+
+### Removed
+
+- `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
+  installed safetensors for them. Nothing in Andrey called them. ([#375])
+
+### Fixed
+
+- `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
+  `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
+  test or score; an empty list now reads as `None` there. ([#395])
+- Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
+  `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
+  `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
+  not change. ([#394])
+- For contributors, the benchmark harness's PCMCI, PCMCI+, and LPCMCI generators no longer fail at
+  large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
+  first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
+  unstable draw. Every draw that was stationary is unchanged. ([#393])
+
+## [0.9.0] - 2026-10-23
+
 ### Highlights
 
 - The same answers in less time: PC, FCI, GFCI, CD-NOD, GES, XGES, BOSS, GRaSP, exact search,
@@ -50,9 +77,6 @@ change names its pull request.
 
 ### Changed
 
-- Every method's **Limitations** paragraph says its measured sizes and times are a reference, not a
-  hard limit: they change with the data generator, the density, the method's settings, and the
-  machine. ([#367])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` return the same
   graphs and p-values in less time, because their skeleton search hands the test each pair's
   conditioning sets, and those of consecutive pairs, as one stack. ([#280], [#292])
@@ -122,22 +146,6 @@ change names its pull request.
   `andrey.temporal.LongitudinalLiNGAM.get_error_independence_p_values` and `residuals_`,
   `andrey.core.independence.hsic_gamma_test` and `measure_hsic_statistic`, and the bandwidth options
   of `hsic_test` and `hsic_statistic_test`, which no caller passed. ([#371])
-- `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
-  installed safetensors for them. Nothing in Andrey called them. ([#375])
-
-### Fixed
-
-- `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
-  `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
-  test or score; an empty list now reads as `None` there. ([#395])
-- Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
-  `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
-  `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
-  not change. ([#394])
-- For contributors, the benchmark harness's PCMCI, PCMCI+, and LPCMCI generators no longer fail at
-  large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
-  first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
-  unstable draw. Every draw that was stationary is unchanged. ([#393])
 
 ## [0.8.0] - 2026-10-23
 
@@ -599,7 +607,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
