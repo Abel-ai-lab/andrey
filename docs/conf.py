@@ -1371,7 +1371,9 @@ THUMBS = GENERATED / "thumbs"
 # The data behind a notebook whose run shows no figure: the gallery draws its true graph instead.
 NOTEBOOK_DATA = {
     # The first size and seed the speed notebook times.
-    "speed_on_your_machine": lambda: benchmarks.scm("linear_gauss_er", 10).sample(n=100, seed=7),
+    "speed_on_your_machine": lambda: benchmarks.scm("linear_gauss_er", 10).sample(
+        n=100, seed=7, scale="raw"
+    ),
 }
 
 

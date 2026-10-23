@@ -301,14 +301,14 @@ def _position_draw(name: str) -> tuple[np.ndarray, tuple]:
     """A draw and the arguments after it, for ``name``'s facade and engine alike, on which firing
     the orientation rules one at a time differs from rounds under some column order."""
     if name == "pc":
-        return data.sample_scm(d=10, n=100, seed=9, density=4.0).data, ()
+        return data.sample_scm(d=10, n=100, seed=9, density=4.0, scale="raw").data, ()
     if name == "cdnod":
         x = data.sample_scm(d=5, n=200, seed=17, density=3.0, scale="standardize").data
         context = np.repeat([0.0, 1.0], 100)
         x[context == 1, 0] += 1.5
         return x, (context,)
     n, seed = (3000, 9) if name == "fci" else (300, 0)
-    return data.sample_scm(d=6, n=n, seed=seed, density=3.0, latents=1).data, ()
+    return data.sample_scm(d=6, n=n, seed=seed, density=3.0, latents=1, scale="raw").data, ()
 
 
 @pytest.mark.parametrize("name", ["pc", "cdnod", "fci", "gfci"])
@@ -455,7 +455,7 @@ def test_cdnod_independent_change_step_visits_columns_by_rank(monkeypatch, d, se
 )
 def test_pag_orientations_are_invariant_to_column_order(module, draw):
     """Seeds on which FCI's rules mark one endpoint both ways."""
-    x = data.sample_scm(d=6, density=3.0, latents=1, **draw).data
+    x = data.sample_scm(d=6, density=3.0, latents=1, **draw, scale="raw").data
     fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
     assert _invariant_to_column_order(fit, x)
 
@@ -464,7 +464,7 @@ def test_pag_orientations_are_invariant_to_column_order(module, draw):
 def test_possible_dsep_is_invariant_to_column_order(module):
     """A draw on which the possible-d-separation step removes different edges when it visits
     them in column order."""
-    x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1).data
+    x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1, scale="raw").data
     fit = getattr(importlib.import_module(module), module.rsplit(".", 1)[1])
     assert _invariant_to_column_order(fit, x, ordered=dict(possible_dsep="fast"))
 
@@ -473,7 +473,7 @@ def test_possible_dsep_is_invariant_to_column_order(module):
 def test_tie_break_position_gives_the_output_of_possible_dsep_fast(name):
     """On a draw where the two orders remove different edges, ``"position"`` gives the output of
     ``possible_dsep="fast"``, and ``"rank"`` that of ``"order_free"``."""
-    x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1).data
+    x = data.sample_scm(d=8, n=300, seed=9, density=3.0, latents=1, scale="raw").data
     facade = getattr(andrey, name)
     modes_differ = False
     orders = [np.arange(x.shape[1])] + [
@@ -513,7 +513,7 @@ def test_possible_dsep_follows_tie_break_unless_given(monkeypatch, name, tie_bre
         return engine(*args, **kwargs)
 
     monkeypatch.setattr(module, name, spy)
-    x = data.sample_scm(d=4, n=100, seed=0, density=2.0, latents=1).data
+    x = data.sample_scm(d=4, n=100, seed=0, density=2.0, latents=1, scale="raw").data
     with andrey.config(tie_break=tie_break):
         getattr(andrey, name)(x, **({} if given is None else dict(possible_dsep=given)))
     assert received == [reaches]
@@ -566,7 +566,9 @@ def _latent_confounded_sample(seed: int, d: int) -> np.ndarray:
     """An observed sample from a random DAG with one hidden confounder."""
     from andrey import data
 
-    return data.sample_scm(graph="erdos_renyi", d=d, n=1200, seed=seed, density=2.0, latents=1).data
+    return data.sample_scm(
+        graph="erdos_renyi", d=d, n=1200, seed=seed, density=2.0, latents=1, scale="raw"
+    ).data
 
 
 def _fit(learner: str, x: np.ndarray):

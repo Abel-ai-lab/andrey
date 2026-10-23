@@ -5,6 +5,7 @@ sparse edge list -- no dense adjacency. ``linear`` is the causally-sufficient de
 ``additive_noise`` (ANM) and ``post_nonlinear`` (PNL) are the nonlinear identifiable families, and
 ``nonmonotone`` an additive-noise family whose effects partial correlation does not see. All four
 share one topological-evaluation loop and differ only in the per-node combine rule.
+:meth:`Linear.draw_unitless` draws the weights and noise scales of ``scale="unitless"``.
 """
 
 from __future__ import annotations
@@ -15,6 +16,10 @@ from typing import ClassVar
 import numpy as np
 
 from .graphs import DAGDraw
+
+#: The most nodes :meth:`Linear.draw_unitless` takes. It keeps the dense ``(d, d)`` correlation
+#: matrix of the nodes, 8 MB in float64 at this size, and its time grows with ``d`` times the edges.
+UNITLESS_MAX_NODES = 1000
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -76,6 +81,78 @@ class Linear(Functional):
 
     def _node(self, parent_values, weights, noise_c):
         return noise_c + parent_values @ weights
+
+    def draw_unitless(
+        self, draw: DAGDraw, rng: np.random.Generator
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Draw edge weights and noise scales that give every node unit variance.
+
+        Algorithm 1 of Herman et al. (2025). In topological order, a node with ``k`` parents
+        draws a uniform point of the unit ``k``-ball: a direction ``a ~ N(0, I_k)`` and a radius
+        ``r = u ** (1 / k)`` with ``u ~ U(0, 1)``. Its weights start as ``r * a / ||a||`` and its
+        noise scale as ``sqrt(1 - r**2)``; both are then divided by the node's standard deviation
+        under the correlation matrix of its parents, so the node has variance 1 however its
+        parents are correlated. The draw of a node depends only on its number of parents. A node
+        without parents has noise scale 1. ``weight_range`` is not used.
+
+        Parameters
+        ----------
+        draw : DAGDraw
+            The drawn graph.
+        rng : np.random.Generator
+            The stream of the draws: one normal per edge, then one uniform per node.
+
+        Returns
+        -------
+        weights : np.ndarray of shape (m,)
+            The weight of each edge, in the order of ``draw.parents`` and ``draw.children``.
+        scales : np.ndarray of shape (d,)
+            The noise standard deviation of each node.
+
+        Raises
+        ------
+        ValueError
+            If the graph has more than :data:`UNITLESS_MAX_NODES` nodes.
+
+        References
+        ----------
+        Herman, R. J., Wahl, J., Ninad, U., and Runge, J. (2025). Unitless Unrestricted
+        Markov-Consistent SCM Generation: Better Benchmark Datasets for Causal Discovery.
+        Proceedings of the Fourth Conference on Causal Learning and Reasoning, PMLR 275,
+        1506-1531.
+        """
+        d = draw.d
+        if d > UNITLESS_MAX_NODES:
+            raise ValueError(
+                f"scale='unitless' keeps a dense (d, d) correlation matrix and takes at most "
+                f"{UNITLESS_MAX_NODES} nodes, got {d}"
+            )
+        m = draw.parents.shape[0]
+        directions = rng.standard_normal(m)
+        radii = rng.uniform(size=d)
+        weights = np.zeros(m)
+        scales = np.ones(d)
+        corr = np.eye(d)
+        edges_by_child = _parents_by_child(draw.children, draw.parents, np.arange(m))
+        for c in draw.topo_order:
+            c = int(c)
+            block = edges_by_child.get(c)
+            if block is None:
+                continue
+            pa, edge = block
+            r = radii[c] ** (1.0 / pa.size)
+            a = r * directions[edge] / np.linalg.norm(directions[edge])
+            s = np.sqrt(1.0 - r * r)
+            sd = np.sqrt(a @ corr[np.ix_(pa, pa)] @ a + s * s)
+            weights[edge] = a / sd
+            scales[c] = s / sd
+            # Cov(X_c, X_j) = sum_p w_p Cov(X_p, X_j) for every node j before c. The entries of the
+            # nodes after c are still zero here and are set when those nodes are drawn.
+            row = weights[edge] @ corr[pa, :]
+            corr[c, :] = row
+            corr[:, c] = row
+            corr[c, c] = 1.0
+        return weights, scales
 
 
 @dataclass(frozen=True, kw_only=True)
