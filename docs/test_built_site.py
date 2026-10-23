@@ -174,18 +174,33 @@ def test_every_page_has_one_short_description_equal_to_its_preview(html):
     assert not problems, "\n".join(problems)
 
 
-def test_each_generated_blog_collection_has_its_own_description(html):
-    home = (html / "index.html").read_text(encoding="utf-8")
-    homepage = re.search(r'<meta name="description" content="([^"]*)"', home)[1]
-    seen = {}
+def _is_blog_collection(text: str) -> bool:
+    """Whether the page is one ABlog generates: All Posts, a year, the archive, a tag, an author."""
+    return 'class="section ablog__collection"' in text or "ablog__catalog_header" in text
+
+
+def test_the_blogs_generated_pages_are_noindex_unlisted_and_name_no_canonical_address(html):
+    sitemap = (html / "sitemap.xml").read_text()
+    seen = 0
     for page, text in _pages(html):
-        if 'class="section ablog__collection"' not in text and "ablog__catalog_header" not in text:
+        if not _is_blog_collection(text):
             continue
-        description = re.search(r'<meta name="description" content="([^"]*)"', text)[1]
-        assert description != homepage, page
-        assert description not in seen, f"{page} and {seen.get(description)}"
-        seen[description] = page
+        seen += 1
+        robots = re.findall(r'<meta name="robots" content="([^"]*)"', text)
+        assert robots == ["noindex, follow"], page
+        assert 'rel="canonical"' not in text, page
+        url = re.search(r'<meta property="og:url" content="([^"]+)"', text)[1]
+        assert f"<loc>{url}</loc>" not in sitemap, page
     assert seen
+
+
+def test_every_title_but_the_homepages_ends_with_the_product_and_its_subject(html):
+    for page, text in _pages(html):
+        title = unescape(re.search(r"<title>(.*?)</title>", text, re.S)[1])
+        if page == html / "index.html":
+            assert title == "Andrey: accelerated, accurate, agentic causal discovery"
+        else:
+            assert title.endswith(" Andrey causal discovery"), f"{page}: {title}"
 
 
 def test_every_homepage_tile_leads_to_details_that_are_built(html):
@@ -416,6 +431,15 @@ def test_every_page_carries_structured_data_that_matches_its_preview(html):
         assert software["image"] == "https://andrey.abel.ai/_static/favicon.svg"
         assert (html / "_static" / "favicon.svg").is_file()
         assert node["about"]["@id"] == software["@id"]
+        # The names and profiles that tie the product to its package and its owner, so it is not
+        # taken for a person named Andrey.
+        assert software["alternateName"] == "andrey-core"
+        assert software["sameAs"] == [
+            "https://pypi.org/project/andrey-core/",
+            "https://github.com/Abel-ai-lab/andrey",
+        ]
+        assert nodes["WebSite"]["alternateName"] == "Andrey causal discovery"
+        assert nodes["Organization"]["sameAs"] == ["https://github.com/Abel-ai-lab"]
         assert nodes["Organization"]["url"] == "https://abel.ai/"
         assert nodes["Organization"]["logo"] == "https://andrey.abel.ai/_static/abel-symbol.png"
 
@@ -500,10 +524,10 @@ def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html
         assert f"https://andrey.abel.ai/{address}" not in urls, address
 
 
-def test_only_the_search_page_and_the_404_page_are_noindex(html):
+def test_only_the_search_page_the_404_page_and_the_blogs_generated_pages_are_noindex(html):
     for page, text in _pages(html):
         robots = re.findall(r'<meta name="robots" content="([^"]*)"', text)
-        if page in (html / "search.html", html / "404.html"):
+        if page in (html / "search.html", html / "404.html") or _is_blog_collection(text):
             assert robots == ["noindex, follow"], page
         else:
             assert not robots, page
