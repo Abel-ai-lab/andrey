@@ -618,6 +618,31 @@
   color: var(--andrey-ground-ink);
 }
 
+/* On the sheet's paper, under the speed panel: the cards are the panel's surface with its line, and
+   the dots take the ink. */
+.andrey-home .run-sheet .wf-belt {
+  margin-top: clamp(1.5rem, 4vw, 2.5rem);
+  color: var(--andrey-ink);
+}
+
+.andrey-home .run-sheet .wf-card {
+  border: 1px solid var(--andrey-line);
+  background: var(--andrey-surface);
+  box-shadow: none;
+}
+
+.andrey-home .run-sheet .wf-dot i {
+  background: color-mix(in srgb, var(--andrey-ink) 18%, transparent);
+}
+
+.andrey-home .run-sheet .wf-dot i::after {
+  background: var(--andrey-accent);
+}
+
+.andrey-home .run-sheet .wf-dot:focus-visible {
+  outline-color: var(--andrey-accent);
+}
+
 .andrey-home .wf-cards {
   --card: min(64rem, calc(100vw - 2 * var(--gutter) - 2.5rem));
   display: flex;
@@ -781,7 +806,7 @@
   }
 }
 
-/* The sheet's fade starts below the carousel, so its dots stay on the art. */
+/* The sheet rises over the art after the section's title, under the speed panel and the carousel. */
 .andrey-home .run-sheet {
   --sheet-fade: clamp(9rem, 24svh, 14rem);
   position: relative;
