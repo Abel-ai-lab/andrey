@@ -18,10 +18,10 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.8.0: nonlinear dependence
+## ⭐ What's new in 0.8.0
 
-PC, FCI, GFCI, and CD-NOD test independence with KCI, RCoT, CMIknn, and GPDC, four tests that
-detect the nonlinear effects partial correlation misses. Each runs faster than the package we
+PC, FCI, GFCI, and CD-NOD now detect nonlinear dependence, which partial correlation misses, with
+four new independence tests: KCI, RCoT, CMIknn, and GPDC. Each runs faster than the package we
 measured it against, at the same level of accuracy.
 
 **[Read the post](https://andrey.abel.ai/blog/20261023-andrey-0-8-0.html)** ·

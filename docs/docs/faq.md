@@ -17,11 +17,8 @@ supported and benchmarked, cover continuous, categorical, and mixed data; indepe
 time series; linear and nonlinear relationships; data with hidden common causes; and data from
 interventions or several domains. The searches also take background knowledge: edges that must or
 cannot exist, and the order of tiers in time. They include PC, FCI, GFCI, GES, XGES, BOSS, GRaSP,
-the LiNGAM family, PCMCI, and LPCMCI. Most methods take a NumPy array or a pandas DataFrame and
-return a `StructureOutput`;
-`multi_group_direct_lingam` and `longitudinal_lingam` take a list of datasets, and the first returns
-one result per group. Many methods spread their work over CPU cores, and some run on a GPU. A
-command line that answers in JSON and an agent skill make it usable by AI agents.
+the LiNGAM family, PCMCI, and LPCMCI. Many methods spread their work over CPU cores, and some run
+on a GPU. A command line that answers in JSON and an agent skill make it usable by AI agents.
 
 ### How do I install it?
 
@@ -127,10 +124,10 @@ large enough to repay the transfer; correlation matrices move too when you set
 
 It depends on the method, the data, and the machine, so the [release cards](benchmarks.md) time
 each method at growing sizes against the packages that implement it. A few published examples:
-PC learns a 400-variable graph in under a second, where causal-learn takes ten minutes (0.1.0);
-tabu search fits 800 variables and 8,000 rows in under two seconds, where bnlearn takes sixteen
-minutes (0.3.0); BOSS and FCI finish 800 variables (0.1.0); and PCMCI fits 160 time series in five
-seconds, where tigramite takes eight minutes (0.5.0). Finishing is not the same as being accurate:
+PC learns a 400-variable graph in under a second, where causal-learn takes ten minutes; tabu
+search fits 800 variables and 8,000 rows in under two seconds, where bnlearn takes sixteen minutes;
+BOSS and FCI finish 800 variables; and PCMCI fits 160 time series in five seconds, where tigramite
+takes eight minutes. Finishing is not the same as being accurate:
 see [Are the classic methods accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
 
 ### Can it use more CPU cores?
@@ -158,26 +155,24 @@ Discrete data, yes: code each category as a whole number, or pass a DataFrame wh
 text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
 data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS, GRaSP,
 and exact search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`;
-all but GFCI pick BDeu by default when every column is categorical. Mixed data, with continuous and
-categorical columns, yes too: PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and
+all but GFCI pick BDeu by default when every column is categorical. For mixed data, with
+continuous and categorical columns, PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and
 exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
 `score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`; GES, hill climbing, BOSS,
 GRaSP, and exact search pick `"local_score_cond_gauss"` by default when some columns are
 categorical. They infer which columns are categorical unless you name them with `categorical`, and
-warn about what they inferred. The [0.6.0 release card](benchmarks/0.6.0.md) benchmarks PC, GES,
-and hill climbing on categorical and mixed data against causal-learn, Tetrad, bnlearn, and pgmpy,
-and the [0.8.0 release card](benchmarks/0.8.0.md) BOSS and GRaSP with BDeu.
+warn about what they inferred. The [release cards](benchmarks.md) benchmark them on categorical
+and mixed data against causal-learn, Tetrad, bnlearn, and pgmpy.
 [Data types](guides/getting-started.md#data-types) explains the settings, the inference rule, and
 how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
 Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, and `granger` learn
-graphs over time lags; `lpcmci` also allows hidden common causes. The
-[0.5.0 release card](benchmarks/0.5.0.md) benchmarks them against tigramite, lingam, and
-causal-learn. `multi_group_direct_lingam` fits several datasets that share one causal order,
-`cdnod` takes data from several domains, and `gies` takes data that mixes observation with
-interventions. All are supported.
+graphs over time lags; `lpcmci` also allows hidden common causes. The [release cards](benchmarks.md)
+benchmark them against tigramite, lingam, and causal-learn. `multi_group_direct_lingam` fits
+several datasets that share one causal order, `cdnod` takes data from several domains, and `gies`
+takes data that mixes observation with interventions. All are supported.
 
 ## Command line and agents
 
