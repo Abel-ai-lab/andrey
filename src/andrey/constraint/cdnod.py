@@ -55,7 +55,7 @@ from andrey.constraint.pc import (
     check_collider_order,
     check_knowledge_cycle,
 )
-from andrey.core import ARROW, NULL, TAIL, GraphStructure
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.independence import _center_kernel, _gaussian_kernel
 from andrey.core.knowledge import orient
 from andrey.core.orient import _is_directed, _reaches_directed, meek, to_structure
@@ -79,6 +79,7 @@ def cdnod(
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
+    workers: int | None = None,
 ) -> GraphStructure:
     """Discover a partially directed graph from multi-domain ``data`` with CDNOD and ``indep_test``.
 
@@ -98,9 +99,11 @@ def cdnod(
     conditioning-set size of the skeleton search. ``constraints``, over the data's columns,
     constrain the skeleton search and the orientations as in :func:`~andrey.constraint.pc.pc`; the
     context is unconstrained. Every edge they decide is directed before the independent-change
-    step, which orients only undirected edges, so it never orients against them. Returns a
-    ``GraphStructure`` tagged ``"cpdag"``: its directions include those the index identifies, so it
-    is not an observational CPDAG.
+    step, which orients only undirected edges, so it never orients against them. ``workers``
+    worker processes share the skeleton search's larger conditioning-size passes
+    (:func:`~andrey.constraint.pc._discover_skeleton`); ``None`` reads
+    ``andrey.config.num_workers``. Returns a ``GraphStructure`` tagged ``"cpdag"``: its directions
+    include those the index identifies, so it is not an observational CPDAG.
     """
     check_collider_order(collider_order)
     X = np.asarray(data, dtype=np.float64)
@@ -117,6 +120,7 @@ def cdnod(
     d = X.shape[1]
     ranked = collider_order == "p_value"
     rule4 = constraints is not None
+    workers = backend.worker_count(workers)
     if np.ptp(context) == 0:
         # One domain: no change to detect, and a constant has no correlation to test, so the
         # search runs on ``data`` alone and gives PC's graph.
@@ -126,6 +130,7 @@ def cdnod(
             indep_test,
             categorical=categorical,
             record_pvalues=ranked,
+            workers=workers,
             max_depth=max_depth,
             constraints=constraints,
         )
@@ -148,6 +153,7 @@ def cdnod(
             indep_test,
             categorical=mask,
             record_pvalues=ranked,
+            workers=workers,
             max_depth=max_depth,
             constraints=padded,
         )

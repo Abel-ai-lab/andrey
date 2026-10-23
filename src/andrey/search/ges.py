@@ -74,6 +74,7 @@ def ges(
     maxP: float | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
+    workers: int | None = None,
     _full_scores: bool = False,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
@@ -110,6 +111,9 @@ def ges(
         required one, the search starts from the class of the required edges, and a move whose
         class holds no DAG that satisfies the knowledge is skipped for the next best one. The
         result is that class narrowed by the knowledge (:func:`~andrey.core.knowledge.mpdag`).
+    workers : int or None
+        Worker processes for the BIC passes above the work threshold; ``None`` reads
+        ``andrey.config.num_workers``.
     _full_scores : bool
         Private test lever: score every candidate by two full local scores (the pre-Schur reference)
         instead of the Schur delta. Tests compare the two scoring paths; this option is not part of
@@ -141,7 +145,7 @@ def ges(
         mask = column_mask(categorical, n)
     ranks = tie_ranks(X, mask).tolist()
     with backend.one_blas_thread():
-        workers = backend.worker_count() if n > 1 else 1
+        workers = backend.worker_count(workers) if n > 1 else 1
         adj = _parallel_ges.run_ges(
             adj,
             score,

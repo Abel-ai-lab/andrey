@@ -257,13 +257,20 @@ def test_cdnod_pipeline_prescreen_invariant(
 # At each conditioning size the pairs are scanned independently and removals applied only after the
 # size completes, so distributing the pairs over worker processes and reducing by union cannot alter
 # the outcome. These pin that: the same skeleton whether the |S| >= 2 scan runs in-process or fans
-# out. Densities are chosen so the search reaches |S| >= 2 (the sizes the pool handles).
+# out. Densities are chosen so the search reaches |S| >= 2 (the sizes the pool handles), and the
+# gate is set to 0, so every such pass of these small cases runs on the pool.
 
 _PARALLEL_SWEEP = [(15, 500, 0.30), (20, 600, 0.25), (30, 500, 0.18)]
 _PARALLEL_CASES = [(seed, d, n, p) for seed in range(2) for (d, n, p) in _PARALLEL_SWEEP]
 _PARALLEL_IDS = [f"seed{s}-d{d}-n{n}-p{p}" for (s, d, n, p) in _PARALLEL_CASES]
 
 
+@pytest.fixture
+def _open_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0")
+
+
+@pytest.mark.usefixtures("_open_gate")
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _PARALLEL_CASES, ids=_PARALLEL_IDS)
 def test_pc_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
@@ -272,6 +279,7 @@ def test_pc_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None
     _assert_same(serial, parallel, f"PC serial/parallel seed={seed} d={d} n={n} p={p}")
 
 
+@pytest.mark.usefixtures("_open_gate")
 @pytest.mark.parametrize(("prescreen", "workers"), [(True, 1), (False, 1), (True, 3)])
 def test_pc_skeleton_without_pvalues_is_the_same(prescreen: bool, workers: int) -> None:
     # The column collider order skips the p-values on the prescreen, scan, and worker paths.
@@ -284,6 +292,7 @@ def test_pc_skeleton_without_pvalues_is_the_same(prescreen: bool, workers: int) 
     _assert_same(bare[:2], full[:2], f"PC without p-values prescreen={prescreen} workers={workers}")
 
 
+@pytest.mark.usefixtures("_open_gate")
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _PARALLEL_CASES, ids=_PARALLEL_IDS)
 def test_fci_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)
@@ -334,6 +343,7 @@ def test_student_t_prescreen_matches_unprescreened(seed: int, d: int, n: int, p:
     )
 
 
+@pytest.mark.usefixtures("_open_gate")
 @pytest.mark.parametrize(("seed", "d", "n", "p"), _T_PARALLEL_CASES, ids=_T_PARALLEL_IDS)
 def test_student_t_serial_matches_parallel(seed: int, d: int, n: int, p: float) -> None:
     x = _gaussian_dag(seed, n, d, p)

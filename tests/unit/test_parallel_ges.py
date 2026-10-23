@@ -589,3 +589,35 @@ def test_script_without_main_guard(tmp_path, d, guarded):
     assert last.startswith("RuntimeError: parallel-search workers failed to start"), last
     assert last.index('if __name__ == "__main__":') < last.index("out of memory"), last
     assert "ANDREY_NUM_WORKERS=1" in last, last
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_kept_reach_sets_match_a_fresh_traversal(seed):
+    """Every reach set kept across a change of successors equals the traversal on the new ones.
+
+    The graphs reach past 64 nodes. An entry none of whose nodes changed successors is always kept.
+    """
+    from andrey.core import _bitset
+
+    rng = np.random.default_rng(seed)
+    d = int(rng.integers(2, 150))
+    tails = rng.random((d, d)) < 2.0 / d
+    np.fill_diagonal(tails, False)
+    before = _bitset.row_masks(tails)
+    reach = {}
+    for _ in range(20):
+        start = int(rng.integers(0, d))
+        clique = _bitset.bitmask(v for v in range(d) if v != start and rng.random() < 0.1)
+        reach[(start, clique)] = _bitset.semidirected_reach_set(before, start, clique)
+    flips = rng.integers(0, d, size=(int(rng.integers(1, 6)), 2))
+    for u, v in flips.tolist():
+        if u != v:
+            tails[u, v] = not tails[u, v]
+    after = _bitset.row_masks(tails)
+    changed = _bitset.bitmask(u for u in range(d) if before[u] != after[u])
+    kept = pg._kept_reach(dict(reach), before, after)
+    for (start, clique), seen in kept.items():
+        assert seen == _bitset.semidirected_reach_set(after, start, clique), (seed, start)
+    for key, seen in reach.items():
+        if not seen & changed:
+            assert key in kept, (seed, key)

@@ -27,7 +27,7 @@ from functools import partial
 import numpy as np
 from scipy.linalg import cho_solve, cholesky, get_lapack_funcs
 from scipy.optimize import minimize
-from scipy.spatial.distance import pdist, squareform
+from scipy.spatial.distance import cdist
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel, Kernel, WhiteKernel
@@ -60,8 +60,9 @@ def _negative_log_marginal_likelihood(
     the search makes several per evaluation.
     """
     c, length, w = np.exp(theta[0]), np.exp(theta[1]), np.exp(theta[2])
-    distances = pdist(cause / length, metric="sqeuclidean")
-    rbf = squareform(np.exp(-0.5 * distances))
+    scaled = cause / length
+    distances = cdist(scaled, scaled, metric="sqeuclidean")  # full and symmetric, zero diagonal
+    rbf = np.exp(-0.5 * distances)
     np.fill_diagonal(rbf, 1)
     K = c * rbf
     K[np.diag_indices_from(K)] += w
@@ -79,7 +80,7 @@ def _negative_log_marginal_likelihood(
     inverse, _ = potri(L, lower=1)  # K^-1 on and below the diagonal, zeros above
     a = alpha[:, 0]
     trace = np.trace(inverse)
-    rbf_distances = rbf * squareform(distances)
+    rbf_distances = np.multiply(rbf, distances, out=distances)  # R * D, written over D
     # For a symmetric M, sum(K^-1 * M) over the full matrix is 2 * sum(triangle * M) - the
     # diagonal's part; diag(R) is 1 and diag(R * D) is 0.
     triangle = inverse.T  # K^-1 on and above the diagonal, C-ordered like R

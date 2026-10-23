@@ -220,7 +220,7 @@ def cli_meta() -> dict:
             "method": "andrey run <method> --help --json -- one method contract",
             "config": "andrey config --json -- current configuration and available backends",
             "environment": "andrey config --help --json -- environment defaults and effects",
-            "calibrate": "andrey calibrate -- measure the GES worker-pool cutoff here",
+            "calibrate": "andrey calibrate -- measure the worker-pool cutoffs (GES, skeleton) here",
             "skill": "andrey --skill -- the SKILL.md guide",
         },
         "output": (
@@ -450,7 +450,8 @@ def render_skill() -> str:
         "platform's support tier, the usable CPU cores, each optional extra with the command that "
         "installs it, and why each unavailable backend is off. Suggest a missing extra to the user "
         "rather than installing it. On many cores, `ANDREY_NUM_WORKERS=-1` runs GES on all "
-        "of them, and `andrey calibrate` measures its pool cutoff on this machine. Set "
+        "of them, and `andrey calibrate` measures the pool cutoffs of GES and the skeleton "
+        "search on this machine. Set "
         "`ANDREY_SEED` when a stochastic method's result must repeat."
     )
     a("")
