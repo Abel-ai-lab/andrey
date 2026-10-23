@@ -15,7 +15,7 @@ change names its pull request.
   ICA-LiNGAM, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of the
   identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
   scores change in their last bits, with the same output on those datasets. ([#251], [#265],
-  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328])
+  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -35,6 +35,13 @@ change names its pull request.
 - For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
   can show that it returns the same bits at any worker count and column order, and
   `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
+- `ges` takes `max_parents`, a gate on its forward phase: a node whose parent count already
+  exceeds it gains no new parents. `None`, the default, keeps the gate of `n_variables / 2` and
+  every result. A lower value makes GES faster on large graphs and can lower its errors, but it
+  can stop short of the lowest-scoring graph. ([#350])
+- `GraphStructure.to_pcalg()` and `GraphStructure.from_pcalg(amat, kind)` convert to and from the
+  adjacency matrix of R's pcalg, `amat.pag` for a PAG and `amat.cpdag` for a CPDAG or DAG, so
+  exchanging a graph with R needs no transpose or code swap of your own. ([#351])
 - For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
   Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
   with the time of Tetrad's JVM reported apart from its search. ([#362])
@@ -44,9 +51,14 @@ change names its pull request.
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` return the same
   graphs and p-values in less time, because their skeleton search hands the test each pair's
   conditioning sets, and those of consecutive pairs, as one stack. ([#280], [#292])
+- `pc`, `fci`, `gfci`, and `cdnod` return the same graphs and p-values with less memory, because
+  their size-one pass builds its queries one stack at a time instead of listing every pair's
+  conditioners first, which took about 4 GB of list pointers on a complete graph of 1,000
+  variables. ([#346])
 - `fci` and `gfci` return the same PAGs in less time: the possible-d-separation step computes one
-  reach set per variable, and GFCI reads each node's neighbors from lists built once and tests its
-  separating sets in stacks. ([#265], [#312])
+  reach set per variable and builds its neighbor lists and reach sets once for each version of the
+  graph, and GFCI reads each node's neighbors from lists built once and tests its separating sets
+  in stacks, those of size 0 for every pair in one. ([#265], [#312], [#353])
 - `ges` and `gfci` return the same graphs in less time, because GES keeps each reach set while a
   move cannot change it and rebuilds the CPDAG after each move faster. ([#328])
 - `xges` returns the same graphs in less time, because each branch of its extended search copies
@@ -67,6 +79,9 @@ change names its pull request.
   the last bits. A near-tie between two candidates for the next variable in the causal order can
   then resolve the other way; on the identity check's datasets every output is the same as 0.8.0's.
   ([#288])
+- `help(andrey)` opens with a quick start and points to `andrey --skill` and
+  `andrey --help --json`, and the package summary says the import name is `andrey`, so an agent
+  that has only run `pip install andrey-core` finds the command line and its skill. ([#347])
 
 ## [0.8.0] - 2026-10-23
 
@@ -609,4 +624,9 @@ First alpha release.
 [#311]: https://github.com/Abel-ai-lab/andrey/pull/311
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#346]: https://github.com/Abel-ai-lab/andrey/pull/346
+[#347]: https://github.com/Abel-ai-lab/andrey/pull/347
+[#350]: https://github.com/Abel-ai-lab/andrey/pull/350
+[#351]: https://github.com/Abel-ai-lab/andrey/pull/351
+[#353]: https://github.com/Abel-ai-lab/andrey/pull/353
 [#362]: https://github.com/Abel-ai-lab/andrey/pull/362
