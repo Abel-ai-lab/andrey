@@ -16,6 +16,10 @@ keywords = [
   "ges",
   "fci",
   "lingam",
+  "time series",
+  "mixed data",
+  "pcmci",
+  "boss",
   "gpu",
 ]
 classifiers = [

@@ -187,6 +187,21 @@ def test_llms_txt_lists_each_section_under_its_heading():
     )
 
 
+def test_llms_txt_lists_its_facts_at_a_glance_before_the_sections():
+    entries = {"docs/faq": {**PAGE, "title": "FAQ", "description": "The FAQ."}}
+    text = discovery.llms_index(
+        "The summary.",
+        entries,
+        [("Docs", ["docs/faq"])],
+        site_url="https://andrey.abel.ai/",
+        project="Andrey",
+        version="0.4.0",
+        facts=["Data: mixed columns.", "Pairwise direction: `anm`."],
+    )
+    glance = "## At a glance\n\n- Data: mixed columns.\n- Pairwise direction: `anm`.\n"
+    assert glance in text and text.index(glance) < text.index("## Docs")
+
+
 def test_llms_txt_refuses_a_missing_private_or_noindex_page():
     with pytest.raises(ValueError, match="missing"):
         llms({}, [("Docs", ["docs/missing"])])

@@ -15,11 +15,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
-      - name: The pull request comes from release/<x.y.z>
+      - name: The pull request comes from release/<x.y.z> or release/<x.y.z>.post<n>
         env:
           HEAD: ${{ github.head_ref }}
         run: |
-          if [[ ! "$HEAD" =~ ^release/[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ ! "$HEAD" =~ ^release/[0-9]+\.[0-9]+\.[0-9]+(\.post[0-9]+)?$ ]]; then
             echo "::error::Only release/<x.y.z> merges to main, and this pull request comes from $HEAD. Target the release's branch instead."
             exit 1
           fi
