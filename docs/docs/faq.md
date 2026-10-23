@@ -82,6 +82,11 @@ For continuous data with no hidden variables, start with `pc` or `ges`; both ret
 `fci` when hidden variables may confound the data; it returns a PAG. Use `direct_lingam` when the
 relationships are linear and the noise is not Gaussian; it returns a DAG with edge weights.
 
+### Does it have neural methods?
+
+No. We focus on speeding up statistical causal discovery methods, the ones built on independence
+tests and scores.
+
 ### Are the classic methods accurate on very large graphs?
 
 Not always. In the release cards, which use sparse simulated graphs with ten samples per variable,
