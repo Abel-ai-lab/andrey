@@ -1,6 +1,7 @@
 ---
 name: graph-representation
-description: How Andrey stores a causal graph, compared with other causal discovery packages.
+description: How Andrey stores a causal graph, converts it between kinds, and hands it to other
+  packages such as DoWhy.
 meta:
   type: guide
 ---
@@ -160,6 +161,7 @@ mixes numbers with text is an error.
 | `to_edges()` | structured array with fields `i`, `j`, `mark_i`, `mark_j` |
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
 | `to_pcalg()` | dense `int8` `(n, n)` pcalg `amat`, for a `dag`, `cpdag`, or `pag` |
+| `to_dot()` | Graphviz DOT text, named by `labels` when set |
 | `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes |
 
 `GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. They
@@ -214,6 +216,49 @@ def from_binary_dag(A):
   needs no transpose. Its wildcard and compound codes (3 and above) have no Andrey equivalent.
 - **lingam** - pass `adjacency_matrix_.T` to `from_binary_dag`. Some estimators write `NaN` for
   an unobserved common cause; decide how to encode those pairs first.
+
+`to_dot()` writes every edge with its endpoint marks as Graphviz arrow shapes: a directed edge runs
+from tail to arrowhead, an undirected edge has `dir=none`, and any other edge has `dir=both`, with
+`arrowtail` and `arrowhead` set to `normal` for an arrowhead, `odot` for a circle, and `none` for a
+tail. Writing it needs no other package; Graphviz renders it.
+
+`andrey.graph` converts between graph kinds:
+
+| Call | Returns |
+|---|---|
+| `to_dag(cpdag)` | a DAG of the CPDAG's equivalence class, or a `ValueError` when it has none |
+| `to_mag(dag, latent=..., selection=...)` | the MAG over the other nodes, a `pag` without circles |
+| `to_pag(graph, latent=..., selection=...)` | the PAG of a DAG or of a MAG over the other nodes |
+
+`latent` and `selection` name nodes by label or 0-based position; `latent` defaults to the nodes
+that `node_types` flags. A hidden common cause becomes `<->` in the MAG, and two ancestors of a
+selection variable become `--`. `to_pag` gives the PAG that `fci` returns with an exact
+conditional-independence test, the fair target to score `fci` against.
+`andrey.metrics.to_cpdag` returns a DAG's CPDAG.
+
+## Hand a graph to DoWhy
+
+DoWhy estimates a causal effect from data and a DAG. Pass it the DAG as DOT text, with the data
+whose columns name the nodes:
+
+```python
+import andrey
+from andrey.graph import to_dag
+from dowhy import CausalModel
+
+out = andrey.pc(df)  # a CPDAG over the columns of df
+dag = to_dag(out)    # one DAG of its equivalence class
+model = CausalModel(data=df, treatment="x", outcome="y", graph=dag.to_dot())
+estimand = model.identify_effect()
+estimate = model.estimate_effect(estimand, method_name="backdoor.linear_regression")
+estimate.value
+```
+
+DoWhy reads DOT text through pydot or pygraphviz, so install one of them with DoWhy. It reads every
+edge as directed, so pass a DAG: `to_dag` picks one DAG of a CPDAG's class, and when an undirected
+edge near the treatment or the outcome can point either way, the estimate depends on that choice.
+Settle such an edge with `knowledge` before you estimate, or compare the estimates across the DAGs
+of the class. A PAG has no single DAG to hand over.
 
 ## References
 

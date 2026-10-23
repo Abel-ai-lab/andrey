@@ -214,7 +214,8 @@ mutual information estimate the test's p-value is built on, a dependence measure
 
 ## Graph structures
 
-`GraphStructure` also reads and writes pcalg's `amat`, with `from_pcalg` and `to_pcalg`;
+`GraphStructure` also reads and writes pcalg's `amat`, with `from_pcalg` and `to_pcalg`, and
+writes Graphviz DOT text with `to_dot`, which needs no other package;
 [Graph representation](guides/graph-representation.md) gives the conventions.
 
 ```{eval-rst}
@@ -226,6 +227,27 @@ mutual information estimate the test's p-value is built on, a dependence measure
    StructureOutput
    SummaryGraph
    TemporalStructure
+```
+
+`andrey.graph` converts between graph kinds: `to_dag` returns a DAG of a CPDAG's equivalence
+class, `to_mag` projects a DAG with hidden and selection variables onto its other nodes as a
+maximal ancestral graph, and `to_pag` returns the PAG of a DAG or of a MAG, which `fci` would
+return with an exact test. `andrey.metrics.to_cpdag` returns a DAG's CPDAG.
+[Hand a graph to DoWhy](guides/graph-representation.md#hand-a-graph-to-dowhy) passes a result to
+DoWhy for effect estimation.
+
+```{eval-rst}
+.. currentmodule:: andrey.graph
+
+.. autosummary::
+   :toctree: api
+   :nosignatures:
+
+   to_dag
+   to_mag
+   to_pag
+
+.. currentmodule:: andrey
 ```
 
 ## Utilities
