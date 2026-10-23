@@ -29,7 +29,7 @@ class Tags(HTMLParser):
 
 
 def everything():
-    return why_fast["belt"]() + "".join(why_fast["fragment"](s["key"]) for s in SCENES)
+    return "".join(why_fast["fragment"](s["key"]) for s in SCENES)
 
 
 def test_no_scene_names_another_package():
@@ -58,29 +58,6 @@ def test_counts_without_script_are_the_scenes_final_counts():
         assert counts[0] < counts[1]
 
 
-def test_the_carousel_has_a_card_and_a_dot_per_idea_in_order():
-    belt = why_fast["belt"]()
-    tags = Tags(belt).tags
-    figures = [a for t, a in tags if t == "figure"]
-    assert [f["data-scene"] for f in figures] == [s["key"] for s in SCENES]
-    # The carousel plays each scene, so a card carries no replay of its own.
-    assert {f["data-play"] for f in figures} == {"belt"}
-    assert "wf-replay" not in belt
-    assert all(why_fast["escape"](s["title"]) in belt for s in SCENES)
-    # A dot per card, each a tab naming its card; the first is current, and without script the
-    # dots stay hidden.
-    dots = [a for t, a in tags if t == "button"]
-    assert [d["aria-controls"] for d in dots] == [f"wf-card-{s['key']}" for s in SCENES]
-    assert [d["aria-selected"] for d in dots] == ["true"] + ["false"] * (len(SCENES) - 1)
-    tablist = next(a for t, a in tags if a.get("role") == "tablist")
-    assert "hidden" in tablist
-    # Each card links to its idea's part of the post, by the heading's id.
-    post = (ROOT / "docs" / "blog" / "20261008-why-andrey-is-fast.md").read_text()
-    for i, scene in enumerate(SCENES, 1):
-        assert f"## {i}. {scene['title']}" in post
-        assert f'#{why_fast["slug"](scene["title"])}">How it works</a>' in belt
-
-
 def test_the_readme_gives_each_idea_in_one_line():
     # The text version for places without the animations: each scene's own line, in order.
     readme = " ".join((ROOT / "README.md").read_text().split())
@@ -93,7 +70,7 @@ def test_the_readme_gives_each_idea_in_one_line():
 def test_the_scenes_load_only_where_they_appear():
     conf = (ROOT / "docs" / "conf.py").read_text()
     pages = re.search(r"WHY_FAST_PAGES = \{(.*?)\}", conf).group(1)
-    assert set(re.findall(r'"([^"]+)"', pages)) == {"index", "blog/20261008-why-andrey-is-fast"}
+    assert set(re.findall(r'"([^"]+)"', pages)) == {"blog/20261008-why-andrey-is-fast"}
     # Motion loads before the script that uses it.
     assert '"motion.js", "why-fast.js"' in conf
 

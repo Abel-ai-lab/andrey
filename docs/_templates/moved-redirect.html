@@ -1,0 +1,14 @@
+{#- A page that moved: its old address sends the reader on at once (conf.py, _moved_pages). -#}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ title|e }}</title>
+<meta http-equiv="refresh" content="0; url={{ target }}">
+<link rel="canonical" href="{{ target }}">
+<meta name="robots" content="noindex">
+</head>
+<body>
+<p>This page moved to <a href="{{ target }}">{{ title|e }}</a>.</p>
+</body>
+</html>

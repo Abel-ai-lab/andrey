@@ -597,9 +597,8 @@
 }
 
 /* The first section opens on the hero's art, which stays on the screen into it (.run): its title
-   and claim come up over the art right after the hero's cards, with the four ideas behind the
-   speed (the carousel, below), then its tiles rise over the art on a sheet of the page's paper,
-   whose top fades in over about a fifth of a screen. */
+   and claim come up over the art right after the hero's cards, then its speed panel rises over
+   the art on a sheet of the page's paper, whose top fades in over about a fifth of a screen. */
 /* Above .section's own padding, which would leave bare ground at the run's foot. */
 .andrey-home .section.act--hero {
   padding-block: 0;
@@ -609,184 +608,168 @@
   padding-top: clamp(2rem, 6vw, 4rem);
 }
 
-/* The ideas behind the speed: a card per idea in a row that scrolls sideways across the screen's
-   full width, each card snapping to the center with its neighbors at the edges, and under them a
-   dot per card, the current one long and filling as its scene plays (why-fast.js). Without
-   script the row scrolls by hand, every scene at its final counts, and the dots stay hidden. */
-.andrey-home .wf-belt {
-  margin-inline: calc(50% - 50vw);
-  color: var(--andrey-ground-ink);
-}
-
-.andrey-home .wf-cards {
-  --card: min(64rem, calc(100vw - 2 * var(--gutter) - 2.5rem));
-  display: flex;
-  gap: clamp(0.75rem, 2vw, 1.25rem);
-  margin: 0;
-  padding: 0.75rem calc((100vw - var(--card)) / 2) 1.75rem;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  list-style: none;
-}
-
-.andrey-home .wf-cards::-webkit-scrollbar {
-  display: none;
-}
-
-.andrey-home .wf-cards.is-dragging {
-  scroll-snap-type: none;
-  cursor: grabbing;
-  user-select: none;
-}
-
-.andrey-home .wf-card {
-  flex: 0 0 var(--card);
-  display: grid;
-  align-content: start;
-  gap: clamp(1rem, 2.5vw, 1.5rem);
-  padding: clamp(1.25rem, 3vw, 2rem);
-  border-radius: 22px;
-  scroll-snap-align: center;
-}
-
-/* Driven, the cards beside the current one stand back. */
-.andrey-home .is-driven .wf-card {
-  opacity: 0.55;
-  scale: 0.97;
-  transition:
-    opacity 0.5s var(--ease),
-    scale 0.5s var(--ease);
-}
-
-.andrey-home .is-driven .wf-card.is-current {
-  opacity: 1;
-  scale: 1;
-}
-
-.andrey-home .wf-card::marker {
-  content: none;
-}
-
-/* The title, and at its right a link to the idea's part of the post, then the narration. */
-.andrey-home .wf-card .wf-words {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.6rem 1.5rem;
-}
-
-.andrey-home .section .wf-card h3 {
-  margin: 0;
-  color: var(--andrey-ink);
-  font-size: clamp(1.4rem, 2.4vw, 2rem);
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
-}
-
-.andrey-home .section .wf-card .wf-words p {
-  grid-column: 1 / -1;
-  max-width: 68ch;
-  margin: 0;
-  color: var(--andrey-muted);
-  font-size: 1rem;
-  line-height: 1.55;
-}
-
-.andrey-home .wf-more {
-  padding: 0.5rem 1.05rem;
-  border-radius: 999px;
-  background: var(--andrey-surface-2);
-  box-shadow: inset 0 0 0 1px var(--andrey-line);
-  color: var(--andrey-ink);
-  font-size: 0.9rem;
-  font-weight: 600;
-  white-space: nowrap;
-  text-decoration: none;
-}
-
-.andrey-home .wf-more:hover {
-  background: var(--andrey-line);
-}
-
-.andrey-home .wf-dots {
-  display: flex;
-  justify-content: center;
-  gap: 0.15rem;
-}
-
-/* Each dot's button is larger than its mark, for the finger. */
-.andrey-home .wf-dot {
-  display: grid;
-  place-items: center;
-  min-width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  cursor: pointer;
-}
-
-.andrey-home .wf-dot i {
-  position: relative;
-  width: 0.5rem;
-  height: 0.5rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--andrey-ground-ink) 40%, transparent);
-  transition: width 0.4s var(--ease);
-}
-
-.andrey-home .wf-dot[aria-selected="true"] i {
-  width: 2.25rem;
-}
-
-.andrey-home .wf-dot i::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--andrey-ground-ink);
-  transform-origin: left;
-  scale: var(--fill, 0) 1;
-}
-
-.andrey-home .wf-dot:focus-visible {
-  outline: 2px solid var(--andrey-ground-ink);
-  outline-offset: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .andrey-home .is-driven .wf-card,
-  .andrey-home .wf-dot i {
-    transition: none;
-  }
-}
-
-@media (max-width: 44rem) {
-  .andrey-home .wf-card .wf-words {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* The link follows the narration. */
-  .andrey-home .wf-more {
-    order: 1;
-    justify-self: start;
-  }
-
-  .andrey-home .section .wf-card .wf-words p {
-    font-size: 0.95rem;
-  }
-}
-
-/* The sheet's fade starts below the carousel, so its dots stay on the art. */
+/* The sheet rises over the art after the section's title, under the speed panel. */
 .andrey-home .run-sheet {
   --sheet-fade: clamp(9rem, 24svh, 14rem);
   position: relative;
   margin-top: calc(var(--sheet-fade) * 0.7);
   padding-block: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 2rem);
+}
+
+/* A tab per figure sits above the selected panel. Without JavaScript, all panels remain visible.
+   On narrow screens, the tabs scroll horizontally. */
+.andrey-home .seg-tabs {
+  position: relative;
+  display: flex;
+  gap: 0.25rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 1.25rem;
+  padding: 0.3rem;
+  overflow-x: auto;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: var(--andrey-surface);
+  scrollbar-width: none;
+}
+
+.andrey-home .seg-tab {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  padding: 0.5rem 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--andrey-muted);
+  font: 500 0.92rem var(--font-sans);
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+
+.andrey-home .seg-tab:hover {
+  color: var(--andrey-ink);
+}
+
+/* The selection is cobalt. Without script the chosen tab carries it; with script a pill glides
+   under the tab beneath the pointer and settles back on the chosen one (tiles.js). */
+.andrey-home .seg-tab[aria-selected="true"],
+.andrey-home .seg-tabs.has-glide .seg-tab.is-lit {
+  color: var(--andrey-surface);
+}
+
+.andrey-home .seg-tabs:not(.has-glide) .seg-tab[aria-selected="true"] {
+  background: var(--andrey-accent);
+}
+
+.andrey-home .seg-tabs.has-glide .seg-tab[aria-selected="true"]:not(.is-lit) {
+  color: var(--andrey-accent);
+}
+
+.andrey-home .seg-glide {
+  position: absolute;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  left: 0;
+  border-radius: 999px;
+  background: var(--andrey-accent);
+  transition: transform 0.25s var(--ease), width 0.25s var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .andrey-home .seg-glide,
+  .andrey-home .seg-tab {
+    transition: none;
+  }
+}
+
+.andrey-home .seg-tab:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+  outline-offset: 2px;
+}
+
+.andrey-home .seg-panel {
+  padding: clamp(1rem, 3vw, 1.75rem);
+  border: 1px solid var(--andrey-line);
+  border-radius: 20px;
+  background: var(--andrey-surface);
+}
+
+.andrey-home .section .run-more {
+  max-width: none;
+  margin: 1.5rem 0 0;
+  font-weight: 600;
+  text-align: center;
+}
+
+.andrey-home .seg-panel + .seg-panel {
+  margin-top: 1.25rem;
+}
+
+.andrey-home .seg-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.5rem 2rem;
+  margin-bottom: 1rem;
+}
+
+.andrey-home .seg-head h3 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.andrey-home .seg-head p {
+  margin: 0.2rem 0 0;
+  color: var(--andrey-muted);
+}
+
+.andrey-home .seg-head .tile-number {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.andrey-home .seg-head .tile-number b {
+  color: var(--andrey-accent);
+  font-size: clamp(2rem, 3.6vw, 3rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.andrey-home .seg-panel .pf-chart {
+  padding: 0;
+  border: 0;
+}
+
+/* On wide screens, the speedup sits at the panel's top right, beside the methods and legend,
+   leaving more space for the figure. Without a method bar, the legend's row stays as tall as
+   the speedup. */
+@media (min-width: 72rem) {
+  .andrey-home .seg-panel {
+    position: relative;
+  }
+
+  .andrey-home .seg-head {
+    position: absolute;
+    top: clamp(1rem, 3vw, 1.75rem);
+    right: clamp(1rem, 3vw, 1.75rem);
+    z-index: 1;
+    margin: 0;
+  }
+
+  .andrey-home .seg-head + .pf-chart .tc-legend {
+    min-height: 3.25rem;
+  }
+}
+
+.andrey-home .seg-foot {
+  margin: 0.75rem 0 0;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
 }
 
 /* Eased stops: a straight ramp shows a line where it starts. */
@@ -1070,8 +1053,7 @@
   padding-top: 1.25rem;
 }
 
-.andrey-home .tile-glass > *,
-.andrey-home .wf-card {
+.andrey-home .tile-glass > * {
   border-radius: 14px;
   background: color-mix(in srgb, var(--andrey-surface) 90%, transparent);
   box-shadow:
@@ -1081,45 +1063,6 @@
   color: var(--andrey-ink);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
   backdrop-filter: blur(14px) saturate(1.4);
-}
-
-/* A card's stage is the card itself: no panel of its own. */
-.andrey-home .wf-card .wf-stage {
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-
-/* A card's scene keeps one row per lane down to a phone's width, where the post's stacks, and
-   grows with the card's width up to half again its drawn size (why-fast.js reads the cap). */
-.andrey-home .wf-card .wf-scene {
-  --wf-scale-max: 1.6;
-}
-
-@container wf-stage (min-width: 26rem) {
-  .andrey-home .wf-card .wf-lane {
-    grid-template-columns: 7.5rem minmax(0, 1fr) 5rem;
-    grid-template-areas: none;
-    column-gap: 14px;
-  }
-
-  .andrey-home .wf-card .wf-who,
-  .andrey-home .wf-card .wf-count,
-  .andrey-home .wf-card .wf-track {
-    grid-area: auto;
-  }
-}
-
-@container wf-stage (min-width: 48rem) {
-  .andrey-home .wf-card .wf-lane {
-    grid-template-columns: 11.5rem minmax(0, 1fr) 6.5rem;
-    column-gap: 20px;
-  }
-
-  .andrey-home .wf-card .wf-count b {
-    font-size: 2.6rem;
-  }
 }
 
 /* A note in the bento grid where a figure would add nothing: plain type on the page's paper, no
@@ -1204,35 +1147,27 @@
   text-align: center;
 }
 
-/* How many of the table's features each package has: a bar of full marks, then partial ones. */
-.andrey-home .coverage-bars {
-  display: grid;
-  gap: 0.55rem;
-  margin: 0;
-  padding: 1rem;
-  list-style: none;
+/* The comparison on the tile's glass: compact, its sources in small type under it. */
+.andrey-home .compare td.value {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
-.andrey-home .coverage-bars li {
-  display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr) 1.2rem;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.82rem;
+.andrey-home .compare td.value.ct-ours {
+  color: var(--andrey-accent);
+  font-weight: 600;
 }
 
-.andrey-home .coverage-bars i {
-  height: 0.55rem;
-  border-radius: 999px;
-  background:
-    linear-gradient(90deg, var(--andrey-accent) 0 calc(var(--yes) / var(--all) * 100%),
-      color-mix(in srgb, var(--andrey-accent) 35%, transparent) 0
-      calc((var(--yes) + var(--part)) / var(--all) * 100%),
-      var(--andrey-surface-2) 0);
+.andrey-home .tile-glass .compare {
+  font-size: 0.8rem;
 }
 
-.andrey-home .coverage-bars b {
-  text-align: right;
+.andrey-home .compare tfoot td {
+  padding: 0.7rem 1rem;
+  border: 0;
+  color: var(--andrey-muted);
+  font-size: 0.72rem;
+  text-align: start;
 }
 
 /* The tiles fly in as they enter the screen, a row at a time with a short stagger across it

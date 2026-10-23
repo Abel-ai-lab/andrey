@@ -1,5 +1,5 @@
 ---
-name: code-index
+name: api
 description: The Andrey public API reference, generated from the source docstrings.
 meta:
   type: code
@@ -37,10 +37,10 @@ whole numbers in a column of numbers, each distinct value of a column one catego
 `tabu`, `boss`, `grasp`, and `exact_search` default to `score_func=None`, which picks the
 linear-Gaussian BIC, `"local_score_BDeu"` when every column is categorical, or
 `"local_score_cond_gauss"` when some are (not for `tabu`), the last two with a `DataTypeWarning`, as
-[Data types](../guides/getting-started.md#data-types) describes. The mixed-data
+[Data types](guides/getting-started.md#data-types) describes. The mixed-data
 settings, `indep_test="degen_gauss"` or `"cond_gauss"` and `score_func="local_score_degen_gauss"` or
 `"local_score_cond_gauss"`, read the categorical columns that `categorical` lists, or infer them, as
-[Data types](../guides/getting-started.md#data-types) describes; a categorical column of numbers
+[Data types](guides/getting-started.md#data-types) describes; a categorical column of numbers
 needs whole numbers. Methods that score with BIC also reject a column that repeats another up to
 scale and shift or, given more rows than columns, is a linear function of other columns. Copies of
 one variable cannot be told apart, so one `ValueError` names every group of copies, such as `x2`
@@ -62,13 +62,13 @@ single column gives a one-node graph.
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
 `knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
-[Background knowledge](../guides/getting-started.md#background-knowledge) shows them in use.
+[Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 ```{eval-rst}
 .. currentmodule:: andrey
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
 
    Knowledge
 ```
@@ -77,9 +77,9 @@ and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each 
 
 The supported methods are benchmarked compared with other packages, and a quality gate checks
 them against known graphs before each release. Supported means measured, not accurate on every
-workload: the [0.1.0](../benchmarks/0.1.0.md#large-graphs),
-[0.2.0](../benchmarks/0.2.0.md#known-limits), [0.3.0](../benchmarks/0.3.0.md#known-limits),
-[0.5.0](../benchmarks/0.5.0.md#known-limits), and [0.7.0](../benchmarks/0.7.0.md#limits) release
+workload: the [0.1.0](benchmarks/0.1.0.md#large-graphs),
+[0.2.0](benchmarks/0.2.0.md#known-limits), [0.3.0](benchmarks/0.3.0.md#known-limits),
+[0.5.0](benchmarks/0.5.0.md#known-limits), and [0.7.0](benchmarks/0.7.0.md#limits) release
 cards show where a method scores worse than the empty graph, or about as well, as ICA-LiNGAM does
 at the 0.1.0 card's sample size, BottomUpParceLiNGAM does from 8 observed variables, hill climbing
 and Tabu search do from 50 variables with ten rows per variable, PCMCI does from 40 series, Granger
@@ -89,7 +89,7 @@ does from 20 series at 1,000 time steps, and GES does at 200 variables with ten 
 .. currentmodule:: andrey
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    pc
@@ -140,7 +140,7 @@ published benchmark, its API may change without deprecation, and it warns with
 has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
-  in its release's [release card](../benchmarks.md);
+  in its release's [release card](benchmarks.md);
 - recovery baselines in `tests/recovery/baselines/`;
 - a place in the release quality gate, `qa/quality_gate.py`;
 - an example notebook.
@@ -192,7 +192,7 @@ mutual information estimate the test's p-value is built on, a dependence measure
 .. currentmodule:: andrey.core
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    ci.FisherZ
@@ -213,7 +213,7 @@ mutual information estimate the test's p-value is built on, a dependence measure
 
 ```{eval-rst}
 .. autosummary::
-   :toctree: generated
+   :toctree: api
 
    GraphStructure
    Structure
@@ -226,7 +226,7 @@ mutual information estimate the test's p-value is built on, a dependence measure
 
 ```{eval-rst}
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    describe
@@ -236,9 +236,9 @@ mutual information estimate the test's p-value is built on, a dependence measure
 `andrey.config` holds the process-wide backend preference, worker count, and tie-break rule. Assign
 `andrey.config.backend`, `andrey.config.num_workers`, or `andrey.config.tie_break` to change the
 default for every later call, or use `with andrey.config(backend=..., num_workers=...,
-tie_break=...):` for one block. [Configuration](../configuration.md) lists the `ANDREY_*`
+tie_break=...):` for one block. [Configuration](configuration.md) lists the `ANDREY_*`
 environment variables and the order in which the settings apply, and
-[Column order and machines](../guides/column-order.md) describes `tie_break`.
+[Column order and machines](guides/column-order.md) describes `tie_break`.
 
 ## Warnings
 
@@ -281,7 +281,7 @@ name.
 
 ```{eval-rst}
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    AndreyWarning
@@ -315,13 +315,13 @@ keeps its file's order, which does not follow its network. The first load downlo
 its SHA-256, and caches it; later loads need no network. The cache directory is the `data_home`
 argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andrey` when
 `XDG_CACHE_HOME` is unset). Without network access, the error names the path to put the file at.
-[Getting started](../guides/getting-started.md) learns and scores the Sachs data end to end.
+[Getting started](guides/getting-started.md) learns and scores the Sachs data end to end.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    load_dataset
@@ -341,7 +341,7 @@ the causal order; `shuffle=False` keeps the order in which the graph was drawn.
 .. currentmodule:: andrey.data
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    sample_discrete
@@ -370,7 +370,7 @@ a matrix of endpoint marks with `GraphStructure.from_numpy(M, kind=...)` first.
 .. currentmodule:: andrey.metrics
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    score
@@ -402,7 +402,7 @@ the nodes when pygraphviz, the `viz` extra, is installed, and a built-in layout 
 .. currentmodule:: andrey.viz
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    draw
@@ -426,7 +426,7 @@ and `rc_params` return plain data and need no import.
 .. currentmodule:: andrey.viz.mpl
 
 .. autosummary::
-   :toctree: generated
+   :toctree: api
    :nosignatures:
 
    cycle

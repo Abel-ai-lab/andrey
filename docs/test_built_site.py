@@ -82,7 +82,7 @@ def html() -> pathlib.Path:
     generated = (
         BUILD,
         DOCS / "_generated",
-        DOCS / "docs" / "code" / "generated",
+        DOCS / "docs" / "api",
         *(DOCS / "docs" / "examples").glob("*.ipynb"),
         DOCS / "_static" / "graph-comparison.html",
         *(DOCS / "_static").glob("graph-types-*.html"),
@@ -143,13 +143,23 @@ def test_the_docs_write_math_in_katex_not_unicode():
 
 
 def test_the_reference_documents_every_public_name_and_nothing_else(html):
-    generated = html / "docs" / "code" / "generated"
+    generated = html / "docs" / "api"
     public = {prefix + name for module, prefix in PUBLIC_MODULES for name in module.__all__}
     documented = {p.stem.removeprefix("andrey.") for p in generated.glob("andrey.*.html")}
     missing = sorted(public - documented - COVERAGE_SKIP)
     assert not missing, f"public names without a reference page: {missing}"
     extra = sorted(documented - public)
     assert not extra, f"reference pages for names that are not public: {extra}"
+
+
+def test_the_homepage_preview_is_the_brand_kits_social_preview(html):
+    home = (html / "index.html").read_text(encoding="utf-8")
+    image = re.search(r'<meta property="og:image" content="https://[^/]+/([^"]+)"', home)[1]
+    width = re.search(r'<meta property="og:image:width" content="(\d+)"', home)[1]
+    height = re.search(r'<meta property="og:image:height" content="(\d+)"', home)[1]
+    preview = (html / image).read_bytes()
+    assert preview == (html / "_static" / "brand" / "andrey-social-preview.jpg").read_bytes()
+    assert preview[:2] == b"\xff\xd8" and (width, height) == ("1280", "640")
 
 
 def test_the_homepage_links_its_stylesheets_with_a_content_version(html):
@@ -198,7 +208,7 @@ def test_every_title_but_the_homepages_ends_with_the_product_and_its_subject(htm
     for page, text in _pages(html):
         title = unescape(re.search(r"<title>(.*?)</title>", text, re.S)[1])
         if page == html / "index.html":
-            assert title == "Andrey: accelerated, accurate, agentic causal discovery"
+            assert title == "Andrey: fast causal discovery in Python, built for AI agents"
         else:
             assert title.endswith(" Andrey causal discovery"), f"{page}: {title}"
 
@@ -492,9 +502,13 @@ def test_llms_txt_links_public_pages_by_section_with_their_preview_text(html):
 
 
 def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html):
-    assert (html / "robots.txt").read_text() == (
-        "User-agent: *\nAllow: /\n\nSitemap: https://andrey.abel.ai/sitemap.xml\n"
-    )
+    robots = (html / "robots.txt").read_text()
+    # All crawlers may access every page; named AI crawlers are explicitly allowed.
+    assert robots.startswith("User-agent: *\nAllow: /\n")
+    assert "Disallow" not in robots
+    for agent in ("GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended"):
+        assert f"User-agent: {agent}\n" in robots
+    assert robots.endswith("\nSitemap: https://andrey.abel.ai/sitemap.xml\n")
     urls = re.findall(r"<loc>([^<]+)</loc>", (html / "sitemap.xml").read_text())
     assert len(urls) == len(set(urls)) > 50
     for url in urls:

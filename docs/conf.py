@@ -12,6 +12,7 @@ from __future__ import annotations
 import html
 import importlib.util
 import inspect
+import io
 import json
 import pathlib
 import posixpath
@@ -88,7 +89,7 @@ extensions = [
 # MyST and print its autodoc directives as text.
 source_suffix = {".rst": "restructuredtext", ".md": "myst-nb", ".ipynb": "myst-nb"}
 # Stubs an earlier build wrote as .md would now sit beside their .rst twins and fail the build.
-for _stale in (HERE / "docs" / "code" / "generated").glob("*.md"):
+for _stale in (HERE / "docs" / "api").glob("*.md"):
     _stale.unlink()
 # The homepage is a template, not a document, so the documentation's index is the root document.
 root_doc = "docs/index"
@@ -214,6 +215,8 @@ ABEL_GITHUB = "https://github.com/Abel-ai-lab"
 ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
 ABEL_LOGO = "_static/abel-symbol.png"
 ABEL_LOGO_WIDTH = 600
+# The icon's PNGs at the site's root, by name, each its side in pixels (_write_discovery).
+FAVICONS = {"favicon-96.png": 96, "apple-touch-icon.png": 180}
 # Pages a search engine should not list: the search page, and the page the server shows for a
 # missing address (404.md). The blog's generated pages (All Posts, the years, the archive, the tags,
 # and the authors) only list the posts again, so they are not listed either (`_blog_collection`).
@@ -227,7 +230,7 @@ LLMS_SECTIONS = (
             "docs/index",
             "docs/guides/getting-started",
             "docs/faq",
-            "docs/code/index",
+            "docs/api",
             "docs/configuration",
             "docs/guides/graph-types",
             "docs/guides/graph-representation",
@@ -294,7 +297,7 @@ NAV_SECTIONS = {
 NAV_REFERENCE = ("Reference", "code")
 # The reference pages' icons in the documentation tree (_templates/nav-icons.html).
 NAV_ICONS = {
-    "docs/code/index": "braces",
+    "docs/api": "braces",
     "docs/configuration": "sliders",
     "docs/benchmarks": "chart",
     "docs/faq": "help",
@@ -308,6 +311,19 @@ html_additional_pages = {
     "demo/index": "demo-redirect.html",
     "docs/demos/benchmark-explorer": "benchmark-explorer-redirect.html",
 }
+
+
+def _moved_pages(app):  # noqa: ANN001, ANN202 -- Sphinx event arguments
+    """Redirects the API reference's old addresses, ``docs/code/index`` and its generated pages
+    under ``docs/code/generated/``, to their corresponding pages under ``docs/api``."""
+    reference = {"title": "API reference", "target": "../api.html"}
+    yield "docs/code/index", reference, "moved-redirect.html"
+    for doc in sorted(app.env.found_docs):
+        if doc.startswith("docs/api/"):
+            name = doc.removeprefix("docs/api/")
+            context = {"title": name, "target": f"../../api/{name}.html"}
+            yield f"docs/code/generated/{name}", context, "moved-redirect.html"
+
 
 # ---- blog (ABlog) ----------------------------------------------------------------------------
 # A post is a page under blog/ whose front matter sets `blogpost: true`, with its `date`. ABlog
@@ -450,10 +466,9 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     summary = _load_summary(app)
     app.andrey_home = site.homepage_context(summary, placeholder=config.andrey_placeholder)
     config.myst_substitutions = {**config.myst_substitutions, **_methods_text()}
-    # The link-preview card shared by the homepage and every page that is not a post.
     site.fastest(summary)
-    home_card = cards.card_jpeg(cards.TAGLINE, cards.ACCENT)
-    _write_bytes(GENERATED / "extra" / HOME_PREVIEW, home_card)
+    # The homepage and non-post pages share the repository's social preview.
+    _write_bytes(GENERATED / "extra" / HOME_PREVIEW, cards.social_jpeg())
     # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
     for name, tile in cards.grain.hero_tiles():
         _write_bytes(GENERATED / "static" / name, tile)
@@ -466,8 +481,8 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     _write(GENERATED / "column-order.md", _column_order_table())
 
 
-# Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage's card carries the
-# slogan and each post's its title; every other page shares the first.
+# Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage and non-post
+# pages use the repository's social preview; each post uses its banner.
 HOME_PREVIEW = "assets/preview/home.jpg"
 # Search results show about this many characters of a description.
 DESCRIPTION_LENGTH = 160
@@ -532,9 +547,9 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     title = home["title"] if home else html.unescape(heading)
     description = _description(app, context, doctree)
     url = SITE_URL + ("" if pagename == "index" else f"{pagename}.html")
-    image = HOME_PREVIEW
+    image, size = HOME_PREVIEW, (cards.SOCIAL_W, cards.SOCIAL_H)
     if pagename in _blog(app):  # each post's preview is its banner: its art, title, and release
-        image = f"assets/preview/{pagename.removeprefix('blog/')}.jpg"
+        image, size = f"assets/preview/{pagename.removeprefix('blog/')}.jpg", (cards.W, cards.H)
         preview = cards.preview_jpeg(_cover_kind(app, pagename), title, _cover_line(app, pagename))
         _write_bytes(pathlib.Path(app.outdir) / image, preview)
     image = SITE_URL + image
@@ -547,8 +562,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "og:url": url,
         "og:image": image,
         "og:image:type": "image/jpeg",
-        "og:image:width": str(cards.W),
-        "og:image:height": str(cards.H),
+        "og:image:width": str(size[0]),
+        "og:image:height": str(size[1]),
         "twitter:card": "summary_large_image",
     }
     preview = "".join(
@@ -558,6 +573,10 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     )
     if not unindexed:
         preview += f'<link rel="canonical" href="{html.escape(url, quote=True)}">\n'
+    # A link to the page's Markdown source for agents.
+    if source := context.get("sourcename"):
+        markdown = html.escape(f"{SITE_URL}_sources/{source}", quote=True)
+        preview += f'<link rel="alternate" type="text/markdown" href="{markdown}">\n'
     page = {"title": title, "description": description, "url": url, "image": image}
     if unindexed:
         page["indexable"] = False
@@ -699,11 +718,37 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
 
     logo = resvg_py.svg_to_bytes(svg_string=ABEL_SYMBOL.read_text(), width=ABEL_LOGO_WIDTH)
     _write_bytes(outdir / ABEL_LOGO, bytes(logo))
+    # The icon at the root too, where crawlers and browsers look first: favicon.ico, a PNG at a
+    # multiple of 48 px for search results, and the home-screen icon.
+    from PIL import Image
+
+    icon = (HERE / html_favicon).read_text()
+    for name, side in FAVICONS.items():
+        _write_bytes(outdir / name, bytes(resvg_py.svg_to_bytes(svg_string=icon, width=side)))
+    ico = io.BytesIO()
+    with Image.open(outdir / "favicon-96.png") as image:
+        image.save(ico, "ICO", sizes=[(16, 16), (32, 32), (48, 48)])
+    _write_bytes(outdir / "favicon.ico", ico.getvalue())
     _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
 
 
+# Assets the homepage omits, by each file name's prefix before the first dot.
+DOCS_ONLY = {
+    "pygments",
+    "mystnb",
+    "copybutton",
+    "sphinxcontrib_typer",
+    "sphinx-design",
+    "katex",
+    "katex-math",
+    "graph-guides",
+    "doctools",
+    "sphinx_highlight",
+    "clipboard",
+    "design-tabs",
+}
 # The pages that show the "Why Andrey is fast" scenes.
-WHY_FAST_PAGES = {"index", "blog/20261008-why-andrey-is-fast"}
+WHY_FAST_PAGES = {"blog/20261008-why-andrey-is-fast"}
 
 
 def _post_key(post: tuple[str, str, str]) -> tuple[str, tuple[int, ...]]:
@@ -811,6 +856,15 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
         app.add_css_file(name, priority=900)
     for name in js:
         app.add_js_file(name, loading_method="defer")
+    if pagename == "index":
+        # The homepage has no code blocks, math, tab sets, or command-line reference.
+        # Omitting assets for those features avoids delaying its first paint.
+        for key in ("css_files", "script_files"):
+            context[key] = [
+                f
+                for f in context[key]
+                if posixpath.basename(f.filename).split(".")[0] not in DOCS_ONLY
+            ]
     context["metatags"] = context.get("metatags", "") + _preview_tags(
         app, pagename, context, doctree
     )
@@ -881,7 +935,8 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
         if path.suffix in {".md", ".ipynb"} and GENERATED not in path.parents
     )
     source = included[0] if included else pathlib.Path(app.env.doc2path(pagename))
-    generated = "generated" in source.parts
+    # Autosummary writes the API reference's pages into docs/docs/api/, which Git ignores.
+    generated = "generated" in source.parts or source.parent == HERE / "docs" / "api"
     context["edit_url"] = None if generated else f"{REPO_URL}/edit/main/{source.relative_to(ROOT)}"
 
 
@@ -1094,7 +1149,8 @@ def _newest_post_card(app) -> str:  # noqa: ANN001
     description = html.escape((app.env.metadata[docname].get("description") or "").strip())
     return (
         f'<a class="band-post" href="{app.builder.get_relative_uri("index", docname)}">'
-        f'<img src="{image}" alt="" width="{cards.COVER_W}" height="{cards.COVER_H}" '
+        f'<img src="{image}" alt="{html.escape(cards.cover_alt(_cover_kind(app, docname)))}" '
+        f'width="{cards.COVER_W}" height="{cards.COVER_H}" '
         'loading="lazy"><span class="band-post-body"><span class="band-post-kicker">Latest post · '
         f'<time datetime="{post.date:%Y-%m-%d}">{post.date.strftime(app.config.post_date_format)}'
         f'</time></span><span class="band-post-title">{html.escape(post.title)}</span>'
@@ -1173,7 +1229,8 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
             image, _ = _cover_file(app, name)
             cover = (
                 f'{link}<img class="dark-light" '
-                f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
+                f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" '
+                f'alt="{html.escape(cards.cover_alt(_cover_kind(app, name)))}" '
                 f'width="{cards.COVER_W}" height="{cards.COVER_H}"></a>'
             )
             latest = (
@@ -1187,7 +1244,8 @@ def _blog_index(app, doctree, docname) -> None:  # noqa: ANN001
         width, height = cards.THUMB_W, cards.THUMB_W * cards.COVER_H // cards.COVER_W
         cover = (
             f'{link}<img class="dark-light" '
-            f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" alt="" '
+            f'src="{posixpath.relpath(image, posixpath.dirname(docname))}" '
+            f'alt="{html.escape(cards.cover_alt(_cover_kind(app, name)))}" '
             f'width="{width}" height="{height}" loading="lazy" decoding="async"></a>'
         )
         rows.append(
@@ -1330,6 +1388,7 @@ def setup(app) -> None:  # noqa: ANN001 -- Sphinx extension entry point
     app.connect("doctree-read", _notebook_thumbnail)
     app.connect("html-page-context", _page_assets)
     app.connect("html-page-context", _docs_sidebar)
+    app.connect("html-collect-pages", _moved_pages)
     app.connect("build-finished", _write_discovery)
     app.connect("build-finished", _version_assets)
     app.connect("doctree-resolved", _post_byline)

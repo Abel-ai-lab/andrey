@@ -52,6 +52,7 @@
   `_static/abel-symbol.png`, the organization's logo in the site's structured data.
 - `wordmark-light.svg`, `wordmark-dark.svg`, `favicon.svg`: the wordmark is "Andrey" in Unbounded
   SemiBold outlines, in light or dark ink with the A's right stroke in the art's amber. The A stays
-  whole, with its apex joined and crossbar intact. The icon is that A alone; its ink follows the
-  browser's light or dark bar. `site/wordmark.py` writes all three.
+  whole, with its apex joined and crossbar intact. The icon is that A alone, white on a rounded
+  square of the art's navy, so it reads the same on a light or a dark browser bar.
+  `site/wordmark.py` writes all three.
 - `fonts/`: Inter, under the SIL Open Font License (`fonts/OFL.txt`).

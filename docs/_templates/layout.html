@@ -1,0 +1,31 @@
+{#- The theme's layout without the scripts for search-as-you-type, which this site disables: the
+    search box opens the search page, which loads those scripts itself, so elsewhere they would only
+    block the first paint. It adds the icon's PNGs at the site's root (conf.py, _write_discovery). -#}
+{%- extends "!layout.html" %}
+{%- import "static/webpack-macros.html" as _webpack with context %}
+{#- The theme's head, without its Font Awesome script: the theme's stylesheet already draws every
+    icon with Font Awesome's web fonts, and the 633 KB script only swaps them for SVGs. The theme's
+    two scripts load at the end of the body, as before, without a preload hint. #}
+{%- block css %}
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "{{ default_mode }}";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "{{ default_mode }}";
+  </script>
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+    </style>
+  </noscript>
+  {{ _webpack.head_pre_assets() }}
+  {{- css() }}
+{%- endblock css %}
+{%- block extrahead %}
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="{{ language }}"/>
+  <meta name="docsearch:version" content="{{ version }}" />
+  {%- if last_updated %}
+    <meta name="docbuild:last-update" content="{{ last_updated | e }}"/>
+  {%- endif %}
+  <link rel="icon" type="image/png" sizes="96x96" href="{{ pathto('favicon-96.png', 1) }}"/>
+  <link rel="apple-touch-icon" href="{{ pathto('apple-touch-icon.png', 1) }}"/>
+{%- endblock extrahead %}

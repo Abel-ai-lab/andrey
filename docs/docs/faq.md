@@ -57,7 +57,7 @@ Andrey in its first cell.
 ### Which methods are there?
 
 {{ n_supported }} are supported: {{ supported_methods }}. The
-[API reference](code/index.md#structure-learning-methods) lists them all, and `andrey list` prints
+[API reference](api.md#structure-learning-methods) lists them all, and `andrey list` prints
 them with their status.
 
 ### What is the difference between supported and experimental?
@@ -89,12 +89,14 @@ compare accuracy there rather than edge by edge.
 
 ## Speed and hardware
 
-### How does it compare with other packages?
+### Is it the fastest causal discovery package?
 
-The [release cards](benchmarks.md) show Andrey side by side with causal-learn, lingam, and other
-packages on the same data and machines: fit time, error counts, and where Andrey is not faster. The
-[homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and
-speed support.
+Andrey is built to be: it batches its work into array operations, runs on every CPU core, and
+runs on a GPU, though support varies by method and configuration. You can use the
+[release cards](benchmarks.md) to compare Andrey with causal-learn, lingam, and other packages on
+the same data and machines: fit time, error counts, and where Andrey is not faster. The
+[homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and speed
+support.
 
 ### Why is it faster?
 
@@ -168,7 +170,7 @@ andrey run pc --help               # its inputs and parameters
 andrey run pc --data your_data.csv alpha=0.01
 ```
 
-The [command-line reference](code/index.md#command-line-interface) has every command and flag.
+The [command-line reference](api.md#command-line-interface) has every command and flag.
 
 ### How does an agent use it?
 
@@ -188,7 +190,7 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 
 Andrey is in alpha: any release may change the API, including the supported methods. Pin the
 version you depend on, and read the [changelog](changelog.md) before upgrading. The public API is
-what the [API reference](code/index.md) documents; names that start with an underscore are private
+what the [API reference](api.md) documents; names that start with an underscore are private
 and can change in any release.
 
 ### What is planned next?

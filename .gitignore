@@ -50,7 +50,7 @@ docs/PR/
 docs/_build/
 docs/_generated/
 docs/docs/examples/*.ipynb
-docs/docs/code/generated/
+docs/docs/api/
 docs/_static/andrey-tokens.css
 docs/_static/graph-comparison.html
 docs/_static/graph-types-*.html

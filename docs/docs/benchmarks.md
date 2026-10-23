@@ -130,7 +130,7 @@ Released October 17, 2026
 :::
 
 :::{div} release-body
-<h3>Time series</h3>
+<h3>Temporal causal discovery</h3>
 
 PCMCI, PCMCI+, LPCMCI, and three more methods for data ordered in time, compared with tigramite,
 causal-learn, and lingam.
@@ -143,7 +143,7 @@ causal-learn, and lingam.
 Released October 16, 2026
 
 - [Release card<span class="visually-hidden"> 0.5.0</span>](benchmarks/0.5.0.md)
-- [Post: Time series](../blog/20261016-andrey-0-5-0.md)
+- [Post: Temporal causal discovery](../blog/20261016-andrey-0-5-0.md)
 :::
 ::::
 

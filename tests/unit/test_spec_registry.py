@@ -323,12 +323,12 @@ def test_indep_test_choices_track_the_tests_each_method_dispatches():
 
 # --- support status -------------------------------------------------------------------------------
 #
-# Supported means every criterion in docs/docs/code/index.md's "Experimental methods" section holds.
+# Supported methods meet every criterion in docs/docs/api.md's "Experimental methods" section.
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")
 EXPERIMENTAL = sorted(n for n, s in REGISTRY.items() if s.status == "experimental")
-GRADUATE = "mark it experimental until it meets the criteria in docs/docs/code/index.md"
+GRADUATE = "mark it experimental until it meets the criteria in docs/docs/api.md"
 LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the paragraph holds"
 
 
@@ -501,7 +501,7 @@ def test_facade_warns_first_exactly_when_experimental(name):
 
 
 def test_api_reference_lists_each_method_under_its_status():
-    page = (ROOT / "docs" / "docs" / "code" / "index.md").read_text()
+    page = (ROOT / "docs" / "docs" / "api.md").read_text()
     supported, rest = page.split("### Supported methods", 1)[1].split("### Experimental methods", 1)
     experimental = rest.split("\n## ", 1)[0]
 
