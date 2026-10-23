@@ -57,7 +57,7 @@ single column gives a one-node graph.
 `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)).
 
-`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
+`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `boss`, `grasp`,
 `exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
 `knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
@@ -137,10 +137,24 @@ default under `andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
-Every method is supported. A new method ships as experimental: it passes recovery tests but has no
-published benchmark, its API may change without deprecation, and it warns with
-{py:class}`~andrey.ExperimentalWarning` on its first call in a process. It becomes supported once it
-has:
+A new method ships as experimental: it passes recovery tests but has no published benchmark, its
+API may change without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on
+its first call in a process.
+
+```{eval-rst}
+.. currentmodule:: andrey
+
+.. autosummary::
+   :toctree: api
+   :nosignatures:
+
+   mmhc
+```
+
+MMHC learns a skeleton with MMPC's conditional-independence tests, then runs hill climbing that
+joins only the skeleton's pairs.
+
+A method becomes supported once it has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
   in its release's [release card](benchmarks.md);

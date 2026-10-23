@@ -364,7 +364,7 @@ def test_methods_list_every_registered_method(monkeypatch):
     sealed = sorted(re.findall(r'aria-describedby="bench-(\w+)"', html))
     assert sealed == sorted(n for n in measured if status[n] == "supported")
     assert html.count('role="tooltip"') == len(sealed) and "Benchmarked</a>" not in html
-    assert html.count('class="method-status"') == 1
+    assert html.count('class="method-status"') == sum(s.status == "experimental" for s in specs)
     assert "Experimental Score-then-FCI hybrid" in re.sub(r"<[^>]+>", "", html)  # read as text
 
 

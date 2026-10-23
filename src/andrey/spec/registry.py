@@ -654,6 +654,63 @@ _add(
     )
 )
 
+# --- hybrid: a restrict phase of CI tests, then a score search among its pairs ------------------
+
+_HYBRID_SCORE_DOC = (
+    "Local score of the maximize phase: local_score_BIC_from_cov = covariance-based BIC; "
+    "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for categorical "
+    "data coded by whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
+    "and conditional Gaussian BIC, for mixed data (not with maximize=tabu). It must read the same "
+    "kind of data as indep_test."
+)
+_HYBRID_MAX_ITER = ParamSpec(
+    name="max_iter",
+    type="int",
+    default=None,
+    doc="Most moves the score search takes, at least 1; null sets no limit (the search still "
+    "ends). Reaching a set limit warns with SearchLimitWarning.",
+    nullable=True,
+)
+_add(
+    MethodSpec(
+        name="mmhc",
+        family="score",
+        summary="Max-min hill climbing: MMPC's conditional-independence tests learn a skeleton, "
+        "then hill climbing searches DAGs whose edges join only its pairs. Faster than hc on "
+        "sparse graphs with many variables. BIC with Fisher-z tests by default; "
+        "indep_test=chisq with score_func=local_score_BDeu for categorical data. Returns the "
+        "CPDAG of the final DAG and its score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
+            "the phases",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC_from_cov",
+                doc=_HYBRID_SCORE_DOC,
+                choices=HC_SCORES,
+            ),
+            _LAMBDA_VALUE,
+            _HYBRID_MAX_ITER,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
+        references=("Tsamardinos, Brown & Aliferis 2006",),
+    )
+)
+
 # --- permutation-based ----------------------------------------------------------------------------
 
 _BOSS_SCORE = ParamSpec(
@@ -1431,6 +1488,11 @@ _MOVE_RULE = (
     "No move adds a forbidden edge or removes a required one; the search starts from the required "
     "edges. "
 )
+_CANDIDATE_RULE = (
+    "The score search considers the pairs the restrict phase keeps and the pairs of the required "
+    "edges, less the pairs the knowledge makes non-adjacent; the restrict phase reads the data "
+    "alone. "
+)
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
 _KNOWLEDGE_HOW: dict[str, str] = {
@@ -1444,6 +1506,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "xges": _MOVE_RULE + _CLASS_RULE,
     "hc": _MOVE_RULE + _CLASS_RULE,
     "tabu": _MOVE_RULE + _CLASS_RULE,
+    "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
