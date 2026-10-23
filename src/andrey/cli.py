@@ -794,10 +794,15 @@ def execute_run(
             raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
     if labels is not None and any(p.name in ("categorical", "knowledge") for p in spec.params):
         # A method that reads column types names the header's columns in its warnings and in
-        # metadata["categorical"]; knowledge names them too.
+        # metadata["categorical"]; knowledge names them too, in each group of a panel.
         import pandas as pd
 
-        positional = [pd.DataFrame(positional[0], columns=list(labels)), *positional[1:]]
+        first = positional[0]
+        if spec.data.inputs[0].kind == "panel":
+            first = [pd.DataFrame(X, columns=list(labels)) for X in first]
+        else:
+            first = pd.DataFrame(first, columns=list(labels))
+        positional = [first, *positional[1:]]
 
     fn = getattr(andrey, spec.name)
     start = time.perf_counter()
