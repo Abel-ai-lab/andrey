@@ -398,16 +398,6 @@ def render_human(
 
 # --- run: `key=value` overrides + `--config`, coerced against the spec ---------------------
 
-# Input names are a closed set (the InputSpec names in the registry); a drift test pins the CLI's
-# input flags to them. Everything else is a hyperparameter, passed as `key=value` or via `--config`.
-_INPUT_FLAGS = ("data", "domain_index", "interventions", "data_groups", "data_list")
-
-# A ParamSpec may not shadow a CLI flag or a reserved-for-future flag; a drift guard enforces it.
-_RESERVED_PARAM_NAMES = frozenset(
-    {"method", "config", "output", "json", "full", "help", "version", "debug", *_INPUT_FLAGS}
-    | {"timeout", "background", "example", "select", "fields", "no_input", "overwrite"}
-)
-
 
 def _unquote(raw: str) -> tuple[str, bool]:
     """Strip one matched pair of double quotes; a quoted value is a literal string (no coercion)."""
@@ -1246,23 +1236,31 @@ def cmd_calibrate(
         help="Pool size to measure; default: ANDREY_NUM_WORKERS if above 1, else all usable CPUs.",
     ),
     method: Optional[list[str]] = typer.Option(
-        None, "--method", help="Measure only this method (ges); repeatable."
+        None,
+        "--method",
+        help="Measure only this method (ges or skeleton); repeatable. Default: both.",
     ),
     as_json: bool = typer.Option(False, "--json", help="Use JSON even on a terminal."),
 ) -> None:
-    """Measure the GES worker-pool cutoff on this machine and print the setting to use.
+    """Measure the worker-pool cutoffs on this machine and print the settings to use.
 
-    Times serial fits against pooled ones for a few sizes and sets nothing. It takes a minute or
-    two, and several minutes when the pool never wins (the search then runs up to 256 variables).
+    Times serial runs against pooled ones for a few sizes, whole fits for GES and single passes for
+    the skeleton search of PC, FCI, GFCI, and CD-NOD, and sets nothing. It takes a minute or two,
+    and several minutes when the pool never wins (the search then runs up to 256 variables).
     """
     from andrey.core import backend
     from andrey.search import calibrate as cal
 
     check_environment()
-    methods = method or ["ges"]
-    unknown = sorted(set(methods) - set(cal.CUTOFFS))
+    methods = method or list(cal.METHODS)
+    unknown = sorted(set(methods) - set(cal.METHODS))
     if unknown:
-        raise CliError("unsupported_value", f"--method must be ges, got {unknown[0]!r}", EXIT_USAGE)
+        raise CliError(
+            "unsupported_value",
+            f"--method must be {' or '.join(cal.METHODS)}, got {unknown[0]!r}",
+            EXIT_USAGE,
+            valid_options=list(cal.METHODS),
+        )
     if workers is not None and workers < 2:
         raise CliError("unsupported_value", "--workers must be at least 2", EXIT_USAGE)
     configured = backend.worker_count()
@@ -1289,10 +1287,11 @@ def calibration_report(results: dict, workers: int) -> dict:
 
     methods = {
         m: {
-            "variable": cal.CUTOFFS[m],
+            "variable": cal.METHODS[m].variable,
             "cutoff": c.cutoff,
             "serial_faster_at": side(c, c.below),
             "pool_faster_at": side(c, c.above),
+            "pool_start_s": None if c.start_s is None else round(c.start_s, 4),
             "timings": [
                 {"d": d, "work": c.work(d), "serial_s": round(s, 4), "pooled_s": round(p, 4)}
                 for d, s, p in c.timings
@@ -1326,7 +1325,9 @@ def render_calibration(report: dict) -> str:
                 f"serial was faster at d={below['d']} (work {below['work']:,}), "
                 f"the pool at d={above['d']} (work {above['work']:,})"
             )
-        lines.append(f"{m.upper()}: {where}.")
+        started = v.get("pool_start_s")
+        took = "" if started is None else f" Starting the pool takes about {started:.2f} s."
+        lines.append(f"{m.upper()}: {where}.{took}")
     lines += ["", "Set:"]
     lines += [f"  export {k}={v}" for k, v in report["settings"].items()]
     lines += ["", report["note"]]

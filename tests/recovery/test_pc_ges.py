@@ -6,6 +6,9 @@ import pytest
 import andrey
 from andrey import data
 from andrey.constraint.pc import pc as pc_engine
+from andrey.core import ARROW
+from andrey.search.ges import ges as search_ges
+from andrey.search.operators import max_parents_in_class
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -118,6 +121,92 @@ def test_ges_does_not_depend_on_the_data_scale():
     x = datagen.generate("gauss_5v")
     want = andrey.ges(x).structure.to_numpy()
     np.testing.assert_array_equal(andrey.ges(x * 1e-85).structure.to_numpy(), want)
+
+
+def fan_in(causes: int, n: int = 2000) -> np.ndarray:
+    """``causes`` independent standard-normal variables and a last one, their noisy sum."""
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((n, causes))
+    return np.column_stack([x, x.sum(axis=1) + 0.5 * rng.standard_normal(n)])
+
+
+def in_degree(out: andrey.StructureOutput, node: int) -> int:
+    return sum(
+        1
+        for _, head, kind in out.structure.oriented_edges(index=True)
+        if head == node and kind == "directed"
+    )
+
+
+def test_ges_max_parents_stops_a_variable_short_of_all_its_causes():
+    # Three causes of the last variable: the default limit of 4 / 2 = 2 admits the third. A cap of
+    # 2 holds it at two parents, and the graph scores worse.
+    x = fan_in(3)
+    full, capped = andrey.ges(x), andrey.ges(x, max_parents=2)
+    assert in_degree(full, 3) == 3
+    assert in_degree(capped, 3) == 2
+    assert capped.metadata["score"] > full.metadata["score"]
+
+
+def test_ges_max_parents_caps_the_graph_where_the_default_limit_does_not():
+    # Five causes of the last of six variables: the default limit of 3 lets it reach four parents.
+    # A cap of 3 holds it at three; a cap of 4 returns the default graph, and a cap of 5 lifts the
+    # limit.
+    x = fan_in(5)
+    default, capped = andrey.ges(x), andrey.ges(x, max_parents=3)
+    same, lifted = andrey.ges(x, max_parents=4), andrey.ges(x, max_parents=5)
+    assert in_degree(default, 5) == 4
+    assert in_degree(capped, 5) == 3
+    assert capped.metadata["score"] > default.metadata["score"]
+    assert same.structure.oriented_edges() == default.structure.oriented_edges()
+    assert same.metadata["score"] == default.metadata["score"]
+    assert in_degree(lifted, 5) == 5
+    assert lifted.metadata["score"] < default.metadata["score"]
+
+
+def test_ges_max_parents_of_one_refuses_the_collider_the_gate_admitted():
+    # Two causes of one variable, three variables, a limit of 1: the gate admits the collider in
+    # one move, because the variable's directed parents are 0 until it is made. The cap refuses it
+    # and returns the two edges undirected, a chain whose class gives no node two parents.
+    x = fan_in(2)
+    capped = andrey.ges(x, max_parents=1).structure.to_numpy()
+    gated = search_ges(x, max_parents=1, _parent_rule="gate")[0].to_numpy()
+    assert max_parents_in_class(capped).max() == 1
+    assert (capped == ARROW).sum() == 0 and (capped != 0).sum() == 4
+    assert (gated[2] == ARROW).sum() == 2
+    assert max_parents_in_class(gated).max() == 2
+
+
+def test_ges_max_parents_of_one_allows_a_chain():
+    # x -> y -> z has no collider, so every graph of its class gives each node at most one parent
+    # and a limit of 1 keeps both edges.
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(2000)
+    y = x + 0.5 * rng.standard_normal(2000)
+    z = y + 0.5 * rng.standard_normal(2000)
+    marks = andrey.ges(np.column_stack([x, y, z]), max_parents=1).structure.to_numpy()
+    assert (marks[0, 1] != 0, marks[1, 2] != 0, marks[0, 2]) == (True, True, 0)
+    assert (marks == ARROW).sum() == 0
+    assert max_parents_in_class(marks).max() == 1
+
+
+def test_ges_max_parents_zero_returns_the_empty_graph():
+    assert andrey.ges(fan_in(3), max_parents=0).structure.oriented_edges() == []
+
+
+def test_ges_rejects_required_edges_the_cap_cannot_hold():
+    knowledge = andrey.Knowledge(required=[(0, 2), (1, 2)])
+    with pytest.raises(ValueError, match="max_parents"):
+        andrey.ges(fan_in(2), max_parents=1, knowledge=knowledge)
+    assert in_degree(andrey.ges(fan_in(2), max_parents=2, knowledge=knowledge), 2) == 2
+
+
+@pytest.mark.parametrize(
+    ("value", "error"), [(-1, ValueError), (2.5, TypeError), (True, TypeError)]
+)
+def test_ges_rejects_a_bad_max_parents(value, error):
+    with pytest.raises(error, match="max_parents"):
+        andrey.ges(fan_in(3), max_parents=value)
 
 
 def test_pc_output_contract():

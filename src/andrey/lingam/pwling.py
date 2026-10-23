@@ -8,8 +8,6 @@ Shared by the LiNGAM ordering methods (DirectLiNGAM, MultiGroupDirectLiNGAM, the
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import numpy as np
 
 from andrey.core import stats
@@ -36,19 +34,15 @@ def compute_residual(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return a - (np.cov(a, b, ddof=0)[0, 1] / np.var(b)) * b
 
 
-def compute_entropy(u: np.ndarray) -> float:
-    """Hyvarinen max-entropy approximation of a standardized 1-D column (via ``core.stats``)."""
-    return float(stats.entropy(u)[0])
-
-
 def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     """Score how plausibly exogenous each column in ``U`` of ``X`` is (higher = more exogenous).
 
     Returns an array aligned with ``U``: ``score(i) = -sum_j min(0, diff_mi(i, j))^2`` with
     ``diff_mi(i, j) = (H(x_j) + H(r_{i|j})) - (H(x_i) + H(r_{j|i}))`` on standardized columns.
-    Entropy is batched over a stack of residuals; :func:`pick` chooses the best, MultiGroup sums
-    across groups first. Order-exactness needs the float64 entropy path -- on a float32 device
-    (atol 1e-3) a near-tie could flip the pick, so pin ``ANDREY_DEVICE=numpy`` for exact order.
+    Each ``H(r_{i|j})`` is computed once and serves both ``i`` and ``j``, batched over the residuals
+    of one column on the others; :func:`pick` chooses the best, MultiGroup sums across groups
+    first. Order-exactness needs the float64 entropy path -- on a float32 device (atol 1e-3) a
+    near-tie could flip the pick, so pin ``ANDREY_DEVICE=numpy`` for exact order.
     """
     cols = np.asarray(U)
     if len(cols) < 2:
@@ -58,41 +52,22 @@ def score_candidates(X: np.ndarray, U: list[int]) -> np.ndarray:
     ent = stats.entropy(x_std)  # (m,) batched candidate entropy
     cov = np.cov(x_std, rowvar=False, ddof=0)  # (m, m), same ddof as var: least-squares slopes
     var = np.var(x_std, axis=0)  # (m,), ddof=0
-    m = len(cols)
+    n, m = x_std.shape
+    # h[i, j] = H(r_{i|j}), computed once per ordered pair: candidate i reads its H(r_{i|j}) terms
+    # from row i and its H(r_{j|i}) terms from column i.
+    h = np.zeros((m, m), dtype=np.float64)
+    r, work = np.empty((n, m - 1), order="F"), np.empty((n, m - 1), order="F")
+    for a in range(m):
+        others = np.arange(m) != a
+        np.multiply(cov[a, others] / var[others], x_std[:, others], out=r)
+        np.subtract(x_std[:, a][:, None], r, out=r)  # residual of i on each j
+        r /= np.std(r, axis=0)
+        h[a, others] = stats.entropy(r, work=work)
     scores = np.empty(m, dtype=np.float64)
     for a in range(m):
         others = np.arange(m) != a
-        xi = x_std[:, a][:, None]  # (n, 1)
-        xj = x_std[:, others]  # (n, m-1)
-        r_ij = xi - (cov[a, others] / var[others])[None, :] * xj  # residual of i on each j
-        r_ji = xj - (cov[others, a] / var[a])[None, :] * xi  # residual of each j on i
-        r_ij /= np.std(r_ij, axis=0)
-        r_ji /= np.std(r_ji, axis=0)
-        diff = (ent[others] + stats.entropy(r_ij)) - (ent[a] + stats.entropy(r_ji))
+        diff = (ent[others] + h[a, others]) - (ent[a] + h[others, a])
         scores[a] = -np.sum(np.minimum(0.0, diff) ** 2)
-    return scores
-
-
-def score_candidates_serial(X: np.ndarray, U: list[int]) -> np.ndarray:
-    """Readable per-pair reference implementation of :func:`score_candidates`."""
-    cols = list(U)
-    x_std = {k: (X[:, k] - X[:, k].mean()) / X[:, k].std() for k in cols}
-    ent = {k: compute_entropy(x_std[k]) for k in cols}
-    scores = np.empty(len(cols), dtype=np.float64)
-    for a, i in enumerate(cols):
-        xi, e_xi = x_std[i], ent[i]
-        acc = 0.0
-        for j in cols:
-            if j == i:
-                continue
-            xj, e_xj = x_std[j], ent[j]
-            r_ij = compute_residual(xi, xj)
-            r_ji = compute_residual(xj, xi)
-            diff = (e_xj + compute_entropy(r_ij / np.std(r_ij))) - (
-                e_xi + compute_entropy(r_ji / np.std(r_ji))
-            )
-            acc += min(0.0, diff) ** 2
-        scores[a] = -acc
     return scores
 
 
@@ -145,15 +120,10 @@ def copy_groups(groups: list[np.ndarray], U: list[int], ranks: np.ndarray) -> di
     return {u: copies[u] for u in U if u in copies}
 
 
-def find_causal_order(
-    X: np.ndarray,
-    *,
-    scores: Callable[[np.ndarray, list[int]], np.ndarray] = score_candidates,
-    precedence: np.ndarray | None = None,
-) -> list[int]:
-    """Peel exogenous variables (:func:`pick` of ``scores``) one at a time, residualizing the rest.
+def find_causal_order(X: np.ndarray, *, precedence: np.ndarray | None = None) -> list[int]:
+    """Peel exogenous variables (:func:`pick` of :func:`score_candidates`) one at a time.
 
-    ``scores(X, U) -> array aligned with U`` is injectable. Only one column of each copy group
+    Each pick is residualized out of the rest. Only one column of each copy group
     (:func:`copy_groups`) is scored; when it is picked, its copies follow it directly in the order.
     Ties and copy representatives are decided by :func:`~andrey.search.hc.tie_ranks` of the input
     columns, which are identical on every machine and keep their ranks when the columns are
@@ -178,10 +148,10 @@ def find_causal_order(
         if len(candidates) == 1:
             m = candidates[0]
         elif precedence is None:
-            m = pick(scores(residualized, candidates), candidates, ranks)
+            m = pick(score_candidates(residualized, candidates), candidates, ranks)
         else:
             eligible = ~precedence[np.ix_(candidates, candidates)].any(axis=0)
-            values = scores(residualized, candidates)[eligible]
+            values = score_candidates(residualized, candidates)[eligible]
             m = pick(values, [c for c, ok in zip(candidates, eligible) if ok], ranks)
         placed = [m, *copies[m]]
         remaining = [u for u in remaining if u not in placed]

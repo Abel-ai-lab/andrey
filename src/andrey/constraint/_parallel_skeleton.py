@@ -3,16 +3,20 @@
 At a fixed conditioning size the still-adjacent pairs are scanned independently: each pair's
 separating set is a read-only function of the start-of-size neighborhood snapshot and the
 correlation matrix, and removals are applied only after the whole size completes. So the pass is
-embarrassingly parallel across pairs, and the reduce is a plain concatenation of per-chunk removals
-with no tie-break -- the recovered adjacency, separating sets, and largest separating p-values are
-identical to the serial scan regardless of how the pairs are partitioned or the order chunks
-complete.
+embarrassingly parallel across pairs. The pairs are cut into contiguous chunks of about equal test
+counts, and the reduce concatenates the per-chunk removals in chunk order, so the removals arrive
+in the serial scan's order with the same separating sets and largest separating p-values. A pass
+that fails raises the exception of its first failing chunk in that order, the exception the serial
+scan meets first.
 
-Workers are seeded once with the parent's exact correlation-matrix bytes (via
-:meth:`~andrey.core.ci.PartialCorrelationTest.from_corr` of the parent's test class) and pin BLAS
-to one thread, so every process feeds identical float64 into the same closed forms and the
-skeleton is bit-identical to the serial oracle. A worker rebuilds the start-of-size neighborhood
-from the adjacency snapshot the task carries and delegates to the shared
+Only the FisherZ and StudentT tests run on the pool
+(:func:`~andrey.constraint._skeleton.canonical_capable`), and only a pass of at least
+:data:`MIN_POOL_QUERIES` tests, or the ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it; any
+other pass scans in the caller's process. Workers are seeded once with the parent's exact
+correlation-matrix bytes (via :meth:`~andrey.core.ci.PartialCorrelationTest.from_corr` of the
+parent's test class) and pin BLAS to one thread, so every process feeds identical float64 into the
+same closed forms and the skeleton is bit-identical to the serial oracle. A worker rebuilds the
+start-of-size neighborhood from the adjacency snapshot the task carries and delegates to the shared
 :func:`~andrey.constraint._skeleton.scan_pairs`.
 """
 
@@ -23,14 +27,20 @@ from typing import cast
 
 import numpy as np
 
-from andrey.constraint._skeleton import Removal, scan_pairs
+from andrey.constraint._skeleton import Removal, pair_queries, scan_pairs
+from andrey.core import env
 from andrey.core.ci import CITest, PartialCorrelationTest
-
-# The start-method policy and fail-loud collect are the same primitives the parallel greedy search
-# uses, so the skeleton reuses those helpers rather than redefining them; only the pair-axis
-# chunking and the correlation-seeded worker glue below are skeleton-specific.
+from andrey.search import _parallel as par
+from andrey.search import calibrate
+from andrey.search._parallel import balanced_chunks as _balanced_chunks
 from andrey.search._parallel import collect as _collect
 from andrey.search._parallel import pick_context as _pick_context
+
+#: The default for the fewest tests a conditioning-size pass needs to run on the worker pool; a
+#: smaller pass scans in the caller's process. ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` overrides it
+#: (0 sends every pass to the pool), and a fit with workers warns once on the default when a pass
+#: nears it; ``andrey calibrate --method skeleton`` measures the value for a machine.
+MIN_POOL_QUERIES: int = 500_000
 
 # Per-worker state installed once by _init_worker and reused across every task and size pass.
 _WORKER_TEST: PartialCorrelationTest | None = None
@@ -38,15 +48,6 @@ _WORKER_TOKEN: object = None
 _WORKER_BLAS: object = (
     None  # a held threadpoolctl controller capping this worker's BLAS to 1 thread
 )
-
-
-def even_pair_chunks(pairs: list[tuple[int, int]], n_chunks: int) -> list[list[tuple[int, int]]]:
-    """Partition ``pairs`` into up to ``n_chunks`` contiguous chunks of ~equal count."""
-    if not pairs:
-        return []
-    n = len(pairs)
-    parts = np.array_split(np.arange(n), max(1, min(n_chunks, n)))
-    return [[pairs[i] for i in part.tolist()] for part in parts if len(part)]
 
 
 def _init_worker(
@@ -84,17 +85,24 @@ def _scan_task(payload: tuple) -> list[Removal]:
 class SkeletonWorkerPool:
     """Persistent worker pool for the skeleton size passes; created lazily, reused across sizes.
 
-    The pool is seeded once with the test's correlation matrix; each size pass submits the chunked
-    pair list plus the adjacency snapshot and reduces the per-chunk removals. The correlation bytes
-    tag a run token every task re-checks, so a stale pool can never mix a prior run's numbers in.
+    The pool starts on the first pass that reaches the cutoff, :data:`MIN_POOL_QUERIES` tests or the
+    ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, seeded once with the test's
+    correlation matrix; each such pass submits its weighted chunks plus the adjacency snapshot and
+    concatenates the per-chunk removals. The correlation bytes tag a run token every task
+    re-checks, so a stale pool can never mix a prior run's numbers in. The caller passes a
+    :func:`~andrey.constraint._skeleton.canonical_capable` test. A bad override raises when the pool
+    is created, before any pass.
     """
 
     def __init__(self, test: CITest, workers: int) -> None:
-        corr, n_samples = test.to_seed()  # ty: ignore[unresolved-attribute]  # gated by caller
-        self._test_class = cast("type[PartialCorrelationTest]", type(test))  # gated by caller
+        corr, n_samples = cast("PartialCorrelationTest", test).to_seed()
+        self._test_class = cast("type[PartialCorrelationTest]", type(test))
         self._corr = np.ascontiguousarray(corr, dtype=np.float64)
         self._n = int(n_samples)
         self._workers = max(1, workers)
+        self._min_queries = par.min_work(env.SKELETON_PARALLEL_MIN_WORK, MIN_POOL_QUERIES)
+        # Warn once a pass comes near the default cutoff (only a fit that can fan out).
+        self._warn = self._workers > 1 and calibrate.cutoff_is_default("skeleton")
         self._pool: ProcessPoolExecutor | None = None
         self._token: object = None
 
@@ -112,26 +120,42 @@ class SkeletonWorkerPool:
     def scan(
         self,
         pairs: list[tuple[int, int]],
+        neighbors: list[np.ndarray],
         adj_mask: np.ndarray,
         size: int,
         alpha: float,
         record_pvalues: bool = True,
-    ) -> list[Removal]:
+        weights: list[int] | None = None,
+    ) -> list[Removal] | None:
         """Scan ``pairs`` at conditioning ``size`` across the worker pool; return all removals.
 
-        Each removal carries its pair's largest separating p-value, or ``None`` when
-        ``record_pvalues`` is false (:func:`~andrey.constraint._skeleton.scan_pairs`).
+        ``neighbors`` is the start-of-size snapshot and ``adj_mask`` the boolean adjacency it was
+        read from, which the workers rebuild it from. ``weights`` holds each pair's test count
+        (:func:`~andrey.constraint._skeleton.pair_queries`) when the caller has taken it for the
+        pass, and is counted here otherwise. The removals come in the order
+        :func:`~andrey.constraint._skeleton.scan_pairs` gives them, each with its pair's largest
+        separating p-value, or ``None`` when ``record_pvalues`` is false. Returns ``None``, running
+        nothing, when the pass holds fewer tests than the cutoff; the caller then scans it
+        in-process.
         """
+        if weights is None:
+            weights = [pair_queries(neighbors, x, y, size) for x, y in pairs]
+        queries = sum(weights)
+        if self._warn and queries >= calibrate.WARN_FRACTION * self._min_queries:
+            calibrate.warn_default_cutoff("skeleton", self._min_queries)
+            self._warn = False
+        if queries < self._min_queries:
+            return None
         pool, token = self._ensure()
-        payloads = [
-            (chunk, adj_mask, size, alpha, record_pvalues, token)
-            for chunk in even_pair_chunks(pairs, self._workers)
+        # Contiguous chunks collected in submission order keep the serial scan's pair order.
+        futures = [
+            pool.submit(
+                _scan_task,
+                ([pairs[i] for i in chunk], adj_mask, size, alpha, record_pvalues, token),
+            )
+            for chunk in _balanced_chunks(weights, self._workers)
         ]
-        futures = [pool.submit(_scan_task, payload) for payload in payloads]
-        removals: list[Removal] = []
-        for chunk_removals in _collect(futures):
-            removals.extend(chunk_removals)
-        return removals
+        return [removal for chunk in _collect(futures, ordered=True) for removal in chunk]
 
     def close(self) -> None:
         if self._pool is not None:

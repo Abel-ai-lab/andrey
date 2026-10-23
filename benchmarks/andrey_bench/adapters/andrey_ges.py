@@ -54,9 +54,17 @@ class AndreyGES:
     lambda_value: float = _DEFAULT_LAMBDA
     #: The local score. A variant with another score needs its own ``name``, as a weight does.
     score_func: str = _DEFAULT_SCORE_FUNC
-    #: Most directed parents a node may hold and still gain one; ``None`` lifts the cap, as the
-    #: public ``andrey.ges`` does. A benchmark that changes it gives the arm its own ``name``.
+    #: The limit on a node's parents, applied as ``parent_rule`` says; ``None`` sets none and keeps
+    #: the default gate of half the variables, as the public ``andrey.ges`` does. A benchmark that
+    #: changes it gives the arm its own ``name``.
     max_parents: float | None = _DEFAULT_MAX_PARENTS
+    #: How ``max_parents`` applies. ``"cap"`` is the public ``andrey.ges(max_parents=k)``: no DAG of
+    #: the CPDAG's class gives a node more than ``k`` parents. ``"gate"`` is the rule of
+    #: the default of half the variables and of causal-learn's ``maxP``: a node that already holds
+    #: more than ``k`` directed parents gains no new ones in the forward phase. A lane that limits
+    #: the reference's parents too sets ``"gate"``, so both packages apply one rule; a lane that
+    #: limits only Andrey's keeps ``"cap"``.
+    parent_rule: str = "cap"
 
     def setup(self) -> None:
         """Import Andrey before timing; see `contracts.SetupAdapter`.
@@ -69,11 +77,13 @@ class AndreyGES:
         from andrey.search.ges import ges  # noqa: F401
 
     def params(self) -> dict[str, Any]:
-        """The score, its BIC weight (BDeu has none), and the parent cap."""
+        """The score, its BIC weight (BDeu has none), and the parent limit with its rule."""
         params: dict[str, Any] = {
             "score_func": self.score_func,
             "max_parents": self.max_parents,
         }
+        if self.max_parents is not None:
+            params["parent_rule"] = self.parent_rule
         if self.score_func != "local_score_BDeu":
             params["lambda_value"] = float(self.lambda_value)
         return params
@@ -86,12 +96,17 @@ class AndreyGES:
         score_func = params.get("score_func", _DEFAULT_SCORE_FUNC)
         lambda_value = float(params.get("lambda_value", _DEFAULT_LAMBDA))
         max_parents = params.get("max_parents", params.get("maxP", _DEFAULT_MAX_PARENTS))
+        parent_rule = params.get("parent_rule", self.parent_rule)
 
         workers = 1 if self.mode == "serial" else _parallel_workers()
         X = np.asarray(data, dtype=np.float64)
         with andrey.config(backend=self.backend, num_workers=workers):
             cpdag, _score = _ges(
-                X, score_func=score_func, lambda_value=lambda_value, maxP=max_parents
+                X,
+                score_func=score_func,
+                lambda_value=lambda_value,
+                max_parents=max_parents,
+                _parent_rule=parent_rule,
             )
         return np.asarray(cpdag.to_numpy())
 
@@ -102,13 +117,17 @@ class AndreyGES:
         return GraphStructure.from_numpy(native, kind=self.output_type)
 
 
-def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "") -> list[AndreyGES]:
+def andrey_ges_adapters(
+    lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "", parent_rule: str = "cap"
+) -> list[AndreyGES]:
     """Two GES benchmark configurations using the ``numpy`` backend: serial and parallel.
 
     ``lambda_value`` sets the BIC penalty weight for both configurations. ``suffix`` is appended
     to their names and must be nonempty for a nondefault weight: ``params`` are excluded from
-    ``run_id``, so distinct weights need distinct names to keep their results separate. With no
-    arguments, the function returns both configurations with the default weight and names.
+    ``run_id``, so distinct weights need distinct names to keep their results separate.
+    ``parent_rule`` is :attr:`AndreyGES.parent_rule`: ``"gate"`` in a lane whose reference limits
+    its parents too. With no arguments, the function returns both configurations with the default
+    weight, names, and rule.
     """
     if lambda_value != _DEFAULT_LAMBDA and not suffix:
         # Without a suffix the second weight reuses the first's names, so its part files are the
@@ -130,6 +149,7 @@ def andrey_ges_adapters(lambda_value: float = _DEFAULT_LAMBDA, suffix: str = "")
             mode=mode,
             package_version=version,
             lambda_value=lambda_value,
+            parent_rule=parent_rule,
         )
         for name, backend, mode in specs
     ]
@@ -139,6 +159,8 @@ def andrey_ges_bdeu() -> AndreyGES:
     """GES with the BDeu score for categorical data, using the ``numpy`` backend serially.
 
     BDeu moves are scored in the calling process, so a parallel variant would run the same code.
+    Its reference, causal-learn's BDeu GES, limits parents too, so Andrey applies its limit as a
+    gate.
     """
     return AndreyGES(
         name="andrey.ges.bdeu",
@@ -146,4 +168,5 @@ def andrey_ges_bdeu() -> AndreyGES:
         mode="serial",
         package_version=_andrey_version(),
         score_func="local_score_BDeu",
+        parent_rule="gate",
     )

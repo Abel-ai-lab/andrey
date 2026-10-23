@@ -353,6 +353,18 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            ParamSpec(
+                name="max_parents",
+                type="int",
+                default=None,
+                doc="A cap on every node's parents, at least 0: no DAG the returned CPDAG "
+                "represents gives a node more than max_parents parents, and some DAG reaches each "
+                "node's count. A move whose CPDAG would "
+                "break the cap, in either phase, is skipped for the next best move. A cap can "
+                "stop the search short of the lowest-scoring graph, which GES otherwise finds. "
+                "null sets no cap; the forward phase then keeps its gate of n_variables / 2.",
+                nullable=True,
+            ),
             _CATEGORICAL,
             _MAX_CATEGORIES,
         ),

@@ -450,23 +450,24 @@ class _GSTNode:
             tree.leaves[key] = leaf
         self.leaf = leaf
 
-    def trace(self, available: list[int], parents: list[int], prefix_set: set[int]) -> _Leaf:
+    def trace(self, excluded: set[int], parents: list[int], prefix_set: set[int]) -> _Leaf:
         """Walk the grow path allowed by ``prefix_set``, then shrink; return the :class:`_Leaf`.
 
         Appends each taken grow variable to ``parents`` and, on reaching the leaf, removes the
         shrink variables, so ``parents`` ends as the traced parent set, the leaf's ``parents``.
-        Mutates ``available`` to drop every branch variable it passes.
+        Adds every branch variable it passes to ``excluded``; a node grows from the tree's
+        ``available`` variables outside it.
         """
         if self.branches is None:
-            self._grow(available, parents)
+            self._grow([u for u in self.tree.available if u not in excluded], parents)
         branches = self.branches or []
         for branch in branches:
             add = branch.add
             assert add is not None  # branch nodes always carry the variable they add
-            available.remove(add)
+            excluded.add(add)
             if add in prefix_set:
                 parents.append(add)
-                return branch.trace(available, parents, prefix_set)
+                return branch.trace(excluded, parents, prefix_set)
         if self.remove is None:
             self._shrink(parents, self.tree.required)
         else:
@@ -492,10 +493,9 @@ class _GrowShrinkTree:
         "vertex",
         "score",
         "delta",
-        "n_features",
         "empty_score",
         "root",
-        "candidates",
+        "available",
         "required",
         "leaves",
     )
@@ -513,26 +513,24 @@ class _GrowShrinkTree:
         self.vertex = vertex
         self.score = score
         self.delta = delta
-        self.n_features = n_features
-        self.candidates = candidates
+        # Every variable that may parent `vertex` -- all others, or the `candidates`.
+        self.available = tuple(
+            [i for i in range(n_features) if i != vertex] if candidates is None else candidates
+        )
         self.required = [] if required is None else required
         self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
         self.leaves: dict[tuple[int, ...], _Leaf] = {}
 
-    def _available(self) -> list[int]:
-        """Every variable that may parent ``vertex`` -- all others, or the ``candidates``."""
-        if self.candidates is not None:
-            return list(self.candidates)
-        vertex = self.vertex
-        return [i for i in range(self.n_features) if i != vertex]
+    def trace(self, prefix: set[int], parents: list[int] | None = None) -> _Leaf:
+        """Return the leaf of ``vertex``'s best parents drawn from ``prefix``; fill ``parents``.
 
-    def trace(self, prefix: Sequence[int], parents: list[int] | None = None) -> _Leaf:
-        """Return the leaf of ``vertex``'s best parents drawn from ``prefix``; fill ``parents``."""
+        ``prefix`` is the set of variables allowed as parents; the trace only reads it.
+        """
         if parents is None:
             parents = []
         parents.extend(self.required)
-        return self.root.trace(self._available(), parents, set(prefix))
+        return self.root.trace(set(), parents, prefix)
 
 
 def _sweep(
@@ -554,7 +552,7 @@ def _sweep(
     with_v: list[_Leaf | None] = [None] * p
     bound_sum = abs_sum = 0.0
 
-    prefix: list[int] = []
+    prefix: set[int] = set()
     acc = 0.0
     for j in range(0, i):
         w = order[j]
@@ -565,7 +563,7 @@ def _sweep(
         acc += node.score
         bound_sum += leaf.bound + node.bound
         abs_sum += abs(leaf.score) + abs(node.score)
-        prefix.append(w)
+        prefix.add(w)
     leaf = gsts[v].trace(prefix)
     v_leaves.append(leaf)
     scores[i] = leaf.score + acc
@@ -580,18 +578,18 @@ def _sweep(
         acc += node.score
         bound_sum += leaf.bound + node.bound
         abs_sum += abs(leaf.score) + abs(node.score)
-        prefix.append(w)
+        prefix.add(w)
     leaf = gsts[v].trace(prefix)
     v_leaves.append(leaf)
     scores[p] = leaf.score + acc
     bound_sum += leaf.bound
     abs_sum += abs(leaf.score)
 
-    prefix.append(v)
+    prefix.add(v)
     acc = 0.0
     for j in range(p - 1, i, -1):
         w = order[j]
-        prefix.pop(j - 1)
+        prefix.remove(w)
         node = with_v[j] = gsts[w].trace(prefix)
         acc += node.score
         bound_sum += node.bound
@@ -600,7 +598,7 @@ def _sweep(
     scores[i] += acc
     for j in range(i - 1, -1, -1):
         w = order[j]
-        prefix.pop(j)
+        prefix.remove(w)
         node = with_v[j] = gsts[w].trace(prefix)
         acc += node.score
         bound_sum += node.bound
@@ -850,10 +848,12 @@ def boss(
             break
 
     parents: dict[int, list[int]] = {}
-    for i, v in enumerate(order):
+    prefix: set[int] = set()
+    for v in order:
         pa: list[int] = []
-        gsts[v].trace(order[:i], pa)
+        gsts[v].trace(prefix, pa)
         parents[v] = pa
+        prefix.add(v)
 
     adj = np.zeros((p, p), dtype=np.int8)
     total = 0.0

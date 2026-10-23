@@ -12,9 +12,12 @@ from threadpoolctl import threadpool_limits
 from andrey.core.orient import to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
+from andrey.search import _parallel as par
 from andrey.search import _parallel_ges as pg
-from andrey.search.ges import _recompute_objective, ges
+from andrey.search import operators as ops
+from andrey.search.ges import _parent_limits, _recompute_objective, ges
 from andrey.search.hc import tie_ranks
+from tests.unit.ges_chunks import backward_inprocess, forward_inprocess
 
 # Random linear-Gaussian datasets spanning sparse/dense and small/large graphs (the test_pc_ges
 # sweep): the general-input regime a single fixed baseline cannot reach.
@@ -40,7 +43,9 @@ def _gaussian_sem(seed: int, n: int, d: int, p: float) -> np.ndarray:
     return x
 
 
-def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None = None):
+def _ges_decomposed(
+    x: np.ndarray, n_chunks: int, max_parents: float | None = None, parent_rule: str = "cap"
+):
     """Full GES via the in-process N-chunk decomposition, mirroring ``ges()``'s serial setup.
 
     Drives the PURE Schur delta engine through ``forward_chunk_best`` / ``backward_chunk_best`` and
@@ -49,15 +54,15 @@ def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None = None):
     """
     X = np.asarray(x, dtype=np.float64)
     n = X.shape[1]
-    max_parents = n / 2 if maxP is None else maxP
+    gate, cap = _parent_limits(n, max_parents, parent_rule)
     score = BICScore(X, lambda_value=1.0)
     engine = DeltaBICScore(score)
     adj = np.zeros((n, n), dtype=np.int8)
     # Match ges()'s BLAS pin so the in-process vs serial comparison is thread-count-invariant.
     with threadpool_limits(limits=1):
         ranks = tie_ranks(X).tolist()
-        adj = pg._forward_inprocess(adj, engine, n, max_parents, n_chunks, ranks)
-        adj = pg._backward_inprocess(adj, engine, n, n_chunks, ranks)
+        adj = forward_inprocess(adj, engine, n, gate, n_chunks, ranks, cap)
+        adj = backward_inprocess(adj, engine, n, n_chunks, ranks, cap)
         total = _recompute_objective(adj, score, n)
     return to_structure(adj, kind="cpdag"), total
 
@@ -123,8 +128,8 @@ def _move_sequence(x: np.ndarray, n_chunks: int):
     try:
         adj = np.zeros((n, n), dtype=np.int8)
         with threadpool_limits(limits=1):
-            adj = pg._forward_inprocess(adj, engine, n, n / 2, n_chunks, range(n))
-            pg._backward_inprocess(adj, engine, n, n_chunks, range(n))
+            adj = forward_inprocess(adj, engine, n, n / 2, n_chunks, range(n))
+            backward_inprocess(adj, engine, n, n_chunks, range(n))
     finally:
         pg.ops.apply_insert, pg.ops.apply_delete = orig_ins, orig_del
     return seq
@@ -166,7 +171,7 @@ def test_ties_are_exercised_by_the_sweep():
     from andrey.search.ges import _reachable
 
     adj = np.zeros((n, n), dtype=np.int8)
-    state = pg.neighborhood_state(adj, n)
+    state = pg.neighborhood_state(adj)
     reachable = _reachable(adj)
     deltas: list[float] = []
     for y in range(n):
@@ -177,7 +182,9 @@ def test_ties_are_exercised_by_the_sweep():
             na = nbrs_y & state[0][xx]
             for T in pg.ops.subsets(sorted(nbrs_y - state[0][xx])):
                 if pg.ops.is_clique(adj, na | set(T)) and not reachable(y, xx, na | set(T)):
-                    deltas.append(round(pg.ops.insert_delta(score, xx, y, na, T, state[1][y]), 12))
+                    base = na | set(T) | set(state[1][y])
+                    with_x, without_x = tuple(sorted(base | {xx})), tuple(sorted(base))
+                    deltas.append(round(score.score(y, with_x) - score.score(y, without_x), 12))
     assert len(deltas) - len(set(deltas)) > 0  # at least one delta tie (to 1e-12) exists to break
 
 
@@ -203,10 +210,10 @@ def _force_pool():
             os.environ["ANDREY_GES_PARALLEL_MIN_WORK"] = prev
 
 
-def _parallel(x: np.ndarray, workers: int, maxP: float | None = None):
+def _parallel(x: np.ndarray, workers: int, max_parents: float | None = None):
     """Run ``ges`` on the pool-backed path (gate forced open) via the ``num_workers`` axis."""
     with _force_pool(), backend.config(num_workers=workers):
-        return ges(x, maxP=maxP)
+        return ges(x, max_parents=max_parents)
 
 
 # Exhaustive exactness across the sweep is the in-process tests' job (cheap); the pool tests only
@@ -221,6 +228,17 @@ def test_pool_parallel_bit_identical_to_serial(seed, workers):
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy()), (
         f"CPDAG differs at seed={seed}, workers={workers}"
     )
+    assert serial_score == par_score
+
+
+def test_pool_parallel_matches_serial_under_a_cap():
+    """Workers test the cap on their own candidates and return serial's CPDAG where it binds."""
+    x = _gaussian_sem(0, 400, 30, 0.2)
+    serial_struct, serial_score = ges(x, max_parents=2)
+    par_struct, par_score = _parallel(x, 4, 2)
+    assert ops.max_parents_in_class(ges(x)[0].to_numpy()).max() > 2, "the cap does not bind"
+    assert not ops.exceeds_parent_cap(par_struct.to_numpy(), 2)
+    assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())
     assert serial_score == par_score
 
 
@@ -260,13 +278,13 @@ import types  # noqa: E402
 def test_fork_context_policy(monkeypatch):
     """``fork`` only when no CUDA context exists; a live CUDA context rules ``fork`` out."""
     monkeypatch.delitem(sys.modules, "torch", raising=False)
-    assert pg._fork_safe() is True  # torch not imported
+    assert par.fork_safe() is True  # torch not imported
     uninit = types.SimpleNamespace(cuda=types.SimpleNamespace(is_initialized=lambda: False))
     monkeypatch.setitem(sys.modules, "torch", uninit)
-    assert pg._fork_safe() is True  # torch present, CUDA cold
+    assert par.fork_safe() is True  # torch present, CUDA cold
     initialized = types.SimpleNamespace(cuda=types.SimpleNamespace(is_initialized=lambda: True))
     monkeypatch.setitem(sys.modules, "torch", initialized)
-    assert pg._fork_safe() is False  # a live CUDA context -> never fork
+    assert par.fork_safe() is False  # a live CUDA context -> never fork
 
 
 def test_spawn_context_parity(monkeypatch):
@@ -334,7 +352,7 @@ def test_collect_reraises_worker_exception():
     fut: Future = Future()
     fut.set_exception(ValueError("worker boom"))
     with pytest.raises(ValueError, match="worker boom"):
-        pg._collect([fut])
+        par.collect([fut])
 
 
 def test_collect_wraps_broken_pool():
@@ -345,7 +363,7 @@ def test_collect_wraps_broken_pool():
     fut: Future = Future()
     fut.set_exception(BrokenProcessPool("worker died"))
     with pytest.raises(RuntimeError, match="ANDREY_NUM_WORKERS=1"):
-        pg._collect([fut])
+        par.collect([fut])
 
 
 # --- the measured density-aware crossover gate ----------------------------------------------------
@@ -393,8 +411,8 @@ def test_forward_work_estimate_is_density_aware():
     for i in range(8):  # an undirected clique among the first 8 nodes
         for j in range(i + 1, 8):
             dense[i, j] = dense[j, i] = TAIL
-    w_sparse = pg.estimate_forward_work(n, pg.neighborhood_state(sparse, n), None)
-    w_dense = pg.estimate_forward_work(n, pg.neighborhood_state(dense, n), None)
+    w_sparse = sum(pg.forward_work_per_target(n, pg.neighborhood_state(sparse), None))
+    w_dense = sum(pg.forward_work_per_target(n, pg.neighborhood_state(dense), None))
     assert w_dense > 10 * w_sparse  # 2^7 per clique candidate dwarfs the sparse all-singleton scan
 
 
@@ -403,9 +421,9 @@ def test_work_estimate_never_overflows_at_high_degree():
     n = 60
     adj = np.ones((n, n), dtype=np.int8)  # every off-diagonal TAIL -> undirected near-clique
     np.fill_diagonal(adj, 0)
-    state = pg.neighborhood_state(adj, n)
-    assert isinstance(pg.estimate_forward_work(n, state, None), int)
-    assert isinstance(pg.estimate_backward_work(n, state), int)
+    state = pg.neighborhood_state(adj)
+    assert isinstance(sum(pg.forward_work_per_target(n, state, None)), int)
+    assert isinstance(sum(pg.backward_work_per_target(n, state)), int)
 
 
 # --- load-balanced degree-aware chunking + cross-pass cache ---------------------------------------
@@ -420,7 +438,7 @@ def test_balanced_chunks_exact_cover():
         n = int(rng.integers(1, 60))
         work = rng.integers(0, 1000, size=n).tolist()
         for k in (1, 2, 3, 7, n, n + 3):
-            chunks = pg.balanced_chunks(work, k)
+            chunks = par.balanced_chunks(work, k)
             assert sorted(chain.from_iterable(chunks)) == list(range(n))
             assert all(chunks)  # no empty chunk
 
@@ -433,7 +451,7 @@ def test_balanced_chunks_reduce_skew():
     def heaviest(chunks):
         return max(sum(work[y] for y in c) for c in chunks)
 
-    assert heaviest(pg.balanced_chunks(work, 4)) < heaviest(pg.even_chunks(n, 4))
+    assert heaviest(par.balanced_chunks(work, 4)) < heaviest(par.even_chunks(n, 4))
 
 
 def test_forward_scan_rescores_group_with_mixed_bounds():
@@ -454,6 +472,17 @@ def test_forward_scan_rescores_group_with_mixed_bounds():
     assert passing == 0b0110
     expected = engine.delta_many_with_base(0, (), [("add", 1), ("add", 2)])
     assert [deltas[1], deltas[2]] == expected
+
+
+def test_forward_scan_refreshes_a_reach_map_before_the_first_graph():
+    """The successor masks start as the empty graph's, one per node, so a reach set kept before
+    the first pass meets masks of the same length."""
+    x = _gaussian_sem(0, 200, 4, 0.5)
+    scan = pg._ForwardScan([0], DeltaBICScore(BICScore(x, lambda_value=1.0)), 4, None, range(4))
+    assert scan.succ == [0] * 4
+    scan.reach[(0, 0)] = 0b1001
+    scan._refresh(np.zeros((4, 4), dtype=np.int8))
+    assert scan.reach == {(0, 0): 0b1001}
 
 
 def test_pool_created_once_spans_passes(monkeypatch):
@@ -493,8 +522,6 @@ def test_gies_gfci_transitive_parity(facade_name):
 
 import importlib.util  # noqa: E402
 import multiprocessing as mp  # noqa: E402
-
-from andrey.search import _parallel as par  # noqa: E402
 
 
 def test_forkserver_template_preloads_worker_modules():
@@ -589,3 +616,35 @@ def test_script_without_main_guard(tmp_path, d, guarded):
     assert last.startswith("RuntimeError: parallel-search workers failed to start"), last
     assert last.index('if __name__ == "__main__":') < last.index("out of memory"), last
     assert "ANDREY_NUM_WORKERS=1" in last, last
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_kept_reach_sets_match_a_fresh_traversal(seed):
+    """Every reach set kept across a change of successors equals the traversal on the new ones.
+
+    The graphs reach past 64 nodes. An entry none of whose nodes changed successors is always kept.
+    """
+    from andrey.core import _bitset
+
+    rng = np.random.default_rng(seed)
+    d = int(rng.integers(2, 150))
+    tails = rng.random((d, d)) < 2.0 / d
+    np.fill_diagonal(tails, False)
+    before = _bitset.row_masks(tails)
+    reach = {}
+    for _ in range(20):
+        start = int(rng.integers(0, d))
+        clique = _bitset.bitmask(v for v in range(d) if v != start and rng.random() < 0.1)
+        reach[(start, clique)] = _bitset.semidirected_reach_set(before, start, clique)
+    flips = rng.integers(0, d, size=(int(rng.integers(1, 6)), 2))
+    for u, v in flips.tolist():
+        if u != v:
+            tails[u, v] = not tails[u, v]
+    after = _bitset.row_masks(tails)
+    changed = _bitset.bitmask(u for u in range(d) if before[u] != after[u])
+    kept = pg._kept_reach(dict(reach), before, after)
+    for (start, clique), seen in kept.items():
+        assert seen == _bitset.semidirected_reach_set(after, start, clique), (seed, start)
+    for key, seen in reach.items():
+        if not seen & changed:
+            assert key in kept, (seed, key)

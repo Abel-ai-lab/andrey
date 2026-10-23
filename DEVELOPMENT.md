@@ -9,7 +9,7 @@ repository's conventions.
 
 - `src/andrey/`: the library and its public API.
 - `tests/`: correctness checks that run on every pull request.
-- `qa/`: the pre-release quality gate, baseline capture, and calibration.
+- `qa/`: the pre-release quality gate, the identity check, baseline capture, and calibration.
 - `benchmarks/`: comparisons with other packages and older Andrey builds.
 - `examples/`: the notebooks.
 - `apps/`: the interactive examples.
@@ -42,6 +42,12 @@ the command-line loop, reading a result (every edge type and its symbol), choosi
 line per method), the `ANDREY_*` variables, and the exit codes. `render_skill` builds it from the
 specs, so a new method or variable reaches it without an edit. To install it for an agent:
 `andrey --skill > ~/.claude/skills/andrey/SKILL.md`.
+
+An agent that has only run `pip install andrey-core` finds it from `help(andrey)`, whose docstring
+(`src/andrey/__init__.py`) holds a quick start and names `andrey --skill` and
+`andrey --help --json`, and from the PyPI summary (`pip show andrey-core`), which gives the import
+name. `tests/unit/test_cli.py` runs the quick start and every `andrey ...` command the docstring
+names.
 
 `tests/unit/test_spec_generate.py` checks that it lists every method and variable, opens with the
 front matter, and explains exactly the edge types a result can carry; `tests/unit/test_cli.py`
@@ -113,7 +119,9 @@ argument-taking methods; `ruff`'s `D` rules are off there, so
 Dispatch numeric kernels through `andrey.core.backend` (`docs/docs/configuration.md` gives the
 selection rules) and, for the greedy score-based searches, use the shared worker pool in
 `src/andrey/search/_parallel.py`. Keep the recovery tests passing and the outputs equal across
-Andrey's execution paths, and measure the speedup with a benchmark campaign.
+Andrey's execution paths, and measure the speedup with a benchmark campaign. `qa/identity.py`
+shows the change returns the same bits and makes no more queries: write its manifest on the base
+commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)).
 
 ### Change a parameter or default
 
@@ -218,10 +226,12 @@ On each dataset the method passes when its median SHD is below the empty graph's
 tolerance of the recorded baseline in either direction. The gate runs once per release, on the
 release pull request into `main`, which `main` requires to pass; the publish reuses that run when
 the tagged commit has the same tree and runs the gate itself otherwise.
-[`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. The gate also fails
-any published benchmark row where Andrey makes more errors than the reference package (from
-0.8.0, when the paired bootstrap 95% interval of the difference over at least 10 datasets lies
-above 0), unless `benchmarks/published/parity-allowlist.json` cites the cause
+[`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. Reference parity is a
+soft gate: the quality gate also flags any published benchmark row where Andrey makes more errors
+than the reference package (from 0.8.0, when the paired bootstrap 95% interval of the difference
+over at least 10 datasets lies above 0), unless `benchmarks/published/parity-allowlist.json` cites
+the cause, but does not fail on it. `uv run python -m qa.reference_parity` runs the same check
+offline and exits 1 on a flag; the release checklist reviews every flag
 ([reference parity](qa/README.md#reference-parity)).
 
 ### 5. Benchmark campaign

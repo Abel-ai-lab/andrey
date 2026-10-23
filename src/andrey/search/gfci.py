@@ -19,9 +19,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.constraint._skeleton import marginal_separated, separating_subsets
 from andrey.constraint.fci import (
     _adjacent,
-    _adjacent_nodes,
     _arrow_allowed,
     _circle_pag,
     _fast_adjacency_search,
@@ -30,6 +30,7 @@ from andrey.constraint.fci import (
     _knowledge_marks,
     _largest_size,
     _majority_sepsets,
+    _neighbor_lists,
     _remove_by_possible_dsep,
     _sepset,
     _test_in_rank_order,
@@ -37,7 +38,7 @@ from andrey.constraint.fci import (
     _validate_collider_rule,
     _validate_possible_dsep,
 )
-from andrey.core import ARROW, NULL, GraphStructure
+from andrey.core import ARROW, NULL, GraphStructure, backend
 from andrey.core.ci import CITest, make_indep_test
 from andrey.core.orient import from_structure
 from andrey.search.ges import ges
@@ -59,6 +60,7 @@ def gfci(
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
+    workers: int | None = None,
 ) -> GraphStructure:
     """Discover a PAG with GES adjacency and FCI orientation.
 
@@ -73,8 +75,12 @@ def gfci(
     or removes a required pair, and their endpoints are set before the orientation rules. GES never
     joins a pair they make non-adjacent, so its colliders over that pair come from the pattern, and
     its separating set from :func:`_derive_sepsets`, as for any pair GES leaves non-adjacent.
+    ``workers`` worker processes share the GES passes and the adjacency search's larger
+    conditioning-size passes, each above its own work threshold; ``None`` reads
+    ``andrey.config.num_workers``.
     """
     X = np.asarray(data, dtype=np.float64)
+    workers = backend.worker_count(workers)
 
     _validate_collider_rule(collider_rule)
     _validate_possible_dsep(possible_dsep)
@@ -84,13 +90,14 @@ def gfci(
         lambda_value=lambda_value,
         categorical=categorical,
         constraints=constraints,
+        workers=workers,
     )
     pattern = from_structure(cpdag_structure)
 
     test = make_indep_test(indep_test, X, categorical=categorical)
     keep = None if constraints is None else constraints.required | constraints.required.T
     support, sepsets = _fast_adjacency_search(
-        X, test, alpha, support=pattern != NULL, keep=keep, max_depth=max_depth
+        X, test, alpha, workers=workers, support=pattern != NULL, keep=keep, max_depth=max_depth
     )
     sepsets.update(
         _derive_sepsets(pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order)
@@ -139,9 +146,7 @@ def _orient_colliders_from_pattern(
     ``a`` and ``c`` is recorded and does not contain ``b``, and the triple is not ``ambiguous``. An
     already-directed tail at ``b`` blocks the orientation.
     """
-    n = marks.shape[0]
-    for b in range(n):
-        adj = _adjacent_nodes(marks, b)
+    for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
@@ -171,27 +176,35 @@ def _derive_sepsets(
 ) -> dict[tuple[int, int], tuple[int, ...]]:
     """Separating sets for every non-adjacent CPDAG pair, from the pooled two-endpoint adjacency.
 
-    For each non-adjacent ``(x, y)`` (``x < y``), searches subsets of ``adj(x) | adj(y) - {x, y}``,
-    of at most ``max_depth`` members when one is given, by increasing size and records, both ways,
-    the union of every subset of the first size that makes the pair independent, as the adjacency
-    search records its sets; a pair with no such subset gets no entry. The union does not depend on
-    the order of the tests. With ``in_column_order``, the first subset found in column order is
-    recorded instead. The
+    For each non-adjacent ``(x, y)`` (``x < y``, row-major), searches subsets of
+    ``adj(x) | adj(y) - {x, y}``, of at most ``max_depth`` members when one is given, by increasing
+    size and records, both ways, the union of every subset of the first size that makes the pair
+    independent, as the adjacency search records its sets; a pair with no such subset gets no
+    entry. The union does not depend on the order of the tests. With ``in_column_order``, the first
+    subset found in column order is recorded instead, and no subset after it is tested. The
     orientation rules that read a separating set use these for the pairs GES left non-adjacent.
+
+    A FisherZ or StudentT test answers the size-0 query of every pair in one canonical query array
+    (:func:`~andrey.constraint._skeleton.marginal_separated`) and evaluates each nonempty size's
+    subsets in chunks of them (:func:`~andrey.constraint._skeleton.separating_subsets`), with the
+    p-values of the scalar calls. Every query of another test, or of ``in_column_order``, is a
+    scalar call.
     """
-    n = cpdag.shape[0]
+    adjacent = cpdag != NULL
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
-    for x, y in combinations(range(n), 2):
-        if _adjacent(cpdag, x, y):
-            continue
-        pool = sorted((set(_adjacent_nodes(cpdag, x)) | set(_adjacent_nodes(cpdag, y))) - {x, y})
+    xs, ys = np.nonzero(np.triu(~adjacent, 1))
+    marginal = None if in_column_order else marginal_separated(test, xs, ys, alpha)
+    for k, (x, y) in enumerate(zip(xs.tolist(), ys.tolist())):
+        pool = [v for v in np.flatnonzero(adjacent[x] | adjacent[y]).tolist() if v != x and v != y]
         for size in range(_largest_size(len(pool), max_depth) + 1):
-            separating = (cond for cond in combinations(pool, size) if test(x, y, cond) > alpha)
+            subsets = combinations(pool, size)
             if in_column_order:
-                first = next(separating, None)
+                first = next((cond for cond in subsets if test(x, y, cond) > alpha), None)
                 found = [] if first is None else [first]
+            elif size == 0 and marginal is not None:
+                found = [()] if marginal[k] else []
             else:
-                found = list(separating)
+                found = separating_subsets(test, x, y, size, subsets, alpha)
             if found:
                 union = tuple(sorted(set().union(*found)))
                 sepsets[(x, y)] = union

@@ -64,6 +64,9 @@ and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each 
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
+`ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
+gives a node more than that many parents, and some graph reaches each node's count.
+
 ```{eval-rst}
 .. currentmodule:: andrey
 
@@ -210,6 +213,9 @@ mutual information estimate the test's p-value is built on, a dependence measure
 ```
 
 ## Graph structures
+
+`GraphStructure` also reads and writes pcalg's `amat`, with `from_pcalg` and `to_pcalg`;
+[Graph representation](guides/graph-representation.md) gives the conventions.
 
 ```{eval-rst}
 .. autosummary::
@@ -448,7 +454,7 @@ and `rc_params` return plain data and need no import.
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
-| `andrey calibrate` | Measured GES worker-pool cutoff for this machine, as a setting to export |
+| `andrey calibrate` | Measured GES and skeleton worker-pool cutoffs for this machine, as settings to export |
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 `--help` selects introspection and `--json` selects the representation: help reads no data or

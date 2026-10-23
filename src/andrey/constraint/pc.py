@@ -9,7 +9,6 @@ from collections import deque
 from collections.abc import Iterable, Mapping
 from contextlib import nullcontext
 from itertools import combinations, groupby
-from math import comb
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -18,8 +17,10 @@ from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
     Removal,
     adjacent_pairs,
-    first_order_separating,
+    canonical_capable,
+    first_order_removals,
     marginal_removals,
+    pair_queries,
     prescreen_capable,
     scan_pairs,
     separate_apart,
@@ -49,6 +50,7 @@ def pc(
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
+    workers: int | None = None,
     _trace: list[dict] | None = None,
 ) -> GraphStructure:
     """Discover a CPDAG from ``data`` with the PC algorithm and the ``indep_test`` CI test.
@@ -67,7 +69,9 @@ def pc(
     rule (:func:`~andrey.constraint._skeleton.unseparated_triples`). Edges they decide that close a
     directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`). ``in_column_order`` fires
     Meek's rules one at a time in column order instead of in order-free rounds
-    (:func:`~andrey.core.orient.meek`). Returns the CPDAG, or the MPDAG with ``constraints``, as a
+    (:func:`~andrey.core.orient.meek`). ``workers`` worker processes share the skeleton search's
+    larger conditioning-size passes (:func:`_discover_skeleton`); ``None`` reads
+    ``andrey.config.num_workers``. Returns the CPDAG, or the MPDAG with ``constraints``, as a
     ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
@@ -84,6 +88,7 @@ def pc(
         indep_test,
         categorical=categorical,
         record_pvalues=collider_order == "p_value",
+        workers=backend.worker_count(workers),
         warn_expensive=True,
         max_depth=max_depth,
         constraints=constraints,
@@ -332,9 +337,11 @@ def _discover_skeleton(
     When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
     the size-0 and size-1 passes take them (all-pairs marginal threshold, then one first-order
     batch per surviving pair) in place of the dense scalar scan -- same removals, same separating
-    sets, same p-values. With ``workers > 1`` the ``|S| >= 2`` scan fans out across
-    worker processes; the reduce is a plain union of per-chunk removals, so the result is identical
-    to the serial scan whatever the partition.
+    sets, same p-values. With ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass
+    of at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
+    ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
+    per-chunk removals are concatenated in pair order, so the result, a raised error included, is
+    identical to the serial scan whatever the partition.
 
     ``warn_expensive`` emits a :class:`~andrey.PerformanceWarning` before each conditioning-size
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
@@ -357,8 +364,7 @@ def _discover_skeleton(
     pvalues: dict[tuple[int, int], float] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    seedable = callable(getattr(test, "to_seed", None))
-    parallel = workers > 1 and seedable and _trace is None
+    parallel = workers > 1 and canonical_capable(test) and _trace is None
     pool = SkeletonWorkerPool(test, workers) if parallel else None
     try:
         size = 0
@@ -374,18 +380,18 @@ def _discover_skeleton(
                 for x, y, p in marginal_removals(test, upper, alpha, _trace, record_pvalues):
                     removals.append((x, y, (), p))
             elif can_prescreen and size == 1:
-                for x, y in adjacent_pairs(testable):
-                    candidates = sorted(
-                        (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
-                    )
-                    separating, p = first_order_separating(
-                        test, x, y, candidates, alpha, _trace, record_pvalues
-                    )
-                    if separating:
-                        removals.append((x, y, tuple(separating), p))
+                removals = first_order_removals(
+                    test, adjacent_pairs(testable), neighbors, alpha, _trace, record_pvalues
+                )
             else:
                 pairs = adjacent_pairs(testable)
-                if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbors, size):
+                # Each pair's test count, taken once: the warning and the pool's cutoff read it.
+                weights = (
+                    [pair_queries(neighbors, x, y, size) for x, y in pairs]
+                    if pool is not None or (warn_expensive and size >= 2)
+                    else []
+                )
+                if warn_expensive and size >= 2 and sum(weights) >= _EXPENSIVE_PASS_TESTS:
                     warn_once(
                         f"PC conditioning size {size} requires at least "
                         f"{_EXPENSIVE_PASS_TESTS:,} CI tests "
@@ -394,8 +400,15 @@ def _discover_skeleton(
                         "the full search remains enabled.",
                         PerformanceWarning,
                     )
-                if pool is not None:
-                    removals = pool.scan(pairs, adj != NULL, size, alpha, record_pvalues)
+                pooled = (
+                    None
+                    if pool is None
+                    else pool.scan(
+                        pairs, neighbors, adj != NULL, size, alpha, record_pvalues, weights
+                    )
+                )
+                if pooled is not None:
+                    removals = pooled
                 else:
                     # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
                     # match the (1-thread) parallel skeleton workers, where it has them, whatever
@@ -430,18 +443,3 @@ def _discover_skeleton(
             if p is not None:
                 pvalues[(x, y)] = p
     return adj, sepsets, pvalues
-
-
-def _expensive_pass(pairs: list[tuple[int, int]], neighbors: list[np.ndarray], size: int) -> bool:
-    """Whether the pass reaches the warning threshold, counting shared subsets once."""
-    tests = 0
-    for x, y in pairs:
-        shared = len(set(neighbors[x]) & set(neighbors[y]))
-        tests += (
-            comb(len(neighbors[x]) - 1, size)
-            + comb(len(neighbors[y]) - 1, size)
-            - comb(shared, size)
-        )
-        if tests >= _EXPENSIVE_PASS_TESTS:
-            return True
-    return False

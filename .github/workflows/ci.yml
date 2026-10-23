@@ -99,7 +99,9 @@ jobs:
         run: uv run --no-sync python -m pytest tests/recovery tests/metrics -q
       - name: Benchmark endpoint conversion
         # Needs only numpy; the rest of benchmarks/tests needs the harness environment.
-        run: uv run --no-sync python -m pytest benchmarks/tests/test_causal_learn_convert.py -q
+        run: >-
+          uv run --no-sync python -m pytest
+          benchmarks/tests/test_causal_learn_convert.py benchmarks/tests/test_pcalg_convert.py -q
 
   # 3.11 and 3.14 bracket the supported range
   build-install:

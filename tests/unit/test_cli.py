@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import io
 import json
+import re
+import shlex
+import textwrap
+import tomllib
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -79,6 +84,29 @@ def test_list_on_a_terminal_names_its_columns(capsys, monkeypatch):
 def test_root_skill(capsys):
     _, skill, _ = _run(["--skill"], capsys)
     assert "andrey run <method> --help --json" in skill and "andrey config" in skill
+
+
+def test_the_package_docstring_runs_and_names_real_commands(capsys):
+    # `help(andrey)` is the first page an agent reads: its quick start runs on a data matrix, and
+    # every `andrey ...` command it names runs.
+    doc = andrey.__doc__
+    quick_start = textwrap.dedent(re.search(r"::\n\n((?: {4}.*\n|\n)+)", doc)[1])
+    namespace = {"data": np.random.default_rng(0).standard_normal((200, 4))}
+    exec(compile(quick_start, "andrey.__doc__", "exec"), namespace)
+    assert namespace["out"].structure.n_nodes == 4
+    capsys.readouterr()
+    commands = re.findall(r"``andrey ([^`]+)``", doc)
+    assert {"--skill", "--help --json"} <= set(commands)
+    for command in commands:
+        code, out, _ = _run(shlex.split(command), capsys)
+        assert code == 0 and out
+
+
+def test_the_package_summary_gives_the_import_name():
+    # `pip show andrey-core` prints this summary; the import name differs from the package's.
+    root = Path(__file__).parents[2]
+    summary = tomllib.loads((root / "pyproject.toml").read_text())["project"]["description"]
+    assert re.search(r"(?<![\w-])andrey(?![\w-])", summary)
 
 
 def test_bare_invocation_prints_help(capsys):
@@ -843,6 +871,22 @@ def test_config_report_separates_preference_availability_and_raw_values(capsys, 
         report["environment"]["variables"], env_dict()["variables"], strict=True
     ):
         assert {k: v for k, v in actual.items() if k != "value"} == expected
+
+
+@pytest.mark.parametrize(
+    "args", [["config", "--json"], ["config", "--help", "--json"], ["--help", "--json"]]
+)
+def test_the_json_introspection_lists_the_skeleton_cutoff(args, capsys, monkeypatch):
+    """An agent reads the variable, its default, and the command that measures it, from the CLI."""
+    from andrey.constraint._parallel_skeleton import MIN_POOL_QUERIES
+
+    monkeypatch.delenv("ANDREY_SKELETON_PARALLEL_MIN_WORK", raising=False)
+    code, out, err = _run(args, capsys)
+    assert code == 0 and not err
+    variables = {v["name"]: v for v in json.loads(out)["environment"]["variables"]}
+    skeleton = variables["ANDREY_SKELETON_PARALLEL_MIN_WORK"]
+    assert skeleton["default"] == str(MIN_POOL_QUERIES)
+    assert "andrey calibrate --method skeleton" in skeleton["effect"]
 
 
 def test_config_report_is_readable_when_piped(capsys, monkeypatch):

@@ -601,11 +601,14 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
     :func:`pdag2dag`, which raises. The input is not validated.
     """
     n = pdag.shape[0]
+    flipped = np.ascontiguousarray(pdag.T)  # one transposed copy keeps every mask below contiguous
     tail = pdag == TAIL
-    directed = tail & (pdag == ARROW).T  # (i, j): i -> j
-    lines = tail & tail.T
+    flipped_tail = flipped == TAIL
+    directed = tail & (flipped == ARROW)  # (i, j): i -> j
+    incoming = flipped_tail & (pdag == ARROW)  # (i, j): j -> i
+    lines = tail & flipped_tail
     children = row_masks(directed)
-    parents = row_masks(directed.T)
+    parents = row_masks(incoming)
     undirected = row_masks(lines)
     adjacent = row_masks(pdag != NULL)
     active = (1 << n) - 1
@@ -622,7 +625,7 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
             rest ^= low
         return True
 
-    ready = [x for x in range(n) if removable(x)]
+    ready = [x for x in range(n) if not children[x] and (not undirected[x] or removable(x))]
     queued = 0
     for x in ready:
         queued |= 1 << x
@@ -631,8 +634,11 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
         x = heapq.heappop(ready)
         active &= ~(1 << x)
         removed.append(x)
+        rest = adjacent[x] & active
+        if not rest:
+            continue
         parents[x] |= undirected[x] & active  # each remaining undirected edge points into x
-        rest = adjacent[x] & active & ~queued
+        rest &= ~queued
         while rest:
             low = rest & -rest
             v = low.bit_length() - 1
@@ -659,7 +665,7 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
         pa = parents[y]
         if not pa:
             continue
-        x = max(nodes(pa), key=pos.__getitem__)
+        x = max(nodes(pa), key=pos.__getitem__) if pa & (pa - 1) else pa.bit_length() - 1
         into_x = compelled[x]
         rest = compelled[y] = pa if into_x & ~pa or pa & ~parents[x] & ~(1 << x) else into_x
         while rest:
@@ -667,10 +673,145 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
             heads.append(y)
             tails.append(low.bit_length() - 1)
             rest ^= low
-    out = np.zeros((n, n), dtype=np.int8)
-    out[directed | directed.T | lines] = TAIL
+    out = (directed | incoming | lines).astype(np.int8) * np.int8(TAIL)
     out[heads, tails] = ARROW
     return out
+
+
+class _Masks:
+    """Bitmasks of the nodes of a PDAG asked for: adjacent nodes, parents, children, and
+    undirected neighbors, read from the matrix a batch at a time."""
+
+    def __init__(self, pdag: np.ndarray) -> None:
+        self.pdag = pdag
+        self.adjacent: dict[int, int] = {}
+        self.parents: dict[int, int] = {}
+        self.children: dict[int, int] = {}
+        self.lines: dict[int, int] = {}
+
+    def load(self, wanted: Iterable[int]) -> None:
+        """Read the masks of the nodes in ``wanted`` that are not loaded."""
+        new = [v for v in set(wanted) if v not in self.adjacent]
+        if not new:
+            return
+        rows = self.pdag[new]
+        columns = np.ascontiguousarray(self.pdag[:, new].T)
+        self.adjacent.update(zip(new, row_masks(rows != NULL)))
+        self.parents.update(zip(new, row_masks(rows == ARROW)))
+        self.children.update(zip(new, row_masks(columns == ARROW)))
+        self.lines.update(zip(new, row_masks((rows == TAIL) & (columns == TAIL))))
+
+
+def _cpdag_of_pdag_near(pdag: np.ndarray, seeds: Iterable[int], limit: int) -> np.ndarray | None:
+    """``_cpdag_of_pdag(pdag)`` for a CPDAG changed by one valid move, rewritten in place.
+
+    A CPDAG is the skeleton with its unshielded colliders oriented, closed under Meek's rules
+    R1-R3. A move changes the skeleton and the colliders only at ``seeds``: the ends of the edges
+    it adds, removes, or orients, and the children shared by the two ends of an edge it adds or
+    removes. A rule concludes an edge at an end of the edge it reads, so the region the move can
+    reach holds the seeds and, from each node in it, the other end of every undirected edge and
+    of every out-edge that is not an arm of an unshielded collider; an arm stays oriented, so it
+    passes the region on only to a node it shares a neighbor with. An edge with no end in the
+    region keeps its marks. The edges with an end in the region are made undirected, oriented
+    where they are arms of unshielded colliders of ``pdag``, and oriented by the rules until none
+    applies; the rules read these edges and their neighbors' masks only.
+
+    Returns ``pdag``, or ``None``, leaving ``pdag`` as it was, when the region has more than
+    ``limit`` nodes.
+    """
+    masks = _Masks(pdag)
+    adjacent, parents, children, lines = masks.adjacent, masks.parents, masks.children, masks.lines
+    region = set(seeds)
+    if len(region) > limit:
+        return None
+    masks.load(region)
+    frontier = list(region)
+    while frontier:
+        masks.load({v for u in frontier for v in nodes(children[u] | lines[u])})
+        joined = []
+        for u in frontier:
+            near_u = adjacent[u]
+            for v in nodes(children[u] | lines[u]):
+                if v not in region and (
+                    (lines[u] >> v) & 1
+                    or not parents[v] & ~near_u & ~(1 << u)
+                    or near_u & adjacent[v]
+                ):
+                    region.add(v)
+                    joined.append(v)
+        if len(region) > limit:
+            return None
+        frontier = joined
+    inside = sorted(region)
+    inner = 0
+    touching = 0
+    for v in inside:
+        inner |= 1 << v
+        touching |= adjacent[v]
+    members = nodes(inner | touching)
+    masks.load(members)
+
+    # The arms of unshielded colliders on the edges that touch the region.
+    arms = []
+    for v in members:
+        into = parents[v] if (inner >> v) & 1 else parents[v] & inner
+        for u in nodes(into):
+            if parents[v] & ~adjacent[u] & ~(1 << u):
+                arms.append((u, v))
+
+    # Every edge that touches the region becomes undirected, except the arms.
+    pa: dict[int, int] = {}
+    ch: dict[int, int] = {}
+    ln: dict[int, int] = {}
+    for v in members:
+        if (inner >> v) & 1:
+            pa[v], ch[v], ln[v] = 0, 0, adjacent[v]
+        else:
+            near = adjacent[v] & inner
+            pa[v], ch[v], ln[v] = parents[v] & ~near, children[v] & ~near, lines[v] | near
+    for u, v in arms:
+        pa[v] |= 1 << u
+        ch[u] |= 1 << v
+        ln[u] &= ~(1 << v)
+        ln[v] &= ~(1 << u)
+
+    def forced(a: int, b: int) -> bool:
+        """Whether R1, R2, or R3 orients the undirected edge ``a - b`` as ``a -> b``."""
+        if pa[a] & ~adjacent[b] & ~(1 << b) or ch[a] & pa[b]:
+            return True
+        both = ln[a] & pa[b]
+        while both:
+            low = both & -both
+            if both & ~adjacent[low.bit_length() - 1] & ~low:
+                return True
+            both ^= low
+        return False
+
+    oriented = True
+    while oriented:
+        oriented = False
+        for a in inside:
+            for b in nodes(ln[a]):
+                if forced(a, b):
+                    tail, head = a, b
+                elif forced(b, a):
+                    tail, head = b, a
+                else:
+                    continue
+                ch[tail] |= 1 << head
+                pa[head] |= 1 << tail
+                ln[tail] &= ~(1 << head)
+                ln[head] &= ~(1 << tail)
+                oriented = True
+    for a in inside:
+        for b in nodes(adjacent[a]):
+            if (ch[a] >> b) & 1:
+                pdag[a, b], pdag[b, a] = TAIL, ARROW
+            elif (pa[a] >> b) & 1:
+                pdag[a, b], pdag[b, a] = ARROW, TAIL
+            else:
+                pdag[a, b], pdag[b, a] = TAIL, TAIL
+    return pdag
 
 
 # ---- collider orientation -----------------------------------------------------------------------

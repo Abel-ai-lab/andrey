@@ -109,8 +109,8 @@ def solutions(alpha: float) -> list:
     between GES and XGES.
     """
     return [
-        *andrey_ges_adapters(),
-        *andrey_ges_adapters(lambda_value=HEAVY_LAMBDA, suffix=".heavy"),
+        *andrey_ges_adapters(parent_rule="gate"),
+        *andrey_ges_adapters(lambda_value=HEAVY_LAMBDA, suffix=".heavy", parent_rule="gate"),
         CausalLearnGES(),
         xges_adapter(alpha=alpha),
         xges_adapter(alpha=SHIPPED_ALPHA, name="xges.ges.shipped"),

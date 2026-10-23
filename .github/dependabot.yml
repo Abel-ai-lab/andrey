@@ -1,9 +1,12 @@
 # Monthly, grouped updates: one pull request for the workflow actions (their pins move with it) and
-# one for the Python dependencies in uv.lock.
+# one for the Python dependencies in uv.lock. Version updates target the active release branch,
+# where work merges; each release moves `target-branch` to the next one. Security updates always
+# target the default branch and are ported by hand.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    target-branch: release/0.10.0
     schedule:
       interval: monthly
     groups:
@@ -11,6 +14,7 @@ updates:
         patterns: ["*"]
   - package-ecosystem: uv
     directory: /
+    target-branch: release/0.10.0
     schedule:
       interval: monthly
     groups:

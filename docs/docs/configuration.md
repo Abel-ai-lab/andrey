@@ -37,19 +37,32 @@ setting wins:
 - `ANDREY_DEVICE`: another name for `ANDREY_BACKEND`; if you set both, `ANDREY_BACKEND` takes
   precedence, but both values must be valid.
 
-A GPU speeds up covariance, correlation, entropy, and the KCI and CMIknn tests. GES, hill climbing,
-and the other searches run on the CPU. An operation without the requested backend uses `auto`,
-without a warning.
+A GPU speeds up covariance, correlation, entropy, the KCI and CMIknn tests, and the independence
+tests of `pnl`. GES, hill climbing, and the other searches run on the CPU. An operation without the
+requested backend uses `auto`, without a warning.
 
 ## Parallel search
 
 - `ANDREY_NUM_WORKERS`: the worker processes for GES and GFCI, and the worker threads for the
-  per-variable regressions of `granger`. `1` (the default) and `0` run serially; `-1` uses every
-  usable core.
+  per-variable regressions of `granger` and the two directions of `pnl`. PC, FCI, GFCI, and CD-NOD
+  also use the worker processes for their skeleton search with the `fisherz` and `student_t` tests,
+  and send a conditioning-set size to them only when it has enough tests to repay them. `1` (the
+  default) and `0` run serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS
+  threads unlimited and with several limits each thread to one, so on a machine with several cores
+  its p-values and statistics can differ in the last digits between one worker and several. Each
+  `pnl` thread holds three n x n float64 matrices; when the threads you ask for would hold more than
+  4 GiB, fewer run, with a `PerformanceWarning`.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
+- `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
+  GFCI, and CD-NOD uses the workers only when it holds at least this many conditional-independence
+  tests. The default is `500000`, measured on an AMD EPYC 9534 server running Linux; `0` always uses
+  them.
 
-The cutoff matters only with more than one worker. `andrey calibrate` measures it for your machine.
+The cutoffs matter only with more than one worker. `andrey calibrate` measures both for your
+machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
+alone. With more than one worker and a default cutoff, a fit warns once when a pass reaches a tenth
+of it; setting the variable, to any value, silences the warning.
 
 ## GPU dispatch
 
@@ -63,6 +76,9 @@ The cutoff matters only with more than one worker. `andrey calibrate` measures i
 - `ANDREY_CMIKNN_GPU_THRESHOLD`: the same for a CMIknn query, from this many distance-matrix
   elements (rows squared). The default is `1024`, 32 rows. Its p-values on `cuda` equal those on
   the CPU.
+- `ANDREY_PNL_GPU_THRESHOLD`: the same for the independence tests of `pnl`, in float64, from this
+  many kernel-matrix elements (rows squared). The default is `26278`, about 163 rows. A single pair
+  uses the GPU only when it is already running, by the rule below.
 - `ANDREY_GPU_CALIBRATE`: when on, the first `auto` use of covariance, correlation, or entropy
   measures where `cuda` starts to beat NumPy on this machine, and keeps the result in
   `$XDG_CACHE_HOME/andrey/gpu_calibration.json`, else `~/.cache/andrey/gpu_calibration.json`. Off
