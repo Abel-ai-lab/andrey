@@ -248,6 +248,8 @@ class TetradBOSS(_TetradSearch):
         "useBes": False,
         "numStarts": 1,
         "useDataOrder": True,
+        "resetAfterBM": False,
+        "resetAfterRS": True,
     }
 
     def settings(self, params: Mapping[str, Any]) -> dict[str, Any]:

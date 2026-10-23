@@ -29,8 +29,9 @@ import java.util.Set;
  * Runs Tetrad's PC, FGES, BOSS, GRaSP, and FCI on a CSV of continuous columns named x0..x{d-1}.
  *
  * <p>The file runs from source against tetrad-lib's shaded jar, with no build step. Every search
- * calls Tetrad's own class directly and takes every setting from its arguments, none from a
- * default:
+ * calls Tetrad's own class directly and takes the settings below from its arguments; any other
+ * setting stays at Tetrad's default, which is no background knowledge, no time lag, and no
+ * max-P collider rule:
  *
  * <pre>
  * java --class-path tetrad-lib-shaded.jar TetradContinuousDriver.java search ALGORITHM DATA.csv
@@ -50,7 +51,7 @@ import java.util.Set;
  * fges   penaltyDiscount structurePrior ruleType precomputeCovariances maxDegree numThreads
  *        symmetricFirstStep faithfulnessAssumed
  * boss   penaltyDiscount structurePrior ruleType precomputeCovariances useBes numStarts
- *        numThreads useDataOrder seed
+ *        numThreads useDataOrder resetAfterBM resetAfterRS seed
  * grasp  penaltyDiscount structurePrior ruleType precomputeCovariances depth uncoveredDepth
  *        nonSingularDepth ordered useScore useRaskuttiUhler useDataOrder allowInternalRandomness
  *        numStarts seed
@@ -166,6 +167,8 @@ public class TetradContinuousDriver {
                 boss.setNumStarts(s.integer("numStarts"));
                 boss.setNumThreads(s.integer("numThreads"));
                 boss.setUseDataOrder(s.bool("useDataOrder"));
+                boss.setResetAfterBM(s.bool("resetAfterBM"));
+                boss.setResetAfterRS(s.bool("resetAfterRS"));
                 boss.setVerbose(false);
                 PermutationSearch search = new PermutationSearch(boss);
                 search.setSeed(s.integer("seed"));

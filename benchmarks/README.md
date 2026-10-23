@@ -476,11 +476,12 @@ empty graph with no structure prior; FGES keeps `faithfulnessAssumed false` and
 `symmetricFirstStep false`, and Andrey's GES runs with `max_parents=None`, which leaves a node's
 parent count at its default of `d / 2`, a bound no node of a mean-degree-2 graph reaches. BOSS and
 GRaSP run one start from the data's column order (`useDataOrder true`, `numStarts 1`), which a
-dataset draws from its seed, and BOSS without the BES step (`useBes false`). They run at the penalty
-the BOSS and GRaSP lane runs, `lambda_value=4`, so their Andrey rows are that lane's. FCI runs
-order-independent with possible-d-separation, the complete rule set R1-R10 (`completeRuleSetUsed`),
-and no cap on conditioning sets or discriminating paths; selection bias is not excluded
-(`excludeSelectionBias false`), so R5-R7 run as in Andrey. `guaranteePag` is off.
+dataset draws from its seed. BOSS runs without the BES step (`useBes false`) and with Tetrad's two
+reset settings (`resetAfterBM false`, `resetAfterRS true`), which Andrey's BOSS has no counterpart
+for. Both run at the penalty the BOSS and GRaSP lane runs, `lambda_value=4`, so their Andrey rows
+are that lane's. FCI runs order-independent with possible-d-separation, the complete rule set R1-R10
+(`completeRuleSetUsed`), and no cap on conditioning sets or discriminating paths; selection bias is
+not excluded (`excludeSelectionBias false`), so R5-R7 run as in Andrey. `guaranteePag` is off.
 
 Tetrad's Fisher z p-values and BIC scores equal Andrey's, which
 `tests/test_adapters_tetrad_search.py` checks query by query, and the two skeleton searches of PC
