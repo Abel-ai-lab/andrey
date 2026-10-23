@@ -1,13 +1,15 @@
-"""Graph conversions: a CPDAG's DAG extension, a DAG's MAG and PAG, and DOT text.
+"""Graph conversions and the ``mag`` kind: a CPDAG's DAG extension, a DAG's MAG and PAG, DOT text.
 
 Fixed cases are small graphs whose answer is derived by hand. The properties hold on every input:
 an extension lies in the CPDAG's equivalence class; a MAG is ancestral and maximal, carries the
 ancestor marks, and has the DAG's independence model over the observed nodes; a PAG equals what
-FCI returns with a d-separation test on the same DAG; DOT text parses back to the same marks.
+FCI returns with a d-separation test on the same DAG; DOT text parses back to the same marks. A
+``mag`` holds no circle, scores as a PAG with the same marks, and survives every exchange format.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from itertools import combinations
 
@@ -17,10 +19,13 @@ import pytest
 
 import andrey
 from andrey import GraphStructure
+from andrey.cli import graph_view
 from andrey.core import ci
 from andrey.core.structure import ARROW, CIRCLE, LATENT, NULL, TAIL
-from andrey.graph import to_dag, to_mag, to_pag
-from andrey.metrics import markov_equivalent, to_cpdag
+from andrey.metrics import markov_equivalent, score, shd, to_cpdag
+from andrey.spec.generate import to_json_schema
+from andrey.spec.models import OutputSpec
+from andrey.spec.registry import REGISTRY
 
 _, T, A, C = NULL, TAIL, ARROW, CIRCLE
 
@@ -67,14 +72,14 @@ def _in_class(dag: GraphStructure, cpdag: GraphStructure) -> bool:
 
 def test_to_dag_refuses_to_choose_by_default():
     with pytest.raises(ValueError) as raised:
-        to_dag(_chain())
+        _chain().to_dag()
     assert "a -- b" in str(raised.value) and "b -- c" in str(raised.value)
 
 
 def test_to_dag_returns_the_unique_dag_without_a_choice():
     dag = _dag([(0, 2), (1, 2)], 3)  # a -> c <- b: its CPDAG has no undirected edge
-    assert to_dag(to_cpdag(dag)) == dag
-    assert to_dag(andrey.StructureOutput.new(dag)) == dag
+    assert to_cpdag(dag).to_dag() == dag
+    assert andrey.StructureOutput.new(dag).structure.to_dag() == dag
 
 
 def test_to_dag_keeps_each_directed_edge():
@@ -82,7 +87,7 @@ def test_to_dag_keeps_each_directed_edge():
     a, b, c, d, e = range(5)
     marks = _dag([(a, b), (c, b), (b, d)], 5).to_numpy()
     marks[d, e] = marks[e, d] = TAIL
-    dag = to_dag(GraphStructure.from_numpy(marks, kind="cpdag"), tie_break="label")
+    dag = GraphStructure.from_numpy(marks, kind="cpdag").to_dag(tie_break="label")
     directed = (marks == TAIL) & (marks.T == ARROW)
     assert np.array_equal(dag.to_numpy()[directed], marks[directed])
     assert markov_equivalent(dag, GraphStructure.from_numpy(marks, kind="cpdag"))
@@ -91,35 +96,35 @@ def test_to_dag_keeps_each_directed_edge():
 @pytest.mark.parametrize("seed", range(10))
 def test_to_dag_lands_in_the_equivalence_class(seed):
     cpdag = _labeled_cpdag(seed)
-    assert _in_class(to_dag(cpdag, tie_break="label"), cpdag)
+    assert _in_class(cpdag.to_dag(tie_break="label"), cpdag)
     for draw in range(3):
-        assert _in_class(to_dag(cpdag, seed=draw), cpdag)
+        assert _in_class(cpdag.to_dag(seed=draw), cpdag)
 
 
 @pytest.mark.parametrize("seed", range(4))
 def test_label_tie_break_ignores_the_column_order(seed):
     cpdag = _labeled_cpdag(seed)
-    want = sorted(to_dag(cpdag, tie_break="label").oriented_edges())
+    want = sorted(cpdag.to_dag(tie_break="label").oriented_edges())
     rng = np.random.default_rng(seed)
     for _ in range(5):
         order = rng.permutation(cpdag.n_nodes)
         marks = cpdag.to_numpy()[np.ix_(order, order)]
         labels = tuple(cpdag.labels[k] for k in order)
         shuffled = GraphStructure.from_numpy(marks, kind="cpdag", labels=labels)
-        assert sorted(to_dag(shuffled, tie_break="label").oriented_edges()) == want
+        assert sorted(shuffled.to_dag(tie_break="label").oriented_edges()) == want
 
 
 def test_a_seed_repeats_its_dag_and_seeds_reach_several():
     cpdag = _chain()
-    assert to_dag(cpdag, seed=3) == to_dag(cpdag, seed=3)
-    dags = {tuple(to_dag(cpdag, seed=seed).oriented_edges()) for seed in range(20)}
+    assert cpdag.to_dag(seed=3) == cpdag.to_dag(seed=3)
+    dags = {tuple(cpdag.to_dag(seed=seed).oriented_edges()) for seed in range(20)}
     assert len(dags) == 3  # every DAG of the chain's class: a <- b <- c, a -> b -> c, a <- b -> c
 
 
 @pytest.mark.parametrize("options", [{"tie_break": "label", "seed": 0}, {"tie_break": "random"}])
 def test_to_dag_rejects_bad_options(options):
     with pytest.raises(ValueError):
-        to_dag(_chain(), **options)
+        _chain().to_dag(**options)
 
 
 @pytest.mark.parametrize("options", [{}, {"tie_break": "label"}])
@@ -129,12 +134,12 @@ def test_to_dag_raises_without_an_extension(options):
     for i in range(4):
         marks[i, (i + 1) % 4] = marks[(i + 1) % 4, i] = TAIL
     with pytest.raises(ValueError, match="no consistent DAG extension"):
-        to_dag(GraphStructure.from_numpy(marks, kind="cpdag"), **options)
+        GraphStructure.from_numpy(marks, kind="cpdag").to_dag(**options)
 
 
 def test_to_dag_rejects_a_pag():
     with pytest.raises(ValueError):
-        to_dag(GraphStructure.from_numpy(np.array([[0, 3], [3, 0]]), kind="pag"))
+        GraphStructure.from_numpy(np.array([[0, 3], [3, 0]]), kind="pag").to_dag()
 
 
 # ---- to_mag -------------------------------------------------------------------------------------
@@ -154,18 +159,18 @@ def test_to_dag_rejects_a_pag():
     ],
 )
 def test_to_mag_fixed_cases(edges, n, latent, selection, want):
-    mag = to_mag(_dag(edges, n), latent=latent, selection=selection)
-    assert mag.kind == "pag"
+    mag = _dag(edges, n).to_mag(latent=latent, selection=selection)
+    assert mag.kind == "mag"
     np.testing.assert_array_equal(mag.to_numpy(), np.array(want, dtype=np.int8))
 
 
 def test_to_mag_reads_latents_from_node_types_and_keeps_labels():
     types = np.array([0, 0, 1, 0], dtype=np.int8)  # c is hidden
     dag = _dag([(2, 0), (2, 1), (1, 3)], 4, labels=("a", "b", "c", "d"), node_types=types)
-    mag = to_mag(dag)
+    mag = dag.to_mag()
     assert mag.labels == ("a", "b", "d")
     assert sorted(mag.oriented_edges()) == [("a", "b", "bidirected"), ("b", "d", "directed")]
-    assert to_mag(dag, latent=[]).n_nodes == 4  # an explicit latent replaces node_types
+    assert dag.to_mag(latent=[]).n_nodes == 4  # an explicit latent replaces node_types
 
 
 def _canonical(marks: np.ndarray) -> tuple[nx.DiGraph, set[int]]:
@@ -226,7 +231,7 @@ CASES = {**FIXED_CASES, **{f"random {seed}": _latent_case(seed) for seed in rang
 @pytest.mark.parametrize("name", CASES)
 def test_mag_is_ancestral_maximal_and_keeps_the_independences(name):
     edges, n, latent, selection = CASES[name]
-    mag = to_mag(_dag(edges, n), latent=latent, selection=selection).to_numpy()
+    mag = _dag(edges, n).to_mag(latent=latent, selection=selection).to_numpy()
     full = nx.DiGraph(edges)
     full.add_nodes_from(range(n))
     observed = [k for k in range(n) if k not in latent and k not in selection]
@@ -278,15 +283,15 @@ def test_pag_of_a_hidden_confounder():
     edges, n, latent, _selection = FIXED_CASES["confounder"]
     dag, hidden = _dag(edges, n), latent[0]
     want = np.array([[_, C, _, _], [A, _, A, _], [_, A, _, A], [_, _, C, _]], dtype=np.int8)
-    np.testing.assert_array_equal(to_pag(dag, latent=[hidden]).to_numpy(), want)
-    np.testing.assert_array_equal(to_pag(to_mag(dag, latent=[hidden])).to_numpy(), want)
+    np.testing.assert_array_equal(dag.to_pag(latent=[hidden]).to_numpy(), want)
+    np.testing.assert_array_equal(dag.to_mag(latent=[hidden]).to_pag().to_numpy(), want)
 
 
 def test_pag_of_a_selected_cycle_has_only_tails():
     # Each edge of the chordless cycle a - b - c - d - a has a selected common child; R5 turns the
     # uncovered circle cycle into tails.
     edges, n, _latent, selection = FIXED_CASES["selected cycle"]
-    pag = to_pag(_dag(edges, n), selection=selection).to_numpy()
+    pag = _dag(edges, n).to_pag(selection=selection).to_numpy()
     want = np.zeros((4, 4), dtype=np.int8)
     for i in range(4):
         want[i, (i + 1) % 4] = want[(i + 1) % 4, i] = TAIL
@@ -318,12 +323,12 @@ def _oracle_fci(edges, n, latent, selection, monkeypatch) -> np.ndarray:
 def test_pag_equals_fci_with_a_dsep_test(name, monkeypatch):
     edges, n, latent, selection = CASES[name]
     dag = _dag(edges, n)
-    pag = to_pag(dag, latent=latent, selection=selection)
+    pag = dag.to_pag(latent=latent, selection=selection)
     np.testing.assert_array_equal(
         pag.to_numpy(), _oracle_fci(edges, n, latent, selection, monkeypatch)
     )
-    mag = to_mag(dag, latent=latent, selection=selection)
-    assert to_pag(mag) == pag  # through the canonical DAG of the MAG
+    mag = dag.to_mag(latent=latent, selection=selection)
+    assert mag.to_pag() == pag  # through the canonical DAG of the MAG
     resolved = (pag.to_numpy() != CIRCLE) & (pag.to_numpy() != NULL)
     assert np.array_equal(pag.to_numpy()[resolved], mag.to_numpy()[resolved])
 
@@ -333,9 +338,9 @@ def test_pag_cases_reach_every_edge_type():
     for edges, n, latent, selection in CASES.values():
         kinds |= {
             t
-            for _, _, t in to_pag(
-                _dag(edges, n), latent=latent, selection=selection
-            ).oriented_edges()
+            for _, _, t in _dag(edges, n)
+            .to_pag(latent=latent, selection=selection)
+            .oriented_edges()
         }
     assert kinds >= {"directed", "bidirected", "undirected", "partially_directed", "circle"}
 
@@ -344,26 +349,27 @@ def test_pag_matches_marginal_on_latent_truths():
     for seed in range(4):
         ds = andrey.data.sample_scm(d=12, n=16, seed=seed, density=3.0, latents=2)
         assert np.array_equal(
-            to_pag(ds.graph).to_numpy(), andrey.data.latent.marginal(ds.graph, "pag").to_numpy()
+            ds.graph.to_pag().to_numpy(), andrey.data.latent.marginal(ds.graph, "pag").to_numpy()
         )
         assert (ds.graph.node_types == LATENT).sum() == 2
 
 
 @pytest.mark.parametrize(
-    "marks",
+    ("marks", "kind"),
     [
         # a -> b -> c with a <-> c: a is an ancestor of c, so not ancestral.
-        [[_, T, A], [A, _, T], [A, A, _]],
+        ([[_, T, A], [A, _, T], [A, A, _]], "mag"),
+        ([[_, T, A], [A, _, T], [A, A, _]], "pag"),
         # a <-> b <-> c <-> d with c -> a and b -> d: an inducing path joins a and d, so not
         # maximal.
-        [[_, A, A, _], [A, _, A, T], [T, A, _, A], [_, A, A, _]],
+        ([[_, A, A, _], [A, _, A, T], [T, A, _, A], [_, A, A, _]], "mag"),
         # a circle: a PAG, not a MAG.
-        [[_, C], [A, _]],
+        ([[_, C], [A, _]], "pag"),
     ],
 )
-def test_to_pag_rejects_a_graph_that_is_not_a_mag(marks):
+def test_to_pag_rejects_a_graph_that_is_not_a_mag(marks, kind):
     with pytest.raises(ValueError, match="not a MAG"):
-        to_pag(GraphStructure.from_numpy(np.array(marks), kind="pag"))
+        GraphStructure.from_numpy(np.array(marks), kind=kind).to_pag()
 
 
 @pytest.mark.parametrize(
@@ -380,14 +386,14 @@ def test_to_pag_rejects_a_graph_that_is_not_a_mag(marks):
 def test_node_arguments_fail_fast(latent, selection, error):
     dag = _dag([(0, 1), (1, 2)], 3, labels=("a", "b", "c"))
     with pytest.raises(error):
-        to_mag(dag, latent=latent, selection=selection)
+        dag.to_mag(latent=latent, selection=selection)
 
 
 def test_a_directed_cycle_is_rejected():
     marks = _dag([(0, 1), (1, 2)], 3).to_numpy()
     marks[2, 0], marks[0, 2] = TAIL, ARROW  # 2 -> 0 closes a cycle
     with pytest.raises(ValueError, match="cycle"):
-        to_pag(GraphStructure.from_numpy(marks, kind="dag"))
+        GraphStructure.from_numpy(marks, kind="dag").to_pag()
 
 
 # ---- to_dot -------------------------------------------------------------------------------------
@@ -450,3 +456,69 @@ def test_to_dot_round_trips_every_mark(graph):
     want = list(graph.labels) if graph.labels else [str(k) for k in range(graph.n_nodes)]
     assert names == want
     np.testing.assert_array_equal(marks, graph.to_numpy())
+
+
+# ---- the mag kind -------------------------------------------------------------------------------
+
+
+def _hidden_cause_mag() -> GraphStructure:
+    # a -> b <- L -> c <- d, b -> e with L hidden: a -> b <-> c <- d, b -> e.
+    dag = _dag([(0, 1), (5, 1), (5, 2), (3, 2), (1, 4)], 6, labels=tuple("abcdeL"))
+    return dag.to_mag(latent=["L"])
+
+
+def test_marginal_and_to_mag_return_a_mag():
+    mag = _hidden_cause_mag()
+    assert mag.kind == "mag" and ("b", "c", "bidirected") in mag.oriented_edges()
+    ds = andrey.data.sample_scm(d=12, n=16, seed=0, density=3.0, latents=2)
+    assert andrey.data.latent.marginal(ds.graph, "mag").kind == "mag"
+
+
+def test_a_mag_holds_no_circle():
+    with pytest.raises(ValueError, match="CIRCLE"):
+        GraphStructure.from_numpy(np.array([[0, 3], [2, 0]]), kind="mag").validate()
+
+
+def test_a_mag_scores_as_a_pag_with_the_same_marks():
+    truth = _hidden_cause_mag()
+    marks = truth.to_numpy()
+    marks[0, 1] = ARROW  # a <-> b instead of a -> b
+    marks[3, 2] = marks[2, 3] = NULL  # drop c <- d
+    estimate = GraphStructure.from_numpy(marks, kind="mag")
+    as_pag = GraphStructure.from_numpy(marks, kind="pag")
+    truth_pag = GraphStructure.from_numpy(truth.to_numpy(), kind="pag")
+    scores = score(estimate, truth)
+    assert scores == score(as_pag, truth_pag) == score(estimate, truth_pag)
+    assert scores["family"] == "pag" and scores["shd_endpoint"] > 0
+    assert shd(estimate, truth, endpoint_aware=True) == shd(as_pag, truth_pag, endpoint_aware=True)
+    digraph = GraphStructure.from_numpy(truth.to_numpy() * 0, kind="digraph")
+    with pytest.raises(ValueError, match="digraph"):
+        score(digraph, truth)
+
+
+def test_a_mag_round_trips_through_pcalg_networkx_and_saved_results(tmp_path):
+    mag = _hidden_cause_mag()
+    amat = mag.to_pcalg()
+    assert set(np.unique(amat)) <= {0, 2, 3}  # amat.pag codes, no circle
+    assert GraphStructure.from_pcalg(amat, "mag", labels=mag.labels) == mag
+    with pytest.raises(ValueError, match="CIRCLE"):
+        GraphStructure.from_pcalg(np.array([[0, 1], [2, 0]]), "mag")
+    assert GraphStructure.from_networkx(mag.to_networkx(), kind="mag") == mag
+    out = andrey.StructureOutput.new(mag)
+    for fmt in ("json", "npz"):
+        path = tmp_path / f"mag.{fmt}"
+        out.save(path, fmt=fmt)
+        assert andrey.StructureOutput.load(path).structure == mag
+
+
+def test_the_command_line_view_names_the_mag_kind():
+    view = graph_view(_hidden_cause_mag())
+    assert view["kind"] == "mag"
+    assert view["edge_types"] == {"directed": 3, "bidirected": 1}
+
+
+def test_the_method_schema_carries_the_mag_kind():
+    output = OutputSpec(structure_type="graph", graph_kind="mag")
+    spec = REGISTRY["fci"].model_copy(update={"output": output})
+    schema = json.loads(json.dumps(to_json_schema(spec)))
+    assert schema["output"]["graph_kind"] == "mag"

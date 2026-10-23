@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from andrey.core.orient import dag2cpdag
-from andrey.core.structure import ARROW, GraphStructure, Kind
+from andrey.core.structure import ARROW, GraphStructure, Kind, is_ancestral_kind
 
 from ._common import _offdiag, as_marks, prf, two_marks
 
@@ -68,7 +68,7 @@ def _confounder(m_est: np.ndarray, m_true: np.ndarray) -> dict[str, float]:
 
 
 def canonicalize_marks(marks: np.ndarray, kind: Kind) -> np.ndarray:
-    """CPDAG marks of a DAG (its essential graph); CPDAG / PAG marks pass through unchanged."""
+    """CPDAG marks of a DAG (its essential graph); CPDAG, PAG, and MAG marks pass through."""
     return dag2cpdag(marks) if kind == "dag" else marks
 
 
@@ -78,16 +78,16 @@ def _digraph_pair(k_est: Kind, k_true: Kind) -> bool:
 
 
 def reject_digraph_pag(k_est: Kind, k_true: Kind) -> None:
-    """Raise when one kind is a ``digraph`` and the other a ``pag`` -- semantically incompatible.
+    """Raise when one kind is a ``digraph`` and the other a ``pag`` or ``mag`` -- incompatible.
 
     A digraph and a PAG share the ``ARROW``/``ARROW`` mark pattern but mean opposite things (a
     directed 2-cycle versus a latent-confounded bidirected edge), so identical marks would score a
     perfect match between contradictory claims. No comparison family covers the pair; fail fast.
     """
-    if {k_est, k_true} == {"digraph", "pag"}:
+    if "digraph" in (k_est, k_true) and (is_ancestral_kind(k_est) or is_ancestral_kind(k_true)):
         raise ValueError(
-            "cannot compare a digraph to a PAG: ARROW/ARROW marks mean a 2-cycle in a digraph "
-            "but a latent confounder in a PAG"
+            "cannot compare a digraph to a PAG or MAG: ARROW/ARROW marks mean a 2-cycle in a "
+            "digraph but a latent confounder in a PAG or MAG"
         )
 
 

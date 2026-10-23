@@ -1,8 +1,8 @@
-"""Run the facade, simulator, and graph-conversion docstring examples as doctests.
+"""Run the facade, simulator, and graph-structure docstring examples as doctests.
 
 A targeted runner, not a global ``--doctest-modules``: it executes only the ``andrey.api`` facade
 examples (the runnable ``Examples`` the docstring standard guarantees) and those of the simulators
-and the graph conversions the API reference lists, so collection stays bounded to the public
+and the graph structures the API reference lists, so collection stays bounded to the public
 surface and does not pull in every internal module's docstring.
 """
 
@@ -28,8 +28,8 @@ def _facade_modules() -> list[str]:
     ]
 
 
-# The simulator modules and the graph conversions the API reference lists.
-SIMULATORS = ["andrey.data.discrete", "andrey.data.mixed", "andrey.graph"]
+# The simulator modules and the graph structures the API reference lists.
+SIMULATORS = ["andrey.data.discrete", "andrey.data.mixed", "andrey.core.structure"]
 
 
 @pytest.mark.parametrize("modname", _facade_modules() + SIMULATORS)

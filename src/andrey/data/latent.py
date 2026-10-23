@@ -133,7 +133,8 @@ def marginal(graph: GraphStructure, target: str = "mag", *, max_nodes: int = 500
     Returns
     -------
     GraphStructure
-        The MAG or PAG over the observed nodes, ``kind="pag"``.
+        The MAG over the observed nodes, ``kind="mag"``, or their PAG, ``kind="pag"``; with no
+        latents, ``"mag"`` returns the DAG itself.
 
     Raises
     ------
@@ -222,7 +223,7 @@ def _mag_projection(
                 rows += [p, q]
                 cols += [q, p]
                 marks += [mark_a, mark_b]
-    return csr_from_endpoints(rows, cols, marks, len(observed), kind="pag")
+    return csr_from_endpoints(rows, cols, marks, len(observed), kind="mag")
 
 
 class DSepOracle:

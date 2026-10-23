@@ -122,7 +122,7 @@ def test_mag_pure_confounder_is_bidirected():
         parents=[2, 2], children=[0, 1], d=3, latent_nodes={2}
     )  # 0,1 observed; 2 latent
     mag = data.latent.marginal(g)
-    assert mag.kind == "pag"
+    assert mag.kind == "mag"
     assert mag.n_nodes == 2
     assert tuple(mag.endpoints(0, 1)) == (ARROW, ARROW)  # bidirected
 
@@ -143,7 +143,7 @@ def test_mag_nonvacuity_and_roundtrip():
 
     ds = data.sample_scm(d=20, n=64, seed=3, density=3.0, latents=3)
     mag = data.latent.marginal(ds.graph)
-    assert mag.kind == "pag"
+    assert mag.kind == "mag"
     assert mag.n_nodes == ds.data.shape[1]  # over observed nodes
     dense = mag.to_numpy()
     assert np.array_equal(dense != 0, (dense != 0).T)  # endpoint-mark support is symmetric
@@ -154,7 +154,7 @@ def test_mag_nonvacuity_and_roundtrip():
     )
     assert bidirected >= 1
     # lossless CSR round-trip
-    assert GraphStructure.from_numpy(mag.to_numpy(), kind="pag") == mag
+    assert GraphStructure.from_numpy(mag.to_numpy(), kind="mag") == mag
 
 
 def test_mag_no_latents_is_identity():
