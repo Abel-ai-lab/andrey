@@ -57,9 +57,12 @@ for Intel GPUs.
 The latest `main` from GitHub, ahead of the next release:
 
 ```shell
-uv add git+https://github.com/Abel-ai-lab/andrey
-pip install git+https://github.com/Abel-ai-lab/andrey
+uv add "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"
+pip install "andrey-core @ git+https://github.com/Abel-ai-lab/andrey@main"
 ```
+
+The distribution is `andrey-core`. After the `@`, name any branch, tag, or commit to install that
+one.
 
 ### From source
 
