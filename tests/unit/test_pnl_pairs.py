@@ -10,10 +10,18 @@ from unittest import mock
 
 import numpy as np
 import pytest
+from scipy.special import gammainc
 
 import andrey
 from andrey.core import backend
-from andrey.core.independence import hsic_statistic_test
+from andrey.core.independence import (
+    _center_kernel,
+    _empirical_bandwidth,
+    _gaussian_kernel,
+    _kernel_into,
+    _standardize,
+    hsic_statistic_test,
+)
 
 _pnl = importlib.import_module("andrey.irregular.pnl")
 
@@ -26,15 +34,32 @@ def _table(n: int) -> np.ndarray:
     return np.column_stack([x, y, np.round(rng.normal(size=n)), x])
 
 
+def _reference_test(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """The HSIC gamma test from whole-matrix kernels, spelled out, for 1-D ``x`` and ``y``."""
+    n = len(x)
+    kxc, kyc = (
+        _center_kernel(
+            _gaussian_kernel(_standardize(v.reshape(-1, 1)), _empirical_bandwidth(v[:, None]))
+        )
+        for v in (x, y)
+    )
+    statistic = np.sum(kxc * kyc)
+    mean = np.trace(kxc) * np.trace(kyc) / n
+    var = 2 * np.sum(kxc**2) * np.sum(kyc**2) / n / n
+    return float(statistic / mean), float(1.0 - gammainc(mean**2 / var, statistic / (var / mean)))
+
+
 @pytest.mark.parametrize("n", [150, 600, 1300])  # each kernel width of the HSIC test
-def test_blocked_hsic_equals_the_reference_test(n):
+def test_blocked_hsic_equals_the_whole_matrix_test(n):
     X = _table(n)
     cause, effect = _pnl._column(X[:, 0]), _pnl._column(X[:, 1])
     disturbance = _pnl._fit_disturbance(cause.phi, effect.outer, effect.outer_deriv)
     buffers = _pnl._Buffers.for_rows(n)
-    kxc = _pnl._kernel_into(cause.standardized, cause.width, buffers.cause, buffers.block)
+    kxc = _kernel_into(cause.standardized, cause.width, buffers.cause, buffers.block)
     blocked = _pnl._hsic(kxc, np.trace(kxc), np.sum(kxc**2), disturbance, buffers)
-    assert blocked == hsic_statistic_test(_pnl._gaussianize(X[:, 0]), disturbance)
+    reference = _reference_test(_pnl._gaussianize(X[:, 0]), disturbance)
+    assert hsic_statistic_test(_pnl._gaussianize(X[:, 0]), disturbance) == reference
+    assert blocked == reference
 
 
 def test_pair_rows_equal_single_calls():
