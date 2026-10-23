@@ -181,3 +181,44 @@ def test_a_pass_above_the_gate_runs_on_the_pool(
         pooled = andrey.pc(x, max_depth=2)
     assert pools == [2]
     assert _same_output(pooled, serial)
+
+
+@pytest.mark.usefixtures("open_gate")
+def test_each_pass_is_counted_once(pools: list[int], monkeypatch: pytest.MonkeyPatch) -> None:
+    """PC counts a pass's tests once for its warning and the pool's cutoff; FCI's pool counts it."""
+    counted = {"pc": 0, "pool": 0}
+    scans: list[tuple[int, list[int] | None]] = []
+
+    def counting(module, name):
+        real = module.pair_queries
+
+        def count(*args):
+            counted[name] += 1
+            return real(*args)
+
+        monkeypatch.setattr(module, "pair_queries", count)
+
+    counting(pc_module, "pc")
+    counting(_parallel_skeleton, "pool")
+    real_scan = _parallel_skeleton.SkeletonWorkerPool.scan
+
+    def scan(self, pairs, neighbors, adj_mask, size, alpha, record_pvalues=True, weights=None):
+        scans.append((len(pairs), weights))
+        return real_scan(self, pairs, neighbors, adj_mask, size, alpha, record_pvalues, weights)
+
+    monkeypatch.setattr(_parallel_skeleton.SkeletonWorkerPool, "scan", scan)
+    x = _gaussian_dag(1, 600, 20, 0.25)
+
+    pc_module._discover_skeleton(x, 0.05, "fisherz", workers=3, warn_expensive=True)
+    assert scans and all(weights is not None and len(weights) == n for n, weights in scans)
+    assert counted == {"pc": sum(n for n, _ in scans), "pool": 0}
+
+    counted.update(pc=0, pool=0)
+    scans.clear()
+    _fast_adjacency_search(x, make_indep_test("fisherz", x), 0.05, workers=3)
+    assert scans and all(weights is None for _, weights in scans)
+    assert counted == {"pc": 0, "pool": sum(n for n, _ in scans)}
+
+    counted.update(pc=0, pool=0)
+    pc_module._discover_skeleton(x, 0.05, "fisherz", workers=1)
+    assert counted == {"pc": 0, "pool": 0}, "a serial fit that does not warn counts nothing"
