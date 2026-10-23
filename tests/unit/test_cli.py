@@ -1084,6 +1084,21 @@ def test_categorical_names_header_columns_or_positions(capsys, tmp_path):
     assert code == 2 and json.loads(err)["error"]["code"] == "unknown_column"
 
 
+def test_target_names_a_header_column_or_a_position(capsys, tmp_path):
+    rng = np.random.default_rng(3)
+    a, b, e = rng.standard_normal((3, 500))
+    path = tmp_path / "collider.csv"
+    rows = zip(a, b, a + b + 0.5 * e)
+    path.write_text("a,b,c\n" + "\n".join(f"{x},{y},{z}" for x, y, z in rows))
+    base = ["run", "iamb", "--data", str(path)]
+    code, by_name, _ = _run([*base, "target=c"], capsys)
+    assert code == 0 and json.loads(by_name)["metadata"]["target"] == "c"
+    code, by_position, _ = _run([*base, "target=2"], capsys)
+    assert json.loads(by_position)["metadata"] == json.loads(by_name)["metadata"]
+    code, _out, err = _run([*base, "target=h"], capsys)
+    assert code == 2 and json.loads(err)["error"]["code"] == "unknown_column"
+
+
 def test_a_mixed_run_reports_inferred_columns_and_its_warning(capsys, tmp_path):
     rng = np.random.default_rng(4)
     g = rng.integers(0, 3, 400)

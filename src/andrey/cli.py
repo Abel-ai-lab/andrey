@@ -796,9 +796,9 @@ def _load_method_inputs(
 
 
 def column_positions(
-    columns: list[str] | tuple[str, ...], labels: tuple[str, ...] | None
+    columns: list[str] | tuple[str, ...], labels: tuple[str, ...] | None, name: str = "categorical"
 ) -> list[int]:
-    """Turn ``categorical=`` entries into 0-based column positions the facade reads.
+    """Turn ``categorical=`` or ``target=`` entries into 0-based column positions the facade reads.
 
     An entry names a column of the data file's header, or else gives a position as digits.
     """
@@ -812,7 +812,7 @@ def column_positions(
             known = f"; the header names {list(labels)}" if labels is not None else ""
             raise CliError(
                 "unknown_column",
-                f"categorical names column {column!r}, which the data file does not have{known}",
+                f"{name} names column {column!r}, which the data file does not have{known}",
                 EXIT_USAGE,
             )
     return positions
@@ -840,6 +840,8 @@ def _prepare_call(
         labels = None
     if fkwargs.get("categorical") is not None:
         fkwargs = {**fkwargs, "categorical": column_positions(fkwargs["categorical"], labels)}
+    if fkwargs.get("target") is not None:
+        fkwargs = {**fkwargs, "target": column_positions([fkwargs["target"]], labels, "target")[0]}
     if fkwargs.get("knowledge") is not None:
         try:
             fkwargs = {**fkwargs, "knowledge": andrey.Knowledge(**fkwargs["knowledge"])}
@@ -847,10 +849,15 @@ def _prepare_call(
             raise CliError("bad_value", f"knowledge: {exc}", EXIT_USAGE) from exc
     if labels is not None and any(p.name in ("categorical", "knowledge") for p in spec.params):
         # A method that reads column types names the header's columns in its warnings and in
-        # metadata["categorical"]; knowledge names them too.
+        # metadata["categorical"]; knowledge names them too, in each group of a panel.
         import pandas as pd
 
-        positional = [pd.DataFrame(positional[0], columns=list(labels)), *positional[1:]]
+        first = positional[0]
+        if spec.data.inputs[0].kind == "panel":
+            first = [pd.DataFrame(X, columns=list(labels)) for X in first]
+        else:
+            first = pd.DataFrame(first, columns=list(labels))
+        positional = [first, *positional[1:]]
     return positional, fkwargs, resolved, labels
 
 

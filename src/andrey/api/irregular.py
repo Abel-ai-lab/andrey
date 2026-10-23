@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.knowledge import Knowledge, resolve
+
 from ._adapt import column_labels, data_matrix, int_in_range, open_unit_interval, with_labels
 from ._irregular import (
     _adapt_anm,
@@ -277,6 +279,7 @@ def rcd(
     cor_alpha: float = 0.01,
     ind_alpha: float = 0.01,
     shapiro_alpha: float = 0.01,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a linear non-Gaussian graph with hidden common causes by repetitive causal discovery.
 
@@ -299,6 +302,14 @@ def rcd(
     shapiro_alpha : float, default=0.01
         Significance level of the Shapiro-Wilk tests that decide whether a residual is
         non-Gaussian, in ``(0, 1)``.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The ancestor search runs as
+        without knowledge. The parent sets it leads to then drop each forbidden parent, an edge
+        into an earlier tier and a pair outside ``allowed`` included, and gain each required one,
+        and the weights are fitted on those parents. A pair forbidden in both directions is never
+        marked ``<->``; a pair forbidden in one direction can be, since ``<->`` claims a hidden
+        common cause, not an edge.
 
     Returns
     -------
@@ -311,10 +322,13 @@ def rcd(
     Raises
     ------
     TypeError
-        If ``max_explanatory_vars`` is not an int.
+        If ``max_explanatory_vars`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``data`` has fewer than 6 rows, if ``max_explanatory_vars`` is less than 1, or if a
-        significance level is not in ``(0, 1)``.
+        significance level is not in ``(0, 1)``. Also if ``knowledge`` names a column ``data``
+        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists, or if its required
+        edges close a directed cycle with the parents the search found.
 
     Notes
     -----
@@ -350,17 +364,21 @@ def rcd(
 
     X = data_matrix(data, min_rows=6)  # HSIC's null variance has (n - 4)(n - 5)
     max_explanatory_vars = int_in_range(max_explanatory_vars, "max_explanatory_vars", 1)
+    labels = column_labels(data)
     model = fit_rcd(
         X,
         max_explanatory_num=max_explanatory_vars,
         cor_alpha=open_unit_interval(cor_alpha, "cor_alpha"),
         ind_alpha=open_unit_interval(ind_alpha, "ind_alpha"),
         shapiro_alpha=open_unit_interval(shapiro_alpha, "shapiro_alpha"),
+        constraints=resolve(knowledge, X.shape[1], labels, method="rcd"),
     )
-    return with_labels(_adapt_rcd(model), column_labels(data))
+    return with_labels(_adapt_rcd(model), labels)
 
 
-def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> StructureOutput:
+def bottom_up_parce_lingam(
+    data: npt.ArrayLike, *, alpha: float = 0.1, knowledge: Knowledge | None = None
+) -> StructureOutput:
     """Learn a linear non-Gaussian causal order that tolerates hidden common causes.
 
     BottomUpParceLiNGAM [1]_ finds sinks one at a time, from the last variable in the causal order
@@ -375,6 +393,15 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     alpha : float, default=0.1
         Significance level of the independence test that accepts a sink, Bonferroni-corrected
         across the remaining variables, in ``(0, 1)``.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`; honors forbidden, allowed, tiers:
+        forbidden edges, the pairs allowed to be adjacent, and temporal tiers. Required edges are
+        not honored (see Notes). A variable
+        is taken as a sink only when no remaining variable belongs to a later tier, so the order
+        keeps the tiers, and each regression drops the parents the knowledge forbids, an edge
+        into an earlier tier and a pair outside ``allowed`` included. In the unordered block, a
+        pair forbidden in both directions is not adjacent, and an ``o-o`` pair forbidden in one
+        direction gets an arrowhead at the cause, as in :func:`~andrey.fci`.
 
     Returns
     -------
@@ -387,9 +414,14 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
 
     Raises
     ------
+    NotImplementedError
+        If ``knowledge`` requires an edge.
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``data`` has fewer than 6 rows or no more rows than columns, or if ``alpha`` is not in
-        ``(0, 1)``.
+        ``(0, 1)``. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Notes
     -----
@@ -401,6 +433,10 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
     pair need not share a cause, and edges among the block's variables stay unoriented. The edge
     weights come from an adaptive-Lasso regression of each variable on those before it, which needs
     more rows than columns.
+
+    **Knowledge.** ``knowledge`` honors forbidden edges, ``allowed``, and tiers. It does not honor
+    required edges: the two ends of a required edge can both end in the unordered block, where no
+    edge is directed, so a required edge raises ``NotImplementedError`` rather than be dropped.
 
     **Limitations.** Suited to a few variables. Measured on linear data with uniform noise, one node
     in five hidden, and 2,000 rows: its median directed-edge errors were below the empty graph's at
@@ -434,5 +470,16 @@ def bottom_up_parce_lingam(data: npt.ArrayLike, *, alpha: float = 0.1) -> Struct
         raise ValueError(
             f"data needs more rows than columns, got {X.shape[0]} rows and {X.shape[1]} columns"
         )
-    model = _native(X, alpha=open_unit_interval(alpha, "alpha"))
-    return with_labels(_adapt_bottom_up_parce(model), column_labels(data))
+    labels = column_labels(data)
+    constraints = resolve(
+        knowledge,
+        X.shape[1],
+        labels,
+        method="bottom_up_parce_lingam",
+        honors=("forbidden", "allowed", "tiers"),
+    )
+    model = _native(X, alpha=open_unit_interval(alpha, "alpha"), constraints=constraints)
+    if constraints is None:
+        return with_labels(_adapt_bottom_up_parce(model), labels)
+    one_way = constraints.forbidden & ~constraints.forbidden.T
+    return with_labels(_adapt_bottom_up_parce(model, one_way), labels)

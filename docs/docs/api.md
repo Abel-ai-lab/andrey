@@ -52,16 +52,21 @@ to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 rep
 data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
 
-`pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
-`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and
-`"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
+`pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
+`indep_test` choices: `"fisherz"`, the default, and `"student_t"` for continuous data, `"chisq"`
+and `"gsq"` for categorical data, `"degen_gauss"` and `"cond_gauss"` for mixed data, and the
+nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)).
 
-`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
-`exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
-and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
-`knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
-`max_depth`, the maximum conditioning-set size of their conditional-independence tests.
+`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
+`grasp`, `exact_search`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`,
+`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `rcd`, and
+`bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and
+forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
+parameter says how it honors them. `bottom_up_parce_lingam` honors every part but required edges.
+For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time
+`t - lag` to `effect` at time `t`. `pc`, `fci`, `gfci`, and `cdnod` also take `max_depth`, the
+maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 `ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents
@@ -137,10 +142,32 @@ default under `andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
-Every method is supported. A new method ships as experimental: it passes recovery tests but has no
-published benchmark, its API may change without deprecation, and it warns with
-{py:class}`~andrey.ExperimentalWarning` on its first call in a process. It becomes supported once it
-has:
+A new method ships as experimental: it passes recovery tests but has no published benchmark, its
+API may change without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on
+its first call in a process.
+
+```{eval-rst}
+.. currentmodule:: andrey
+
+.. autosummary::
+   :toctree: api
+   :nosignatures:
+
+   iamb
+   inter_iamb
+   mmpc
+   mmhc
+   rsmax2
+```
+
+IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
+`target`; without one, they return every variable's set as undirected edges, joining a pair when
+each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then
+runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase
+keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and
+its maximize phase runs hill climbing or tabu search among them.
+
+A method becomes supported once it has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
   in its release's [release card](benchmarks.md);
@@ -152,7 +179,8 @@ has:
 
 ### Conditional-independence tests
 
-PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_test`:
+PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, MMHC, and RSMAX2 take their conditional-independence
+test as `indep_test`:
 
 | `indep_test` | Test | Status |
 |---|---|---|
