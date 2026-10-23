@@ -18,6 +18,10 @@ change names its pull request.
 
 ### Added
 
+- Experimental hybrid searches: `mmhc` learns MMPC's skeleton and then hill climbs within it,
+  `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
+  or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
+  parents and children with `target=`, or every variable's set without it. ([#400])
 - `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
   `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
   `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
@@ -739,4 +743,5 @@ First alpha release.
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#396]: https://github.com/Abel-ai-lab/andrey/pull/396
+[#400]: https://github.com/Abel-ai-lab/andrey/pull/400
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411
