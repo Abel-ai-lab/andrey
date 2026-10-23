@@ -96,6 +96,59 @@ def _center_kernel(matrix: np.ndarray) -> np.ndarray:
     return matrix - (col_sums[None, :] + col_sums[:, None]) / n + (total / n**2)
 
 
+# Kernel elements computed per block (rows times columns), so a block's elementwise steps run in
+# cache.
+_BLOCK_ELEMENTS = 32768
+
+
+def _block_rows(n: int) -> int:
+    """Rows of the block :func:`_kernel_into` builds at a time for ``n`` samples."""
+    return max(1, min(n, _BLOCK_ELEMENTS // max(n, 1)))
+
+
+def _kernel_into(z: np.ndarray, width: float, out: np.ndarray, block: np.ndarray) -> np.ndarray:
+    """Write the centered Gaussian kernel of the standardized 1-D ``z`` into ``out`` and return it.
+
+    Every element takes ``exp(-0.5 * d**2 * width)``, then ``K - (col_sum_j + col_sum_i) / n +
+    total / n**2``, as :func:`_gaussian_kernel` and :func:`_center_kernel` do, but in row blocks of
+    ``block``'s size written into ``out``, so no ``n x n`` temporary is allocated.
+    """
+    n = z.shape[0]
+    rows = block.shape[0]
+    for start in range(0, n, rows):
+        part = out[start : start + rows]
+        np.subtract(z[start : start + rows, None], z[None, :], out=part)
+        np.square(part, out=part)
+        np.multiply(part, -0.5, out=part)
+        np.multiply(part, width, out=part)
+        np.exp(part, out=part)
+    col_sums = out.sum(axis=0)
+    shift = col_sums.sum() / n**2
+    for start in range(0, n, rows):
+        part = out[start : start + rows]
+        offsets = block[: part.shape[0]]
+        np.add(col_sums[None, :], col_sums[start : start + rows, None], out=offsets)
+        np.divide(offsets, n, out=offsets)
+        np.subtract(part, offsets, out=part)
+        np.add(part, shift, out=part)
+    return out
+
+
+def _gamma_test(
+    statistic: float, trace_x: float, sumsq_x: float, trace_y: float, sumsq_y: float, n: int
+) -> tuple[float, float]:
+    """Return ``(statistic / mean, p_value)`` of the HSIC test from its two kernels' sums.
+
+    ``trace_*`` and ``sumsq_*`` are each centered kernel's trace and sum of squared entries; the
+    gamma null's mean and variance are those of :func:`hsic_statistic_test`.
+    """
+    mean_appr = trace_x * trace_y / n
+    var_appr = 2 * sumsq_x * sumsq_y / n / n
+    shape = mean_appr**2 / var_appr
+    scale = var_appr / mean_appr
+    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
+
+
 def _resolve_bandwidth(raw: np.ndarray, est_width: str, manual_width: float | None) -> float:
     """Return the Gaussian ``width`` precision for one variable under the chosen estimator."""
     if manual_width is not None:
@@ -110,7 +163,11 @@ def _resolve_bandwidth(raw: np.ndarray, est_width: str, manual_width: float | No
 def _centered_kernel(raw: np.ndarray, est_width: str, manual_width: float | None) -> np.ndarray:
     """Build a centered kernel with raw-data bandwidth and z-scored inputs."""
     width = _resolve_bandwidth(raw, est_width, manual_width)
-    return _center_kernel(_gaussian_kernel(_standardize(raw), width))
+    z = _standardize(raw)
+    if z.shape[1] > 1:
+        return _center_kernel(_gaussian_kernel(z, width))
+    n = z.shape[0]
+    return _kernel_into(z[:, 0], width, np.empty((n, n)), np.empty((_block_rows(n), n)))
 
 
 def measure_hsic_statistic(
@@ -179,11 +236,7 @@ def hsic_statistic_test(
     kyc = _centered_kernel(_as_columns(y), est_width, kernel_width_y)
 
     statistic = np.sum(kxc * kyc)
-    mean_appr = np.trace(kxc) * np.trace(kyc) / n
-    var_appr = 2 * np.sum(kxc**2) * np.sum(kyc**2) / n / n
-    shape = mean_appr**2 / var_appr
-    scale = var_appr / mean_appr
-    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
+    return _gamma_test(statistic, np.trace(kxc), np.sum(kxc**2), np.trace(kyc), np.sum(kyc**2), n)
 
 
 # ---- LiNGAM-family HSIC (median-distance bandwidth, biased V-statistic) --------------------------

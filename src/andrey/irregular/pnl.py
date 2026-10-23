@@ -29,11 +29,16 @@ from dataclasses import dataclass
 from itertools import combinations, groupby
 
 import numpy as np
-from scipy.special import gammainc
 from scipy.stats import norm, rankdata
 
 from andrey.core import backend, env
-from andrey.core.independence import _empirical_bandwidth, _standardize
+from andrey.core.independence import (
+    _block_rows,
+    _empirical_bandwidth,
+    _gamma_test,
+    _kernel_into,
+    _standardize,
+)
 from andrey.core.warning_policy import PerformanceWarning, warn_once
 
 _N_FEATURES = 10
@@ -42,15 +47,8 @@ _BARRIER_FLOOR = 1e-6
 _MAX_NEWTON = 60
 _TOL = 1e-8
 
-# Kernel elements computed per block (rows times columns), so a block's elementwise steps run in
-# cache.
-_BLOCK_ELEMENTS = 32768
-
 # Smallest kernel matrix (rows squared) at which `auto` runs a table's PNL tests on a CUDA GPU.
-# `qa/gpu_calibration_validate.py` on an A100-SXM4-80GB found 26,278 (163 rows) on each of five
-# runs, against the CPU path at its default of one worker; on its table of four columns, the GPU
-# ran at 1.5x the CPU's speed at 200 rows, 4.2x at 500, and 10x at 1,000 (against four workers:
-# 1.1x, 1.8x, 3.6x). PNL computes in float64, so `mps` (float32) is never used.
+# PNL computes in float64, so `mps` (float32) is never used.
 _PNL_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 26_278, "mps": None}
 
 # Device memory one batch of disturbance kernels uses.
@@ -203,37 +201,9 @@ class _Buffers:
 
     @classmethod
     def for_rows(cls, n: int) -> _Buffers:
-        rows = min(n, max(1, _BLOCK_ELEMENTS // max(n, 1)))
-        return cls(np.empty((n, n)), np.empty((n, n)), np.empty((n, n)), np.empty((rows, n)))
-
-
-def _kernel_into(z: np.ndarray, width: float, out: np.ndarray, block: np.ndarray) -> np.ndarray:
-    """Write the centered Gaussian kernel of the standardized 1-D ``z`` into ``out`` and return it.
-
-    The matrix equals, bit for bit, the one :func:`~andrey.core.independence.hsic_statistic_test`
-    builds: every element takes the same operations in the same order, ``exp(-0.5 * d**2 * width)``
-    and then ``K - (col_sum_j + col_sum_i) / n + total / n**2``, but in row blocks of ``block``'s
-    size written into ``out``, so no ``n x n`` temporary is allocated.
-    """
-    n = z.shape[0]
-    rows = block.shape[0]
-    for start in range(0, n, rows):
-        part = out[start : start + rows]
-        np.subtract(z[start : start + rows, None], z[None, :], out=part)
-        np.square(part, out=part)
-        np.multiply(part, -0.5, out=part)
-        np.multiply(part, width, out=part)
-        np.exp(part, out=part)
-    col_sums = out.sum(axis=0)
-    shift = col_sums.sum() / n**2
-    for start in range(0, n, rows):
-        part = out[start : start + rows]
-        offsets = block[: part.shape[0]]
-        np.add(col_sums[None, :], col_sums[start : start + rows, None], out=offsets)
-        np.divide(offsets, n, out=offsets)
-        np.subtract(part, offsets, out=part)
-        np.add(part, shift, out=part)
-    return out
+        return cls(
+            np.empty((n, n)), np.empty((n, n)), np.empty((n, n)), np.empty((_block_rows(n), n))
+        )
 
 
 def _hsic(
@@ -242,8 +212,7 @@ def _hsic(
     """Return ``hsic_statistic_test(cause, disturbance)`` given the cause's centered kernel.
 
     ``kxc`` is the cause's centered kernel, ``trace_x`` its trace, and ``sumsq_x`` the sum of its
-    squared entries; the statistic and the gamma null's moments take the same operations, in the
-    same order, as in :func:`~andrey.core.independence.hsic_statistic_test`.
+    squared entries.
     """
     raw = disturbance.reshape(-1, 1)
     kyc = _kernel_into(
@@ -252,22 +221,6 @@ def _hsic(
     statistic = np.sum(np.multiply(kxc, kyc, out=buffers.product))
     sumsq_y = np.sum(np.square(kyc, out=buffers.product))
     return _gamma_test(statistic, trace_x, sumsq_x, np.trace(kyc), sumsq_y, kyc.shape[0])
-
-
-def _gamma_test(
-    statistic: float, trace_x: float, sumsq_x: float, trace_y: float, sumsq_y: float, n: int
-) -> tuple[float, float]:
-    """Return ``(statistic / mean, p_value)`` of the HSIC test from its two kernels' sums.
-
-    ``trace_*`` and ``sumsq_*`` are each centered kernel's trace and sum of squared entries; the
-    gamma null's moments take the same operations, in the same order, as in
-    :func:`~andrey.core.independence.hsic_statistic_test`.
-    """
-    mean_appr = trace_x * trace_y / n
-    var_appr = 2 * sumsq_x * sumsq_y / n / n
-    shape = mean_appr**2 / var_appr
-    scale = var_appr / mean_appr
-    return float(statistic / mean_appr), float(1.0 - gammainc(shape, statistic / scale))
 
 
 def _run_tasks(
