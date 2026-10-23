@@ -206,6 +206,14 @@ def pnl(data: npt.ArrayLike, *, alpha: float | None = None) -> StructureOutput:
     running in the process; the fits stay on the CPU, and the p-values then match the CPU's to
     rounding.
 
+    On the CPU, ``num_workers`` above 1 (``andrey.config`` or ``ANDREY_NUM_WORKERS``) fits the two
+    directions on two threads, each limited to one BLAS thread; with one worker the BLAS threads
+    are not limited. On a machine with several cores the fits then round differently, so the
+    p-values and statistics with one worker and with several can differ in their last digits, and
+    the direction can differ when the two p-values nearly tie. Each thread holds three ``n x n``
+    float64 matrices; when the threads asked for would hold more than 4 GiB, fewer run, with a
+    ``PerformanceWarning``.
+
     **Limitations.** Measured on simulated cause-effect pairs with a post-nonlinear mechanism, a
     linear inner transform and an invertible nonlinear outer one, and Laplace noise, from 200 to
     5,000 rows. It named the true direction on three pairs in four at 200 rows and on every pair
