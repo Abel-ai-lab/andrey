@@ -39,6 +39,10 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
     },
+    "RSMAX2": {
+        "structural": ["graph"],
+        "numeric": {"score": {"atol": 1e-6, "rtol": 1e-6}},
+    },
     "ExactSearch": {
         "structural": ["graph"],
         "numeric": {},

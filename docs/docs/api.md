@@ -57,9 +57,9 @@ single column gives a one-node graph.
 `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)).
 
-`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `boss`, `grasp`,
-`exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
-and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
+`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
+`grasp`, `exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of
+required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
 `knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
@@ -149,10 +149,13 @@ its first call in a process.
    :nosignatures:
 
    mmhc
+   rsmax2
 ```
 
 MMHC learns a skeleton with MMPC's conditional-independence tests, then runs hill climbing that
-joins only the skeleton's pairs.
+joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase keeps the pairs of MMPC's
+skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and its maximize phase runs
+hill climbing or tabu search among them.
 
 A method becomes supported once it has:
 

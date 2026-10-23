@@ -261,3 +261,181 @@ def mmhc(
         max_categories=max_categories,
         knowledge=knowledge,
     )
+
+
+def rsmax2(
+    data: npt.ArrayLike,
+    *,
+    restrict: str = "mmpc",
+    maximize: str = "hc",
+    alpha: float = 0.05,
+    indep_test: str = "fisherz",
+    score_func: str = "local_score_BIC_from_cov",
+    lambda_value: float = 1.0,
+    max_iter: int | None = None,
+    tabu_length: int = 10,
+    max_tabu: int | None = None,
+    categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn a CPDAG from observational data with a restrict phase and a maximize phase.
+
+    The restrict phase learns the pairs that may be adjacent with conditional-independence tests;
+    the maximize phase runs a score search over DAGs whose edges join only those pairs [1]_ [5]_.
+    A small candidate set makes the score search faster on many variables.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    restrict : {"mmpc", "iamb", "inter_iamb", "pc"}, default="mmpc"
+        The restrict phase. ``"mmpc"`` keeps a pair when each variable is in the other's MMPC
+        parents and children [2]_, as :func:`~andrey.mmhc` does. ``"iamb"`` and ``"inter_iamb"``
+        keep a pair when each variable is in the other's Markov blanket from IAMB or Inter-IAMB
+        [3]_, the moral graph, which also joins the parents of a common child. ``"pc"`` keeps the
+        skeleton of :func:`~andrey.pc`'s adjacency search [4]_. See Notes.
+    maximize : {"hc", "tabu"}, default="hc"
+        The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
+    alpha : float, default=0.05
+        Significance level of the restrict phase's tests. Smaller values keep fewer pairs.
+    indep_test : str, default="fisherz"
+        Conditional-independence test of the restrict phase, any of :func:`~andrey.pc`'s. It must
+        read the same kind of data as ``score_func``.
+    score_func : str, default="local_score_BIC_from_cov"
+        Local score of the maximize phase, any of :func:`~andrey.hc`'s; with ``maximize="tabu"``,
+        any of :func:`~andrey.tabu`'s, which take no mixed data.
+    lambda_value : float, default=1.0
+        Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
+    max_iter : int or None, default=None
+        Maximum moves of the maximize phase, at least ``1``; ``None`` sets no limit.
+    tabu_length : int, default=10
+        With ``maximize="tabu"``, the number of most recently visited DAGs a move may not return
+        to, at least ``1``, as for :func:`~andrey.tabu`; hill climbing ignores it.
+    max_tabu : int or None, default=None
+        With ``maximize="tabu"``, the non-improving moves allowed without a better DAG, from ``1``
+        to ``tabu_length``; ``None`` uses ``tabu_length``. Hill climbing ignores it.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data test and score, as for
+        :func:`~andrey.pc`. The other settings take no column types and reject it.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``, as for :func:`~andrey.pc`.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The maximize phase considers the
+        pairs the restrict phase keeps and the pairs of the required edges, less the pairs the
+        knowledge makes non-adjacent, and then honors the knowledge as :func:`~andrey.hc` does.
+        The restrict phase reads the data alone.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``cpdag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"RSMAX2"``, ``metadata["score"]`` the score of the DAG found, computed as for
+        :func:`andrey.ges` (lower is better), and ``metadata["restrict"]`` and
+        ``metadata["maximize"]`` name the phases. Under a mixed-data setting,
+        ``metadata["categorical"]`` lists the categorical columns it read.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``indep_test`` names no available test, or ``score_func`` no score ``maximize`` takes.
+    TypeError
+        If ``tabu_length``, a given ``max_tabu``, or a given ``max_iter`` is not an int,
+        ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If ``restrict`` or ``maximize`` is not one of its choices, which the message lists, if
+        ``alpha`` is not in ``(0, 1)``, if ``score_func`` and ``indep_test`` read different kinds
+        of data, if ``tabu_length`` or a given ``max_iter`` is less than ``1``, if ``max_tabu`` is
+        outside ``1..tabu_length``, or if ``data`` or ``categorical`` does not suit the test or
+        score, as for :func:`~andrey.pc` and :func:`~andrey.hc`. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    SearchLimitWarning
+        When the maximize phase takes a given ``max_iter`` moves.
+    PerformanceWarning
+        With ``restrict="pc"``, when a conditioning pass needs at least ten million tests, as for
+        :func:`~andrey.pc`.
+    DataTypeWarning
+        As for :func:`~andrey.pc`, when a mixed-data setting infers the categorical columns or a
+        continuous setting meets columns that look like category codes; once per process.
+
+    See Also
+    --------
+    andrey.mmhc : ``restrict="mmpc"`` with ``maximize="hc"``.
+
+    Notes
+    -----
+    **How it works.** The restrict phase follows the sparse candidate idea of [1]_: tests narrow
+    the pairs a score search must consider. Each choice finds every true adjacency when its tests
+    are exact. The MMPC skeleton and PC's skeleton then hold only the true adjacencies; the moral
+    graph also joins two parents of a common child, which the maximize phase can leave
+    non-adjacent. The maximize phase starts from the empty graph, or from the required edges, with
+    every pair outside the candidates forbidden in both directions, and returns the CPDAG of the
+    DAG it ends with. :func:`~andrey.mmpc`, :func:`~andrey.iamb`, and :func:`~andrey.inter_iamb`
+    describe their searches; ``"pc"`` runs :func:`~andrey.pc`'s adjacency search without
+    orienting.
+
+    Ties go to the column whose rank, computed from its own data, comes first, as for
+    :func:`~andrey.hc`, so the result does not depend on the column order unless two columns are
+    identical.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on 20 variables with 2,000 rows of
+    simulated linear-Gaussian data. An edge the restrict phase misses is never added, and the
+    maximize phase stops at a local optimum. MMPC tests each candidate against every subset of
+    the current members, so its cost grows exponentially with the size of a variable's
+    parents-and-children set. IAMB and Inter-IAMB condition on the whole current blanket, so each
+    of their tests needs more rows as the blankets grow.
+
+    References
+    ----------
+    .. [1] Friedman, N., Nachman, I., and Pe'er, D. (1999). Learning Bayesian network structure
+       from massive datasets: the "sparse candidate" algorithm. UAI, 206-215.
+    .. [2] Tsamardinos, I., Brown, L. E., and Aliferis, C. F. (2006). The max-min hill-climbing
+       Bayesian network structure learning algorithm. Machine Learning 65(1), 31-78.
+    .. [3] Tsamardinos, I., Aliferis, C. F., and Statnikov, A. (2003). Algorithms for large scale
+       Markov blanket discovery. FLAIRS, 376-380.
+    .. [4] Colombo, D., and Maathuis, M. H. (2014). Order-independent constraint-based causal
+       structure learning. JMLR 15, 3921-3962.
+    .. [5] Scutari, M. (2010). Learning Bayesian networks with the bnlearn R package. Journal of
+       Statistical Software 35(3). https://doi.org/10.18637/jss.v035.i03
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> from andrey import rsmax2
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = x + 0.1 * rng.standard_normal(500)
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     out = rsmax2(np.column_stack([x, y]), restrict="pc", maximize="tabu")
+    >>> out.metadata["restrict"], out.metadata["maximize"]
+    ('pc', 'tabu')
+    """
+    warn_experimental("rsmax2")
+    return _fit(
+        "rsmax2",
+        data,
+        restrict=restrict,
+        maximize=maximize,
+        alpha=alpha,
+        indep_test=indep_test,
+        score_func=score_func,
+        lambda_value=lambda_value,
+        max_iter=max_iter,
+        tabu_length=tabu_length,
+        max_tabu=max_tabu,
+        categorical=categorical,
+        max_categories=max_categories,
+        knowledge=knowledge,
+    )

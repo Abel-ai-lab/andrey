@@ -107,6 +107,9 @@ FITS: dict[str, Fit] = {
     "HC": Fit(andrey.hc),
     "Tabu": Fit(andrey.tabu),
     "MMHC": Fit(functools.partial(andrey.mmhc, alpha=ALPHA), alpha=ALPHA),
+    "RSMAX2": Fit(
+        functools.partial(andrey.rsmax2, restrict="pc", maximize="tabu", alpha=ALPHA), alpha=ALPHA
+    ),
     "ExactSearch": Fit(andrey.exact_search),
     "CALM": Fit(functools.partial(andrey.calm, seed=0)),
     "BOSS": Fit(functools.partial(andrey.boss, seed=0)),
@@ -139,12 +142,12 @@ FITS: dict[str, Fit] = {
 }
 
 #: The methods that run on ``andrey.config(num_workers=...)``: GES, GFCI's GES phase, and the
-#: skeleton searches of PC, FCI, GFCI, and CD-NOD in worker processes, Granger's regressions and
-#: PNL's two directions on threads.
-WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "GES", "Granger", "PNL")
+#: skeleton searches of PC, FCI, GFCI, CD-NOD, and RSMAX2's PC phase in worker processes, Granger's
+#: regressions and PNL's two directions on threads.
+WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "RSMAX2", "GES", "Granger", "PNL")
 
 #: The gate datasets of the experimental methods, which the quality gate does not fit.
-EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = {"MMHC": qg.CPDAG_DATA}
+EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = dict.fromkeys(("MMHC", "RSMAX2"), qg.CPDAG_DATA)
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -177,7 +180,8 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
 }
 LARGER: dict[str, str] = {
     **dict.fromkeys(
-        ("PC", "GES", "XGES", "HC", "Tabu", "MMHC", "BOSS", "GRaSP"), "linear_gauss_er_d100"
+        ("PC", "GES", "XGES", "HC", "Tabu", "MMHC", "RSMAX2", "BOSS", "GRaSP"),
+        "linear_gauss_er_d100",
     ),
     **dict.fromkeys(("FCI", "GFCI"), "latent_gauss_er_d100"),
     **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM"), "lingam_sf_d70"),

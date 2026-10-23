@@ -54,6 +54,7 @@ def candidate_graph(
             categorical=categorical,
             record_pvalues=False,
             workers=backend.worker_count(None),
+            warn_expensive=True,
         )
         return adj != NULL
     test = make_indep_test(indep_test, X, categorical=categorical)

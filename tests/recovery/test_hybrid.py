@@ -103,3 +103,103 @@ def test_mmhc_relabels_under_a_column_shuffle(seed):
     moved = andrey.mmhc(sample.data[:, order])
     assert _edges(moved, order) == _edges(base)
     assert moved.metadata["score"] == pytest.approx(base.metadata["score"], rel=1e-12)
+
+
+PHASES = [(r, m) for r in ("mmpc", "iamb", "inter_iamb", "pc") for m in ("hc", "tabu")]
+
+
+def test_mmhc_is_rsmax2_with_mmpc_and_hill_climbing():
+    x = _er_sample(20, 1).data
+    mmhc, rsmax2 = andrey.mmhc(x), andrey.rsmax2(x)
+    assert _edges(mmhc) == _edges(rsmax2)
+    assert mmhc.metadata["score"] == rsmax2.metadata["score"]
+
+
+def test_rsmax2_reaches_the_score_optimum_on_gauss_5v():
+    x = datagen.generate("gauss_5v")
+    out = andrey.rsmax2(x, restrict="pc", maximize="tabu")
+    assert markov_equivalent(out.structure, to_cpdag(andrey.exact_search(x).structure))
+    assert_recorded_output(out, "RSMAX2", case="gauss_5v")
+
+
+@pytest.mark.parametrize(("restrict", "maximize"), PHASES)
+def test_rsmax2_joins_only_candidate_pairs_and_recovers_sparse_graphs(restrict, maximize):
+    from andrey.search.hybrid import candidate_graph
+
+    sample = _er_sample(20, 0)
+    out = andrey.rsmax2(sample.data, restrict=restrict, maximize=maximize)
+    candidates = candidate_graph(sample.data, restrict, alpha=0.05, indep_test="fisherz")
+    assert all(candidates[i, j] for i, j in map(tuple, _adjacent(out)))
+    assert shd(out.structure, to_cpdag(sample.graph)) <= 10
+
+
+@pytest.mark.parametrize("restrict", ["mmpc", "iamb", "inter_iamb", "pc"])
+def test_tabu_never_scores_worse_than_hill_climbing_on_the_same_candidates(restrict):
+    x = _er_sample(20, 1).data
+    tabu = andrey.rsmax2(x, restrict=restrict, maximize="tabu").metadata["score"]
+    assert tabu <= andrey.rsmax2(x, restrict=restrict, maximize="hc").metadata["score"]
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_each_restrict_phase_finds_its_graph_under_an_oracle(seed, oracle_test):
+    """The skeleton phases return the true skeleton; the blanket phases the true moral graph."""
+    from andrey.search.hybrid import candidate_graph
+
+    sample = _er_sample(15, seed)
+    oracle = oracle_test["oracle"] = DSeparation(sample.graph)
+    for restrict, want in [
+        ("mmpc", oracle.skeleton()),
+        ("pc", oracle.skeleton()),
+        ("iamb", oracle.moral_graph()),
+        ("inter_iamb", oracle.moral_graph()),
+    ]:
+        got = candidate_graph(sample.data, restrict, alpha=0.5, indep_test="dsep")
+        np.testing.assert_array_equal(got, want, err_msg=restrict)
+
+
+@pytest.mark.parametrize("seed", range(5))
+@pytest.mark.parametrize("restrict", ["iamb", "pc"])
+def test_rsmax2_relabels_under_a_column_shuffle(seed, restrict):
+    x = _er_sample(20, 1).data
+    order = np.random.default_rng(seed).permutation(20)
+    base = andrey.rsmax2(x, restrict=restrict, maximize="tabu")
+    moved = andrey.rsmax2(x[:, order], restrict=restrict, maximize="tabu")
+    assert _edges(moved, order) == _edges(base)
+
+
+def test_rsmax2_with_pc_gives_the_same_graph_on_more_workers():
+    from andrey.core import backend
+
+    x = _er_sample(20, 1).data
+    first = andrey.rsmax2(x, restrict="pc")
+    with backend.config(num_workers=3):
+        again = andrey.rsmax2(x, restrict="pc")
+    assert _edges(again) == _edges(first) and again.metadata == first.metadata
+
+
+@pytest.mark.parametrize(
+    ("setting", "error"),
+    [
+        ({"restrict": "gs"}, ValueError),
+        ({"maximize": "ges"}, ValueError),
+        ({"maximize": "tabu", "score_func": "local_score_cond_gauss"}, NotImplementedError),
+        ({"score_func": "local_score_BDeu"}, ValueError),  # a categorical score with fisherz
+    ],
+)
+def test_rsmax2_rejects_settings_it_does_not_take(setting, error):
+    with pytest.raises(error):
+        andrey.rsmax2(_er_sample(5, 0, n=200).data, **setting)
+
+
+def test_categorical_data_with_the_chi_square_test_and_bdeu():
+    """On a categorical collider, MMHC keeps the independent causes apart, which hill climbing
+    alone joins; tabu search within the same skeleton orients the collider."""
+    rng = np.random.default_rng(0)
+    a, b = rng.integers(0, 2, (2, 3000))
+    c = np.where(rng.random(3000) < 0.85, a + b, rng.integers(0, 3, 3000))
+    x = np.column_stack([a, b, c]).astype(float)
+    setting = {"indep_test": "chisq", "score_func": "local_score_BDeu"}
+    assert frozenset((0, 1)) in _adjacent(andrey.hc(x, score_func="local_score_BDeu"))
+    assert _adjacent(andrey.mmhc(x, **setting)) == {frozenset((0, 2)), frozenset((1, 2))}
+    out = andrey.rsmax2(x, maximize="tabu", **setting)
+    assert _edges(out) == {(0, 2, "directed"), (1, 2, "directed")}

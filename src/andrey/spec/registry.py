@@ -15,6 +15,7 @@ from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
 from andrey.search.ges import GES_SCORES
 from andrey.search.hc import HC_SCORES
+from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 from andrey.search.tabu import TABU_SCORES
 
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
@@ -708,6 +709,80 @@ _add(
             _MAX_CATEGORIES,
         ),
         references=("Tsamardinos, Brown & Aliferis 2006",),
+    )
+)
+_add(
+    MethodSpec(
+        name="rsmax2",
+        family="score",
+        summary="Restrict-maximize search: conditional-independence tests keep the candidate pairs "
+        "(restrict=mmpc, iamb, inter_iamb, or pc), then a score search (maximize=hc or tabu) "
+        "searches DAGs whose edges join only those pairs. mmhc is restrict=mmpc with maximize=hc. "
+        "Returns the CPDAG of the final DAG and its score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
+            "the phases",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="restrict",
+                type="str",
+                default="mmpc",
+                doc="The restrict phase: mmpc = each variable in the other's MMPC parents and "
+                "children; iamb and inter_iamb = each in the other's Markov blanket (the moral "
+                "graph); pc = PC's skeleton.",
+                choices=RESTRICTS,
+            ),
+            ParamSpec(
+                name="maximize",
+                type="str",
+                default="hc",
+                doc="The maximize phase: hc = hill climbing; tabu = tabu search.",
+                choices=MAXIMIZES,
+            ),
+            _ALPHA,
+            _INDEP_TEST,
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC_from_cov",
+                doc=_HYBRID_SCORE_DOC,
+                choices=HC_SCORES,
+            ),
+            _LAMBDA_VALUE,
+            _HYBRID_MAX_ITER,
+            ParamSpec(
+                name="tabu_length",
+                type="int",
+                default=10,
+                doc="With maximize=tabu, the number of most recently visited DAGs a move may not "
+                "return to, at least 1.",
+            ),
+            ParamSpec(
+                name="max_tabu",
+                type="int",
+                default=None,
+                doc="With maximize=tabu, the non-improving moves allowed without a better DAG, "
+                "from 1 to tabu_length; null uses tabu_length.",
+                nullable=True,
+            ),
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
+        references=(
+            "Friedman, Nachman & Pe'er 1999",
+            "Tsamardinos, Brown & Aliferis 2006",
+            "Tsamardinos, Aliferis & Statnikov 2003",
+            "Scutari 2010",
+        ),
     )
 )
 
@@ -1507,6 +1582,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "hc": _MOVE_RULE + _CLASS_RULE,
     "tabu": _MOVE_RULE + _CLASS_RULE,
     "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
+    "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,

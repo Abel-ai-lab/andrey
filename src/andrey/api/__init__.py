@@ -13,7 +13,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 """
 
 from .constraint import cdnod, fci, gfci, pc
-from .hybrid import mmhc
+from .hybrid import mmhc, rsmax2
 from .irregular import anm, bottom_up_parce_lingam, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
@@ -37,6 +37,7 @@ __all__ = [
     "calm",
     # hybrid: a restrict phase of CI tests, then a score search
     "mmhc",
+    "rsmax2",
     # permutation-based
     "boss",
     "grasp",
