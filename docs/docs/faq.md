@@ -1,6 +1,6 @@
 ---
 name: faq
-description: Frequently asked questions about Andrey - install, methods, speed, data, the command line, and the project.
+description: Frequently asked questions about Andrey - what data it learns from, its methods, speed and scale, the command line, and the project.
 meta:
   type: guide
   tags: [faq]
@@ -12,11 +12,13 @@ meta:
 
 ### What is Andrey?
 
-A Python package that learns causal graphs from observational data. Its {{ method_count }} include
-PC, FCI, GES, BOSS, GRaSP, and the LiNGAM family. Most methods take a NumPy array or a pandas
-DataFrame and return a `StructureOutput`; `multi_group_direct_lingam` and `longitudinal_lingam` take
-a list of datasets, and the first returns one result per group. Some methods can spread their work
-over more CPU cores or a GPU.
+An open-source Python package that learns causal graphs from data. Its {{ method_count }}, all
+supported and benchmarked, cover continuous, categorical, and mixed data; independent samples and
+time series; linear and nonlinear relationships; data with hidden common causes; and data from
+interventions or several domains. The searches also take background knowledge: edges that must or
+cannot exist, and the order of tiers in time. They include PC, FCI, GFCI, GES, XGES, BOSS, GRaSP,
+the LiNGAM family, PCMCI, and LPCMCI. Many methods spread their work over CPU cores, and some run
+on a GPU. A command line that answers in JSON and an agent skill make it usable by AI agents.
 
 ### How do I install it?
 
@@ -127,6 +129,16 @@ large enough to repay the transfer; correlation matrices move too when you set
 - `data`: saving and loading generated datasets (`andrey.data`).
 - `all`: all three.
 
+### How large a problem can it handle?
+
+It depends on the method, the data, and the machine, so the [release cards](benchmarks.md) time
+each method at growing sizes against the packages that implement it. A few published examples:
+PC learns a 400-variable graph in under a second, where causal-learn takes ten minutes; tabu
+search fits 800 variables and 8,000 rows in under two seconds, where bnlearn takes sixteen minutes;
+BOSS and FCI finish 800 variables; and PCMCI fits 160 time series in five seconds, where tigramite
+takes eight minutes. Finishing is not the same as being accurate:
+see [Are the classic methods accurate on very large graphs?](#are-the-classic-methods-accurate-on-very-large-graphs).
+
 ### Can it use more CPU cores?
 
 GES and GFCI (in its GES phase) can spread each pass over worker processes: set
@@ -155,22 +167,24 @@ Discrete data, yes: code each category as a whole number, or pass a DataFrame wh
 text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
 data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS, GRaSP,
 and exact search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`;
-all but GFCI pick BDeu by default when every column is categorical. Mixed data, with continuous and
-categorical columns, is experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and
+all but GFCI pick BDeu by default when every column is categorical. For mixed data, with
+continuous and categorical columns, PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and
 exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
 `score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`; GES, hill climbing, BOSS,
 GRaSP, and exact search pick `"local_score_cond_gauss"` by default when some columns are
 categorical. They infer which columns are categorical unless you name them with `categorical`, and
-warn about what they inferred. We have not benchmarked them yet.
+warn about what they inferred. The [release cards](benchmarks.md) benchmark them on categorical
+and mixed data against causal-learn, Tetrad, bnlearn, and pgmpy.
 [Data types](guides/getting-started.md#data-types) explains the settings, the inference rule, and
 how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
-`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, and `granger` learn graphs
-over time lags; `lpcmci` also allows hidden common causes. `multi_group_direct_lingam` fits several
-datasets that share one causal order, and `cdnod` takes data from several domains. All eight are
-experimental.
+Yes. `varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, and `granger` learn
+graphs over time lags; `lpcmci` also allows hidden common causes. The [release cards](benchmarks.md)
+benchmark them against tigramite, lingam, and causal-learn. `multi_group_direct_lingam` fits
+several datasets that share one causal order, `cdnod` takes data from several domains, and `gies`
+takes data that mixes observation with interventions. All are supported.
 
 ## Command line and agents
 

@@ -416,7 +416,12 @@ def _discovery_graph(text):
     assert len(scripts) == 1, "Each page must have one valid JSON-LD graph"
     data = json.loads(scripts[0])
     assert data["@context"] == "https://schema.org"
-    return {node["@type"]: node for node in data["@graph"]}
+    # A node can have several types (the software is source code and an application): each names it.
+    return {
+        kind: node
+        for node in data["@graph"]
+        for kind in (node["@type"] if isinstance(node["@type"], list) else [node["@type"]])
+    }
 
 
 def test_every_page_carries_structured_data_that_matches_its_preview(html):
@@ -434,7 +439,10 @@ def test_every_page_carries_structured_data_that_matches_its_preview(html):
             assert len(preview) == 1 and preview == twitter, page
             assert node[field] == unescape(preview[0]), page
         software = nodes["SoftwareSourceCode"]
+        assert software is nodes["SoftwareApplication"]
         assert software["name"] == "Andrey" and software["programmingLanguage"] == "Python"
+        # What it covers, in plain sentences an answer engine can quote.
+        assert any("mixed" in fact and "time series" in fact for fact in software["featureList"])
         assert software["license"]["name"] == "Apache-2.0"
         assert software["license"]["url"].endswith("/blob/main/LICENSE")
         assert software["codeRepository"] == "https://github.com/Abel-ai-lab/andrey"
@@ -483,7 +491,9 @@ def test_a_post_carries_the_date_authors_and_release_of_its_front_matter(html):
 def test_llms_txt_links_public_pages_by_section_with_their_preview_text(html):
     text = (html / "llms.txt").read_text()
     assert text.startswith("# Andrey\n\n> ") and andrey.__version__ in text
-    assert re.findall(r"^## (.+)$", text, re.M) == ["Docs", "Release cards", "Blog"]
+    assert re.findall(r"^## (.+)$", text, re.M) == ["At a glance", "Docs", "Release cards", "Blog"]
+    glance = text[text.index("## At a glance") : text.index("## Docs")]
+    assert "mixed" in glance and "time series" in glance and "Open source" in glance
     links = re.findall(r"^- \[(.*?)\]\((https://andrey\.abel\.ai/[^)]+)\): (.+)$", text, re.M)
     assert len(links) >= 12
     assert len(links) == len({url for _, url, _ in links})
