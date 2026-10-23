@@ -61,8 +61,8 @@ the edge between `i` and `j`, so every edge fills two cells. The codes are expor
 | Edge | `M[i, j]` | `M[j, i]` | Valid in |
 |---|---|---|---|
 | `i -> j` | `TAIL` | `ARROW` | every kind |
-| `i -- j` | `TAIL` | `TAIL` | `cpdag`, `pag` |
-| `i <-> j` | `ARROW` | `ARROW` | `pag` (bidirected edge); the same codes mean a 2-cycle in `digraph` |
+| `i -- j` | `TAIL` | `TAIL` | `cpdag`, `pag`, `mag` |
+| `i <-> j` | `ARROW` | `ARROW` | `pag`, `mag` (bidirected edge); the same codes mean a 2-cycle in `digraph` |
 | `i o-> j` | `CIRCLE` | `ARROW` | `pag` |
 | `i -o j` | `TAIL` | `CIRCLE` | `pag` |
 | `i o-o j` | `CIRCLE` | `CIRCLE` | `pag` |
@@ -222,13 +222,14 @@ from tail to arrowhead, an undirected edge has `dir=none`, and any other edge ha
 `arrowtail` and `arrowhead` set to `normal` for an arrowhead, `odot` for a circle, and `none` for a
 tail. Writing it needs no other package; Graphviz renders it.
 
-`andrey.graph` converts between graph kinds:
+`GraphStructure` also converts between graph kinds; a result reaches these through its graph, as
+in `out.structure.to_dag(tie_break="label")`:
 
 | Call | Returns |
 |---|---|
-| `to_dag(cpdag, tie_break="label")` or `to_dag(cpdag, seed=0)` | a DAG of the CPDAG's equivalence class |
-| `to_mag(dag, latent=..., selection=...)` | the MAG over the other nodes, a `pag` without circles |
-| `to_pag(graph, latent=..., selection=...)` | the PAG of a DAG or of a MAG over the other nodes |
+| `cpdag.to_dag(tie_break="label")` or `cpdag.to_dag(seed=0)` | a `dag` of the CPDAG's equivalence class |
+| `dag.to_mag(latent=..., selection=...)` | the `mag` over the other nodes |
+| `graph.to_pag(latent=..., selection=...)` | the `pag` of a DAG or of a MAG over the other nodes |
 
 A CPDAG with an undirected edge holds more than one DAG, so `to_dag` raises a `ValueError` that
 names those edges unless you say how to pick one: `tie_break="label"` takes the DAG the node labels
@@ -236,11 +237,14 @@ decide, the same whatever the column order, and `seed` takes a reproducible rand
 class, though not every DAG is equally likely. A CPDAG without an undirected edge, or a DAG, needs
 neither.
 
-`latent` and `selection` name nodes by label or 0-based position; `latent` defaults to the nodes
-that `node_types` flags. A hidden common cause becomes `<->` in the MAG, and two ancestors of a
-selection variable become `--`. `to_pag` gives the PAG that `fci` returns with an exact
-conditional-independence test, the fair target to score `fci` against.
-`andrey.metrics.to_cpdag` returns a DAG's CPDAG.
+A `mag`, a maximal ancestral graph, is one member of a PAG's class: it has a PAG's marks without
+circles, and the metrics score it as they score a PAG. `latent` and `selection` name nodes by
+label or 0-based position; `latent` defaults to the nodes that `node_types` flags. A hidden common
+cause becomes `<->` in the MAG, and two ancestors of a selection variable become `--`. `to_pag`
+gives the PAG that `fci` returns with an exact conditional-independence test, the fair target to
+score `fci` against. `andrey.metrics.to_cpdag` returns a DAG's CPDAG. `from_numpy` never infers
+`mag`, so pass `kind="mag"` for one; `to_pcalg` writes a MAG as `amat.pag`, and
+`from_pcalg(amat, "mag")` reads it back.
 
 ## Hand a graph to DoWhy
 
@@ -249,11 +253,10 @@ whose columns name the nodes:
 
 ```python
 import andrey
-from andrey.graph import to_dag
 from dowhy import CausalModel
 
-out = andrey.pc(df)                     # a CPDAG over the columns of df
-dag = to_dag(out, tie_break="label")    # the DAG of its class that the labels decide
+out = andrey.pc(df)                                # a CPDAG over the columns of df
+dag = out.structure.to_dag(tie_break="label")      # the DAG of its class the labels decide
 model = CausalModel(data=df, treatment="x", outcome="y", graph=dag.to_dot())
 estimand = model.identify_effect()
 estimate = model.estimate_effect(estimand, method_name="backdoor.linear_regression")

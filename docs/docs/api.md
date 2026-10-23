@@ -215,8 +215,16 @@ mutual information estimate the test's p-value is built on, a dependence measure
 ## Graph structures
 
 `GraphStructure` also reads and writes pcalg's `amat`, with `from_pcalg` and `to_pcalg`, and
-writes Graphviz DOT text with `to_dot`, which needs no other package;
-[Graph representation](guides/graph-representation.md) gives the conventions.
+writes Graphviz DOT text with `to_dot`, which needs no other package. It converts between graph
+kinds: `to_dag` returns a DAG of a CPDAG's equivalence class, and when the class holds more than
+one DAG, it asks you to choose how to pick one, with `tie_break="label"` or `seed`; `to_mag`
+projects a DAG with hidden and selection variables onto its other nodes as a maximal ancestral
+graph, of kind `mag`; and `to_pag` returns the PAG of a DAG or of a MAG, which `fci` would return
+with an exact test. `andrey.metrics.to_cpdag` returns a DAG's CPDAG. A result reaches them through
+its graph, as in `out.structure.to_dag(tie_break="label")`.
+[Graph representation](guides/graph-representation.md) gives the conventions, and
+[Hand a graph to DoWhy](guides/graph-representation.md#hand-a-graph-to-dowhy) passes a result to
+DoWhy for effect estimation.
 
 ```{eval-rst}
 .. autosummary::
@@ -227,28 +235,6 @@ writes Graphviz DOT text with `to_dot`, which needs no other package;
    StructureOutput
    SummaryGraph
    TemporalStructure
-```
-
-`andrey.graph` converts between graph kinds: `to_dag` returns a DAG of a CPDAG's equivalence
-class, and when the class holds more than one DAG, it asks you to choose how to pick one, with
-`tie_break="label"` or `seed`; `to_mag` projects a DAG with hidden and selection variables onto its
-other nodes as a maximal ancestral graph; and `to_pag` returns the PAG of a DAG or of a MAG, which
-`fci` would return with an exact test. `andrey.metrics.to_cpdag` returns a DAG's CPDAG.
-[Hand a graph to DoWhy](guides/graph-representation.md#hand-a-graph-to-dowhy) passes a result to
-DoWhy for effect estimation.
-
-```{eval-rst}
-.. currentmodule:: andrey.graph
-
-.. autosummary::
-   :toctree: api
-   :nosignatures:
-
-   to_dag
-   to_mag
-   to_pag
-
-.. currentmodule:: andrey
 ```
 
 ## Utilities
@@ -390,7 +376,7 @@ a matrix of endpoint marks with `GraphStructure.from_numpy(M, kind=...)` first.
 |---|---|---|
 | `dag` | both graphs are DAGs | skeleton and arrowhead precision, recall, and F1; `shd`; `mec_shd` and `mec_arrowhead_f1`, scored through the CPDAGs; the causal-order scores when the result has an ordering; `coefficient_mae` when both carry weights |
 | `cpdag` | either graph is a CPDAG | the skeleton and arrowhead scores and `shd`, with a DAG converted to its CPDAG first |
-| `pag` | either graph is a PAG | the skeleton and arrowhead scores and `shd`, plus `shd_endpoint` and the scores for bidirected pairs |
+| `pag` | either graph is a PAG or a MAG | the skeleton and arrowhead scores and `shd`, plus `shd_endpoint` and the scores for bidirected pairs |
 | `digraph` | either graph is a `digraph` | the skeleton and arrowhead scores and `shd`, self-loops included |
 | `latent` | either graph has latent nodes | `latent_cluster_ari` and the two latent counts |
 | `temporal` | both are a `TemporalStructure` | scores per lag, for the lagged and contemporaneous edges, and for the summary graph |
