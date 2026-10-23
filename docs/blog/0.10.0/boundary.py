@@ -4,8 +4,9 @@
 (columns). On the size map, the rows are the number of rows of data, with a mean degree of 2; on the
 density map, the rows are the mean degree, with 2,000 rows. A cell's color is the method's median
 errors as a share of the empty graph's, from the cobalt ramp, the deeper the fewer; a cell where it
-does no better than the empty graph is gray; a mark is a problem where a fit stopped, on time or
-memory, or failed. The outline around the cells inside the boundary is the boundary: in each row,
+does no better than the empty graph is gray; a mark is a problem where a row stopped: on time or
+memory, on a failed fit, or past the accuracy boundary, after two sizes in a row that do not beat
+the empty graph. The outline around the cells inside the boundary is the boundary: in each row,
 the sizes before the first one that does not finish or does not beat the empty graph. Every color is
 an ``--andrey-*`` token.
 
@@ -41,7 +42,12 @@ NAMES = {
     "exact_search": "Exact search", "calm": "CALM", "boss": "BOSS", "grasp": "GRaSP",
     "direct_lingam": "DirectLiNGAM", "ica_lingam": "ICA-LiNGAM",
 }  # fmt: skip
-STOPS = {"time": ("×", "time cap"), "memory": ("■", "memory cap"), "error": ("!", "failed")}
+STOPS = {
+    "time": ("×", "time cap"),
+    "memory": ("■", "memory cap"),
+    "error": ("!", "failed"),
+    "accuracy": ("○", "past the accuracy boundary"),
+}
 # A regime with a fixed number of rows, e.g. ``deg2-n2000``; ``deg2-n10d`` scales them with d.
 FIXED = re.compile(r"deg(\d+)-n(\d+)$")
 SIZE_DEGREE, DENSITY_ROWS = 2, 2000
@@ -172,8 +178,9 @@ def family_figure(family: str, cells: list[dict]) -> str:
         f'<figure class="bnd"><p class="bnd-title">{escape(FAMILIES[family])}</p>{panels}'
         "<figcaption>Columns: the number of variables. Color: errors as a share of the empty "
         "graph's, deeper is fewer; gray does no better than the empty graph. × stopped at the time "
-        "cap, ■ at the memory cap, ! failed. The outline is the boundary: in each row, the sizes "
-        "before the first that does not finish or does not beat the empty graph.</figcaption>"
+        "cap, ■ at the memory cap, ! failed, ○ past the accuracy boundary. The outline is the "
+        "boundary: in each row, the sizes before the first that does not finish or does not beat "
+        "the empty graph.</figcaption>"
         "</figure>\n"
     )
 
