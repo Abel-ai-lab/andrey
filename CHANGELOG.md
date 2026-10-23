@@ -9,6 +9,62 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- The same answers in less time: PC, FCI, GFCI, CD-NOD, GES, XGES, BOSS, GRaSP, exact search,
+  ICA-LiNGAM, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of the
+  identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
+  scores change in their last bits, with the same output on those datasets. ([#251], [#265],
+  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328])
+- Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
+  `cdnod` run the larger passes of their skeleton search in worker processes and return the same
+  graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
+  ([#282], [#289], [#290])
+
+### Added
+
+- With more than one worker (`ANDREY_NUM_WORKERS` or `andrey.config(num_workers=...)`), `pc`,
+  `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` run each skeleton pass
+  over conditioning sets of two or more variables in worker processes once it holds enough tests,
+  and return the same graphs and p-values as with one worker. ([#282], [#289])
+- `ANDREY_SKELETON_PARALLEL_MIN_WORK` sets the fewest CI tests a conditioning-size pass of the
+  `pc`, `fci`, `gfci`, and `cdnod` skeleton search needs to use the worker processes. The default,
+  500000, was measured on an AMD EPYC 9534 server running Linux; a fit with more than one worker
+  warns once on it when a pass reaches a tenth of it. `andrey calibrate --method skeleton`
+  measures the value for your machine, and `andrey calibrate` now measures it with GES's. ([#290])
+- For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
+  can show that it returns the same bits at any worker count and column order, and
+  `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
+
+### Changed
+
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` return the same
+  graphs and p-values in less time, because their skeleton search hands the test each pair's
+  conditioning sets, and those of consecutive pairs, as one stack. ([#280], [#292])
+- `fci` and `gfci` return the same PAGs in less time: the possible-d-separation step computes one
+  reach set per variable, and GFCI reads each node's neighbors from lists built once and tests its
+  separating sets in stacks. ([#265], [#312])
+- `ges` and `gfci` return the same graphs in less time, because GES keeps each reach set while a
+  move cannot change it and rebuilds the CPDAG after each move faster. ([#328])
+- `xges` returns the same graphs in less time, because each branch of its extended search copies
+  only the parts of the graph it changes. ([#311])
+- `boss` and `grasp` return the same graphs in less time, because each grow-shrink tree keeps one
+  tuple of candidate parents instead of copying the list on every trace. ([#267])
+- `exact_search` returns the same graphs in less time, because its linear-Gaussian BIC solves the
+  normal equations of a size's parent sets in stacks of up to 4,096. ([#273])
+- `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
+  built once and in blocks, and its HSIC tests run on a CUDA GPU, in float64, from the cutoff
+  `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
+- `anm` returns the same results with less memory, because it builds its kernel's distance matrix
+  directly. ([#294])
+- `ica_lingam` returns the same results in less time, because its causal-order search drops each
+  placed row with a mask. ([#275])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` compute
+  each pair's residual entropy once per step instead of twice, so their internal scores change in
+  the last bits. A near-tie between two candidates for the next variable in the causal order can
+  then resolve the other way; on the identity check's datasets every output is the same as 0.8.0's.
+  ([#288])
+
 ## [0.8.0] - 2026-10-23
 
 ### Highlights
@@ -526,7 +582,27 @@ First alpha release.
 [#237]: https://github.com/Abel-ai-lab/andrey/pull/237
 [#239]: https://github.com/Abel-ai-lab/andrey/pull/239
 [#248]: https://github.com/Abel-ai-lab/andrey/pull/248
+[#251]: https://github.com/Abel-ai-lab/andrey/pull/251
 [#261]: https://github.com/Abel-ai-lab/andrey/pull/261
+[#262]: https://github.com/Abel-ai-lab/andrey/pull/262
+[#265]: https://github.com/Abel-ai-lab/andrey/pull/265
+[#267]: https://github.com/Abel-ai-lab/andrey/pull/267
+[#269]: https://github.com/Abel-ai-lab/andrey/pull/269
 [#271]: https://github.com/Abel-ai-lab/andrey/pull/271
+[#273]: https://github.com/Abel-ai-lab/andrey/pull/273
+[#275]: https://github.com/Abel-ai-lab/andrey/pull/275
+[#277]: https://github.com/Abel-ai-lab/andrey/pull/277
 [#278]: https://github.com/Abel-ai-lab/andrey/pull/278
+[#280]: https://github.com/Abel-ai-lab/andrey/pull/280
+[#282]: https://github.com/Abel-ai-lab/andrey/pull/282
+[#284]: https://github.com/Abel-ai-lab/andrey/pull/284
+[#286]: https://github.com/Abel-ai-lab/andrey/pull/286
+[#288]: https://github.com/Abel-ai-lab/andrey/pull/288
+[#289]: https://github.com/Abel-ai-lab/andrey/pull/289
+[#290]: https://github.com/Abel-ai-lab/andrey/pull/290
+[#292]: https://github.com/Abel-ai-lab/andrey/pull/292
+[#294]: https://github.com/Abel-ai-lab/andrey/pull/294
 [#299]: https://github.com/Abel-ai-lab/andrey/pull/299
+[#311]: https://github.com/Abel-ai-lab/andrey/pull/311
+[#312]: https://github.com/Abel-ai-lab/andrey/pull/312
+[#328]: https://github.com/Abel-ai-lab/andrey/pull/328

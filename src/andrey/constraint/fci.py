@@ -6,7 +6,7 @@ The algorithm, its settings, and its references are described on :func:`andrey.f
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import nullcontext
 from functools import cache
 from itertools import combinations, islice, permutations
@@ -14,10 +14,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
+from andrey.constraint._parallel_skeleton import SkeletonWorkerPool, pool_capable
 from andrey.constraint._skeleton import (
     adjacent_pairs,
-    first_order_separating,
+    first_order_removals,
     marginal_removals,
     prescreen_capable,
     scan_pairs,
@@ -26,6 +26,7 @@ from andrey.constraint._skeleton import (
 )
 from andrey.constraint.pc import check_knowledge_cycle
 from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
+from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.search.hc import tie_ranks
 
@@ -49,6 +50,7 @@ def fci(
     max_depth: int | None = None,
     constraints: Constraints | None = None,
     in_column_order: bool = False,
+    workers: int | None = None,
 ) -> GraphStructure:
     """Discover a PAG from ``data`` with the FCI algorithm and the ``indep_test`` CI test.
 
@@ -70,6 +72,8 @@ def fci(
     (:func:`~andrey.constraint._skeleton.unseparated_triples`).
     An arrowhead the knowledge puts at ``x`` on an edge ``x - y`` while its required edges lead from
     ``x`` to ``y`` raises ``ValueError`` (:func:`~andrey.constraint.pc.check_knowledge_cycle`).
+    ``workers`` worker processes share the adjacency search's larger conditioning-size passes
+    (:func:`_fast_adjacency_search`); ``None`` reads ``andrey.config.num_workers``.
     Returns the PAG as a ``GraphStructure`` of kind ``"pag"`` (circle marks and all).
     """
     X = np.asarray(data, dtype=np.float64)
@@ -83,7 +87,14 @@ def fci(
         keep = constraints.required | constraints.required.T
         apart = ~allowed
     support, sepsets = _fast_adjacency_search(
-        X, test, alpha, support=allowed, keep=keep, apart=apart, max_depth=max_depth
+        X,
+        test,
+        alpha,
+        workers=backend.worker_count(workers),
+        support=allowed,
+        keep=keep,
+        apart=apart,
+        max_depth=max_depth,
     )
 
     marks = _circle_pag(support)
@@ -147,9 +158,11 @@ def _fast_adjacency_search(
 
     When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
     the size-0 and size-1 passes take them instead of the dense scalar scan -- same removals and
-    separating sets. With ``workers > 1`` the ``|S| >= 2`` scan fans out across worker
-    processes, reducing per-chunk removals by union, so the skeleton stays identical to the serial
-    scan.
+    separating sets. With ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of
+    at least :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
+    ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
+    per-chunk removals are concatenated in pair order, so the skeleton, a raised error included,
+    stays identical to the serial scan.
     """
     d = X.shape[1]
     support = np.ones((d, d), dtype=bool) if support is None else np.array(support, dtype=bool)
@@ -157,9 +170,7 @@ def _fast_adjacency_search(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    seedable = callable(getattr(test, "to_seed", None))
-    parallel = workers > 1 and seedable
-    pool = SkeletonWorkerPool(test, workers) if parallel else None
+    pool = SkeletonWorkerPool(test, workers) if workers > 1 and pool_capable(test) else None
     try:
         size = -1
         while True:
@@ -179,22 +190,24 @@ def _fast_adjacency_search(
                     sepsets[(x, y)] = ()
                     sepsets[(y, x)] = ()  # skeleton separations are recorded both ways
             elif can_prescreen and size == 1:
-                for x, y in adjacent_pairs(testable):
-                    candidates = sorted(
-                        (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
-                    )
-                    separating, _ = first_order_separating(
-                        test, x, y, candidates, alpha, record_pvalues=False
-                    )
-                    if separating:
-                        remove.append((x, y))
-                        key = tuple(separating)
-                        sepsets[(x, y)] = key
-                        sepsets[(y, x)] = key
+                pairs = adjacent_pairs(testable)
+                for x, y, separating, _ in first_order_removals(
+                    test, pairs, neighbors, alpha, record_pvalues=False
+                ):
+                    remove.append((x, y))
+                    sepsets[(x, y)] = separating
+                    sepsets[(y, x)] = separating
             else:
                 pairs = adjacent_pairs(testable)
-                if pool is not None:
-                    removals = pool.scan(pairs, support.copy(), size, alpha, record_pvalues=False)
+                pooled = (
+                    None
+                    if pool is None
+                    else pool.scan(
+                        pairs, neighbors, support.copy(), size, alpha, record_pvalues=False
+                    )
+                )
+                if pooled is not None:
+                    removals = pooled
                 else:
                     # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
                     # match the (1-thread) parallel skeleton workers, where it has them, whatever
@@ -277,7 +290,12 @@ def _parents(marks: np.ndarray, b: int) -> set[int]:
 
 def _adjacent_nodes(marks: np.ndarray, b: int) -> list[int]:
     """Ascending list of nodes sharing an edge with ``b``."""
-    return [j for j in range(marks.shape[0]) if marks[b, j] != NULL]
+    return np.flatnonzero(marks[b] != NULL).tolist()
+
+
+def _neighbor_lists(marks: np.ndarray) -> list[list[int]]:
+    """Every node's :func:`_adjacent_nodes`, read from ``marks`` at once."""
+    return [np.flatnonzero(row).tolist() for row in marks != NULL]
 
 
 def _into(marks: np.ndarray, b: int, mark: int) -> list[int]:
@@ -354,7 +372,7 @@ def _majority_sepsets(
     its recorded sets. Subsets are tested in chunks of ``_MAJORITY_CHUNK``, so memory per triple
     stays bounded.
     """
-    neighbors = [_adjacent_nodes(marks, node) for node in range(len(marks))]
+    neighbors = _neighbor_lists(marks)
     ambiguous = set()
     batched = getattr(test, "batched_call", None)
     for b, adjacent in enumerate(neighbors):
@@ -405,9 +423,7 @@ def _orient_colliders(
     does not contain ``b``; the endpoint at ``b`` on both edges is then set to an arrowhead. An
     already-directed tail at ``b`` blocks the orientation.
     """
-    n = marks.shape[0]
-    for b in range(n):
-        adj = _adjacent_nodes(marks, b)
+    for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
@@ -427,33 +443,31 @@ def _orient_colliders(
 # ---- possible-d-separation refinement -----------------------------------------------------------
 
 
-def _exists_semidirected_path(marks: np.ndarray, src: int, dst: int) -> bool:
-    """True when a semidirected path ``src o-> ... o-> dst`` exists.
+def _semidirected_reach(marks: np.ndarray) -> Callable[[int], int]:
+    """``reach(src)``: the bitmask of every node ``dst`` with a semidirected path
+    ``src o-> ... o-> dst`` of one or more steps, searched once per ``src``.
 
-    A step ``src -> u`` is allowed when the endpoint at ``src`` is a tail or a circle.
+    A step ``u -> v`` is allowed when the endpoint at ``u`` is a tail or a circle, so ``src`` is in
+    its own set only when such a path returns to it.
     """
-    n = marks.shape[0]
-    seen: set[int] = set()
-    queue: deque[int] = deque()
-    for u in range(n):
-        if marks[src, u] in (TAIL, CIRCLE) and u not in seen:
-            seen.add(u)
-            queue.append(u)
-    while queue:
-        node = queue.popleft()
-        if node == dst:
-            return True
-        for u in range(n):
-            if marks[node, u] in (TAIL, CIRCLE) and u not in seen:
-                seen.add(u)
-                queue.append(u)
-    return False
+    step = (marks == TAIL) | (marks == CIRCLE)
+    succ = row_masks(step)
+    pred = row_masks(step.T)
+
+    @cache
+    def reach(src: int) -> int:
+        seen = semidirected_reach_set(succ, src, 0)
+        # The search counts src as reached; keep it only when a reached node steps back into it.
+        return seen if seen & pred[src] else seen & ~(1 << src)
+
+    return reach
 
 
 def _exists_possible_parent_path(
-    previous: Mapping[int, set[int]], node: int, x: int, marks: np.ndarray
+    previous: Mapping[int, set[int]], node: int, x: int, reach: Callable[[int], int]
 ) -> bool:
-    """The possible-d-sep reachability check over the ``previous`` predecessor sets."""
+    """The possible-d-sep reachability check over the ``previous`` predecessor sets, with the
+    semidirected paths of :func:`_semidirected_reach`."""
     if node == x:
         return True
     preds = previous.get(node)
@@ -462,7 +476,7 @@ def _exists_possible_parent_path(
     for r in preds:
         if r == node or r == x:
             continue
-        if _exists_semidirected_path(marks, r, x) or _exists_semidirected_path(marks, r, node):
+        if reach(r) & (1 << x | 1 << node):
             return True
     return False
 
@@ -477,7 +491,8 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     reasons for keeping it. A node's possible-parent check runs when the frontier reaches it, over
     the predecessors recorded so far, so the set depends on the order of the node indices.
     """
-    n = marks.shape[0]
+    neighbors = _neighbor_lists(marks)
+    reach = _semidirected_reach(marks)
     dsep: set[int] = set()
     queue: deque[tuple[int, int]] = deque()
     visited: set[tuple[int, int]] = set()
@@ -485,8 +500,8 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     first: tuple[int, int] | None = None
     distance = 0
 
-    for b in range(n):
-        if not _adjacent(marks, x, b) or b == y:
+    for b in neighbors[x]:
+        if b == y:
             continue
         edge = (x, b)
         if first is None:
@@ -504,10 +519,10 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
             if distance > _UNBOUNDED_PATH:
                 break
         a, b = t
-        if _exists_possible_parent_path(previous, b, x, marks):
+        if _exists_possible_parent_path(previous, b, x, reach):
             dsep.add(b)
-        for c in range(n):
-            if not _adjacent(marks, b, c) or c in (a, x, y):
+        for c in neighbors[b]:
+            if c in (a, x, y):
                 continue
             previous.setdefault(c, set()).add(b)
             if _is_def_collider(marks, a, b, c) or _adjacent(marks, a, c):
@@ -800,9 +815,7 @@ def _rule_r1r2_cycle(
     out: np.ndarray | _Implied | None = None,
 ) -> bool:
     """Sweep R1 and R2 over every node ``b`` and each ordered pair of its neighbors."""
-    n = marks.shape[0]
-    for b in range(n):
-        adj = _adjacent_nodes(marks, b)
+    for b, adj in enumerate(_neighbor_lists(marks)):
         for i in range(len(adj)):
             for k in range(i + 1, len(adj)):
                 a, c = adj[i], adj[k]
@@ -1227,10 +1240,9 @@ def _rule_r7(
 def _rule_r8(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | None = None) -> bool:
     """R8: ``a -> b -> c`` (or ``a --o b -> c``) with ``a o-> c``  =>  ``a -> c``."""
     out = marks if out is None else out
-    n = marks.shape[0]
-    for b in range(n):
+    for b, adj in enumerate(_neighbor_lists(marks)):
         # Both orders of each neighbor pair, so the rule does not depend on node labels.
-        for x, z in permutations(_adjacent_nodes(marks, b), 2):
+        for x, z in permutations(adj, 2):
             b_to_z = marks[z, b] == ARROW and marks[b, z] == TAIL
             x_to_b_directed = marks[b, x] == ARROW and marks[x, b] == TAIL
             x_to_b_circle = marks[b, x] == CIRCLE and marks[x, b] == TAIL
@@ -1242,13 +1254,19 @@ def _rule_r8(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | No
     return change
 
 
-def _pd_reaches_target(marks: np.ndarray, target: int, a: int) -> set[int]:
-    """Nodes with a possibly-directed walk to ``target`` that avoids ``a``."""
+def _pd_reaches_target(
+    marks: np.ndarray, target: int, a: int, neighbors: list[list[int]] | None = None
+) -> set[int]:
+    """Nodes with a possibly-directed walk to ``target`` that avoids ``a``.
+
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
+    """
+    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
     reachable = {target}
     queue = deque([target])
     while queue:
         node = queue.popleft()
-        for previous in _adjacent_nodes(marks, node):
+        for previous in neighbors[node]:
             if (
                 previous not in reachable
                 and previous != a
@@ -1266,6 +1284,7 @@ def _exists_uncovered_pd_path(
     first: int,
     target: int,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    neighbors: list[list[int]] | None = None,
 ) -> bool:
     """True when an uncovered possibly-directed simple path ``a, first, ..., target`` exists.
 
@@ -1273,10 +1292,12 @@ def _exists_uncovered_pd_path(
     to each path: reaching a node through one predecessor must not block a different route.
     Reverse reachability prunes branches with no p.d. walk to the target avoiding ``a``.
     Ambiguity checks cover interior triples of the open path, with no wraparound at its target.
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
     """
     if marks[a, first] not in (TAIL, CIRCLE) or marks[first, a] == TAIL:
         return False
-    reachable = _pd_reaches_target(marks, target, a)
+    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
+    reachable = _pd_reaches_target(marks, target, a, neighbors)
     if first not in reachable:
         return False
     stack = [[a, first]]
@@ -1285,7 +1306,7 @@ def _exists_uncovered_pd_path(
         last = path[-1]
         if last == target:
             return True
-        for node in _adjacent_nodes(marks, last):
+        for node in neighbors[last]:
             if (
                 node not in reachable
                 or node in path
@@ -1312,6 +1333,7 @@ def _rule_r9(
     """R9: ``a o-> c`` with an uncovered possibly-directed path ``a .. b .. c``  =>  ``a -> c``."""
     out = marks if out is None else out
     n = marks.shape[0]
+    neighbors = _neighbor_lists(marks)
     for c in range(n):
         for a in _into(marks, c, ARROW):
             if marks[a, c] != CIRCLE:  # need a o-> c
@@ -1322,7 +1344,7 @@ def _rule_r9(
             for b in candidates:
                 if _adjacent(marks, b, c):
                     continue
-                if _exists_uncovered_pd_path(marks, a, b, c, ambiguous):
+                if _exists_uncovered_pd_path(marks, a, b, c, ambiguous, neighbors):
                     out[a, c] = TAIL
                     out[c, a] = ARROW
                     change = True
@@ -1350,6 +1372,7 @@ def _rule_r10(
     """
     out = marks if out is None else out
     n = marks.shape[0]
+    neighbors = _neighbor_lists(marks)
     for c in range(n):
         into_arrows = _into(marks, c, ARROW)
         if len(into_arrows) < 2:
@@ -1366,7 +1389,7 @@ def _rule_r10(
                     b, d = into_arrows[i], into_arrows[k]
                     if marks[b, c] != TAIL or marks[d, c] != TAIL:  # need b -> c <- d
                         continue
-                    if _r10_connects(marks, children, b, d, a, ambiguous):
+                    if _r10_connects(marks, children, b, d, a, ambiguous, neighbors):
                         out[a, c] = TAIL
                         out[c, a] = ARROW
                         change = True
@@ -1380,16 +1403,21 @@ def _r10_connects(
     d: int,
     a: int,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    neighbors: list[list[int]] | None = None,
 ) -> bool:
     """True when uncovered p.d. paths from ``a`` reach ``b``/``d`` via non-adjacent children.
 
     Either child of a pair may lead to either tail. Each child is searched at most once per tail.
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
     """
+    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
     reaches: dict[tuple[int, int], bool] = {}
 
     def reach(child: int, target: int) -> bool:
         if (child, target) not in reaches:
-            reaches[child, target] = _exists_uncovered_pd_path(marks, a, child, target, ambiguous)
+            reaches[child, target] = _exists_uncovered_pd_path(
+                marks, a, child, target, ambiguous, neighbors
+            )
         return reaches[child, target]
 
     for one, two in combinations(children, 2):
