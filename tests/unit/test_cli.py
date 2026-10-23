@@ -922,7 +922,6 @@ def test_config_report_describes_the_machine_and_how_to_fill_its_gaps(capsys, mo
         lambda: {
             "torch": ["torch"],
             "viz": ["matplotlib", "pygraphviz"],
-            "data": ["safetensors"],
         },
     )
     monkeypatch.setattr(cli, "_version", {"torch": "2.8.0", "matplotlib": "3.9.0"}.get)

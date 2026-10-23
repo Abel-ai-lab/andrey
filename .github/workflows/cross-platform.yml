@@ -134,8 +134,8 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
-      - name: Sync with the torch and data extras
-        run: uv sync --locked --extra torch --extra data --python ${{ matrix.python-version }}
+      - name: Sync with the torch extra
+        run: uv sync --locked --extra torch --python ${{ matrix.python-version }}
       - name: torch imports
         # Without torch the torch-path tests skip, and the job would pass with torch broken.
         run: uv run --no-sync python -c "import torch, andrey; print('torch', torch.__version__); print(andrey.describe().as_dict())"
