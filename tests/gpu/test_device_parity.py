@@ -108,7 +108,7 @@ def test_kci_and_cmiknn_match_the_cpu(device, nonlinear):
     cpu_kci = [kci(*q) for q in queries]
     cpu_cmiknn = [cmiknn(*q) for q in queries]
     cpu_graphs = [andrey.pc(nonlinear, indep_test=t).structure for t in ("kci", "cmiknn")]
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     with andrey.config(backend=device):
         got_kci = [kci(*q) for q in queries]
         got_cmiknn = [cmiknn(*q) for q in queries]
@@ -134,7 +134,7 @@ def test_pnl_matches_the_cpu(device):
     table = np.column_stack([x, y, a, b])
     with andrey.config(backend="numpy"):
         cpu = pnl_pairs(table)
-    backend.reset_dispatch_stats()
+    backend._dispatch_counts.clear()
     with andrey.config(backend=device):
         got = pnl_pairs(table)
         threaded = pnl_pairs(table, num_workers=3)

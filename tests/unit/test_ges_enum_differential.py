@@ -23,6 +23,7 @@ from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
 from andrey.search.ges import ges
 from andrey.search.hc import tie_ranks
+from tests.unit.ges_chunks import backward_inprocess, forward_inprocess
 
 
 @pytest.fixture
@@ -433,7 +434,7 @@ def test_kept_scan_honors_any_engine_bounds(
         with monkeypatch.context() as patch:
             patch.setattr(ops, "apply_insert", record_insert)
             patch.setattr(pg, "_FULL_RESCAN", full_rescan)
-            adj = pg._forward_inprocess(np.zeros((d, d), dtype=np.int8), engine, d, 3, 1, range(d))
+            adj = forward_inprocess(np.zeros((d, d), dtype=np.int8), engine, d, 3, 1, range(d))
         return adj, moves
 
     kept_adj, kept_moves = forward(False)
@@ -487,8 +488,8 @@ def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None):
     adj = np.zeros((n, n), dtype=np.int8)
     with threadpool_limits(limits=1):
         ranks = tie_ranks(X).tolist()
-        adj = pg._forward_inprocess(adj, engine, n, max_parents, n_chunks, ranks)
-        adj = pg._backward_inprocess(adj, engine, n, n_chunks, ranks)
+        adj = forward_inprocess(adj, engine, n, max_parents, n_chunks, ranks)
+        adj = backward_inprocess(adj, engine, n, n_chunks, ranks)
         total = _recompute_objective(adj, score, n)
     return to_structure(adj, kind="cpdag").to_numpy(), total
 
