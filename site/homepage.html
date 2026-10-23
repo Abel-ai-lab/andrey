@@ -7,6 +7,7 @@
 {{ super() }}
 {{ home.robots }}
 <link rel="preload" as="font" type="font/woff2" href="_static/fonts/inter-latin.woff2" crossorigin>
+<link rel="preload" as="image" type="image/avif" href="{{ home.hero_image }}" fetchpriority="high">
 <noscript><style>.andrey-home .tile-dialog { display: block; position: static; margin: 2rem auto; } .andrey-home .tile-dialog .wf-close { display: none; }</style></noscript>
 <style>{{ home.style }}</style>
 {%- endblock extrahead %}

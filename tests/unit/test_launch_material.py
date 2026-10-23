@@ -48,6 +48,9 @@ def test_readme_blocks_match_summary_and_registry(monkeypatch, offline_datasets)
     lead, fewer = build.more_than(build.fewest_errors(summaries))
     claim = f"- **Accurate**: {lead.lower()} {fewer}% fewer errors than other popular packages."
     assert claim in pitch
+    # The kinds of data the methods cover, which a reader and an answer engine look for first.
+    for kind in ("categorical", "mixed", "time series", "nonlinear"):
+        assert kind in pitch
 
 
 def readme_targets(readme):
