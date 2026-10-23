@@ -93,6 +93,7 @@ ALGORITHMS = {
     "ICALiNGAM": (_facade("ica_lingam"), "lingam_5v_uniform"),
     "PC": (_facade("pc"), "gauss_5v"),
     "FCI": (_facade("fci"), "gauss_5v"),
+    "RFCI": (_facade("rfci"), "gauss_5v"),
     "GFCI": (_facade("gfci", lambda_value=2.0), "gauss_5v"),
     "CDNOD": (_run_cdnod, "gauss_5v"),
     "GES": (_facade("ges", lambda_value=2.0), "gauss_5v"),

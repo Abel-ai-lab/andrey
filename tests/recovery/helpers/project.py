@@ -10,7 +10,8 @@ import numpy as np
 _SCORE_GRAPH = frozenset({"GES", "GIES", "XGES", "HC", "Tabu"})
 # Graph-output algorithms: candidate = {"graph"[, "score"]}.
 _GRAPH = (
-    frozenset({"PC", "FCI", "GFCI", "CDNOD", "ExactSearch", "BOSS", "GRaSP", "CALM"}) | _SCORE_GRAPH
+    frozenset({"PC", "FCI", "RFCI", "GFCI", "CDNOD", "ExactSearch", "BOSS", "GRaSP", "CALM"})
+    | _SCORE_GRAPH
 )
 # LiNGAM: candidate = ordering + weighted_adjacency, transposing native W back to the B layout.
 _LINGAM = frozenset({"DirectLiNGAM", "ICALiNGAM"})

@@ -43,6 +43,10 @@ SPEC: dict[str, dict] = {
         "structural": ["graph"],
         "numeric": {},
     },
+    "RFCI": {
+        "structural": ["graph"],
+        "numeric": {},
+    },
     "GFCI": {
         "structural": ["graph"],
         "numeric": {},
