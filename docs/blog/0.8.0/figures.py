@@ -1,14 +1,14 @@
-"""The 0.8.0 post's figures, written next to it as HTML that the post includes.
+"""The 0.8.0 post's figures, saved as HTML beside this script for inclusion in the post.
 
-- ``dependence.html``: three relationships, linear, cos, and square, each with the p-value partial
-  correlation gives it and the one KCI gives it.
+- ``dependence.html``: three relationships, linear, cosine, and square, with p-values from partial
+  correlation and each nonlinear test.
 - ``graphs.html``: the post's example, the true graph beside the graph PC finds with partial
-  correlation and with each new test.
+  correlation and with each nonlinear test.
 - ``comparison.html``: PC and FCI with each test against each reference package: the speedup.
 
-The table's numbers come from the 0.8.0 release card's summary (``SUMMARY``), so they change only
-with it; the other two figures are fitted here, on fixed seeds. Every color is an ``--andrey-*``
-token. Run with ``uv run python docs/blog/0.8.0/figures.py [summary.json]``.
+The table's numbers come from the 0.8.0 release card's summary (``SUMMARY``). The other two figures
+use fits computed here with fixed seeds. Every color is an ``--andrey-*`` token. The script runs
+with ``uv run python docs/blog/0.8.0/figures.py [summary.json]``.
 """
 
 from __future__ import annotations
@@ -44,20 +44,20 @@ PALETTE = Palette(
 
 
 def listed(names: list[str]) -> str:
-    """Names joined as a sentence lists them: A, B, and C."""
+    """Names joined in a list: A, B, and C."""
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + f", and {names[-1]}"
 
 
 def p_text(p: float) -> str:
-    """A p-value as the figures print it."""
+    """A p-value formatted for display in the figures."""
     if p < 0.001:
         return "p < 0.001"
     return f"p = {p:.3f}" if p < 0.01 else f"p = {p:.2f}"
 
 
 def dependence_figure() -> str:
-    # 400 draws of x, and y as a line, a cos, and a square of x with the same noise: each
-    # relationship's points on the left of its row, and on the right whether each test finds it.
+    # 400 draws of x, with linear, cosine, and square functions of x sharing the same noise.
+    # Each row shows the points on the left and each test's result on the right.
     rng = np.random.default_rng(0)
     x = rng.uniform(-3, 3, 400)
     noise = rng.normal(0, 0.3, 400)
@@ -105,14 +105,14 @@ def dependence_figure() -> str:
 
 
 def graphs_figure() -> str:
-    # The post's example: 500 rows of 8 variables, each a weighted sum of the cos of its causes.
+    # The post's example: 500 rows of 8 variables, each a weighted sum of cosines plus noise.
     dataset = sample_scm(
         d=8, n=500, functional="nonmonotone", density=2.0, scale="standardize", seed=0
     )
     labels = tuple("ABCDEFGH")
     truth = dataset.graph.adjacency
     true_graph = GraphStructure.from_numpy(truth, kind="dag", labels=labels)
-    # The nodes on a circle, so no edge runs through another node at this size.
+    # Nodes lie on a circle so no edge passes through another node at this size.
     angles = np.linspace(np.pi / 2, np.pi / 2 - 2 * np.pi, len(labels), endpoint=False)
     positions = {
         i: (0.5 + 0.42 * float(np.cos(a)), 0.5 - 0.42 * float(np.sin(a)))
@@ -146,12 +146,13 @@ def graphs_figure() -> str:
 
 
 def table(title: str, columns: tuple[str, ...], groups: tuple, rank=None, note: str = "") -> str:
-    """A comparison table in the post's one layout: rows grouped under a label set on its side,
-    Andrey's column first and tinted, each row's best cell in bold.
+    """A comparison table with vertical group labels and Andrey's column first and tinted.
 
-    ``groups`` holds ``(label, rows)``, each row ``(name, detail, cells)`` with a cell per column:
-    a number, a word, or None for a cell with no measurement. ``rank`` orders a row's cells,
-    lowest best; it defaults to the number itself, and a cell it ranks None is never best.
+    The best cells are bold when the row has different ranks.
+
+    ``groups`` holds ``(label, rows)`` pairs. Each row is ``(name, detail, cells)``, with one cell
+    per column: a number, a word, or None for no measurement. ``rank`` orders cells from best to
+    worst and defaults to the cell's value. A cell ranked None is never best.
     """
     rank = rank or (lambda cell: cell)
     ours = ' class="ct-ours"'
@@ -198,14 +199,14 @@ def table(title: str, columns: tuple[str, ...], groups: tuple, rank=None, note: 
 
 
 def floored(value: float) -> str:
-    """``value`` cut down to two significant figures, so a speedup is never overstated."""
+    """``value`` rounded down to two significant figures to avoid overstating a speedup."""
     digits = 1 - int(np.floor(np.log10(value)))
     return f"{np.floor(value * 10**digits) / 10**digits:g}"
 
 
 def comparison_table(summary: dict) -> str:
-    # One row per test and reference package, over every size we measured, PC and FCI together:
-    # the speedup range of the median fit time, smallest cut down and largest rounded.
+    # One row per test and reference package across all measured sizes of PC and FCI:
+    # the range of median fit-time ratios, with the minimum rounded down and maximum rounded.
     ratios: dict[tuple[str, str], list[float]] = {}
     for method in summary["methods"]:
         test = method["solution"].split(".")[2]
@@ -230,7 +231,7 @@ def main() -> None:
     (HERE / "dependence.html").write_text(dependence_figure(), encoding="utf-8")
     (HERE / "graphs.html").write_text(graphs_figure(), encoding="utf-8")
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else SUMMARY
-    if path.exists():  # the release card's summary lands with the card
+    if path.exists():  # the comparison requires the release card's summary
         summary = json.loads(path.read_text(encoding="utf-8"))
         (HERE / "comparison.html").write_text(comparison_table(summary), encoding="utf-8")
 
