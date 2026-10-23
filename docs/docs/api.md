@@ -211,6 +211,9 @@ mutual information estimate the test's p-value is built on, a dependence measure
 
 ## Graph structures
 
+`GraphStructure` also reads and writes pcalg's `amat`, with `from_pcalg` and `to_pcalg`;
+[Graph representation](guides/graph-representation.md) gives the conventions.
+
 ```{eval-rst}
 .. autosummary::
    :toctree: api
