@@ -75,7 +75,8 @@ class PCMCIPlusResult:
     ``(tau_max + 1, n, n)``, indexed ``[lag, i, j]`` for ``X^i_{t-lag}`` and ``X^j_t``; lag 0 is
     symmetric. ``adjacency`` holds the links after phase 2. A link's p-value is the largest of its
     phase-2 tests, and its statistic the partial correlation of that test; a lagged link phase 1
-    removed reports its largest phase-1 test instead, and the lag-0 diagonal is ``1`` and ``0``.
+    removed reports its largest phase-1 test instead, and the lag-0 diagonal is ``1`` and ``0``,
+    as is a link the knowledge keeps apart; a required link reads ``0`` and ``1``.
     ``marks`` holds the lag-0 endpoint marks: ``marks[i, j]`` is the mark at ``i`` on the link
     ``i - j``, ``TAIL``/``ARROW`` for ``i -> j``, ``TAIL`` at both ends for an unoriented link, and
     ``ARROW`` at both ends for a conflict. ``sepsets[(i, lag, j)]`` is the lag-0 separating set

@@ -120,8 +120,8 @@ class LPCMCIResult:
     ``end_marks`` the mark at ``X^j_t``, ``NULL`` where there is no link. Marks are ``TAIL``,
     ``ARROW``, ``CIRCLE``, or :data:`CONFLICT`. Lag 0 holds both orders of a link, so
     ``start_marks[0, i, j] == end_marks[0, j, i]``. ``statistics`` and ``p_values`` have the same
-    shape; a pair's entry is its final-phase test with the largest p-value, and ``0`` and ``1``
-    where no test ran. ``sepsets[(i, j, lag)]`` lists the
+    shape; a pair's entry is its final-phase test with the largest p-value, ``0`` and ``1``
+    where no test ran, and ``1`` and ``0`` for a required link. ``sepsets[(i, j, lag)]`` lists the
     separating sets of a removed link (``i < j`` at lag 0) as ``(variable, lag)`` nodes relative
     to ``X^j_t``. ``parents[j]`` holds the ``(i, lag)`` nodes the last preliminary iteration found
     to be parents of ``X^j_t``, kept as directed links for the final phase.

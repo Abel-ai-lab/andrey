@@ -91,7 +91,8 @@ class PCMCIResult:
     ``parents[j]`` holds the ``(i, lag)`` parents PC1 selected for variable ``j``, strongest first.
     ``statistics``, ``p_values``, and ``graph`` have shape ``(tau_max, n, n)``: entry
     ``[lag - 1, i, j]`` belongs to the link ``X^i_{t-lag} -> X^j_t``, and ``graph`` is
-    ``p_values <= alpha_level``.
+    ``p_values <= alpha_level``. A link the knowledge forbids reads statistic 0 and p-value 1, and
+    a required one 1 and 0.
     """
 
     parents: tuple[tuple[Link, ...], ...]
