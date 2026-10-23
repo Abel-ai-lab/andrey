@@ -281,7 +281,7 @@ class GraphStructure(Structure):
         Raises
         ------
         ValueError
-            If ``kind`` is not one of the four kinds, ``M`` is not square, has a nonzero diagonal
+            If ``kind`` is not one of the five kinds, ``M`` is not square, has a nonzero diagonal
             without ``allow_self_loops`` or a diagonal value other than ``0`` or ``2`` with it,
             holds a value outside ``0..3``, has a mark in ``M[i, j]`` but not in ``M[j, i]``,
             ``labels`` does not have ``n`` entries or has two that are equal as text, such as ``1``
