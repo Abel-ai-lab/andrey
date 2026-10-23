@@ -34,7 +34,9 @@ def test_andrey_and_causal_learn_ges_return_the_same_graph(d: int, seed: int):
     """At the matched penalty the two engines return the same graph."""
     pytest.importorskip("causallearn", reason="causal-learn is not installed")
     x = _linear_gaussian(d, 1000, seed)
-    assert _fit_hash(andrey_ges_adapters()[0], x) == _fit_hash(CausalLearnGES(), x)
+    assert _fit_hash(andrey_ges_adapters(parent_rule="gate")[0], x) == _fit_hash(
+        CausalLearnGES(), x
+    )
 
 
 def test_the_hash_still_separates_a_solution_that_disagrees():
