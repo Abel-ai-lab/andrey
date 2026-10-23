@@ -10,6 +10,7 @@ rejection rates over many draws are a measurement, made by ``qa/ci_calibration.p
 
 from __future__ import annotations
 
+import importlib
 import math
 import subprocess
 import sys
@@ -238,11 +239,13 @@ def _full_matrix_estimate(ranks: np.ndarray, x: int, y: int, cond: tuple, k: int
     return float(digamma(k) + np.mean(digamma(k_z) - digamma(k_xz) - digamma(k_yz)))
 
 
+@pytest.mark.parametrize("select", [np.int16, np.int32])
 @pytest.mark.parametrize("n", [63, 64, 200])
-def test_cmiknn_statistic_equals_the_whole_matrix_estimate(n):
+def test_cmiknn_statistic_equals_the_whole_matrix_estimate(n, select, monkeypatch):
     """The estimate, computed a block of rows at a time, equals the whole-matrix formula exactly
-    with less than one block, exactly one, and several with a remainder; it does not depend on
-    the argument order."""
+    with less than one block, exactly one, and several with a remainder, selecting the neighbor
+    distances as 16- or 32-bit integers; it does not depend on the argument order."""
+    monkeypatch.setattr(ci_cmiknn, "_PARTITION_DTYPE", select)
     data = _common_cause(seed=11, n=n, n_cond=2, shared=0.3)
     data[:, 3] = np.round(data[:, 3], 1)  # ties
     test = CMIknn(data, k_cmi=5)
@@ -251,6 +254,44 @@ def test_cmiknn_statistic_equals_the_whole_matrix_estimate(n):
         first, second = sorted((rank[x], rank[y]))
         expected = _full_matrix_estimate(test._ranks, first, second, [rank[c] for c in cond], 5)
         assert test.statistic(x, y, cond) == expected == test.statistic(y, x, cond[::-1])
+
+
+@pytest.mark.parametrize("n", [63, 200])
+def test_cmiknn_selection_type_leaves_the_pvalues_unchanged(n, monkeypatch):
+    """Selecting the neighbor distances as 16- or 32-bit integers gives the same estimates and
+    p-values on data with ties and duplicate rows."""
+    data = np.round(_common_cause(seed=7, n=n, n_cond=2, shared=0.3), 1)
+    data[n // 2 :] = data[: n - n // 2]  # every row twice
+    queries = [(0, 1, ()), (0, 1, (2,)), (0, 3, (1, 2)), (1, 3, (2,))]
+    results = {}
+    for select in (np.int16, np.int32):
+        monkeypatch.setattr(ci_cmiknn, "_PARTITION_DTYPE", select)
+        test = CMIknn(data, n_permutations=30)
+        results[select] = [(test(*query), test.statistic(*query)) for query in queries]
+    assert results[np.int16] == results[np.int32]
+
+
+@pytest.mark.parametrize(
+    ("features", "expected"),
+    [
+        ({"AVX2": True, "AVX512_SKX": True, "AVX512_ICL": True}, np.int16),
+        ({"AVX2": True, "AVX512_SKX": True, "AVX512_ICL": False}, np.int32),
+        ({"AVX2": True, "AVX512_ICL": False}, np.int32),
+        ({"AVX2": False, "AVX512_ICL": False}, np.int16),
+        ({"NEON": True, "ASIMD": True}, np.int16),
+    ],
+)
+def test_cmiknn_selects_in_the_type_numpy_sorts_with_simd(features, expected):
+    """16-bit integers where NumPy has a 16-bit SIMD selection (AVX512_ICL) or no 32-bit one
+    (no AVX2), 32-bit integers elsewhere on x86."""
+    assert ci_cmiknn._partition_dtype(features) is expected
+
+
+def test_cmiknn_reads_the_cpu_features_numpy_reports():
+    """The selection type follows the features NumPy reports; if NumPy moves that report, this
+    fails rather than every CPU falling back to 32-bit integers."""
+    features = importlib.import_module("numpy._core._multiarray_umath").__cpu_features__
+    assert ci_cmiknn._partition_dtype(features) is ci_cmiknn._PARTITION_DTYPE
 
 
 def test_cmiknn_takes_k_cmi_as_a_count_or_a_fraction():

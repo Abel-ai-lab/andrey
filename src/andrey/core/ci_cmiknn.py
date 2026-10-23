@@ -7,7 +7,8 @@ where a larger value means more independent.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+import importlib
+from collections.abc import Iterable, Iterator, Mapping
 from functools import lru_cache
 from numbers import Integral
 
@@ -35,6 +36,27 @@ _DEVICE_BATCH_BYTES = 2**30
 
 # Rows of the distance matrices one step of the CPU estimate holds, so its temporaries stay small.
 _BLOCK_ROWS = 64
+
+
+def _partition_dtype(features: Mapping[str, bool]) -> type[np.integer]:
+    """The integer type in which :func:`_cmi_given_yz` selects each row's ``k``-th distance, given
+    the CPU features NumPy reports.
+
+    NumPy selects 16-bit integers with SIMD only where the CPU has AVX512_ICL, and 32-bit integers
+    with AVX2 or AVX-512. Without AVX512_ICL a 16-bit selection runs scalar, 4 to 7 times slower
+    than the same values as 32-bit integers, so those CPUs widen. Where NumPy reports no AVX2, as
+    on ARM, widening gains nothing. The values are integers below the rows, so the ``k``-th
+    smallest is the same in either type.
+    """
+    return np.int16 if features.get("AVX512_ICL") or not features.get("AVX2") else np.int32
+
+
+try:
+    _PARTITION_DTYPE = _partition_dtype(
+        importlib.import_module("numpy._core._multiarray_umath").__cpu_features__
+    )
+except (ImportError, AttributeError):  # NumPy moved its feature report: the type never 4x slower
+    _PARTITION_DTYPE = np.int32
 
 
 def _rank_columns(data: np.ndarray, rng: np.random.Generator) -> np.ndarray:
@@ -69,18 +91,26 @@ def _cmi_given_yz(x: np.ndarray, yz: tuple[np.ndarray, ...], k: int) -> float:
 
     The ``k``-th neighbor distance ``eps_i`` is taken in the joint space; each ``k_*,i`` counts the
     rows strictly closer than ``eps_i`` in a subspace, row ``i`` included. The joint distances and
-    ``k_xz`` take ``_BLOCK_ROWS`` rows at a time; ``k_yz`` and ``k_z`` are binary searches in the
-    sorted rows. The counts are integers, and the estimate is formed once from all of them.
+    ``k_xz`` take ``_BLOCK_ROWS`` rows at a time, selecting ``eps`` as :func:`_partition_dtype`
+    says; ``k_yz`` and ``k_z`` are binary searches in the sorted rows. The counts are integers,
+    and the estimate is formed once from all of them.
     """
     dyz, dz, yz_rows, z_rows = yz
     n = x.shape[0]
+    select = np.promote_types(x.dtype, _PARTITION_DTYPE)
+    # A row of flags summed as bytes, in the narrowest type that holds its count, is several times
+    # faster than `np.count_nonzero` along an axis.
+    count = np.uint16 if n <= np.iinfo(np.uint16).max else np.intp
     eps = np.empty(n, dtype=x.dtype)
     k_xz = np.empty(n, dtype=np.intp)
     for start in range(0, n, _BLOCK_ROWS):
         rows = slice(start, start + _BLOCK_ROWS)
         dx = np.abs(x[rows, None] - x[None, :])
-        eps[rows] = np.partition(np.maximum(dx, dyz[rows]), k, axis=1)[:, k]  # 0: row i itself
-        k_xz[rows] = np.count_nonzero(np.maximum(dx, dz[rows]) < eps[rows, None], axis=1)
+        joint = np.maximum(dx, dyz[rows]).astype(select, copy=False)
+        joint.partition(k, axis=1)
+        eps[rows] = joint[:, k]  # 0: row i itself
+        closer = np.maximum(dx, dz[rows]) < eps[rows, None]
+        k_xz[rows] = closer.view(np.uint8).sum(axis=1, dtype=count)
     offset = np.arange(0, n * n, n, dtype=yz_rows.dtype)
     k_yz = np.searchsorted(yz_rows, offset + eps) - offset
     k_z = np.searchsorted(z_rows, offset + eps) - offset
