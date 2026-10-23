@@ -167,6 +167,49 @@ def _canonical_chunk(
     return pvalues(*_query_arrays(size, [(min(a, b), max(a, b), chunk)]))
 
 
+def marginal_separated(
+    test: CITest, xs: np.ndarray, ys: np.ndarray, alpha: float
+) -> np.ndarray | None:
+    """Whether the marginal test separates each pair ``(xs[i], ys[i])``, ``xs[i] < ys[i]``.
+
+    A FisherZ or StudentT test answers every pair in one canonical query array, with the p-values
+    of the scalar calls. Another test returns ``None``: its scalar calls keep their order. So does
+    a call with no pair, whose query array a one-column test cannot index.
+    """
+    canonical = _canonical_route(test)
+    if canonical is None or not len(xs):
+        return None
+    return canonical(xs, ys, np.empty((len(xs), 0), dtype=np.intp)) > alpha
+
+
+def separating_subsets(
+    test: CITest,
+    x: int,
+    y: int,
+    size: int,
+    subsets: Iterator[tuple[int, ...]],
+    alpha: float,
+) -> list[tuple[int, ...]]:
+    """The ``subsets`` (sorted, distinct, of ``size`` members) whose test separates ``x < y``.
+
+    A FisherZ or StudentT test evaluates the subsets in chunks of ``_CHUNK`` canonical queries, in
+    order. A chunk whose evaluation raises is tested again subset by subset with scalar ``test``
+    calls, so the error is the one the scalar loop raises, after the same queries. Another test
+    makes one scalar call per subset.
+    """
+    canonical = _canonical_route(test)
+    if canonical is None:
+        return [cond for cond in subsets if test(x, y, cond) > alpha]
+    found: list[tuple[int, ...]] = []
+    while chunk := list(islice(subsets, _CHUNK)):
+        try:
+            pvalues = _canonical_chunk(canonical, size, x, y, chunk)
+        except Exception:
+            pvalues = [test(x, y, cond) for cond in chunk]
+        found.extend(cond for cond, p in zip(chunk, pvalues) if p > alpha)
+    return found
+
+
 def record_tests(
     trace: list[dict],
     depth: int,
