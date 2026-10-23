@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from andrey.search.operators import max_parents_in_class
 from andrey_bench.adapters.andrey_ges import AndreyGES, andrey_ges_adapters
 
 
@@ -36,12 +37,14 @@ def test_params_record_the_rule_only_where_a_limit_applies() -> None:
     assert "parent_rule" not in _adapter("cap", max_parents=None).params()
 
 
-@pytest.mark.parametrize(("parent_rule", "neighbors"), [("gate", 2), ("cap", 1)])
-def test_the_adapter_applies_the_rule_it_records(parent_rule: str, neighbors: int) -> None:
-    """Two causes of one variable under a limit of 1: the gate links it to both, the cap to one."""
-    adapter = _adapter(parent_rule)
+@pytest.mark.parametrize(("parent_rule", "exceeds"), [("cap", False), ("gate", True)])
+def test_the_adapter_applies_the_rule_it_records(parent_rule: str, exceeds: bool) -> None:
+    """Two causes of one variable under a limit of 1: the cap guarantees that no DAG of the
+    returned class gives a node more than one parent; the gate admits the collider, so the
+    variable reaches two."""
+    adapter = _adapter(parent_rule, max_parents=1)
     marks = adapter.fit(_fan_in(2), adapter.params())
-    assert int((marks[2] != 0).sum()) == neighbors
+    assert (max_parents_in_class(marks) > 1).any() == exceeds
 
 
 def test_the_ges_lane_gives_both_packages_one_limit_and_one_rule() -> None:
