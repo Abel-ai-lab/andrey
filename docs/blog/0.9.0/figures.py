@@ -57,7 +57,10 @@ def speedup_table(summary: dict) -> str:
                 (
                     NAMES.get(m, m),
                     "",
-                    (f"{floored(min(speeds[m]))}-{max(speeds[m]):.2g}x", "Yes" if same[m] else "No"),
+                    (
+                        f"{floored(min(speeds[m]))}-{max(speeds[m]):.2g}x",
+                        "Yes" if same[m] else "No",
+                    ),
                 )
                 for m in speeds
                 if family.get(m) == key
