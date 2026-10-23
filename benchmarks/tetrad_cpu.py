@@ -89,7 +89,7 @@ SLICE = {
     "density": datasets.CANONICAL_DENSITY,
 }
 
-#: Smallest run that touches every solution: one dataset at the smallest size.
+#: Smallest run that touches every solution: two datasets at the smallest size.
 SMOKE = {"ladder": [20], "seeds": 2, "repeats": 1, "cap_wall_s": 300.0}
 
 #: Untimed fits before each measurement. Tetrad's warm-up searches run in the JVM of its timed

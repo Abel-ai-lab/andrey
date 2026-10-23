@@ -5,6 +5,7 @@ import edu.cmu.tetrad.data.DoubleDataBox;
 import edu.cmu.tetrad.graph.Graph;
 import edu.cmu.tetrad.graph.Node;
 import edu.cmu.tetrad.search.Boss;
+import edu.cmu.tetrad.search.Fas;
 import edu.cmu.tetrad.search.Fci;
 import edu.cmu.tetrad.search.Fges;
 import edu.cmu.tetrad.search.Grasp;
@@ -56,6 +57,11 @@ import java.util.Set;
  * fci    alpha depth stable doPossibleDsep completeRuleSetUsed maxDiscriminatingPathLength
  *        r0ColliderRule guaranteePag excludeSelectionBias
  * </pre>
+ *
+ * <p>Tetrad 7.6.10 wraps the test of {@code Fci} in a cache that is a plain {@code HashMap}, and
+ * runs its stable skeleton search in a parallel stream over that test, which on several threads
+ * throws {@code ClassCastException} or never returns. The driver gives the skeleton search the
+ * uncached test; the later steps of the search still use the cache, in one thread.
  *
  * <p>{@code ptest} prints the Fisher z p-value of each "x y z1 ..." line of QUERIES (column
  * indices), and {@code score} the local BIC score of each "node p1 p2 ..." line at PENALTY, the
@@ -183,7 +189,8 @@ public class TetradContinuousDriver {
                 return grasp.getGraph(true, false);
             }
             case "fci": {
-                Fci fci = new Fci(new IndTestFisherZ(data, s.real("alpha")));
+                IndTestFisherZ test = new IndTestFisherZ(data, s.real("alpha"));
+                Fci fci = new Fci(test);
                 fci.setDepth(s.integer("depth"));
                 fci.setStable(s.bool("stable"));
                 fci.setDoPossibleDsep(s.bool("doPossibleDsep"));
@@ -193,7 +200,7 @@ public class TetradContinuousDriver {
                 fci.setGuaranteePag(s.bool("guaranteePag"));
                 fci.setExcludeSelectionBias(s.bool("excludeSelectionBias"));
                 fci.setVerbose(false);
-                return fci.search();
+                return fci.search(new Fas(test));
             }
             default:
                 throw new IllegalArgumentException("unknown algorithm " + algorithm);

@@ -8,8 +8,8 @@ timed one. The timed search builds the independence test or the score from the d
 search; the record's ``wall_s`` is that time inside the JVM and its ``process_s`` is the whole
 call, with the JVM start, the in-memory compile of the driver, and the CSV round trip. The JVM
 sees only the fit's cores (``-XX:ActiveProcessorCount``), and FGES's and BOSS's thread pools use
-all of them; PC's skeleton pass and FCI's run on the JVM's common pool, which has as many threads
-as the JVM sees processors.
+all of them; PC's and FCI's skeleton search runs on the JVM's common pool, which has as many
+threads as the JVM sees processors.
 
 A solution's ``params`` use Andrey's names for the settings it shares with Andrey's adapter, and
 Tetrad's setter names for the rest, each written out; :meth:`_TetradSearch.settings` maps them to

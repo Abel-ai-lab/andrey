@@ -445,10 +445,12 @@ the same JVM, then times one search that builds the test or the score from the d
 search. The record's `wall_s` is that search, as a Python package's time excludes interpreter start
 and import; `process_s` is the whole call, with the JVM start, the compile of the driver, and the
 CSV round trip, so the JVM's time is reported apart. `--cap-wall-s` covers the whole call, the JVM
-start and the warm-up searches included. The JVM sees the fit's cores, and Tetrad uses them: FGES's
-and BOSS's thread pools take every core, and the skeleton search of PC and FCI runs on the JVM's
-common pool, which has as many threads as the JVM sees processors. With `--cores 1`, every Tetrad
-search is single-threaded.
+start and the warm-up searches included. The JVM sees the fit's cores, and FGES's and BOSS's thread
+pools take every one, and the stable skeleton search of PC and FCI runs on the JVM's common pool,
+which has as many threads as the JVM sees processors; with `--cores 1`, every Tetrad search is
+single-threaded. Tetrad 7.6.10 wraps FCI's test in a cache that is a plain `HashMap` and runs the
+skeleton search in a parallel stream over it, which on several threads throws `ClassCastException`
+or never returns, so the driver gives that search the test uncached.
 
 `tetrad_cpu.py` runs on standardized linear-Gaussian Erdos-Renyi graphs with mean degree 2 and
 `n = 10 * d` rows, and scores every estimate against the true graph's CPDAG; `tetrad_fci_latent.py`
@@ -524,10 +526,9 @@ sha1sum tetrad-lib-7.6.10-shaded.jar  # 3a160a01a8cb648c03ceb8c7d5f47e5a8a1e2283
 export ANDREY_BENCH_TETRAD_GIN_JAR=$PWD/tetrad-lib-7.6.10-shaded.jar
 ```
 
-Each record's `package_version` names the tetrad-lib and Java releases. The defaults of
-`tetrad_cpu.py` are `d` of 20, 50, 100, and 200, five seeds, one repeat after one warm-up fit, and a
-wall cap of 1800 s; `tetrad_fci_latent.py` runs `d` of 20, 50, and 100, whose possible-d-separation
-step grows fastest. A smoke run fits every solution on one small dataset, and a run can keep to some
+Each record's `package_version` names the tetrad-lib and Java releases. The defaults of both drivers
+are `d` of 20, 50, 100, and 200, five seeds, one repeat after one warm-up fit, and a wall cap of
+1800 s. A smoke run fits every solution on two small datasets, and a run can keep to some
 solutions:
 
 ```shell

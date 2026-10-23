@@ -156,6 +156,11 @@ def test_the_thread_pools_follow_the_fits_cores(monkeypatch) -> None:
     assert tetrad_search.TetradFGES().settings({})["numThreads"] == 1
 
 
+def test_the_fci_skeleton_search_gets_the_uncached_test() -> None:
+    """Tetrad's cache is a plain ``HashMap`` that its parallel skeleton search corrupts."""
+    assert "fci.search(new Fas(test))" in DRIVER
+
+
 def test_the_driver_gets_booleans_and_numbers_as_it_reads_them() -> None:
     assert [tetrad_search._flag(v) for v in (True, False, -1, 0.05, "sepsets")] == [
         "true",

@@ -16,8 +16,7 @@ speed-up and how many datasets both packages returned the same PAG on; where the
 README's "Tetrad on continuous data" section gives why.
 
     ANDREY_BENCH_PYTHON=... ANDREY_BENCH_TETRAD_GIN_JAR=... $ANDREY_BENCH_PYTHON \\
-        benchmarks/tetrad_fci_latent.py --out outputs/tetrad-fci --ladder 20 50 100 \\
-        --cap-mem-mb 30000
+        benchmarks/tetrad_fci_latent.py --out outputs/tetrad-fci --cap-mem-mb 30000
 """
 
 from __future__ import annotations
@@ -54,8 +53,8 @@ SLICE = {
     "density": datasets.CANONICAL_DENSITY,
 }
 
-#: Smallest run that touches every solution: one dataset at the smallest size.
-SMOKE = {"ladder": [10], "seeds": 1, "repeats": 1, "cap_wall_s": 300.0}
+#: Smallest run that touches every solution: two datasets at the smallest size.
+SMOKE = {"ladder": [20], "seeds": 2, "repeats": 1, "cap_wall_s": 300.0}
 
 #: Untimed fits before each measurement. Tetrad's warm-up search runs in the JVM of its timed fit,
 #: so the timed search finds its code compiled, as a Python package's does.
@@ -85,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--out", required=True, help="output directory, created if absent")
     p.add_argument(
-        "--ladder", type=int, nargs="+", default=[20, 50, 100], help="d sizes, run in order"
+        "--ladder", type=int, nargs="+", default=[20, 50, 100, 200], help="d sizes, run in order"
     )
     p.add_argument("--seeds", type=int, default=5, help="datasets per rung (default: 5)")
     p.add_argument("--repeats", type=int, default=1, help="timed repeats per fit (default: 1)")
@@ -113,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--smoke",
         action="store_true",
-        help="run d=10, one seed, one repeat, and a 300 s cap, replacing those flags",
+        help="run d=20, two seeds, one repeat, and a 300 s cap, replacing those flags",
     )
     p.add_argument(
         "--resume",
