@@ -198,70 +198,47 @@ def table(title: str, columns: tuple[str, ...], groups: tuple, rank=None, note: 
     )
 
 
-# Speedups are compared only on one CPU. AMD EPYC 7713 has no AVX-512, which Andrey's CMIknn uses;
-# the card's other servers have it.
-CPUS = {
-    "AMD EPYC 7713": "AMD EPYC 7713",
-    "AMD EPYC 9534": "AVX-512 CPUs",
-    "AMD EPYC 9555": "AVX-512 CPUs",
-    "Intel Xeon Gold 5418Y": "AVX-512 CPUs",
-    "Intel Xeon Gold 6542Y": "AVX-512 CPUs",
-}
-
-
-def ratios(values: list[float]) -> str | None:
-    """A speedup range as the card writes it, three significant figures."""
-    if not values:
-        return None
-    low, high = (f"{v:#.3g}".rstrip(".") for v in (min(values), max(values)))
-    return f"{low}x" if low == high else f"{low}-{high}x"
+def floored(value: float) -> str:
+    """``value`` cut down to two significant figures, so a speedup is never overstated."""
+    digits = 1 - int(np.floor(np.log10(value)))
+    return f"{np.floor(value * 10**digits) / 10**digits:g}"
 
 
 def comparison_table(summary: dict) -> str:
-    # One row per search, test, and reference package, from the card's server rows: the share of
-    # paired datasets on which Andrey has no more errors, and the speedup range on each CPU kind.
-    columns = tuple(dict.fromkeys(CPUS.values()))
-    found: dict[tuple[str, str, str], dict] = {}
+    # One row per test and reference package, over every size we measured, PC and FCI together:
+    # the mean errors Andrey saves per graph, from the card's promotion rule, and the speedup
+    # range of the median fit time, smallest cut down and largest rounded.
+    ratios: dict[tuple[str, str], list[float]] = {}
     for method in summary["methods"]:
-        search, test = method["solution"].split(".")[1:3]
-        if method["lane"] != "nonlinear" or test not in TESTS:
-            continue
-        entry = found.setdefault(
-            (search, test, method["comparator"]), {"paired": 0, "no_more": 0, "cpu": {}}
-        )
-        for row in method["rows"]:
-            entry["paired"] += row["paired"]
-            entry["no_more"] += row["paired"] - row["comparator_fewer_errors"]
-            if row.get("ratio"):
-                cpu = CPUS[row["hardware"].split(",")[0]]
-                entry["cpu"].setdefault(cpu, []).append(row["ratio"])
-    groups = []
-    for search in ("pc", "fci"):
-        rows = tuple(
-            (
-                f"{TESTS[test]}",
-                f"vs {comparator}",
-                (
-                    f"{round(100 * entry['no_more'] / entry['paired'])}%",
-                    *(ratios(entry["cpu"].get(c, [])) for c in columns),
-                ),
+        test = method["solution"].split(".")[2]
+        if method["lane"] == "nonlinear" and test in TESTS:
+            ratios.setdefault((TESTS[test], method["comparator"]), []).extend(
+                row["ratio"] for row in method["rows"] if row.get("ratio")
             )
-            for test in TESTS
-            for (s_, t_, comparator), entry in found.items()
-            if (s_, t_) == (search, test)
-        )
-        if rows:
-            groups.append((search.upper(), rows))
+    rows = []
+    for name, references in summary["promotion"]["tests"].items():
+        for reference, result in references["references"].items():
+            speeds = ratios[(name, reference)]
+            rows.append(
+                (
+                    name,
+                    f"vs {reference}",
+                    (
+                        f"{-result['pooled_mean_D']:.2f}",
+                        f"{floored(min(speeds))}-{max(speeds):.2g}x",
+                    ),
+                )
+            )
     return table(
-        "Against each reference package",
-        ("No more errors", *(f"Faster, {c}" for c in columns)),
-        tuple(groups),
+        "Each test against its reference package",
+        ("Fewer errors per graph", "Faster by"),
+        (("PC and FCI", tuple(rows)),),
         rank=lambda cell: None,
         note=(
-            "No more errors: the share of datasets, 20 per size, on which Andrey's graph has no "
-            "more errors than the reference's. Faster: the range over sizes of the median "
-            "speedup on 5 datasets, each fit on 4 cores. AVX-512 CPUs: AMD EPYC 9534 and 9555, "
-            "Intel Xeon Gold 5418Y and 6542Y. A dash marks a CPU that timed no size."
+            "Errors are the structural Hamming distance to the true graph: the edges missing, "
+            "extra, or misdirected. Fewer errors per graph is the mean over every dataset we ran, "
+            "20 per size. Faster by is the range over sizes of the reference's median fit time "
+            "over Andrey's."
         ),
     )
 
