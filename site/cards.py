@@ -1,8 +1,7 @@
-"""Link previews (Open Graph, Twitter), the README banner, release and post art, and the brand kit,
-drawn at build time.
+"""Link previews, the README banner, release and post art, and the brand kit, drawn at build time.
 
-The homepage and every page that is not a post share the repository's social preview
-(``social_jpeg``), the one GitHub shows; each post's preview is its banner (``preview_jpeg``).
+The homepage and non-post pages share the repository's social preview (``social_jpeg``), which
+GitHub also shows. Each post's link preview is its banner (``preview_jpeg``).
 """
 
 from __future__ import annotations
@@ -142,7 +141,7 @@ BANNER_W, BANNER_H = 1600, 480  # shown about 830 px wide on GitHub, so sharp at
 BANNER_RADIUS = 27
 BANNER_QUALITY = 65  # its base64 inside the SVG is about 290 KB, under MAX_BYTES
 TAGLINE = "Accelerated, accurate, agentic causal discovery"
-# The tagline's words in amber, on the banner and the social preview: the three A's.
+# The tagline's three A's appear in amber on the banner and social preview.
 ACCENT = ("Accelerated,", "accurate,", "agentic")
 
 

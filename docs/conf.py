@@ -314,8 +314,8 @@ html_additional_pages = {
 
 
 def _moved_pages(app):  # noqa: ANN001, ANN202 -- Sphinx event arguments
-    """The API reference's earlier addresses, docs/code/index and its generated pages under
-    docs/code/generated/, each a page that sends the reader to its place under docs/api."""
+    """Redirects the API reference's old addresses, ``docs/code/index`` and its generated pages
+    under ``docs/code/generated/``, to their corresponding pages under ``docs/api``."""
     reference = {"title": "API reference", "target": "../api.html"}
     yield "docs/code/index", reference, "moved-redirect.html"
     for doc in sorted(app.env.found_docs):
@@ -467,7 +467,7 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     app.andrey_home = site.homepage_context(summary, placeholder=config.andrey_placeholder)
     config.myst_substitutions = {**config.myst_substitutions, **_methods_text()}
     site.fastest(summary)
-    # The link preview of the homepage and every page that is not a post: the social preview.
+    # The homepage and non-post pages share the repository's social preview.
     _write_bytes(GENERATED / "extra" / HOME_PREVIEW, cards.social_jpeg())
     # The homepage hero draws the cards' stipple from CSS gradients and these repeating tiles.
     for name, tile in cards.grain.hero_tiles():
@@ -481,8 +481,8 @@ def _site_content(app, config) -> None:  # noqa: ANN001 -- Sphinx passes its app
     _write(GENERATED / "column-order.md", _column_order_table())
 
 
-# Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage, and every page
-# that is not a post, shows the repository's social preview; each post shows its banner.
+# Link previews (Open Graph, Twitter card), drawn by site/cards.py. The homepage and non-post
+# pages use the repository's social preview; each post uses its banner.
 HOME_PREVIEW = "assets/preview/home.jpg"
 # Search results show about this many characters of a description.
 DESCRIPTION_LENGTH = 160
@@ -728,7 +728,7 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
     _write(outdir / "sitemap.xml", discovery.sitemap_xml(discovery.sitemap_urls(outdir)))
 
 
-# The documents' own files, by name before the first dot, which the homepage does not use.
+# Assets the homepage omits, by each file name's prefix before the first dot.
 DOCS_ONLY = {
     "pygments",
     "mystnb",
@@ -853,8 +853,8 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
     for name in js:
         app.add_js_file(name, loading_method="defer")
     if pagename == "index":
-        # The homepage is a template with no code block, math, tab set, or command-line page, so
-        # the extensions' files for those would only delay its first paint.
+        # The homepage has no code blocks, math, tab sets, or command-line reference.
+        # Omitting assets for those features avoids delaying its first paint.
         for key in ("css_files", "script_files"):
             context[key] = [
                 f
@@ -931,7 +931,7 @@ def _docs_sidebar(app, pagename, templatename, context, doctree) -> None:  # noq
         if path.suffix in {".md", ".ipynb"} and GENERATED not in path.parents
     )
     source = included[0] if included else pathlib.Path(app.env.doc2path(pagename))
-    # autosummary writes the API reference's pages into docs/docs/api/, which git ignores.
+    # Autosummary writes the API reference's pages into docs/docs/api/, which Git ignores.
     generated = "generated" in source.parts or source.parent == HERE / "docs" / "api"
     context["edit_url"] = None if generated else f"{REPO_URL}/edit/main/{source.relative_to(ROOT)}"
 

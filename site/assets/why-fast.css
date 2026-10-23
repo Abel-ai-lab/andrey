@@ -1,4 +1,4 @@
-/* "Why Andrey is fast": the scenes in the launch post.
+/* "Why Andrey is fast": the blog post's animated scenes.
    Every color is an --andrey-* token generated from src/andrey/viz/theme.py, or derived from
    one, so this file names no color value. Both lanes of a scene share one grid, so a station or a pile sits at the same place in
    each. Motion runs only with no reduced-motion preference (why-fast.js). */

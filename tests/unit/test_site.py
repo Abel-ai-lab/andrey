@@ -232,12 +232,12 @@ def test_the_speed_panel_has_a_tab_and_a_figure_per_family():
     summaries = build.release_summaries(SUMMARY)
     panel = build.speed_panel(summaries)
     families = [info["family"] for info in build.family_tiles(summaries)]
-    # A tab per family, the first chosen, each controlling its own panel.
+    # Each family has a tab controlling its panel; the first tab is selected.
     tabs = re.findall(r'role="tab" id="speed-tab-([\w-]+)" aria-controls="speed-([\w-]+)"', panel)
     assert [t for t, _ in tabs] == families and all(t == c for t, c in tabs)
     assert panel.count('aria-selected="true"') == 1
-    # Each panel opens on its family's speed, shows its figure, and ends on one short line and
-    # the release cards.
+    # Each panel shows the family's speedup and figure, followed by a brief description and
+    # a link to the release cards.
     intro = build.family_intro()
     assert len(intro) < 100 and "errors" not in intro
     for key in families:
@@ -253,12 +253,12 @@ def test_a_family_figure_shows_each_method_once_at_a_size_both_packages_ran():
     points = build.frontier_points(summaries)
     for family, shown in points.items():
         ours = [p for p in shown if p["ours"]]
-        # One Andrey point per method, and each package's point at that method's size.
+        # Each method has one Andrey series; all packages share its largest measured size.
         assert len({p["method"] for p in ours}) == len(ours), family
         for p in shown:
             mine = next(o for o in ours if o["method"] == p["method"])
             assert p["size"] == mine["size"] and p["seconds"] > 0 and p["share"] >= 0
-    # A setting's comparison ("XGES without extended search") stands in for no method.
+    # Method names omit setting descriptions such as "XGES without extended search".
     names = {p["method"] for shown in points.values() for p in shown}
     assert not any(" on " in n or " without " in n or ", " in n for n in names)
 
@@ -282,13 +282,13 @@ def test_the_panel_number_follows_the_chosen_method():
     info = next(i for i in build.family_tiles(summaries) if i["family"] == "constraint")
     bar = build.method_bar(points, build.family_number(info))
     numbers = dict(re.findall(r'data-method="([\w-]*)" data-number="([^"]*)"', bar))
-    # "All" shows the family's number; each method its own best published speedup.
+    # "All" shows the family's best speedup; each method shows its own best published speedup.
     assert html.unescape(numbers[""]) == build.family_number(info)
     pc = build.method_ratio(points, "PC")
     assert pc == max(r["ratio"] or 0 for m in build.supported(summaries)
                      if m["method"] == "PC" for r in m["rows"])  # fmt: skip
     assert html.unescape(numbers["pc"]) == build.speed_number(pc)
-    # Each method's key is its own, so choosing PCMCI does not light PCMCI+.
+    # Distinct method keys keep the PCMCI selection from highlighting PCMCI+.
     for shown in build.frontier_points(summaries).values():
         names = {p["method"] for p in shown}
         assert len({build.method_key(n) for n in names}) == len(names)
@@ -302,13 +302,13 @@ def test_a_family_figure_colors_andrey_alone_and_gives_each_package_a_shape():
     figure = build.frontier_chart("Constraint-based", points, frame)
     ours = [p for p in points if p["ours"]]
     sizes = sum(len(p["sizes"]) for p in ours)
-    assert figure.count('class="pf-andrey"') == sizes + 1  # and its legend's
+    assert figure.count('class="pf-andrey"') == sizes + 1  # plus the legend marker
     packages = {p["package"] for p in points if not p["ours"]}
     shapes = set(re.findall(r'class="pf-other pf-(\w+)"', figure))
     assert len(shapes) == len(packages)
     assert figure.count('class="pf-line') == sum(len(p["sizes"]) > 1 for p in points)
     assert 'class="pf-quadrant"' in figure and "Pareto" not in figure
-    # Every method's name, once, and none drawn past the axis.
+    # Each method's name appears once.
     for p in ours:
         assert figure.count(f">{build.escape(p['method'])}</text>") == 1
 
@@ -399,8 +399,7 @@ def test_unpublished_summary_needs_the_placeholder_flag():
 def test_page_shows_every_claimed_ratio_and_no_internal_locations(placeholder_page):
     summaries = placeholder_summaries()
     page = placeholder_page
-    # Each family's dialog holds its figure, a point per method; every size is on the release
-    # cards.
+    # Each family's panel holds its figure; the release cards list every measured size.
     points = build.frontier_points(summaries)
     for info in build.family_tiles(summaries):
         dialog = page[page.index(f'id="speed-{info["family"]}"') :]
@@ -957,8 +956,8 @@ def test_every_partial_mark_says_what_it_covers():
 
 def test_the_comparison_is_one_short_table_with_a_mark_for_every_package():
     table = build.comparison_table([SUMMARY])
-    # One table in three sections, each heading once; each attribute in a few words, its detail
-    # in the notes.
+    # One table has three sections, each heading appears once, and brief attribute labels have
+    # details in the notes.
     assert re.findall(r'<tr class="compare-group"><th[^>]*>([^<]+)</th>', table) == list(
         build.SECTIONS
     )
@@ -1298,8 +1297,8 @@ def test_the_hero_and_the_first_section_share_one_art(placeholder_page):
 def test_the_accuracy_bars_draw_only_the_methods_with_fewer_errors():
     rows = build.accuracy_rows([SUMMARY])
     figure = build.accuracy_wins([SUMMARY])
-    # No count of comparisons: a pair of bars for each family's largest cut in errors, each saying
-    # how many fewer, and the other tile bounds the other methods.
+    # Each family's largest error reduction has paired bars and a percentage, with no comparison
+    # count. The other tile states the limits for other methods.
     wins = build.family_wins([SUMMARY])
     assert 0 < len(wins) < len(rows)
     assert len({r["family"] for r in wins}) == len(wins)
@@ -1335,8 +1334,8 @@ def test_the_accuracy_section_leads_with_its_largest_win(placeholder_page):
 
 
 def test_the_first_section_links_why_it_is_fast_under_its_speed_panel(placeholder_page):
-    # The section's title, its speed panel, and one line to the post that explains the speed: no
-    # animation, tile, or dialog of its own.
+    # The section has a title, a speed panel, and a link to the speed explanation, with no
+    # separate animation, tile, or dialog.
     section = placeholder_page[placeholder_page.index('id="accelerated"') :]
     section = section[: section.index("</section>")]
     assert section.index('id="accelerated-title"') < section.index('class="seg"')
@@ -1360,7 +1359,7 @@ def test_a_grid_comparison_shows_its_smallest_sample_size_and_its_slowest_cpu():
     ]
     grid = {"lane": "nonlinear", "rows": rows}
     assert [(r["d"], r["n"]) for r in build.shown_rows(grid)] == [(10, 500), (20, 500)]
-    # Another lane's rows are every size it measured, whatever the sample size.
+    # Other lanes retain every measured size, regardless of sample size.
     sweep = [_timed_row(5, 100, 3.0), _timed_row(5, 200, 4.0)]
     assert build.shown_rows({"lane": "other", "rows": sweep}) == sweep
 
@@ -1379,8 +1378,8 @@ def test_a_second_machines_timings_and_an_unshown_regime_are_not_counted(tmp_pat
 
 
 def test_a_list_is_a_note_in_plain_type_not_a_card(placeholder_page):
-    # The release promise needs no figure, which a card would only frame: it is a note beside a
-    # tile, its heading and text on the page's paper. The methods count sits in the comparison.
+    # The release promise appears as an unframed note beside a tile. The comparison table holds
+    # the method count.
     notes = re.findall(r'<li class="bento-note">(.*?)</li>', placeholder_page, re.S)
     assert [re.search(r"<h3>([^<]+)</h3>", note)[1] for note in notes] == [
         "Tested against the true graphs",
@@ -1457,8 +1456,8 @@ def test_every_hero_and_tile_art_is_stored_in_the_brand_tones_at_its_size(placeh
 
 
 def test_the_homepage_names_its_sources_where_they_are_used(placeholder_page):
-    # No notes at the page's foot: the comparison names what its marks were read from, and each
-    # partial mark carries its note as a tooltip.
+    # The comparison table names its sources, and each partial mark has a tooltip. No separate
+    # notes appear at the page's foot.
     page = placeholder_page
     for note in (
         'class="footnotes"',

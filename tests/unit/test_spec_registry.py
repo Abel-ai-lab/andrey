@@ -323,7 +323,7 @@ def test_indep_test_choices_track_the_tests_each_method_dispatches():
 
 # --- support status -------------------------------------------------------------------------------
 #
-# Supported means every criterion in docs/docs/api.md's "Experimental methods" section holds.
+# Supported methods meet every criterion in docs/docs/api.md's "Experimental methods" section.
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")

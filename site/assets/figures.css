@@ -462,8 +462,8 @@ div[class*="highlight-"].window pre {
   stroke: var(--andrey-muted);
 }
 
-/* A family's methods on one figure: Andrey's points in the accent, every other package a gray
-   shape joined to Andrey's point for the same method, and the Pareto frontier behind them. */
+/* A family's methods on one figure: Andrey uses the accent color; other packages use gray
+   shapes. Lines connect each method's sizes, with a shaded corner behind them. */
 .pf-chart svg text.pf-label {
   fill: var(--andrey-ink);
   font-weight: 600;
@@ -501,7 +501,7 @@ div[class*="highlight-"].window pre {
   stroke-opacity: 0.8;
 }
 
-/* Other packages' lines stay behind Andrey's; a chosen method lights its own and dims the rest. */
+/* Other packages' lines stay behind Andrey's; selecting a method highlights it and dims the rest. */
 .pf-series:not(.pf-series--andrey) {
   opacity: 0.45;
 }

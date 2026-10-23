@@ -151,18 +151,18 @@ ERRORS = {
 # gives the panel, the charts, and the counts its rows at mean degree 2, the density of the other
 # summaries' Erdos-Renyi graphs.
 MEAN_DEGREE = 2.0
-# Comparisons no page counts, by the summary's ``comparison``: Andrey against an earlier build, and
-# a second machine's timings of a comparison the first machine's rows already give.
+# Comparisons excluded from page counts, keyed by the summary's ``comparison``: earlier Andrey
+# builds and timings from a second machine that repeat the first machine's comparison.
 NOT_COUNTED = {"earlier-build", "second-machine timing"}
-# Regimes the homepage leaves out, as (lane, regime): the additive data of the nonlinear tests,
-# whose effects are near-monotone and which partial correlation still sees, and the diabetes
-# network, a single size with only a lower bound.
+# Regimes the homepage omits, as (lane, regime): additive data whose near-monotone effects
+# partial correlation still detects, and the diabetes network, a single size with only a lower
+# bound.
 NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
 # The summary lanes that measure each graph size at several sample sizes.
 GRID_LANES = {"nonlinear"}
-# A method's line is its default comparison, the shortest name. These settings show instead: BOSS
-# and GRaSP with the BDeu score on categorical data, the comparison the 0.8.0 release measured,
-# each under the method's own name.
+# A method's line uses its shortest-named comparison by default. These settings override that
+# choice: BOSS and GRaSP with the BDeu score on categorical data, as measured in 0.8.0, each shown
+# under the method's name.
 SHOWN_SETTINGS = {
     "BOSS on discrete data, BDeu score": "BOSS",
     "GRaSP on discrete data, BDeu score": "GRaSP",
@@ -187,7 +187,7 @@ TOKEN_PALETTE = andrey.viz.Palette(
 # ---- the summaries ---------------------------------------------------------------------------
 def load_summary(path: Path, *, placeholder: bool = False) -> dict:
     """Read a release's benchmark summary and check its layout; refuse unpublished files for
-    release. A comparison in ``NOT_COUNTED`` and a regime in ``NOT_SHOWN`` are left out."""
+    release. Comparisons in ``NOT_COUNTED`` and regimes in ``NOT_SHOWN`` are excluded."""
     if not placeholder and not path.resolve().is_relative_to(PUBLISHED):
         raise ValueError(
             f"{path} is not under benchmarks/published/; preview it with -D andrey_placeholder=1"
@@ -202,10 +202,9 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
     missing = {"generated", "methods"} - summary.keys()
     if missing:
         raise ValueError(f"summary lacks {sorted(missing)}")
-    # A comparison with an earlier Andrey build measures Andrey's own progress, not another
-    # package, and one timed on a second machine repeats a comparison timed on the first, so no
-    # page counts them; the release card gives them. Neither does the homepage show a regime in
-    # ``NOT_SHOWN``.
+    # Earlier-build comparisons measure Andrey's progress; second-machine timings repeat a
+    # comparison. Both appear on the release card and are excluded from page counts.
+    # Regimes in ``NOT_SHOWN`` are also excluded.
     summary = {
         **summary,
         "methods": [
@@ -339,20 +338,18 @@ def claimed_ratio(row: dict) -> tuple[float | None, bool]:
 
 
 def cpu_type(row: dict) -> str | None:
-    """The CPU a row's times ran on, as its ``hardware`` names it before the core count."""
+    """The CPU used for a row's timings, from ``hardware`` before the core count."""
     return (row.get("hardware") or "").split(",")[0] or None
 
 
 def shown_rows(method: dict) -> list[dict]:
-    """The rows of a comparison the homepage shows: one line of sizes, each true wherever we
-    measured it.
+    """A comparison's rows selected for the homepage, along one line of graph sizes.
 
     - Rows at a mean degree other than ``MEAN_DEGREE`` are left out.
-    - A comparison of a lane in ``GRID_LANES`` measures every graph size at several sample sizes,
-      and keeps the smallest sample size that has a speedup, so its line runs along the graph
-      sizes.
-    - A comparison timed on more than one CPU type keeps the CPU type whose smallest speedup is the
-      smallest, so no number shown is above what another CPU gave.
+    - A lane in ``GRID_LANES`` measures each graph size at several sample sizes. Only rows at the
+      smallest sample size with a recorded speedup remain.
+    - If timings cover several CPU types, only the CPU type with the lowest minimum speedup
+      remains, along with rows that name no CPU.
     """
     rows = [r for r in method["rows"] if r.get("mean_degree", MEAN_DEGREE) == MEAN_DEGREE]
     timed = [r for r in rows if claimed_ratio(r)[0] is not None]
@@ -382,8 +379,8 @@ def comparisons(summary: dict) -> list[dict]:
     - ``ratio`` and ``at_least``: the speedup, from :func:`claimed_ratio`;
     - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`.
 
-    Rows are those :func:`shown_rows` keeps. So are the summary's ``reach`` rows, the sizes the
-    other package did not finish or did not run: they have no paired time.
+    Rows are those :func:`shown_rows` keeps. The summary's ``reach`` rows are excluded: they cover
+    sizes the other package did not finish or run, so they have no paired time.
     """
     specs = {s.name: s for s in list_specs()}
     out = []
@@ -404,8 +401,8 @@ def comparisons(summary: dict) -> list[dict]:
                     "at_least": at_least,
                     "andrey_errors": row[ours],
                     "comparator_errors": row[theirs],
-                    # Errors against the empty graph's: a pair's empty graph gets every pair
-                    # wrong.
+                    # The empty graph's error count; in pairwise comparisons, it gets every
+                    # pair wrong.
                     "empty_errors": row["paired"] if pairs else row.get(empty) if empty else None,
                     # A temporal summary's link F1: cross-links, or LPCMCI's adjacencies.
                     "andrey_f1": row.get("andrey_cross_f1", row.get("andrey_adjacency_f1")),
@@ -623,7 +620,7 @@ def claimed_comparisons(summaries: list[dict]) -> list[dict]:
 
 # ---- speed across methods --------------------------------------------------------------------
 def family_intro() -> str:
-    """What a family's figure shows, in one line; its legend names the packages."""
+    """A brief description of a family's figure; its legend names the packages."""
     return "Each line runs from a method's smallest graph to its largest. Down and left is better."
 
 
@@ -737,8 +734,10 @@ def seconds_axis(v: float) -> str:
 
 
 def speed_groups(summaries: list[dict]) -> list[tuple[str, list[dict]]]:
-    """The groups of ``time_groups`` that get a speedup chart: a comparison where Andrey is not
-    faster stays in the release cards' tables."""
+    """Groups from ``time_groups`` where Andrey is faster in every comparison.
+
+    Other comparisons appear in the release cards' tables.
+    """
     return [(n, ms) for n, ms in time_groups(summaries) if all(faster(m) for m in ms)]
 
 
@@ -942,9 +941,11 @@ def accuracy_change(row: dict) -> float:
 
 
 def family_wins(summaries: list[dict]) -> list[dict]:
-    """Each family's largest cut in errors against a package, most fewer first; a family where
-    Andrey has no fewer errors anywhere is left to the release cards. A row whose change rounds to
-    0% is on par."""
+    """Each family's largest error reduction against a package, largest reduction first.
+
+    Families without a reduction appear only in the release cards. A change that rounds to
+    0% counts as equal.
+    """
     best: dict[str, dict] = {}
     for r in accuracy_rows(summaries):
         if accuracy_change(r) <= -0.5 and (
@@ -955,8 +956,10 @@ def family_wins(summaries: list[dict]) -> list[dict]:
 
 
 def accuracy_wins(summaries: list[dict]) -> str:
-    """Each family's largest cut in errors (``family_wins``): both packages' errors summed over the
-    sizes the two share, as a pair of bars on the row's own scale, and how many fewer in words."""
+    """Each family's largest error reduction (``family_wins``) as paired bars and text.
+
+    Each row uses its own scale and sums both packages' errors over their shared sizes.
+    """
     wins = family_wins(summaries)
     rows = []
     for r in wins:
@@ -1725,7 +1728,7 @@ def family_tiles(summaries: list[dict]) -> list[dict]:
             continue
         cells = [(m, r) for m in found for r in m["rows"] if r["ratio"] is not None]
         method, row = max(cells, key=lambda cell: cell[1]["ratio"])
-        # Each method once, by its default's name, the shortest of its comparisons' names.
+        # Each method appears once, under its shortest comparison name.
         names: dict[str, str] = {}
         for m in found:
             if m["spec"] not in names or len(m["method"]) < len(names[m["spec"]]):
@@ -1957,8 +1960,8 @@ def names_only(figures: str) -> str:
 
 
 def coverage_tiles(summaries: list[dict], graphs: str) -> str:
-    """What the package covers and guarantees: its methods and the comparison with the most used
-    packages in one table, then the kinds of causal graph its methods return."""
+    """The package's methods and features compared with other packages in one table, followed by
+    the kinds of causal graph its methods return."""
     return glass_tile(
         "wide",
         "Compared with other packages",
@@ -1984,8 +1987,11 @@ def tile(key: str, size: str, body: str, *, kind: str = "") -> str:
 
 
 def speed_number(ratio: float) -> str:
-    """A best speedup in words: "more than" its one-digit number (``round_down``), or "at least"
-    where nothing is rounded off; nothing where Andrey is not at least twice as fast."""
+    """A best speedup as text, rounded down to one significant digit (``round_down``).
+
+    The text starts with "more than" if rounding lowers the value, or "at least" for an exact
+    value. Nothing is shown when Andrey is less than twice as fast.
+    """
     if ratio < 2:
         return ""
     number = round_down(ratio)
@@ -2004,9 +2010,11 @@ def method_ratio(points: list[dict], method: str) -> float:
 
 
 def method_bar(points: list[dict], family: str) -> str:
-    """A bar of the family's methods over its figure: choosing one lights its lines, dims the
-    rest, and shows its own best speedup in place of the family's (``tiles.js``). Without script
-    it is only a list of the methods."""
+    """Method buttons above a family's figure.
+
+    Selecting a method highlights its lines, dims the rest, and replaces the family's best
+    speedup with the method's (``tiles.js``). Without JavaScript, the buttons list the methods.
+    """
     names = list(dict.fromkeys(p["method"] for p in points))
     if len(names) < 2:
         return ""
@@ -2024,9 +2032,11 @@ def method_bar(points: list[dict], family: str) -> str:
 
 
 def speed_panel(summaries: list[dict]) -> str:
-    """The families' speed in one panel: a tab per family, each showing the family's methods on
-    one figure (``frontier_chart``) under its best speedup. Without script every family's panel
-    shows in turn; ``tiles.js`` makes the tabs switch them."""
+    """Speed comparisons with a tab per family.
+
+    Each panel shows the family's best speedup and a figure of its methods (``frontier_chart``).
+    Without JavaScript, all panels remain visible; ``tiles.js`` switches between them.
+    """
     points = frontier_points(summaries)
     frame = frontier_frame(
         [p for family, shown in points.items() if family not in F1_FAMILIES for p in shown]
@@ -2071,23 +2081,25 @@ DIALOG_TAIL = "</div></dialog>"
 
 
 # ---- a family's methods on one figure: fit time against errors ------------------------------
-# Each method at its default setting (its shortest-named comparison: a setting's name extends its
-# method's, "XGES without extended search"), at the largest size where Andrey and every package
-# compared ran and were scored. Errors are a share of the empty graph's, so methods of different
-# sizes share one axis: 0 is the true graph, 1 no better than the empty one.
-# How a family's figure scores a graph: errors over the empty graph's, or, for temporal methods,
-# whose window of lags lets errors far outrun the empty graph's, 1 minus the link F1 (the window
-# graph's links between different variables; LPCMCI's adjacencies).
+# Each method uses its shortest-named comparison unless SHOWN_SETTINGS overrides it. Each line
+# covers sizes where Andrey and every compared package ran and were scored; its largest marker
+# shows the largest shared size. Errors are divided by the empty graph's error count: 0 means no
+# errors, and 1 means the same error count as the empty graph.
+# Temporal methods use 1 minus link F1 instead: cross-variable links in the window graph, or
+# adjacencies for LPCMCI. Their lag windows can produce far more errors than the empty graph.
 F1_FAMILIES = {"temporal"}
 FRONTIER_SHAPES = ("square", "triangle", "diamond", "cross", "star")
-FRONTIER_BAND = 0.25  # the share of the height above the empty graph's errors, when any point is
+FRONTIER_BAND = 0.25  # share of chart height for errors above the empty graph's
 
 
 def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
-    """Per family, a line per method and package across the sizes where Andrey and every package
-    compared ran and were scored: ``method``, ``package``, ``ours``, ``unit``, and ``sizes``, each
-    ``(size, seconds, share)`` with share the errors over the empty graph's, smallest first; and
-    the largest size's ``size``, ``seconds``, and ``share``."""
+    """Lines grouped by family, with one per method and package across shared, scored sizes.
+
+    Each line records ``method``, ``package``, ``ours``, ``unit``, and ``sizes``. Each size is
+    ``(size, seconds, share)``, smallest first. The score is the error count divided by the empty
+    graph's, or one minus link F1 for temporal methods. ``size``, ``seconds``, and ``share`` also
+    record the largest size's values.
+    """
     default: dict[str, tuple[str, list[dict]]] = {}
     for name, methods in time_groups(summaries):
         if not all(faster(m) for m in methods):
@@ -2178,8 +2190,11 @@ def method_key(name: str) -> str:
 def place_labels(
     labels: list[tuple[float, float, str]], left: float, marks: list[tuple[float, float]]
 ) -> str:
-    """Each method's name beside its point: on the left, else on the right where the left would
-    overlap a name, a mark, or the axis, else moved down past what it would overlap."""
+    """Method names beside their points, on the left when space permits.
+
+    A name moves right to avoid another name, a marker, or the axis. If neither side fits, it
+    moves down past the overlap.
+    """
     # Each name's or mark's left edge, right edge, and baseline.
     placed = [(cx - 6, cx + 6, cy + 3) for cx, cy in marks]
     out = []
@@ -2196,7 +2211,7 @@ def place_labels(
             if free(x0, x0 + width, ly):
                 break
         else:
-            # Down past what it overlaps, on the side the axis leaves room for.
+            # The label moves below overlaps, on the side with room beside the axis.
             x0, anchor = (cx - 8 - width, "end") if cx - 8 - width >= left else (cx + 8, "start")
             while any(abs(ly - py) < 11 and x0 < q and p < x0 + width for p, q, py in placed):
                 ly += 11
@@ -2210,7 +2225,7 @@ def place_labels(
 
 
 def key(mark: str, label: str) -> str:
-    """A legend entry: a marker drawn on its own small square, and its label."""
+    """A legend entry with a marker in a small square and a label."""
     return (
         f'<span class="pf-key"><svg viewBox="0 0 12 12" aria-hidden="true">{mark}</svg>'
         f"{escape(label)}</span>"
@@ -2218,14 +2233,16 @@ def key(mark: str, label: str) -> str:
 
 
 def card_href(release: str) -> str:
-    """The release card of ``release``, or the release cards' page where it has none."""
+    """The card for ``release``, or the release cards page if no card exists."""
     page = DOCS / "docs" / "benchmarks" / f"{release}.md"
     return f"docs/benchmarks/{release}.html" if page.exists() else "docs/benchmarks.html"
 
 
 def point_tip(p: dict, d: int, seconds: float, share: float, andrey: dict) -> str:
-    """A point's tooltip, as data the page's script shows on hover (``tiles.js``): its method,
-    package, and size, then its time and errors beside Andrey's, and its release card."""
+    """Tooltip data for ``tiles.js``: the point's method, package, size, and release card.
+
+    The tooltip compares time and errors with Andrey's values at the same size.
+    """
     head = f"{p['method']} · {p['package']} · {d:,} {p['unit']}"
     if p["f1"]:
         said = lambda v: f"link F1 {1 - v:.2f}"  # noqa: E731
@@ -2245,9 +2262,10 @@ def point_tip(p: dict, d: int, seconds: float, share: float, andrey: dict) -> st
 
 
 def frontier_frame(points: list[dict]) -> dict:
-    """The frame every family's figure shares, from all families' points: one time axis, one
-    errors axis, and one corner (faster and with fewer errors than the median point of them
-    all), so the figures line up."""
+    """A shared frame computed from the supplied points, with time and error axes.
+
+    The shaded corner lies below the median on each axis.
+    """
     times = [t for p in points for _, t, _ in p["sizes"]]
     shares = [e for p in points for _, _, e in p["sizes"]]
     return {
@@ -2258,18 +2276,21 @@ def frontier_frame(points: list[dict]) -> dict:
 
 
 def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
-    """A family's methods on one figure: fit time (x, log) against errors as a share of the empty
-    graph's (y), a line per method and package through its sizes, its largest size's mark the
-    larger. Andrey's lines are the one color; each other package's are gray, marked with its own
-    shape. Each method's data differ, so a method's lines compare with each other, not across
-    methods. The shaded corner is the same in every family's figure (``frontier_frame``)."""
+    """A family's fit times (x, log) against error scores (y), with a line per method and package.
+
+    Scores are errors divided by the empty graph's error count, or one minus link F1 for temporal
+    methods. Each line spans the measured sizes, with a larger marker at the largest size.
+    Andrey's lines use the accent color; other packages use gray and distinct marker shapes.
+    Each method uses different data, so comparisons apply within a method. The shaded corner
+    shares the position set by ``frontier_frame`` across families.
+    """
     if not points:
         return ""
     w, h, left, right, top, bottom = 640, 380, 58, 560, 12, 336
     xr = frame["xr"]
     x = log_scale(xr[0], xr[1], left, right)
-    # Errors up to the empty graph's take most of the height on a linear scale; any above, where
-    # both packages make more errors than the empty graph, share a band at the top on a log scale.
+    # Error counts up to the empty graph's use a linear scale over most of the height. Higher
+    # error counts share a band at the top on a log scale.
     # 1 - F1 tops out at 1, so an F1 panel takes the whole height on one linear scale; its shaded
     # corner keeps the others' place on the page.
     f1 = any(p["f1"] for p in points)
@@ -2308,15 +2329,15 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
     packages = list(dict.fromkeys(p["package"] for p in points if not p["ours"]))
     shapes = {name: FRONTIER_SHAPES[i % len(FRONTIER_SHAPES)] for i, name in enumerate(packages)}
     ours = {p["method"]: p for p in points if p["ours"]}
-    # The most attractive quadrant, the same in every family's figure.
+    # The shaded region has the same position in every family's figure.
     mid_x, mid_y = x(frame["corner"][0]), shared(frame["corner"][1])
     quadrant = (
         f'<rect class="pf-quadrant" x="{left}" y="{mid_y:.1f}" width="{mid_x - left:.1f}" '
         f'height="{bottom - mid_y:.1f}"/>'
     )
-    # A group per method and package, tagged with the method, so the method bar can light one:
-    # its line through its sizes, smallest to largest, and a mark at every size, the largest
-    # size's the larger, each with its tooltip. A method's name sits at Andrey's largest size.
+    # Each method and package has a group tagged for highlighting by the method bar. Its line
+    # runs from smallest to largest size, with a tooltip on every marker and a larger marker at
+    # the largest size. The method's name sits beside Andrey's largest-size marker.
     series, labels = [], []
     for p in sorted(points, key=lambda p: p["ours"]):  # Andrey's lines drawn last, on top
         body = []
@@ -2373,11 +2394,11 @@ def frontier_chart(title: str, points: list[dict], frame: dict) -> str:
 
 
 # ---- compared with other packages ------------------------------------------------------------
-# Andrey beside the most used packages. Each mark was read from the package's released code
-# (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1): a hook for a
-# user's own test or score earns no mark, and files only on a development branch count for
-# nothing. Permutation invariance comes from the 0.7.0 post's measurements, open benchmarks from
-# each package's README, documentation, and release notes.
+# Andrey compared with other packages. Feature marks come from released code
+# (causal-learn 0.1.4.8, Tetrad and causal-cmd 7.6.10, pcalg 2.7-12, bnlearn 5.2.1). Hooks for
+# custom tests or scores do not count as implementations. Features only on a development branch
+# do not count as released. Permutation invariance uses the 0.7.0 post's measurements; open
+# benchmarks use each package's README, documentation, and release notes.
 PEERS = ("Andrey", "causal-learn", "Tetrad", "pcalg", "bnlearn")
 PEER_VERSIONS = "causal-learn 0.1.4.8, Tetrad 7.6.10, pcalg 2.7-12, and bnlearn 5.2.1"
 # Each mark's icon on the homepage, its words for screen readers, and its README symbol.
@@ -2386,10 +2407,10 @@ MARKS = {
     "part": ("half", "Partly", "\u25d0"),
     "no": ("x", "No", "\u2717"),
 }
-# The table's sections, in order, each its measured rows (``measured_rows``) then its marks.
+# Table sections in order, each with measured rows (``measured_rows``) followed by feature marks.
 SECTIONS = ("Coverage", "Speed", "Agentic")
-# (section, attribute, one mark per package in PEERS order, a note for every "part" mark by
-# package). An attribute is a few words; its notes carry the detail.
+# Each entry holds a section, an attribute, marks in PEERS order, and notes keyed by package
+# for every "part" mark. Attribute labels are brief; the notes give details.
 COMPARISON = (
     ("Coverage", "Temporal data", ("yes", "yes", "yes", "no", "no"), {}),
     (
@@ -2462,9 +2483,10 @@ METHOD_COUNTS = {"Andrey": 25, "causal-learn": 21, "Tetrad": 21, "pcalg": 8, "bn
 
 
 def measured_rows(summaries: list[dict]) -> list[tuple[str, str, list[str | None]]]:
-    """The measured rows, (section, label, a value per package in PEERS order). Speed has none:
-    a number pooled over different methods says little, so the speed figures carry it, each
-    method beside its packages."""
+    """Measured rows as (section, label, values in PEERS order).
+
+    Speed has no pooled value across methods; the speed figures compare each method separately.
+    """
     return [("Coverage", "Distinct methods", [str(METHOD_COUNTS[p]) for p in PEERS])]
 
 
@@ -2486,8 +2508,9 @@ def comparison_notes() -> list[tuple[str, str, str, str]]:
 
 
 def comparison_table(summaries: list[dict]) -> str:
-    """The comparison, one column per package: the measured rows (``measured_rows``), then the
-    attributes, a mark each.
+    """A comparison with one column per package.
+
+    Each section lists measured rows (``measured_rows``), then feature marks.
 
     Each partial mark keeps its note as text for screen readers and as a tooltip.
     """

@@ -1,7 +1,6 @@
-{#- The theme's layout, without the search scripts it loads on every page for its search-as-you-type
-    option, which this site leaves off: the search box sends the reader to the search page, which
-    loads them itself. On every other page they would only block its first paint. It adds the
-    icon's PNGs at the site's root (conf.py, _write_discovery). -#}
+{#- The theme's layout without the scripts for search-as-you-type, which this site disables: the
+    search box opens the search page, which loads those scripts itself, so elsewhere they would only
+    block the first paint. It adds the icon's PNGs at the site's root (conf.py, _write_discovery). -#}
 {%- extends "!layout.html" %}
 {%- block extrahead %}
   <meta name="viewport" content="width=device-width, initial-scale=1"/>

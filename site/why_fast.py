@@ -1,8 +1,8 @@
 """The "Why Andrey is fast" scenes: one animation per idea behind Andrey's speed.
 
 Each scene runs the same illustrative work in two lanes: Andrey's, and a quieter lane for other
-packages, which are never named. The scenes appear under the headings of the blog post "Why Andrey
-is fast". The markup is complete without script: each counter already shows its lane's final count.
+packages, which are never named. Each scene appears under a heading in the blog post "Why Andrey
+is fast". Without JavaScript, each counter shows its lane's final count.
 ``site/assets/why-fast.js`` plays the scenes with Motion; they are illustrations of the ideas, not
 measurements.
 """
@@ -120,7 +120,7 @@ def stage(scene: dict) -> str:
 
 
 def figure(scene: dict) -> str:
-    """One scene's stage: it plays once when it scrolls into view, then offers a replay."""
+    """A scene's stage, which plays once when it scrolls into view, then offers a replay."""
     size = " ".join(
         f'data-{name}="{" ".join(map(str, value)) if isinstance(value, tuple) else value}"'
         for name, value in scene["size"].items()

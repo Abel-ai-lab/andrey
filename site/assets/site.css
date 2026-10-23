@@ -616,8 +616,8 @@
   padding-block: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 2rem);
 }
 
-/* A segmented panel: a pill of tabs, one per figure, over one card that shows the chosen figure.
-   Without script every panel shows in turn. On a narrow screen the tabs scroll sideways. */
+/* A tab per figure sits above the selected panel. Without JavaScript, all panels remain visible.
+   On narrow screens, the tabs scroll horizontally. */
 .andrey-home .seg-tabs {
   position: relative;
   display: flex;
@@ -745,9 +745,9 @@
   border: 0;
 }
 
-/* Wide enough, the number sits at the panel's top right, beside the methods and the legend, so the
-   figure starts at the top and takes the room the number's row used. A panel without a method bar
-   keeps the legend's row as tall as the number. */
+/* On wide screens, the speedup sits at the panel's top right, beside the methods and legend,
+   leaving more space for the figure. Without a method bar, the legend's row stays as tall as
+   the speedup. */
 @media (min-width: 72rem) {
   .andrey-home .seg-panel {
     position: relative;

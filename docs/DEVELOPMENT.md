@@ -48,9 +48,9 @@ sections follow the headline's words, then All-in-one (`ACTS` in `site/build.py`
 art at full bleed with its title and its claim (`act_covers()`), then shows its evidence: tiles,
 each with a figure of its own, and a note in plain type where the evidence is a list (`bento-note`).
 The hero and Accelerated share the fast lanes (`HERO_ART`, `.run` in `site.css`), which stay on the
-screen while Accelerated's title comes up over them, until the speed panel rises over the art.
+screen as Accelerated's title appears, until the speed panel rises over the art.
 
-- Accelerated: the speed panel, a tab per method family, and under it a link to the post "Why
+- Accelerated: the speed panel with a tab per method family, followed by a link to the post "Why
   Andrey is fast".
 - Accurate: where Andrey has fewer errors, as a chart, and beside it a note: every release is
   tested against true graphs, and its release card gives every method's errors.
@@ -67,12 +67,12 @@ with a published comparison (`family_tiles()`) shows the family's largest ratio 
 digit ("up to 900x faster"), and none where Andrey is not at least twice as fast; a new family gets
 its tile with no change to the page.
 
-The ideas behind the speed are four animated scenes from [`site/why_fast.py`](../site/why_fast.py)
-in the post `docs/blog/20261008-why-andrey-is-fast.md`; each compares Andrey with a lane labeled
-Others and names no package. `why-fast.js` plays a scene once it scrolls into view, then offers a
-replay; without script, or under reduced motion, each shows its final counts. The scenes play with
-Motion, vendored unmodified as `site/assets/motion.js` under its MIT license and pinned in
-`tests/unit/test_why_fast.py`; `conf.py` loads both scripts only on that post.
+The post `docs/blog/20261008-why-andrey-is-fast.md` explains the speed through four animated scenes
+from [`site/why_fast.py`](../site/why_fast.py). Each compares Andrey with a lane labeled Others and
+names no package. `why-fast.js` plays each scene once when it scrolls into view, then offers a
+replay. Without JavaScript or under reduced motion, each scene shows its final counts. Motion
+plays the scenes; it is vendored unmodified as `site/assets/motion.js` under its MIT license and
+pinned in `tests/unit/test_why_fast.py`. `conf.py` loads both scripts only on that post.
 
 The page moves with the scroll, never under reduced motion: the stylesheet drives it from scroll and
 view timelines where the browser has them, and only opacity and transforms move; elsewhere the page
