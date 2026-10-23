@@ -207,6 +207,34 @@ _add(
 )
 _add(
     MethodSpec(
+        name="rfci",
+        family="constraint",
+        summary="A faster FCI for large graphs: allows latent confounders and selection bias and "
+        "skips FCI's possible-d-separation step, testing each unshielded triple and discriminating "
+        "path before orienting it; returns an RFCI-PAG, whose marks are sound but which can keep "
+        "edges FCI's PAG removes. Use when unmeasured confounding is plausible and FCI is too "
+        "slow.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="pag",
+            doc="metadata['categorical'] lists the categorical columns a mixed-data setting read",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` breaks ties between separating sets of equal size and p-value '
+            "by column position."
+        ),
+        params=(_ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
+        references=("Colombo, Maathuis, Kalisch & Richardson 2012", "Zhang 2008"),
+    )
+)
+_add(
+    MethodSpec(
         name="gfci",
         family="constraint",
         summary="Score-then-FCI hybrid: GES adjacencies, pruned by independence tests and oriented "
@@ -1437,6 +1465,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
     "fci": _SKELETON_RULE + _PAG_MARKS,
+    "rfci": _SKELETON_RULE + _PAG_MARKS,
     "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
     "and never removes a required pair. " + _PAG_MARKS,
     "ges": _MOVE_RULE + _CLASS_RULE,
@@ -1473,7 +1502,7 @@ for _name, _how in _KNOWLEDGE_HOW.items():
         f"adjacent, and temporal tiers. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
         nullable=True,
     )
-    _depth = (_MAX_DEPTH,) if _name in ("pc", "cdnod", "fci", "gfci") else ()
+    _depth = (_MAX_DEPTH,) if _name in ("pc", "cdnod", "fci", "rfci", "gfci") else ()
     REGISTRY[_name] = REGISTRY[_name].model_copy(
         update={
             "params": (*REGISTRY[_name].params, *_depth, _knowledge),

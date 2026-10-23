@@ -26,6 +26,7 @@ from andrey.api._adapt import (
     open_unit_interval,
     structure_output,
 )
+from andrey.api._experimental import warn_experimental
 from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
@@ -559,6 +560,196 @@ def fci(
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
+    )
+
+
+def rfci(
+    data: npt.ArrayLike,
+    *,
+    alpha: float = 0.05,
+    indep_test: str = "fisherz",
+    categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
+) -> StructureOutput:
+    """Learn an RFCI-PAG from observational data with RFCI, a faster FCI for large graphs.
+
+    RFCI [1]_ runs FCI's first step and orientation rules but skips its possible-d-separation step,
+    whose tests grow quickly with the graph. Instead, it runs a few extra tests before it orients an
+    unshielded triple or a discriminating path, so the marks it sets stay sound when unmeasured
+    common causes are present. Its PAG can keep edges that FCI's would remove.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_variables)
+        Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
+        become the structure's ``labels``.
+    alpha : float, default=0.05
+        Significance level of the conditional-independence test. Smaller values give sparser graphs.
+    indep_test : str, default="fisherz"
+        Conditional-independence test, as for :func:`~andrey.fci`: ``"fisherz"`` and
+        ``"student_t"`` for continuous data, ``"chisq"`` and ``"gsq"`` for categorical data coded by
+        whole numbers, ``"degen_gauss"`` and ``"cond_gauss"`` for mixed data, and ``"kci"``,
+        ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` for nonlinear dependence in continuous data, at a
+        far higher cost per test.
+    categorical : sequence of str or int, optional
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
+        0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
+        columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
+        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
+        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+    max_categories : int, default=10
+        The most distinct whole numbers a column may hold to be inferred as categorical, at least
+        ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
+        they may be category codes.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. It caps the first step's
+        tests; every later test conditions on part of a separating set the first step found, so the
+        cap bounds those too.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs, and no step tests or removes a required pair; the tests can remove any
+        other allowed pair. A pair the knowledge makes non-adjacent is tested for a separating set,
+        so colliders over it are oriented as usual; when the search finds none within
+        ``max_depth``, no rule reads its unshielded triples as colliders or non-colliders. In the
+        PAG, a forbidden ``a -> b`` on an adjacent pair puts an
+        arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``;
+        knowledge that puts an arrowhead at ``a`` on an edge ``a - b`` while its required edges lead
+        from ``a`` to ``b`` raises ``ValueError``.
+
+    Returns
+    -------
+    StructureOutput
+        Wraps a ``pag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
+        ``"RFCI"``. Endpoints carry arrowheads, tails, or circle marks (``o``), as in FCI's PAG;
+        see Notes for how the two differ. Under a mixed-data setting, ``metadata["categorical"]``
+        lists the categorical columns it read, by name or 0-based position.
+
+    Raises
+    ------
+    NotImplementedError
+        If ``indep_test`` names no available test.
+    TypeError
+        If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
+    ValueError
+        If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
+        not in ``(0, 1)``, or if ``data`` or ``categorical`` does not suit the test, as for
+        :func:`~andrey.pc`. With ``"fisherz"`` or ``"student_t"``, also if a column repeats another
+        up to scale and shift, before any test runs; one message names every group of copies and
+        says to keep one column per group. Also if a given ``max_depth`` is negative, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
+
+    Warns
+    -----
+    ExperimentalWarning
+        On the first call in a process: the method has no published benchmark, and its API may
+        change without deprecation.
+    DataTypeWarning
+        When a mixed-data test infers the categorical columns, or finds none and so runs as the
+        linear-Gaussian form, or when a continuous setting meets columns that look like category
+        codes; each message warns once per process.
+
+    See Also
+    --------
+    andrey.fci : Removes more edges, at the cost of the possible-d-separation step.
+
+    Notes
+    -----
+    **When to use it.** RFCI suits the data FCI suits, data that unmeasured common causes or sample
+    selection may affect, when the graph is too large for FCI. FCI's possible-d-separation step
+    tests a pair given subsets of a set that can grow with the whole graph; RFCI conditions only on
+    parts of separating sets its first step found, so its extra tests stay few and small on sparse
+    graphs.
+
+    **When not to.** When FCI runs in the time you have, its PAG says more: RFCI's can keep an edge
+    FCI's removes.
+
+    **How it works.** RFCI runs in three steps [1]_. First, it removes edges by
+    conditional-independence tests, as :func:`~andrey.fci` does, and records a minimal separating
+    set for each pair it removes. Next, for each unshielded triple ``a - b - c``, it tests ``a`` and
+    ``b``, and ``b`` and ``c``, given the separating set of ``a`` and ``c`` without ``b``. A pair
+    found independent loses its edge and takes a minimal separating set from that set; when no test
+    removes an edge, it orients ``a *-> b <-* c`` wherever ``b`` is not in the separating set.
+    Last, it applies Zhang's orientation rules R1-R10 [2]_, except that before rule R4 orients a
+    discriminating path from ``d`` to ``c``, RFCI tests each two consecutive nodes on the path given
+    every subset of the separating set of ``d`` and ``c``. A pair found independent loses its edge,
+    and the triples that removal leaves unshielded go through the second step again.
+
+    The second step runs in rounds, as the first step does: each round tests every unshielded
+    triple and removes the pairs found independent together, and the rounds repeat until one
+    removes nothing. The rules run in rounds as :func:`~andrey.fci`'s do; a round in which R4's
+    tests remove an edge sets no mark, and the next round starts on the new graph. R4 tests every
+    shortest discriminating path, and paths that decide differently leave the endpoint a circle.
+    When several subsets separate a pair, the smallest wins, then the one with the largest p-value,
+    then the one whose columns come first in a tie rank computed from each column's own data, as
+    for :func:`~andrey.hc`. The result therefore does not depend on the column order, unless two
+    columns are identical. Under ``andrey.config(tie_break="position")``, the tie rank is the
+    column position. The :doc:`column-order guide </docs/guides/column-order>` lists what reordering
+    the columns does to each method.
+
+    **The RFCI-PAG.** With exact tests, RFCI's PAG is FCI's PAG with possibly some extra edges, each
+    between two nodes neither of which causes the other; such an edge carries no tail [1]_. Every
+    tail and arrowhead it sets is correct for the true graph, but a circle can hide a mark FCI would
+    set, and the PAG can describe more than one equivalence class. On graphs where no pair needs a
+    possible-d-separation set to be separated, the two PAGs are equal.
+
+    **Limitations.** Not benchmarked yet. Its tests run it on 17 variables with 2,000 rows of
+    simulated linear-Gaussian data, and on 12 variables with exact d-separation tests. Rule R4's
+    path search and rule R5's cycle search stop at FCI's bounds, so on graphs with many such paths
+    they can leave circles. Each pair the first step removes takes a minimal separating set, found
+    by testing subsets of the separating sets the first step recorded, which costs extra tests
+    when many sets of one size separate a pair.
+
+    References
+    ----------
+    .. [1] Colombo, D., Maathuis, M. H., Kalisch, M., and Richardson, T. S. (2012). Learning
+       high-dimensional directed acyclic graphs with latent and selection variables. Annals of
+       Statistics 40(1), 294-321.
+    .. [2] Zhang, J. (2008). On the completeness of orientation rules for causal discovery in the
+       presence of latent confounders and selection bias. Artificial Intelligence 172(16-17),
+       1873-1896.
+
+    Examples
+    --------
+    >>> import warnings
+    >>> import numpy as np
+    >>> from andrey import rfci
+    >>> rng = np.random.default_rng(0)
+    >>> x = rng.standard_normal(500)
+    >>> y = x + 0.1 * rng.standard_normal(500)
+    >>> with warnings.catch_warnings():
+    ...     warnings.simplefilter("ignore")
+    ...     out = rfci(np.column_stack([x, y]))
+    >>> out.structure.kind
+    'pag'
+    """
+    warn_experimental("rfci")
+    from andrey.constraint.rfci import rfci as _rfci
+
+    X, mask = checked_data(
+        data, categorical, "indep_test", indep_test, max_categories=max_categories
+    )
+    alpha = open_unit_interval(alpha, "alpha")
+    labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="rfci")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
+    with copies_named(labels):
+        pag = _rfci(
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            categorical=mask,
+            max_depth=max_depth,
+            constraints=constraints,
+        )
+    return structure_output(
+        pag, labels=labels, metadata={"algorithm": "RFCI", **categorical_metadata(mask, data)}
     )
 
 

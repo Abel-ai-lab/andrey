@@ -12,7 +12,7 @@ Wrappers share :mod:`andrey.api._adapt` for adjacency conversion, JSON-safe meta
 ``StructureOutput`` construction.
 """
 
-from .constraint import cdnod, fci, gfci, pc
+from .constraint import cdnod, fci, gfci, pc, rfci
 from .irregular import anm, bottom_up_parce_lingam, pnl, rcd
 from .latent import gin
 from .lingam import direct_lingam, ica_lingam, multi_group_direct_lingam
@@ -24,6 +24,7 @@ __all__ = [
     # constraint-based
     "pc",
     "fci",
+    "rfci",
     "gfci",
     "cdnod",
     # score-based

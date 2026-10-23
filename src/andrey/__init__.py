@@ -41,6 +41,7 @@ from .api import (
     pcmciplus,
     pnl,
     rcd,
+    rfci,
     tabu,
     varma_lingam,
     xges,
@@ -86,6 +87,7 @@ __all__ = [
     # Algorithm facades - one uniform StructureOutput each.
     "pc",
     "fci",
+    "rfci",
     "gfci",
     "cdnod",
     "ges",
