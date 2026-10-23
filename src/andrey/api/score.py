@@ -77,13 +77,13 @@ def ges(
         be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
         per free parameter of a variable's conditional probability table.
     max_parents : int or None, default=None
-        Limits the forward phase, at least ``0``: a variable that already has more than
-        ``max_parents`` parents gets no new edges. ``None`` keeps the limit of
-        ``n_variables / 2``, and a larger integer lifts it. A lower limit makes the search faster
-        on large graphs and can lower the errors, but it can stop the search short of the
-        lowest-scoring graph, which GES otherwise finds. One move can give a variable several
-        parents at once, so a variable can finish with more than ``max_parents``. The backward
-        phase has no limit.
+        A gate on the forward phase, at least ``0``: a node whose parent count already exceeds
+        ``max_parents`` gains no new parents in it. It does not cap the finished graph: one move
+        can give a node several parents at once, so a node can end with more than ``max_parents``.
+        ``None`` keeps the default gate of ``n_variables / 2``, and a larger integer lifts it. A
+        lower value makes the search faster on large graphs and can lower the errors, but it can
+        stop the search short of the lowest-scoring graph, which GES otherwise finds. The
+        backward phase has no gate.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -164,11 +164,11 @@ def ges(
     on the published benchmarks. FGES, a fast GES, multiplied the BIC penalty by 4 when searching
     continuous data on graphs of up to a million variables [2]_.
 
-    **How it works.** In the forward phase, a variable with more than ``max_parents`` parents
-    (``n_variables / 2`` for ``None``) gets no new edges. The backward phase has no cap. Moves
-    whose score changes are equal after rounding are chosen by each column's rank, as in
-    :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says what the rank
-    keeps under a new column order and on another machine.
+    **How it works.** In the forward phase, a variable whose parent count already exceeds
+    ``max_parents`` (``n_variables / 2`` for ``None``) gains no new parents. The backward phase has
+    no such gate. Moves whose score changes are equal after rounding are chosen by each column's
+    rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says
+    what the rank keeps under a new column order and on another machine.
 
     **Categorical data.** ``"local_score_BDeu"`` takes each distinct value of a column as one
     category, so the codes need not start at 0 or be consecutive; a DataFrame's text, ``bool``, and
