@@ -14,9 +14,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import SkeletonWorkerPool, pool_capable
+from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
     adjacent_pairs,
+    canonical_capable,
     first_order_removals,
     marginal_removals,
     prescreen_capable,
@@ -170,7 +171,7 @@ def _fast_adjacency_search(
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    pool = SkeletonWorkerPool(test, workers) if workers > 1 and pool_capable(test) else None
+    pool = SkeletonWorkerPool(test, workers) if workers > 1 and canonical_capable(test) else None
     try:
         size = -1
         while True:
