@@ -419,13 +419,12 @@ _add(
                 name="max_parents",
                 type="int",
                 default=None,
-                doc="A gate on the forward phase, at least 0: a node whose parent count already "
-                "exceeds max_parents gains no new parents in it. It does not cap the finished "
-                "graph: one move can give a node several parents at once, so a node can end with "
-                "more than max_parents. null keeps the default gate of n_variables / 2, and a "
-                "larger integer lifts it. A lower value makes the search faster on large graphs "
-                "and can lower the errors, but it can stop the search short of the "
-                "lowest-scoring graph, which GES otherwise finds.",
+                doc="A cap on every node's parents, at least 0: no DAG the returned CPDAG "
+                "represents gives a node more than max_parents parents, and some DAG reaches each "
+                "node's count. A move whose CPDAG would "
+                "break the cap, in either phase, is skipped for the next best move. A cap can "
+                "stop the search short of the lowest-scoring graph, which GES otherwise finds. "
+                "null sets no cap; the forward phase then keeps its gate of n_variables / 2.",
                 nullable=True,
             ),
             _CATEGORICAL,

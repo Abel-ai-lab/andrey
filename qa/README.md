@@ -7,7 +7,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | Tool | Purpose |
 |---|---|
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
-| `reference_parity.py` | Fail a published row where Andrey makes more errors than the reference package. |
+| `reference_parity.py` | Flag a published row where Andrey makes more errors than the reference package. |
 | `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
 | `identity.py` | Hash every supported method's full output, to show a change returns the same bits. |
 | `profiler.py` | Time one method's fit and show where it spends its time. |
@@ -232,10 +232,12 @@ uv run python -m qa.quality_gate --capture  # re-measure; review the diff
 
 ## Reference parity
 
-Before any fit, the gate checks the published benchmark summaries
-(`benchmarks/published/*/summary.json`) with `reference_parity.py`, which reads only those files,
-so the reference packages need not be installed. Each row pairs Andrey with one reference package
-at one size. A summary's `parity_rule` sets how its rows are judged.
+Reference parity is a soft gate. Before any fit, the quality gate checks the published benchmark
+summaries (`benchmarks/published/*/summary.json`) with `reference_parity.py`, which reads only those
+files, so the reference packages need not be installed; it prints the flagged rows and does not fail
+on them. Run on its own, `reference_parity.py` exits 1 on a flagged row: the release checklist runs
+it offline and reviews every flag before the release. Each row pairs Andrey with one reference
+package at one size. A summary's `parity_rule` sets how its rows are judged.
 
 With `"parity_rule": "paired bootstrap"` (0.8.0 and later), a row is judged by D = SHD(Andrey) -
 SHD(reference) on each of its paired datasets, the datasets both finished (`paired`). The
@@ -277,7 +279,7 @@ side's mean SHD over the paired datasets under the paired bootstrap), so a re-ru
 row voids it, and an entry that matches no failing row fails the check.
 
 ```shell
-uv run python -m qa.reference_parity  # exit 1 if any row fails
+uv run python -m qa.reference_parity  # exit 1 if any row is flagged
 ```
 
 ## Other tools
