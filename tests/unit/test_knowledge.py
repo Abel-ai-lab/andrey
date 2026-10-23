@@ -22,8 +22,8 @@ from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
 
 METHODS = [name for name, spec in REGISTRY.items() if spec.knowledge]
-PAGS = {"fci", "gfci"}
-DEPTH = ["pc", "fci", "gfci", "cdnod"]
+PAGS = {"fci", "rfci", "gfci"}
+DEPTH = ["pc", "fci", "rfci", "gfci", "cdnod"]
 LABELS = list("abcdef")
 # a -> c <- b, c -> d -> e, a -> f.
 TRUTH = {("a", "c"), ("b", "c"), ("c", "d"), ("d", "e"), ("a", "f")}
@@ -196,7 +196,7 @@ def test_bdeu_search_honors_required_forbidden_and_tiers(name):
 @pytest.mark.parametrize(
     ("name", "setting"),
     [(name, {}) for name in DEPTH]
-    + [(name, {"possible_dsep": "fast"}) for name in DEPTH if name in PAGS],
+    + [(name, {"possible_dsep": "fast"}) for name in ("fci", "gfci")],
     ids=lambda value: value if isinstance(value, str) else ("fast" if value else "default"),
 )
 def test_max_depth_caps_the_conditioning_sets(name, setting, monkeypatch):
@@ -233,7 +233,12 @@ def test_max_depth_caps_the_conditioning_sets(name, setting, monkeypatch):
             return getattr(self._test, attr)
 
     # The packages re-export functions under their modules' names, so import the modules by path.
-    for path in ("andrey.constraint.pc", "andrey.constraint.fci", "andrey.search.gfci"):
+    for path in (
+        "andrey.constraint.pc",
+        "andrey.constraint.fci",
+        "andrey.constraint.rfci",
+        "andrey.search.gfci",
+    ):
         module = importlib.import_module(path)
         make = module.make_indep_test
         monkeypatch.setattr(

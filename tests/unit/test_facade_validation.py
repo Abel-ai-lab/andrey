@@ -56,6 +56,7 @@ def _with(x, cell, value):
 SINGLE = {
     "pc": andrey.pc,
     "fci": andrey.fci,
+    "rfci": andrey.rfci,
     "gfci": andrey.gfci,
     "cdnod": lambda data, **kw: andrey.cdnod(data, domain_index=np.arange(len(data)) % 2, **kw),
     "ges": andrey.ges,
@@ -193,7 +194,7 @@ def _two_groups_of_copies():
 
 # The searches that reject copies before the fit: the BIC searches, the partial-correlation
 # constraint searches, and the lagged partial-correlation searches.
-COPY_CHECKED = [*BIC, "pc", "fci", "cdnod", "pcmci", "pcmciplus", "lpcmci"]
+COPY_CHECKED = [*BIC, "pc", "fci", "rfci", "cdnod", "pcmci", "pcmciplus", "lpcmci"]
 
 
 @pytest.mark.parametrize("method", COPY_CHECKED)
@@ -207,7 +208,7 @@ def test_copy_checked_searches_name_every_group_of_copies_by_column_name(method)
 
 
 @pytest.mark.parametrize("indep_test", ["fisherz", "student_t"])
-@pytest.mark.parametrize("method", ["pc", "fci", "cdnod"])
+@pytest.mark.parametrize("method", ["pc", "fci", "rfci", "cdnod"])
 def test_constraint_searches_reject_copies_no_test_meets(method, indep_test):
     # The copy is unrelated to every other column, so no test conditions on it with its original.
     x = _data(200, 4)

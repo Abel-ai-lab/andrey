@@ -135,6 +135,7 @@ def _domain_index(n: int) -> np.ndarray:
 _FACADES = {
     "pc": andrey.pc,
     "fci": andrey.fci,
+    "rfci": andrey.rfci,
     "gfci": andrey.gfci,
     "cdnod": lambda x: andrey.cdnod(x, _domain_index(len(x))),
 }
