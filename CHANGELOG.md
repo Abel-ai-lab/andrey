@@ -15,7 +15,7 @@ change names its pull request.
   ICA-LiNGAM, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of the
   identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
   scores change in their last bits, with the same output on those datasets. ([#251], [#265],
-  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353])
+  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#365])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -58,6 +58,9 @@ change names its pull request.
   in stacks, those of size 0 for every pair in one. ([#265], [#312], [#353])
 - `ges` and `gfci` return the same graphs in less time, because GES keeps each reach set while a
   move cannot change it and rebuilds the CPDAG after each move faster. ([#328])
+- `ges`, `gfci`, and `gies` return the same graphs in less time, because GES derives again only the
+  edges of the nodes a move can reach instead of rebuilding the whole CPDAG after each move.
+  ([#365])
 - `xges` returns the same graphs in less time, because each branch of its extended search copies
   only the parts of the graph it changes. ([#311])
 - `boss` and `grasp` return the same graphs in less time, because each grow-shrink tree keeps one
@@ -635,4 +638,5 @@ First alpha release.
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
 [#353]: https://github.com/Abel-ai-lab/andrey/pull/353
+[#365]: https://github.com/Abel-ai-lab/andrey/pull/365
 [#363]: https://github.com/Abel-ai-lab/andrey/pull/363

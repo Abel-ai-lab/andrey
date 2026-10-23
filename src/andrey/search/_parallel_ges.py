@@ -914,12 +914,10 @@ def run_ges(
                 break
             key, x, y, T = best
             if constraints is None:
-                ops.apply_insert(adj, x, y, T)
-                adj = _reform_cpdag(adj)
+                adj = ops.insert_cpdag(adj, x, y, T)
             else:
-                moved = adj.copy()
-                ops.apply_insert(moved, x, y, T)
-                adj = _admitted(_reform_cpdag(moved), adj, constraints, excluded, key)
+                moved = ops.insert_cpdag(adj.copy(), x, y, T)
+                adj = _admitted(moved, adj, constraints, excluded, key)
         excluded.clear()  # forward and backward moves share the key shape
         while True:  # backward phase
             state = neighborhood_state(adj, n)
@@ -941,12 +939,10 @@ def run_ges(
                 break
             key, x, y, H = best
             if constraints is None:
-                ops.apply_delete(adj, x, y, H)
-                adj = _reform_cpdag(adj)
+                adj = ops.delete_cpdag(adj, x, y, H)
             else:
-                moved = adj.copy()
-                ops.apply_delete(moved, x, y, H)
-                adj = _admitted(_reform_cpdag(moved), adj, constraints, excluded, key)
+                moved = ops.delete_cpdag(adj.copy(), x, y, H)
+                adj = _admitted(moved, adj, constraints, excluded, key)
     finally:
         if lazy is not None:
             lazy.close()
