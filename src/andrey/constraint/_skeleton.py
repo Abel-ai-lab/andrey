@@ -2,8 +2,8 @@
 
 :func:`scan_conditioning_sets` tests one adjacent pair against every size-``k`` subset of a
 candidate neighborhood. It uses the test's vectorized path when there is one (one stacked
-``np.linalg.inv`` per chunk for the partial-correlation tests, its subsets canonical as built; one
-count of every chunk's contingency tables for the chi-square tests) in place of thousands of scalar
+``np.linalg.inv`` per chunk for the partial-correlation tests; one count of every chunk's
+contingency tables for the chi-square tests) in place of thousands of scalar
 calls, and the scalar loop otherwise, so a test that implements only
 :class:`~andrey.core.ci.CITest` still works. Every shipped vectorized path returns the scalar
 p-values exactly, so the skeleton is the same either way. Subsets are consumed in fixed-size
@@ -14,7 +14,7 @@ consecutive pairs into one evaluation, up to ``_STACK_BYTES`` of submatrices.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
 from functools import partial
 from itertools import chain, combinations, islice
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 #: p-value is ``None`` when the scan does not record it.
 Removal = tuple[int, int, tuple[int, ...], float | None]
 # A pair's subsets that one call evaluates: ``(the pair's position, x, y, subsets)``, ``x < y``.
-_Chunk = tuple[int, int, int, list[tuple[int, ...]]]
+_Chunk = tuple[int, int, int, Sequence[tuple[int, ...]]]
 
 # One batched_call evaluates a chunk of subsets together; cap how many subsets a chunk holds so a
 # huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
@@ -72,14 +72,12 @@ def scan_conditioning_sets(
     evaluated once per pair. Skipping a repeat changes neither the union nor the return value.
 
     ``candidates`` are ascending and exclude ``a`` and ``b``, so every subset is a sorted, distinct
-    conditioning set. A FisherZ or StudentT test evaluates the subsets in size-bounded chunks of
-    canonical query arrays (the test's ``_canonical_pvalues``), with no re-sorting. Another test
-    that exposes ``batched_call(a, b, condition_sets)`` evaluates the same chunks through it;
-    otherwise each subset is tested with a scalar ``test(a, b, subset)`` call, or
-    ``test._bounded_pvalue(a, b, subset, alpha, exact_above)`` where the test has one, with
-    ``exact_above`` true when ``largest`` is given. All paths visit the same subsets in the same
-    order and take the same ``p > alpha`` decisions, so the accumulated ``separating``, the largest
-    p-value, and the return value are identical.
+    conditioning set. A test that exposes ``batched_call(a, b, condition_sets)`` evaluates the
+    subsets in size-bounded chunks through it; otherwise each subset is tested with a scalar
+    ``test(a, b, subset)`` call, or ``test._bounded_pvalue(a, b, subset, alpha, exact_above)``
+    where the test has one, with ``exact_above`` true when ``largest`` is given. Both paths visit
+    the same subsets in the same order and take the same ``p > alpha`` decisions, so the
+    accumulated ``separating``, the largest p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
     runs once per chunk.
@@ -91,13 +89,9 @@ def scan_conditioning_sets(
     scalar = (
         test if bounded is None else partial(bounded, alpha=alpha, exact_above=largest is not None)
     )
-    canonical = _canonical_route(test)
-    if canonical is not None:
-        batched = partial(_canonical_chunk, canonical, size)
-    else:
-        batched = getattr(test, "batched_call", None) or (
-            lambda a, b, chunk: [scalar(a, b, subset) for subset in chunk]
-        )
+    batched = getattr(test, "batched_call", None) or (
+        lambda a, b, chunk: [scalar(a, b, subset) for subset in chunk]
+    )
     found = False
     top = 0.0
     while True:
@@ -129,27 +123,48 @@ def _subsets(
     return subsets
 
 
-def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
-    """A FisherZ or StudentT test's ``_canonical_pvalues``, which the skeleton's canonical query
-    arrays take, else ``None``.
+def canonical_capable(test: CITest) -> bool:
+    """Whether ``test`` takes canonical query arrays and runs on the worker pool: a FisherZ or
+    StudentT test, exactly.
 
-    A subclass or a wrapper of either test keeps the ``batched_call`` and ``first_order_pvalues``
-    it may override.
+    A subclass or a wrapper of either keeps the ``batched_call`` and ``first_order_pvalues`` it
+    may override, and a worker cannot rebuild it from the correlation matrix, so it scans in the
+    caller's process one call at a time.
     """
-    if type(test) in (FisherZ, StudentT):
+    return type(test) in (FisherZ, StudentT)
+
+
+def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
+    """A :func:`canonical_capable` test's ``_canonical_pvalues``, which the canonical query arrays
+    take, else ``None``."""
+    if canonical_capable(test):
         return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
     return None
 
 
+def _query_arrays(
+    size: int, queries: Sequence[tuple[int, int, Sequence[tuple[int, ...]]]]
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The canonical query arrays ``(x, y, conditions)`` of ``queries``, in order.
+
+    Each query is ``(x, y, subsets)`` with ``x < y`` and the pair tested against every subset, each
+    of ``size`` members, sorted and distinct. The arrays hold one row per subset.
+    """
+    counts = [len(subsets) for _, _, subsets in queries]
+    rows = sum(counts)
+    xs = np.repeat(np.array([x for x, _, _ in queries], dtype=np.intp), counts)
+    ys = np.repeat(np.array([y for _, y, _ in queries], dtype=np.intp), counts)
+    members = chain.from_iterable(chain.from_iterable(subsets for _, _, subsets in queries))
+    zs = np.fromiter(members, np.intp, rows * size).reshape(rows, size)
+    return xs, ys, zs
+
+
 def _canonical_chunk(
-    pvalues: Callable[..., np.ndarray], size: int, a: int, b: int, chunk: list[tuple[int, ...]]
+    pvalues: Callable[..., np.ndarray], size: int, a: int, b: int, chunk: Sequence[tuple[int, ...]]
 ) -> np.ndarray:
     """``pvalues`` of the pair ``(a, b)`` given each subset of ``chunk``: ``size`` members, sorted
     and distinct, as the subsets of ascending candidates are."""
-    n = len(chunk)
-    x = np.full(n, min(a, b), dtype=np.intp)
-    y = np.full(n, max(a, b), dtype=np.intp)
-    return pvalues(x, y, np.array(chunk, dtype=np.intp).reshape(n, size))
+    return pvalues(*_query_arrays(size, [(min(a, b), max(a, b), chunk)]))
 
 
 def marginal_separated(
@@ -226,10 +241,6 @@ def record_tests(
 # of the dense per-pair scalar loop. The decisions (p > alpha) and separating sets are identical to
 # the scalar scan (the p-values match exactly), so the recovered skeleton is unchanged.
 
-# The most first-order queries one stack of pairs holds, so the size-1 pass holds a bounded array
-# however many pairs it tests.
-_FIRST_ORDER_STACK = 1 << 16
-
 
 def prescreen_capable(test: CITest) -> bool:
     """Whether ``test`` exposes the vectorized size-0/1 prescreen primitives.
@@ -283,58 +294,64 @@ def first_order_removals(
     is the largest p-value among the pair's tests, or ``None`` when ``record_pvalues`` is false. A
     FisherZ or StudentT test evaluates the queries of consecutive pairs in one stack
     (:func:`_stacked_first_order`); another test evaluates each pair's candidates in one
-    ``first_order_pvalues`` call. With ``trace`` given, every test is recorded, pair by pair.
+    ``first_order_pvalues`` call. The queries are built as they are evaluated, so the pass holds
+    one stack however many pairs and conditioners it tests. With ``trace`` given, every test is
+    recorded, pair by pair.
     """
-    queries = []
-    for x, y in pairs:
-        candidates = sorted((set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y})
-        if candidates:
-            queries.append((x, y, candidates))
+    queries = _first_order_queries(pairs, neighbors)
     canonical = _canonical_route(test)
     tested = (
         _stacked_first_order(canonical, queries)
         if canonical is not None
         else (
-            (x, y, c, test.first_order_pvalues(x, y, c))  # ty: ignore[unresolved-attribute]
-            for x, y, c in queries
+            (x, y, subsets, test.first_order_pvalues(x, y, c))  # ty: ignore[unresolved-attribute]
+            for x, y, c, subsets in queries
         )
     )
     removals: list[Removal] = []
-    for x, y, candidates, pvals in tested:
+    for x, y, subsets, pvals in tested:
         if trace is not None:
-            record_tests(trace, 1, x, y, [(c,) for c in candidates], pvals, alpha)
-        passing = np.asarray(candidates)[pvals > alpha]
+            record_tests(trace, 1, x, y, subsets, pvals, alpha)
+        passing = np.flatnonzero(pvals > alpha)
         if passing.size:
             # Some candidate separates, so the largest p-value is a separating one.
             p = max(pvals.tolist()) if record_pvalues else None
-            removals.append((x, y, tuple(sorted(passing.tolist())), p))
+            removals.append((x, y, tuple(subsets[k][0] for k in passing.tolist()), p))
     return removals
 
 
-def _stacked_first_order(
-    pvalues: Callable[..., np.ndarray], queries: list[tuple[int, int, list[int]]]
-) -> Iterator[tuple[int, int, list[int], np.ndarray]]:
-    """Yield each ``(x, y, candidates)`` query with the first-order p-values of its candidates.
+def _first_order_queries(
+    pairs: list[tuple[int, int]], neighbors: list[np.ndarray]
+) -> Iterator[tuple[int, int, list[int], list[tuple[int]]]]:
+    """Yield ``(x, y, candidates, subsets)`` for each of ``pairs`` with a candidate, in order.
 
-    ``pvalues`` takes canonical query arrays. Consecutive queries are stacked, whole, up to
-    ``_FIRST_ORDER_STACK`` conditioners at a time; the first-order closed form is elementwise, so
-    each p-value is the one a query evaluated alone gets.
+    The candidates are the ascending conditioners of :func:`first_order_removals`, and ``subsets``
+    the same as one-member conditioning sets, shared across the pairs.
     """
-    start = 0
-    while start < len(queries):
-        stop, held = start + 1, len(queries[start][2])
-        while stop < len(queries) and held + len(queries[stop][2]) <= _FIRST_ORDER_STACK:
-            held += len(queries[stop][2])
-            stop += 1
-        block = queries[start:stop]
-        counts = [len(candidates) for _, _, candidates in block]
-        x = np.repeat(np.array([q[0] for q in block], dtype=np.intp), counts)
-        y = np.repeat(np.array([q[1] for q in block], dtype=np.intp), counts)
-        z = np.fromiter((c for _, _, candidates in block for c in candidates), np.intp, held)
-        stacked = pvalues(x, y, z[:, None])
-        for query, pvals in zip(block, np.split(stacked, np.cumsum(counts)[:-1])):
-            yield (*query, pvals)
-        start = stop
+    singles = [(z,) for z in range(len(neighbors))]
+    for x, y in pairs:
+        candidates = sorted((set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y})
+        if candidates:
+            yield x, y, candidates, [singles[z] for z in candidates]
+
+
+def _stacked_first_order(
+    pvalues: Callable[..., np.ndarray],
+    queries: Iterable[tuple[int, int, list[int], list[tuple[int]]]],
+) -> Iterator[tuple[int, int, Sequence[tuple[int, ...]], np.ndarray]]:
+    """Yield each query of :func:`_first_order_queries` as ``(x, y, subsets, p-values)``, the
+    p-values those of its ``subsets`` in order.
+
+    ``pvalues`` takes canonical query arrays. Consecutive queries are stacked, whole, as size-1
+    chunks (:func:`_stacks`); the first-order closed form is elementwise, so each p-value is the one
+    a query evaluated alone gets.
+    """
+    chunks = ((i, x, y, subsets) for i, (x, y, _, subsets) in enumerate(queries))
+    for stack, values in _stacks(pvalues, 1, chunks):
+        stop = 0
+        for _, x, y, subsets in stack:
+            start, stop = stop, stop + len(subsets)
+            yield x, y, subsets, values[start:stop]
 
 
 def scan_pairs(
@@ -450,40 +467,33 @@ def _stacks(
 ) -> Iterator[tuple[list[_Chunk], np.ndarray]]:
     """Yield ``(stack, values)``: consecutive ``chunks``, whole, and the p-values of their queries.
 
-    A stack holds as many chunks as fit in ``_STACK_BYTES`` of correlation submatrices, at least
-    one (:func:`_evaluated`).
+    A stack holds as many chunks as fit in ``_STACK_BYTES`` of correlation submatrices, a query
+    taking ``(size + 2) ** 2`` entries of 8 bytes, at least one (:func:`_evaluated`).
     """
     limit = max(1, _STACK_BYTES // (8 * (size + 2) ** 2))
     stack: list[_Chunk] = []
     rows = 0
     for item in chunks:
         if stack and rows + len(item[3]) > limit:
-            yield from _evaluated(pvalues, size, stack, rows)
+            yield from _evaluated(pvalues, size, stack)
             stack, rows = [], 0
         stack.append(item)
         rows += len(item[3])
     if stack:
-        yield from _evaluated(pvalues, size, stack, rows)
+        yield from _evaluated(pvalues, size, stack)
 
 
 def _evaluated(
-    pvalues: Callable[..., np.ndarray],
-    size: int,
-    stack: list[_Chunk],
-    rows: int,
+    pvalues: Callable[..., np.ndarray], size: int, stack: list[_Chunk]
 ) -> Iterator[tuple[list[_Chunk], np.ndarray]]:
-    """Yield ``(stack, values)`` for the ``rows`` queries of ``stack`` evaluated in one call.
+    """Yield ``(stack, values)`` for the queries of ``stack`` evaluated in one call.
 
     When that call raises, each chunk is evaluated in a call of its own and yielded alone, so the
     error comes from the chunk the per-pair scan raises on, after the same calls.
     """
-    counts = [len(chunk) for _, _, _, chunk in stack]
-    xs = np.repeat(np.array([x for _, x, _, _ in stack], dtype=np.intp), counts)
-    ys = np.repeat(np.array([y for _, _, y, _ in stack], dtype=np.intp), counts)
-    members = chain.from_iterable(subset for _, _, _, chunk in stack for subset in chunk)
-    zs = np.fromiter(members, np.intp, rows * size).reshape(rows, size)
+    arrays = _query_arrays(size, [item[1:] for item in stack])
     try:
-        values = pvalues(xs, ys, zs)
+        values = pvalues(*arrays)
     except Exception:
         values = None
     if values is not None:

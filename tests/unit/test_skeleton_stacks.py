@@ -4,7 +4,8 @@ For FisherZ and StudentT, ``scan_pairs`` evaluates the chunks of consecutive pai
 ``_STACK_BYTES`` of correlation submatrices. Every cap, from one chunk per stack to the default,
 gives the removals, separating sets, largest p-values, and trace of the per-pair scan, which a
 subclass of either test takes; a singular query raises the per-pair scan's error after the same
-trace.
+trace. The size-1 pass, ``first_order_removals``, stacks the same way and prepares its queries
+only as the stacks need them.
 """
 
 from __future__ import annotations
@@ -13,7 +14,12 @@ import numpy as np
 import pytest
 
 from andrey.constraint import _skeleton
-from andrey.constraint._skeleton import pair_queries, scan_pairs
+from andrey.constraint._skeleton import (
+    canonical_capable,
+    first_order_removals,
+    pair_queries,
+    scan_pairs,
+)
 from andrey.core.ci import FisherZ, SingularCorrelationError, StudentT
 
 ALPHA = 0.2
@@ -117,3 +123,123 @@ def test_a_singular_stack_raises_the_per_pair_error(
     assert errors[0] == errors[1]
     assert traces[0] == traces[1]
     assert traces[0], "the singular query must come after other pairs' tests"
+
+
+def _first_order(test, pairs, neighbors, record_pvalues=True):
+    trace: list[dict] = []
+    removals = first_order_removals(test, pairs, neighbors, ALPHA, trace, record_pvalues)
+    return removals, trace
+
+
+def _candidate_rows(pairs, neighbors):
+    """The first-order queries of ``pairs``: either endpoint's neighbors, less the pair."""
+    return sum(len((set(neighbors[x]) | set(neighbors[y])) - {x, y}) for x, y in pairs)
+
+
+@pytest.mark.parametrize(("stacked", "per_pair"), TESTS)
+@pytest.mark.parametrize("cap", [1, 4000, None])
+@pytest.mark.parametrize("seed", range(3))
+def test_first_order_stacks_match_the_per_pair_pass(
+    monkeypatch: pytest.MonkeyPatch, stacked, per_pair, cap, seed
+) -> None:
+    if cap is not None:
+        monkeypatch.setattr(_skeleton, "_STACK_BYTES", cap)
+    X, pairs, neighbors = _case(seed)
+    for record_pvalues in (True, False):
+        got = _first_order(stacked(X), pairs, neighbors, record_pvalues)
+        want = _first_order(per_pair(X), pairs, neighbors, record_pvalues)
+        assert got == want
+    assert got[0], "the case must remove something"
+    assert len(got[1]) == _candidate_rows(pairs, neighbors)
+
+
+def test_a_first_order_stack_holds_many_pairs_within_the_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    limit = 100
+    monkeypatch.setattr(_skeleton, "_STACK_BYTES", 8 * limit * 3**2)
+    X, pairs, neighbors = _case(0)
+    test = FisherZ(X)
+    rows: list[int] = []
+    canonical = test._canonical_pvalues
+
+    def spy(x, y, conditions):
+        rows.append(len(x))
+        return canonical(x, y, conditions)
+
+    test._canonical_pvalues = spy
+    first_order_removals(test, pairs, neighbors, ALPHA)
+    assert sum(rows) == _candidate_rows(pairs, neighbors)
+    assert max(rows) <= limit
+    assert len(rows) < len(pairs), "a stack must hold the queries of several pairs"
+
+
+class _Watched(FisherZ):
+    """A FisherZ subclass whose first-order calls report how many rows were prepared before each."""
+
+    def __init__(self, X, prepared):
+        super().__init__(X)
+        self.prepared = prepared
+        self.waiting: list[int] = []
+        self.evaluated = 0
+
+    def first_order_pvalues(self, x, y, zs):
+        zs = list(zs)
+        self.waiting.append(self.prepared() - self.evaluated)
+        self.evaluated += len(zs)
+        return super().first_order_pvalues(x, y, zs)
+
+
+@pytest.mark.parametrize("stacked", [True, False])
+def test_first_order_queries_are_prepared_as_they_are_evaluated(
+    monkeypatch: pytest.MonkeyPatch, stacked: bool
+) -> None:
+    """Rows built but not yet evaluated stay within one stack and one pair, whatever the pairs."""
+    limit, d = 100, 30
+    monkeypatch.setattr(_skeleton, "_STACK_BYTES", 8 * limit * 3**2)
+    prepared = 0
+    real = _skeleton._first_order_queries
+
+    def counting(pairs, neighbors):
+        nonlocal prepared
+        for query in real(pairs, neighbors):
+            prepared += len(query[2])
+            yield query
+
+    monkeypatch.setattr(_skeleton, "_first_order_queries", counting)
+    X, pairs, neighbors = _case(1, d=d, p=1.0)
+    total = _candidate_rows(pairs, neighbors)
+    assert total > 20 * limit
+    if stacked:
+        test = FisherZ(X)
+        rows: list[int] = []
+        canonical = test._canonical_pvalues
+        waiting: list[int] = []
+
+        def spy(x, y, conditions):
+            waiting.append(prepared - sum(rows))
+            rows.append(len(x))
+            return canonical(x, y, conditions)
+
+        test._canonical_pvalues = spy
+        first_order_removals(test, pairs, neighbors, ALPHA)
+        assert sum(rows) == total
+        assert max(waiting) <= limit + d - 2
+    else:
+        test = _Watched(X, lambda: prepared)
+        first_order_removals(test, pairs, neighbors, ALPHA)
+        assert test.evaluated == total
+        assert max(test.waiting) <= d - 2
+
+
+def test_canonical_capable_is_the_exact_type_rule() -> None:
+    X, _, _ = _case(0)
+
+    class Scalar:
+        def __call__(self, x, y, condition_set=()):
+            return 1.0
+
+    assert canonical_capable(FisherZ(X)) and canonical_capable(StudentT(X))
+    assert not canonical_capable(_PerPairFisherZ(X))
+    assert not canonical_capable(_PerPairStudentT(X))
+    assert not canonical_capable(Scalar())  # ty: ignore[invalid-argument-type]
