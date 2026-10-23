@@ -17,6 +17,7 @@ from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
 from andrey.search.ges import GES_SCORES
 from andrey.search.hc import HC_SCORES
+from andrey.search.hybrid import MAXIMIZES, RESTRICTS
 from andrey.search.tabu import TABU_SCORES
 
 from .models import DataSpec, InputSpec, MethodSpec, OutputSpec, ParamSpec
@@ -334,6 +335,67 @@ _add(
         references=("Huang et al. 2020", "Ramsey, Zhang & Spirtes 2006", "Colombo & Maathuis 2014"),
     )
 )
+
+# --- local structure: one variable's Markov blanket or parents and children ----------------------
+
+_TARGET = ParamSpec(
+    name="target",
+    type="str",
+    default=None,
+    doc="The variable whose set to learn: a column name from the data file's header or a 0-based "
+    "position. null learns every variable's set and keeps a pair when each is in the other's set.",
+    nullable=True,
+)
+_LOCAL_OUTPUT_DOC = (
+    "undirected edges only, from target to each member, or between each pair in each other's "
+    "set when target is null; metadata['target'] names the target and metadata['{key}'] lists the "
+    "members in the order they joined"
+)
+for _name, _summary, _key, _refs in (
+    (
+        "iamb",
+        "One variable's Markov blanket (its parents, children, and children's other parents) by "
+        "incremental association: grow by conditional-independence tests, then shrink. With "
+        "target=null, the moral graph of every variable's blanket.",
+        "markov_blanket",
+        ("Tsamardinos, Aliferis & Statnikov 2003",),
+    ),
+    (
+        "inter_iamb",
+        "One variable's Markov blanket by interleaved IAMB, which shrinks after every addition. "
+        "With target=null, the moral graph of every variable's blanket.",
+        "markov_blanket",
+        ("Tsamardinos, Aliferis & Statnikov 2003",),
+    ),
+    (
+        "mmpc",
+        "One variable's parents and children, undirected, by max-min parents and children: "
+        "conditional-independence tests over subsets of the members so far, with a symmetry "
+        "check. With target=null, the skeleton that mmhc searches.",
+        "parents_and_children",
+        ("Tsamardinos, Brown & Aliferis 2006",),
+    ),
+):
+    _add(
+        MethodSpec(
+            name=_name,
+            family="constraint",
+            summary=_summary,
+            data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+            output=OutputSpec(
+                structure_type="graph",
+                graph_kind="cpdag",
+                doc=_LOCAL_OUTPUT_DOC.format(key=_key),
+            ),
+            determinism="deterministic",
+            accel="numpy",
+            status="experimental",
+            column_order="relabels",
+            tie_break=True,
+            params=(_TARGET, _ALPHA, _INDEP_TEST, _CATEGORICAL, _MAX_CATEGORIES),
+            references=_refs,
+        )
+    )
 
 # --- score-based ----------------------------------------------------------------------------------
 
@@ -679,6 +741,138 @@ _add(
             ),
         ),
         references=("Jin, Ng, Zhang & Huang 2026",),
+    )
+)
+
+# --- hybrid: a restrict phase of CI tests, then a score search among its pairs ------------------
+
+_HYBRID_SCORE_DOC = (
+    "Local score of the maximize phase: local_score_BIC_from_cov or local_score_BIC = "
+    "covariance-based BIC; "
+    "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for categorical "
+    "data coded by whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
+    "and conditional Gaussian BIC, for mixed data (not with maximize=tabu). It must read the same "
+    "kind of data as indep_test."
+)
+_HYBRID_MAX_ITER = ParamSpec(
+    name="max_iter",
+    type="int",
+    default=None,
+    doc="Most moves the score search takes, at least 1; null sets no limit (the search still "
+    "ends). Reaching a set limit warns with SearchLimitWarning.",
+    nullable=True,
+)
+_add(
+    MethodSpec(
+        name="mmhc",
+        family="score",
+        summary="Max-min hill climbing: MMPC's conditional-independence tests learn a skeleton, "
+        "then hill climbing searches DAGs whose edges join only its pairs. Faster than hc on "
+        "sparse graphs with many variables. BIC with Fisher-z tests by default; "
+        "indep_test=chisq with score_func=local_score_BDeu for categorical data. Returns the "
+        "CPDAG of the final DAG and its score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
+            "the phases",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            _ALPHA,
+            _INDEP_TEST,
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC_from_cov",
+                doc=_HYBRID_SCORE_DOC,
+                choices=HC_SCORES,
+            ),
+            _LAMBDA_VALUE,
+            _HYBRID_MAX_ITER,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
+        references=("Tsamardinos, Brown & Aliferis 2006",),
+    )
+)
+_add(
+    MethodSpec(
+        name="rsmax2",
+        family="score",
+        summary="Restrict-maximize search: conditional-independence tests keep the candidate pairs "
+        "(restrict=mmpc, iamb, inter_iamb, or pc), then a score search (maximize=hc or tabu) "
+        "searches DAGs whose edges join only those pairs. mmhc is restrict=mmpc with maximize=hc. "
+        "Returns the CPDAG of the final DAG and its score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['restrict'] and metadata['maximize'] name "
+            "the phases",
+        ),
+        determinism="deterministic",
+        accel="numpy",
+        status="experimental",
+        column_order="relabels",
+        tie_break=True,
+        params=(
+            ParamSpec(
+                name="restrict",
+                type="str",
+                default="mmpc",
+                doc="The restrict phase: mmpc = each variable in the other's MMPC parents and "
+                "children; iamb and inter_iamb = each in the other's Markov blanket (the moral "
+                "graph); pc = PC's skeleton.",
+                choices=RESTRICTS,
+            ),
+            ParamSpec(
+                name="maximize",
+                type="str",
+                default="hc",
+                doc="The maximize phase: hc = hill climbing; tabu = tabu search.",
+                choices=MAXIMIZES,
+            ),
+            _ALPHA,
+            _INDEP_TEST,
+            ParamSpec(
+                name="score_func",
+                type="str",
+                default="local_score_BIC_from_cov",
+                doc=_HYBRID_SCORE_DOC,
+                choices=HC_SCORES,
+            ),
+            _LAMBDA_VALUE,
+            _HYBRID_MAX_ITER,
+            ParamSpec(
+                name="tabu_length",
+                type="int",
+                default=10,
+                doc="With maximize=tabu, the number of most recently visited DAGs a move may not "
+                "return to, at least 1.",
+            ),
+            ParamSpec(
+                name="max_tabu",
+                type="int",
+                default=None,
+                doc="With maximize=tabu, the non-improving moves allowed without a better DAG, "
+                "from 1 to tabu_length; null uses tabu_length.",
+                nullable=True,
+            ),
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
+        references=(
+            "Friedman, Nachman & Pe'er 1999",
+            "Tsamardinos, Brown & Aliferis 2006",
+            "Tsamardinos, Aliferis & Statnikov 2003",
+            "Scutari 2010",
+        ),
     )
 )
 
@@ -1460,8 +1654,22 @@ _MOVE_RULE = (
     "No move adds a forbidden edge or removes a required one; the search starts from the required "
     "edges. "
 )
+_CANDIDATE_RULE = (
+    "The score search considers the pairs the restrict phase keeps and the pairs of the required "
+    "edges, less the pairs the knowledge makes non-adjacent; the restrict phase reads the data "
+    "alone. "
+)
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
+_REGRESSION_RULE = (
+    "The regression drops forbidden parents and does not penalize required ones; every required "
+    "edge is in the DAG."
+)
+_LINK_RULE = (
+    "An edge [cause, effect, lag] is the link from cause at time t - lag to effect at time t; a "
+    "forbidden [cause, effect] pair forbids it at every lag, and a required link names its lag. "
+    "Tiers and allowed hold at every lag; a variable's links to its own past stay allowed. "
+)
 _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
@@ -1473,16 +1681,43 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "xges": _MOVE_RULE + _CLASS_RULE,
     "hc": _MOVE_RULE + _CLASS_RULE,
     "tabu": _MOVE_RULE + _CLASS_RULE,
+    "mmhc": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
+    "rsmax2": _CANDIDATE_RULE + _MOVE_RULE + _CLASS_RULE,
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
-    "direct_lingam": _ORDER_RULE + "The regression drops forbidden parents and does not penalize "
-    "required ones; every required edge is in the DAG.",
+    "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
+    "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
+    + _ORDER_RULE
+    + _REGRESSION_RULE,
+    "multi_group_direct_lingam": "It holds for every group. " + _ORDER_RULE + _REGRESSION_RULE,
+    "pcmci": _LINK_RULE + "No test runs on a forbidden or a required link: a forbidden link is not "
+    "in the graph, and a required one is.",
+    "pcmciplus": _LINK_RULE + "The lagged and skeleton phases test no forbidden or required link: "
+    "a forbidden link is never linked, and a required one stays. Same-step links the knowledge "
+    "decides are directed before the colliders, which never reverse them; rules R1-R3 follow.",
+    "varma_lingam": _LINK_RULE + "Lags run over the autoregressive part, 0 to order[0]. At lag 0 "
+    "the innovations' DirectLiNGAM honors the knowledge as direct_lingam does. With prune=true "
+    "each regression drops forbidden lagged regressors and keeps required ones unpenalized; with "
+    "prune=false every lagged weight stays, so a forbidden lagged link raises.",
+    "longitudinal_lingam": _LINK_RULE + "At lag 0 each time point's DirectLiNGAM honors the "
+    "knowledge as direct_lingam does. A forbidden lagged link is left out of the least-squares "
+    "fit of its effect's lagged weights; every other lagged weight stays.",
+    "rcd": "The ancestor search runs as without knowledge; the parent sets then drop forbidden "
+    "parents and gain required ones, and a pair forbidden both ways is never marked <->.",
+    "bottom_up_parce_lingam": "A sink is taken only when no remaining variable is in a later "
+    "tier, and each regression drops forbidden parents. In the unordered block, a pair forbidden "
+    "both ways is not adjacent and a pair forbidden one way has an arrowhead at the cause. "
+    "Required edges raise.",
+    "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
+    "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
+    "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
-#: The Knowledge parts each method honors (every part, for every method that takes knowledge).
-_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
-    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
-)
+#: The Knowledge parts each method honors: every part, but for BottomUpParceLiNGAM.
+_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
+    **dict.fromkeys(_KNOWLEDGE_HOW, KNOWLEDGE_PARTS),
+    "bottom_up_parce_lingam": ("forbidden", "allowed", "tiers"),
+}
 _MAX_DEPTH = ParamSpec(
     name="max_depth",
     type="int",

@@ -18,6 +18,10 @@ change names its pull request.
 
 ### Added
 
+- Experimental hybrid searches: `mmhc` learns MMPC's skeleton and then hill climbs within it,
+  `rsmax2` pairs a restrict phase (`"mmpc"`, `"iamb"`, `"inter_iamb"`, or `"pc"`) with hill climbing
+  or tabu search, and `iamb`, `inter_iamb`, and `mmpc` return one variable's Markov blanket or
+  parents and children with `target=`, or every variable's set without it. ([#400])
 - `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
   `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
   `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
@@ -30,6 +34,11 @@ change names its pull request.
   the others explain follows the causal order; it takes up to 1,000 variables.
   `andrey.data.generate` takes `scale`. For contributors, the benchmark harness has unitless
   variants of its four linear regimes. ([#411])
+- `pcmci`, `pcmciplus`, `lpcmci`, `varma_lingam`, `longitudinal_lingam`, `ica_lingam`,
+  `multi_group_direct_lingam`, `rcd`, and `bottom_up_parce_lingam` (every part but required edges)
+  take `knowledge`, where a time-series method reads `(cause, effect, lag)` as the link from
+  `cause` at time `t - lag` to `effect` at time `t`, so you can rule links in or out at one lag.
+  ([#410])
 - `pc`, `cdnod`, `fci`, and `gfci` take `collider_rule="conservative"` or `"majority"`, which decide
   each collider by a vote over the separating subsets of its ends' neighbors and list the triples
   the vote leaves undecided in `metadata["ambiguous_triples"]`. ([#397])
@@ -743,4 +752,6 @@ First alpha release.
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#396]: https://github.com/Abel-ai-lab/andrey/pull/396
 [#397]: https://github.com/Abel-ai-lab/andrey/pull/397
+[#400]: https://github.com/Abel-ai-lab/andrey/pull/400
+[#410]: https://github.com/Abel-ai-lab/andrey/pull/410
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411
