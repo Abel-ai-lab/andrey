@@ -41,8 +41,8 @@ _INDEP_TEST = ParamSpec(
     "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
     "columns named by categorical: degen_gauss = degenerate Gaussian and "
     "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
-    "data, the experimental tests, each far slower per test: kci = kernel test; rcot = its "
-    "random-feature approximation; cmiknn = nearest-neighbor conditional mutual information; "
+    "data, each far slower per test: kci = kernel test; rcot = its random-feature approximation; "
+    "cmiknn = nearest-neighbor conditional mutual information; "
     "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
     "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
     "order.",
@@ -353,6 +353,19 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            ParamSpec(
+                name="max_parents",
+                type="int",
+                default=None,
+                doc="A gate on the forward phase, at least 0: a node whose parent count already "
+                "exceeds max_parents gains no new parents in it. It does not cap the finished "
+                "graph: one move can give a node several parents at once, so a node can end with "
+                "more than max_parents. null keeps the default gate of n_variables / 2, and a "
+                "larger integer lifts it. A lower value makes the search faster on large graphs "
+                "and can lower the errors, but it can stop the search short of the "
+                "lowest-scoring graph, which GES otherwise finds.",
+                nullable=True,
+            ),
             _CATEGORICAL,
             _MAX_CATEGORIES,
         ),

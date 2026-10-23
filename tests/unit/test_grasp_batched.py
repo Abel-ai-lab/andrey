@@ -120,7 +120,8 @@ def test_grow_rechecks_both_sides_of_near_ties(
     candidate = -score.score(0, [1, 2])
     node = grasp_mod._GSTNode(tree, score=base + base_error)
 
-    def rounded_batch(vertex, base_parents, deltas):
+    def rounded_batch(vertex, base_parents, deltas, *, bounds):
+        bounds[:] = [abs(candidate_error) if add == 2 else 0.0 for _, add in deltas]
         return [
             score.score(vertex, [*base_parents, add]) - (candidate_error if add == 2 else 0)
             for _, add in deltas
@@ -149,7 +150,8 @@ def test_grow_preserves_input_order_for_tied_siblings(monkeypatch, available) ->
     assert exact == -score.score(0, [2])
     assert exact - tree.empty_score > grasp_mod._SCORE_EPS
 
-    def rounded_batch(vertex, parents, deltas):
+    def rounded_batch(vertex, parents, deltas, *, bounds):
+        bounds[:] = [i * 1e-10 for i in range(len(deltas))]
         return [score.score(vertex, [add]) - i * 1e-10 for i, (_, add) in enumerate(deltas)]
 
     monkeypatch.setattr(delta, "score_many_with_base", rounded_batch)
@@ -200,9 +202,9 @@ def test_grasp_matches_per_candidate_order_and_graph(
         original_init(self, *args)
         orders.append(self)
 
-    def capture_batch(self, vertex, parents, deltas):
+    def capture_batch(self, vertex, parents, deltas, **options):
         batches.append((vertex, tuple(parents), tuple(deltas)))
-        return original_batch(self, vertex, parents, deltas)
+        return original_batch(self, vertex, parents, deltas, **options)
 
     monkeypatch.setattr(grasp_mod._Order, "__init__", capture_order)
     monkeypatch.setattr(DeltaBICScore, "score_many_with_base", capture_batch)
@@ -210,9 +212,10 @@ def test_grasp_matches_per_candidate_order_and_graph(
     batched_requests = batches.copy()
     batches.clear()
 
-    def per_candidate(self, vertex, parents, deltas):
+    def per_candidate(self, vertex, parents, deltas, *, bounds):
         batches.append((vertex, tuple(parents), tuple(deltas)))
         assert all(op == "add" for op, _ in deltas)
+        bounds[:] = [0.0] * len(deltas)
         return [self.score_obj.score(vertex, [*parents, add]) for _, add in deltas]
 
     monkeypatch.setattr(DeltaBICScore, "score_many_with_base", per_candidate)

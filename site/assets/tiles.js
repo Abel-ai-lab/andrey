@@ -61,7 +61,115 @@
     for (const sweep of document.querySelectorAll(".cover-sweep")) lit.observe(sweep);
   }
 
-  // An address that ends in a tile's id, such as an old link to #methods, opens that tile.
+  // A segmented panel: its tabs show one panel at a time; the arrow keys move between tabs.
+  const choose = new Map();
+  for (const seg of document.querySelectorAll("[data-seg]")) {
+    const tabs = [...seg.querySelectorAll('[role="tab"]')];
+    let show = (tab, focus) => {
+      for (const each of tabs) {
+        const on = each === tab;
+        each.setAttribute("aria-selected", String(on));
+        each.tabIndex = on ? 0 : -1;
+        document.getElementById(each.getAttribute("aria-controls")).hidden = !on;
+      }
+      if (focus) tab.focus();
+    };
+    // A pill glides under the tab beneath the pointer and settles back on the chosen tab.
+    const bar = seg.querySelector('[role="tablist"]');
+    const glide = document.createElement("span");
+    glide.className = "seg-glide";
+    glide.setAttribute("aria-hidden", "true");
+    bar.prepend(glide);
+    bar.classList.add("has-glide");
+    const chosen = () => tabs.find((tab) => tab.getAttribute("aria-selected") === "true");
+    const light = (tab) => {
+      glide.style.width = `${tab.offsetWidth}px`;
+      glide.style.transform = `translateX(${tab.offsetLeft}px)`;
+      for (const each of tabs) each.classList.toggle("is-lit", each === tab);
+    };
+    for (const tab of tabs) tab.addEventListener("pointerenter", () => light(tab));
+    bar.addEventListener("pointerleave", () => light(chosen()));
+    window.addEventListener("resize", () => light(chosen()));
+    const settle = show;
+    show = (tab, focus) => { settle(tab, focus); light(tab); };
+    show(chosen() || tabs[0], false);
+    tabs.forEach((tab, i) => {
+      choose.set(tab.getAttribute("aria-controls"), () => show(tab, false));
+      tab.addEventListener("click", () => show(tab, false));
+      tab.addEventListener("keydown", (event) => {
+        const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        show(tabs[(i + step + tabs.length) % tabs.length], true);
+      });
+    });
+  }
+
+  // A family figure's method bar lights one method's lines and dims the rest.
+  for (const bar of document.querySelectorAll(".pf-bar")) {
+    const figure = bar.nextElementSibling;
+    const chips = [...bar.querySelectorAll(".pf-chip")];
+    for (const chip of chips) {
+      chip.addEventListener("click", () => {
+        for (const each of chips) each.setAttribute("aria-pressed", String(each === chip));
+        if (chip.dataset.method) figure.dataset.focus = chip.dataset.method;
+        else delete figure.dataset.focus;
+        for (const part of figure.querySelectorAll("[data-method]")) {
+          part.classList.toggle("is-on", part.dataset.method === chip.dataset.method);
+        }
+        // The panel's number follows the choice: the method's own best speedup, or the family's.
+        const head = bar.closest(".seg-panel")?.querySelector(".seg-head");
+        if (head) head.innerHTML = chip.dataset.number;
+      });
+    }
+  }
+
+  // A figure point's tooltip: its method, package, and size, its numbers in short bullets, and
+  // its release card. It stays while the pointer moves onto it, so its link can be followed.
+  const tip = document.createElement("div");
+  tip.className = "pf-tip";
+  tip.setAttribute("role", "tooltip");
+  tip.hidden = true;
+  document.body.append(tip);
+  let hide;
+  const showTip = (mark) => {
+    clearTimeout(hide);
+    const data = JSON.parse(mark.dataset.tip);
+    tip.replaceChildren();
+    const head = document.createElement("strong");
+    head.textContent = data.head;
+    const list = document.createElement("ul");
+    for (const line of data.lines) {
+      const item = document.createElement("li");
+      item.textContent = line;
+      list.append(item);
+    }
+    const card = document.createElement("a");
+    card.href = data.card;
+    card.textContent = `${data.release} release card`;
+    tip.append(head, list, card);
+    tip.hidden = false;
+    const box = mark.getBoundingClientRect();
+    const left = Math.min(box.right + 10, window.innerWidth - tip.offsetWidth - 12);
+    tip.style.left = `${left + window.scrollX}px`;
+    tip.style.top = `${box.top + window.scrollY - tip.offsetHeight / 2 + box.height / 2}px`;
+  };
+  const later = () => { hide = setTimeout(() => { tip.hidden = true; }, 250); };
+  for (const mark of document.querySelectorAll("[data-tip]")) {
+    mark.addEventListener("pointerenter", () => showTip(mark));
+    mark.addEventListener("focus", () => showTip(mark));
+    mark.addEventListener("pointerleave", later);
+    mark.addEventListener("blur", later);
+  }
+  tip.addEventListener("pointerenter", () => clearTimeout(hide));
+  tip.addEventListener("pointerleave", later);
+
+  // An address that ends in a tile's id, such as an old link to #methods, opens that tile; one
+  // that ends in a panel's id, such as #speed-score, shows that panel.
   const target = location.hash && document.getElementById(location.hash.slice(1));
   if (target && target.matches("dialog.tile-dialog")) open(target);
+  if (target && choose.has(target.id)) {
+    choose.get(target.id)();
+    target.scrollIntoView();
+  }
 })();

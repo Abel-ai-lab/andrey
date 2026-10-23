@@ -6,10 +6,8 @@
 {%- block extrahead %}
 {{ super() }}
 {{ home.robots }}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="_static/fonts/inter-latin.woff2" crossorigin>
 <noscript><style>.andrey-home .tile-dialog { display: block; position: static; margin: 2rem auto; } .andrey-home .tile-dialog .wf-close { display: none; }</style></noscript>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap">
 <style>{{ home.style }}</style>
 {%- endblock extrahead %}
 {%- block content %}
@@ -51,11 +49,9 @@
     {#- Each section opens on its art with its claim, then shows the evidence. #}
     <section class="section wrap act act--hero" id="accelerated" aria-labelledby="accelerated-title">
       {{ home.act_covers["accelerated"] }}
-      {#- The ideas behind the speed, a card each, one playing at a time (why-fast.js). #}
-      {{ home.why_fast_belt }}
-      <div class="run-sheet">
-        <ul class="bento-grid">{{ home.family_tiles }}</ul>
-      </div>
+      <div class="run-sheet">{{ home.speed_panel }}
+        <p class="run-more"><a href="blog/20261008-why-andrey-is-fast.html">Explore why Andrey is
+          so fast</a></p></div>
     </section>
   </div>
 
@@ -97,7 +93,6 @@
   </section>
 
   <div class="tile-details">
-    {{ home.family_dialogs }}
     {{ home.dialog_head("graphs", home.graph_title) }}
     <p>A causal graph says which variables drive which, and how much the data can tell decides its
       kind. Four methods on data about a lawn, its sprinkler, and the rain: three on a table of
@@ -110,18 +105,13 @@
       method's parameters, so an agent can use it with no person watching.
       <code>andrey --skill</code> prints a guide the agent loads as a skill.</p>
     {{ home.agent_demo }}
-    <p><a href="docs/code/index.html#command-line-interface">Command-line reference</a></p>
+    <p><a href="docs/api.html#command-line-interface">Command-line reference</a></p>
     {{ home.dialog_tail }}
     {{ home.dialog_head("methods", "Methods for every kind of data") }}
     <p>{{ home.lede }} {{ home.methods_title }}. Every method name links to its API reference. An
       experimental method has no published benchmark, and its API may change without
       deprecation.</p>
     {{ home.methods }}
-    {{ home.dialog_tail }}
-    {{ home.dialog_head("compare", "How Andrey compares") }}
-    <p>What each package offers, by method family. {{ home.compare_source }} The speed and accuracy
-      tiles measure Andrey against these and other packages on the same data.</p>
-    {{ home.comparison }}
     {{ home.dialog_tail }}
   </div>
 

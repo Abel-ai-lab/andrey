@@ -36,6 +36,8 @@ uv add andrey-core
 pip install andrey-core
 ```
 
+You install andrey-core and then `import andrey`.
+
 - **Optional extras**: `andrey-core[torch]` for GPUs, `andrey-core[viz]` for charts and graph
   layouts
 - **Development version**: `uv add git+https://github.com/Abel-ai-lab/andrey`
@@ -84,13 +86,13 @@ Four ideas make it fast; each is animated in
 
 | Family | Methods | Returns |
 |---|---|---|
-| Constraint-based | [`pc`](https://andrey.abel.ai/docs/code/generated/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/code/generated/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/code/generated/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/code/generated/andrey.cdnod.html) | CPDAG, PAG |
-| Score-based | [`ges`](https://andrey.abel.ai/docs/code/generated/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/code/generated/andrey.gies.html), [`xges`](https://andrey.abel.ai/docs/code/generated/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/code/generated/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/code/generated/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/code/generated/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/code/generated/andrey.calm.html) | CPDAG, DAG |
-| Permutation-based | [`boss`](https://andrey.abel.ai/docs/code/generated/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/code/generated/andrey.grasp.html) | CPDAG |
-| Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.multi_group_direct_lingam.html) | DAG |
-| Time series | [`varma_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/code/generated/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/code/generated/andrey.pcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/code/generated/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/code/generated/andrey.granger.html) | Temporal graph |
-| Latent variables | [`gin`](https://andrey.abel.ai/docs/code/generated/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/code/generated/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/code/generated/andrey.bottom_up_parce_lingam.html) | DAG, PAG |
-| Pairwise direction | [`anm`](https://andrey.abel.ai/docs/code/generated/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/code/generated/andrey.pnl.html) | Two-node DAG |
+| Constraint-based | [`pc`](https://andrey.abel.ai/docs/api/andrey.pc.html), [`fci`](https://andrey.abel.ai/docs/api/andrey.fci.html), [`gfci`](https://andrey.abel.ai/docs/api/andrey.gfci.html), [`cdnod`](https://andrey.abel.ai/docs/api/andrey.cdnod.html) | CPDAG, PAG |
+| Score-based | [`ges`](https://andrey.abel.ai/docs/api/andrey.ges.html), [`gies`](https://andrey.abel.ai/docs/api/andrey.gies.html), [`xges`](https://andrey.abel.ai/docs/api/andrey.xges.html), [`hc`](https://andrey.abel.ai/docs/api/andrey.hc.html), [`tabu`](https://andrey.abel.ai/docs/api/andrey.tabu.html), [`exact_search`](https://andrey.abel.ai/docs/api/andrey.exact_search.html), [`calm`](https://andrey.abel.ai/docs/api/andrey.calm.html) | CPDAG, DAG |
+| Permutation-based | [`boss`](https://andrey.abel.ai/docs/api/andrey.boss.html), [`grasp`](https://andrey.abel.ai/docs/api/andrey.grasp.html) | CPDAG |
+| Linear non-Gaussian | [`direct_lingam`](https://andrey.abel.ai/docs/api/andrey.direct_lingam.html), [`ica_lingam`](https://andrey.abel.ai/docs/api/andrey.ica_lingam.html), [`multi_group_direct_lingam`](https://andrey.abel.ai/docs/api/andrey.multi_group_direct_lingam.html) | DAG |
+| Temporal causal discovery | [`varma_lingam`](https://andrey.abel.ai/docs/api/andrey.varma_lingam.html), [`longitudinal_lingam`](https://andrey.abel.ai/docs/api/andrey.longitudinal_lingam.html), [`pcmci`](https://andrey.abel.ai/docs/api/andrey.pcmci.html), [`pcmciplus`](https://andrey.abel.ai/docs/api/andrey.pcmciplus.html), [`lpcmci`](https://andrey.abel.ai/docs/api/andrey.lpcmci.html), [`granger`](https://andrey.abel.ai/docs/api/andrey.granger.html) | Temporal graph |
+| Latent variables | [`gin`](https://andrey.abel.ai/docs/api/andrey.gin.html), [`rcd`](https://andrey.abel.ai/docs/api/andrey.rcd.html), [`bottom_up_parce_lingam`](https://andrey.abel.ai/docs/api/andrey.bottom_up_parce_lingam.html) | DAG, PAG |
+| Pairwise direction | [`anm`](https://andrey.abel.ai/docs/api/andrey.anm.html), [`pnl`](https://andrey.abel.ai/docs/api/andrey.pnl.html) | Two-node DAG |
 
 <!-- METHODS:END -->
 
@@ -155,6 +157,9 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 - [Examples](https://andrey.abel.ai/docs/examples/): notebooks, one method or task each.
 - [Demos](https://andrey.abel.ai/docs/demos/): step through methods and explore results in your
   browser.
+- [What's new in 0.8.0](https://andrey.abel.ai/blog/20261023-andrey-0-8-0.html): KCI, RCoT,
+  CMIknn, and GPDC, four tests for nonlinear dependence, with its
+  [release card](https://andrey.abel.ai/docs/benchmarks/0.8.0.html).
 - [Release cards](https://andrey.abel.ai/docs/benchmarks.html): every size, time, and error count.
 - [Launch post](https://andrey.abel.ai/blog/20261008-introducing-andrey.html),
   [FAQ](https://andrey.abel.ai/docs/faq.html), and
@@ -175,7 +180,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.7.0},
+  version = {0.8.0},
   url = {https://andrey.abel.ai},
 }
 ```

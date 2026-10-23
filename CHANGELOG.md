@@ -9,6 +9,115 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- The same answers in less time: PC, FCI, GFCI, CD-NOD, GES, XGES, BOSS, GRaSP, exact search,
+  ICA-LiNGAM, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of the
+  identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
+  scores change in their last bits, with the same output on those datasets. ([#251], [#265],
+  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#365])
+- Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
+  `cdnod` run the larger passes of their skeleton search in worker processes and return the same
+  graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
+  ([#282], [#289], [#290])
+
+### Added
+
+- With more than one worker (`ANDREY_NUM_WORKERS` or `andrey.config(num_workers=...)`), `pc`,
+  `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` run each skeleton pass
+  over conditioning sets of two or more variables in worker processes once it holds enough tests,
+  and return the same graphs and p-values as with one worker. ([#282], [#289])
+- `ANDREY_SKELETON_PARALLEL_MIN_WORK` sets the fewest CI tests a conditioning-size pass of the
+  `pc`, `fci`, `gfci`, and `cdnod` skeleton search needs to use the worker processes. The default,
+  500000, was measured on an AMD EPYC 9534 server running Linux; a fit with more than one worker
+  warns once on it when a pass reaches a tenth of it. `andrey calibrate --method skeleton`
+  measures the value for your machine, and `andrey calibrate` now measures it with GES's. ([#290])
+- For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
+  can show that it returns the same bits at any worker count and column order, and
+  `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
+- `ges` takes `max_parents`, a gate on its forward phase: a node whose parent count already
+  exceeds it gains no new parents. `None`, the default, keeps the gate of `n_variables / 2` and
+  every result. A lower value makes GES faster on large graphs and can lower its errors, but it
+  can stop short of the lowest-scoring graph. ([#350])
+- `GraphStructure.to_pcalg()` and `GraphStructure.from_pcalg(amat, kind)` convert to and from the
+  adjacency matrix of R's pcalg, `amat.pag` for a PAG and `amat.cpdag` for a CPDAG or DAG, so
+  exchanging a graph with R needs no transpose or code swap of your own. ([#351])
+
+### Changed
+
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` return the same
+  graphs and p-values in less time, because their skeleton search hands the test each pair's
+  conditioning sets, and those of consecutive pairs, as one stack. ([#280], [#292])
+- `pc`, `fci`, `gfci`, and `cdnod` return the same graphs and p-values with less memory, because
+  their size-one pass builds its queries one stack at a time instead of listing every pair's
+  conditioners first, which took about 4 GB of list pointers on a complete graph of 1,000
+  variables. ([#346])
+- `fci` and `gfci` return the same PAGs in less time: the possible-d-separation step computes one
+  reach set per variable and builds its neighbor lists and reach sets once for each version of the
+  graph, and GFCI reads each node's neighbors from lists built once and tests its separating sets
+  in stacks, those of size 0 for every pair in one. ([#265], [#312], [#353])
+- `ges` and `gfci` return the same graphs in less time, because GES keeps each reach set while a
+  move cannot change it and rebuilds the CPDAG after each move faster. ([#328])
+- `ges`, `gfci`, and `gies` return the same graphs in less time, because GES derives again only the
+  edges of the nodes a move can reach instead of rebuilding the whole CPDAG after each move.
+  ([#365])
+- `xges` returns the same graphs in less time, because each branch of its extended search copies
+  only the parts of the graph it changes. ([#311])
+- `xges` enters numpy's floating-point error state once per run instead of once per scored trial,
+  and raises `RuntimeError` instead of building a different graph if a branch of its extended
+  search starts from a snapshot that no longer matches the graph; `ges` starts its reach cache from
+  the empty graph's successor masks. The returned graphs are unchanged. ([#361])
+- `boss` and `grasp` return the same graphs in less time, because each grow-shrink tree keeps one
+  tuple of candidate parents instead of copying the list on every trace. ([#267])
+- `exact_search` returns the same graphs in less time, because its linear-Gaussian BIC solves the
+  normal equations of a size's parent sets in stacks of up to 4,096. ([#273])
+- `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
+  built once and in blocks, and its HSIC tests run on a CUDA GPU, in float64, from the cutoff
+  `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
+- `pnl` runs fewer worker threads than asked for when their kernel matrices (three n x n float64
+  matrices per thread) would hold more than 4 GiB, with a `PerformanceWarning`; `num_workers=-1`
+  at 5,000 rows on 64 cores had asked for about 38 GB. With one worker the BLAS threads stay
+  unlimited, so on a machine with several cores its p-values and statistics can differ in the last
+  digits from those of several workers. ([#359])
+- `anm` returns the same results with less memory, because it builds its kernel's distance matrix
+  directly. ([#294])
+- `anm` and the `kci` test without conditioning variables return the same p-values with less
+  memory, because their HSIC test builds each kernel in blocks into one reused matrix, as `pnl`
+  does. ([#363])
+- `andrey calibrate` sets the skeleton search's cutoff one past the slowest pass it measured when
+  the worker pool never won, because the search uses the pool for a pass of exactly the cutoff's
+  size. ([#363])
+- For contributors, `qa/identity.py --compare` fails when a count falls as well as when one rises
+  (`--allow-fewer-queries` accepts a fall), counts the exact search's score evaluations, and
+  refits `pnl` on workers. ([#363])
+- `ica_lingam` returns the same results in less time, because its causal-order search drops each
+  placed row with a mask. ([#275])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` compute
+  each pair's residual entropy once per step instead of twice, so their internal scores change in
+  the last bits. A near-tie between two candidates for the next variable in the causal order can
+  then resolve the other way; on the identity check's datasets every output is the same as 0.8.0's.
+  ([#288])
+- `help(andrey)` opens with a quick start and points to `andrey --skill` and
+  `andrey --help --json`, and the package summary says the import name is `andrey`, so an agent
+  that has only run `pip install andrey-core` finds the command line and its skill. ([#347])
+
+## [0.8.0] - 2026-10-23
+
+### Highlights
+
+- Nonlinear independence tests: `pc`, `fci`, `gfci`, and `cdnod` support KCI, RCoT, CMIknn, and
+  GPDC, four tests that detect nonlinear dependence that partial correlation misses. KCI and CMIknn
+  also run on a CUDA GPU. The 0.8.0 post and release card give the measurements. ([#209], [#213],
+  [#299])
+- The same graph in any column order and on any CPU: DirectLiNGAM, ICA-LiNGAM, exact search, GES,
+  GIES, XGES, CALM, GIN, ParceLiNGAM, the PCMCI methods, and the nonlinear tests break ties by
+  each column's data rather than its position or rounding differences. ([#205], [#213], [#228])
+- Faster categorical tests: `pc` with `indep_test="chisq"` or `"gsq"` runs 4-6x faster than in
+  0.7.0 on the alarm, hepar2, and andes networks, with the same p-values and graphs. ([#208])
+- Background knowledge for every search: all 13 searches accept required and forbidden edges,
+  allowed adjacent pairs, and temporal tiers through `knowledge=`. Constraint-based methods also
+  accept `max_depth`. ([#214])
+
 ### Breaking
 
 - `boss`, `grasp`, `ges`, `hc`, `tabu`, and `exact_search` pick their default score from the
@@ -26,8 +135,8 @@ change names its pull request.
   priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
 - `boss` and `grasp` take `score_func="local_score_BIC_categorical"`, the multinomial BIC that
   `ges`, `hc`, `tabu`, and `exact_search` take for categorical data. ([#220])
-- `pc`, `fci`, `gfci`, and `cdnod` take four experimental conditional-independence tests that
-  detect nonlinear dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#209])
+- `pc`, `fci`, `gfci`, and `cdnod` take four conditional-independence tests that detect nonlinear
+  dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#209])
 - The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
   and have reference pages; `make_indep_test` passes settings to them, a variant registered with
   `register_indep_test` is selected by name, `CMIknn(k_cmi=...)` takes a neighbor count or a
@@ -56,11 +165,6 @@ change names its pull request.
   setting. Under `"position"`, `pc`, `cdnod`, `fci`, and `gfci` also fire their orientation rules
   one at a time in column order instead of in rounds, and `fci` and `gfci` default to
   `possible_dsep="fast"`. ([#210])
-- `ANDREY_SKELETON_PARALLEL_MIN_WORK` sets the fewest CI tests a conditioning-size pass of the
-  `pc`, `fci`, `gfci`, and `cdnod` skeleton search needs to use the worker processes. The default,
-  500000, was measured on an AMD EPYC 9534 server running Linux; a fit with more than one worker
-  warns once on it when a pass reaches a tenth of it. `andrey calibrate --method skeleton`
-  measures the value for your machine, and `andrey calibrate` now measures it with GES's. ([#290])
 
 ### Changed
 
@@ -75,9 +179,10 @@ change names its pull request.
   finds one. ([#207])
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
   same graphs and p-values in less time, because each test answers many queries at once. ([#208])
-- `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
-  built once and in blocks, and its HSIC tests run on a CUDA GPU, in float64, from the cutoff
-  `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
+- `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` are supported: on nonlinear data each
+  makes fewer errors on average than its reference packages, causal-learn for KCI, causal-learn and
+  pcalg for RCoT, and tigramite for CMIknn and GPDC, they have checks in the release quality gate,
+  and they no longer warn with `ExperimentalWarning`. ([#299])
 
 ### Fixed
 
@@ -135,6 +240,15 @@ change names its pull request.
 - `andrey run` reads a quoted header name that holds a comma, and a first row that mixes numbers
   with text exits with `bad_data` naming one of each; a first row of numbers is data, so quote a
   header name that is a number. ([#261])
+- `boss` and `grasp` with the linear-Gaussian BIC make every decision as full local scores make
+  it: each fast update from a base parent set comes with a bound on its rounding error, and a
+  comparison the bound leaves open is decided by full scores. Updates no longer build on earlier
+  updates. On dense data with nearly collinear parent sets, where an update could be off by more
+  than the `1e-6` tolerance, rounding error no longer decides a move, and `boss` can return a
+  different graph. ([#271])
+- `varma_lingam` and `longitudinal_lingam` fit on the columns sorted by a rank computed from each
+  column's own data instead of in column order, so reordering the columns no longer changes their
+  graphs, and on data where the order mattered their graphs and weights can change. ([#278])
 
 ## [0.7.0] - 2026-10-19
 
@@ -447,7 +561,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...v0.5.0
@@ -505,4 +620,34 @@ First alpha release.
 [#248]: https://github.com/Abel-ai-lab/andrey/pull/248
 [#251]: https://github.com/Abel-ai-lab/andrey/pull/251
 [#261]: https://github.com/Abel-ai-lab/andrey/pull/261
+[#262]: https://github.com/Abel-ai-lab/andrey/pull/262
+[#265]: https://github.com/Abel-ai-lab/andrey/pull/265
+[#267]: https://github.com/Abel-ai-lab/andrey/pull/267
+[#269]: https://github.com/Abel-ai-lab/andrey/pull/269
+[#271]: https://github.com/Abel-ai-lab/andrey/pull/271
+[#273]: https://github.com/Abel-ai-lab/andrey/pull/273
+[#275]: https://github.com/Abel-ai-lab/andrey/pull/275
+[#277]: https://github.com/Abel-ai-lab/andrey/pull/277
+[#278]: https://github.com/Abel-ai-lab/andrey/pull/278
+[#280]: https://github.com/Abel-ai-lab/andrey/pull/280
+[#282]: https://github.com/Abel-ai-lab/andrey/pull/282
+[#284]: https://github.com/Abel-ai-lab/andrey/pull/284
+[#286]: https://github.com/Abel-ai-lab/andrey/pull/286
+[#288]: https://github.com/Abel-ai-lab/andrey/pull/288
+[#289]: https://github.com/Abel-ai-lab/andrey/pull/289
 [#290]: https://github.com/Abel-ai-lab/andrey/pull/290
+[#292]: https://github.com/Abel-ai-lab/andrey/pull/292
+[#294]: https://github.com/Abel-ai-lab/andrey/pull/294
+[#299]: https://github.com/Abel-ai-lab/andrey/pull/299
+[#311]: https://github.com/Abel-ai-lab/andrey/pull/311
+[#312]: https://github.com/Abel-ai-lab/andrey/pull/312
+[#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#346]: https://github.com/Abel-ai-lab/andrey/pull/346
+[#347]: https://github.com/Abel-ai-lab/andrey/pull/347
+[#350]: https://github.com/Abel-ai-lab/andrey/pull/350
+[#351]: https://github.com/Abel-ai-lab/andrey/pull/351
+[#353]: https://github.com/Abel-ai-lab/andrey/pull/353
+[#365]: https://github.com/Abel-ai-lab/andrey/pull/365
+[#359]: https://github.com/Abel-ai-lab/andrey/pull/359
+[#361]: https://github.com/Abel-ai-lab/andrey/pull/361
+[#363]: https://github.com/Abel-ai-lab/andrey/pull/363

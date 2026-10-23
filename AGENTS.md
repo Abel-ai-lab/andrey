@@ -31,15 +31,15 @@ right, make it fast." For algorithm implementations:
 - Prefer editing an existing page over adding one. Every page under `docs/docs/` sets a
   `description` in its front matter (its search snippet and link preview); a page added, renamed,
   or removed updates its folder's `index.md` in the same change.
-- When the public API changes, update the docstrings, `docs/docs/code/index.md`, and the affected
+- When the public API changes, update the docstrings, `docs/docs/api.md`, and the affected
   guides in the same change.
 - A blog post (`docs/blog/<yyyymmdd>-<name>.md`, named for its date) also sets ABlog's
-  `blogpost`, `date`, and `author`, a `description`, which the blog index shows, and two `tags`:
-  its kind (`Release` or `Engineering`) and its topic (a method family as the README's method
-  table names it, or `Speed`). Its `cover` names an art in `site/brand/art-<cover>.jpg`, its
-  subject on the right; the link preview's banner adds the title and the release. A centered
-  `art-<cover>-center.jpg`, when there is one, is the post's cover and thumbnail instead. A
-  published post that is renamed keeps its old address with `redirect`.
+  `blogpost`, `date`, and `author`, a `description`, which the blog index shows, and `tags`: its
+  kind (`Release` or `Engineering`) first, then one or more topics (a method family as the README's
+  method table names it, `Speed`, or the post's subject). Its `cover` names an art in
+  `site/brand/art-<cover>.jpg`, its subject on the right; the link preview's banner adds the title
+  and the release. A centered `art-<cover>-center.jpg`, when there is one, is the post's cover and
+  thumbnail instead. A published post that is renamed keeps its old address with `redirect`.
 
 ## Documentation style
 

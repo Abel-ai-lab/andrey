@@ -9,8 +9,6 @@ that case are recorded outputs.
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pytest
 
@@ -23,13 +21,6 @@ from tests.recovery.helpers.ci_tests import CI_TESTS, recorded_pvalues
 
 CASE = "nonmonotone_4v"
 TRUE_EDGES = [(i, j, "directed") for i, j in datagen.CASES[CASE]["edges"]]
-
-
-@pytest.fixture(autouse=True)
-def _quiet_experimental():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", andrey.ExperimentalWarning)
-        yield
 
 
 @pytest.fixture

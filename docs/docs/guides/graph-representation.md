@@ -34,6 +34,8 @@ coefficient `0.8` is an illustration, not an estimate from data.
 |---|---|---|
 | Andrey endpoints | `GraphStructure.to_numpy()` | `1`: tail at `i`; reverse cell is `2`: arrowhead at `j` |
 | causal-learn endpoints | `GeneralGraph.graph` | `-1`: tail at `i`; reverse cell is `1`: arrowhead at `j` |
+| pcalg `amat.cpdag` | `as(fit, "amat")` | `0`: tail at `i`; reverse cell is `1`: arrowhead at `j` |
+| pcalg `amat.pag` | `fit@amat` | `2`: arrowhead at `j`; reverse cell is `3`: tail at `i` |
 | Binary directed adjacency | `A` | `1`: edge from row `i` to column `j` |
 | lingam coefficients | `adjacency_matrix_` | Effect of column `j` on row `i`; the coefficient for `i -> j` is in `[j, i]` |
 
@@ -157,6 +159,7 @@ mixes numbers with text is an error.
 | `oriented_edges()` | list of `(source, target, type)`, named by `labels` when set |
 | `to_edges()` | structured array with fields `i`, `j`, `mark_i`, `mark_j` |
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
+| `to_pcalg()` | dense `int8` `(n, n)` pcalg `amat`, for a `dag`, `cpdag`, or `pag` |
 | `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes |
 
 `GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. They
@@ -172,6 +175,13 @@ direction, so read `endpoints` or `oriented_edges()` rather than the arc. A `Mul
 reverse arc for `<->` and `o-o`. A `digraph` emits each arc from tail to arrowhead, so NetworkX's
 cycle functions see its cycles. `from_networkx` reads `endpoints`; an edge without it is read as
 `u -> v`.
+
+For pcalg, `GraphStructure.from_pcalg(amat, kind)` reads its `amat` and `to_pcalg()` writes one for
+the graph's kind. `amat.pag` (`fit@amat` from `fci` or `rfci`; `kind="pag"`, a MAG too) holds the
+mark at the column node, coded `1` circle, `2` arrowhead, `3` tail, so the methods transpose it and
+swap pcalg's codes for circle and tail. `amat.cpdag` (`as(fit, "amat")` from `pc`; `kind="cpdag"`
+or `"dag"`) writes `i -> j` at `[j, i]`, the child's row, and an undirected edge as `1` in both
+cells, so the methods transpose it too. A `digraph` has no pcalg matrix.
 
 Andrey has no converters for other packages' objects. Build their matrices into a `GraphStructure`
 with `from_numpy`:
@@ -210,6 +220,10 @@ def from_binary_dag(A):
 - [causal-learn graph implementation][signed-graph]: signed endpoint marks.
 - [LiNGAM model definition](https://lingam.readthedocs.io/en/latest/tutorial/lingam.html):
   the coefficient convention in $x = Bx + e$.
+- [pcalg `amatType`][pcalg-amat-type]: the `amat.cpdag` and `amat.pag` codes, and the row or
+  column the mark belongs to.
 
 [signed-graph]:
   https://github.com/py-why/causal-learn/blob/main/causallearn/graph/GeneralGraph.py
+[pcalg-amat-type]:
+  https://search.r-project.org/CRAN/refmans/pcalg/html/amatType.html

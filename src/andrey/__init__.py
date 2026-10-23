@@ -1,9 +1,19 @@
-"""Andrey -- scalable causal discovery (familiar methods, accelerated on CPU & GPU).
+"""Andrey -- accelerated, accurate, agentic causal discovery.
 
-Every algorithm returns one ``StructureOutput`` wrapping a first-class ``Structure`` (a
-``GraphStructure`` or ``TemporalStructure``). The public graph types are re-exported here
-for intuitive top-level access (``andrey.GraphStructure``) alongside ``andrey.core.*``; algorithm
-callables (``andrey.ges``, ...) are exposed with their facade wrappers.
+Install ``andrey-core``; the import name is ``andrey``. Quick start, with ``data`` a pandas
+DataFrame or a NumPy array of one row per sample and one column per variable::
+
+    import andrey
+
+    out = andrey.pc(data)  # a StructureOutput; the graph is out.structure
+    print(out)
+
+Every algorithm (``andrey.ges``, ``andrey.fci``, ...) returns one ``StructureOutput`` wrapping a
+first-class ``Structure`` (a ``GraphStructure`` or ``TemporalStructure``). The public graph types
+are re-exported here (``andrey.GraphStructure``) alongside ``andrey.core.*``.
+
+For a coding agent, the command line carries the same methods: ``andrey --skill`` prints the guide
+to save as its ``SKILL.md``, and ``andrey --help --json`` prints every method's contract as JSON.
 """
 
 from .api import (
@@ -49,7 +59,7 @@ from .core.warning_policy import (
     SearchLimitWarning,
 )
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 __all__ = [
     "__version__",
