@@ -1639,6 +1639,15 @@ _CANDIDATE_RULE = (
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
+_REGRESSION_RULE = (
+    "The regression drops forbidden parents and does not penalize required ones; every required "
+    "edge is in the DAG."
+)
+_LINK_RULE = (
+    "An edge [cause, effect, lag] is the link from cause at time t - lag to effect at time t; a "
+    "forbidden [cause, effect] pair forbids it at every lag, and a required link names its lag. "
+    "Tiers and allowed hold at every lag; a variable's links to its own past stay allowed. "
+)
 _KNOWLEDGE_HOW: dict[str, str] = {
     "pc": _SKELETON_RULE + _CLASS_RULE,
     "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
@@ -1655,13 +1664,38 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
-    "direct_lingam": _ORDER_RULE + "The regression drops forbidden parents and does not penalize "
-    "required ones; every required edge is in the DAG.",
+    "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
+    "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
+    + _ORDER_RULE
+    + _REGRESSION_RULE,
+    "multi_group_direct_lingam": "It holds for every group. " + _ORDER_RULE + _REGRESSION_RULE,
+    "pcmci": _LINK_RULE + "No test runs on a forbidden or a required link: a forbidden link is not "
+    "in the graph, and a required one is.",
+    "pcmciplus": _LINK_RULE + "The lagged and skeleton phases test no forbidden or required link: "
+    "a forbidden link is never linked, and a required one stays. Same-step links the knowledge "
+    "decides are directed before the colliders, which never reverse them; rules R1-R3 follow.",
+    "varma_lingam": _LINK_RULE + "Lags run over the autoregressive part, 0 to order[0]. At lag 0 "
+    "the innovations' DirectLiNGAM honors the knowledge as direct_lingam does. With prune=true "
+    "each regression drops forbidden lagged regressors and keeps required ones unpenalized; with "
+    "prune=false every lagged weight stays, so a forbidden lagged link raises.",
+    "longitudinal_lingam": _LINK_RULE + "At lag 0 each time point's DirectLiNGAM honors the "
+    "knowledge as direct_lingam does. A forbidden lagged link is left out of the least-squares "
+    "fit of its effect's lagged weights; every other lagged weight stays.",
+    "rcd": "The ancestor search runs as without knowledge; the parent sets then drop forbidden "
+    "parents and gain required ones, and a pair forbidden both ways is never marked <->.",
+    "bottom_up_parce_lingam": "A sink is taken only when no remaining variable is in a later "
+    "tier, and each regression drops forbidden parents. In the unordered block, a pair forbidden "
+    "both ways is not adjacent and a pair forbidden one way has an arrowhead at the cause. "
+    "Required edges raise.",
+    "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
+    "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
+    "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
-#: The Knowledge parts each method honors (every part, for every method that takes knowledge).
-_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
-    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
-)
+#: The Knowledge parts each method honors: every part, but for BottomUpParceLiNGAM.
+_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
+    **dict.fromkeys(_KNOWLEDGE_HOW, KNOWLEDGE_PARTS),
+    "bottom_up_parce_lingam": ("forbidden", "allowed", "tiers"),
+}
 _MAX_DEPTH = ParamSpec(
     name="max_depth",
     type="int",

@@ -34,6 +34,11 @@ change names its pull request.
   the others explain follows the causal order; it takes up to 1,000 variables.
   `andrey.data.generate` takes `scale`. For contributors, the benchmark harness has unitless
   variants of its four linear regimes. ([#411])
+- `pcmci`, `pcmciplus`, `lpcmci`, `varma_lingam`, `longitudinal_lingam`, `ica_lingam`,
+  `multi_group_direct_lingam`, `rcd`, and `bottom_up_parce_lingam` (every part but required edges)
+  take `knowledge`, where a time-series method reads `(cause, effect, lag)` as the link from
+  `cause` at time `t - lag` to `effect` at time `t`, so you can rule links in or out at one lag.
+  ([#410])
 
 ### Changed
 
@@ -744,4 +749,5 @@ First alpha release.
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#396]: https://github.com/Abel-ai-lab/andrey/pull/396
 [#400]: https://github.com/Abel-ai-lab/andrey/pull/400
+[#410]: https://github.com/Abel-ai-lab/andrey/pull/410
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411

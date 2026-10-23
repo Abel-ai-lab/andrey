@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core.knowledge import Knowledge, resolve_lagged
+
 from ._adapt import (
     column_labels,
     column_namer,
@@ -48,6 +50,7 @@ def varma_lingam(
     prune: bool = False,
     structural_ma: bool = False,
     max_iter: int = 100,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a temporal causal structure from one multivariate time series with VARMA-LiNGAM.
 
@@ -79,6 +82,22 @@ def varma_lingam(
     max_iter : int, default=100
         Most iterations of the likelihood fit, at least ``1``. With ``criterion`` set, every fit
         in the grid gets this limit.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables over the autoregressive lags ``0`` to ``order[0]``: required and forbidden
+        links, the pairs allowed to be linked, and temporal tiers, all honored. A link
+        ``(cause, effect, lag)`` is the link from ``cause`` at time ``t - lag`` to ``effect`` at
+        time ``t``, lag ``0`` being the same step; a forbidden ``(cause, effect)`` pair forbids it
+        at every lag, and a required link names its lag. At lag ``0``, DirectLiNGAM on the
+        innovations honors the knowledge as :func:`~andrey.direct_lingam` does: the causal order
+        puts the cause of each required link, and each earlier tier, first, and the regression
+        drops forbidden parents and keeps required ones unpenalized. With ``prune=True``, each
+        variable's regression also drops its forbidden lagged regressors and keeps its required
+        ones unpenalized. With ``prune=False`` every lagged weight stays, so a required lagged
+        link is in the graph, and a forbidden lagged link raises. Tiers forbid every link from a
+        later tier into an earlier one, and a pair left out of ``allowed`` has no link at any
+        lag; a variable's links to its own past stay allowed. The moving-average weights are not
+        constrained.
 
     Returns
     -------
@@ -93,11 +112,14 @@ def varma_lingam(
     Raises
     ------
     TypeError
-        If ``order`` is not a pair of ints, or ``max_iter`` is not an int.
+        If ``order`` is not a pair of ints, ``max_iter`` is not an int, or ``knowledge`` is
+        neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``criterion`` is not one of ``"aic"``, ``"bic"``, ``"hqic"``, or ``None``, if ``order``
         holds a negative count or is ``(0, 0)``, if ``max_iter`` is below 1, or if ``data`` has
-        fewer than 2 columns.
+        fewer than 2 columns. Also if ``knowledge`` names a column ``data`` lacks, contradicts
+        itself, requires a link without a lag or beyond ``order[0]``, forbids a lagged link while
+        ``prune=False``, or requires a link at a lag beyond the ``p`` that ``criterion`` selected.
 
     Notes
     -----
@@ -160,6 +182,7 @@ def varma_lingam(
         raise ValueError("order must have p or q above 0, got (0, 0)")
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
+    constraints = resolve_lagged(knowledge, X.shape[1], labels, order[0], method="varma_lingam")
     causal_order, psis, omegas = _native(
         X,
         order=order,
@@ -167,13 +190,19 @@ def varma_lingam(
         prune=prune,
         structural_ma=structural_ma,
         max_iter=max_iter,
+        constraints=constraints,
+        name=column_namer(labels),
     )
     model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=causal_order)
     return with_labels(_adapt_varma_lingam(model), labels)
 
 
 def longitudinal_lingam(
-    data_list: Sequence[npt.ArrayLike], *, n_lags: int = 1, measure: str = "pwling"
+    data_list: Sequence[npt.ArrayLike],
+    *,
+    n_lags: int = 1,
+    measure: str = "pwling",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a temporal causal structure from panel data with Longitudinal LiNGAM.
 
@@ -193,6 +222,21 @@ def longitudinal_lingam(
         number of time points minus one.
     measure : {"pwling"}, default="pwling"
         DirectLiNGAM pairwise independence measure for the instantaneous fit.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables over lags ``0`` to ``n_lags``, the same at every time point: required and
+        forbidden links, the pairs allowed to be linked, and temporal tiers, all honored. A link
+        ``(cause, effect, lag)`` is the link from ``cause`` at time point ``t - lag`` to
+        ``effect`` at time point ``t``, lag ``0`` being the same time point; a forbidden
+        ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag. At
+        lag ``0``, each time point's DirectLiNGAM honors the knowledge as
+        :func:`~andrey.direct_lingam` does: the causal order puts the cause of each required
+        link, and each earlier tier, first, and the regression drops forbidden parents and keeps
+        required ones unpenalized. A forbidden lagged link is left out of the least-squares fit
+        of its effect's lagged weights, so its weight is ``0``; every other lagged weight stays,
+        so a required lagged link is in the graph. Tiers forbid every link from a later tier into
+        an earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's
+        links to its own past stay allowed.
 
     Returns
     -------
@@ -212,10 +256,13 @@ def longitudinal_lingam(
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
     TypeError
-        If ``n_lags`` is not an int.
+        If ``n_lags`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``data_list`` has fewer than two time points, if ``n_lags`` is outside its range, if
-        the per-time arrays differ in shape, or if the DataFrames' column names differ.
+        the per-time arrays differ in shape, or if the DataFrames' column names differ. Also if
+        ``knowledge`` names a column the data lacks, contradicts itself, or requires a link
+        without a lag or beyond ``n_lags``.
 
     Notes
     -----
@@ -260,7 +307,10 @@ def longitudinal_lingam(
         raise ValueError(f"data_list must hold at least two time points, got {len(panel)}")
     n_lags = int_in_range(n_lags, "n_lags", 1, len(panel) - 1)
     labels = shared_labels(column_labels(X) for X in data_list)
-    model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure).fit(panel)
+    constraints = resolve_lagged(
+        knowledge, panel[0].shape[1], labels, n_lags, method="longitudinal_lingam"
+    )
+    model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure, constraints=constraints).fit(panel)
     return with_labels(_adapt_longitudinal_lingam(model), labels)
 
 
@@ -271,6 +321,7 @@ def pcmci(
     pc_alpha: float = 0.2,
     alpha_level: float = 0.05,
     indep_test: str = "student_t",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged causal links of one multivariate time series with PCMCI.
 
@@ -298,6 +349,16 @@ def pcmci(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables: required and forbidden links, the pairs allowed to be linked, and temporal
+        tiers, all honored. A link ``(cause, effect, lag)`` is the link from ``cause`` at time
+        ``t - lag`` to ``effect`` at time ``t``; a forbidden ``(cause, effect)`` pair forbids it at
+        every lag, and a required link names its lag, from ``1`` to ``tau_max``. No test runs on
+        a forbidden or a required link: a forbidden link is in no conditioning set and not in the
+        graph, and a required one is a parent in every PC1 round and in the graph. Tiers forbid
+        every link from a later tier into an earlier one, and a pair left out of ``allowed`` has
+        no link at any lag; a variable's links to its own past stay allowed.
 
     Returns
     -------
@@ -307,15 +368,17 @@ def pcmci(
         the link from variable ``i`` at time ``t - k`` to variable ``j`` at time ``t``; a self-loop
         is a variable's dependence on its own past. The structure has no ``lag_weights``.
         ``metadata["p_values"][k - 1][i][j]`` and ``metadata["statistics"][k - 1][i][j]`` hold the
-        MCI p-value and partial correlation of that link, for every pair, significant or not.
-        ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag ``k``) that
-        PC1 selected for variable ``j``, strongest first. ``ordering`` is ``None``, and
+        MCI p-value and partial correlation of that link, for every pair, significant or not; a
+        link the knowledge forbids reads p-value 1 and statistic 0, and a required one reads 0 and
+        1. ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag ``k``)
+        that PC1 selected for variable ``j``, strongest first. ``ordering`` is ``None``, and
         ``metadata["algorithm"]`` is ``"pcmci"``.
 
     Raises
     ------
     TypeError
-        If ``tau_max`` is not an int.
+        If ``tau_max`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``tau_max`` is below 1, if ``pc_alpha`` or ``alpha_level`` is not in ``(0, 1)``, if
         ``indep_test`` is neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is not a usable
@@ -323,7 +386,8 @@ def pcmci(
         every test keeps a degree of freedom. Also if a variable repeats another up to scale and
         shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
         message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks, contradicts
+        itself, or requires a link without a lag or outside lags ``1`` to ``tau_max``.
 
     Notes
     -----
@@ -392,9 +456,17 @@ def pcmci(
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
     labels = column_labels(data)
+    constraints = resolve_lagged(
+        knowledge, X.shape[1], labels, tau_max, method="pcmci", contemporaneous=False
+    )
     with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
         result = _native(
-            X, tau_max=tau_max, pc_alpha=pc_alpha, alpha_level=alpha_level, indep_test=indep_test
+            X,
+            tau_max=tau_max,
+            pc_alpha=pc_alpha,
+            alpha_level=alpha_level,
+            indep_test=indep_test,
+            constraints=constraints,
         )
     return with_labels(_adapt_pcmci(result), labels)
 
@@ -406,6 +478,7 @@ def pcmciplus(
     pc_alpha: float = 0.01,
     collider_rule: str = "majority",
     indep_test: str = "student_t",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn the lagged and same-step causal links of one multivariate time series with PCMCI+.
 
@@ -438,6 +511,22 @@ def pcmciplus(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables: required and forbidden links, the pairs allowed to be linked, and temporal
+        tiers, all honored. A link ``(cause, effect, lag)`` is the link from ``cause`` at time
+        ``t - lag`` to ``effect`` at time ``t``, lag ``0`` being the same step; a forbidden
+        ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag, from
+        ``0`` to ``tau_max``. The lagged and skeleton phases test neither: a required link stays
+        and a forbidden one is never linked. The collider phase tests a pair kept apart for the
+        subsets that separate it, as it does any unlinked pair; with ``collider_rule="none"``,
+        which reads the skeleton phase's separating set, a triple over such a pair is ambiguous.
+        At the same step, a pair forbidden in both directions is not linked, and a link the
+        knowledge allows in one direction only is directed that way before the colliders, which
+        never reverse it. Tiers forbid every link from a later tier into an earlier one, and a
+        pair left out of ``allowed`` has no link at any lag; a variable's links to its own past
+        stay allowed. The rule phase applies R1 to R3 only, so a same-step link that Meek's rule R4
+        would direct from the knowledge can stay undirected.
 
     Returns
     -------
@@ -453,7 +542,9 @@ def pcmciplus(
         skeleton-phase tests of the link between variable ``i`` at ``t - k`` and variable ``j``
         at ``t`` (the first step's tests for a lagged link that step removed), and
         ``metadata["statistics"][k][i][j]`` the partial correlation of that test; lag ``0`` is
-        symmetric with ``1`` and ``0`` on the diagonal. ``metadata["parents"][j]`` lists the
+        symmetric with ``1`` and ``0`` on the diagonal. A link the knowledge forbids, never
+        tested, reads p-value 1 and statistic 0, and a required one reads 0 and 1.
+        ``metadata["parents"][j]`` lists the
         ``[i, k]`` pairs (variable ``i`` at lag ``k``) the first step selected for variable
         ``j``, strongest first, and ``metadata["ambiguous_triples"]`` the ``[i, k, m, j]``
         triples (variable ``i`` at lag ``k``, then ``m`` and ``j`` at lag ``0``) the collider rule
@@ -463,7 +554,8 @@ def pcmciplus(
     Raises
     ------
     TypeError
-        If ``tau_max`` is not an int.
+        If ``tau_max`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``tau_max`` is below 1, if ``pc_alpha`` is not in ``(0, 1)``, if ``collider_rule`` or
         ``indep_test`` is not one of its choices, or if ``data`` is not a usable 2-D matrix with
@@ -471,7 +563,9 @@ def pcmciplus(
         every test keeps a degree of freedom. Also if a variable repeats another up to scale and
         shift, at the same step or up to ``2 * tau_max`` steps apart, before any test runs; one
         message names every group of copies, a lagged value as ``'x' at lag k``, and says to keep
-        one column per group.
+        one column per group. Also if ``knowledge`` names a column ``data`` lacks, contradicts
+        itself, requires a link without a lag or beyond ``tau_max``, or directs same-step links
+        into a directed cycle over the links the skeleton phase kept.
 
     Notes
     -----
@@ -543,6 +637,7 @@ def pcmciplus(
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
     labels = column_labels(data)
+    constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="pcmciplus")
     with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
         result = _native(
             X,
@@ -550,6 +645,7 @@ def pcmciplus(
             pc_alpha=pc_alpha,
             collider_rule=collider_rule,
             indep_test=indep_test,
+            constraints=constraints,
         )
     return with_labels(_adapt_pcmciplus(result), labels)
 
@@ -561,6 +657,7 @@ def lpcmci(
     pc_alpha: float = 0.05,
     n_preliminary_iterations: int = 1,
     indep_test: str = "student_t",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a time-series partial ancestral graph that allows hidden common causes with LPCMCI.
 
@@ -590,6 +687,19 @@ def lpcmci(
         The partial-correlation test behind every p-value. Both report the same partial
         correlation; ``"student_t"`` takes its p-value from the Student-t distribution and
         ``"fisherz"`` from Fisher's z-transform.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables: required and forbidden links, the pairs allowed to be linked, and temporal
+        tiers, all honored. A link ``(cause, effect, lag)`` is the link from ``cause`` at time
+        ``t - lag`` to ``effect`` at time ``t``, lag ``0`` being the same step; a forbidden
+        ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag, from
+        ``0`` to ``tau_max``. A forbidden lagged link, and a same-step pair forbidden in both
+        directions, is never linked. A same-step link forbidden in one direction carries an
+        arrowhead at the cause, as in :func:`~andrey.fci`: the cause is not an ancestor of the
+        effect. A required link is ``-->`` from the start and no test or rule removes it. No rule
+        changes a mark the knowledge sets. Tiers forbid every link from a later tier into an
+        earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's links
+        to its own past stay allowed.
 
     Returns
     -------
@@ -609,14 +719,16 @@ def lpcmci(
         ``structure.lag(k)`` leaves out. ``metadata["p_values"][k][i][j]`` is the largest p-value
         of the final round's tests of that pair, and ``metadata["statistics"][k][i][j]`` the
         partial correlation of that test; lag ``0`` is symmetric with ``1`` and ``0`` on the
-        diagonal. ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag
+        diagonal and on pairs no test ran on, and a required link, never tested, reads ``0`` and
+        ``1``. ``metadata["parents"][j]`` lists the ``[i, k]`` pairs (variable ``i`` at lag
         ``k``) the last preliminary round found to be parents of variable ``j``. ``ordering`` is
         ``None``, and ``metadata["algorithm"]`` is ``"lpcmci"``.
 
     Raises
     ------
     TypeError
-        If ``tau_max`` or ``n_preliminary_iterations`` is not an int.
+        If ``tau_max`` or ``n_preliminary_iterations`` is not an int, or ``knowledge`` is neither
+        ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``tau_max`` is below 1, ``n_preliminary_iterations`` below 0, ``pc_alpha`` not in
         ``(0, 1)``, ``indep_test`` neither ``"student_t"`` nor ``"fisherz"``, or if ``data`` is
@@ -624,7 +736,9 @@ def lpcmci(
         rows, the length at which every test keeps a degree of freedom. Also if a variable repeats
         another up to scale and shift, at the same step or up to ``2 * tau_max`` steps apart,
         before any test runs; one message names every group of copies, a lagged value as
-        ``'x' at lag k``, and says to keep one column per group.
+        ``'x' at lag k``, and says to keep one column per group. Also if ``knowledge`` names a
+        column ``data`` lacks, contradicts itself, or requires a link without a lag or beyond
+        ``tau_max``.
 
     Notes
     -----
@@ -710,6 +824,7 @@ def lpcmci(
             f"{X.shape[1]} variables, got {X.shape[0]}"
         )
     labels = column_labels(data)
+    constraints = resolve_lagged(knowledge, X.shape[1], labels, tau_max, method="lpcmci")
     with copies_named(labels, design_column_name(X.shape[1], column_namer(labels))):
         result = _native(
             X,
@@ -717,6 +832,7 @@ def lpcmci(
             pc_alpha=pc_alpha,
             n_preliminary_iterations=n_preliminary_iterations,
             indep_test=indep_test,
+            constraints=constraints,
         )
     return with_labels(_adapt_lpcmci(result), labels)
 
