@@ -66,20 +66,27 @@ def _structure_bits(structure: Sequence[int]) -> int:
     return bits
 
 
-def _best_subset(
-    parent_graph: list[_ParentEntry], target_bits: int
-) -> tuple[tuple[int, ...], float]:
-    """Lowest-score parent set whose members all lie within ``target_bits``.
+def _subset_choices(
+    parent_graph: list[_ParentEntry], n_vars: int
+) -> list[tuple[tuple[int, ...], float]]:
+    """Each set of variables' optimal parent choice, indexed by the set's bitmask.
 
-    ``parent_graph`` is sorted by ascending score, so the first entry that is a subset of the
-    available variables is the optimal parent choice among them. Without required parents the empty
-    set is present and is a subset of everything, so a match always exists; with them, a target that
-    lacks one has no match and gives ``((), inf)``.
+    ``parent_graph`` is sorted by ascending score, so a set's optimal choice is the first entry
+    whose members all lie within it. Entry ``mask`` of the result is that entry's parent set and
+    score. Without required parents the empty set is in ``parent_graph`` and lies within every
+    set; with them, a set that lacks one has no such entry and maps to ``((), inf)``. A table of
+    each mask's first entry index starts at the entries' own masks and takes, for one variable at
+    a time, the minimum over the masks with and without it, so each mask ends with the lowest
+    index among its subsets.
     """
-    for parents, score, bits in parent_graph:
-        if bits & target_bits == bits:
-            return parents, score
-    return (), float("inf")
+    first = np.full(1 << n_vars, len(parent_graph), dtype=np.int64)
+    first[[bits for _, _, bits in parent_graph]] = np.arange(len(parent_graph))
+    for v in range(n_vars):
+        pairs = first.reshape(-1, 2, 1 << v)  # axis 1: variable v absent, present
+        np.minimum(pairs[:, 1], pairs[:, 0], out=pairs[:, 1])
+    choices = [(parents, score) for parents, score, _ in parent_graph]
+    choices.append(((), float("inf")))
+    return [choices[i] for i in first.tolist()]
 
 
 class _GramBICScore:
@@ -151,14 +158,16 @@ def _generate_parent_graph(
     """Build a variable's parent graph: the maximal-candidate parent sets, sorted by score.
 
     Enumerates candidate parent sets by increasing size and keeps only *maximal candidates* -- a set
-    is dropped when a subset scores at least as low, since it can then never be the optimal choice
-    for any available-variable set. The retained entries stay sorted by ascending score so
-    :func:`_best_subset` returns the optimum in one forward scan.
+    is dropped when a subset scores lower, since it can then never be the optimal choice for any
+    available-variable set. The retained entries stay sorted by ascending score, so the first entry
+    within an available-variable set is its optimum (:func:`_subset_choices`). Each enumerated set
+    records the lowest score of a retained set within it, so a set's subsets are looked up rather
+    than searched for.
 
     With ``constraints``, every set holds the node's required parents and adds parents that are
     neither forbidden nor required, and a set is compared only with its subsets that still hold
-    the required parents. :func:`_best_subset` then finds no set until the required parents are
-    available, and its ``inf`` score keeps the order searches off that path.
+    the required parents. :func:`_subset_choices` then finds no set until the required parents
+    are available, and its ``inf`` score keeps the order searches off that path.
     """
     parent_graph: list[_ParentEntry] = []
     scores: list[float] = []
@@ -175,7 +184,10 @@ def _generate_parent_graph(
         required = tuple(np.flatnonzero(constraints.required[:, node]).tolist())
         legal = ~constraints.forbidden[:, node] & ~constraints.required[:, node]
         candidates = [c for c in np.flatnonzero(legal).tolist() if c != node]
-    insert(required, score.score(node, required), _structure_bits(required))
+    required_value = score.score(node, required)
+    insert(required, required_value, _structure_bits(required))
+    # Each enumerated set's bitmask -> the lowest score of a retained set within it.
+    lowest: dict[int, float] = {_structure_bits(required): required_value}
     for size in range(1, len(candidates) + 1):
         level = itertools.combinations(candidates, size)
         while extras := list(itertools.islice(level, _SCORE_BATCH)):
@@ -186,13 +198,12 @@ def _generate_parent_graph(
                 values = [score.score(node, list(combo)) for combo in combos]
             for extra, combo, value in zip(extras, combos, values, strict=True):
                 bits = _structure_bits(combo)
-                maximal = True
-                for v in extra:  # dropping a required parent leaves no legal subset
-                    _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))
-                    if sub_value < value:  # a subset already scores lower -- combo is dominated
-                        maximal = False
-                        break
-                if maximal:
+                # Dropping a required parent leaves no legal subset.
+                sub_value = min(lowest[bits & ~(1 << v)] for v in extra)
+                if sub_value < value:  # a subset already scores lower -- combo is dominated
+                    lowest[bits] = sub_value
+                else:
+                    lowest[bits] = value
                     insert(combo, value, bits)
     return parent_graph
 
@@ -209,6 +220,7 @@ def _astar_shortest_path(
     """
     full = (1 << n_vars) - 1
     base = [pg[0][1] for pg in parent_graphs]  # each variable's globally best local score
+    choices = [_subset_choices(pg, n_vars) for pg in parent_graphs]
 
     def heuristic(mask: int) -> float:
         return sum(base[i] for i in range(n_vars) if not mask & (1 << i))
@@ -237,7 +249,7 @@ def _astar_shortest_path(
             new_mask = mask | lsb
             if new_mask in closed:
                 continue
-            parents, value = _best_subset(parent_graphs[i], mask)
+            parents, value = choices[i][mask]
             new_g = g + value
             if new_mask not in best_g or new_g < best_g[new_mask]:
                 best_g[new_mask] = new_g
@@ -260,6 +272,7 @@ def _dp_shortest_path(
     full = (1 << n_vars) - 1
     distance: dict[int, float] = {0: 0.0}
     predecessor: dict[int, tuple[int, int, tuple[int, ...]]] = {}
+    choices = [_subset_choices(pg, n_vars) for pg in parent_graphs]
     for mask in sorted(range(1 << n_vars), key=int.bit_count):
         if mask not in distance:
             continue
@@ -268,7 +281,7 @@ def _dp_shortest_path(
             bit = 1 << i
             if mask & bit:
                 continue
-            parents, value = _best_subset(parent_graphs[i], mask)
+            parents, value = choices[i][mask]
             new_mask = mask | bit
             candidate = settled + value
             if new_mask not in distance or candidate < distance[new_mask]:
