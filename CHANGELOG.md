@@ -125,6 +125,12 @@ change names its pull request.
 - `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
   installed safetensors for them. Nothing in Andrey called them. ([#375])
 
+### Fixed
+
+- `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
+  `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
+  test or score; an empty list now reads as `None` there. ([#395])
+
 ## [0.8.0] - 2026-10-23
 
 ### Highlights
@@ -683,3 +689,4 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
+[#395]: https://github.com/Abel-ai-lab/andrey/pull/395
