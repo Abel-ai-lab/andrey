@@ -231,11 +231,13 @@ class DSepOracle:
     Returns ``1.0`` when the query is d-separated (a "p-value" above any alpha -> independent) and
     ``0.0`` otherwise, so it drops into the FCI orientation rules in place of a data CI test; alpha
     is therefore irrelevant. Queries are memoized (FCI re-asks pairs constantly). Query index
-    ``k`` names the DAG node ``nodes[k]``, and every query also conditions on the DAG nodes
-    ``given``.
+    ``k`` names the DAG node ``nodes[k]``, or ``k`` itself when ``nodes`` is ``None``, and every
+    query also conditions on the DAG nodes ``given``.
     """
 
-    def __init__(self, dag, nodes: Sequence[int], given: Collection[int] = ()) -> None:
+    def __init__(
+        self, dag, nodes: Sequence[int] | None = None, given: Collection[int] = ()
+    ) -> None:
         self._dag = dag
         self._nodes = nodes
         self._given = frozenset(given)
@@ -248,11 +250,10 @@ class DSepOracle:
         if value is None:
             import networkx as nx
 
-            nodes = self._nodes
-            sep = {nodes[z] for z in key[2]} | self._given
-            value = (
-                1.0 if nx.is_d_separator(self._dag, {nodes[key[0]]}, {nodes[key[1]]}, sep) else 0.0
-            )
+            node = (lambda k: k) if self._nodes is None else self._nodes.__getitem__
+            sep = {node(z) for z in key[2]} | self._given
+            separated = nx.is_d_separator(self._dag, {node(key[0])}, {node(key[1])}, sep)
+            value = 1.0 if separated else 0.0
             self._cache[key] = value
         return value
 
