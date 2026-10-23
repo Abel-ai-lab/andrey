@@ -9,6 +9,21 @@ change names its pull request.
 
 ## [Unreleased]
 
+### Highlights
+
+- Nonlinear independence tests: `pc`, `fci`, `gfci`, and `cdnod` support KCI, RCoT, CMIknn, and
+  GPDC, four tests that detect nonlinear dependence that partial correlation misses. KCI and CMIknn
+  also run on a CUDA GPU. The 0.8.0 post and release card give the measurements. ([#209], [#213],
+  [#299])
+- The same graph in any column order and on any CPU: DirectLiNGAM, ICA-LiNGAM, exact search, GES,
+  GIES, XGES, CALM, GIN, ParceLiNGAM, the PCMCI methods, and the nonlinear tests break ties by
+  each column's data rather than its position or rounding differences. ([#205], [#213], [#228])
+- Faster categorical tests: `pc` with `indep_test="chisq"` or `"gsq"` runs 4-6x faster than in
+  0.7.0 on the alarm, hepar2, and andes networks, with the same p-values and graphs. ([#208])
+- Background knowledge for every search: all 13 searches accept required and forbidden edges,
+  allowed adjacent pairs, and temporal tiers through `knowledge=`. Constraint-based methods also
+  accept `max_depth`. ([#214])
+
 ### Breaking
 
 - `boss`, `grasp`, `ges`, `hc`, `tabu`, and `exact_search` pick their default score from the

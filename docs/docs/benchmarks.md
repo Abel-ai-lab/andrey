@@ -16,13 +16,11 @@ rerun the measurements. A card keeps the numbers its release published.
 % release moves to the top of "Earlier releases" (docs/DEVELOPMENT.md, "The release cards").
 :::::{div} release-latest
 
-% Draft (cover art pending): the stipple ground shows until release-cards/0.8.0.jpg and its
-% release-art-0-8-0 rule land (docs/DEVELOPMENT.md, "The release cards").
 :::{card}
 :link: benchmarks/0.8.0
 :link-type: doc
 :link-alt: The 0.8.0 release card: nonlinear tests
-:class-card: release-cover
+:class-card: release-cover release-art release-art-0-8-0
 :shadow: none
 :margin: 0
 
