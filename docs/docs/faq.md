@@ -89,9 +89,10 @@ compare accuracy there rather than edge by edge.
 
 ## Speed and hardware
 
-### How does it compare with other packages?
+### Is it the fastest causal discovery package?
 
-The [release cards](benchmarks.md) show Andrey side by side with causal-learn, lingam, and other
+Andrey is built to be: it batches each round of tests or moves into one array operation, runs on
+every CPU core, and runs on a GPU. The [release cards](benchmarks.md) show Andrey side by side with causal-learn, lingam, and other
 packages on the same data and machines: fit time, error counts, and where Andrey is not faster. The
 [homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and
 speed support.

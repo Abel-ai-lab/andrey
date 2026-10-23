@@ -177,6 +177,10 @@ def test_llms_txt_lists_each_section_under_its_heading():
     text = llms(entries, [("Docs", ["docs/faq"]), ("Release cards", ["docs/benchmarks/0.4.0"])])
     assert text == (
         "# Andrey\n\n> The summary.\n\nVersion: 0.4.0.\n\n"
+        "Install: `pip install andrey-core`. From a shell or an agent, `andrey list` prints the\n"
+        "methods as JSON, `andrey run <method> --data data.csv` prints the learned graph as JSON,\n"
+        "`andrey run <method> --help --json` gives a method's parameters as JSON Schema, and\n"
+        "`andrey --skill` prints Andrey's agent skill.\n\n"
         "## Docs\n\n- [FAQ](https://andrey.abel.ai/docs/faq.html): The FAQ.\n\n"
         "## Release cards\n\n"
         "- [0.4.0 card](https://andrey.abel.ai/docs/benchmarks/0.4.0.html): The card.\n"
