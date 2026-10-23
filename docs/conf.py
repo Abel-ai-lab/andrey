@@ -715,6 +715,21 @@ def _write_discovery(app, exception) -> None:  # noqa: ANN001 -- Sphinx event ar
 
 
 # The pages that show the "Why Andrey is fast" scenes.
+# The documents' own files, by name before the first dot, which the homepage does not use.
+DOCS_ONLY = {
+    "pygments",
+    "mystnb",
+    "copybutton",
+    "sphinxcontrib_typer",
+    "sphinx-design",
+    "katex",
+    "katex-math",
+    "graph-guides",
+    "doctools",
+    "sphinx_highlight",
+    "clipboard",
+    "design-tabs",
+}
 WHY_FAST_PAGES = {"blog/20261008-why-andrey-is-fast"}
 
 
@@ -823,6 +838,15 @@ def _page_assets(app, pagename, templatename, context, doctree) -> None:  # noqa
         app.add_css_file(name, priority=900)
     for name in js:
         app.add_js_file(name, loading_method="defer")
+    if pagename == "index":
+        # The homepage is a template with no code block, math, tab set, or command-line page, so
+        # the extensions' files for those would only delay its first paint.
+        for key in ("css_files", "script_files"):
+            context[key] = [
+                f
+                for f in context[key]
+                if posixpath.basename(f.filename).split(".")[0] not in DOCS_ONLY
+            ]
     context["metatags"] = context.get("metatags", "") + _preview_tags(
         app, pagename, context, doctree
     )
