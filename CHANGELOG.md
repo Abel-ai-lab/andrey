@@ -12,10 +12,11 @@ change names its pull request.
 ### Highlights
 
 - The same answers in less time: PC, FCI, GFCI, CD-NOD, GES, XGES, BOSS, GRaSP, exact search,
-  ICA-LiNGAM, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of the
-  identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
-  scores change in their last bits, with the same output on those datasets. ([#251], [#265],
-  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353])
+  ICA-LiNGAM, LPCMCI, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of
+  the identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
+  scores change in their last bits, with the same output on those datasets. ([#251], [#265], [#267],
+  [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#364], [#365],
+  [#368])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -61,17 +62,42 @@ change names its pull request.
   in stacks, those of size 0 for every pair in one. ([#265], [#312], [#353])
 - `ges` and `gfci` return the same graphs in less time, because GES keeps each reach set while a
   move cannot change it and rebuilds the CPDAG after each move faster. ([#328])
+- `ges`, `gfci`, and `gies` return the same graphs in less time, because GES derives again only the
+  edges of the nodes a move can reach instead of rebuilding the whole CPDAG after each move.
+  ([#365])
 - `xges` returns the same graphs in less time, because each branch of its extended search copies
   only the parts of the graph it changes. ([#311])
+- `xges` enters numpy's floating-point error state once per run instead of once per scored trial,
+  and raises `RuntimeError` instead of building a different graph if a branch of its extended
+  search starts from a snapshot that no longer matches the graph; `ges` starts its reach cache from
+  the empty graph's successor masks. The returned graphs are unchanged. ([#361])
+- `lpcmci` returns the same graphs in less time, because it keeps each node's sorted neighbors, its
+  parent, child, and neighbor sets, and its path steps for each version of the graph instead of
+  building them again for every query. ([#364])
 - `boss` and `grasp` return the same graphs in less time, because each grow-shrink tree keeps one
-  tuple of candidate parents instead of copying the list on every trace. ([#267])
+  tuple of candidate parents instead of copying the list on every trace, and the order sweeps keep
+  the set of allowed parents between traces instead of building it for each one. ([#267], [#368])
 - `exact_search` returns the same graphs in less time, because its linear-Gaussian BIC solves the
   normal equations of a size's parent sets in stacks of up to 4,096. ([#273])
 - `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
   built once and in blocks, and its HSIC tests run on a CUDA GPU, in float64, from the cutoff
   `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
+- `pnl` runs fewer worker threads than asked for when their kernel matrices (three n x n float64
+  matrices per thread) would hold more than 4 GiB, with a `PerformanceWarning`; `num_workers=-1`
+  at 5,000 rows on 64 cores had asked for about 38 GB. With one worker the BLAS threads stay
+  unlimited, so on a machine with several cores its p-values and statistics can differ in the last
+  digits from those of several workers. ([#359])
 - `anm` returns the same results with less memory, because it builds its kernel's distance matrix
   directly. ([#294])
+- `anm` and the `kci` test without conditioning variables return the same p-values with less
+  memory, because their HSIC test builds each kernel in blocks into one reused matrix, as `pnl`
+  does. ([#363])
+- `andrey calibrate` sets the skeleton search's cutoff one past the slowest pass it measured when
+  the worker pool never won, because the search uses the pool for a pass of exactly the cutoff's
+  size. ([#363])
+- For contributors, `qa/identity.py --compare` fails when a count falls as well as when one rises
+  (`--allow-fewer-queries` accepts a fall), counts the exact search's score evaluations, and
+  refits `pnl` on workers. ([#363])
 - `ica_lingam` returns the same results in less time, because its causal-order search drops each
   placed row with a mask. ([#275])
 - `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` compute
@@ -629,4 +655,10 @@ First alpha release.
 [#350]: https://github.com/Abel-ai-lab/andrey/pull/350
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
 [#353]: https://github.com/Abel-ai-lab/andrey/pull/353
+[#359]: https://github.com/Abel-ai-lab/andrey/pull/359
+[#361]: https://github.com/Abel-ai-lab/andrey/pull/361
 [#362]: https://github.com/Abel-ai-lab/andrey/pull/362
+[#363]: https://github.com/Abel-ai-lab/andrey/pull/363
+[#364]: https://github.com/Abel-ai-lab/andrey/pull/364
+[#365]: https://github.com/Abel-ai-lab/andrey/pull/365
+[#368]: https://github.com/Abel-ai-lab/andrey/pull/368

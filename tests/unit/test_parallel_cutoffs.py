@@ -23,14 +23,14 @@ from andrey.search import calibrate as cal
 
 pg = importlib.import_module("andrey.search._parallel_ges")
 sk = importlib.import_module("andrey.constraint._parallel_skeleton")
-SKELETON_VARIABLE = cal.CUTOFFS["skeleton"]
+SKELETON_VARIABLE = cal.METHODS["skeleton"].variable
 
 METHODS = {"ges": pg}
 
 
 @pytest.fixture(autouse=True)
 def unset_cutoffs(monkeypatch):
-    for var in cal.CUTOFFS.values():
+    for var in (m.variable for m in cal.METHODS.values()):
         monkeypatch.delenv(var, raising=False)
 
 
@@ -56,7 +56,7 @@ def test_default_cutoff_warns_once_naming_the_setting_and_command(method, monkey
         _fit(method, workers=2)
         _fit(method, workers=2)
     [warning] = _cutoff_warnings(caught)
-    assert f"{cal.CUTOFFS[method]}=300" in str(warning.message)
+    assert f"{cal.METHODS[method].variable}=300" in str(warning.message)
     assert "`andrey calibrate`" in str(warning.message)
     assert "If this process runs many fits" in str(warning.message)
     assert warning.filename == __file__
@@ -92,7 +92,7 @@ def test_an_explicit_cutoff_never_warns(method, value, monkeypatch):
     _small_default(monkeypatch, method, 300)
     if value == "default":
         value = str(METHODS[method]._DEFAULT_MIN_WORK)
-    monkeypatch.setenv(cal.CUTOFFS[method], value)
+    monkeypatch.setenv(cal.METHODS[method].variable, value)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         _fit(method, workers=2)
@@ -118,7 +118,7 @@ def test_serial_and_pooled_fits_agree_around_a_forced_cutoff(method, offset, poo
     created = []
     real = METHODS[method]._create_pool
     monkeypatch.setattr(METHODS[method], "_create_pool", lambda *a: created.append(a) or real(*a))
-    monkeypatch.setenv(cal.CUTOFFS[method], str(d * (d - 1) + offset))
+    monkeypatch.setenv(cal.METHODS[method].variable, str(d * (d - 1) + offset))
     parallel = _fit(method, workers=2, d=d)
     if pooled is not None:
         assert bool(created) is pooled
@@ -179,6 +179,21 @@ def test_bracket_extends_above_the_grid_and_stops_at_the_cap():
     assert (c.below, c.above) == (cal._MAX_D, None)
     assert c.cutoff == max(cal._MAX_D * (cal._MAX_D - 1), pg._DEFAULT_MIN_WORK)  # never below it
     assert max(calls) == cal._MAX_D
+
+
+def test_a_never_faster_cutoff_keeps_the_slowest_measured_pass_off_the_pool(monkeypatch):
+    """GES uses the pool above its cutoff and the skeleton search at it, so a calibration that
+    never finds the pool faster sets the skeleton's cutoff one past the slowest pass measured."""
+    ges = cal.Crossover(256, None, (), ((256, 2_000_000),), "ges")
+    assert ges.cutoff == 2_000_000
+    p = cal.skeleton_pass(100, 2)
+    assert p.tests > sk.MIN_POOL_QUERIES
+    never = cal.Crossover(256, None, (), ((256, p.tests),), "skeleton")
+    assert never.cutoff == p.tests + 1
+    monkeypatch.setenv(SKELETON_VARIABLE, str(never.cutoff))
+    monkeypatch.setattr(sk.SkeletonWorkerPool, "_ensure", lambda self: pytest.fail("pool started"))
+    pool = sk.SkeletonWorkerPool(p.test, 2)
+    assert pool.scan(p.pairs, p.neighbors, p.adjacency, p.size, 0.05) is None
 
 
 def test_bracket_when_the_pool_wins_down_to_the_smallest_size():
@@ -284,7 +299,7 @@ def test_a_bad_skeleton_override_fails_the_fit_before_any_pass(monkeypatch):
         andrey.pc(cal.sample(6))
 
 
-@pytest.mark.parametrize("variable", cal.CUTOFFS.values())
+@pytest.mark.parametrize("variable", [m.variable for m in cal.METHODS.values()])
 def test_the_command_line_rejects_a_bad_cutoff(variable, capsys, monkeypatch):
     monkeypatch.setenv(variable, "many")
     assert main(["config"]) == 2
@@ -406,7 +421,10 @@ def test_calibrate_command_measures_every_cutoff_by_default(capsys, monkeypatch)
     assert main(["calibrate", "--workers", "4", "--json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert seen["methods"] == ["ges", "skeleton"]
-    assert set(report["settings"]) == {"ANDREY_NUM_WORKERS", *cal.CUTOFFS.values()}
+    assert set(report["settings"]) == {
+        "ANDREY_NUM_WORKERS",
+        *(m.variable for m in cal.METHODS.values()),
+    }
     assert report["methods"]["skeleton"]["variable"] == SKELETON_VARIABLE
     assert report["methods"]["skeleton"]["pool_start_s"] == 0.1235
     text = render_calibration(calibration_report(fake(4, ["skeleton"]), 4))

@@ -1262,14 +1262,14 @@ def cmd_calibrate(
     from andrey.search import calibrate as cal
 
     check_environment()
-    methods = method or list(cal.CUTOFFS)
-    unknown = sorted(set(methods) - set(cal.CUTOFFS))
+    methods = method or list(cal.METHODS)
+    unknown = sorted(set(methods) - set(cal.METHODS))
     if unknown:
         raise CliError(
             "unsupported_value",
-            f"--method must be {' or '.join(cal.CUTOFFS)}, got {unknown[0]!r}",
+            f"--method must be {' or '.join(cal.METHODS)}, got {unknown[0]!r}",
             EXIT_USAGE,
-            valid_options=list(cal.CUTOFFS),
+            valid_options=list(cal.METHODS),
         )
     if workers is not None and workers < 2:
         raise CliError("unsupported_value", "--workers must be at least 2", EXIT_USAGE)
@@ -1297,7 +1297,7 @@ def calibration_report(results: dict, workers: int) -> dict:
 
     methods = {
         m: {
-            "variable": cal.CUTOFFS[m],
+            "variable": cal.METHODS[m].variable,
             "cutoff": c.cutoff,
             "serial_faster_at": side(c, c.below),
             "pool_faster_at": side(c, c.above),
