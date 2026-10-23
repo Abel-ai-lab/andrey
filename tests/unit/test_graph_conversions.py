@@ -23,6 +23,7 @@ from andrey.cli import graph_view
 from andrey.core import ci
 from andrey.core.structure import ARROW, CIRCLE, LATENT, NULL, TAIL
 from andrey.metrics import markov_equivalent, score, shd, to_cpdag
+from andrey.resample import BootstrapOutput
 from andrey.spec.generate import to_json_schema
 from andrey.spec.models import OutputSpec
 from andrey.spec.registry import REGISTRY
@@ -522,3 +523,10 @@ def test_the_method_schema_carries_the_mag_kind():
     spec = REGISTRY["fci"].model_copy(update={"output": output})
     schema = json.loads(json.dumps(to_json_schema(spec)))
     assert schema["output"]["graph_kind"] == "mag"
+
+
+def test_an_averaged_mag_reads_as_a_pag():
+    mag = _hidden_cause_mag()
+    average = BootstrapOutput.from_fits([andrey.StructureOutput.new(mag)] * 2).structure
+    assert average.kind == "pag"
+    assert average.to_numpy().tolist() == mag.to_numpy().tolist()
