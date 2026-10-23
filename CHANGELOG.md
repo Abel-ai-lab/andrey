@@ -36,9 +36,9 @@ change names its pull request.
 - For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
   can show that it returns the same bits at any worker count and column order, and
   `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
-- `ges` takes `max_parents`, a cap on a node's parents: no node of the returned CPDAG has more
-  than that many parents plus undirected neighbors, so no graph the CPDAG represents gives a node
-  more. A move that would break the cap, in either phase, is skipped for the next best move, and
+- `ges` takes `max_parents`, a cap on a node's parents: no graph the returned CPDAG represents
+  gives a node more than that many parents, and some graph reaches each node's count. A move that
+  would break the cap, in either phase, is skipped for the next best move, and
   a cap can stop GES short of the lowest-scoring graph. `None`, the default, sets no cap and keeps
   the forward gate of `n_variables / 2` and every result. ([#350], [#380])
 - `GraphStructure.to_pcalg()` and `GraphStructure.from_pcalg(amat, kind)` convert to and from the

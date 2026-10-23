@@ -58,8 +58,8 @@ class AndreyGES:
     #: the default gate of half the variables, as the public ``andrey.ges`` does. A benchmark that
     #: changes it gives the arm its own ``name``.
     max_parents: float | None = _DEFAULT_MAX_PARENTS
-    #: How ``max_parents`` applies. ``"cap"`` is the public ``andrey.ges(max_parents=k)``: no node
-    #: of the CPDAG has more than ``k`` parents plus undirected neighbors. ``"gate"`` is the rule of
+    #: How ``max_parents`` applies. ``"cap"`` is the public ``andrey.ges(max_parents=k)``: no DAG of
+    #: the CPDAG's class gives a node more than ``k`` parents. ``"gate"`` is the rule of
     #: the default of half the variables and of causal-learn's ``maxP``: a node that already holds
     #: more than ``k`` directed parents gains no new ones in the forward phase. A lane that limits
     #: the reference's parents too sets ``"gate"``, so both packages apply one rule; a lane that

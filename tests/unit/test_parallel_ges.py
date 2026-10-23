@@ -236,8 +236,8 @@ def test_pool_parallel_matches_serial_under_a_cap():
     x = _gaussian_sem(0, 400, 30, 0.2)
     serial_struct, serial_score = ges(x, max_parents=2)
     par_struct, par_score = _parallel(x, 4, 2)
-    assert ops.parent_counts(ges(x)[0].to_numpy()).max() > 2, "the cap does not bind"
-    assert ops.parent_counts(par_struct.to_numpy()).max() <= 2
+    assert ops.max_parents_in_class(ges(x)[0].to_numpy()).max() > 2, "the cap does not bind"
+    assert not ops.exceeds_parent_cap(par_struct.to_numpy(), 2)
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())
     assert serial_score == par_score
 

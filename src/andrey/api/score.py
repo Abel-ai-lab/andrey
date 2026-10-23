@@ -77,12 +77,11 @@ def ges(
         be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
         per free parameter of a variable's conditional probability table.
     max_parents : int or None, default=None
-        A cap on every node's parents, at least ``0``: no node of the returned CPDAG has more than
-        ``max_parents`` parents plus undirected neighbors, so no graph the CPDAG represents gives a
-        node more than ``max_parents`` parents. A move whose CPDAG would break the cap, in either
-        phase, is skipped for the next best move. A cap can stop the search short of the
-        lowest-scoring graph, which GES otherwise finds. ``None`` sets no cap; the forward phase
-        then keeps its gate of ``n_variables / 2``. See Notes.
+        A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
+        node more than ``max_parents`` parents, and some DAG reaches each node's count. A move whose
+        CPDAG would break the cap, in either phase, is skipped for the next best move. A cap can
+        stop the search short of the lowest-scoring graph, which GES otherwise finds. ``None`` sets
+        no cap; the forward phase then keeps its gate of ``n_variables / 2``. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
@@ -123,15 +122,15 @@ def ges(
         given ``max_parents`` is not an int.
     ValueError
         If ``lambda_value`` is negative or non-finite, if a given ``max_parents`` is negative or
-        below the parents plus undirected neighbors that the required edges of ``knowledge`` give a
-        node, if ``max_categories`` is less than ``2``, with a categorical score, if ``data`` holds
-        a number that is not whole, or, with a mixed-data score, if ``categorical`` names a column
-        ``data`` lacks, or if a categorical column holds a number that is not whole or a missing
-        value. Also if ``categorical`` is given with another score. With the BIC score, also if a
-        column repeats another up to scale and shift given more than two rows or, with more rows
-        than columns, is a linear function of other columns. One message names every group of
-        copies and says to keep one column per group. Also if ``knowledge`` names a column ``data``
-        lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
+        below the parents some graph of the required edges of ``knowledge`` gives a node, if
+        ``max_categories`` is less than ``2``, with a categorical score, if ``data`` holds a number
+        that is not whole, or, with a mixed-data score, if ``categorical`` names a column ``data``
+        lacks, or if a categorical column holds a number that is not whole or a missing value. Also
+        if ``categorical`` is given with another score. With the BIC score, also if a column
+        repeats another up to scale and shift given more than two rows or, with more rows than
+        columns, is a linear function of other columns. One message names every group of copies and
+        says to keep one column per group. Also if ``knowledge`` names a column ``data`` lacks or
+        contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -169,9 +168,11 @@ def ges(
     no such gate. With ``max_parents``, that gate gives way to the cap. One move can add several
     parents to a variable at once, and rebuilding the CPDAG after a move can direct or undirect
     other edges, so the search tests the CPDAG after each move and takes the best move whose CPDAG
-    keeps every variable within the cap. The test counts all of a variable's undirected neighbors,
-    since some graph of the class directs any one of them into it, so a cap of ``1`` allows only
-    isolated edges. Moves whose score changes are equal after rounding are chosen by each column's
+    keeps every variable within the cap. A variable's count is its directed parents plus the
+    largest set of its undirected neighbors that are adjacent to one another: a graph of the class
+    directs such a set into it and no larger one, since two neighbors that are not adjacent would
+    add a collider. A cap of ``1`` therefore allows a chain or a tree of undirected edges but not
+    a collider. Moves whose score changes are equal after rounding are chosen by each column's
     rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says
     what the rank keeps under a new column order and on another machine.
 

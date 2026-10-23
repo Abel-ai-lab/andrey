@@ -15,11 +15,11 @@ The forward phase keeps each target's Insert candidates between passes and enume
 only for the targets a move touches (:class:`_ForwardScan`); it selects the move a full scan
 (:func:`forward_chunk_best`) selects.
 
-A parent cap (``cap``) holds on the CPDAG after every move of either phase: no node has more than
-``cap`` parents plus undirected neighbors (:func:`~andrey.search.operators.parent_counts`). A scan
-never selects a move whose rebuilt CPDAG breaks it (:func:`_breaks_cap`), so the move it returns is
-the best of those that keep it; an Insert whose scored family alone exceeds it is left out before
-scoring (:func:`_over_cap`).
+A parent cap (``cap``) holds on the CPDAG after every move of either phase: no DAG of its class
+gives a node more than ``cap`` parents (:func:`~andrey.search.operators.max_parents_in_class`). A
+scan never selects a move whose rebuilt CPDAG breaks it (:func:`_breaks_cap`), so the move it
+returns is the best of those that keep it; an Insert whose scored family alone exceeds it is left
+out before scoring (:func:`_over_cap`).
 
 ``ges()`` uses :func:`run_ges`; ``workers=1`` scans all targets in-process. The objective is
 recomputed from the final CPDAG by :func:`andrey.search.ges._recompute_objective`.
@@ -161,9 +161,9 @@ def _over_cap(cap: float | None, parents: int) -> bool:
     """Whether ``parents`` parents exceed ``cap``; never when ``cap`` is ``None``.
 
     An Insert scored off ``base`` gives its target a DAG of the new class in which the target's
-    parents are ``base`` and the source, and the target's parents plus undirected neighbors in the
-    rebuilt CPDAG include every one of them. An Insert whose ``len(base) + 1`` exceeds the cap is
-    never allowed, whatever the rebuild does.
+    parents are ``base`` and the source, so the class's most parents for the target is at least
+    ``len(base) + 1``. An Insert whose ``len(base) + 1`` exceeds the cap is never allowed, whatever
+    the rebuild does.
     """
     return cap is not None and parents > cap
 
@@ -171,14 +171,14 @@ def _over_cap(cap: float | None, parents: int) -> bool:
 def _breaks_cap(
     adj: np.ndarray, rebuilt: Callable[..., np.ndarray], move: tuple, cap: float | None
 ):
-    """Whether a node of the CPDAG after ``rebuilt(adj.copy(), *move)`` has more than ``cap``
-    parents plus undirected neighbors.
+    """Whether some DAG of the class of the CPDAG after ``rebuilt(adj.copy(), *move)`` gives a node
+    more than ``cap`` parents.
 
     ``rebuilt`` is :func:`~andrey.search.operators.insert_cpdag` or ``delete_cpdag``, ``move`` its
-    ``(x, y, subset)``. The rebuild can raise a node's count by turning an edge it directed away
-    from the node undirected, so the CPDAG after the move is the one checked.
+    ``(x, y, subset)``. The rebuild can direct or undirect edges far from the move, so the CPDAG
+    after it is the one checked.
     """
-    return cap is not None and bool((ops.parent_counts(rebuilt(adj.copy(), *move)) > cap).any())
+    return cap is not None and ops.exceeds_parent_cap(rebuilt(adj.copy(), *move), cap)
 
 
 def forward_chunk_best(
@@ -865,8 +865,8 @@ def run_ges(
     again on the same graph without that move. Serial and pooled passes see the same rejections.
 
     ``max_parents`` is the forward phase's gate on a node's directed parents and ``cap`` the cap on
-    its parents plus undirected neighbors, which ``adj`` must already satisfy: no pass selects a
-    move whose CPDAG breaks it, so each applied move keeps it.
+    the most parents any DAG of the class gives a node, which ``adj`` must already satisfy: no pass
+    selects a move whose CPDAG breaks it, so each applied move keeps it.
     """
     global largest_pass_work
     workers = max(1, min(workers, n))

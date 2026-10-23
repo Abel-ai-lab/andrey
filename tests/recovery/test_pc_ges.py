@@ -8,7 +8,7 @@ from andrey import data
 from andrey.constraint.pc import pc as pc_engine
 from andrey.core import ARROW
 from andrey.search.ges import ges as search_ges
-from andrey.search.operators import parent_counts
+from andrey.search.operators import max_parents_in_class
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
 
@@ -166,14 +166,28 @@ def test_ges_max_parents_caps_the_graph_where_the_default_limit_does_not():
 
 def test_ges_max_parents_of_one_refuses_the_collider_the_gate_admitted():
     # Two causes of one variable, three variables, a limit of 1: the gate admits the collider in
-    # one move, because the variable's directed parents are 0 until it is made. The cap refuses it,
-    # and no node of the result has a parent plus a neighbor to spare.
+    # one move, because the variable's directed parents are 0 until it is made. The cap refuses it
+    # and returns the two edges undirected, a chain whose class gives no node two parents.
     x = fan_in(2)
     capped = andrey.ges(x, max_parents=1).structure.to_numpy()
     gated = search_ges(x, max_parents=1, _parent_rule="gate")[0].to_numpy()
-    assert parent_counts(capped).max() == 1
+    assert max_parents_in_class(capped).max() == 1
+    assert (capped == ARROW).sum() == 0 and (capped != 0).sum() == 4
     assert (gated[2] == ARROW).sum() == 2
-    assert parent_counts(gated).max() == 2
+    assert max_parents_in_class(gated).max() == 2
+
+
+def test_ges_max_parents_of_one_allows_a_chain():
+    # x -> y -> z has no collider, so every graph of its class gives each node at most one parent
+    # and a limit of 1 keeps both edges.
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal(2000)
+    y = x + 0.5 * rng.standard_normal(2000)
+    z = y + 0.5 * rng.standard_normal(2000)
+    marks = andrey.ges(np.column_stack([x, y, z]), max_parents=1).structure.to_numpy()
+    assert (marks[0, 1] != 0, marks[1, 2] != 0, marks[0, 2]) == (True, True, 0)
+    assert (marks == ARROW).sum() == 0
+    assert max_parents_in_class(marks).max() == 1
 
 
 def test_ges_max_parents_zero_returns_the_empty_graph():

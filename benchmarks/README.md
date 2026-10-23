@@ -584,7 +584,7 @@ $ANDREY_BENCH_PYTHON benchmarks/calm_cpu.py --out outputs/calm-andrey --ladder 1
 
 ### GES parent limit
 
-`andrey.ges(max_parents=k)` caps a node's parents plus undirected neighbors in the returned CPDAG.
+`andrey.ges(max_parents=k)` caps the parents a node has in any DAG of the returned CPDAG's class.
 The limit of the reference packages is a gate: causal-learn's `maxP` stops a node that already
 holds more than `maxP` directed parents from gaining new ones, and one move can still leave a node
 above it. The Andrey GES adapter therefore reads `max_parents` through a private keyword of

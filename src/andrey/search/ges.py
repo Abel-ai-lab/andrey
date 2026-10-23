@@ -56,8 +56,8 @@ def _recompute_objective(adj: np.ndarray, score: Score, n: int) -> float:
     return float(sum(score.score(v, ops.parents(dag, v).tolist()) for v in range(n)))
 
 
-#: How :func:`ges` applies ``max_parents``: ``"cap"`` on each node's parents plus undirected
-#: neighbors in every CPDAG of the search, ``"gate"`` on its directed parents in the forward phase.
+#: How :func:`ges` applies ``max_parents``: ``"cap"`` on the most parents any DAG of the class gives
+#: a node, in every CPDAG of the search, ``"gate"`` on its directed parents in the forward phase.
 PARENT_RULES: tuple[str, ...] = ("cap", "gate")
 
 
@@ -122,11 +122,12 @@ def ges(
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes; BDeu ignores it.
     max_parents : float or None
-        A cap on every node's parents plus undirected neighbors in the returned CPDAG, and in the
-        CPDAG after each move: an Insert or Delete whose CPDAG breaks it is skipped for the next
-        best move. ``None`` sets no cap and keeps the forward phase's gate on a node that already
-        holds more than ``n_features / 2`` directed parents, which the backward phase lacks. With
-        a cap, ``constraints`` may not require edges that already break it.
+        A cap on the most parents any DAG of the class gives a node, in the returned CPDAG and in
+        the CPDAG after each move (:func:`~andrey.search.operators.max_parents_in_class`): an Insert
+        or Delete whose CPDAG breaks it is skipped for the next best move. ``None`` sets no cap and
+        keeps the forward phase's gate on a node that already holds more than ``n_features / 2``
+        directed parents, which the backward phase lacks. With a cap, ``constraints`` may not
+        require edges that already break it.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
     constraints : Constraints or None
@@ -162,10 +163,10 @@ def ges(
     adj = np.zeros((n, n), dtype=np.int8)
     if constraints is not None and constraints.required.any():
         adj = _cpdag_of_pdag(required_dag(constraints))
-    if cap is not None and (ops.parent_counts(adj) > cap).any():
+    if cap is not None and ops.exceeds_parent_cap(adj, cap):
         raise ValueError(
             f"the required edges give a node more than max_parents={max_parents} parents "
-            "plus undirected neighbors"
+            "in some graph of their class"
         )
     # Local import breaks the ges <-> _parallel_ges cycle.
     from andrey.search import _parallel_ges
