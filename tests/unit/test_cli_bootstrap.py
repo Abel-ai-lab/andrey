@@ -90,7 +90,8 @@ def test_a_method_that_cannot_be_bootstrapped_is_an_unsupported_value(csv_path, 
     code, _out, err = _run(
         ["bootstrap", "pc", "--data", str(csv_path), "--block-length", "5"], capsys
     )
-    assert code == 3 and "block_length" in json.loads(err)["error"]["message"]
+    error = json.loads(err)["error"]
+    assert code == 2 and error["code"] == "bad_value" and "--block-length" in error["message"]
 
 
 def test_it_resolves_the_method_like_run(capsys):

@@ -996,6 +996,7 @@ def execute_bootstrap(
         raise CliError(
             "bad_value", "the bootstrap seeds each fit itself; set --seed, not seed=", EXIT_USAGE
         )
+    panel = spec.data.inputs[0].kind == "panel"
     bad = [
         message
         for ok, message in (
@@ -1003,6 +1004,10 @@ def execute_bootstrap(
             (0 < threshold <= 1, f"--threshold must lie in (0, 1], got {threshold}"),
             (seed is None or seed >= 0, f"--seed must not be negative, got {seed}"),
             (block_length is None or block_length >= 1, "--block-length must be at least 1"),
+            (
+                block_length is None or (spec.family == "temporal" and not panel),
+                f"--block-length is for a time-series method on one series, not {spec.name}",
+            ),
         )
         if not ok
     ]
