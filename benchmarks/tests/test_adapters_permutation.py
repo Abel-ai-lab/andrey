@@ -31,7 +31,7 @@ def _sample() -> np.ndarray:
     """Return a fixed small linear-Gaussian ER sample."""
     import andrey.data as data
 
-    ds = data.benchmarks.scm("linear_gauss_er", 6).sample(n=200, seed=0)
+    ds = data.benchmarks.scm("linear_gauss_er", 6).sample(n=200, seed=0, scale="raw")
     return np.asarray(ds.data, dtype=np.float64)
 
 

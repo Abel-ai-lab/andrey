@@ -24,7 +24,7 @@ from andrey.data.sortability import (
 )
 
 
-def _linear_gauss(d, n, seed, density=2.0):
+def _linear_gauss(d, n, seed, density=2.0, scale="raw"):
     ds = data.sample_scm(
         graph="erdos_renyi",
         functional="linear",
@@ -33,6 +33,7 @@ def _linear_gauss(d, n, seed, density=2.0):
         n=n,
         seed=seed,
         density=density,
+        scale=scale,
     )
     return ds.data.astype(np.float64), directed_adjacency(ds.params.edges, d)
 
@@ -76,6 +77,19 @@ def test_r2sortability_above_chance():
     assert np.nanmean(vals) > 0.55, np.nanmean(vals)
 
 
+def test_unitless_r2sortability_is_near_chance():
+    """On random graphs the unitless draws are R^2-sortable near chance, where the raw (and so the
+    standardized) draws of the same graphs are well above it.
+
+    Over 30 graphs the mean's standard error is about 0.03, so the 0.1 margin is three of them.
+    """
+    seeds = range(30)
+    unitless = [r2sortability(*_linear_gauss(20, 400, s, scale="unitless")) for s in seeds]
+    raw = [r2sortability(*_linear_gauss(20, 400, s)) for s in seeds]
+    assert abs(np.nanmean(unitless) - 0.5) < 0.1, np.nanmean(unitless)
+    assert np.nanmean(raw) > 0.65, np.nanmean(raw)
+
+
 def test_r2sortability_singular_when_n_leq_d():
     """r2sortability returns nan (never garbage) when n <= d makes corrcoef singular."""
     x, adj = _linear_gauss(20, 15, 0)  # n < d
@@ -95,7 +109,7 @@ def test_degenerate_inputs_no_nan_leak():
 
 def test_edge_only_variant_scales():
     """The O(nnz) edge-only variant is a valid probability and needs no dense (d, d)."""
-    ds = data.sample_scm(d=2000, n=64, seed=0, density=2.0)
+    ds = data.sample_scm(d=2000, n=64, seed=0, density=2.0, scale="raw")
     v = varsortability_edges(ds.data.astype(np.float64), ds.params.edges)
     assert 0.0 <= v <= 1.0
 

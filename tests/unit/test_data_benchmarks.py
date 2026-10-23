@@ -17,7 +17,7 @@ def test_each_benchmark_generates_valid_data(name):
     from andrey.core.structure import TemporalStructure
 
     scm = data.benchmarks.scm(name, d=20)
-    ds = scm.sample(n=200, seed=0)
+    ds = scm.sample(n=200, seed=0, scale="raw")
     assert np.all(np.isfinite(ds.data))
     if scm.functional.is_temporal:
         assert isinstance(ds.graph, TemporalStructure)

@@ -108,7 +108,7 @@ def test_tabu_is_deterministic_across_runs_and_worker_counts():
 
 def test_tabu_sets_no_move_limit_by_default():
     # 200 variables need over 400 moves: a limit of 200 stops the search, the default does not.
-    x = data.sample_scm(d=200, n=2000, seed=0, density=2.0).data
+    x = data.sample_scm(d=200, n=2000, seed=0, density=2.0, scale="raw").data
     with pytest.warns(andrey.SearchLimitWarning):
         andrey.tabu(x, max_iter=200)
     with warnings.catch_warnings():

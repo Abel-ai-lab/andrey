@@ -256,7 +256,7 @@ def test_the_gates_columns_say_nothing_of_the_causal_order(cell, monkeypatch) ->
             functional=data.functional.linear(),
             noise=data.noise.gaussian(),
         )
-        plain = [scm.sample(n=5, seed=s, shuffle=False) for s in _ORDER_SEEDS]
+        plain = [scm.sample(n=5, seed=s, shuffle=False, scale="raw") for s in _ORDER_SEEDS]
         control, _ = _correlations(qg.Draw(ds.data, ds.graph) for ds in plain)
     else:
         draws = qg.pair_draws(cell, 5) if cell in qg.PAIRS else _regime_draws(cell)

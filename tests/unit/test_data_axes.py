@@ -37,7 +37,7 @@ def test_topologies_acyclic_and_valid(spec_fn, d):
     scm = data.SCM(
         graph=spec_fn(d), functional=data.functional.linear(), noise=data.noise.gaussian()
     )
-    _valid_dag(scm.sample(n=16, seed=0))
+    _valid_dag(scm.sample(n=16, seed=0, scale="raw"))
 
 
 @pytest.mark.parametrize(
@@ -52,7 +52,7 @@ def test_topologies_reproducible(spec_fn):
     scm = data.SCM(
         graph=spec_fn(), functional=data.functional.linear(), noise=data.noise.gaussian()
     )
-    a, b = scm.sample(n=32, seed=11), scm.sample(n=32, seed=11)
+    a, b = scm.sample(n=32, seed=11, scale="raw"), scm.sample(n=32, seed=11, scale="raw")
     assert a.graph == b.graph
     assert np.array_equal(a.data, b.data)
 
@@ -64,7 +64,7 @@ def test_scale_free_is_hubby():
         functional=data.functional.linear(),
         noise=data.noise.gaussian(),
     )
-    g = scm.sample(n=8, seed=0).graph.to_networkx().to_undirected()
+    g = scm.sample(n=8, seed=0, scale="raw").graph.to_networkx().to_undirected()
     degrees = np.array([deg for _, deg in g.degree()])
     assert degrees.max() > 4 * degrees.mean()
 
@@ -75,7 +75,7 @@ def test_hub_has_high_degree_hubs():
         functional=data.functional.linear(),
         noise=data.noise.gaussian(),
     )
-    g = scm.sample(n=8, seed=0).graph.to_networkx().to_undirected()
+    g = scm.sample(n=8, seed=0, scale="raw").graph.to_networkx().to_undirected()
     degrees = np.sort([deg for _, deg in g.degree()])[::-1]
     assert degrees[0] > 10  # a genuine hub, not a uniform graph
 
@@ -93,7 +93,7 @@ def test_nonlinear_functionals_finite(functional_fn):
         functional=functional_fn(),
         noise=data.noise.gaussian(),
     )
-    ds = scm.sample(n=500, seed=0)
+    ds = scm.sample(n=500, seed=0, scale="raw")
     assert np.all(np.isfinite(ds.data))
     assert ds.data.shape == (500, 30)
     _valid_dag(ds)
@@ -103,7 +103,13 @@ def test_nonmonotone_child_is_uncorrelated_with_a_symmetric_parent():
     """A child of one Gaussian source is ``w cos(parent) + noise``: uncorrelated with the parent,
     exactly determined by it up to the noise."""
     ds = data.sample_scm(
-        graph="erdos_renyi", functional="nonmonotone", d=12, n=20_000, seed=0, density=2.0
+        graph="erdos_renyi",
+        functional="nonmonotone",
+        d=12,
+        n=20_000,
+        seed=0,
+        density=2.0,
+        scale="raw",
     )
     parents = {c: [] for c in range(12)}
     for parent, child, _ in ds.graph.oriented_edges(index=True):
@@ -120,7 +126,13 @@ def test_nonmonotone_child_is_uncorrelated_with_a_symmetric_parent():
 @pytest.mark.parametrize("noise_name", ["uniform", "laplace", "exponential", "gumbel"])
 def test_non_gaussian_noise_finite_and_centered(noise_name):
     ds = data.sample_scm(
-        graph="erdos_renyi", functional="linear", noise=noise_name, d=20, n=4000, seed=0
+        graph="erdos_renyi",
+        functional="linear",
+        noise=noise_name,
+        d=20,
+        n=4000,
+        seed=0,
+        scale="raw",
     )
     assert np.all(np.isfinite(ds.data))
     # Every noise family is normalized to ~unit variance, so column spreads stay well-scaled.
