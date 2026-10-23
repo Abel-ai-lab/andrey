@@ -13,10 +13,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.constraint._parallel_skeleton import SkeletonWorkerPool, pool_capable
+from andrey.constraint._parallel_skeleton import SkeletonWorkerPool
 from andrey.constraint._skeleton import (
     Removal,
     adjacent_pairs,
+    canonical_capable,
     first_order_removals,
     marginal_removals,
     pair_queries,
@@ -363,7 +364,7 @@ def _discover_skeleton(
     pvalues: dict[tuple[int, int], float] = {}
 
     can_prescreen = prescreen and prescreen_capable(test)
-    parallel = workers > 1 and pool_capable(test) and _trace is None
+    parallel = workers > 1 and canonical_capable(test) and _trace is None
     pool = SkeletonWorkerPool(test, workers) if parallel else None
     try:
         size = 0
@@ -384,7 +385,13 @@ def _discover_skeleton(
                 )
             else:
                 pairs = adjacent_pairs(testable)
-                if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbors, size):
+                # Each pair's test count, taken once: the warning and the pool's cutoff read it.
+                weights = (
+                    [pair_queries(neighbors, x, y, size) for x, y in pairs]
+                    if pool is not None or (warn_expensive and size >= 2)
+                    else []
+                )
+                if warn_expensive and size >= 2 and sum(weights) >= _EXPENSIVE_PASS_TESTS:
                     warn_once(
                         f"PC conditioning size {size} requires at least "
                         f"{_EXPENSIVE_PASS_TESTS:,} CI tests "
@@ -396,7 +403,9 @@ def _discover_skeleton(
                 pooled = (
                     None
                     if pool is None
-                    else pool.scan(pairs, neighbors, adj != NULL, size, alpha, record_pvalues)
+                    else pool.scan(
+                        pairs, neighbors, adj != NULL, size, alpha, record_pvalues, weights
+                    )
                 )
                 if pooled is not None:
                     removals = pooled
@@ -434,13 +443,3 @@ def _discover_skeleton(
             if p is not None:
                 pvalues[(x, y)] = p
     return adj, sepsets, pvalues
-
-
-def _expensive_pass(pairs: list[tuple[int, int]], neighbors: list[np.ndarray], size: int) -> bool:
-    """Whether the pass reaches the warning threshold, counting shared subsets once."""
-    tests = 0
-    for x, y in pairs:
-        tests += pair_queries(neighbors, x, y, size)
-        if tests >= _EXPENSIVE_PASS_TESTS:
-            return True
-    return False

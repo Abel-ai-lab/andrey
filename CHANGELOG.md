@@ -41,6 +41,10 @@ change names its pull request.
 - `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="fisherz"` or `"student_t"` return the same
   graphs and p-values in less time, because their skeleton search hands the test each pair's
   conditioning sets, and those of consecutive pairs, as one stack. ([#280], [#292])
+- `pc`, `fci`, `gfci`, and `cdnod` return the same graphs and p-values with less memory, because
+  their size-one pass builds its queries one stack at a time instead of listing every pair's
+  conditioners first, which took about 4 GB of list pointers on a complete graph of 1,000
+  variables. ([#346])
 - `fci` and `gfci` return the same PAGs in less time: the possible-d-separation step computes one
   reach set per variable, and GFCI reads each node's neighbors from lists built once and tests its
   separating sets in stacks. ([#265], [#312])
@@ -606,3 +610,4 @@ First alpha release.
 [#311]: https://github.com/Abel-ai-lab/andrey/pull/311
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#346]: https://github.com/Abel-ai-lab/andrey/pull/346
