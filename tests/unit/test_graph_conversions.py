@@ -52,7 +52,7 @@ def test_to_dag_directs_a_chain_without_a_collider():
 
 
 def test_to_dag_keeps_each_directed_edge():
-    # a -> b <- c, b -> d, d -- e: Meek leaves d -- e undirected.
+    # The PDAG a -> b <- c, b -> d, d -- e: to_dag directs d -- e without adding a collider.
     a, b, c, d, e = range(5)
     marks = _dag([(a, b), (c, b), (b, d)], 5).to_numpy()
     marks[d, e] = marks[e, d] = TAIL
