@@ -96,10 +96,14 @@ def rfci(
         max_depth=max_depth,
     )
     tests = _Tests(test, alpha, tie_ranks(X, categorical), keep)
+    # Only a pair with a common neighbor forms an unshielded triple or ends a discriminating path,
+    # and removals never add one, so the steps after the search read only those pairs' sets.
+    shared = support.astype(np.float32) @ support.astype(np.float32) > 0
     sepsets: Sepsets = {}
     for (x, y), union in unions.items():
         if x < y:
-            sepsets[(x, y)] = sepsets[(y, x)] = tests.minimal(x, y, union)
+            found = tests.minimal(x, y, union) if shared[x, y] else union
+            sepsets[(x, y)] = sepsets[(y, x)] = found
 
     marks = _circle_pag(support)
     ambiguous = unseparated_triples(support, sepsets, constraints)
