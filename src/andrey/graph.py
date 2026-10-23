@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Collection
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -23,39 +23,62 @@ if TYPE_CHECKING:
 
 __all__ = ["to_dag", "to_mag", "to_pag"]
 
+_LISTED = 10  # undirected edges an error message lists before "and N more"
 
-def to_dag(graph: GraphStructure | StructureOutput) -> GraphStructure:
+
+def to_dag(
+    graph: GraphStructure | StructureOutput,
+    *,
+    tie_break: Literal["label"] | None = None,
+    seed: int | None = None,
+) -> GraphStructure:
     """Return a DAG from a CPDAG's Markov equivalence class.
+
+    A CPDAG with an undirected edge stands for several DAGs, and the choice among them can change
+    what a later step concludes, such as an effect estimate, so the caller picks how to choose:
+    by label with ``tie_break="label"``, or at random with ``seed``.
 
     Parameters
     ----------
     graph : GraphStructure or StructureOutput
-        A ``cpdag``, or a ``dag``, which comes back unchanged, or a result that holds one.
+        A ``cpdag``, or a ``dag``, or a result that holds one.
+    tie_break : {"label"} or None, default=None
+        ``"label"`` picks the DAG the node labels decide, whatever the column order: the same DAG,
+        in label terms, for every column order of a labeled graph. A graph without labels is
+        named by position, so its DAG follows the column order.
+    seed : int or None, default=None
+        Picks a DAG of the class at random, the same one for the same seed. Every DAG of the class
+        can come back, but not with equal probability.
 
     Returns
     -------
     GraphStructure
         A ``dag`` with the nodes and labels of ``graph``, its skeleton, its v-structures, and
-        each of its directed edges, so a DAG of the class when ``graph`` is a CPDAG. Of the DAGs
-        that qualify, it returns the one the algorithm in the Notes reaches, which depends on the
-        node order.
+        each of its directed edges, so a DAG of its class. A graph with no undirected edge has
+        one such DAG, which comes back whatever ``tie_break`` and ``seed`` say.
 
     Raises
     ------
     TypeError
         If ``graph`` is not a ``GraphStructure`` or a result that holds one.
     ValueError
-        If ``graph`` is not a ``dag`` or a ``cpdag``, or no DAG has its skeleton, its
-        v-structures, and its directed edges. The message names a chordless undirected cycle of
-        four or more nodes when there is one, since every orientation of such a cycle adds a
-        v-structure or closes a directed cycle.
+        If ``graph`` is not a ``dag`` or a ``cpdag``; if no DAG has its skeleton, its
+        v-structures, and its directed edges, with a message that names a chordless undirected
+        cycle of four or more nodes when there is one, since every orientation of such a cycle
+        adds a v-structure or closes a directed cycle; if ``graph`` has an undirected edge and
+        neither ``tie_break`` nor ``seed`` is given, with a message that names the undirected
+        edges; if both are given; or if ``tie_break`` is not ``"label"`` or ``None``.
 
     Notes
     -----
     The algorithm of Dor and Tarsi [1]_ keeps every directed edge, then repeatedly removes the
-    lowest-numbered node that has no outgoing directed edge and whose undirected neighbors are
-    each adjacent to all its other neighbors, and directs its undirected edges into it. When no
-    node qualifies before every node is removed, no extension exists.
+    first node, in a ranking of the nodes, that has no outgoing directed edge and whose undirected
+    neighbors are each adjacent to all its other neighbors, and directs its undirected edges into
+    it. When no node qualifies before every node is removed, no extension exists.
+    ``tie_break="label"`` ranks the nodes by label, and ``seed`` by a random permutation. A DAG of
+    the class comes back from every ranking that lists its nodes from the last in its causal order
+    to the first, so each DAG has a positive probability under ``seed``; DAGs that more rankings
+    reach are more likely.
 
     References
     ----------
@@ -67,17 +90,46 @@ def to_dag(graph: GraphStructure | StructureOutput) -> GraphStructure:
     >>> import numpy as np
     >>> from andrey import GraphStructure
     >>> from andrey.graph import to_dag
-    >>> M = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])  # 0 -- 1 -- 2
-    >>> dag = to_dag(GraphStructure.from_numpy(M, kind="cpdag"))
+    >>> M = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])  # a -- b -- c
+    >>> cpdag = GraphStructure.from_numpy(M, kind="cpdag", labels=("a", "b", "c"))
+    >>> dag = to_dag(cpdag, tie_break="label")
     >>> dag.kind, dag.oriented_edges()
-    ('dag', [(1, 0, 'directed'), (2, 1, 'directed')])
+    ('dag', [('b', 'a', 'directed'), ('c', 'b', 'directed')])
     """
     structure = _graph(graph)
     if structure.kind not in ("dag", "cpdag"):
         raise ValueError(f"to_dag takes a dag or a cpdag, not a {structure.kind}")
+    if tie_break not in ("label", None):
+        raise ValueError(f'tie_break must be "label" or None, got {tie_break!r}')
+    if tie_break is not None and seed is not None:
+        raise ValueError("pass tie_break or seed, not both")
     structure.validate()
-    marks = pdag2dag(structure.to_numpy())
-    return GraphStructure.from_numpy(marks, kind="dag", labels=structure.labels)
+    marks = structure.to_numpy()
+    first = pdag2dag(marks)  # raises when no extension exists
+    undirected = [(i, j) for i, j, a, b in structure.to_edges().tolist() if a == b == TAIL]
+    if not undirected:
+        return GraphStructure.from_numpy(first, kind="dag", labels=structure.labels)
+    if tie_break is None and seed is None:
+        names = [" -- ".join(map(str, _names(structure, [u, v]))) for u, v in undirected[:_LISTED]]
+        more = f" and {len(undirected) - _LISTED} more" if len(undirected) > _LISTED else ""
+        raise ValueError(
+            f"the {structure.kind} has {len(undirected)} undirected edge(s), "
+            f'{", ".join(names)}{more}, so more than one DAG fits it; pass tie_break="label" '
+            "to pick the DAG its labels decide, or seed= to pick one at random"
+        )
+    n = structure.n_nodes
+    if seed is not None:
+        rank = np.random.default_rng(seed).permutation(n)
+    elif structure.labels is None:
+        rank = np.arange(n)
+    else:
+        rank = np.argsort(np.array(structure.labels, dtype=object), kind="stable")
+    extension = pdag2dag(marks[np.ix_(rank, rank)])
+    back = np.empty(n, dtype=np.intp)
+    back[rank] = np.arange(n)
+    return GraphStructure.from_numpy(
+        extension[np.ix_(back, back)], kind="dag", labels=structure.labels
+    )
 
 
 def to_mag(

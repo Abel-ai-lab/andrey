@@ -42,13 +42,39 @@ def _random_dag(rng: np.random.Generator, n: int, p: float) -> list[tuple[int, i
 # ---- to_dag -------------------------------------------------------------------------------------
 
 
-def test_to_dag_directs_a_chain_without_a_collider():
+def _chain() -> GraphStructure:
     marks = np.zeros((3, 3), dtype=np.int8)
     marks[[0, 1, 1, 2], [1, 0, 2, 1]] = TAIL  # a -- b -- c
-    cpdag = GraphStructure.from_numpy(marks, kind="cpdag", labels=("a", "b", "c"))
-    dag = to_dag(cpdag)
-    assert dag.kind == "dag" and dag.labels == ("a", "b", "c")
-    assert markov_equivalent(dag, cpdag)  # no v-structure at b
+    return GraphStructure.from_numpy(marks, kind="cpdag", labels=("a", "b", "c"))
+
+
+def _labeled_cpdag(seed: int, n: int = 9) -> GraphStructure:
+    truth = _dag(_random_dag(np.random.default_rng(seed), n, 0.4), n)
+    labels = tuple(f"x{k}" for k in range(n))
+    return GraphStructure.from_numpy(to_cpdag(truth).to_numpy(), kind="cpdag", labels=labels)
+
+
+def _in_class(dag: GraphStructure, cpdag: GraphStructure) -> bool:
+    edges = nx.DiGraph([(s, t) for s, t, _ in dag.oriented_edges(index=True)])
+    return (
+        dag.kind == "dag"
+        and nx.is_directed_acyclic_graph(edges)
+        and np.array_equal(dag.to_numpy() != NULL, cpdag.to_numpy() != NULL)  # same skeleton
+        and markov_equivalent(dag, cpdag)  # same v-structures
+        and to_cpdag(dag).to_numpy().tolist() == cpdag.to_numpy().tolist()
+    )
+
+
+def test_to_dag_refuses_to_choose_by_default():
+    with pytest.raises(ValueError) as raised:
+        to_dag(_chain())
+    assert "a -- b" in str(raised.value) and "b -- c" in str(raised.value)
+
+
+def test_to_dag_returns_the_unique_dag_without_a_choice():
+    dag = _dag([(0, 2), (1, 2)], 3)  # a -> c <- b: its CPDAG has no undirected edge
+    assert to_dag(to_cpdag(dag)) == dag
+    assert to_dag(andrey.StructureOutput.new(dag)) == dag
 
 
 def test_to_dag_keeps_each_directed_edge():
@@ -56,36 +82,54 @@ def test_to_dag_keeps_each_directed_edge():
     a, b, c, d, e = range(5)
     marks = _dag([(a, b), (c, b), (b, d)], 5).to_numpy()
     marks[d, e] = marks[e, d] = TAIL
-    dag = to_dag(GraphStructure.from_numpy(marks, kind="cpdag"))
+    dag = to_dag(GraphStructure.from_numpy(marks, kind="cpdag"), tie_break="label")
     directed = (marks == TAIL) & (marks.T == ARROW)
     assert np.array_equal(dag.to_numpy()[directed], marks[directed])
     assert markov_equivalent(dag, GraphStructure.from_numpy(marks, kind="cpdag"))
 
 
-@pytest.mark.parametrize("seed", range(20))
+@pytest.mark.parametrize("seed", range(10))
 def test_to_dag_lands_in_the_equivalence_class(seed):
+    cpdag = _labeled_cpdag(seed)
+    assert _in_class(to_dag(cpdag, tie_break="label"), cpdag)
+    for draw in range(3):
+        assert _in_class(to_dag(cpdag, seed=draw), cpdag)
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_label_tie_break_ignores_the_column_order(seed):
+    cpdag = _labeled_cpdag(seed)
+    want = sorted(to_dag(cpdag, tie_break="label").oriented_edges())
     rng = np.random.default_rng(seed)
-    truth = _dag(_random_dag(rng, 8, 0.4), 8)
-    cpdag = to_cpdag(truth)
-    dag = to_dag(cpdag)
-    assert nx.is_directed_acyclic_graph(nx.DiGraph([(s, t) for s, t, _ in dag.oriented_edges()]))
-    assert np.array_equal(dag.to_numpy() != NULL, truth.to_numpy() != NULL)  # same skeleton
-    assert markov_equivalent(dag, truth)  # same v-structures
-    assert to_cpdag(dag) == cpdag
+    for _ in range(5):
+        order = rng.permutation(cpdag.n_nodes)
+        marks = cpdag.to_numpy()[np.ix_(order, order)]
+        labels = tuple(cpdag.labels[k] for k in order)
+        shuffled = GraphStructure.from_numpy(marks, kind="cpdag", labels=labels)
+        assert sorted(to_dag(shuffled, tie_break="label").oriented_edges()) == want
 
 
-def test_to_dag_returns_a_dag_unchanged():
-    dag = _dag([(0, 1), (2, 1)], 3)
-    assert to_dag(andrey.StructureOutput.new(dag)) == dag
+def test_a_seed_repeats_its_dag_and_seeds_reach_several():
+    cpdag = _chain()
+    assert to_dag(cpdag, seed=3) == to_dag(cpdag, seed=3)
+    dags = {tuple(to_dag(cpdag, seed=seed).oriented_edges()) for seed in range(20)}
+    assert len(dags) == 3  # every DAG of the chain's class: a <- b <- c, a -> b -> c, a <- b -> c
 
 
-def test_to_dag_raises_without_an_extension():
+@pytest.mark.parametrize("options", [{"tie_break": "label", "seed": 0}, {"tie_break": "random"}])
+def test_to_dag_rejects_bad_options(options):
+    with pytest.raises(ValueError):
+        to_dag(_chain(), **options)
+
+
+@pytest.mark.parametrize("options", [{}, {"tie_break": "label"}])
+def test_to_dag_raises_without_an_extension(options):
     # The chordless cycle a -- b -- c -- d -- a: every orientation adds a v-structure or a cycle.
     marks = np.zeros((4, 4), dtype=np.int8)
     for i in range(4):
         marks[i, (i + 1) % 4] = marks[(i + 1) % 4, i] = TAIL
     with pytest.raises(ValueError, match="no consistent DAG extension"):
-        to_dag(GraphStructure.from_numpy(marks, kind="cpdag"))
+        to_dag(GraphStructure.from_numpy(marks, kind="cpdag"), **options)
 
 
 def test_to_dag_rejects_a_pag():
