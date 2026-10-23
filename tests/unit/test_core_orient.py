@@ -448,5 +448,20 @@ def test_pdag2dag_rejects_inextensible_pdag():
     pdag[1, 2], pdag[2, 1] = TAIL, ARROW  # 1 -> 2
     pdag[2, 3], pdag[3, 2] = TAIL, TAIL  # 2 -- 3
     pdag[3, 0], pdag[0, 3] = TAIL, ARROW  # 3 -> 0
-    with pytest.raises(ValueError, match="no consistent"):
+    with pytest.raises(ValueError, match=r"no consistent .*among nodes \[0, 1, 2, 3\]"):
         pdag2dag(pdag)
+
+
+def test_pdag2dag_names_a_chordless_cycle_of_the_undirected_edges():
+    # The undirected 4-cycle 0 -- 1 -- 2 -- 3 -- 0, with the pendant edge 3 -> 4: every orientation
+    # of the cycle adds a v-structure or closes a directed cycle.
+    pdag = np.zeros((5, 5), dtype=np.int8)
+    for a, b in [(0, 1), (1, 2), (2, 3), (3, 0)]:
+        pdag[a, b], pdag[b, a] = TAIL, TAIL
+    pdag[3, 4], pdag[4, 3] = TAIL, ARROW
+    with pytest.raises(ValueError, match=r"no DAG has its skeleton, its v-structures") as error:
+        pdag2dag(pdag)
+    assert "chordless cycle 0 - 1 - 2 - 3 - 0" in str(error.value)
+    # A chord makes the cycle's undirected part chordal, and an extension exists.
+    pdag[0, 2], pdag[2, 0] = TAIL, TAIL
+    assert pdag2dag(pdag).shape == (5, 5)

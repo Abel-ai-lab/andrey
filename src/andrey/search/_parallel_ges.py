@@ -5,9 +5,11 @@ target, candidates sharing ``base = sorted(NA u T u Pa)`` are scored in one batc
 ``delta_many_with_base`` call. Fixed target ownership preserves arithmetic and reuses worker
 caches across passes.
 
-The move key is ``(stable_key(delta, n), x, y, index)``. ``stable_key`` quantizes ``delta / n``;
-``index`` is the subset-enumeration position of ``T``, preserving the serial tie order. The CPDAG
-is byte-identical across partitions and worker assignments.
+The move key is :func:`move_key`: ``stable_key(delta, n)``, which quantizes ``delta / n``, then the
+:func:`~andrey.search.hc.tie_ranks` of ``x``, of ``y``, and of the subset ``T`` or ``H``. Moves
+with equal quantized deltas are chosen by ranks that follow the columns, so reordering the columns
+reorders the CPDAG the same way. Each key is unique, so the CPDAG is byte-identical across
+partitions and worker assignments.
 
 The forward phase keeps each target's Insert candidates between passes and enumerates them again
 only for the targets a move touches (:class:`_ForwardScan`); it selects the move a full scan
@@ -21,12 +23,13 @@ from __future__ import annotations
 
 import heapq
 import math
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Protocol
 
 import numpy as np
 
 from andrey.core import _bitset, env
+from andrey.core.knowledge import Constraints, admits
 from andrey.core.score import BICScore, LocalScore
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.search import _parallel as par
@@ -44,17 +47,32 @@ _pick_context = par.pick_context
 _StableWorkerSet = par.StableWorkerSet
 
 # A chunk best, or ``None`` when the chunk has no improving operator. ``key`` is the total-order
-# reduce key ``(stable_key(delta, n), x, y, index)``; ``T`` / ``H`` carry the move to apply.
+# reduce key from :func:`move_key`; ``T`` / ``H`` carry the move to apply.
 ForwardResult = tuple[tuple, int, int, tuple[int, ...]] | None  # (key, x, y, T)
 BackwardResult = tuple[tuple, int, int, tuple[int, ...]] | None  # (key, x, y, H)
+# Moves a scan skips, by the move part of their :func:`move_key`, ``key[1:]``: under background
+# knowledge, the moves whose class admits no DAG that satisfies it on the current graph.
+Excluded = set[tuple[int, int, tuple[int, ...]]] | None
+
+
+def move_key(
+    delta: float, n: int, x: int, y: int, subset: Iterable[int], ranks: Sequence[int]
+) -> tuple:
+    """The reduce key of the move of edge ``x``-``y`` with ``subset`` (``T`` or ``H``); lower wins.
+
+    ``(stable_key(delta, n), ranks[x], ranks[y], sorted ranks of subset)``, with ``ranks`` from
+    :func:`~andrey.search.hc.tie_ranks`. A candidate's ``(x, y, subset)`` is unique in a pass, so
+    the key is too.
+    """
+    return (stable_key(delta, n), ranks[x], ranks[y], tuple(sorted(ranks[v] for v in subset)))
 
 
 def reduce_best(
     results: Sequence[ForwardResult | BackwardResult],
 ) -> ForwardResult | BackwardResult:
-    """Select the best chunk by its ``(stable_key, x, y, index)`` key in ``r[0]``.
+    """Select the best chunk by its :func:`move_key` in ``r[0]``.
 
-    Uses :func:`andrey.search._parallel.reduce_best`. Each ``(x, y, index)`` belongs to one target
+    Uses :func:`andrey.search._parallel.reduce_best`. Each ``(x, y, subset)`` belongs to one target
     partition; unique keys make strict-``<`` reduction independent of completion order.
     """
     return par.reduce_best(results, key=lambda r: r[0])
@@ -113,23 +131,28 @@ def _rows(mask: np.ndarray) -> list[np.ndarray]:
 
 
 def _insert_candidates(
-    y: int, adj: np.ndarray, state: NeighborState
+    y: int, adj: np.ndarray, state: NeighborState, forbidden: np.ndarray | None = None
 ) -> Iterator[tuple[int, int, tuple[int, ...], set[int]]]:
     """Yield ``(x, t_index, T, clique)`` for every Insert into ``y`` whose ``NA u T`` is a clique.
 
     ``clique = NA u T`` is the node set every semi-directed ``y ~> x`` path must meet for the
     Insert to be valid; the caller checks that. Sources come in ascending ``x``, and each source's
-    subsets in :func:`~andrey.search.operators.clique_extensions` order.
+    subsets in :func:`~andrey.search.operators.clique_extensions` order. With ``forbidden``
+    (``[i, j]``: no edge ``i -> j``), neither ``x`` nor a member of ``T`` is forbidden into ``y``.
     """
     adj_sets, _par_of, nbr = state
     nbrs_y = nbr[y]
     sources = np.flatnonzero((adj[:, y] == ops.NULL) & (adj[y] == ops.NULL))
+    free = nbrs_y  # the undirected neighbors T may hold
+    if forbidden is not None:
+        sources = sources[~forbidden[sources, y]]
+        free = nbrs_y - set(np.flatnonzero(forbidden[:, y]).tolist())
     for x in sources.tolist():
         if x == y:
             continue
         adj_x = adj_sets[x]
         na = nbrs_y & adj_x
-        t0 = sorted(nbrs_y - adj_x)
+        t0 = sorted(free - adj_x)
         for t_index, T in ops.clique_extensions(adj, na, t0):
             yield x, t_index, T, na | set(T)
 
@@ -142,8 +165,11 @@ def forward_chunk_best(
     max_parents: float | None,
     state: NeighborState,
     reachable: Callable[[int, int, set[int]], bool],
+    ranks: Sequence[int],
+    forbidden: np.ndarray | None = None,
+    excluded: Excluded = None,
 ) -> ForwardResult:
-    """The best-improving Insert whose target is in ``targets``, by ``(stable_key, x, y, t_idx)``.
+    """The best-improving Insert whose target is in ``targets``, by :func:`move_key`.
 
     Enumerates the chunk's valid Insert candidates score-free (clique + reachability), groups them
     per target by ``base = sorted(NA u T u Pa)``, and scores each group with one batched
@@ -152,6 +178,8 @@ def forward_chunk_best(
     is below ``-_EPS_IMPROVE``; the argmin is over the quantized key, so the visitation order
     cannot change the result. Grouping is per target, and a target lives wholly in one
     chunk, so the batch shape (hence each delta) is identical however the targets are partitioned.
+    ``forbidden`` filters the candidates as in :func:`_insert_candidates`; a move in ``excluded``
+    is never selected.
     """
     par_of = state[1]
     best: ForwardResult = None
@@ -162,20 +190,22 @@ def forward_chunk_best(
             continue  # y already carries the maximum admissible parent count.
         pa_set = set(int(p) for p in paj)
         # Group valid candidates by their base parent set; each base scores its adds in one batch.
-        groups: dict[tuple[int, ...], list[tuple[int, int, tuple[int, ...]]]] = {}
-        for x, t_index, T, clique in _insert_candidates(y, adj, state):
+        groups: dict[tuple[int, ...], list[tuple[int, tuple[int, ...]]]] = {}
+        for x, _t_index, T, clique in _insert_candidates(y, adj, state, forbidden):
             if reachable(y, x, clique):
                 continue  # some semi-directed y ~> x path misses the clique: invalid Insert.
             base = tuple(sorted(pa_set | clique))
-            groups.setdefault(base, []).append((x, t_index, T))
+            groups.setdefault(base, []).append((x, T))
         for base, cands in groups.items():
-            moves = [("add", x) for x, _, _ in cands]
-            for (x, t_index, T), delta in zip(
+            moves = [("add", x) for x, _ in cands]
+            for (x, T), delta in zip(
                 cands, delta_engine.delta_many_with_base(y, base, moves), strict=True
             ):
                 if delta < -_EPS_IMPROVE:
-                    key = (stable_key(delta, n), x, y, t_index)
+                    key = move_key(delta, n, x, y, T, ranks)
                     if best_key is None or key < best_key:
+                        if excluded and key[1:] in excluded:
+                            continue
                         best_key = key
                         best = (key, x, y, T)
     return best
@@ -187,15 +217,22 @@ def backward_chunk_best(
     delta_engine: DeltaEngine,
     n: int,
     state: NeighborState,
+    ranks: Sequence[int],
     kept: dict[tuple[int, tuple[int, ...], int], float] | None = None,
+    constraints: Constraints | None = None,
+    excluded: Excluded = None,
 ) -> BackwardResult:
-    """The best-improving Delete whose target is in ``targets``, by ``(stable_key, x, y, h_idx)``.
+    """The best-improving Delete whose target is in ``targets``, by :func:`move_key`.
 
     Enumerates the chunk's valid Delete candidates score-free (residual-clique check; Delete carries
     no reachability test) and scores each with one scalar ``("remove", x)`` off ``base = sorted(
     residual u Pa u {x})`` -- the PURE Schur remove delta. Improving iff the raw delta is below
     ``-_EPS_IMPROVE``; the argmin is over the quantized key. ``kept``, when given, holds each
     ``(y, base, x)``'s delta across passes: a scalar remove depends on nothing else.
+
+    With ``constraints``, a required pair is never deleted, and ``H`` holds no ``h`` whose
+    orientation ``y -> h`` or ``x -> h`` is forbidden: such an ``h`` stays in the residual, which
+    must still be a clique. A move in ``excluded`` is never selected.
     """
     adj_sets, par_of, nbr = state
     best: BackwardResult = None
@@ -211,7 +248,15 @@ def backward_chunk_best(
                 continue
             h0 = sorted(nbrs_y & adj_sets[x])
             h0_set = set(h0)
-            for h_index, H in ops.clique_residuals(adj, h0):
+            candidates = ops.clique_residuals(adj, h0)
+            if constraints is not None:
+                if constraints.required[x, y] or constraints.required[y, x]:
+                    continue
+                f = constraints.forbidden
+                pinned = {h for h in h0 if f[y, h] or f[x, h]}
+                if pinned:
+                    candidates = ((i, H) for i, H in candidates if pinned.isdisjoint(H))
+            for _h_index, H in candidates:
                 residual = h0_set - set(H)
                 base = tuple(sorted(residual | pa_set | {int(x)}))
                 delta = None if kept is None else kept.get((y, base, x))
@@ -220,8 +265,10 @@ def backward_chunk_best(
                     if kept is not None:
                         kept[(y, base, x)] = delta
                 if delta < -_EPS_IMPROVE:
-                    key = (stable_key(delta, n), x, y, h_index)
+                    key = move_key(delta, n, x, y, H, ranks)
                     if best_key is None or key < best_key:
+                        if excluded and key[1:] in excluded:
+                            continue
                         best_key = key
                         best = (key, x, y, H)
     return best
@@ -284,6 +331,7 @@ class _ForwardScan:
     """The forward pass over fixed targets, keeping each target's candidates between passes.
 
     :meth:`best` returns what :func:`forward_chunk_best` returns for the same targets and graph.
+    ``forbidden`` (``[i, j]``: no edge ``i -> j``) filters the candidates as there.
     """
 
     def __init__(
@@ -292,12 +340,18 @@ class _ForwardScan:
         delta_engine: DeltaEngine,
         n: int,
         max_parents: float | None,
+        ranks: Sequence[int],
+        forbidden: np.ndarray | None = None,
     ) -> None:
         self.targets = list(targets)
         self.delta_engine = delta_engine
         self.n = n
         self.max_parents = max_parents
+        self.ranks = ranks
         self.everyone = (1 << n) - 1
+        self.forbidden = forbidden
+        # Per target, the nodes forbidden into it, as bitmasks; None without knowledge.
+        self.into = None if forbidden is None else _bitset.row_masks(forbidden.T)
         self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
         # Per target: each base's group; the candidates that can improve, sorted by lowest exact
         # delta; and each base's last exact deltas with a mask of the passing sources they were
@@ -310,13 +364,22 @@ class _ForwardScan:
         self.reach: dict[tuple[int, int], int] = {}
         self.succ: list[int] | None = None
 
-    def best(self, adj: np.ndarray) -> ForwardResult:
-        """The best-improving Insert into the targets, by ``(stable_key, x, y, t_idx)``."""
+    def best(self, adj: np.ndarray, excluded: Excluded = None) -> ForwardResult:
+        """The best-improving Insert into the targets not in ``excluded``, by :func:`move_key`."""
         if _FULL_RESCAN:
             state = neighborhood_state(adj, self.n)
             reachable = _reachable(adj)
             return forward_chunk_best(
-                self.targets, adj, self.delta_engine, self.n, self.max_parents, state, reachable
+                self.targets,
+                adj,
+                self.delta_engine,
+                self.n,
+                self.max_parents,
+                state,
+                reachable,
+                self.ranks,
+                self.forbidden,
+                excluded,
             )
         self._refresh(adj)
         heap = [(moves[0][0], y, 0) for y, moves in self.screened.items() if moves]
@@ -329,7 +392,7 @@ class _ForwardScan:
             moves = self.screened[y]
             if i + 1 < len(moves):
                 heapq.heappush(heap, (moves[i + 1][0], y, i + 1))
-            _low, x, t_index, T, base = moves[i]
+            _low, x, _t_index, T, base = moves[i]
             exact = scored.get((y, base))  # this pass's exact deltas and passing sources
             if exact is None:
                 exact = scored[(y, base)] = self._exact(y, base)
@@ -337,8 +400,10 @@ class _ForwardScan:
             if not (passing >> x) & 1 or not deltas[x] < -_EPS_IMPROVE:
                 continue  # a y ~> x path misses the clique, or the Insert does not improve
             delta = deltas[x]
-            key = (stable_key(delta, self.n), x, y, t_index)
+            key = move_key(delta, self.n, x, y, T, self.ranks)
             if best is None or key < best[0]:
+                if excluded and key[1:] in excluded:
+                    continue
                 best = (key, x, y, T)
                 # A delta that can still win rounds to this key or below, so it lies within half a
                 # quantization step of it; the limit allows two steps as slack against rounding.
@@ -382,6 +447,12 @@ class _ForwardScan:
         pa_set = set(parents)
         nbrs = lines[y]
         nonadjacent = self.everyone & ~adjacent[y] & ~(1 << y)
+        free = nbrs  # the undirected neighbors T may hold
+        if self.into is not None:
+            nonadjacent &= ~self.into[y]
+            free &= ~self.into[y]
+            if not nonadjacent:
+                return  # every source is forbidden into y or already adjacent to it.
         by_na: dict[int, tuple[list[int], int]] = {0: (_bitset.nodes(nonadjacent), nonadjacent)}
         if nbrs:
             lists: dict[int, list[int]] = {}
@@ -391,7 +462,7 @@ class _ForwardScan:
         members: dict[tuple[int, ...], tuple[list[tuple[int, int, tuple[int, ...]]], int]] = {}
         for na_mask, (xs, xs_mask) in by_na.items():
             na = _bitset.nodes(na_mask)
-            for t_index, T in ops.clique_extensions(adj, na, _bitset.nodes(nbrs & ~na_mask)):
+            for t_index, T in ops.clique_extensions(adj, na, _bitset.nodes(free & ~na_mask)):
                 base = tuple(sorted(pa_set.union(na, T)))
                 cands, mask = members.get(base, ([], 0))
                 cands.extend((x, t_index, T) for x in xs)
@@ -454,7 +525,12 @@ class _ForwardScan:
 
 
 def _forward_inprocess(
-    adj: np.ndarray, delta_engine: DeltaEngine, n: int, max_parents: float | None, n_chunks: int
+    adj: np.ndarray,
+    delta_engine: DeltaEngine,
+    n: int,
+    max_parents: float | None,
+    n_chunks: int,
+    ranks: Sequence[int],
 ) -> np.ndarray:
     """Forward phase over an in-process N-chunk decomposition (no pool; the chunk-invariance guard).
 
@@ -462,7 +538,8 @@ def _forward_inprocess(
     so no per-move total is threaded here.
     """
     scans = [
-        _ForwardScan(chunk, delta_engine, n, max_parents) for chunk in even_chunks(n, n_chunks)
+        _ForwardScan(chunk, delta_engine, n, max_parents, ranks)
+        for chunk in even_chunks(n, n_chunks)
     ]
     while True:
         best = reduce_best([scan.best(adj) for scan in scans])
@@ -474,13 +551,13 @@ def _forward_inprocess(
 
 
 def _backward_inprocess(
-    adj: np.ndarray, delta_engine: DeltaEngine, n: int, n_chunks: int
+    adj: np.ndarray, delta_engine: DeltaEngine, n: int, n_chunks: int, ranks: Sequence[int]
 ) -> np.ndarray:
     """Backward phase over an in-process N-chunk decomposition (no pool; chunk-invariance guard)."""
     while True:
         state = neighborhood_state(adj, n)
         results = [
-            backward_chunk_best(chunk, adj, delta_engine, n, state)
+            backward_chunk_best(chunk, adj, delta_engine, n, state, ranks)
             for chunk in even_chunks(n, n_chunks)
         ]
         best = reduce_best(results)
@@ -499,13 +576,15 @@ def _backward_inprocess(
 # identical bytes into ``local_score_bic`` -- bit-identical to serial under one BLAS thread.
 # The task functions take their targets positionally, so ``StableWorkerSet.dispatch`` drives them
 # directly. A worker always receives the same targets, so it keeps their forward candidates in
-# one :class:`_ForwardScan` across the passes it runs.
+# one :class:`_ForwardScan` across the passes it runs. Background knowledge and the moves to skip
+# travel with each pass.
 
 # Per-worker state installed once by ``_init_worker`` and reused across every task and pass, so the
 # delta engine's pure inv-cov cache persists across passes -- the cross-pass reuse lever.
 _WORKER_DELTA: DeltaBICScore | None = None
 _WORKER_N: int = 0
 _WORKER_TOKEN: object = None
+_WORKER_RANKS: list[int] = []  # each column's tie rank, from the parent
 _WORKER_BLAS: object = (
     None  # a held threadpoolctl controller capping this worker's BLAS to 1 thread
 )
@@ -513,7 +592,12 @@ _WORKER_SCAN: _ForwardScan | None = None  # this worker's forward scan, built on
 
 
 def _init_worker(
-    cov: np.ndarray, n_samples: int, n_vars: int, lambda_value: float, run_token: object
+    cov: np.ndarray,
+    n_samples: int,
+    n_vars: int,
+    lambda_value: float,
+    run_token: object,
+    ranks: list[int],
 ) -> None:
     """Seed a worker with the shared covariance and pin its numeric environment.
 
@@ -521,19 +605,26 @@ def _init_worker(
     oversubscribe, and multi-thread BLAS reduction order is not bit-stable) and builds the PURE
     Schur delta engine over the parent's exact ``cov`` bytes. Its inv-cov cache is a pure function
     of the parent set, so it persists across tasks and passes for free. ``n_samples`` is the
-    observation count the BIC penalty uses; ``n_vars`` is the graph's node count.
+    observation count the BIC penalty uses; ``n_vars`` is the graph's node count; ``ranks`` holds
+    each column's tie rank.
     """
-    global _WORKER_DELTA, _WORKER_N, _WORKER_TOKEN, _WORKER_BLAS
+    global _WORKER_DELTA, _WORKER_N, _WORKER_TOKEN, _WORKER_BLAS, _WORKER_RANKS
     from threadpoolctl import threadpool_limits
 
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
     _WORKER_DELTA = DeltaBICScore(BICScore.from_cov(cov, n_samples, lambda_value=lambda_value))
     _WORKER_N = n_vars
     _WORKER_TOKEN = run_token
+    _WORKER_RANKS = ranks
 
 
 def _forward_task(
-    targets: Sequence[int], adj: np.ndarray, max_parents: float | None, run_token: object
+    targets: Sequence[int],
+    adj: np.ndarray,
+    max_parents: float | None,
+    run_token: object,
+    constraints: Constraints | None = None,
+    excluded: Excluded = None,
 ) -> ForwardResult:
     """Worker side of one forward chunk: refresh the kept candidates, scan, return the best."""
     global _WORKER_SCAN
@@ -542,11 +633,20 @@ def _forward_task(
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     n = _WORKER_N
     if _WORKER_SCAN is None or _WORKER_SCAN.targets != list(targets):
-        _WORKER_SCAN = _ForwardScan(targets, _WORKER_DELTA, n, max_parents)
-    return _WORKER_SCAN.best(adj)
+        forbidden = None if constraints is None else constraints.forbidden
+        _WORKER_SCAN = _ForwardScan(
+            targets, _WORKER_DELTA, n, max_parents, _WORKER_RANKS, forbidden
+        )
+    return _WORKER_SCAN.best(adj, excluded)
 
 
-def _backward_task(targets: Sequence[int], adj: np.ndarray, run_token: object) -> BackwardResult:
+def _backward_task(
+    targets: Sequence[int],
+    adj: np.ndarray,
+    run_token: object,
+    constraints: Constraints | None = None,
+    excluded: Excluded = None,
+) -> BackwardResult:
     """Worker side of one backward chunk."""
     global _WORKER_SCAN
     _WORKER_SCAN = None  # the forward phase has ended
@@ -555,7 +655,16 @@ def _backward_task(targets: Sequence[int], adj: np.ndarray, run_token: object) -
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     n = _WORKER_N
     state = neighborhood_state(adj, n)
-    return backward_chunk_best(targets, adj, _WORKER_DELTA, n, state)
+    return backward_chunk_best(
+        targets,
+        adj,
+        _WORKER_DELTA,
+        n,
+        state,
+        _WORKER_RANKS,
+        constraints=constraints,
+        excluded=excluded,
+    )
 
 
 # ---- the density-aware crossover gate -----------------------------------------------------------
@@ -630,13 +739,14 @@ def _create_pool(
     lambda_value: float,
     run_token: object,
     workers: int,
+    ranks: list[int],
 ) -> par.StableWorkerSet:
     """Build the persistent stable-assignment worker set -- the seam tests spy on (created once)."""
     return par.StableWorkerSet(
         n_vars,
         workers,
         _init_worker,
-        (cov, n_samples, n_vars, lambda_value, run_token),
+        (cov, n_samples, n_vars, lambda_value, run_token, ranks),
         context=_pick_context(),
     )
 
@@ -650,10 +760,11 @@ class _LazyWorkerSet:
     task carries so a worker can reject a mismatched run).
     """
 
-    def __init__(self, score: BICScore, n_vars: int, workers: int) -> None:
+    def __init__(self, score: BICScore, n_vars: int, workers: int, ranks: list[int]) -> None:
         self._score = score
         self._n_vars = n_vars
         self._workers = workers
+        self._ranks = ranks
         self._wset: par.StableWorkerSet | None = None
         self.token: object = None
 
@@ -667,6 +778,7 @@ class _LazyWorkerSet:
                 self._score.lambda_value,
                 self.token,
                 self._workers,
+                self._ranks,
             )
         return self._wset
 
@@ -676,6 +788,26 @@ class _LazyWorkerSet:
             self._wset = None
 
 
+def _admitted(
+    after: np.ndarray,
+    before: np.ndarray,
+    constraints: Constraints,
+    excluded: set[tuple[int, int, tuple[int, ...]]],
+    key: tuple,
+) -> np.ndarray:
+    """``after``, the CPDAG a move with ``key`` reaches from ``before``, when its class holds a DAG
+    that satisfies ``constraints``; otherwise ``before``.
+
+    An accepted move clears ``excluded``; a rejected one joins it, so the next scan of ``before``
+    selects the next best move.
+    """
+    if admits(after, constraints):
+        excluded.clear()
+        return after
+    excluded.add(key[1:])
+    return before
+
+
 def run_ges(
     adj: np.ndarray,
     score: LocalScore,
@@ -683,7 +815,9 @@ def run_ges(
     max_parents: float | None,
     *,
     workers: int,
+    ranks: list[int],
     full_scores: bool = False,
+    constraints: Constraints | None = None,
 ) -> np.ndarray:
     """Both GES phases with per-pass parallelism: a pass fans out only above the fixed work gate.
 
@@ -691,12 +825,17 @@ def run_ges(
     over the whole target range (``workers=1`` never crosses it, so serial always takes it); above
     it the pass fans out to one lazily-created worker set that spans all remaining passes -- each
     worker owns a FIXED contiguous target partition, so its inv-cov cache persists across passes.
-    Either way the reduce keys on ``(stable_key(delta, n), x, y, index)``, so the selected CPDAG is
-    partition-invariant. Returns only the CPDAG; ``ges()`` recomputes the objective from it.
-    ``full_scores`` swaps the in-process PURE Schur engine for the two-full-score reference (the
-    quality gate's ``_full_scores`` arm); pooled workers only ever run Schur on BIC, so the
-    reference arm, like any score other than :class:`~andrey.core.score.BICScore` (BDeu and the
-    mixed-data scores), is held in-process and never fans out.
+    Either way the reduce keys on :func:`move_key`, so the selected CPDAG is partition-invariant;
+    ``ranks`` holds each column's :func:`~andrey.search.hc.tie_ranks`. Returns only the CPDAG;
+    ``ges()`` recomputes the objective from it. ``full_scores`` swaps the in-process PURE Schur
+    engine for the two-full-score reference (the quality gate's ``_full_scores`` arm); pooled
+    workers only ever run Schur on BIC, so the reference arm, like any score other than
+    :class:`~andrey.core.score.BICScore` (BDeu and the mixed-data scores), is held in-process and
+    never fans out.
+
+    ``constraints`` filters the candidates (:func:`forward_chunk_best`, :func:`backward_chunk_best`)
+    and rejects a selected move whose class holds no DAG that satisfies them; the pass then runs
+    again on the same graph without that move. Serial and pooled passes see the same rejections.
     """
     global largest_pass_work
     workers = max(1, min(workers, n))
@@ -705,15 +844,19 @@ def run_ges(
     lazy: _LazyWorkerSet | None
     if isinstance(score, BICScore) and not full_scores:
         engine = DeltaBICScore(score)
-        lazy = _LazyWorkerSet(score, n, workers)
+        lazy = _LazyWorkerSet(score, n, workers, ranks)
     else:
         engine = FullScoreDelta(score)
         lazy = None
     largest = 0
     # Warn once a pass comes near the default cutoff (only a pass that can fan out).
     warn = workers > 1 and lazy is not None and calibrate.cutoff_is_default("ges")
-    scan = _ForwardScan(range(n), engine, n, max_parents)
+    forbidden = None if constraints is None else constraints.forbidden
+    scan = _ForwardScan(range(n), engine, n, max_parents, ranks, forbidden)
     kept: dict[tuple[int, tuple[int, ...], int], float] = {}  # the in-process backward deltas
+    excluded: set[tuple[int, int, tuple[int, ...]]] = (
+        set()
+    )  # the moves rejected on the current graph
     try:
         while True:  # forward phase
             work = [0]
@@ -734,14 +877,24 @@ def run_ges(
                 # Each worker scans its own fixed target partition (stable assignment); reduce keys
                 # on the global order, so this is bit-identical to the whole-range serial scan.
                 wset = lazy.get()
-                best = reduce_best(wset.dispatch(_forward_task, adj, max_parents, lazy.token))
+                best = reduce_best(
+                    wset.dispatch(
+                        _forward_task, adj, max_parents, lazy.token, constraints, excluded
+                    )
+                )
             else:
-                best = scan.best(adj)
+                best = scan.best(adj, excluded)
             if best is None:
                 break
-            _key, x, y, T = best
-            ops.apply_insert(adj, x, y, T)
-            adj = _reform_cpdag(adj)
+            key, x, y, T = best
+            if constraints is None:
+                ops.apply_insert(adj, x, y, T)
+                adj = _reform_cpdag(adj)
+            else:
+                moved = adj.copy()
+                ops.apply_insert(moved, x, y, T)
+                adj = _admitted(_reform_cpdag(moved), adj, constraints, excluded, key)
+        excluded.clear()  # forward and backward moves share the key shape
         while True:  # backward phase
             state = neighborhood_state(adj, n)
             work = backward_work_per_target(n, state) if workers > 1 else [0]
@@ -751,14 +904,23 @@ def run_ges(
                 warn = False
             if lazy is not None and workers > 1 and sum(work) > w_min:  # full scores stay serial
                 wset = lazy.get()
-                best = reduce_best(wset.dispatch(_backward_task, adj, lazy.token))
+                best = reduce_best(
+                    wset.dispatch(_backward_task, adj, lazy.token, constraints, excluded)
+                )
             else:
-                best = backward_chunk_best(range(n), adj, engine, n, state, kept)
+                best = backward_chunk_best(
+                    range(n), adj, engine, n, state, ranks, kept, constraints, excluded
+                )
             if best is None:
                 break
-            _key, x, y, H = best
-            ops.apply_delete(adj, x, y, H)
-            adj = _reform_cpdag(adj)
+            key, x, y, H = best
+            if constraints is None:
+                ops.apply_delete(adj, x, y, H)
+                adj = _reform_cpdag(adj)
+            else:
+                moved = adj.copy()
+                ops.apply_delete(moved, x, y, H)
+                adj = _admitted(_reform_cpdag(moved), adj, constraints, excluded, key)
     finally:
         if lazy is not None:
             lazy.close()

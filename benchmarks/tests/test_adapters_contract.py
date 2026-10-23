@@ -48,8 +48,6 @@ from andrey_bench.adapters.causal_learn_ges import CausalLearnGES
 from andrey_bench.adapters.causal_learn_grasp import CausalLearnGRaSP
 from andrey_bench.adapters.causal_learn_ica_lingam import CausalLearnICALiNGAM
 from andrey_bench.adapters.causal_learn_pc import CausalLearnPC
-from andrey_bench.adapters.gcastle_ges import GCastleGES
-from andrey_bench.adapters.gcastle_pc import GCastlePC
 from andrey_bench.adapters.lingam_direct import LingamDirect
 from andrey_bench.adapters.pcalg_fci import PcalgFCI
 from andrey_bench.adapters.pcalg_ges import PcalgGES
@@ -57,6 +55,7 @@ from andrey_bench.adapters.pcalg_gies import PcalgGIES
 from andrey_bench.adapters.pcalg_pc import PcalgPC
 from andrey_bench.adapters.pcalg_rfci import PcalgRFCI
 from andrey_bench.adapters.tetrad_gfci import TetradGFCI
+from andrey_bench.adapters.tigramite_pc import TigramitePC
 from andrey_bench.contracts import SolutionAdapter
 from andrey_bench.oracle import OracleGES
 
@@ -65,6 +64,7 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     *andrey_hc_adapters(),
     *andrey_tabu_adapters(),
     AndreyPC(),
+    *[AndreyPC(test) for test in ("kci", "rcot", "cmiknn", "gpdc")],
     AndreyFCI(),
     AndreyFCI("majority"),
     AndreyGFCI(),
@@ -81,6 +81,8 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     AndreyExactSearch(),
     CausalLearnGES(),
     CausalLearnPC(),
+    CausalLearnPC("kci"),
+    CausalLearnPC("rcot"),
     CausalLearnFCI(),
     CausalLearnCALM(),
     CausalLearnBOSS(),
@@ -88,8 +90,6 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     CausalLearnDirectLiNGAM(),
     CausalLearnICALiNGAM(),
     CausalLearnExactSearch(),
-    GCastleGES(),
-    GCastlePC(),
     LingamDirect(),
     PcalgGES(),
     PcalgGIES(),
@@ -100,6 +100,8 @@ ALL_ADAPTERS: list[SolutionAdapter] = [
     BnlearnHC(),
     BnlearnTabu(),
     BnlearnPCStable(),
+    TigramitePC("cmiknn"),
+    TigramitePC("gpdc"),
     OracleGES(),
     BaselineEmpty(),
 ]
@@ -149,6 +151,10 @@ DEFERRED_MODULES = {
     "andrey.hc.numpy.serial": "andrey.search.hc",
     "andrey.tabu.numpy.serial": "andrey.search.tabu",
     "andrey.pc.numpy": "andrey.constraint.pc",
+    "andrey.pc.kci.numpy": "andrey.core.ci_kernel",
+    "andrey.pc.rcot.numpy": "andrey.core.ci_kernel",
+    "andrey.pc.cmiknn.numpy": "andrey.core.ci_cmiknn",
+    "andrey.pc.gpdc.numpy": "andrey.core.ci_gpdc",
     "andrey.fci.numpy": "andrey.constraint.fci",
     "andrey.fci.majority.numpy": "andrey.constraint.fci",
     "andrey.gfci.numpy": "andrey.search.gfci",
@@ -170,6 +176,16 @@ DEFERRED_MODULES = {
 }
 
 
+#: The module each comparator package imports as. Its fit cases skip where it is not installed.
+COMPARATOR_MODULES = {"causal-learn": "causallearn", "lingam": "lingam"}
+
+
+def _skip_without_package(adapter: SolutionAdapter) -> None:
+    module = COMPARATOR_MODULES.get(adapter.package)
+    if module is not None:
+        pytest.importorskip(module, reason=f"{adapter.package} is not installed")
+
+
 @pytest.mark.parametrize(
     "adapter",
     [a for a in ALL_ADAPTERS if a.package == "andrey" or a.name in DEFERRED_MODULES],
@@ -178,6 +194,7 @@ DEFERRED_MODULES = {
 def test_setup_imports_the_module_fit_defers(adapter: SolutionAdapter) -> None:
     import sys
 
+    _skip_without_package(adapter)
     module = DEFERRED_MODULES[adapter.name]
     sys.modules.pop(module, None)
     adapter.setup()
@@ -195,11 +212,6 @@ def test_a_parallel_adapter_runs_the_workers_the_runner_pinned(monkeypatch, pinn
 
     monkeypatch.setenv("ANDREY_NUM_WORKERS", pinned)
     assert andrey_ges._parallel_workers() == workers
-
-
-def test_gcastle_ges_declares_only_the_params_it_honors() -> None:
-    """gCastle GES has no penalty or max-parents setting, so its params carry neither."""
-    assert set(GCastleGES().params()) == {"criterion", "method"}
 
 
 def test_the_cuda_directlingam_variant_pins_andrey_to_cuda() -> None:
@@ -225,10 +237,8 @@ FIT_CASES = [
     *[_case(a, "linear_gauss_er", "cpdag", _MARKS) for a in andrey_ges_adapters()],
     *[_case(a, "linear_gauss_er", "cpdag", _MARKS) for a in andrey_tabu_adapters()],
     _case(CausalLearnGES(), "linear_gauss_er", "cpdag", _ADJACENCY),
-    _case(GCastleGES(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(AndreyPC(), "linear_gauss_er", "cpdag", _MARKS),
     _case(CausalLearnPC(), "linear_gauss_er", "cpdag", _ADJACENCY),
-    _case(GCastlePC(), "linear_gauss_er", "cpdag", _ADJACENCY),
     _case(AndreyBOSS(), "linear_gauss_er", "cpdag", _MARKS),
     _case(AndreyGRaSP(), "linear_gauss_er", "cpdag", _MARKS),
     _case(CausalLearnBOSS(), "linear_gauss_er", "cpdag", _ADJACENCY),
@@ -257,6 +267,7 @@ def test_a_fit_converts_to_a_valid_graph(
 ) -> None:
     import andrey.data as data
 
+    _skip_without_package(adapter)
     x = np.asarray(data.benchmarks.scm(scm, 6).sample(n=200, seed=0).data, dtype=np.float64)
     d = x.shape[1]
     adapter.setup()

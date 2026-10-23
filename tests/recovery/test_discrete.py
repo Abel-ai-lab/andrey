@@ -3,7 +3,9 @@
 The fixed cases have one answer: ``discrete_5v`` is the network ``x0 -> x2 <- x1``, ``x2 -> x3 ->
 x4``, whose CPDAG has every edge oriented, and ``discrete_independent_4v`` has no edges. The
 ground-truth case is a random network from :func:`andrey.data.sample_discrete`, scored against its
-CPDAG with a margin. Edges are named by variable and mapped to the case's columns.
+CPDAG with a margin, and the permutation searches are checked against exact search's optimum on
+draws where that optimum's class is unique. Edges are named by variable and mapped to the case's
+columns.
 """
 
 from __future__ import annotations
@@ -36,6 +38,10 @@ CPDAG_FITS = {
     "hc-bic": lambda x: andrey.hc(x, score_func="local_score_BIC_categorical"),
     "tabu-bdeu": lambda x: andrey.tabu(x, score_func="local_score_BDeu"),
     "tabu-bic": lambda x: andrey.tabu(x, score_func="local_score_BIC_categorical"),
+    "boss-bdeu": lambda x: andrey.boss(x, score_func="local_score_BDeu"),
+    "grasp-bdeu": lambda x: andrey.grasp(x, score_func="local_score_BDeu"),
+    "boss-bic": lambda x: andrey.boss(x, score_func="local_score_BIC_categorical"),
+    "grasp-bic": lambda x: andrey.grasp(x, score_func="local_score_BIC_categorical"),
     "cdnod-chisq": lambda x: andrey.cdnod(x, np.zeros(len(x)), indep_test="chisq"),
 }
 PAG_FITS = {
@@ -108,7 +114,7 @@ def test_a_dataframe_names_the_nodes():
 
 
 @pytest.mark.parametrize("d", [1, 2])
-@pytest.mark.parametrize("fit", ["ges", "hc"])
+@pytest.mark.parametrize("fit", ["ges", "hc", "boss", "grasp"])
 def test_bdeu_fits_one_or_two_columns(fit, d):
     """With two or fewer variables the structure prior is left out, so the score stays finite."""
     x = datagen.generate(CASE)[:, COLUMN[[2, 3][:d]]]  # x2, and x3 with its parent x2
@@ -132,9 +138,10 @@ def test_cdnod_chisq_finds_a_shift_in_one_domain_of_three():
     assert andrey.cdnod(x, domain).structure.oriented_edges() == [(0, 1, "undirected")]
 
 
-# A random network: 10 variables, 10 edges, 5000 rows. On this draw every method finds the true
-# CPDAG (SHD 0); the margin allows for a change in tie-breaking without hiding a broken build,
-# which scores near the empty graph's 10.
+# A random network: 10 variables, 10 edges, 5000 rows. On this draw every method listed finds the
+# true CPDAG (SHD 0); the margin allows for a change in tie-breaking without hiding a broken build,
+# which scores near the empty graph's 10. GRaSP with BDeu stops at a worse-scoring DAG on this draw,
+# so it is checked against exact search instead.
 _RANDOM = {"d": 10, "n": 5000, "seed": 5}
 _MARGIN = 2
 
@@ -144,7 +151,9 @@ def random_network():
     return sample_discrete(**_RANDOM)
 
 
-@pytest.mark.parametrize("fit", ["pc-chisq", "pc-gsq", "ges-bdeu", "ges-bic"])
+@pytest.mark.parametrize(
+    "fit", ["pc-chisq", "pc-gsq", "ges-bdeu", "ges-bic", "boss-bdeu", "boss-bic", "grasp-bic"]
+)
 def test_a_random_network_is_recovered_within_the_margin(random_network, fit):
     truth = to_cpdag(random_network.graph)
     assert shd(np.zeros((_RANDOM["d"],) * 2), truth) == 10
@@ -189,3 +198,28 @@ def test_the_searches_order_by_score_on_one_categorical_score(score_func):
 def test_tabu_takes_no_mixed_data_score():
     with pytest.raises(NotImplementedError, match="tabu supports"):
         andrey.tabu(datagen.generate("discrete_5v"), score_func="local_score_cond_gauss")
+
+
+# Draws of sample_discrete, as (d, n, seed), whose optimal class is unique under BDeu and under the
+# multinomial BIC: the next-best class scores far above the search tolerance. Hill climbing stops
+# above the optimum on each.
+_UNIQUE_OPTIMA = [(6, 5000, 2), (7, 2000, 1), (8, 5000, 2)]
+_SCORES = {"bdeu": "local_score_BDeu", "bic": "local_score_BIC_categorical"}
+
+
+@pytest.mark.parametrize("fit", ["boss-bdeu", "grasp-bdeu", "boss-bic", "grasp-bic"])
+@pytest.mark.parametrize("draw", _UNIQUE_OPTIMA)
+def test_the_permutation_searches_find_the_exact_optimum(fit, draw):
+    """BOSS and GRaSP return the class of exact search's DAG, at its score."""
+    d, n, seed = draw
+    score_func = _SCORES[fit.split("-")[1]]
+    data = sample_discrete(d=d, n=n, seed=seed).data
+    score = make_score(score_func, data)
+    exact = andrey.exact_search(data, score_func=score_func).structure
+    optimum = sum(
+        score.score(v, np.flatnonzero(exact.to_numpy()[:, v] == TAIL).tolist()) for v in range(d)
+    )
+    out = CPDAG_FITS[fit](data)
+    np.testing.assert_array_equal(out.structure.to_numpy(), to_cpdag(exact).to_numpy())
+    assert out.metadata["score"] == pytest.approx(optimum, abs=1e-6)
+    assert andrey.hc(data, score_func=score_func).metadata["score"] > optimum + 1.0

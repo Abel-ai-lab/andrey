@@ -21,6 +21,7 @@ from statsmodels.tsa.statespace.varmax import VARMAX, VARMAXResultsWrapper
 
 from andrey.lingam.adjacency import estimate, predict_adaptive_lasso
 from andrey.lingam.direct import direct_lingam
+from andrey.search.hc import tie_ranks
 
 _CRITERIA = ("aic", "bic", "hqic")
 
@@ -53,8 +54,16 @@ def varma_lingam(
     the paper-exact moving-average transform ``(I - B0) Theta_j (I - B0)^-1``, which recovers the
     true structural MA influence on the independent innovations; the default
     ``structural_ma=False`` uses ``(I - B0) Theta_j``.
+
+    The fit runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, so reordering the
+    columns of ``X`` relabels the result and changes nothing else, unless two columns are identical.
+    The likelihood fit, which can stop before it converges, then starts from and stops at the same
+    point for every column order.
     """
     X = np.asarray(X, dtype=np.float64)
+    by_rank = np.argsort(tie_ranks(X))  # the fit's column k is the data's column by_rank[k]
+    back = np.argsort(by_rank)
+    X = np.ascontiguousarray(X[:, by_rank])
 
     if criterion is None:
         p, q = int(order[0]), int(order[1])
@@ -69,7 +78,8 @@ def varma_lingam(
     else:
         psis, omegas = _structural_matrices(b0, phis, thetas, p, q, structural_ma)
 
-    return causal_order, psis, omegas
+    causal_order = [int(by_rank[i]) for i in causal_order]
+    return causal_order, psis[:, back][:, :, back], omegas[:, back][:, :, back]
 
 
 def _fit_varma(

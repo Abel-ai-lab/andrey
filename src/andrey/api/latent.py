@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from andrey.api._adapt import column_labels, data_matrix, open_unit_interval
+from andrey.core.structure import node_labels
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -38,29 +39,30 @@ def gin(
         forms a cluster, and a latent is the next in the order, when the test's p-value is at
         least ``alpha``, so larger values make each test harder to pass.
     labels : tuple of str or None, default=None
-        Optional names for the observed variables, one per column. Defaults to a DataFrame's
-        column names, else ``X1..Xn``. Latents are auto-named ``L1..Lm``.
+        Optional names for the observed variables, one per column, each taken as text,
+        ``str(label)``. Defaults to a DataFrame's column names, else ``X1..Xn``. Latents are
+        named ``L1``, ``L2``, and so on, skipping a name an observed variable has.
 
     Returns
     -------
     StructureOutput
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure` over the observed variables (indices
-        ``0`` to ``n_variables - 1``) and one latent per cluster, named ``L1`` to ``Lm``: the
-        ordered latents first, in causal order, then the unordered ones; ``structure.node_types``
-        flags the latents. Each latent points to the observed variables in its cluster. An ordered
-        latent also points to every later latent and to every unordered one, and unordered latents
-        have no edge between them: edges between latents follow the order only and do not mean a
-        direct effect was found. An observed variable in no cluster has no edges.
-        ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]`` lists the clusters as
-        lists of column indices, by smallest member, ``metadata["causal_order"]`` lists the ordered
-        ones earliest latent first, ``metadata["unordered"]`` lists the rest by smallest member,
-        and ``metadata["n_latents"]`` is the latent count.
+        ``0`` to ``n_variables - 1``) and one latent per cluster, named ``L1``, ``L2``, and so on:
+        the ordered latents first, in causal order, then the unordered ones;
+        ``structure.node_types`` flags the latents. Each latent points to the observed variables in
+        its cluster. An ordered latent also points to every later latent and to every unordered one,
+        and unordered latents have no edge between them: edges between latents follow the order only
+        and do not mean a direct effect was found. An observed variable in no cluster has no edges.
+        ``metadata["algorithm"]`` is ``"GIN"``, ``metadata["clusters"]`` lists the clusters as lists
+        of column indices, by smallest member, ``metadata["causal_order"]`` lists the ordered ones
+        earliest latent first, ``metadata["unordered"]`` lists the rest by smallest member, and
+        ``metadata["n_latents"]`` is the latent count.
 
     Raises
     ------
     ValueError
         If ``alpha`` is not in ``(0, 1)``, or if ``labels`` does not give one name per column of
-        ``data``.
+        ``data`` or gives two that are equal as text.
 
     Notes
     -----
@@ -82,10 +84,11 @@ def gin(
 
     **Column order.** Each column gets a tie rank computed from its own data, as for
     :func:`~andrey.hc`, and the search runs on the columns sorted by it: the order of the groups it
-    tests, the member each run of a root test takes, and the choice between root candidates with
-    equal p-values follow the rank. Reordering the columns therefore relabels the clusters and
-    changes nothing else, unless two columns are identical. The rank is arbitrary with respect to
-    causal structure.
+    tests, the member each run of a root test takes, and the choice between root candidates whose
+    lowest p-values agree to nine decimals follow the rank. Reordering the columns therefore
+    relabels the clusters and changes nothing else, unless two columns are identical. The rank is
+    arbitrary with respect to causal structure. The
+    :doc:`column-order guide </docs/guides/column-order>` says what reordering the columns keeps.
 
     **Limitations.** Measured on simulated linear measurement models with uniform noise and 1,000
     rows: 2 to 4 latents, each a cause of every later one and measured by three indicators of its
@@ -133,5 +136,5 @@ def gin(
         raise ValueError(
             f"labels must name each of the {X.shape[1]} columns of data, got {len(labels)} names"
         )
-    names = labels if labels is not None else column_labels(data)
+    names = node_labels(labels) if labels is not None else column_labels(data)
     return gin_structure(X, alpha=alpha, labels=names)

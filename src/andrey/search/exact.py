@@ -12,8 +12,9 @@ mixed-data scores :class:`~andrey.core.score.DGScore` and :class:`~andrey.core.s
 BIC with ``lambda_value=1``. Both searches, A* (``"astar"``) and the subset-lattice dynamic
 program (``"dp"``), run over the order graph, whose nodes are variable subsets: the shortest
 path from the empty set to the full set gives each variable its best parent set among the
-variables before it. The result is the optimal DAG itself, not its CPDAG, and each
-search breaks score ties deterministically.
+variables before it. Every DAG of the optimal DAG's Markov equivalence class has the same score, so
+the search's choice among them follows rounding and column order; :func:`_canonical_member`
+replaces it by one member fixed by the CPDAG and :func:`~andrey.search.hc.tie_ranks`.
 """
 
 from __future__ import annotations
@@ -26,8 +27,18 @@ from collections.abc import Sequence
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure
-from andrey.core.orient import to_structure
-from andrey.core.score import ZERO_RESIDUAL, Score, check_columns, make_score
+from andrey.core.knowledge import Constraints, mpdag
+from andrey.core.mixed import column_mask
+from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
+from andrey.core.score import (
+    DISCRETE_SCORES,
+    MIXED_SCORES,
+    ZERO_RESIDUAL,
+    Score,
+    check_columns,
+    make_score,
+)
+from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`exact_search` accepts.
 EXACT_SCORES: tuple[str, ...] = (
@@ -57,8 +68,9 @@ def _best_subset(
     """Lowest-score parent set whose members all lie within ``target_bits``.
 
     ``parent_graph`` is sorted by ascending score, so the first entry that is a subset of the
-    available variables is the optimal parent choice among them. The empty set is always present and
-    is a subset of everything, so a match always exists.
+    available variables is the optimal parent choice among them. Without required parents the empty
+    set is present and is a subset of everything, so a match always exists; with them, a target that
+    lacks one has no match and gives ``((), inf)``.
     """
     for parents, score, bits in parent_graph:
         if bits & target_bits == bits:
@@ -109,13 +121,20 @@ def _solve_normal_equations(a: np.ndarray, b: np.ndarray) -> np.ndarray:
         return np.linalg.pinv(a) @ b
 
 
-def _generate_parent_graph(score: Score, node: int, n_vars: int) -> list[_ParentEntry]:
+def _generate_parent_graph(
+    score: Score, node: int, n_vars: int, constraints: Constraints | None = None
+) -> list[_ParentEntry]:
     """Build a variable's parent graph: the maximal-candidate parent sets, sorted by score.
 
     Enumerates candidate parent sets by increasing size and keeps only *maximal candidates* -- a set
     is dropped when a subset scores at least as low, since it can then never be the optimal choice
     for any available-variable set. The retained entries stay sorted by ascending score so
     :func:`_best_subset` returns the optimum in one forward scan.
+
+    With ``constraints``, every set holds the node's required parents and adds parents that are
+    neither forbidden nor required, and a set is compared only with its subsets that still hold
+    the required parents. :func:`_best_subset` then finds no set until the required parents are
+    available, and its ``inf`` score keeps the order searches off that path.
     """
     parent_graph: list[_ParentEntry] = []
     scores: list[float] = []
@@ -125,14 +144,21 @@ def _generate_parent_graph(score: Score, node: int, n_vars: int) -> list[_Parent
         parent_graph.insert(index, (parents, value, bits))
         scores.insert(index, value)
 
-    insert((), score.score(node, ()), 0)
-    candidates = [c for c in range(n_vars) if c != node]
+    if constraints is None:
+        required: tuple[int, ...] = ()
+        candidates = [c for c in range(n_vars) if c != node]
+    else:
+        required = tuple(np.flatnonzero(constraints.required[:, node]).tolist())
+        legal = ~constraints.forbidden[:, node] & ~constraints.required[:, node]
+        candidates = [c for c in np.flatnonzero(legal).tolist() if c != node]
+    insert(required, score.score(node, required), _structure_bits(required))
     for size in range(1, len(candidates) + 1):
-        for combo in itertools.combinations(candidates, size):
+        for extra in itertools.combinations(candidates, size):
+            combo = tuple(sorted(required + extra)) if required else extra
             bits = _structure_bits(combo)
             value = score.score(node, list(combo))
             maximal = True
-            for v in combo:
+            for v in extra:  # dropping a required parent leaves no legal subset
                 _, sub_value = _best_subset(parent_graph, bits & ~(1 << v))
                 if sub_value < value:  # a subset already scores lower -- combo is dominated
                     maximal = False
@@ -228,21 +254,49 @@ def _dp_shortest_path(
     return tuple(structures)
 
 
+def _canonical_member(
+    dag: np.ndarray, ranks: np.ndarray, constraints: Constraints | None = None
+) -> np.ndarray:
+    """The DAG of ``dag``'s Markov equivalence class fixed by its CPDAG and ``ranks``.
+
+    Numbers the nodes by ascending rank and takes :func:`~andrey.core.orient.pdag2dag` of the
+    CPDAG, which keeps the compelled edges and orients the reversible ones into the lowest-numbered
+    node that can take them. Every DAG of one class gives the same member, and relabeling the
+    columns relabels it, when the ranks move with the columns. With ``constraints``, which ``dag``
+    satisfies, the CPDAG is first narrowed by them (:func:`~andrey.core.knowledge.mpdag`), so the
+    member satisfies them too.
+    """
+    cpdag = dag2cpdag(dag)
+    if constraints is not None:
+        cpdag = mpdag(cpdag, constraints)
+    order = np.argsort(ranks)
+    member = np.empty_like(dag)
+    member[np.ix_(order, order)] = pdag2dag(cpdag[np.ix_(order, order)])
+    return member
+
+
 def exact_search(
     data: np.ndarray,
     *,
     search_method: str = "astar",
     score_func: str = "local_score_BIC",
     categorical: np.ndarray | None = None,
+    constraints: Constraints | None = None,
 ) -> GraphStructure:
     """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
     Scores candidates with ``score_func``; the default, the linear-Gaussian BIC (``lambda=1``), on
     mean-centered data.
     Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
-    ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score but may return
-    different score-tied representatives of the same Markov equivalence class. Exponential in the
+    ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score. Exponential in the
     number of variables, so intended for small problems.
+
+    Every DAG of the optimal Markov equivalence class scores the same, so the result is the member
+    :func:`_canonical_member` fixes: the class's reversible edges that ``constraints`` leave open
+    are oriented by the order of :func:`~andrey.search.hc.tie_ranks`, ranks computed from each
+    column's own data. Both searches
+    return this member, it does not depend on last-bit rounding, and reordering the columns
+    relabels it.
 
     Parameters
     ----------
@@ -255,11 +309,14 @@ def exact_search(
         a mixed-data BIC.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
+    constraints : Constraints or None
+        Background knowledge: each variable's parent sets hold its required parents and no
+        forbidden one, so the DAG is the score-optimal one among those that satisfy the knowledge.
 
     Returns
     -------
     GraphStructure
-        The score-optimal DAG, edge ``i -> j`` when ``i`` is an optimal parent of ``j``.
+        The score-optimal DAG, edge ``i -> j`` when ``i`` is a parent of ``j``.
     """
     X = np.asarray(data, dtype=np.float64)
     if search_method not in ("astar", "dp"):
@@ -277,7 +334,7 @@ def exact_search(
         if score_func == "local_score_BIC"
         else make_score(score_func, X, categorical=categorical)
     )
-    parent_graphs = [_generate_parent_graph(score, i, n_vars) for i in range(n_vars)]
+    parent_graphs = [_generate_parent_graph(score, i, n_vars, constraints) for i in range(n_vars)]
 
     if search_method == "astar":
         structures = _astar_shortest_path(parent_graphs, n_vars)
@@ -289,4 +346,7 @@ def exact_search(
         for parent in parents:
             adj[parent, child] = TAIL  # tail at the parent
             adj[child, parent] = ARROW  # arrowhead at the child
-    return to_structure(adj, kind="dag")
+    mask = np.full(n_vars, score_func in DISCRETE_SCORES)
+    if score_func in MIXED_SCORES:
+        mask = column_mask(categorical, n_vars)
+    return to_structure(_canonical_member(adj, tie_ranks(X, mask), constraints), kind="dag")

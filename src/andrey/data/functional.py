@@ -2,8 +2,9 @@
 
 A functional spec draws per-edge parameters and then evaluates the SCM in topological order over the
 sparse edge list -- no dense adjacency. ``linear`` is the causally-sufficient default;
-``additive_noise`` (ANM) and ``post_nonlinear`` (PNL) are the nonlinear identifiable families. All
-three share one topological-evaluation loop and differ only in the per-node combine rule.
+``additive_noise`` (ANM) and ``post_nonlinear`` (PNL) are the nonlinear identifiable families, and
+``nonmonotone`` an additive-noise family whose effects partial correlation does not see. All four
+share one topological-evaluation loop and differ only in the per-node combine rule.
 """
 
 from __future__ import annotations
@@ -107,6 +108,22 @@ class PostNonlinear(Functional):
 
 
 @dataclass(frozen=True, kw_only=True)
+class NonMonotone(Functional):
+    """Non-monotone additive-noise model ``X_c = sum_p w_{p,c} cos(X_p) + noise_c``.
+
+    ``cos`` is even, so a child is uncorrelated with a parent whose distribution is symmetric about
+    zero though it depends on it: partial correlation misses the edge where a nonlinear
+    conditional-independence test finds it. ``cos`` is bounded, so no variance accumulates down
+    the causal order.
+    """
+
+    name: str = "nonmonotone"
+
+    def _node(self, parent_values, weights, noise_c):
+        return noise_c + np.cos(parent_values) @ weights
+
+
+@dataclass(frozen=True, kw_only=True)
 class VAR(Functional):
     """Vector-autoregressive temporal model: instantaneous DAG mixing ``B0`` plus lag matrices.
 
@@ -178,6 +195,11 @@ def post_nonlinear(weight_range: tuple[float, float] = (0.5, 2.0)) -> PostNonlin
     An invertible nonlinearity of a linear combination plus noise.
     """
     return PostNonlinear(weight_range=weight_range)
+
+
+def nonmonotone(weight_range: tuple[float, float] = (0.5, 2.0)) -> NonMonotone:
+    """Non-monotone additive-noise structural equations (see :class:`NonMonotone`)."""
+    return NonMonotone(weight_range=weight_range)
 
 
 def var(n_lags: int = 1, lag_density: float = 0.3) -> VAR:

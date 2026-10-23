@@ -1,0 +1,29 @@
+{
+  "algorithm": "CMIknn",
+  "case": "nonmonotone_4v",
+  "input": {
+    "case": "nonmonotone_4v",
+    "column_order": [
+      2,
+      3,
+      0,
+      1
+    ],
+    "seed": 20261014,
+    "sha256": "1242fad5f9dc6bf9ab2ce6d9b0ce40603bde039838d85e873e9d052e7878b9ee",
+    "shape": [
+      400,
+      4
+    ]
+  },
+  "output": {
+    "pvalues": [
+      0.693069306930693,
+      0.009900990099009901,
+      0.009900990099009901,
+      0.9207920792079208,
+      0.009900990099009901
+    ]
+  },
+  "schema_version": 3
+}

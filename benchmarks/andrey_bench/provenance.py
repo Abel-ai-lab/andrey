@@ -23,6 +23,15 @@ _BENCH_ROOT = Path(__file__).resolve().parents[1]
 _BENCH_VENV = _BENCH_ROOT / ".venv-bench"
 
 
+def shared_venv() -> Path:
+    """Return the venv shared fits run in: ``$ANDREY_BENCH_PYTHON``'s, else the in-tree bench-env.
+
+    Not ``resolve()``: a venv's ``bin/python`` is a symlink to the base interpreter.
+    """
+    raw = os.environ.get("ANDREY_BENCH_PYTHON", "").strip()
+    return Path(raw).absolute().parent.parent if raw else _BENCH_VENV
+
+
 def _run(cmd: list[str], *, cwd: Path | None = None, timeout: int = 60) -> tuple[int, str, str]:
     """Return ``(returncode, stdout, stderr)`` without raising; a missing binary returns 127."""
     try:
@@ -187,7 +196,7 @@ def capture(
     extra_venvs
         Additional fit environments as ``{label: venv_directory}``. Each is frozen and BLAS-probed
         under ``environments[label]``; top-level ``versions`` and ``blas`` describe the shared
-        environment. Pass the environment directory, not its ``bin/python``.
+        environment, :func:`shared_venv`. Pass the environment directory, not its ``bin/python``.
 
     Returns
     -------
@@ -200,8 +209,8 @@ def capture(
 
     prov = {
         "timestamp": timestamp,
-        "versions": _freeze(_BENCH_VENV),
-        "blas": _blas_identity(_BENCH_VENV),
+        "versions": _freeze(shared_venv()),
+        "blas": _blas_identity(shared_venv()),
         "cpu": _cpu_identity(),
         "gpu": _gpu_identity(),
         "git_sha": _git_sha(_BENCH_ROOT),

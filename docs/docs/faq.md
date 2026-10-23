@@ -57,7 +57,7 @@ Andrey in its first cell.
 ### Which methods are there?
 
 {{ n_supported }} are supported: {{ supported_methods }}. The
-[API reference](code/index.md#structure-learning-methods) lists them all, and `andrey list` prints
+[API reference](api.md#structure-learning-methods) lists them all, and `andrey list` prints
 them with their status.
 
 ### What is the difference between supported and experimental?
@@ -77,10 +77,9 @@ relationships are linear and the noise is not Gaussian; it returns a DAG with ed
 
 Not always. In the release cards, which use sparse simulated graphs with ten samples per variable,
 FCI at 800 variables returns graphs with no fewer errors than the empty graph in both Andrey and
-causal-learn, so there the limit is the algorithm's, not the software's. PC's graphs in gCastle are
-worse than the empty graph at 200 and 400 variables, while PC in Andrey and causal-learn stays below
-it. The 0.1.0 release card's [large graphs](benchmarks/0.1.0.md#large-graphs) section lists every
-case, including Andrey's GES at 200 variables with the default penalty.
+causal-learn, so there the limit is the algorithm's, not the software's. The 0.1.0 release card's
+[large graphs](benchmarks/0.1.0.md#large-graphs) section lists every case, including Andrey's GES
+at 200 variables with the default penalty.
 
 ### Why does a result differ from another package's?
 
@@ -90,12 +89,14 @@ compare accuracy there rather than edge by edge.
 
 ## Speed and hardware
 
-### How does it compare with other packages?
+### Is it the fastest causal discovery package?
 
-The [release cards](benchmarks.md) show Andrey side by side with causal-learn, gCastle, and lingam
-on the same data and machines: fit time, error counts, and where Andrey is not faster. The
-[homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and
-speed support.
+Andrey is built to be: it batches its work into array operations, runs on every CPU core, and
+runs on a GPU, though support varies by method and configuration. You can use the
+[release cards](benchmarks.md) to compare Andrey with causal-learn, lingam, and other packages on
+the same data and machines: fit time, error counts, and where Andrey is not faster. The
+[homepage](https://andrey.abel.ai/#compare) compares their interfaces, method families, and speed
+support.
 
 ### Why is it faster?
 
@@ -140,14 +141,17 @@ row names the nodes) or a `.npy` file.
 
 Discrete data, yes: code each category as a whole number, or pass a DataFrame whose columns hold
 text, booleans, or a pandas `category`. PC, FCI, GFCI, and CDNOD test independence on categorical
-data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, and exact
-search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`. Mixed data,
-with continuous and categorical columns, is experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing,
-BOSS, GRaSP, and exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
-`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`. They infer which columns are
-categorical unless you name them with `categorical`, and warn about what they inferred. We have not
-benchmarked them yet. [Data types](guides/getting-started.md#data-types) explains the settings, the
-inference rule, and how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
+data with `indep_test="chisq"` or `"gsq"`, and GES, GFCI, hill climbing, Tabu search, BOSS, GRaSP,
+and exact search score it with `score_func="local_score_BDeu"` or `"local_score_BIC_categorical"`;
+all but GFCI pick BDeu by default when every column is categorical. Mixed data, with continuous and
+categorical columns, is experimental: PC, FCI, GFCI, CDNOD, GES, hill climbing, BOSS, GRaSP, and
+exact search take `indep_test="degen_gauss"` or `"cond_gauss"` and
+`score_func="local_score_degen_gauss"` or `"local_score_cond_gauss"`; GES, hill climbing, BOSS,
+GRaSP, and exact search pick `"local_score_cond_gauss"` by default when some columns are
+categorical. They infer which columns are categorical unless you name them with `categorical`, and
+warn about what they inferred. We have not benchmarked them yet.
+[Data types](guides/getting-started.md#data-types) explains the settings, the inference rule, and
+how to turn it off. The LiNGAM methods assume continuous non-Gaussian noise.
 
 ### Time series and several datasets?
 
@@ -166,7 +170,7 @@ andrey run pc --help               # its inputs and parameters
 andrey run pc --data your_data.csv alpha=0.01
 ```
 
-The [command-line reference](code/index.md#command-line-interface) has every command and flag.
+The [command-line reference](api.md#command-line-interface) has every command and flag.
 
 ### How does an agent use it?
 
@@ -186,7 +190,7 @@ Install Andrey's agent skill: make sure the andrey-core package is installed, ru
 
 Andrey is in alpha: any release may change the API, including the supported methods. Pin the
 version you depend on, and read the [changelog](changelog.md) before upgrading. The public API is
-what the [API reference](code/index.md) documents; names that start with an underscore are private
+what the [API reference](api.md) documents; names that start with an underscore are private
 and can change in any release.
 
 ### What is planned next?
@@ -234,7 +238,7 @@ citation.
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.7.0},
+  version = {0.8.0},
   url = {https://andrey.abel.ai},
 }
 ```

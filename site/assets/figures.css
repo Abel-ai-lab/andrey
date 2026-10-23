@@ -462,6 +462,162 @@ div[class*="highlight-"].window pre {
   stroke: var(--andrey-muted);
 }
 
+/* A family's methods on one figure: Andrey uses the accent color; other packages use gray
+   shapes. Lines connect each method's sizes, with a shaded corner behind them. */
+.pf-chart svg text.pf-label {
+  fill: var(--andrey-ink);
+  font-weight: 600;
+}
+
+.pf-andrey {
+  fill: var(--andrey-accent);
+  stroke: var(--andrey-surface);
+  stroke-width: 1.5;
+}
+
+.pf-other {
+  fill: var(--andrey-muted);
+  stroke: var(--andrey-surface);
+  stroke-width: 1;
+}
+
+.pf-other.pf-cross {
+  fill: none;
+  stroke: var(--andrey-muted);
+  stroke-width: 2;
+}
+
+.pf-line {
+  fill: none;
+  stroke: var(--andrey-muted);
+  stroke-width: 1.25;
+  stroke-opacity: 0.55;
+  stroke-linejoin: round;
+}
+
+.pf-line--andrey {
+  stroke: var(--andrey-accent);
+  stroke-width: 2;
+  stroke-opacity: 0.8;
+}
+
+/* Other packages' lines stay behind Andrey's; selecting a method highlights it and dims the rest. */
+.pf-series:not(.pf-series--andrey) {
+  opacity: 0.45;
+}
+
+.pf-chart [data-method] {
+  transition: opacity 0.2s ease;
+}
+
+.pf-chart[data-focus] [data-method]:not(.is-on) {
+  opacity: 0.12;
+}
+
+.pf-chart[data-focus] [data-method].is-on {
+  opacity: 1;
+}
+
+.pf-chart [data-tip] {
+  cursor: pointer;
+}
+
+.pf-chart [data-tip]:focus-visible {
+  outline: 2px solid var(--andrey-accent);
+}
+
+/* The method bar over a family's figure. */
+.pf-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+}
+
+.pf-chip {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 999px;
+  background: var(--andrey-surface);
+  color: var(--andrey-muted);
+  font: 500 0.82rem var(--font-sans);
+  cursor: pointer;
+}
+
+.pf-chip:hover {
+  color: var(--andrey-ink);
+}
+
+.pf-chip[aria-pressed="true"] {
+  border-color: var(--andrey-accent);
+  background: var(--andrey-accent);
+  color: var(--andrey-surface);
+}
+
+/* A point's tooltip: a small card, its numbers in bullets, its release card at the foot. */
+.pf-tip {
+  position: absolute;
+  z-index: 50;
+  max-width: 19rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: 10px;
+  background: var(--andrey-surface);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--andrey-ink) 14%, transparent);
+  color: var(--andrey-ink);
+  font: 400 0.8rem/1.45 var(--font-sans);
+}
+
+.pf-tip strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.pf-tip ul {
+  margin: 0 0 0.35rem;
+  padding-left: 1rem;
+  color: var(--andrey-muted);
+}
+
+.pf-tip a {
+  color: var(--andrey-accent);
+}
+
+.pf-quadrant {
+  fill: var(--andrey-accent);
+  fill-opacity: 0.07;
+}
+
+.pf-chart .tc-grid {
+  stroke-dasharray: 2 3;
+}
+
+.tc-grid.pf-empty {
+  stroke-dasharray: 4 3;
+}
+
+.pf-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pf-key svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin: 0;
+  overflow: visible;
+}
+
+.pf-key i.pf-quadrant-key {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  background: var(--andrey-accent);
+  opacity: 0.18;
+}
+
 /* The charts ride a belt that slides left in a loop and fades at both edges. It pauses under the
    pointer or keyboard focus; with reduced motion it stands still and scrolls by hand. */
 .tc-belt {

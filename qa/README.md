@@ -7,9 +7,10 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 | Tool | Purpose |
 |---|---|
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
-| `reference_parity.py` | Fail a published row where the reference package has fewer errors. |
+| `reference_parity.py` | Fail a published row where Andrey makes more errors than the reference package. |
 | `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
+| `ci_calibration.py` | Measure how often each nonlinear CI test rejects, with and without a dependence. |
 | `gpu_calibration_validate.py` | Check accelerator crossovers, calibration cache reuse, and dispatch. |
 
 ## FCI column order
@@ -27,6 +28,20 @@ measurement with no passing threshold.
 uv run python -m qa.column_order
 ```
 
+## CI test calibration
+
+A conditional-independence test is calibrated when it rejects a true independence at the rate
+`alpha`. `ci_calibration.py` measures that rate, and the rate with a dependence (the power), for
+KCI, RCoT, CMIknn, and GPDC at their default settings. Each draw makes `x` and `y` different
+nonlinear functions of 0 to 3 conditioning variables plus noise; a noise term shared by `x` and
+`y` makes them dependent. It is a measurement with no passing threshold: a rate is a property of
+the test on this data, not a pass or fail of the build.
+
+```shell
+uv run python -m qa.ci_calibration                 # every test at its default row counts
+uv run python -m qa.ci_calibration kci --rows 200  # one test, one row count
+```
+
 ## Quality gate
 
 One command checks the current commit before a release, and exits 1 if any check fails:
@@ -35,18 +50,24 @@ One command checks the current commit before a release, and exits 1 if any check
 uv run python -m qa.quality_gate
 ```
 
-The `quality-gate` workflow runs the same command. Every job that publishes to PyPI must need a job
-that calls it; `tests/unit/test_release_gates.py` fails otherwise. Pull requests do not run the
+The `quality-gate` workflow runs the same command once per release, on the head of the release pull
+request into `main`, and `main`'s ruleset requires it. The publish workflow skips its own run when a
+passing run has the tree of the commit it publishes (`scripts/gate_reuse.py`; a squash merge keeps
+the tree), so the published files are the ones the gate passed. A change after the gate, or a lookup
+that fails, runs the gate again. Every job that publishes to PyPI must need a job that calls the
+workflow; `tests/unit/test_release_gates.py` fails otherwise. Other pull requests do not run the
 gate. It checks PC, FCI, GFCI, CD-NOD, GES, GIES, XGES, HC, Tabu, exact search, CALM, BOSS, GRaSP,
 DirectLiNGAM, ICA-LiNGAM, MultiGroupDirectLiNGAM, RCD, BottomUpParceLiNGAM, GIN, ANM, PNL, PCMCI,
 PCMCI+, LPCMCI, VARMA-LiNGAM, LongitudinalLiNGAM, and Granger on the datasets whose assumptions each
-method needs:
+method needs, and PC with each supported nonlinear conditional-independence test, KCI, RCoT,
+CMIknn, and GPDC, on nonlinear data:
 
 | Dataset | Draws | Methods |
 |---|---|---|
 | `linear_gauss_er` at `d = 20, 50` | 10 seeds each | PC, GES, XGES, HC, Tabu, BOSS, GRaSP |
 | `linear_gauss_er` at `d = 10, 15` | 10 seeds each | exact search; CALM at `d = 10` |
 | `latent_gauss_er` at `d = 20, 50` | 10 seeds each | FCI, GFCI |
+| `anm_er`, `nonmonotone_er` at `d = 5, 10`, `n = 50d` | 10 seeds each | PC with KCI; with RCoT at `d = 10`; with CMIknn and GPDC at `d = 5` |
 | `interventional_gauss_er` at `d = 20, 50` | 10 seeds each | GIES |
 | `domain_shift_er` at `d = 20, 50`, `n = 2000` | 10 seeds each | CD-NOD |
 | `multi_group_er` at `d = 10, 20`, three groups of `n = 1000` | 10 seeds each | MultiGroupDirectLiNGAM |
@@ -72,6 +93,12 @@ method needs:
   the hidden nodes. From `d = 20`, BottomUpParceLiNGAM's median SHD is no lower than the empty
   graph's, and on ASIA's 1,000 rows RCD's is higher, so RCD and BottomUpParceLiNGAM run on this
   regime only.
+- **Nonlinear regimes.** `anm_er` adds to each variable a weighted sum of `z + sin(z)` over its
+  parents, and `nonmonotone_er` of `cos(z)`, where a child is uncorrelated with its parent, so
+  partial correlation misses the edge; both have Gaussian noise. PC with a nonlinear test costs far
+  more per test, so they run at `d = 5` and `10`, `n = 50d`, and CMIknn and GPDC, at over half a
+  minute per fit from `d = 10` on one core, at `d = 5` only. RCoT warns under 500 rows, so it runs
+  at `d = 10` only. A test keeps both in step with the benchmark harness.
 - **Smaller graphs.** Exact search scores every parent set, so its run time at least doubles with
   each variable, and the cost of a CALM optimizer step grows with the cube of the variable count;
   they run on `linear_gauss_er` at `d = 10` and `15`, and CALM on the smaller one only.
@@ -107,9 +134,10 @@ method needs:
   from `cmu-phil/example-causal-datasets` (CC0-1.0) at a pinned commit once, checks its SHA-256,
   and caches it, so the first run needs network access.
 
-SHD follows the published summaries: PC, GES, XGES, HC, Tabu, exact search, CALM, BOSS, and GRaSP
-against the truth's CPDAG, the LiNGAM methods, ANM, and PNL against the DAG, MultiGroupDirectLiNGAM
-summed over its groups, and FCI and GFCI by endpoint SHD against the PAG of the observed variables.
+SHD follows the published summaries: PC, with any test, GES, XGES, HC, Tabu, exact search, CALM,
+BOSS, and GRaSP against the truth's CPDAG, the LiNGAM methods, ANM, and PNL against the DAG,
+MultiGroupDirectLiNGAM summed over its groups, and FCI and GFCI by endpoint SHD against the PAG of
+the observed variables.
 GIES is scored against the interventional essential graph of the true DAG under the rows' targets,
 and CD-NOD against the CPDAG in which the domain index orients the edges it reaches. GIN's errors
 are the latents it misses: the true latents whose indicators it does not return as one cluster.
@@ -143,14 +171,32 @@ uv run python -m qa.quality_gate --capture  # re-measure; review the diff
 Before any fit, the gate checks the published benchmark summaries
 (`benchmarks/published/*/summary.json`) with `reference_parity.py`, which reads only those files,
 so the reference packages need not be installed. Each row pairs Andrey with one reference package
-at one size, and it fails at any margin:
+at one size. A summary's `parity_rule` sets how its rows are judged.
+
+With `"parity_rule": "paired bootstrap"` (0.8.0 and later), a row is judged by D = SHD(Andrey) -
+SHD(reference) on each of its paired datasets, the datasets both finished (`paired`). The
+summary's builder records the mean of D (`mean_D`) and its percentile bootstrap 95% interval
+(`bootstrap_95`, 10,000 resamples, NumPy's `default_rng(0)`), the interval a CI test's promotion
+to supported also uses. A row with at least 10 paired datasets fails only when that interval lies
+entirely above 0, so a difference within the noise of 20 datasets passes. A row with fewer than 10
+paired datasets is reported, with its counts, and not gated. A randomized test's row is judged by
+its `multi_draw` fields where it has them: each dataset fit several times per package (`draws`),
+and D per dataset the mean over the draws.
+
+A summary without `parity_rule` (0.1.0 to 0.7.0) keeps the count rule, which fails at any margin:
 
 - where the row counts the series on which each side has fewer errors, when the reference has fewer
   errors on more series than Andrey;
 - otherwise, when Andrey's errors (the row's mean or median SHD, or directed errors) are higher.
 
 A row where either side has no result is skipped. A released summary never changes, so a method
-re-measured against the same reference in a later summary is judged by the later rows only.
+re-measured against the same reference in a later summary is judged by the later rows only. Where
+a summary has one entry per regime for a method and reference, a row's key names its `regime`.
+
+A row of a reference whose result depends on the column order (`reference_order_dependent`) may
+also hold Andrey's column-order mode on the same datasets (`andrey_column_shd_by_seed`,
+`comparator_shd_by_seed`). It is context: the check prints the datasets on which each side has
+fewer errors in that comparison beside the row, and never judges them.
 
 `benchmarks/published/parity-allowlist.json` exempts a failing row only when it names the cause,
 with a reason and a citation:
@@ -162,8 +208,9 @@ with a reason and a citation:
   reversed order (`"column_order": "reversed"`, `andrey_errors`, `comparator_errors`), where the
   row must pass.
 
-Each entry pins the row's two error values (its two series counts, where the row has them), so a
-re-run that changes the row voids it, and an entry that matches no failing row fails the check.
+Each entry pins the row's two error values (its two series counts, where the row has them, or each
+side's mean SHD over the paired datasets under the paired bootstrap), so a re-run that changes the
+row voids it, and an entry that matches no failing row fails the check.
 
 ```shell
 uv run python -m qa.reference_parity  # exit 1 if any row fails

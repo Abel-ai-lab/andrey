@@ -12,7 +12,8 @@ when its ``e``, built with each other remaining cluster in turn and given the cl
 ordered, passes the pooled test at ``alpha`` for every one of them. Each of those tests runs once
 per member, so that every member of every cluster involved enters ``e``, and pools the runs by
 Fisher's method. When several candidates pass, the one whose lowest pooled p-value is highest is
-taken. When none passes, the ordering stops and the remaining clusters stay unordered: the paper
+taken, and of lowest p-values equal to ``_KEY_DP`` decimals, the one holding the lowest-ranked
+column. When none passes, the ordering stops and the remaining clusters stay unordered: the paper
 adds a latent to the order only when the condition holds.
 
 The search runs on the columns sorted by :func:`~andrey.search.hc.tie_ranks`, a rank computed from
@@ -25,7 +26,7 @@ Each column's HSIC kernel matrix is built once per fit and reused by every test,
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import combinations
+from itertools import combinations, count, islice
 
 import numpy as np
 from scipy.special import gammaincc
@@ -33,6 +34,7 @@ from scipy.special import gammaincc
 from andrey.core.independence import gamma_gram, hsic_gamma_from_grams
 from andrey.core.output import StructureOutput
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
+from andrey.search._parallel import _KEY_DP
 from andrey.search.hc import tie_ranks
 
 _Gram = tuple[np.ndarray, float]  # a column's centered HSIC kernel matrix and its mean
@@ -174,20 +176,23 @@ def _find_root(
     """Return the root among ``clusters`` given the ``ordered`` ones, or ``None`` if none passes.
 
     A candidate passes when :func:`_root_pvalue` is at least ``alpha`` against every other cluster;
-    of the passing candidates, the one with the highest lowest p-value is the root, and the earlier
-    one in ``clusters`` on a tie. A single remaining cluster is the root.
+    of the passing candidates, the one with the highest lowest p-value is the root. Lowest p-values
+    equal to ``_KEY_DP`` decimals go to the cluster with the smallest member: :func:`gin` passes the
+    columns sorted by :func:`~andrey.search.hc.tie_ranks`, so a column's index is its rank. A single
+    remaining cluster is the root.
     """
     if len(clusters) == 1:
         return clusters[0]
-    best, best_pvalue = None, -1.0
+    best, best_key = None, None
     for candidate in clusters:
         lowest = min(
             _root_pvalue(data, cov, grams, candidate, other, ordered)
             for other in clusters
             if other is not candidate
         )
-        if lowest >= alpha and lowest > best_pvalue:
-            best, best_pvalue = candidate, lowest
+        key = (-round(lowest, _KEY_DP), min(candidate))
+        if lowest >= alpha and (best_key is None or key < best_key):
+            best, best_key = candidate, key
     return best
 
 
@@ -275,9 +280,12 @@ def _structure_from_result(
     node_types[n_variables:] = LATENT
 
     observed_labels = (
-        tuple(labels) if labels is not None else tuple(f"X{i + 1}" for i in range(n_variables))
+        tuple(str(label) for label in labels)
+        if labels is not None
+        else tuple(f"X{i + 1}" for i in range(n_variables))
     )
-    all_labels = observed_labels + tuple(f"L{k + 1}" for k in range(n_latent))
+    free = (f"L{k}" for k in count(1) if f"L{k}" not in observed_labels)
+    all_labels = observed_labels + tuple(islice(free, n_latent))
 
     structure = GraphStructure.from_numpy(
         marks, kind="dag", labels=all_labels, node_types=node_types
@@ -299,9 +307,10 @@ def gin_structure(
 
     A convenience over :func:`gin` that materializes the clustering and latent order as a directed
     graph over observed *and* latent nodes: observed variables occupy indices ``0..n_variables-1``
-    (optionally named by ``labels``), latents follow named ``L1..Lm``, the ordered ones first, and
-    ``node_types`` flags which nodes are latent. Each latent points to its observed children, and an
-    ordered latent to every later latent; the clustering and order also ride along in ``metadata``.
+    (optionally named by ``labels``), latents follow named ``L1``, ``L2``, and so on, skipping a
+    name an observed variable has, the ordered ones first, and ``node_types`` flags which nodes are
+    latent. Each latent points to its observed children, and an ordered latent to every later
+    latent; the clustering and order also ride along in ``metadata``.
     """
     data = np.asarray(data, dtype=np.float64)
     return _structure_from_result(data.shape[1], gin(data, alpha=alpha), labels)

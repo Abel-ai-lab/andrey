@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from andrey.core import ARROW, TAIL, GraphStructure, Structure, StructureOutput
 from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS, SingularCorrelationError
+from andrey.core.knowledge import column_position
 from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, CopiedColumnsError, copies_message
-from andrey.core.structure import relabel
+from andrey.core.structure import node_labels, relabel
 from andrey.core.warning_policy import DataTypeWarning, warn_once
 
 if TYPE_CHECKING:
@@ -24,10 +25,12 @@ if TYPE_CHECKING:
 def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -> np.ndarray:
     """Return ``data`` as a float64 ``(n_samples, n_features)`` matrix, checked before a fit.
 
-    Raises ``ValueError``, naming ``name``, when the values are not numeric, the array is not 2-D,
-    it has fewer than ``min_rows`` rows, it holds ``NaN`` or ``inf``, or a column is constant: no
-    method can estimate a variance or a dependence from such data.
+    Raises ``ValueError``, naming ``name``, when two columns share a name (:func:`column_labels`),
+    the values are not numeric, the array is not 2-D, it has fewer than ``min_rows`` rows, it holds
+    ``NaN`` or ``inf``, or a column is constant: no method can estimate a variance or a dependence
+    from such data. The message names every constant column.
     """
+    column_labels(data)
     try:
         X = np.asarray(data, dtype=np.float64)
     except (TypeError, ValueError) as error:
@@ -47,10 +50,17 @@ def data_matrix(data: npt.ArrayLike, *, name: str = "data", min_rows: int = 2) -
             f"{name} holds NaN or inf in {cells} at row {row}, column {col}; drop or impute "
             "them before the fit"
         )
-    constant = np.flatnonzero(np.ptp(X, axis=0) == 0)
-    if constant.size:
-        column = _column_name(data, int(constant[0]))
-        raise ValueError(f"{name} column {column} is constant; drop it before the fit")
+    constant = [_column_name(data, int(j)) for j in np.flatnonzero(np.ptp(X, axis=0) == 0)]
+    if constant:
+        if len(constant) == 1:
+            columns, verb, pronoun = f"column {constant[0]}", "is", "it"
+        else:
+            columns = f"columns {', '.join(constant[:-1])} and {constant[-1]}"
+            verb, pronoun = "are", "them"
+        raise ValueError(
+            f"{name} {columns} {verb} constant; a constant column holds no information about "
+            f"the other variables, so drop {pronoun} before the fit"
+        )
     return X
 
 
@@ -101,6 +111,142 @@ def data_kind(name: str) -> str:
 MAX_CATEGORIES = 10
 
 
+def default_score(
+    data: npt.ArrayLike,
+    score_func: str | None,
+    linear: str,
+    *,
+    categorical: Sequence[str | int] | None = None,
+    max_categories: int = MAX_CATEGORIES,
+    mixed: bool = True,
+) -> tuple[str, Sequence[str | int] | None]:
+    """Return the score of a score search on ``data`` and the ``categorical`` it reads.
+
+    A given ``score_func`` returns as it is, with ``categorical``. For ``None``, the categorical
+    columns are the ones ``categorical`` lists by name or 0-based position, else the ones
+    :func:`mixed_matrix` infers: a DataFrame's ``category``, ``bool``, ``object``, and ``string``
+    columns, and every column of at most ``max_categories`` distinct whole numbers. When every
+    column is categorical, the score is ``"local_score_BDeu"``; when some are,
+    ``"local_score_cond_gauss"``, the conditional Gaussian BIC, returned with the listed columns, or
+    the inferred ones by position, so that :func:`checked_data` reads them without inferring again;
+    when none are, ``linear``, the linear-Gaussian BIC. Either switch warns once with a
+    :class:`~andrey.DataTypeWarning`; an inferred one names ``linear`` too, since columns of counts
+    or ratings meet the rule. ``mixed=False``, for a search without a mixed-data score, keeps
+    ``linear`` on mixed data. Inferring keeps ``linear`` for data that is not a finite numeric table
+    apart from its typed columns, so that :func:`checked_data` reports it.
+
+    Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
+    as :func:`mixed_matrix` does when ``categorical`` is not a list of the columns ``data`` has.
+    """
+    if score_func is not None:
+        return score_func, categorical
+    max_categories = int_in_range(max_categories, "max_categories", 2)
+    given = categorical is not None
+    if given:
+        mask = _listed_mask(data, categorical)
+    else:
+        inferred = _inferred_columns(data, max_categories)
+        if inferred is None:
+            return linear, None
+        typed, counts = inferred
+        mask = typed | (counts > 0)
+    if not mask.any() or (not mask.all() and not mixed):
+        return linear, None
+    guide = "see Data types in the getting-started guide"
+    if mask.all():
+        if given:
+            reason = "categorical names every column of data"
+            advice = f"to read them as numbers, pass score_func={linear!r} without categorical"
+        else:
+            reason = f"every column of data is categorical ({_inference_rule(max_categories)})"
+            advice = (
+                "if the columns are counts or ratings to read as numbers, pass "
+                f"score_func={linear!r}, the linear-Gaussian BIC"
+            )
+        warn_once(
+            f"{reason}, so the score defaults to score_func='local_score_BDeu'; {advice} ({guide})",
+            DataTypeWarning,
+        )
+        return "local_score_BDeu", None
+    columns = np.flatnonzero(mask).tolist()
+    if given:
+        names = ", ".join(_column_name(data, j) for j in columns)
+        reason = f"categorical names data columns {names}; the others are continuous"
+        advice = f"pass score_func={linear!r} without categorical to read every column as numbers"
+    else:
+        listed = _listed_columns(data, columns, typed, counts)
+        reason = (
+            f"data columns {listed} are categorical ({_inference_rule(max_categories)}) and the "
+            "others continuous"
+        )
+        advice = (
+            f"pass score_func={linear!r} to keep the linear-Gaussian BIC, which reads every column "
+            "as numbers, or categorical=[...] to name the categorical columns"
+        )
+    warn_once(
+        f"{reason}, so the score defaults to score_func='local_score_cond_gauss', the conditional "
+        f"Gaussian BIC; {advice} ({guide})",
+        DataTypeWarning,
+    )
+    return "local_score_cond_gauss", categorical if given else columns
+
+
+def _inference_rule(max_categories: int) -> str:
+    """Describe the rule that infers a categorical column."""
+    return (
+        "a category, bool, or text type, or at most "
+        f"max_categories={max_categories} distinct whole numbers"
+    )
+
+
+def _listed_mask(data: npt.ArrayLike, categorical: Sequence[str | int]) -> np.ndarray:
+    """Mark the columns of ``data`` that ``categorical`` lists by label or 0-based position.
+
+    Raises as :func:`data_matrix` does when ``data`` is not a 2-D table, and as :func:`mixed_matrix`
+    does when ``categorical`` is not a list of the columns ``data`` has.
+    """
+    try:
+        shape = np.shape(data)
+    except ValueError:
+        shape = ()
+    if len(shape) != 2:
+        data_matrix(data)
+    return _column_mask(categorical, column_labels(data), shape[1])
+
+
+def _inferred_columns(
+    data: npt.ArrayLike, max_categories: int
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Return the typed columns of ``data`` and each other column's count of category codes.
+
+    ``typed`` marks a DataFrame's ``category``, ``bool``, ``object``, and ``string`` columns;
+    ``counts`` holds each other column's count of distinct whole numbers when at most
+    ``max_categories``, else ``0``. ``None`` when ``data`` has no columns, or its untyped columns
+    are not a finite numeric table of at least 2 rows with no constant column, which
+    :func:`data_matrix` rejects.
+    """
+    if getattr(data, "columns", None) is None:
+        numeric, typed = data, None
+    else:
+        import pandas as pd
+
+        typed = _categorical_dtypes(data)
+        numeric = pd.DataFrame(data).iloc[:, ~typed]
+    try:
+        X = np.asarray(numeric, dtype=np.float64)
+    except (TypeError, ValueError):
+        return None
+    if X.ndim != 2 or X.shape[0] < 2 or not np.isfinite(X).all() or (np.ptp(X, axis=0) == 0).any():
+        return None
+    if typed is None:
+        typed = np.zeros(X.shape[1], dtype=bool)
+    if typed.size == 0:
+        return None
+    counts = np.zeros(typed.size, dtype=np.int64)
+    counts[~typed] = _category_counts(X, max_categories)
+    return typed, counts
+
+
 def checked_data(
     data: npt.ArrayLike,
     categorical: object,
@@ -122,8 +268,10 @@ def checked_data(
     mixed. ``index_categorical`` passes to :func:`mixed_matrix`.
 
     Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
-    ``ValueError`` when ``categorical`` is given for a setting that reads no column types.
+    ``ValueError`` when two columns share a name (:func:`column_labels`) or ``categorical`` is given
+    for a setting that reads no column types.
     """
+    column_labels(data)
     setting = f"{option}={value!r}"
     kind = data_kind(value)
     max_categories = int_in_range(max_categories, "max_categories", 2)
@@ -194,9 +342,10 @@ def mixed_matrix(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return mixed data as a float64 matrix and a boolean mask of its categorical columns.
 
-    ``categorical`` lists the categorical columns by DataFrame column name or 0-based position;
-    ``[]`` lists none. ``None`` infers them: a pandas DataFrame's ``category``, ``bool``,
-    ``object``, and ``string`` columns, and every column whose values, over all its rows, are at
+    ``categorical`` lists the categorical columns by label (a string) or 0-based position (an
+    integer), as :func:`~andrey.core.knowledge.column_position` reads them; ``[]`` lists none.
+    ``None`` infers them: a pandas DataFrame's ``category``, ``bool``, ``object``, and ``string``
+    columns, and every column whose values, over all its rows, are at
     most ``max_categories`` distinct whole numbers. A :class:`~andrey.DataTypeWarning` names the
     inferred columns and why. A categorical column that does not hold numbers has its values
     numbered, each distinct value one category; a numeric one must hold whole numbers, as
@@ -212,6 +361,7 @@ def mixed_matrix(
     """
     columns = getattr(data, "columns", None)
     names = None if columns is None else list(columns)
+    labels = column_labels(data)
     if categorical is None:
         typed = np.zeros(0, dtype=bool) if names is None else _categorical_dtypes(data)
         table = data if names is None else _encode_categories(data, typed, setting, name)
@@ -219,12 +369,7 @@ def mixed_matrix(
         counts = _category_counts(X, max_categories)
         mask = (counts > 0) | (typed if typed.size else False)
         if mask.any():
-            listed = ", ".join(
-                f"{_column_name(data, j)} ("
-                + (_dtype_word(data, j) if typed.size and typed[j] else f"{counts[j]} values")
-                + ")"
-                for j in np.flatnonzero(mask).tolist()
-            )
+            listed = _listed_columns(data, np.flatnonzero(mask).tolist(), typed, counts)
             warn_once(
                 f"{setting} reads {name} columns {listed} as categorical, inferred from a "
                 "category, bool, or text type or from at most "
@@ -236,7 +381,7 @@ def mixed_matrix(
         X = data_matrix(data, name=name)
         mask = _column_mask(categorical, None, X.shape[1])
     else:
-        mask = _column_mask(categorical, names, len(names))
+        mask = _column_mask(categorical, labels, len(names))
         X = data_matrix(_encode_categories(data, mask, setting, name), name=name)
     check_categories(np.where(mask, X, 0.0), data, setting, name=name)
     if not mask.any() and not index_categorical:
@@ -281,6 +426,16 @@ def _category_counts(X: np.ndarray, max_categories: int) -> np.ndarray:
     return counts
 
 
+def _listed_columns(data: object, columns: list[int], typed: np.ndarray, counts: np.ndarray) -> str:
+    """Name each of ``columns`` with why it is categorical: its type, or its count of values."""
+    return ", ".join(
+        f"{_column_name(data, j)} ("
+        + (_dtype_word(data, j) if typed.size and typed[j] else f"{counts[j]} values")
+        + ")"
+        for j in columns
+    )
+
+
 def _dtype_word(data: object, j: int) -> str:
     """Name a DataFrame column's categorical type: ``category``, ``bool``, or ``text``."""
     import pandas as pd
@@ -307,8 +462,8 @@ def _categorical_dtypes(data: object) -> np.ndarray:
     return np.array([categorical(dtype) for dtype in dtypes], dtype=bool)
 
 
-def _column_mask(categorical: object, names: list | None, d: int) -> np.ndarray:
-    """Mark the columns ``categorical`` lists by name or 0-based position."""
+def _column_mask(categorical: object, labels: tuple[str, ...] | None, d: int) -> np.ndarray:
+    """Mark the columns ``categorical`` lists by label or 0-based position."""
     if isinstance(categorical, (str, bytes)) or not isinstance(
         categorical, (list, tuple, np.ndarray)
     ):
@@ -318,22 +473,14 @@ def _column_mask(categorical: object, names: list | None, d: int) -> np.ndarray:
         )
     mask = np.zeros(d, dtype=bool)
     for item in categorical:
-        if isinstance(item, (int, np.integer)) and not isinstance(item, (bool, np.bool_)):
-            if not 0 <= item < d:
-                raise ValueError(f"categorical lists column {item}, but data has {d} columns")
-            mask[int(item)] = True
-        elif isinstance(item, str):
-            if names is None:
-                raise ValueError(
-                    f"categorical names column {item!r}, but data has no column names; give a "
-                    "DataFrame or the column's 0-based position"
+        if isinstance(item, str) or (
+            isinstance(item, (int, np.integer)) and not isinstance(item, (bool, np.bool_))
+        ):
+            mask[
+                column_position(
+                    item if isinstance(item, str) else int(item), labels, d, "categorical"
                 )
-            if item not in names:
-                raise ValueError(
-                    f"categorical names column {item!r}, which data does not have; its columns "
-                    f"are {[str(n) for n in names]}"
-                )
-            mask[names.index(item)] = True
+            ] = True
         else:
             raise TypeError(
                 "categorical must list column names or 0-based positions, got "
@@ -480,19 +627,13 @@ def structure_output(
     return StructureOutput.new(structure, ordering=order, weighted_adjacency=weights, metadata=meta)
 
 
-def node_labels(names: Iterable[object]) -> tuple[str, ...]:
-    """Turn column names into node labels: strings, unique so that each names one node."""
-    labels = tuple(str(name) for name in names)
-    if len(set(labels)) != len(labels):
-        raise ValueError(f"column names must be unique to name the nodes, got {list(labels)}")
-    return labels
-
-
 def column_labels(data: object) -> tuple[str, ...] | None:
-    """Return a DataFrame's column names as node labels; ``None`` for an array.
+    """Return a DataFrame's column names as node labels; ``None`` for arrays.
 
     Reads any table with a ``columns`` attribute (pandas, polars), so pandas stays optional. Default
-    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array.
+    integer columns ``0..n-1`` name nothing, so such a table numbers its nodes like an array. Each
+    name becomes text, and ``ValueError`` names each label two columns share
+    (:func:`~andrey.core.structure.node_labels`).
     """
     columns = getattr(data, "columns", None)
     if columns is None:
@@ -501,23 +642,35 @@ def column_labels(data: object) -> tuple[str, ...] | None:
     return None if names == list(range(len(names))) else node_labels(names)
 
 
+def column_namer(labels: tuple[str, ...] | None) -> Callable[[int], str]:
+    """Name a column position by its label in ``labels``, quoted, or by its number.
+
+    A position past the labels, such as a column a method adds to the data, and every position
+    without ``labels`` keep their number.
+    """
+    if labels is None:
+        return str
+    return lambda j: repr(labels[j]) if j < len(labels) else str(j)
+
+
 @contextlib.contextmanager
-def copies_named(labels: tuple[str, ...] | None) -> Generator[None]:
-    """Name the columns of a copies error raised in the block by ``labels``.
+def copies_named(
+    labels: tuple[str, ...] | None, name: Callable[[int], str] | None = None
+) -> Generator[None]:
+    """Name the columns of a copies error raised in the block by ``labels``, or by ``name``.
 
     A :class:`~andrey.core.score.CopiedColumnsError`, or a
     :class:`~andrey.core.ci.SingularCorrelationError` that found copies, names columns by position;
-    with ``labels``, the message names them by label instead. A position past the labels, such as a
-    column a method adds to the data, keeps its number.
+    the message names them by :func:`column_namer` of ``labels`` instead, or by ``name`` when it is
+    given.
     """
     try:
         yield
     except (CopiedColumnsError, SingularCorrelationError) as error:
-        if labels is not None and error.groups:
-            named = copies_message(
-                error.groups, lambda j: repr(labels[j]) if j < len(labels) else str(j)
-            )
-            error.args = (str(error).replace(copies_message(error.groups), named),)
+        if error.groups and (labels is not None or name is not None):
+            raised = error.column_name if isinstance(error, CopiedColumnsError) else str
+            named = copies_message(error.groups, name or column_namer(labels))
+            error.args = (str(error).replace(copies_message(error.groups, raised), named),)
         raise
 
 

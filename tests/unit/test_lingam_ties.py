@@ -1,0 +1,240 @@
+"""The LiNGAM causal-order search breaks score ties by each column's own data.
+
+Two columns that are interchangeable in the sample have mathematically equal scores, which differ
+only by rounding, and the rounding depends on the CPU's BLAS kernel. A test cannot switch kernels,
+so it checks the invariant that rules out a kernel-dependent pick: reordering the columns reorders
+the causal order and changes nothing else. Continuous data without ties give the orders of a plain
+argmax of the scores.
+"""
+
+from __future__ import annotations
+
+import itertools
+
+import numpy as np
+import pytest
+
+import andrey
+from andrey.data.scm import sample_scm
+from andrey.lingam import direct, multi_group, pwling
+
+# Ranks / 8 of two columns with the same values, whose sample is invariant to swapping them.
+_SWAP_PAIR_N8 = np.array([[5, 4], [4, 6], [2, 8], [3, 5], [7, 2], [1, 7], [6, 3], [8, 1]]) / 8
+
+
+def _exchangeable_pair(seed: int, n: int, k: int) -> tuple[np.random.Generator, np.ndarray]:
+    """Ranks / ``n`` of ``a`` and of ``b`` = ``a`` with ``k`` disjoint adjacent ranks swapped."""
+    rng = np.random.default_rng(seed)
+    a = rng.permutation(n) + 1.0
+    b = a.copy()
+    for r in rng.choice(np.arange(1, n, 2), size=k, replace=False):
+        i, j = np.flatnonzero(a == r)[0], np.flatnonzero(a == r + 1)[0]
+        b[i], b[j] = r + 1, r
+    return rng, np.column_stack([a, b]) / n
+
+
+def _balanced_binary_pair(seed: int, n: int) -> np.ndarray:
+    """Median splits of two correlated Gaussians: both columns hold ``n / 2`` ones."""
+    rng = np.random.default_rng(seed)
+    z = rng.multivariate_normal([0.0, 0.0], [[1.0, 0.5], [0.5, 1.0]], size=n)
+    return (z > np.median(z, axis=0)).astype(np.float64)
+
+
+def _assert_order_follows_columns(fit, groups: list[np.ndarray]) -> None:
+    """Every column permutation of ``groups`` gives the same order, relabeled."""
+    order = fit(groups)
+    for perm in itertools.permutations(range(groups[0].shape[1])):
+        relabeled = fit([X[:, list(perm)] for X in groups])
+        assert [perm[j] for j in relabeled] == order, perm
+
+
+def _assert_position_follows_order(fit, groups: list[np.ndarray]) -> None:
+    """Under ``tie_break="position"``, some column permutation changes the order, relabeled."""
+    with andrey.config(tie_break="position"):
+        order = fit(groups)
+        assert any(
+            [perm[j] for j in fit([X[:, list(perm)] for X in groups])] != order
+            for perm in itertools.permutations(range(groups[0].shape[1]))
+        )
+
+
+def _direct(groups: list[np.ndarray]) -> list[int]:
+    return pwling.find_causal_order(groups[0])
+
+
+def _shared(groups: list[np.ndarray]) -> list[int]:
+    return multi_group.multi_group_direct_lingam(groups)[0]
+
+
+def test_swap_symmetric_pair_order_follows_columns() -> None:
+    _assert_order_follows_columns(_direct, [_SWAP_PAIR_N8])
+    _assert_position_follows_order(_direct, [_SWAP_PAIR_N8])
+
+
+@pytest.mark.parametrize("seed", [3, 6])
+def test_exchangeable_pair_with_an_independent_column(seed: int) -> None:
+    """A near-copy pair is the top tie at a score near zero; the third column is independent."""
+    rng, pair = _exchangeable_pair(seed, 1000, 50)
+    X = np.column_stack([pair, (rng.permutation(1000) + 1.0) / 1000])
+    _assert_order_follows_columns(_direct, [X])
+
+
+def test_balanced_binary_pair_order_follows_columns() -> None:
+    _assert_order_follows_columns(_direct, [_balanced_binary_pair(0, 1000)])
+
+
+def test_multi_group_order_follows_columns() -> None:
+    groups = [_balanced_binary_pair(0, 600), _balanced_binary_pair(1, 400)]
+    _assert_order_follows_columns(_shared, groups)
+    _assert_position_follows_order(_shared, groups)
+
+
+def test_pick_ties_within_the_tolerance_only() -> None:
+    """Rounding-sized gaps tie and go to the lower rank; a real gap keeps the higher score."""
+    ranks = np.array([1, 0])
+    assert pwling.pick(np.array([0.0, -7.9e-31]), [0, 1], ranks) == 1
+    assert pwling.pick(np.array([-0.25, -0.25 - 1e-15]), [0, 1], ranks) == 1
+    assert pwling.pick(np.array([0.0, -1e-15]), [0, 1], ranks) == 0
+    assert pwling.pick(np.array([-0.25, -0.25 - 1e-9]), [0, 1], ranks) == 0
+
+
+def test_pick_ranks_nan_scores_highest() -> None:
+    """A NaN score outranks every number, and NaN candidates tie among themselves."""
+    ranks = np.array([3, 2, 1, 0])
+    assert pwling.pick(np.array([-1e-3, np.nan, -0.0, -0.0]), [0, 1, 2, 3], ranks) == 1
+    assert pwling.pick(np.array([-1e-3, np.nan, np.nan, -0.0]), [0, 1, 2, 3], ranks) == 2
+
+
+def test_copied_column_gives_a_full_order() -> None:
+    """Ranked data whose last column copies the one before score NaN for the pair and still fit."""
+    rng = np.random.default_rng(3)
+    x = rng.standard_normal((100, 3))
+    for j in (1, 2):
+        x[:, j] += 2 * np.tanh(x[:, j - 1])
+    x[:, 2] = x[:, 1]
+    ranked = np.argsort(np.argsort(x, axis=0), axis=0) / 100.0
+    assert sorted(pwling.find_causal_order(ranked)) == [0, 1, 2]
+
+
+# Orders a plain argmax of the scores gives on continuous data without ties.
+_CONTINUOUS_ORDERS = {
+    (6, "uniform", 0): [4, 2, 0, 3, 1, 5],
+    (8, "laplace", 1): [6, 2, 1, 5, 7, 3, 0, 4],
+    (10, "exponential", 2): [2, 6, 0, 7, 1, 9, 4, 8, 3, 5],
+    (12, "gumbel", 3): [2, 0, 1, 9, 4, 7, 8, 10, 6, 11, 3, 5],
+    (15, "uniform", 4): [10, 5, 3, 7, 11, 6, 1, 12, 2, 8, 0, 14, 9, 4, 13],
+}
+_SHARED_ORDERS = {0: [2, 6, 1, 4, 0, 5, 3], 1: [3, 4, 5, 0, 1, 6, 2]}
+
+
+@pytest.mark.parametrize(("d", "noise", "seed"), list(_CONTINUOUS_ORDERS))
+def test_continuous_orders_are_unchanged(d: int, noise: str, seed: int) -> None:
+    X = sample_scm(noise=noise, d=d, n=500, seed=seed).data
+    assert pwling.find_causal_order(X) == _CONTINUOUS_ORDERS[d, noise, seed]
+
+
+@pytest.mark.parametrize("seed", list(_SHARED_ORDERS))
+def test_continuous_shared_orders_are_unchanged(seed: int) -> None:
+    groups = [sample_scm(noise="uniform", d=7, n=300 + 100 * g, seed=seed).data for g in range(2)]
+    assert _shared(groups) == _SHARED_ORDERS[seed]
+
+
+def _chain_with_copy(copy: str) -> np.ndarray:
+    """Ranks / n of a nonlinear chain x0 -> x1 -> x2 and a fourth column copying x1.
+
+    ``copy`` is ``"exact"`` (the same values), ``"near"`` (x1 plus noise of size 1e-12), or
+    ``"reversed"`` (1 + 1 / n - x1, the ranks of -x1).
+    """
+    n = 300
+    rng = np.random.default_rng(5)
+    x = rng.uniform(-1, 1, (n, 3))
+    x[:, 1] += 2 * np.tanh(2 * x[:, 0])
+    x[:, 2] += x[:, 1] ** 3
+    ranked = (np.argsort(np.argsort(x, axis=0), axis=0) + 1.0) / n
+    twin = {
+        "exact": ranked[:, 1].copy(),
+        "near": ranked[:, 1] + 1e-12 * rng.uniform(-1, 1, n),
+        "reversed": 1 + 1 / n - ranked[:, 1],
+    }[copy]
+    return np.column_stack([ranked, twin])
+
+
+def test_copies_give_one_order_up_to_the_pair() -> None:
+    """Exact, 1e-12-near, and reversed copies of x1 give one order, the copies next to each other.
+
+    Which of two copies comes first can differ: identical columns fall back to column position.
+    """
+    orders = [pwling.find_causal_order(_chain_with_copy(c)) for c in ("exact", "near", "reversed")]
+    for order in orders:
+        pos = sorted([order.index(1), order.index(3)])
+        assert pos[1] == pos[0] + 1, order
+    assert len({tuple(3 if k == 1 else k for k in order) for order in orders}) == 1, orders
+
+
+@pytest.mark.parametrize("copy", ["near", "reversed"])
+def test_copy_order_follows_columns(copy: str) -> None:
+    _assert_order_follows_columns(_direct, [_chain_with_copy(copy)])
+
+
+@pytest.mark.parametrize("copy", ["exact", "near", "reversed"])
+def test_copy_comes_after_its_cause(copy: str) -> None:
+    """The root x0 comes first, and the copies of x1 follow it, next to each other."""
+    order = pwling.find_causal_order(_chain_with_copy(copy))
+    assert order[0] == 0
+    assert sorted(order[1:3]) == [1, 3], order
+
+
+def test_copy_groups_pick_the_representative_by_rank() -> None:
+    """A copy group is scored by its lowest-ranked column, whatever the order of the candidates."""
+    X = _chain_with_copy("near")
+    ranks = np.array([0, 2, 3, 1])
+    for U in ([0, 1, 2, 3], [3, 2, 1, 0]):
+        groups = pwling.copy_groups([X], U, ranks)
+        assert groups == {u: ([1] if u == 3 else []) for u in U if u != 1}, U
+
+
+def test_multi_group_copy_comes_after_its_cause() -> None:
+    """A copy in one group joins the copy group; the shared order relabels with the columns."""
+    groups = [_chain_with_copy("near"), _chain_with_copy("near")[::-1].copy()]
+    groups[1][:, 3] = groups[1][:, 3] + 0.1 * np.sin(np.arange(300))
+    order = _shared(groups)
+    assert order[0] == 0 and sorted(order[1:3]) == [1, 3], order
+    _assert_order_follows_columns(_shared, groups)
+
+
+@pytest.mark.parametrize("copy", ["exact", "near", "reversed"])
+def test_copy_takes_its_twin_as_only_parent(copy: str) -> None:
+    """The later copy has one parent, the earlier copy, with weight 1 up to sign, and no children.
+
+    A regression on both copies would split their effect between them by rounding, which differs
+    between CPUs. x1 keeps its parent x0 and its child x2.
+    """
+    order, B = direct.direct_lingam(_chain_with_copy(copy))
+    first, second = sorted([1, 3], key=order.index)
+    assert np.flatnonzero(B[second]).tolist() == [first]
+    assert not B[:, second].any()
+    np.testing.assert_allclose(abs(B[second, first]), 1.0, atol=1e-9)
+    assert np.flatnonzero(B[first]).tolist() == [0] and np.flatnonzero(B[2]).tolist() == [first]
+
+
+def test_rounding_sized_perturbation_keeps_the_edges() -> None:
+    """An exact copy and a 1e-12-near copy give the same edges, up to which copy comes first."""
+    swap = [0, 3, 2, 1]
+    edges = []
+    for copy in ("exact", "near"):
+        order, B = direct.direct_lingam(_chain_with_copy(copy))
+        edges.append(B != 0 if order.index(1) < order.index(3) else (B != 0)[np.ix_(swap, swap)])
+    np.testing.assert_array_equal(edges[0], edges[1])
+
+
+@pytest.mark.parametrize("copy", ["near", "reversed"])
+def test_copy_adjacency_follows_columns(copy: str) -> None:
+    """Reordering the columns reorders the weighted adjacency and changes nothing else."""
+    X = _chain_with_copy(copy)
+    _, B = direct.direct_lingam(X)
+    for perm in itertools.permutations(range(4)):
+        _, B_perm = direct.direct_lingam(X[:, list(perm)])
+        relabeled = np.zeros_like(B)
+        relabeled[np.ix_(perm, perm)] = B_perm
+        np.testing.assert_array_equal(relabeled != 0, B != 0, err_msg=str(perm))
+        np.testing.assert_allclose(relabeled, B, atol=1e-9, err_msg=str(perm))

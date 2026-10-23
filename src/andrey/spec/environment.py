@@ -81,14 +81,36 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
         group="backend",
     ),
     EnvVarSpec(
+        name="ANDREY_KCI_GPU_THRESHOLD",
+        values="integer (elements: rows squared)",
+        default="cuda 31250, mps never",
+        effect=(
+            "Smallest kernel matrix (rows squared) at which `auto` runs a KCI query with a "
+            "conditioning set on a CUDA GPU, in float64. A set value replaces the `cuda` default; "
+            "KCI never runs on `mps`."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_CMIKNN_GPU_THRESHOLD",
+        values="integer (elements: rows squared)",
+        default="cuda 1024, mps never",
+        effect=(
+            "Smallest distance matrix (rows squared) at which `auto` runs a CMIknn query on a CUDA "
+            "GPU. A set value replaces the `cuda` default; CMIknn never runs on `mps`."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
         name="ANDREY_GPU_CALIBRATE",
         values="1/true/yes/on or 0/false/no/off",
         default="off",
         effect=(
-            "Opt-in auto-tuning for `cuda`. The first `auto` use of each operation measures the "
-            "local numpy-to-`cuda` crossover, caches it by operation and machine fingerprint, and "
-            "logs the cutoff at INFO. A manual `*_GPU_THRESHOLD` takes precedence. `auto` never "
-            "selects `mps`, so calibration never measures it."
+            "Opt-in auto-tuning for `cuda`. The first `auto` use of covariance, correlation, or "
+            "entropy measures the local numpy-to-`cuda` crossover, caches it by operation and "
+            "machine fingerprint, and logs the cutoff at INFO. A manual `*_GPU_THRESHOLD` takes "
+            "precedence. `auto` never selects `mps`, so calibration never measures it. KCI and "
+            "CMIknn are not calibrated."
         ),
         group="backend",
     ),
@@ -100,6 +122,20 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "Global default seed for every stochastic method (BOSS, GRaSP, ICA-LiNGAM, CALM). An "
             "explicit `seed=` / `random_state=` overrides it. Deterministic methods (PC, GES, FCI, "
             "DirectLiNGAM, ...) ignore it."
+        ),
+        group="reproducibility",
+    ),
+    EnvVarSpec(
+        name="ANDREY_TIE_BREAK",
+        values="rank, position",
+        default="rank",
+        effect=(
+            "How the searches order tied candidates. `rank` orders them by a rank computed from "
+            "each column's own data, so reordering the columns relabels the result. `position` "
+            "orders them by column position, which skips computing the ranks, fires the "
+            "orientation rules of `pc`, `cdnod`, `fci`, and `gfci` one at a time in column order, "
+            "and visits the possible-d-separation step of `fci` and `gfci` in column order; "
+            "the result can then depend on the column order. Also `andrey.config(tie_break=...)`."
         ),
         group="reproducibility",
     ),
@@ -130,6 +166,8 @@ PRECEDENCE: tuple[str, ...] = (
     "Backend: `with andrey.config(backend=...)` > `andrey.config.backend = ...` > "
     "`ANDREY_BACKEND`/`ANDREY_DEVICE` > default (`auto`).",
     "Seed: explicit `seed=`/`random_state=` argument > `ANDREY_SEED` > `0`.",
+    "Tie break: `with andrey.config(tie_break=...)` > `andrey.config.tie_break = ...` > "
+    "`ANDREY_TIE_BREAK` > default (`rank`).",
     "GPU threshold: manual `ANDREY_*_GPU_THRESHOLD` > `ANDREY_GPU_CALIBRATE` measurement > "
     "per-device default.",
 )

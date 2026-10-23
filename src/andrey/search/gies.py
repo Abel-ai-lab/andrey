@@ -21,17 +21,24 @@ from __future__ import annotations
 import heapq
 import math
 from collections import deque
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 
 import numpy as np
 import numpy.typing as npt
 
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend, score_delta, stats
-from andrey.core.orient import to_structure
+from andrey.core.knowledge import Constraints, mpdag, orient, violates
+from andrey.core.orient import pdag2dag, to_structure
 from andrey.core.score import BICScore, check_columns
 from andrey.search import operators as ops
-from andrey.search._parallel import _EPS_IMPROVE, stable_key
-from andrey.search.ges import _reachable, _recompute_objective
+from andrey.search._parallel import _EPS_IMPROVE
+from andrey.search._parallel_ges import move_key
+from andrey.search.ges import _reachable, _recompute_objective, required_dag
+from andrey.search.hc import tie_ranks
+
+# The moves a scan skips, as ``(u, v, C)``: under background knowledge, those whose class holds no
+# DAG that satisfies it on the current graph.
+Excluded = set[tuple[int, int, frozenset[int]]]
 
 
 def intervention_mask(interventions: npt.ArrayLike, data: np.ndarray) -> np.ndarray:
@@ -214,6 +221,27 @@ def replace_unprotected(adj: np.ndarray, cut: np.ndarray) -> np.ndarray:
     return adj
 
 
+def admits(adj: np.ndarray, constraints: Constraints, cut: np.ndarray) -> bool:
+    """Whether some DAG in the interventional class ``adj`` satisfies ``constraints``.
+
+    Directs the lines the constraints decide and asks for a consistent extension (Dor and Tarsi)
+    whose interventional essential graph is ``adj``. Once ``adj`` has every required adjacency,
+    directs no forbidden edge, and joins no pair the constraints make non-adjacent, a line with a
+    forbidden direction is one the constraints decide, so the extension uses no forbidden edge;
+    when they decide no line, every DAG of the class satisfies them.
+    """
+    if violates(adj, constraints):
+        return False
+    oriented = orient(adj, constraints)
+    if np.array_equal(oriented, adj):
+        return True
+    try:
+        dag = pdag2dag(oriented)
+    except ValueError:
+        return False
+    return bool(np.array_equal(replace_unprotected(dag, cut), adj))
+
+
 def _lex_bfs(start: Sequence[int], ne: Mapping[int, set[int]]) -> list[int]:
     """LexBFS ordering of the vertices in ``start``; ties go to the vertex earlier in ``start``."""
     partition = [list(start)]
@@ -324,56 +352,72 @@ class _Objective:
 
 
 def _forward_candidates(
-    v: int, adj: np.ndarray, score: InterventionalBICScore, n: int
+    v: int,
+    adj: np.ndarray,
+    score: InterventionalBICScore,
+    n: int,
+    ranks: Sequence[int],
+    forbidden: np.ndarray | None = None,
 ) -> list[tuple[tuple, int, set[int]]]:
     """The improving insertions into ``v`` as ``(key, u, C)``, sorted by ``key``, path unchecked.
 
     ``u -> v`` with ``C`` the parents in ``v``'s component (Hauser and Buhlmann 2012, Prop. 25 (i)
-    and (ii)); ``key`` is ``(stable_key(delta, n), u, v, index)``, ``index`` the position of
-    ``C``'s free part among the subsets of ``ne(v)`` without ``u``'s neighbors. Insertions that
-    give ``v`` the same other parents are scored together
-    (:meth:`InterventionalBICScore.add_deltas`).
+    and (ii)); ``key`` is :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``.
+    Insertions that give ``v`` the same other parents are scored together
+    (:meth:`InterventionalBICScore.add_deltas`). With ``forbidden`` (``[i, j]``: no edge
+    ``i -> j``), neither ``u`` nor a member of ``C``'s free part is forbidden into ``v``.
     """
     row = adj[v]
     pa = np.flatnonzero(row == ARROW)
     ne = np.flatnonzero((row == TAIL) & (adj[:, v] == TAIL))
     sources = np.flatnonzero(row == NULL)
     sources = sources[sources != v]
+    if forbidden is not None:
+        sources = sources[~forbidden[sources, v]]
     out = []
     if ne.size == 0:
         deltas = score.add_deltas(v, pa)[sources]
         better = deltas < -_EPS_IMPROVE
         for u, delta in zip(sources[better].tolist(), deltas[better].tolist(), strict=True):
-            out.append(((stable_key(delta, n), u, v, 0), u, set()))
+            out.append((move_key(delta, n, u, v, (), ranks), u, set()))
     else:
         pa_set = set(pa.tolist())
         ne_list = ne.tolist()
         linked = adj[np.ix_(sources, ne)] != NULL
-        groups: dict[tuple[int, ...], list[tuple[int, int, set[int]]]] = {}
+        groups: dict[tuple[int, ...], list[tuple[int, set[int]]]] = {}
         for u, hits in zip(sources.tolist(), linked.tolist(), strict=True):
             na = {w for w, hit in zip(ne_list, hits, strict=True) if hit}
             t0 = [w for w, hit in zip(ne_list, hits, strict=True) if not hit]
-            for index, T in ops.clique_extensions(adj, na, t0):
+            if forbidden is not None:
+                t0 = [w for w in t0 if not forbidden[w, v]]
+            for _index, T in ops.clique_extensions(adj, na, t0):
                 C = na | set(T)
-                groups.setdefault(tuple(sorted(pa_set | C)), []).append((u, index, C))
+                groups.setdefault(tuple(sorted(pa_set | C)), []).append((u, C))
         for base, moves in groups.items():
             deltas = score.add_deltas(v, base)
-            for u, index, C in moves:
+            for u, C in moves:
                 delta = float(deltas[u])
                 if delta < -_EPS_IMPROVE:
-                    out.append(((stable_key(delta, n), u, v, index), u, C))
+                    out.append((move_key(delta, n, u, v, C, ranks), u, C))
     out.sort(key=lambda move: move[0])
     return out
 
 
 def _backward_candidate(
-    v: int, adj: np.ndarray, score: InterventionalBICScore, n: int
+    v: int,
+    adj: np.ndarray,
+    score: InterventionalBICScore,
+    n: int,
+    ranks: Sequence[int],
+    constraints: Constraints | None = None,
+    excluded: Excluded | None = None,
 ) -> tuple[tuple, int, set[int]] | None:
     """The best-improving deletion of an edge at ``v`` as ``(key, u, C)``, or None.
 
-    ``C`` is ``v``'s neighbors kept as its parents (Prop. 28); ``key`` is ``(stable_key(delta,
-    n), u, v, index)``, ``index`` the position of the dropped neighbors among the subsets of
-    ``ne(v)`` adjacent to ``u``.
+    ``C`` is ``v``'s neighbors kept as its parents (Prop. 28); ``key`` is
+    :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``. With ``constraints``, a
+    required pair is never deleted, and a neighbor ``h`` whose orientation ``v -> h`` or ``u -> h``
+    is forbidden is never dropped. A move in ``excluded`` is never returned.
     """
     row = adj[v]
     pa = set(np.flatnonzero(row == ARROW).tolist())
@@ -382,13 +426,23 @@ def _backward_candidate(
     best: tuple[tuple, int, set[int]] | None = None
     for u in np.flatnonzero((row == ARROW) | lines).tolist():
         h0 = ne[adj[u, ne] != NULL].tolist()
-        for index, H in ops.clique_residuals(adj, h0):
+        candidates = ops.clique_residuals(adj, h0)
+        if constraints is not None:
+            if constraints.required[u, v] or constraints.required[v, u]:
+                continue
+            f = constraints.forbidden
+            pinned = {h for h in h0 if f[v, h] or f[u, h]}
+            if pinned:
+                candidates = ((i, H) for i, H in candidates if pinned.isdisjoint(H))
+        for _index, H in candidates:
             C = set(h0) - set(H)
             kept = C | pa
             delta = score.score(v, kept - {u}) - score.score(v, kept | {u})
             if delta < -_EPS_IMPROVE:
-                key = (stable_key(delta, n), u, v, index)
+                key = move_key(delta, n, u, v, C, ranks)
                 if best is None or key < best[0]:
+                    if excluded and (u, v, frozenset(C)) in excluded:
+                        continue
                     best = (key, u, C)
     return best
 
@@ -429,29 +483,45 @@ def _separated(
 
 
 def _turning_best(
-    adj: np.ndarray, score: InterventionalBICScore, n: int
+    adj: np.ndarray,
+    score: InterventionalBICScore,
+    n: int,
+    ranks: Sequence[int],
+    constraints: Constraints | None = None,
+    excluded: Excluded | None = None,
 ) -> tuple[int, int, set[int], bool] | None:
     """The best-improving turn as ``(u, v, C, essential)``: ``v -> u`` (or ``v -- u``) becomes
     ``u -> v`` with ``C`` the parents of ``v`` in its component.
 
-    Lines follow Prop. 31 and arrows Prop. 34; the score change is Corollary 32 or 36.
+    Lines follow Prop. 31 and arrows Prop. 34; the score change is Corollary 32 or 36. Turns are
+    compared by :func:`~andrey.search._parallel_ges.move_key` of the move with ``C``. With
+    ``constraints``, a turn never makes a forbidden ``u -> v`` (the reverse of a required edge
+    included) or a forbidden ``c -> v`` for a ``c`` of ``C`` not adjacent to ``u``, which the
+    v-structure ``u -> v <- c`` compels. A move in ``excluded`` is never returned.
     """
     pa, nbr, adj_sets = _neighborhoods(adj)
     succ = ops.tail_successor_lists(adj)
     best_key: tuple | None = None
     best: tuple[int, int, set[int], bool] | None = None
+    forbidden = None if constraints is None else constraints.forbidden
 
     def offer(delta: float, key: tuple, move: tuple[int, int, set[int], bool]) -> None:
         nonlocal best_key, best
         if delta < -_EPS_IMPROVE and (best_key is None or key < best_key):
+            if excluded and (move[0], move[1], frozenset(move[2])) in excluded:
+                return
             best_key, best = key, move
 
     for v in range(n):
         for u in sorted(nbr[v]):  # a line, turned in a DAG where it points v -> u
+            if forbidden is not None and forbidden[u, v]:
+                continue
             N = nbr[v] & adj_sets[u]
-            for index, T in ops.clique_extensions(adj, (), sorted(nbr[v] - {u})):
+            for _index, T in ops.clique_extensions(adj, (), sorted(nbr[v] - {u})):
                 C = set(T)
                 if not C - N or not _separated(nbr, nbr[v], N - C, C - N, C & N):
+                    continue
+                if forbidden is not None and forbidden[list(C - N), v].any():
                     continue
                 kept = pa[u] | (C & N)
                 delta = (
@@ -460,12 +530,16 @@ def _turning_best(
                     - score.score(v, pa[v] | C)
                     - score.score(u, kept | {v})
                 )
-                offer(delta, (stable_key(delta, n), u, v, 0, index), (u, v, C, False))
+                offer(delta, move_key(delta, n, u, v, C, ranks), (u, v, C, False))
         for u in np.nonzero(adj[:, v] == ARROW)[0].tolist():  # an arrow v -> u
+            if forbidden is not None and forbidden[u, v]:
+                continue
             N = nbr[v] & adj_sets[u]
-            for index, T in ops.clique_extensions(adj, N, sorted(nbr[v] - adj_sets[u])):
+            for _index, T in ops.clique_extensions(adj, N, sorted(nbr[v] - adj_sets[u])):
                 C = N | set(T)
                 if _reaches(succ, v, u, C | nbr[u]):
+                    continue
+                if forbidden is not None and forbidden[list(T), v].any():
                     continue
                 delta = (
                     score.score(v, pa[v] | C | {u})
@@ -473,7 +547,7 @@ def _turning_best(
                     - score.score(v, pa[v] | C)
                     - score.score(u, pa[u])
                 )
-                offer(delta, (stable_key(delta, n), u, v, 1, index), (u, v, C, True))
+                offer(delta, move_key(delta, n, u, v, C, ranks), (u, v, C, True))
     return best
 
 
@@ -505,32 +579,52 @@ def _turn(
 
 
 class _Search:
-    """The GIES search state: the essential graph, the cached candidates, and the objective."""
+    """The GIES search state: the essential graph, the cached candidates, and the objective.
 
-    def __init__(self, score: InterventionalBICScore, n: int) -> None:
+    ``constraints`` filters the candidates, and ``start``, an essential graph, replaces the empty
+    graph the search otherwise starts from.
+    """
+
+    def __init__(
+        self,
+        score: InterventionalBICScore,
+        n: int,
+        ranks: Sequence[int],
+        constraints: Constraints | None = None,
+        start: np.ndarray | None = None,
+    ) -> None:
         self.score = score
         self.n = n
-        self.adj = np.zeros((n, n), dtype=np.int8)
+        self.ranks = ranks
+        self.constraints = constraints
+        self.forbidden = None if constraints is None else constraints.forbidden
+        self.adj = np.zeros((n, n), dtype=np.int8) if start is None else start
         self.objective = _Objective(score, n)
+        if start is not None:
+            self.objective.update(start, np.ones(n, dtype=bool))
         self.forward: dict[int, list[tuple[tuple, int, set[int]]]] = {}
         self.backward: dict[int, tuple[tuple, int, set[int]] | None] = {}
 
-    def forward_best(self) -> tuple[int, int, set[int]] | None:
-        """The best-improving insertion as ``(u, v, C)`` (Prop. 25)."""
+    def forward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
+        """The best-improving insertion not in ``excluded`` as ``(u, v, C)`` (Prop. 25)."""
         adj, n = self.adj, self.n
         if _FULL_RESCAN:
             reachable = _reachable(adj)
             valid = (
-                (key, u, C)
+                (key, u, v, C)
                 for v in range(n)
-                for key, u, C in _forward_candidates(v, adj, self.score, n)
-                if not reachable(v, u, C)
+                for key, u, C in _forward_candidates(
+                    v, adj, self.score, n, self.ranks, self.forbidden
+                )
+                if not reachable(v, u, C) and not (excluded and (u, v, frozenset(C)) in excluded)
             )
-            best = min(valid, default=None)
-            return None if best is None else (best[1], best[0][2], best[2])
+            best = min(valid, key=lambda move: move[0], default=None)
+            return None if best is None else best[1:]
         for v in range(n):
             if v not in self.forward:
-                self.forward[v] = _forward_candidates(v, adj, self.score, n)
+                self.forward[v] = _forward_candidates(
+                    v, adj, self.score, n, self.ranks, self.forbidden
+                )
         heap = [(moves[0][0], v, 0) for v, moves in self.forward.items() if moves]
         if not heap:
             return None
@@ -541,24 +635,60 @@ class _Search:
             moves = self.forward[v]
             _key, u, C = moves[i]
             if not reachable(v, u, C):  # Prop. 25(iii): every path from v to u meets C
-                return u, v, C
+                if not (excluded and (u, v, frozenset(C)) in excluded):
+                    return u, v, C
             if i + 1 < len(moves):
                 heapq.heappush(heap, (moves[i + 1][0], v, i + 1))
         return None
 
-    def backward_best(self) -> tuple[int, int, set[int]] | None:
-        """The best-improving deletion as ``(u, v, C)`` (Prop. 28)."""
+    def backward_best(self, excluded: Excluded | None = None) -> tuple[int, int, set[int]] | None:
+        """The best-improving deletion not in ``excluded`` as ``(u, v, C)`` (Prop. 28).
+
+        A target keeps one candidate; when it is excluded, the target is scanned again without
+        the excluded moves.
+        """
         adj, n = self.adj, self.n
         if _FULL_RESCAN:
             self.backward.clear()
         for v in range(n):
             if v not in self.backward:
-                self.backward[v] = _backward_candidate(v, adj, self.score, n)
-        best = min((move for move in self.backward.values() if move is not None), default=None)
+                self.backward[v] = _backward_candidate(
+                    v, adj, self.score, n, self.ranks, self.constraints
+                )
+        moves = []
+        for v, move in self.backward.items():
+            if move is not None and excluded and (move[1], v, frozenset(move[2])) in excluded:
+                move = _backward_candidate(
+                    v, adj, self.score, n, self.ranks, self.constraints, excluded
+                )
+            if move is not None:
+                moves.append((move, v))
+        best = min(moves, key=lambda found: found[0][0], default=None)
         if best is None:
             return None
-        key, u, C = best
-        return u, key[2], C
+        (_key, u, C), v = best
+        return u, v, C
+
+    def turning_best(
+        self, excluded: Excluded | None = None
+    ) -> tuple[int, int, set[int], bool] | None:
+        """The best-improving turn not in ``excluded`` (:func:`_turning_best`)."""
+        return _turning_best(self.adj, self.score, self.n, self.ranks, self.constraints, excluded)
+
+    def step(self, best: Callable, move: Callable[..., np.ndarray], cut: np.ndarray) -> bool:
+        """Apply the move ``best`` selects, built by ``move``; False when it selects none.
+
+        Under knowledge, a move whose class holds no DAG that satisfies it is skipped, and ``best``
+        selects again without it.
+        """
+        excluded: Excluded = set()
+        while (found := best(excluded)) is not None:
+            adj = move(self.adj.copy(), *found, cut)
+            if self.constraints is None or admits(adj, self.constraints, cut):
+                self.apply(adj)
+                return True
+            excluded.add((found[0], found[1], frozenset(found[2])))
+        return False
 
     def apply(self, adj: np.ndarray) -> None:
         """Move to ``adj``, the graph after one step; raise unless it lowers the score."""
@@ -577,15 +707,19 @@ class _Search:
 
 
 def gies(
-    data: np.ndarray, mask: np.ndarray | None = None, *, lambda_value: float = 1.0
+    data: np.ndarray,
+    mask: np.ndarray | None = None,
+    *,
+    lambda_value: float = 1.0,
+    constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover an interventional essential graph by greedy interventional equivalence search.
 
     Starts from the empty graph and repeats the forward (insert), backward (delete), and turning
     phases, each until it finds no improving step, until a round of backward and turning phases
     changes nothing. Every step takes the move with the lowest score change divided by the
-    variable count and rounded to nine decimal places, ties broken by the vertices and the move's
-    position in the enumeration.
+    variable count and rounded to nine decimal places; equal ones are ordered by the
+    :func:`~andrey.search.hc.tie_ranks` of the move's two vertices, then of its other vertices.
 
     Parameters
     ----------
@@ -596,6 +730,12 @@ def gies(
         :func:`intervention_mask` returns; None for observational data.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
+    constraints : Constraints or None
+        Background knowledge. No step adds a forbidden edge, removes or turns a required one, or
+        reaches a class that holds no DAG that satisfies the knowledge (such a step is skipped
+        for the next best one); the search starts from the class of the required edges. The
+        result is the essential graph with the edges the knowledge decides directed, then Meek's
+        rules with R4 (:func:`~andrey.core.knowledge.mpdag`).
 
     Returns
     -------
@@ -611,19 +751,22 @@ def gies(
     n = X.shape[1]
     score = InterventionalBICScore(X, mask, lambda_value=lambda_value)
     cut = np.zeros((n, n), dtype=bool) if mask is None else cut_pairs(mask)
+    ranks = tie_ranks(X).tolist()
+    start = None
+    if constraints is not None and constraints.required.any():
+        start = replace_unprotected(required_dag(constraints), cut)
     with backend.one_blas_thread():
-        search = _Search(score, n)
+        search = _Search(score, n, ranks, constraints, start)
         while True:
-            while (step := search.forward_best()) is not None:
-                search.apply(_insert(search.adj.copy(), *step, cut))
+            while search.step(search.forward_best, _insert, cut):
+                pass
             changed = False
-            while (step := search.backward_best()) is not None:
-                search.apply(_delete(search.adj.copy(), *step, cut))
+            while search.step(search.backward_best, _delete, cut):
                 changed = True
-            while (turn := _turning_best(search.adj, score, n)) is not None:
-                search.apply(_turn(search.adj.copy(), *turn, cut))
+            while search.step(search.turning_best, _turn, cut):
                 changed = True
             if not changed:
                 break
         total = _recompute_objective(search.adj, score, n)
-    return to_structure(search.adj, kind="cpdag"), total
+    adj = search.adj if constraints is None else mpdag(search.adj, constraints)
+    return to_structure(adj, kind="cpdag"), total

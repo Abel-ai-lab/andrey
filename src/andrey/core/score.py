@@ -153,10 +153,12 @@ class CopiedColumnsError(ValueError):
     """Raised when data columns repeat other columns up to scale and shift.
 
     ``groups`` holds each group of copies as column positions, as :func:`copy_groups` returns
-    them; the message is :func:`copies_message` of those groups.
+    them; the message is :func:`copies_message` of those groups, naming each position by
+    ``column_name``.
     """
 
     groups: tuple[tuple[int, ...], ...] = ()
+    column_name: Callable[[int], str] = str
 
 
 def copy_groups(corr: np.ndarray, n: int) -> tuple[tuple[int, ...], ...]:
@@ -207,6 +209,20 @@ def copies_message(groups: Sequence[Sequence[int]], name: Callable[[int], str] =
     )
 
 
+def copies_error(
+    groups: Sequence[Sequence[int]], name: Callable[[int], str] = str
+) -> CopiedColumnsError:
+    """Return the :class:`CopiedColumnsError` for the groups of copies ``groups``.
+
+    Its message is :func:`copies_message` of ``groups`` and ``name``; its ``groups`` and
+    ``column_name`` hold them.
+    """
+    error = CopiedColumnsError(copies_message(groups, name))
+    error.groups = tuple(tuple(group) for group in groups)
+    error.column_name = name
+    return error
+
+
 def check_columns(cov: np.ndarray, n: int) -> None:
     """Raise ``ValueError`` when a column of the data behind ``cov`` makes BIC scoring meaningless.
 
@@ -249,9 +265,7 @@ def check_columns(cov: np.ndarray, n: int) -> None:
     corr = cov / np.outer(sd, sd)
     groups = copy_groups(corr, n)
     if groups:
-        error = CopiedColumnsError(copies_message(groups))
-        error.groups = groups
-        raise error
+        raise copies_error(groups)
     if n <= d:
         return
     if np.linalg.eigvalsh(corr)[0] > ZERO_RESIDUAL:

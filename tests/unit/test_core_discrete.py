@@ -98,6 +98,55 @@ def test_a_sparse_table_counts_only_the_occupied_cells(monkeypatch):
     assert ChiSquare(x)(0, 1, (2, 3)) == pytest.approx(dense, rel=1e-12)
 
 
+def _fast_path_data(case: str) -> np.ndarray:
+    """Categorical columns of one of three kinds of table.
+
+    ``"dependent"``: tables with every cell filled. ``"sparse"``: few rows and many categories,
+    so most cells are empty and many configurations hold one row. ``"one value"``: a column with
+    one category, and a pair whose first column takes one value in some configurations, so a test
+    has zero degrees of freedom.
+    """
+    if case == "dependent":
+        return _codes(n=400, cards=(2, 3, 4, 3, 5))
+    if case == "sparse":
+        return _codes(seed=2, n=15, cards=(6, 5, 7, 4, 6))
+    x = _codes(seed=3, n=60, cards=(2, 3, 3, 2, 4))
+    x[:, 3] = 1.0
+    x[:, 0] = np.where(x[:, 2] == 0, 0.0, x[:, 0])
+    return x
+
+
+@pytest.mark.parametrize("g_square", [False, True], ids=["chisq", "gsq"])
+@pytest.mark.parametrize("case", ["dependent", "sparse", "one value"])
+@pytest.mark.parametrize(
+    ("batch", "rows", "table"),
+    [(1 << 22, 4, 1 << 16), (64, 4, 1 << 16), (1 << 22, 0, 40)],
+    ids=["one count", "a count per set", "large tables on the scalar path"],
+)
+def test_every_fast_path_returns_the_scalar_p_values(
+    monkeypatch, g_square, case, batch, rows, table
+):
+    """The batched, first-order, and all-pairs marginal paths equal the scalar call bit for bit:
+    whatever the argument order, with every table in one count or one count per set and the
+    marginal tables in one Gram block or several, and with tables over the size limit on the
+    scalar path."""
+    from andrey.core import ci
+
+    monkeypatch.setattr(ci, "_BATCH_CELLS", batch)
+    monkeypatch.setattr(ci, "_TABLE_ROWS", rows)
+    monkeypatch.setattr(ci, "_TABLE_MIN", table)
+    x = _fast_path_data(case)
+    d = x.shape[1]
+    test = ChiSquare(x, g_square=g_square)
+    marginal = test.marginal_pvalues()
+    for a, b in combinations(range(d), 2):
+        assert marginal[a, b] == marginal[b, a] == test(a, b)
+        others = [c for c in range(d) if c not in (a, b)]
+        sets = [s[::-1] for size in range(4) for s in combinations(others, size)][::-1]
+        assert test.batched_call(b, a, sets) == [test(a, b, s) for s in sets]
+        assert test.first_order_pvalues(b, a, others).tolist() == [test(a, b, (c,)) for c in others]
+
+
 def _bdeu(counts: np.ndarray, q: int, a: float = 1.0) -> float:
     """Log BDeu marginal likelihood of ``counts`` (one row per parent configuration)."""
     r = counts.shape[1]

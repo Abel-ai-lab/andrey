@@ -3,7 +3,9 @@
 Each ``(topology, functional, noise, density, d, n, seed, standardize, latents)`` dataset is stored
 once as a ``.npz`` containing ``float64`` samples and the true graph's int8 endpoint marks. The
 ``categorical`` functional samples a discrete network with ``andrey.data.sample_discrete`` instead;
-its samples are category codes. The ``conditional_gaussian`` functional samples a mixed network with
+its samples are category codes. The ``network_tables`` functional samples a published network
+from its own conditional probability tables with ``andrey.data.load_dataset``, the key's topology
+naming the network. The ``conditional_gaussian`` functional samples a mixed network with
 ``andrey.data.sample_mixed``: category codes in its categorical columns, values in the rest.
 :class:`DatasetKey` supplies the ``dataset_id``; :func:`load` casts to ``float32`` for those fits
 outside timing, without storing another copy.
@@ -72,6 +74,7 @@ FUNCTIONAL_TO_ANDREY = {
     "linear": "linear",
     "anm": "additive_noise",
     "pnl": "post_nonlinear",
+    "nonmonotone": "nonmonotone",
     "var": "var",
 }
 STANDARDIZE_TO_SCALE = {
@@ -105,6 +108,11 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # PNL is identifiable. The inner transform is linear and the outer one nonlinear and invertible.
     # At ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "pnl_pair": ("er", "pnl", "laplace", "standardized"),
+    # Nonlinear additive noise without hidden nodes: PC with the nonlinear CI tests.
+    "anm_er": ("er", "anm", "gaussian", "standardized"),
+    # Additive noise through cos, an even function: a child is uncorrelated with a symmetric
+    # parent, so partial correlation misses edges the nonlinear CI tests find.
+    "nonmonotone_er": ("er", "nonmonotone", "gaussian", "standardized"),
     # Categorical data from a discrete network, Dirichlet tables on an ER DAG: the chi-square and
     # G-square tests and the BDeu score. Codes are categories, so they are never rescaled.
     "discrete_er": ("er", "categorical", "dirichlet", "raw"),
@@ -151,6 +159,13 @@ DISCRETE_SETTINGS: dict[str, object] = {"categories": [2, 3], "concentration": 1
 #: share and the categories per categorical column travel on the key.
 MIXED_FUNCTIONAL = "conditional_gaussian"
 MIXED_SETTINGS: dict[str, object] = {"concentration": 1.0}
+
+#: The functional label of a published network's rows, sampled from its own conditional probability
+#: tables by ``andrey.data.load_dataset(..., discrete=True)``. A network key's topology is the
+#: dataset name, its noise :data:`NETWORK_NOISE`, its density 0, and its ``d`` the network's
+#: variables (:func:`network_key`): the network fixes its graph and tables.
+NETWORK_FUNCTIONAL = "network_tables"
+NETWORK_NOISE = "tables"
 
 #: Temporal regimes and the density their keys set. At density 0 the instantaneous graph has no
 #: edges, so the truth is lag-only: lag 1 holds every link.
@@ -396,6 +411,17 @@ def generation_kwargs(key: DatasetKey) -> dict[str, object]:
             **MIXED_SETTINGS,
             **shuffle,
         }
+    if key.functional == NETWORK_FUNCTIONAL:
+        if key.standardize != "raw" or key.latents or key.density:
+            raise ValueError(f"{key.label}: network rows are raw codes, no hidden nodes, density 0")
+        return {
+            "generator": "andrey.data.load_dataset",
+            "name": key.topology,
+            "n": key.n,
+            "seed": key.seed,
+            "discrete": True,
+            **shuffle,
+        }
     if key.functional == DISCRETE_FUNCTIONAL:
         if key.standardize != "raw" or key.latents:
             raise ValueError(f"{key.label}: categorical data are raw codes with no hidden nodes")
@@ -478,6 +504,8 @@ def graph_record(key: DatasetKey) -> dict[str, object]:
             "density": key.density,
             "params": lingam_models.model_params(key.functional),
         }
+    if key.functional == NETWORK_FUNCTIONAL:
+        return {"model": key.topology, "num_nodes": key.d, "density": key.density, "params": {}}
     model = TOPOLOGY_TO_GRAPH[key.topology]
     return {
         "model": model,
@@ -496,7 +524,7 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
     returned as :func:`lag_only_marks` with the kind ``"temporal"``. A paper model's series and
     truth come from :mod:`andrey_bench.temporal_models` or :mod:`andrey_bench.lingam_models`, as
     the module docstring says, and a :mod:`~andrey_bench.regime_models` dataset's data and truth come
-    from that module.
+    from that module. A network key's rows and truth come from ``andrey.data.load_dataset``.
 
     ``column_order[j]`` is the observed column that column ``j`` holds with ``shuffle`` off: the
     identity for an unshuffled key, and ``None`` for an :data:`ORDER_FREE` functional.
@@ -528,6 +556,26 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
     if key.functional == "panel2013":
         panel, stack = lingam_models.sample_panel(key.functional, key.d, key.times, key.n, key.seed)
         return panel, stack, COEFFICIENT_KINDS[key.functional], None
+    if key.functional == NETWORK_FUNCTIONAL:
+        ds = data.load_dataset(
+            key.topology,
+            n=key.n,
+            seed=key.seed,
+            discrete=True,
+            shuffle=key.shuffle,
+            as_frame=False,
+        )
+        if len(ds.feature_names) != key.d:
+            raise ValueError(f"{key.label}: {key.topology} has {len(ds.feature_names)} variables")
+        file_order = _network_names(key.topology)
+        columns = [file_order.index(name) for name in ds.feature_names]
+        marks = np.ascontiguousarray(ds.graph.to_numpy())
+        return (
+            np.ascontiguousarray(ds.data, dtype=CANONICAL_DTYPE),
+            marks,
+            str(ds.graph.kind),
+            columns,
+        )
     generator = kwargs.pop("generator", None)
     kwargs["shuffle"] = key.shuffle  # an unshuffled key's call leaves it out
     if generator == "sample_discrete":
@@ -553,6 +601,31 @@ def generate_one(key: DatasetKey) -> tuple[np.ndarray, np.ndarray, str, list[int
         raise ValueError(f"{key.label}: hidden nodes are not the last {key.latents} nodes")
     marks = np.ascontiguousarray(graph.to_numpy())  # int8 endpoint marks
     return data_arr, marks, str(graph.kind), columns
+
+
+def _network_names(name: str) -> list[str]:
+    """The published network `name`'s variables in its file's order."""
+    return list(
+        data.load_dataset(name, n=2, discrete=True, shuffle=False, as_frame=False).feature_names
+    )
+
+
+def network_key(name: str, n: int, seed: int, *, shuffle: bool = True) -> DatasetKey:
+    """Return the key of `n` rows sampled from the published network `name`'s own tables.
+
+    The first call downloads the network's file into ``andrey.data``'s cache.
+    """
+    return DatasetKey(
+        topology=name,
+        functional=NETWORK_FUNCTIONAL,
+        noise=NETWORK_NOISE,
+        density=0.0,
+        d=len(_network_names(name)),
+        n=n,
+        seed=seed,
+        standardize="raw",
+        shuffle=shuffle,
+    )
 
 
 def lag_only_marks(key: DatasetKey, truth: TemporalStructure) -> np.ndarray:
@@ -743,6 +816,9 @@ __all__ = [
     "DISCRETE_SETTINGS",
     "MIXED_FUNCTIONAL",
     "MIXED_SETTINGS",
+    "NETWORK_FUNCTIONAL",
+    "NETWORK_NOISE",
+    "network_key",
     "NOISES",
     "STANDARDIZE_TO_SCALE",
 ]

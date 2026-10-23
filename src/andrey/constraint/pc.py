@@ -5,11 +5,12 @@ The algorithm, its settings, and its references are described on :func:`andrey.p
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterable, Mapping
 from contextlib import nullcontext
 from itertools import combinations, groupby
 from math import comb
-from operator import itemgetter
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -21,11 +22,18 @@ from andrey.constraint._skeleton import (
     marginal_removals,
     prescreen_capable,
     scan_pairs,
+    separate_apart,
+    unseparated_triples,
 )
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
 from andrey.core.ci import make_indep_test, pins_blas
+from andrey.core.knowledge import KnowledgeError, _has_cycle, orient
 from andrey.core.orient import meek, to_structure
 from andrey.core.warning_policy import PerformanceWarning, warn_once
+from andrey.search._parallel import _KEY_DP
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 _EXPENSIVE_PASS_TESTS = 10_000_000
 COLLIDER_ORDERS = ("p_value", "column")
@@ -38,6 +46,8 @@ def pc(
     indep_test: str = "fisherz",
     collider_order: str = "p_value",
     categorical: np.ndarray | None = None,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
     in_column_order: bool = False,
     _trace: list[dict] | None = None,
 ) -> GraphStructure:
@@ -47,9 +57,18 @@ def pc(
     significance level in ``(0, 1)`` (a pair is separated when its p-value exceeds ``alpha``);
     ``indep_test`` selects the conditional-independence test from the registry, ``collider_order``
     the order of :func:`_orient_colliders`, and ``categorical``, a boolean mask of the categorical
-    columns, reaches a mixed-data test. ``in_column_order`` fires Meek's rules one at a time in
-    column order instead of in order-free rounds (:func:`~andrey.core.orient.meek`). Returns the
-    CPDAG as a ``GraphStructure`` of kind ``"cpdag"``.
+    columns, reaches a mixed-data test. ``max_depth`` caps the conditioning-set size of the
+    skeleton search. With ``constraints``, the skeleton search starts from the pairs they allow,
+    never tests a required pair, and gives a pair they make non-adjacent a separating set when it
+    finds one (:func:`_discover_skeleton`); every edge they decide is directed before the
+    colliders, and Meek's rules run with R4, so the result is the maximally oriented PDAG (MPDAG)
+    of the class under the knowledge (Meek 1995; Perkovic, Kalisch, and Maathuis 2017). A triple
+    over a non-adjacent pair with no separating set is neither a collider nor a non-collider to any
+    rule (:func:`~andrey.constraint._skeleton.unseparated_triples`). Edges they decide that close a
+    directed cycle raise ``ValueError`` (:func:`check_knowledge_cycle`). ``in_column_order`` fires
+    Meek's rules one at a time in column order instead of in order-free rounds
+    (:func:`~andrey.core.orient.meek`). Returns the CPDAG, or the MPDAG with ``constraints``, as a
+    ``GraphStructure`` of kind ``"cpdag"``.
 
     The private ``_trace`` sink receives one record per step, in the order the steps run: each
     independence test (``step="test"``, from :func:`_discover_skeleton`), each unshielded triple
@@ -66,23 +85,105 @@ def pc(
         categorical=categorical,
         record_pvalues=collider_order == "p_value",
         warn_expensive=True,
+        max_depth=max_depth,
+        constraints=constraints,
         _trace=_trace,
     )
+    rule4 = constraints is not None
+    ambiguous = unseparated_triples(skeleton != NULL, sepsets, constraints)
+    if constraints is not None:
+        skeleton = orient(skeleton, constraints)
+        check_knowledge_cycle((skeleton == TAIL) & (skeleton.T == ARROW))
     pdag = _orient_colliders(skeleton, sepsets, pvalues, order=collider_order, _trace=_trace)
     if _trace is None:
-        return to_structure(
-            _undirect_conflicts(meek(pdag, in_column_order=in_column_order)), kind="cpdag"
-        )
+        cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
+        return to_structure(_undirect_conflicts(cpdag), kind="cpdag")
     firings: list[dict] = []
-    cpdag = meek(pdag, in_column_order=in_column_order, _trace=firings)
+    cpdag = meek(
+        pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order, _trace=firings
+    )
     _trace.extend(dict(step="meek", **firing) for firing in firings)
     return to_structure(_undirect_conflicts(cpdag, _trace=_trace), kind="cpdag")
+
+
+def resolve_collider_order(collider_order: str | None) -> str:
+    """Return ``collider_order``, or for ``None`` the order ``andrey.config.tie_break`` selects.
+
+    ``"rank"`` selects ``"p_value"`` and ``"position"`` selects ``"column"``. An explicit
+    ``collider_order`` is returned as given, without reading the setting.
+    """
+    if collider_order is not None:
+        return collider_order
+    return "column" if backend.config.tie_break == "position" else "p_value"
+
+
+def resolve_in_column_order() -> bool:
+    """Whether ``andrey.config.tie_break`` is ``"position"``, which fires the orientation rules.
+
+    Under ``"position"``, Meek's rules and FCI's rules R1-R10 fire one at a time in column order
+    (``in_column_order``); under ``"rank"``, they run in order-free rounds.
+    """
+    return backend.config.tie_break == "position"
+
+
+def resolve_possible_dsep(possible_dsep: str | None) -> str:
+    """Return ``possible_dsep``, or for ``None`` the order ``andrey.config.tie_break`` selects.
+
+    ``"rank"`` selects ``"order_free"`` and ``"position"`` selects ``"fast"``. An explicit
+    ``possible_dsep`` is returned as given, without reading the setting.
+    """
+    if possible_dsep is not None:
+        return possible_dsep
+    return "fast" if backend.config.tie_break == "position" else "order_free"
 
 
 def check_collider_order(collider_order: str) -> None:
     """Raise ``ValueError`` unless ``collider_order`` is one of :data:`COLLIDER_ORDERS`."""
     if collider_order not in COLLIDER_ORDERS:
         raise ValueError(f"collider_order must be 'p_value' or 'column', got {collider_order!r}")
+
+
+def check_knowledge_cycle(paths: np.ndarray, closing: np.ndarray | None = None) -> None:
+    """Raise :class:`~andrey.core.knowledge.KnowledgeError` when the edges background knowledge
+    directs close a cycle.
+
+    The cycle follows edges ``paths[i, j]`` (``i -> j``) from a node ``y`` to a node ``x`` and
+    closes with ``closing[x, y]``; ``closing`` defaults to ``paths``, so any directed cycle of
+    ``paths`` counts. PC and CD-NOD pass the edges the knowledge directs. FCI passes its required
+    edges as ``paths`` and its arrowheads as ``closing``: a required path from ``y`` to ``x`` makes
+    ``y`` an ancestor of ``x``, which an arrowhead at ``y`` on the edge ``x - y`` denies, while a
+    cycle of arrowheads alone fits bidirected edges. The message names the cycle by column position.
+    """
+    closing = paths if closing is None else closing
+    if not _has_cycle(paths | closing):
+        return
+    successors = [np.flatnonzero(row).tolist() for row in paths]
+    for y in np.flatnonzero(closing.any(axis=0)).tolist():
+        previous = {y: y}
+        queue = deque([y])
+        while queue:
+            x = queue.popleft()
+            if closing[x, y]:
+                cycle = [x]
+                while cycle[-1] != y:
+                    cycle.append(previous[cycle[-1]])
+                if closing is paths:
+                    path = " -> ".join(str(v) for v in [*cycle[::-1], y])
+                    conflict = f"orients the edges {path} into a directed cycle"
+                else:
+                    path = " -> ".join(str(v) for v in cycle[::-1])
+                    conflict = (
+                        f"requires the directed path {path}, which makes {y} an ancestor of {x}, "
+                        f"and puts an arrowhead at {y} on the edge {x} - {y}, which denies it"
+                    )
+                raise KnowledgeError(
+                    f"the background knowledge {conflict}, over the adjacencies the search kept; "
+                    "change the required edges, forbidden edges, or tiers that set them"
+                )
+            for z in successors[x]:
+                if z not in previous:
+                    previous[z] = x
+                    queue.append(z)
 
 
 def _orient_colliders(
@@ -96,21 +197,24 @@ def _orient_colliders(
     """Orient the unshielded colliders in ``order``, by default most clearly separated pair first.
 
     ``pdag`` holds the skeleton's endpoint marks, every edge undirected or some already directed
-    (CDNOD directs the context's edges first); the result is a new matrix. An unshielded triple
-    ``x - y - z`` (``x`` and ``z`` both adjacent to ``y`` but not to each other) is a collider
-    ``x -> y <- z`` iff ``y`` is not in the separating set of ``x`` and ``z``. A collider is skipped
+    (CDNOD directs the context's edges first, and background knowledge the edges it decides); the
+    result is a new matrix. An unshielded triple ``x - y - z`` (``x`` and ``z`` both adjacent to
+    ``y`` but not to each other) is a collider ``x -> y <- z`` iff ``y`` is not in the separating
+    set of ``x`` and ``z``; a triple whose endpoints have no recorded separating set, a pair the
+    knowledge makes non-adjacent for which the search found none, is skipped. A collider is skipped
     when an edge it would orient already has an arrowhead at ``x`` or ``z``, which it would make
-    bidirected; so of two conflicting colliders, the one oriented first is kept.
+    bidirected; so of two conflicting colliders, the one oriented first is kept, and an edge
+    directed before the colliders is never reversed or made bidirected.
 
     With ``order="p_value"``, the collider's rank is ``pvalues[(x, z)]``, keyed with the lower index
     first: the largest p-value among the conditioning sets that separated ``x`` and ``z``. Colliders
-    are oriented from the highest rank to the lowest. Colliders of exactly equal rank are each
-    checked against the marks set before their rank, then all set: an edge two of them dispute ends
-    bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's rules. The result
-    depends on the ranks, not on the column order. With ``order="column"``, ``pvalues`` is not read
-    (it may be empty): the triples are visited by middle node ``y``, then by endpoint pair
-    ``(x, z)``, in ascending column order, each decided against the marks set before it, so no edge
-    ends bidirected and the result depends on the column order.
+    are oriented from the highest rank to the lowest. Colliders whose ranks agree to ``_KEY_DP``
+    decimals are each checked against the marks set before their rank, then all set: an edge two of
+    them dispute ends bidirected, and :func:`_undirect_conflicts` leaves it undirected after Meek's
+    rules. The result depends on the ranks, not on the column order. With ``order="column"``,
+    ``pvalues`` is not read (it may be empty): the triples are visited by middle node ``y``, then by
+    endpoint pair ``(x, z)``, in ascending column order, each decided against the marks set before
+    it, so no edge ends bidirected and the result depends on the column order.
 
     The private ``_trace`` sink records every unshielded triple in the order decided:
     ``step="collider"``, the ``triple`` ``(x, y, z)``, the pair's ``sepset`` and rank ``p``
@@ -123,11 +227,15 @@ def _orient_colliders(
     for y in range(pdag.shape[0]):
         nbrs = np.flatnonzero(pdag[y] != NULL).tolist()
         for x, z in combinations(nbrs, 2):
-            if pdag[x, z] == NULL:
+            if pdag[x, z] == NULL and ((x, z) in sepsets or (z, x) in sepsets):
                 triples.append((pvalues[(x, z)] if ranked else None, x, y, z))
     if ranked:
-        triples.sort(key=itemgetter(0), reverse=True)
-        groups = [list(tied) for _, tied in groupby(triples, key=itemgetter(0))]
+
+        def rank(triple: tuple) -> float:
+            return round(triple[0], _KEY_DP)
+
+        triples.sort(key=rank, reverse=True)
+        groups = [list(tied) for _, tied in groupby(triples, key=rank)]
     else:
         groups = [[triple] for triple in triples]
     for group in groups:
@@ -197,13 +305,18 @@ def _discover_skeleton(
     prescreen: bool = True,
     workers: int = 1,
     warn_expensive: bool = False,
+    max_depth: int | None = None,
+    constraints: Constraints | None = None,
     _trace: list[dict] | None = None,
 ) -> tuple[np.ndarray, dict[tuple[int, int], tuple[int, ...]], dict[tuple[int, int], float]]:
     """Learn the undirected skeleton and, for every removed pair, its separating set and p-value.
 
-    Grows the conditioning size from zero; at each size, every currently adjacent pair is tested
-    against subsets of a start-of-size neighborhood snapshot (in both directions, as PC does), and
-    edges found independent are removed together after the size completes. A removed pair's
+    Grows the conditioning size from zero, up to ``max_depth`` when one is given, over the complete
+    graph, or over the pairs ``constraints`` allow when given; a pair joined by a required edge is
+    never tested, so it stays.
+    At each size, every currently adjacent pair is tested against subsets of a start-of-size
+    neighborhood snapshot (in both directions, as PC does), and edges found independent are
+    removed together after the size completes. A removed pair's
     separating set is the union of every conditioning set that made it independent, and its p-value
     the largest among those sets' tests; both are keyed ``(x, y)`` with ``x < y``. ``indep_test``
     selects the CI test (shared by PC and CDNOD, which pass the augmented matrix); ``categorical``
@@ -211,10 +324,15 @@ def _discover_skeleton(
     column collider order, which ranks nothing, no p-value is compared or kept and the returned
     p-value dict is empty; the skeleton and the separating sets are the same.
 
-    When ``prescreen`` is set and the test exposes the vectorized closed forms, the size-0 and
-    size-1 passes read the correlation matrix directly (all-pairs marginal threshold, then one
-    first-order read per surviving pair) in place of the dense scalar scan -- same removals, same
-    separating sets, same p-values. With ``workers > 1`` the ``|S| >= 2`` scan fans out across
+    After the last size, a pair ``constraints`` make non-adjacent that shares a neighbor gets its
+    separating set and p-value the same way, from the final neighborhoods
+    (:func:`~andrey.constraint._skeleton.separate_apart`), so colliders over it are oriented as
+    usual; a pair no tested conditioning set separates gets neither.
+
+    When ``prescreen`` is set and the test exposes the vectorized marginal and first-order paths,
+    the size-0 and size-1 passes take them (all-pairs marginal threshold, then one first-order
+    batch per surviving pair) in place of the dense scalar scan -- same removals, same separating
+    sets, same p-values. With ``workers > 1`` the ``|S| >= 2`` scan fans out across
     worker processes; the reduce is a plain union of per-chunk removals, so the result is identical
     to the serial scan whatever the partition.
 
@@ -222,7 +340,8 @@ def _discover_skeleton(
     pass requiring at least ten million CI tests. The search still evaluates every conditioning set.
 
     The private ``_trace`` sink records every test in the order it runs: ``step="test"``,
-    ``depth``, the pair ``x < y``, the conditioning set ``S``, the p-value ``p``, and ``removed``
+    ``depth``, the pair ``x < y``, the conditioning set ``S``, the p-value ``p`` (for CMIknn, which
+    stops its shuffles once the side of ``alpha`` is certain, a bound on that side), and ``removed``
     (``p > alpha``: the test separates the pair, so the edge is removed when its depth ends). A
     trace needs every p-value in this process, so tracing scans serially.
     """
@@ -230,6 +349,10 @@ def _discover_skeleton(
     test = make_indep_test(indep_test, X, categorical=categorical)
     adj = np.full((d, d), TAIL, dtype=np.int8)
     np.fill_diagonal(adj, NULL)
+    keep = None
+    if constraints is not None:
+        adj[~constraints.support()] = NULL
+        keep = constraints.required | constraints.required.T
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     pvalues: dict[tuple[int, int], float] = {}
 
@@ -242,15 +365,16 @@ def _discover_skeleton(
         while True:
             neighbors = [np.flatnonzero(adj[i] != NULL) for i in range(d)]
             max_degree = max((nb.size for nb in neighbors), default=0)
-            if size > max_degree - 1:
+            if size > max_degree - 1 or (max_depth is not None and size > max_depth):
                 break
+            testable = adj if keep is None else (adj != NULL) & ~keep
             removals: list[Removal] = []
             if can_prescreen and size == 0:
-                upper = np.triu(adj != NULL, 1)
+                upper = np.triu(testable != NULL, 1)
                 for x, y, p in marginal_removals(test, upper, alpha, _trace, record_pvalues):
                     removals.append((x, y, (), p))
             elif can_prescreen and size == 1:
-                for x, y in adjacent_pairs(adj):
+                for x, y in adjacent_pairs(testable):
                     candidates = sorted(
                         (set(neighbors[x].tolist()) | set(neighbors[y].tolist())) - {x, y}
                     )
@@ -260,7 +384,7 @@ def _discover_skeleton(
                     if separating:
                         removals.append((x, y, tuple(separating), p))
             else:
-                pairs = adjacent_pairs(adj)
+                pairs = adjacent_pairs(testable)
                 if warn_expensive and size >= 2 and _expensive_pass(pairs, neighbors, size):
                     warn_once(
                         f"PC conditioning size {size} requires at least "
@@ -291,6 +415,20 @@ def _discover_skeleton(
         if pool is not None:
             pool.close()
 
+    if constraints is not None:
+        removals = separate_apart(
+            test,
+            adj != NULL,
+            ~constraints.support(),
+            alpha,
+            max_depth=max_depth,
+            trace=_trace,
+            record_pvalues=record_pvalues,
+        )
+        for x, y, separating, p in removals:
+            sepsets[(x, y)] = separating
+            if p is not None:
+                pvalues[(x, y)] = p
     return adj, sepsets, pvalues
 
 

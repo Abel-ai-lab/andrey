@@ -2,8 +2,9 @@
 
 The underlying searches use :mod:`andrey.core` for the conditional-independence tests (Fisher-Z and
 Student-t on continuous data, chi-square and G-square on categorical data, degenerate and
-conditional Gaussian likelihood ratios on mixed data) and orientation. ``pc`` and ``cdnod`` produce
-CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with a BIC, BDeu, or mixed-data score.
+conditional Gaussian likelihood ratios on mixed data, and the nonlinear tests) and orientation.
+``pc`` and ``cdnod`` produce CPDAGs; ``fci`` and ``gfci`` produce PAGs. GFCI also uses GES with a
+BIC, BDeu, or mixed-data score.
 """
 
 from __future__ import annotations
@@ -18,11 +19,14 @@ from andrey.api._adapt import (
     check_categories,
     checked_data,
     column_labels,
+    column_namer,
     copies_named,
     data_kind,
+    int_in_range,
     open_unit_interval,
     structure_output,
 )
+from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -37,9 +41,11 @@ def pc(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    collider_order: str = "p_value",
+    collider_order: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with the PC algorithm.
 
@@ -55,22 +61,27 @@ def pc(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
-        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` and ``"student_t"``
-        test partial correlation, for continuous data: ``"fisherz"`` applies Fisher's z-transform
-        and the normal distribution; ``"student_t"`` applies the Student-t distribution, which is
-        exact for Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and
-        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
+    indep_test : str, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
+        for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal
+        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
+        Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed data, continuous and categorical columns, by a likelihood ratio. See Notes.
-    collider_order : {"p_value", "column"}, default="p_value"
+        mixed data, continuous and categorical columns, by a likelihood ratio. Four more tests
+        detect nonlinear dependence in continuous data, at a far higher cost per test: ``"kci"`` is
+        the kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a
+        nearest-neighbor conditional mutual information test; and ``"gpdc"`` Gaussian-process
+        regression with a distance correlation test. See Notes.
+    collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, which decides between two colliders that would
         orient one edge in opposite directions. ``"p_value"`` orients first the collider whose
         endpoints were separated with the largest p-value, so the colliders do not depend on the
         column order. ``"column"`` orients them in column order and keeps the first of two that
-        conflict. See Notes.
+        conflict. ``None`` follows ``andrey.config.tie_break``: ``"p_value"`` under ``"rank"``,
+        ``"column"`` under ``"position"``. See Notes.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
@@ -79,6 +90,20 @@ def pc(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs and never removes a required pair; the tests can remove any other allowed
+        pair. A pair the knowledge makes non-adjacent is tested for a separating set, so colliders
+        over it are oriented as usual; when the search finds none within ``max_depth``, no rule
+        reads its unshielded triples as colliders or non-colliders. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow, giving the maximally
+        oriented PDAG (MPDAG) :class:`~andrey.Knowledge` describes; knowledge that orients the edges
+        the search kept into a directed cycle raises ``ValueError``.
 
     Returns
     -------
@@ -94,16 +119,19 @@ def pc(
         If ``indep_test`` names no available test.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
         not in ``(0, 1)``, if ``max_categories`` is less than ``2``, with ``"chisq"`` or ``"gsq"``,
         if ``data`` holds a value that is not a whole number, or, with ``"degen_gauss"`` or
         ``"cond_gauss"``, if ``categorical`` names a column ``data`` lacks, or if a categorical
         column holds a number that is not whole or a missing value. Also if ``categorical`` is given
-        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. When
-        copies of a column, up to scale and shift, make that matrix singular, the message names
-        every group of copies and says to keep one column per group.
+        with another test, or if ``collider_order`` is not ``"p_value"`` or ``"column"``. With
+        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
+        before any test runs; one message names every group of copies and says to keep one column
+        per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -124,9 +152,10 @@ def pc(
     -----
     **When to use it.** PC suits data with no unmeasured common causes. Its default Fisher-Z test
     assumes continuous data, where each variable depends linearly on its causes with roughly
-    Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, and for mixed data
-    ``"degen_gauss"`` or ``"cond_gauss"``. It is fastest on sparse graphs, where every variable has
-    few neighbors [5]_.
+    Gaussian noise; for categorical data, use ``"chisq"`` or ``"gsq"``, for mixed data
+    ``"degen_gauss"`` or ``"cond_gauss"``, and for nonlinear effects in continuous data ``"kci"``,
+    ``"rcot"``, ``"cmiknn"``, or ``"gpdc"``, at a far higher cost per test.
+    It is fastest on sparse graphs, where every variable has few neighbors [5]_.
 
     **When not to.** When unmeasured common causes are plausible, use :func:`~andrey.fci`. When the
     noise is non-Gaussian and every edge should be oriented, use :func:`~andrey.direct_lingam`.
@@ -143,21 +172,25 @@ def pc(
     it. Two colliders conflict when they would orient one edge in opposite directions, so the order
     in which they are oriented can change the result [3]_. A collider is skipped when it would give
     an edge an arrowhead at both ends, so of two conflicting colliders the one oriented first is
-    kept. With the default ``collider_order="p_value"``, each collider ``x -> y <- z`` ranks by the
-    largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders are
-    oriented from the highest rank to the lowest. When two conflicting colliders rank exactly
-    equal, the edge they dispute stays undirected, and Meek's rules do not orient it. The colliders
-    therefore do not depend on the column order. This adapts the conflict rule of Ramsey [10]_,
-    which ranks a collider by separating sets that additional tests choose; Andrey ranks it by the
-    tests that removed the edge, so orienting runs no new test. With ``collider_order="column"``,
-    colliders are oriented by middle node, then by endpoint pair, in column order, so the result
-    can depend on the column order. After the colliders, Meek's rules run in rounds: each round
-    collects every orientation they imply on the graph as it stands and applies them together,
-    except that an edge two of them would direct both ways stays undirected, and so do
-    orientations that would together close a directed cycle. The rounds repeat until one orients
-    nothing, so Meek's rules do not depend on the column order. Such conflicts arise only when no
-    DAG on the skeleton has exactly the colliders found, as test errors can cause; otherwise the
-    rounds give the CPDAG that firing the rules one at a time gives.
+    kept. With ``collider_order="p_value"`` (the default), each collider ``x -> y <- z`` ranks by
+    the largest p-value among the conditioning sets that separated ``x`` and ``z``, and colliders
+    are oriented from the highest rank to the lowest. When two conflicting colliders rank equal to
+    nine decimals, the edge they dispute stays undirected, and Meek's rules do not orient it. The
+    colliders therefore do not depend on the column order. This adapts the conflict rule of Ramsey
+    [10]_, which ranks a collider by separating sets that additional tests choose; Andrey ranks it
+    by the tests that removed the edge, so orienting runs no new test. With
+    ``collider_order="column"``, colliders are oriented by middle node, then by endpoint pair, in
+    column order, so the result can depend on the column order. After the colliders, Meek's rules
+    run in rounds: each round collects every orientation they imply on the graph as it stands and
+    applies them together, except that an edge two of them would direct both ways stays
+    undirected, and so do orientations that would together close a directed cycle. The rounds
+    repeat until one orients nothing, so Meek's rules do not depend on the column order. Such
+    conflicts arise only when no DAG on the skeleton has exactly the colliders found, as test errors
+    can cause; otherwise the rounds give the CPDAG that firing the rules one at a time gives. Under
+    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order instead,
+    and of two firings that would orient one edge in opposite directions the first decides. The
+    :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
+    each method.
 
     **Limitations.** The benchmark numbers below were measured with ``collider_order="column"``; the
     default is not benchmarked yet. On simulated linear-Gaussian data from sparse random graphs
@@ -255,15 +288,25 @@ def pc(
     [('g', 'v', 'directed'), ('u', 'v', 'directed')]
     """
     from andrey.constraint.pc import pc as _pc
+    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="pc")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         cpdag = _pc(
-            X, alpha=alpha, indep_test=indep_test, collider_order=collider_order, categorical=mask
+            X,
+            alpha=alpha,
+            indep_test=indep_test,
+            collider_order=resolve_collider_order(collider_order),
+            categorical=mask,
+            max_depth=max_depth,
+            constraints=constraints,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "PC", **categorical_metadata(mask, data)}
@@ -278,7 +321,9 @@ def fci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "order_free",
+    possible_dsep: str | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with FCI, sound under latent confounders.
 
@@ -294,14 +339,18 @@ def fci(
         become the structure's ``labels``.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
-        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` and ``"student_t"``
-        test partial correlation, for continuous data: ``"fisherz"`` applies Fisher's z-transform
-        and the normal distribution; ``"student_t"`` applies the Student-t distribution, which is
-        exact for Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and
-        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
+    indep_test : str, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` and ``"student_t"`` test partial correlation,
+        for continuous data: ``"fisherz"`` applies Fisher's z-transform and the normal
+        distribution; ``"student_t"`` applies the Student-t distribution, which is exact for
+        Gaussian data at any sample size. ``"chisq"`` (Pearson's chi-square) and ``"gsq"``
+        (G-square, the likelihood ratio) test categorical data, coded by whole numbers.
         ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional Gaussian) test
-        mixed data, continuous and categorical columns. See Notes.
+        mixed data, continuous and categorical columns. Four more tests detect nonlinear
+        dependence in continuous data, at a far higher cost per test: ``"kci"`` is the kernel
+        test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
+        conditional mutual information test; and ``"gpdc"`` Gaussian-process regression with a
+        distance correlation test. See Notes.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
         How FCI decides whether ``z`` is a collider on a triple ``x - z - y`` where ``x`` and ``y``
         are not adjacent. ``"sepsets"`` makes it a collider when ``z`` is not in the separating set
@@ -310,7 +359,7 @@ def fci(
         fewer than half of the separating subsets (``p >= alpha``) contain ``z`` [4]_; at exactly
         half the triple stays unoriented. Majority runs up to ``2**degree`` extra tests per triple.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
@@ -319,13 +368,30 @@ def fci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"order_free", "fast"}, default="order_free"
+    possible_dsep : {"order_free", "fast"} or None, default=None
         The order of FCI's possible-d-separation step [2]_ [3]_, which removes edges the first step
         kept, one at a time, so each removal changes what the step tests after it.
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. Both took about the same time on the benchmark
-        graphs; see Notes and Limitations.
+        ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
+        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
+        Limitations.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove. It caps the tests of
+        the adjacency search, the possible-d-separation step, the majority rule, and the
+        discriminating-path rule.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs and never removes a required pair; the tests can remove any other allowed
+        pair. A pair the knowledge makes non-adjacent is tested for a separating set, so colliders
+        over it are oriented as usual; when the search finds none within ``max_depth``, no rule
+        reads its unshielded triples as colliders or non-colliders. In the PAG, a forbidden
+        ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and can leave a circle at ``b``,
+        and a required one is ``a -> b``; knowledge that puts an arrowhead at ``a`` on an edge
+        ``a - b`` while its required edges lead from ``a`` to ``b`` raises ``ValueError``.
 
     Returns
     -------
@@ -342,13 +408,16 @@ def fci(
         If ``indep_test`` names no available test.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
     ValueError
         If ``data`` has too few samples for a test or a singular correlation matrix, if ``alpha`` is
         not in ``(0, 1)``, if ``collider_rule`` or ``possible_dsep`` is not a supported choice, or
-        if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. When
-        copies of a column, up to scale and shift, make that matrix singular, the message names
-        every group of copies and says to keep one column per group.
+        if ``data`` or ``categorical`` does not suit the test, as for :func:`~andrey.pc`. With
+        ``"fisherz"`` or ``"student_t"``, also if a column repeats another up to scale and shift,
+        before any test runs; one message names every group of copies and says to keep one column
+        per group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -388,7 +457,12 @@ def fci(
     decides an endpoint by every shortest discriminating path, so paths whose tests disagree leave
     it a circle. The orientation rules therefore do not depend on the column order, and with
     ``possible_dsep="order_free"`` neither does the result, unless two columns are identical. With
-    ``"fast"`` the result can depend on the column order through the possible-d-separation step.
+    ``"fast"`` the result can depend on the column order through the possible-d-separation step. A
+    fixed column order gives reproducible results. Under ``andrey.config(tie_break="position")``,
+    the rules instead fire one at a time in column order, and of two firings that conflict the
+    first decides. ``possible_dsep`` then defaults to ``"fast"``. The
+    :doc:`column-order guide </docs/guides/column-order>` lists what reordering the columns does to
+    each method.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only if the whole cycle,
     including the closing edge, is uncovered, that is, no two nodes two steps apart are adjacent.
@@ -417,20 +491,25 @@ def fci(
     because it does not depend on the order of the tests, and on simulated data it gave more
     accurate PAGs than the first set found.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2) with one variable in ten hidden, from 20 to 800 variables counting the hidden ones,
-    with ten rows per variable. Its median endpoint errors, each mismatched tail, arrowhead, or
-    circle, stayed below the empty graph's up to 400 variables (836 against 884) and passed it at
-    800 (2,579 against 1,772). The median fit took 0.061 s at 20 variables and 72 s at 800, on 16
-    cores. On the 223-variable ANDES network with 1,000 simulated rows, its median endpoint errors
-    passed the empty graph's (696 against 676). Rule R5 stops searching a pair after a fixed number
-    of partial paths and leaves its circles, so on graphs with many circle-circle edges it can miss
-    an undirected cycle. On these graphs, the default ``possible_dsep="order_free"`` took as long as
-    ``"fast"`` (median time ratio 0.99 to 1.05 at each size). At 400 variables with one variable in
-    five hidden and 50 rows per variable, its rank order needed more tests than the column orders
-    tried on some graphs: on one graph of mean degree 4, 33 to 34 s against 23 to 29 s for
-    ``"fast"`` over the same five column orders. With the mixed-data tests, it is experimental and
-    not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
+    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
+    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
+    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's at
+    every size with mean degree 4, and up to 400 variables with mean degree 2, where they passed it
+    at 800 (2,582 against 1,738 with one variable in ten hidden and ten rows per variable). With
+    those settings the median fit took 0.0064 s at 20 variables and 114 s at 800; with one variable
+    in five hidden and 50 rows per variable it took 78 s at 400 and 4,829 s at 800, where two of
+    five fits ran past 7,200 s. The default, ``"order_free"``, took 0.99 to 1.05 times as long as
+    ``"fast"`` up to 200 variables and 0.78 to 1.42 times at 400 and 800, and its median endpoint
+    errors were within 2% of ``"fast"``'s. On some graphs from 400 variables its order needs more
+    tests than the column order: on one with 400 variables, mean degree 4, one variable in five
+    hidden, and 50 rows per variable, it took 34 s against 23 to 29 s for ``"fast"`` over five
+    column orders. ``possible_dsep="fast"`` gives the column-order mode. On the 223-variable ANDES
+    network with 1,000 simulated rows, its median endpoint errors passed the empty graph's (696
+    against 676). Rule R5 stops searching a pair after a fixed number of partial paths and leaves
+    its circles, so on graphs with many circle-circle edges it can miss an undirected cycle. With
+    the mixed-data tests, it is experimental and not benchmarked yet; its tests run it on 5
+    variables with 3,000 rows.
 
     References
     ----------
@@ -455,12 +534,15 @@ def fci(
     'pag'
     """
     from andrey.constraint.fci import fci as _fci
+    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
 
     X, mask = checked_data(
         data, categorical, "indep_test", indep_test, max_categories=max_categories
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="fci")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         pag = _fci(
             X,
@@ -468,7 +550,10 @@ def fci(
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=mask,
-            possible_dsep=possible_dsep,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
+            max_depth=max_depth,
+            constraints=constraints,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "FCI", **categorical_metadata(mask, data)}
@@ -485,7 +570,9 @@ def gfci(
     collider_rule: str = "sepsets",
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
-    possible_dsep: str = "order_free",
+    possible_dsep: str | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a PAG from observational data with GFCI, a score-then-FCI hybrid.
 
@@ -509,12 +596,13 @@ def gfci(
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter in the GES phase. Larger
         values give sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
         BDeu ignores it.
-    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
-        Conditional-independence test for the FCI phase, by default ``"fisherz"``. ``"fisherz"``
-        (Fisher's z) and ``"student_t"`` (Student-t) test partial correlation, for continuous data.
-        ``"chisq"`` (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test
-        categorical data, coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed
-        data, as for :func:`~andrey.pc`.
+    indep_test : str, default="fisherz"
+        Conditional-independence test for the FCI phase. ``"fisherz"`` (Fisher's z) and
+        ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
+        (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
+        coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data.
+        ``"kci"``, ``"rcot"``, ``"cmiknn"``, and ``"gpdc"`` also detect nonlinear dependence in
+        continuous data, at a far higher cost per test. Each as for :func:`~andrey.pc`.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
     collider_rule : {"sepsets", "majority"}, default="sepsets"
@@ -536,13 +624,27 @@ def gfci(
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
         they may be category codes.
-    possible_dsep : {"order_free", "fast"}, default="order_free"
+    possible_dsep : {"order_free", "fast"} or None, default=None
         The order of GFCI's possible-d-separation step [2]_ [4]_, which removes edges the adjacency
         search kept, one at a time, so each removal changes what the step tests after it.
         ``"order_free"`` visits the pairs and nodes by a rank computed from each column's own data,
         so the result does not depend on the column order unless two columns are identical.
-        ``"fast"`` visits them in column order. Both took about the same time on the benchmark
-        graphs; see Notes and Limitations.
+        ``"fast"`` visits them in column order. ``None`` follows ``andrey.config.tie_break``:
+        ``"order_free"`` under ``"rank"``, ``"fast"`` under ``"position"``. See Notes and
+        Limitations.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove. It caps the tests of
+        the adjacency search, the separating sets for the pairs GES leaves non-adjacent, the
+        possible-d-separation step, the majority rule, and the discriminating-path rule, but not the
+        GES phase.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The GES phase honors it as
+        :func:`~andrey.ges` does, and the test phase starts from the adjacencies GES found and never
+        removes a required pair. In the PAG, a forbidden ``a -> b`` on an adjacent pair puts an
+        arrowhead at ``a`` and can leave a circle at ``b``, and a required one is ``a -> b``.
 
     Returns
     -------
@@ -559,7 +661,8 @@ def gfci(
         If ``score_func`` names no available score, or ``indep_test`` no available test.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
     ValueError
         If ``alpha`` is not in ``(0, 1)``, if ``lambda_value`` is negative or non-finite, if
         ``collider_rule`` or ``possible_dsep`` is not a supported choice, if ``score_func`` and
@@ -567,7 +670,9 @@ def gfci(
         ``categorical`` does not suit them, as for :func:`~andrey.pc`. With the BIC score, also if a
         column repeats another up to scale and shift given more than two rows or, with more rows
         than columns, is a linear function of other columns. One message names every group of copies
-        and says to keep one column per group.
+        and says to keep one column per group. Also if a given ``max_depth`` is negative, or if
+        ``knowledge`` names a column ``data`` lacks or contradicts itself, as
+        :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -589,7 +694,10 @@ def gfci(
     R1-R10 [2]_ then orient the endpoints, in rounds as in :func:`~andrey.fci`; an endpoint no rule
     resolves stays a circle. A rule that needs the separating set of a pair GES left non-adjacent
     uses the union of the smallest subsets of the two endpoints' CPDAG neighbors that make the pair
-    independent, which does not depend on the column order.
+    independent, which does not depend on the column order. Under
+    ``andrey.config(tie_break="position")``, the rules fire one at a time in column order, such a
+    pair's separating set is the first subset found in column order, and ``possible_dsep`` defaults
+    to ``"fast"``.
 
     Rule R5 turns a cycle of circle-circle edges into undirected edges only when the whole cycle,
     closing edge included, is uncovered, that is, no two nodes two steps apart on it are adjacent.
@@ -598,23 +706,28 @@ def gfci(
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2) with one variable in ten hidden, from 20 to 200 variables counting the hidden ones (18
-    to 180 observed), with ten rows per variable. Its median endpoint errors, each mismatched tail,
-    arrowhead, or circle, stayed below the empty graph's at every size (197 against 444 at 180
-    observed variables). The median fit took 0.58 s at 90 observed variables and 2.9 s at 180, on 4
-    cores. It runs a full :func:`~andrey.ges` search before any test,
-    so it takes at least as long as GES on the same data. Its BIC score and Fisher-Z tests assume
-    linear relations with Gaussian noise. With fewer rows than columns the BIC score is
-    unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so the
-    GES search never selects one, nor any parent set that leaves its child a residual variance of at
-    most ``1e-12`` times its variance. Rule R5 has the search bound described under
-    :func:`~andrey.fci`. On these graphs, the default ``possible_dsep="order_free"`` took as long
-    as ``"fast"`` (median time ratio 1.00 to 1.02 at each size). At 400 variables with one variable
-    in five hidden and 50 rows per variable, its rank order needed more tests than the column
-    orders tried on some graphs: on one graph of mean degree 2, 406 to 417 s against 120 to 336 s
-    for ``"fast"`` over the same five column orders. With the mixed-data score and test, it is
-    experimental and not benchmarked yet; its tests run it on 5 variables with 3,000 rows.
+    **Limitations.** Measured with ``possible_dsep="fast"`` on simulated linear-Gaussian data from
+    random graphs with mean degree 2 or 4 and one variable in ten or one in five hidden, from 20 to
+    800 variables counting the hidden ones, with 10 or 50 rows per variable, on 4 cores. Its median
+    endpoint errors, each mismatched tail, arrowhead, or circle, stayed below the empty graph's
+    wherever its fits finished (197 against 444 at 200 variables with mean degree 2, one variable in
+    ten hidden, and ten rows per variable). With those settings the median fit took 0.53 s at 100
+    variables, 2.6 s at 200, and 132 s at 800. Every fit at 800 variables finished within 7,200 s in
+    four of the eight settings; with mean degree 4, one variable in five hidden, and 50 rows per
+    variable, none did, and three of five fits at 400 ran past 3,600 s. The default,
+    ``"order_free"``, took 1.00 to 1.02 times as long as ``"fast"`` up to 200 variables and 0.87 to
+    1.03 times at 400 and 800, and its median endpoint errors were within 2% of ``"fast"``'s. On
+    some graphs from 400 variables its order needs more tests than the column order: on one with 400
+    variables, mean degree 2, one variable in five hidden, and 50 rows per variable, it took 407 s
+    against 120 to 336 s for ``"fast"`` over five column orders. ``possible_dsep="fast"`` gives the
+    column-order mode. It runs a full :func:`~andrey.ges` search before any test, so it takes at
+    least as long as GES on the same data. Its BIC score and Fisher-Z tests assume linear relations
+    with Gaussian noise. With fewer rows than columns the BIC score is unreliable. A parent set of
+    ``n_samples - 1`` or more variables fits its child exactly, so the GES search never selects one,
+    nor any parent set that leaves its child a residual variance of at most ``1e-12`` times its
+    variance. Rule R5 has the search bound described under :func:`~andrey.fci`. With the mixed-data
+    score and test, it is experimental and not benchmarked yet; its tests run it on 5 variables with
+    3,000 rows.
 
     References
     ----------
@@ -638,6 +751,7 @@ def gfci(
     >>> gfci(np.column_stack([x, y])).structure.kind
     'pag'
     """
+    from andrey.constraint.pc import resolve_in_column_order, resolve_possible_dsep
     from andrey.search.gfci import gfci as _gfci
 
     # Both phases read the same data, so the score and the test must agree on its type.
@@ -654,6 +768,8 @@ def gfci(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="gfci")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     with copies_named(labels):
         pag = _gfci(
             X,
@@ -663,7 +779,10 @@ def gfci(
             indep_test=indep_test,
             collider_rule=collider_rule,
             categorical=mask,
-            possible_dsep=possible_dsep,
+            possible_dsep=resolve_possible_dsep(possible_dsep),
+            max_depth=max_depth,
+            constraints=constraints,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         pag, labels=labels, metadata={"algorithm": "GFCI", **categorical_metadata(mask, data)}
@@ -676,10 +795,12 @@ def cdnod(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    collider_order: str = "p_value",
+    collider_order: str | None = None,
     categorical: Sequence[str | int] | None = None,
     max_categories: int = MAX_CATEGORIES,
     dependence_threshold: float | None = None,
+    max_depth: int | None = None,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a partially directed graph over the data variables from multi-domain data with CDNOD.
 
@@ -701,19 +822,22 @@ def cdnod(
         equals :func:`~andrey.pc`'s.
     alpha : float, default=0.05
         Significance level of the conditional-independence test. Smaller values give sparser graphs.
-    indep_test : {"fisherz", "student_t", "chisq", "gsq", "degen_gauss", "cond_gauss"}
-        Conditional-independence test, by default ``"fisherz"``. ``"fisherz"`` (Fisher's z) and
-        ``"student_t"`` (Student-t) test partial correlation, for continuous data. ``"chisq"``
-        (Pearson's chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data,
-        coded by whole numbers, and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data, as for
-        :func:`~andrey.pc`; see Notes for the index.
-    collider_order : {"p_value", "column"}, default="p_value"
+    indep_test : str, default="fisherz"
+        Conditional-independence test. ``"fisherz"`` (Fisher's z) and ``"student_t"`` (Student-t)
+        test partial correlation, for continuous data. ``"chisq"`` (Pearson's chi-square) and
+        ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by whole numbers,
+        and ``"degen_gauss"`` and ``"cond_gauss"`` mixed data. ``"kci"``, ``"rcot"``, ``"cmiknn"``,
+        and ``"gpdc"`` also detect nonlinear dependence in continuous data, at a far higher cost per
+        test. Each as for :func:`~andrey.pc`; see Notes for the index.
+    collider_order : {"p_value", "column"} or None, default=None
         The order in which colliders are oriented, as for :func:`~andrey.pc`: ``"p_value"`` by the
         largest p-value that separated each collider's endpoints, so the colliders do not depend on
-        the column order, and ``"column"`` in column order. Under either order, the edges out of
-        the index are directed first, and no collider puts an arrowhead at the index.
+        the column order, and ``"column"`` in column order. ``None`` follows
+        ``andrey.config.tie_break``, which also sets whether Meek's rules run in order-free rounds
+        or fire one at a time in column order, as for :func:`~andrey.pc`. Under either order, the
+        edges out of the index are directed first, and no collider puts an arrowhead at the index.
     categorical : sequence of str or int, optional
-        The categorical columns of ``data``, for a mixed-data test: DataFrame column names or
+        The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The domain index is categorical too, so ``data`` may
@@ -728,6 +852,20 @@ def cdnod(
         dependence measure: two modules, the distributions of a candidate cause and of its effect
         given it, whose measure is at most the threshold count as changing independently. ``None``
         skips the step. See Notes.
+    max_depth : int or None, default=None
+        The maximum conditioning-set size of every conditional-independence test, at least ``0``:
+        ``0`` runs only unconditional tests, and ``None`` sets no limit. A smaller cap runs fewer
+        tests and can keep edges that a larger conditioning set would remove.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The adjacency search starts from
+        the allowed pairs and never removes a required pair; the tests can remove any other allowed
+        pair. A pair the knowledge makes non-adjacent is tested for a separating set, so colliders
+        over it are oriented as usual; when the search finds none within ``max_depth``, no rule
+        reads its unshielded triples as colliders or non-colliders. The result directs every edge
+        the knowledge decides, then Meek's rules direct the edges that follow, as
+        :class:`~andrey.Knowledge` describes; knowledge that orients the edges the search kept into
+        a directed cycle raises ``ValueError``. The domain index is unconstrained.
 
     Returns
     -------
@@ -749,14 +887,19 @@ def cdnod(
         If ``indep_test`` names no available test.
     TypeError
         If ``categorical`` is not a list of column names and positions, or ``max_categories`` is not
-        an int.
+        an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
+        given ``max_depth`` is not an int.
     ValueError
         If ``domain_index`` does not hold one value per row of ``data`` or holds ``NaN`` /
         ``inf``, if ``data`` has too few rows for a test, if ``alpha`` or ``dependence_threshold``
         is not in ``(0, 1)``, if ``data`` or ``categorical`` does not suit the test, as for
         :func:`~andrey.pc`, or, with a categorical or mixed-data test, if ``domain_index`` holds a
         value that is not a whole number. Also if ``collider_order`` is not ``"p_value"`` or
-        ``"column"``.
+        ``"column"``. With ``"fisherz"`` or ``"student_t"``, also if a column of ``data``, or
+        ``domain_index`` with more than one domain, repeats another up to scale and shift, before
+        any test runs; one message names every group of copies and says to keep one column per
+        group. Also if a given ``max_depth`` is negative, or if ``knowledge`` names a column
+        ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -845,6 +988,7 @@ def cdnod(
     [(0, 1, 'directed')]
     """
     from andrey.constraint.cdnod import cdnod as _cdnod
+    from andrey.constraint.pc import resolve_collider_order, resolve_in_column_order
 
     # A mixed-data test takes the index as categorical, so every data column may be continuous.
     X, mask = checked_data(
@@ -857,20 +1001,27 @@ def cdnod(
     )
     alpha = open_unit_interval(alpha, "alpha")
     labels = column_labels(data)
+    constraints = resolve(knowledge, X.shape[1], labels, method="cdnod")
+    max_depth = None if max_depth is None else int_in_range(max_depth, "max_depth", 0)
     c = np.asarray(domain_index, dtype=np.float64)
     if data_kind(indep_test) != "continuous":
         check_categories(c, None, f"indep_test={indep_test!r}", name="domain_index")
     if dependence_threshold is not None:
         dependence_threshold = open_unit_interval(dependence_threshold, "dependence_threshold")
-    with copies_named(labels):
+    # The search appends the index as column d, so a copy of it is named as the index.
+    d, column = X.shape[1], column_namer(labels)
+    with copies_named(labels, lambda j: "domain_index" if j == d else column(j)):
         cpdag = _cdnod(
             X,
             c,
             alpha=alpha,
             indep_test=indep_test,
-            collider_order=collider_order,
+            collider_order=resolve_collider_order(collider_order),
             categorical=mask,
             dependence_threshold=dependence_threshold,
+            max_depth=max_depth,
+            constraints=constraints,
+            in_column_order=resolve_in_column_order(),
         )
     return structure_output(
         cpdag, labels=labels, metadata={"algorithm": "CDNOD", **categorical_metadata(mask, data)}

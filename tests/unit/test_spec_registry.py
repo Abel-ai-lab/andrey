@@ -20,6 +20,7 @@ import pytest
 
 import andrey
 from andrey.api import __all__ as API_ALL
+from andrey.core.knowledge import KNOWLEDGE_PARTS
 from andrey.spec import ENV_VARS, PRECEDENCE, REGISTRY, get_spec
 from andrey.spec.models import Status
 
@@ -95,7 +96,23 @@ def _type_matches(ptype: str, default: object) -> bool:
         return isinstance(default, tuple) and all(isinstance(x, int) for x in default)
     if ptype == "str_list":
         return isinstance(default, (tuple, list))
+    if ptype == "knowledge":
+        return isinstance(default, dict)
     return False
+
+
+@pytest.mark.parametrize("name", list(REGISTRY))
+def test_knowledge_parts_match_the_facade(name):
+    """A method takes ``knowledge`` exactly when its spec lists the parts it honors, and its
+    docstring names them."""
+    spec = get_spec(name)
+    takes = "knowledge" in inspect.signature(getattr(andrey, name)).parameters
+    assert takes is bool(spec.knowledge)
+    if takes:
+        doc = inspect.getdoc(getattr(andrey, name)) or ""
+        entry = doc.split("knowledge : Knowledge or None", 1)[1].split("\n\n", 1)[0]
+        named = "all honored" if spec.knowledge == KNOWLEDGE_PARTS else ", ".join(spec.knowledge)
+        assert named in " ".join(entry.split())
 
 
 def test_param_type_is_consistent_with_default():
@@ -306,12 +323,12 @@ def test_indep_test_choices_track_the_tests_each_method_dispatches():
 
 # --- support status -------------------------------------------------------------------------------
 #
-# Supported means every criterion in docs/docs/code/index.md's "Experimental methods" section holds.
+# Supported methods meet every criterion in docs/docs/api.md's "Experimental methods" section.
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SUPPORTED = sorted(n for n, s in REGISTRY.items() if s.status == "supported")
 EXPERIMENTAL = sorted(n for n, s in REGISTRY.items() if s.status == "experimental")
-GRADUATE = "mark it experimental until it meets the criteria in docs/docs/code/index.md"
+GRADUATE = "mark it experimental until it meets the criteria in docs/docs/api.md"
 LIMITATIONS = "DEVELOPMENT.md (Add a method, Mark it supported) says what the paragraph holds"
 
 
@@ -433,6 +450,14 @@ def test_quality_gate_checks_exactly_the_supported_methods():
     assert gated == {_normalized(n) for n in SUPPORTED}, GRADUATE
 
 
+def test_quality_gate_checks_exactly_the_supported_nonlinear_tests():
+    from andrey.core import ci
+    from qa import quality_gate
+
+    gated = {_normalized(n) for n in quality_gate.SUPPORTED_TESTS}
+    assert gated == set(ci.NONLINEAR_INDEP_TESTS), GRADUATE
+
+
 @pytest.mark.parametrize("name", SUPPORTED)
 def test_supported_method_has_an_example(name):
     notebooks = (ROOT / "examples").glob("*.ipynb")
@@ -476,7 +501,7 @@ def test_facade_warns_first_exactly_when_experimental(name):
 
 
 def test_api_reference_lists_each_method_under_its_status():
-    page = (ROOT / "docs" / "docs" / "code" / "index.md").read_text()
+    page = (ROOT / "docs" / "docs" / "api.md").read_text()
     supported, rest = page.split("### Supported methods", 1)[1].split("### Experimental methods", 1)
     experimental = rest.split("\n## ", 1)[0]
 

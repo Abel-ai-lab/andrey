@@ -1,0 +1,29 @@
+{
+  "algorithm": "KCI",
+  "case": "nonmonotone_4v",
+  "input": {
+    "case": "nonmonotone_4v",
+    "column_order": [
+      2,
+      3,
+      0,
+      1
+    ],
+    "seed": 20261014,
+    "sha256": "1242fad5f9dc6bf9ab2ce6d9b0ce40603bde039838d85e873e9d052e7878b9ee",
+    "shape": [
+      400,
+      4
+    ]
+  },
+  "output": {
+    "pvalues": [
+      0.3368005922236911,
+      0.0,
+      4.8767581848140956e-52,
+      0.15777122660029125,
+      6.254329271013797e-34
+    ]
+  },
+  "schema_version": 3
+}

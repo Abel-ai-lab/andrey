@@ -9,6 +9,155 @@ change names its pull request.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-23
+
+### Highlights
+
+- Nonlinear independence tests: `pc`, `fci`, `gfci`, and `cdnod` support KCI, RCoT, CMIknn, and
+  GPDC, four tests that detect nonlinear dependence that partial correlation misses. KCI and CMIknn
+  also run on a CUDA GPU. The 0.8.0 post and release card give the measurements. ([#209], [#213],
+  [#299])
+- The same graph in any column order and on any CPU: DirectLiNGAM, ICA-LiNGAM, exact search, GES,
+  GIES, XGES, CALM, GIN, ParceLiNGAM, the PCMCI methods, and the nonlinear tests break ties by
+  each column's data rather than its position or rounding differences. ([#205], [#213], [#228])
+- Faster categorical tests: `pc` with `indep_test="chisq"` or `"gsq"` runs 4-6x faster than in
+  0.7.0 on the alarm, hepar2, and andes networks, with the same p-values and graphs. ([#208])
+- Background knowledge for every search: all 13 searches accept required and forbidden edges,
+  allowed adjacent pairs, and temporal tiers through `knowledge=`. Constraint-based methods also
+  accept `max_depth`. ([#214])
+
+### Breaking
+
+- `boss`, `grasp`, `ges`, `hc`, `tabu`, and `exact_search` pick their default score from the
+  column types and warn once with a `DataTypeWarning`: BDeu when every column is categorical, and
+  the conditional Gaussian BIC, `"local_score_cond_gauss"`, when some are, except for `tabu`, which
+  has no mixed-data score. Pass `score_func="local_score_BIC_from_cov"` (`"local_score_BIC"` for
+  `ges` and `exact_search`) to keep the linear-Gaussian BIC. Data with no categorical column keep it
+  without a change. ([#237])
+
+### Added
+
+- `andrey.data.load_dataset("diabetes")`, the bnlearn diabetes network: 413 variables and 602
+  arcs. ([#225])
+- `boss` and `grasp` take `score_func="local_score_BDeu"` for categorical data, with the BDeu
+  priors of `ges`, `hc`, `tabu`, and `exact_search`. ([#211])
+- `boss` and `grasp` take `score_func="local_score_BIC_categorical"`, the multinomial BIC that
+  `ges`, `hc`, `tabu`, and `exact_search` take for categorical data. ([#220])
+- `pc`, `fci`, `gfci`, and `cdnod` take four conditional-independence tests that detect nonlinear
+  dependence: `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`. ([#209])
+- The classes behind them, `KCI`, `RCoT`, `CMIknn`, and `GPDC`, take their settings as arguments
+  and have reference pages; `make_indep_test` passes settings to them, a variant registered with
+  `register_indep_test` is selected by name, `CMIknn(k_cmi=...)` takes a neighbor count or a
+  fraction of the rows, and `CMIknn.statistic` returns its conditional mutual information
+  estimate. ([#209])
+- `SampleSizeWarning`: RCoT warns when it conditions on fewer than 500 rows, the smallest sample
+  size its reference evaluates. ([#209])
+- `KCI(rank=...)`, a low-rank KCI for many rows: each kernel becomes an incomplete Cholesky
+  factor of at most `rank` columns. ([#209])
+- `andrey.data.sample_scm(functional="nonmonotone")`, additive noise through `cos`, whose effects
+  partial correlation does not see. ([#209])
+- KCI and CMIknn run on a CUDA GPU, KCI in float64 and CMIknn with the CPU's p-values, from the
+  cutoffs `ANDREY_KCI_GPU_THRESHOLD` and `ANDREY_CMIKNN_GPU_THRESHOLD`. ([#209])
+- `knowledge=` on `pc`, `cdnod`, `fci`, `gfci`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`,
+  `grasp`, `exact_search`, and `direct_lingam` takes `andrey.Knowledge(required=, forbidden=,
+  allowed=, tiers=)`: the edges the graph must have and must not have, the only pairs that may be
+  adjacent, and tiers in time order; knowledge that contradicts itself or names a column the data
+  lack raises a `ValueError`, and the CLI takes `knowledge=` as JSON or a path.
+  `Knowledge.from_skeleton` turns a result's adjacencies into the allowed set. ([#214])
+- `pc`, `fci`, `gfci`, and `cdnod` take `max_depth`, the largest conditioning set any test uses.
+  ([#214])
+- `andrey.config.tie_break`, `andrey.config(tie_break=...)`, and `ANDREY_TIE_BREAK` choose how
+  the searches break ties: `"rank"`, the default, by a rank computed from each column's own data,
+  or `"position"`, by column position. The new Column order and machines guide lists what each
+  method keeps under a new column order and on another machine, and which methods follow the
+  setting. Under `"position"`, `pc`, `cdnod`, `fci`, and `gfci` also fire their orientation rules
+  one at a time in column order instead of in rounds, and `fci` and `gfci` default to
+  `possible_dsep="fast"`. ([#210])
+
+### Changed
+
+- With `indep_test="fisherz"` or `"student_t"`, `pc`, `fci`, and `cdnod` reject copied columns
+  before any test runs, even when no test meets the copies, and `pcmci`, `pcmciplus`, and `lpcmci`
+  reject a series that repeats another at the same step or some steps back, naming its lagged
+  value, such as `'a' at lag 1 repeats 'd'`. ([#206])
+- A constant column raises one `ValueError` that names every constant column and says to drop
+  them, `direct_lingam`, `ica_lingam`, and `multi_group_direct_lingam` say up front that they need
+  at least `n_variables + 1` rows for their pruning step, and `andrey.core.orient.pdag2dag` says
+  why a PDAG has no consistent extension, naming a chordless cycle of its undirected edges when it
+  finds one. ([#207])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="chisq"`, `"gsq"`, or `"cond_gauss"` return the
+  same graphs and p-values in less time, because each test answers many queries at once. ([#208])
+- `indep_test="kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` are supported: on nonlinear data each
+  makes fewer errors on average than its reference packages, causal-learn for KCI, causal-learn and
+  pcalg for RCoT, and tigramite for CMIknn and GPDC, they have checks in the release quality gate,
+  and they no longer warn with `ExperimentalWarning`. ([#299])
+
+### Fixed
+
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` treat
+  causal-order candidates whose scores differ only by rounding as tied and pick among them by a
+  rank computed from each column's own data, so two interchangeable columns, such as two balanced
+  binary columns, no longer get a different order on another CPU or after reordering the columns.
+  ([#205])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` score
+  one column per group of copies, where a column copies another up to scale when it leaves at
+  most `1e-12` of the other's variance unexplained. The other copies follow it directly in the
+  causal order and each takes a single edge from it, so copies no longer come ahead of their
+  causes and give the same graph on every CPU. ([#205])
+- `exact_search` returns the same DAG of the equivalence class it finds on every CPU, with either
+  `search_method`, and under any column order, because it orients the edges the class leaves
+  reversible by a rank computed from each column's own data, so the DAG can differ from before but
+  its class does not. ([#205])
+- `pcmciplus` runs its tests on one BLAS thread, as `pcmci` and `lpcmci` do, so the host's BLAS
+  thread count cannot change its p-values. ([#205])
+- When several variables can come next in its causal order, `ica_lingam` picks one by a rank
+  computed from each column's own data instead of by column position, so reordering the columns no
+  longer changes that choice, and its order and graph can change. ([#205])
+- `ges`, `gies`, `xges`, `calm`, `gin`, `bottom_up_parce_lingam`, `pcmci`, `pcmciplus`, and `lpcmci`
+  break ties between equal score changes or test results by a rank computed from each column's own
+  data instead of by column position; `calm` also assigns its random draws, and
+  `bottom_up_parce_lingam` its regression predictors, in that rank order; `calm` chooses each
+  Markov-blanket member by its partial correlation where p-values underflow to zero; and `pc` and
+  `cdnod` orient colliders whose p-values agree to nine decimals together, so these choices no
+  longer depend on the column order. ([#205])
+- The nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"` seed their random features,
+  shuffles, and tie-breaks, and choose the variable KCI joins to the conditioning set and CMIknn
+  shuffles, by a rank computed from each column's own data instead of by column position, so
+  reordering the columns no longer changes their p-values or the graphs built from them.
+  ([#213])
+- The independent-change step of `cdnod` (`dependence_threshold`) visits the columns by a rank
+  computed from each column's own data instead of by column position, so reordering the columns no
+  longer changes the edges it orients, and on data where its tests compete its graph can change.
+  ([#228])
+- `"rcot"` samples the random Fourier features of `x` and `y` for each conditioning set, with
+  frequencies and phases from a scrambled Halton sequence (quasi-Monte Carlo feature maps), so one
+  pair's tests over different conditioning sets no longer share features and reject together, and
+  PC with it keeps fewer false edges, misses slightly more true ones, and makes fewer errors in all
+  on graphs of 10 to 50 variables. ([#248])
+- Every method takes a DataFrame's column names as node labels in text, `str(name)`, so
+  `categorical=["1"]` finds a column named `1`, which it reported missing before. Two names that
+  are equal as text, such as `1` and `"1"`, raise a `ValueError` before the fit that names the
+  label and its columns, also in `granger`, `rcd`, and `bottom_up_parce_lingam`, which raised after
+  it. ([#261])
+- `GraphStructure.from_numpy`, `from_edges`, and `from_networkx`, the `TemporalStructure`
+  constructors, and `StructureOutput.load` hold labels as text and raise a `ValueError` on two
+  labels that are equal as text: such a graph was already broken, as a NetworkX round trip merged
+  its nodes, so the error replaces a broken result rather than a working one. `gin` checks its
+  `labels` the same way and names its latents `L1`, `L2`, and so on, skipping a name an observed
+  column has. ([#261])
+- `andrey run` reads a quoted header name that holds a comma, and a first row that mixes numbers
+  with text exits with `bad_data` naming one of each; a first row of numbers is data, so quote a
+  header name that is a number. ([#261])
+- `boss` and `grasp` with the linear-Gaussian BIC make every decision as full local scores make
+  it: each fast update from a base parent set comes with a bound on its rounding error, and a
+  comparison the bound leaves open is decided by full scores. Updates no longer build on earlier
+  updates. On dense data with nearly collinear parent sets, where an update could be off by more
+  than the `1e-6` tolerance, rounding error no longer decides a move, and `boss` can return a
+  different graph. ([#271])
+- `varma_lingam` and `longitudinal_lingam` fit on the columns sorted by a rank computed from each
+  column's own data instead of in column order, so reordering the columns no longer changes their
+  graphs, and on data where the order mattered their graphs and weights can change. ([#278])
+
 ## [0.7.0] - 2026-10-19
 
 ### Highlights
@@ -320,7 +469,8 @@ First alpha release.
 - `andrey.viz`: SVG drawings of any graph, laid out by Graphviz when it is installed.
 - Python 3.11 to 3.14. Linux is supported; macOS and Windows run it without a guarantee yet.
 
-[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Abel-ai-lab/andrey/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Abel-ai-lab/andrey/compare/v0.4.1...v0.5.0
@@ -357,8 +507,26 @@ First alpha release.
 [#192]: https://github.com/Abel-ai-lab/andrey/pull/192
 [#202]: https://github.com/Abel-ai-lab/andrey/pull/202
 [#203]: https://github.com/Abel-ai-lab/andrey/pull/203
+[#205]: https://github.com/Abel-ai-lab/andrey/pull/205
+[#206]: https://github.com/Abel-ai-lab/andrey/pull/206
+[#207]: https://github.com/Abel-ai-lab/andrey/pull/207
+[#208]: https://github.com/Abel-ai-lab/andrey/pull/208
+[#209]: https://github.com/Abel-ai-lab/andrey/pull/209
+[#210]: https://github.com/Abel-ai-lab/andrey/pull/210
+[#211]: https://github.com/Abel-ai-lab/andrey/pull/211
+[#213]: https://github.com/Abel-ai-lab/andrey/pull/213
+[#214]: https://github.com/Abel-ai-lab/andrey/pull/214
 [#215]: https://github.com/Abel-ai-lab/andrey/pull/215
 [#216]: https://github.com/Abel-ai-lab/andrey/pull/216
+[#220]: https://github.com/Abel-ai-lab/andrey/pull/220
+[#225]: https://github.com/Abel-ai-lab/andrey/pull/225
+[#228]: https://github.com/Abel-ai-lab/andrey/pull/228
 [#229]: https://github.com/Abel-ai-lab/andrey/pull/229
 [#233]: https://github.com/Abel-ai-lab/andrey/pull/233
+[#237]: https://github.com/Abel-ai-lab/andrey/pull/237
 [#239]: https://github.com/Abel-ai-lab/andrey/pull/239
+[#248]: https://github.com/Abel-ai-lab/andrey/pull/248
+[#261]: https://github.com/Abel-ai-lab/andrey/pull/261
+[#271]: https://github.com/Abel-ai-lab/andrey/pull/271
+[#278]: https://github.com/Abel-ai-lab/andrey/pull/278
+[#299]: https://github.com/Abel-ai-lab/andrey/pull/299

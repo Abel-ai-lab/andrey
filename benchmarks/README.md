@@ -24,15 +24,15 @@ Reproduce ([0.4.0](../docs/docs/benchmarks/0.4.0.md#reproduce),
 [0.1.0](../docs/docs/benchmarks/0.1.0.md#reproduce)).
 
 [`published/parity-allowlist.json`](published/parity-allowlist.json) lists the rows where a
-reference package has fewer errors than Andrey, each with its cited cause; any other such row fails
-the quality gate before a release ([reference parity](../qa/README.md#reference-parity)).
+reference package makes fewer errors than Andrey by the parity rule, each with its cited cause; any
+other such row fails the quality gate before a release
+([reference parity](../qa/README.md#reference-parity)).
 
 ## Comparison packages
 
 Packages:
 
 - [causal-learn](https://github.com/py-why/causal-learn)
-- [gCastle](https://github.com/huawei-noah/trustworthyAI/tree/master/gcastle)
 - [lingam](https://github.com/cdt15/lingam)
 - [pcalg](https://cran.r-project.org/package=pcalg) (R)
 - [bnlearn](https://www.bnlearn.com/) (R)
@@ -82,6 +82,16 @@ environment:
 benchmarks/start_xges.sh
 export ANDREY_BENCH_XGES_PYTHON=$PWD/benchmarks/.venv-xges/bin/python
 ```
+
+tigramite (GPL-3.0), the reference for the CMIknn and GPDC conditional-independence tests, also
+fits in an environment of its own, so it and its dependencies stay out of bench-env:
+
+```shell
+benchmarks/start_tigramite.sh
+export ANDREY_BENCH_TIGRAMITE_PYTHON=$PWD/benchmarks/.venv-tigramite/bin/python
+```
+
+Its adapter calls the package's public API only.
 
 lingam 1.13.0 pins scipy 1.13.1 or older, and pygam, which lingam imports, pins scipy below 1.17.
 lingam's MultiGroupDirectLiNGAM runs in a third environment, on Python 3.12:
@@ -156,14 +166,17 @@ Copy `benchmark.py`, then edit its `SOLUTIONS` and `SLICE`. Each adapter in
 
 | method | solutions |
 |---|---|
-| GES | Andrey (numpy/serial, numpy/parallel), causal-learn, gCastle, pcalg |
+| GES | Andrey (numpy/serial, numpy/parallel), causal-learn, pcalg |
 | XGES (GES family) | Andrey and xges, each with and without the extended search |
 | HC | Andrey, bnlearn (`hc`), pgmpy (categorical data) |
 | Tabu | Andrey, bnlearn (`tabu`) |
 | GIES | Andrey, pcalg (`gies`) |
 | Exact search | Andrey, causal-learn (`bic_exact_search`) |
-| PC | Andrey, causal-learn, gCastle, pcalg, bnlearn (`pc.stable`) |
+| PC | Andrey, causal-learn, pcalg, bnlearn (`pc.stable`) |
+| PC with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT), tigramite (CMIknn, GPDC), pcalg with RCIT (RCoT) |
 | FCI | Andrey, causal-learn, pcalg (`fci`, `rfci`) |
+| FCI with nonlinear CI tests | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT) |
+| Nonlinear CI tests, query by query | Andrey (KCI, RCoT, CMIknn, GPDC), causal-learn (KCI, RCoT, FastKCI), tigramite (CMIknn, GPDC), RCIT (RCoT, KCIT) |
 | GFCI | Andrey, Tetrad |
 | CALM | Andrey (two optimizer schedules), causal-learn |
 | BOSS | Andrey, causal-learn |
@@ -185,6 +198,27 @@ Include `baseline.empty` to bound the solutions run on the same datasets. Keep o
 DirectLiNGAM and ICA-LiNGAM need the `lingam_sf` values in `SLICE` because Gaussian data cannot
 identify the model. Use `andrey.direct_lingam.torch-cuda` for GPU runs. It selects CUDA inside
 `fit`, so `ANDREY_DEVICE` has no effect. Both ICA-LiNGAM solutions pin FastICA's seed to 0.
+
+`nonlinear_ci_cpu.py` runs PC, or with `--method fci` FCI, with each nonlinear CI test on additive
+nonlinear noise, with rows as an axis of their own. `--regime nonmonotone_er` makes each effect
+`w cos(parent)`, an even function partial correlation does not see. Every reference runs at
+Andrey's defaults under its own names:
+
+| Andrey | causal-learn | tigramite | RCIT (R) |
+|---|---|---|---|
+| `indep_test="kci"` | `indep_test="kci"` | - | `KCIT(Bootstrap = FALSE)` |
+| `indep_test="rcot"` | `indep_test="rcit"`, `rcit=False`, `approx="hbe"` | - | `RCoT(approx = "hbe")` |
+| RCoT `n_features=5`, `n_features_cond=100` | `num_f2=5`, `num_f=100` | - | `num_f2 = 5`, `num_f = 100` |
+| `indep_test="cmiknn"` | - | `CMIknn`, `significance="shuffle_test"`, `sig_blocklength=1` | - |
+| CMIknn `k_cmi=0.1`, `k_perm=5`, `n_permutations=500` | - | `knn=0.1`, `shuffle_neighbors=5`, `sig_samples=500` | - |
+| `indep_test="gpdc"` | - | `GPDC`, `significance="analytic"` | - |
+| `alpha=0.05` | `alpha=0.05` | `pc_alpha=0.05`, `contemp_collider_rule="none"` | pcalg `alpha = 0.05` |
+
+pcalg's PC with RCIT's RCoT (`pcalg.pc.rcot`) needs the R library of `start_r.sh`, which installs
+RCIT from its GitHub repository at a fixed commit. `nonlinear_ci_queries.py` compares the tests
+themselves: every contestant answers the same queries on the same seeded draws, independent and
+dependent, and the summary gives each one's level, power, distance of its p-values to the uniform
+under independence, agreement with Andrey's test, and seconds per query.
 
 The harness does not submit jobs. One file is one job.
 
@@ -592,19 +626,25 @@ causal-learn's fit takes over a minute at 1000 rows and grows with the rows.
 
 ### Categorical data
 
-`discrete_cpu.py` compares Andrey's PC with the chi-square and the G-square test, GES with the BDeu
-score, and hill climbing with the BDeu score and the multinomial BIC against the same method in
-causal-learn, bnlearn, and pgmpy, with the empty-graph baseline. It runs on `discrete_er`: category
-codes from a discrete network on an Erdos-Renyi graph, each node with 2 or 3 categories and each row
-of its conditional probability table drawn from a flat Dirichlet (`datasets.DISCRETE_SETTINGS`,
-recorded in each dataset's generator call). The codes are never rescaled. Every solution is serial.
-Andrey's GES runs on the numpy backend; BDeu moves are scored in one process.
+`discrete_cpu.py` compares Andrey's PC with the chi-square and the G-square test, GES, BOSS, and
+GRaSP with the BDeu score, and hill climbing with the BDeu score and the multinomial BIC against the
+same method in causal-learn, bnlearn, and pgmpy, with the empty-graph baseline. Andrey's BOSS and
+GRaSP with the multinomial BIC run alone, since no package here takes that score for them. It runs
+on `discrete_er`: category codes from a discrete network on an Erdos-Renyi graph, each node with 2
+or 3 categories and each row of its conditional probability table drawn from a flat Dirichlet
+(`datasets.DISCRETE_SETTINGS`, recorded in each dataset's generator call). The codes are never
+rescaled. Every solution is serial. Andrey's GES runs on the numpy backend; BDeu moves are scored
+in one process.
 
 | method | Andrey | causal-learn | bnlearn | pgmpy |
 |---|---|---|---|---|
 | PC, chi-square | `andrey.pc.chisq` | `causal-learn.pc.chisq` | `bnlearn.pc-stable.chisq` | |
 | PC, G-square | `andrey.pc.gsq` | `causal-learn.pc.gsq` | `bnlearn.pc-stable.gsq` | |
 | GES, BDeu | `andrey.ges.bdeu` | `causal-learn.ges.bdeu` | | |
+| BOSS, BDeu | `andrey.boss.bdeu` | `causal-learn.boss.bdeu` | | |
+| GRaSP, BDeu | `andrey.grasp.bdeu` | `causal-learn.grasp.bdeu` | | |
+| BOSS, BIC | `andrey.boss.bic_categorical` | | | |
+| GRaSP, BIC | `andrey.grasp.bic_categorical` | | | |
 | HC, BDeu | `andrey.hc.BDeu` | | `bnlearn.hc.BDeu` | `pgmpy.hc.BDeu` |
 | HC, BIC | `andrey.hc.BIC_categorical` | | `bnlearn.hc.BIC_categorical` | `pgmpy.hc.BIC_categorical` |
 
@@ -642,7 +682,7 @@ conditioning variables, where bnlearn's PC removes the edge and Andrey's PC test
 
 The defaults are 2000 rows, `d` of 10, 20, and 40, five seeds, one repeat after one warm-up fit, and
 `--cap-wall-s` of 1800. Each estimate is scored against the true DAG's CPDAG: `shd` and the
-skeleton and arrowhead columns. Andrey's PC, GES, and hill climbing return CPDAGs. bnlearn's and
+skeleton and arrowhead columns. Andrey's solutions and causal-learn's return CPDAGs. bnlearn's and
 pgmpy's hill climbing return DAGs, whose comparable columns are `mec_shd` and `mec_arrowhead_f1`,
 scored through the DAG's essential graph. The summary prints each solution's median wall time and
 error per `d`, with the F1 columns in the same comparable form, then each pair's speed-up: the other
@@ -669,8 +709,10 @@ ANDREY_BENCH_DATA=outputs/discrete-cpu/data $ANDREY_BENCH_PYTHON benchmarks/disc
 
 The p-values and BDeu scores of Andrey and causal-learn follow the same definitions (Andrey's BDeu
 is `-2` times causal-learn's), and on the datasets of `benchmarks/tests/test_adapters_discrete.py`
-the two packages return the same graph, with Andrey's PC on the column-order collider rule that
-causal-learn's PC runs; PC's default p-value order can orient conflicting colliders differently.
+the two packages' PC and GES return the same graph, with Andrey's PC on the column-order collider
+rule that causal-learn's PC runs; PC's default p-value order can orient conflicting colliders
+differently. BOSS and GRaSP run on search seed 0 in both packages, but each package draws its orders
+from its own random streams, so their graphs can differ at equal settings.
 Each comparator's objective is checked against Andrey's in
 `benchmarks/tests/test_adapters_discrete_comparators.py`, where R or pgmpy is installed: the scores
 agree on a fixed DAG, bnlearn's hill climbing reaches the score Andrey's does on those datasets, and
@@ -1082,7 +1124,8 @@ searches run in the timed fit's process before its clock, so `warmup_s` holds on
 Andrey uses hardcoded thresholds for accelerated paths:
 
 - `ANDREY_GES_PARALLEL_MIN_WORK` selects the worker pool.
-- `ANDREY_COV_GPU_THRESHOLD` and `ANDREY_ENTROPY_GPU_THRESHOLD` select the accelerator.
+- `ANDREY_COV_GPU_THRESHOLD`, `ANDREY_ENTROPY_GPU_THRESHOLD`, `ANDREY_KCI_GPU_THRESHOLD`, and
+  `ANDREY_CMIKNN_GPU_THRESHOLD` select the accelerator.
 
 Three thresholds were calibrated once on one machine. Later measurements found errors of 7x for GES,
 25x for `cov`, and 40x for entropy. Each error kept the faster path disabled.
@@ -1097,8 +1140,9 @@ thresholds**. Recording an unused calibration is worse than no calibration: it r
 that did not control the run.
 
 **Check the unit before setting a threshold.** GES uses candidate evaluations, `cov` uses `n * d`,
-and `entropy` uses batch width `B`. `andrey.spec.environment` lists these units, and
-`andrey --help --json` prints them. A value in the wrong unit silently selects the wrong path.
+`entropy` uses batch width `B`, and KCI and CMIknn use `n * n`. `andrey.spec.environment` lists
+these units, and `andrey --help --json` prints them. A value in the wrong unit silently selects the
+wrong path.
 
 **Backend pins affect the gates differently.** Worker-pool gates run on each search pass and ignore
 the backend. Below the GES threshold, `ges.numpy.parallel` uses the serial path. Device thresholds
@@ -1225,8 +1269,8 @@ and guidance in [Reading a result](#reading-a-result).
 | `STATUS.json` | job, node, and units done against expected. `complete` stays false until the |
 | | table assembles, so an interrupted run still shows how far it got |
 | `records/` | one parquet per (dataset, solution), written as each finishes |
-| `provenance.json` | package versions and BLAS of the bench venv, CPU, GPU, git sha. Captured |
-| | once, so a resume keeps the recorded build |
+| `provenance.json` | package versions and BLAS of the bench venv (`$ANDREY_BENCH_PYTHON`'s when |
+| | set), CPU, GPU, git sha. Captured once, so a resume keeps the recorded build |
 | `run_meta.json` | flags and literals, written before the first fit |
 | `data/registry.json` | each dataset's generator call and column order; under |
 | | `$ANDREY_BENCH_DATA` when set |
@@ -1358,8 +1402,7 @@ Read `params` before comparing solutions because their defaults may optimize dif
 - `andrey_bench/aggregate.py` - pools a results root and joins each run with its provenance.
 - `andrey_bench/pairing.py` - defines valid comparisons, including run pairing, dataset grouping,
   duration skew, and timeout meaning.
-- `ges_cpu.py` - compares serial and parallel Andrey GES, causal-learn, gCastle, and the baseline
-  on CPU.
+- `ges_cpu.py` - compares serial and parallel Andrey GES, causal-learn, and the baseline on CPU.
 - `boss_grasp_cpu.py` - compares BOSS and GRaSP with causal-learn at matched BIC penalties.
 - `boss_grasp_reach.py` - extends the paired BOSS comparison beyond GRaSP's measured range.
 - `lingam_gpu.py` - compares DirectLiNGAM on CPU and GPU with non-Gaussian data.
@@ -1385,10 +1428,14 @@ Read `params` before comparing solutions because their defaults may optimize dif
   BIC.
 - `anm_pairs.py` - compares the ANM direction test with causal-learn on cause-effect pairs.
 - `pnl_pairs.py` - compares the PNL direction test with causal-learn on post-nonlinear pairs.
-- `discrete_cpu.py` - compares PC with the chi-square and G-square tests, GES with BDeu, and hill
-  climbing with BDeu and the multinomial BIC with causal-learn, bnlearn, and pgmpy on categorical
-  data. `bnlearn_discrete.py` and `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical tests and
-  scores.
+- `nonlinear_ci_cpu.py` - compares PC and FCI with the nonlinear CI tests with causal-learn,
+  tigramite, and pcalg with RCIT on additive nonlinear noise.
+- `nonlinear_ci_queries.py` - compares the nonlinear CI tests query by query with causal-learn,
+  tigramite, and RCIT. `start_tigramite.sh` builds the environment of tigramite's fits.
+- `discrete_cpu.py` - compares PC with the chi-square and G-square tests, GES, BOSS, and GRaSP with
+  BDeu, and hill climbing with BDeu and the multinomial BIC with causal-learn, bnlearn, and pgmpy on
+  categorical data, and runs BOSS and GRaSP with the multinomial BIC. `bnlearn_discrete.py` and
+  `pgmpy_hc.py` adapt bnlearn's and pgmpy's categorical tests and scores.
 - `mixed_cpu.py` - compares PC, GES, and hill climbing with the degenerate and conditional Gaussian
   tests and scores with Tetrad and bnlearn on mixed data.
 - `gies_cpu.py` - compares GIES with pcalg on simulated interventional data.

@@ -34,7 +34,9 @@ coefficient `0.8` is an illustration, not an estimate from data.
 |---|---|---|
 | Andrey endpoints | `GraphStructure.to_numpy()` | `1`: tail at `i`; reverse cell is `2`: arrowhead at `j` |
 | causal-learn endpoints | `GeneralGraph.graph` | `-1`: tail at `i`; reverse cell is `1`: arrowhead at `j` |
-| gCastle directed adjacency | `causal_matrix` | `1`: edge from row `i` to column `j` |
+| pcalg `amat.cpdag` | `as(fit, "amat")` | `0`: tail at `i`; reverse cell is `1`: arrowhead at `j` |
+| pcalg `amat.pag` | `fit@amat` | `2`: arrowhead at `j`; reverse cell is `3`: tail at `i` |
+| Binary directed adjacency | `A` | `1`: edge from row `i` to column `j` |
 | lingam coefficients | `adjacency_matrix_` | Effect of column `j` on row `i`; the coefficient for `i -> j` is in `[j, i]` |
 
 A binary directed adjacency matrix needs extra conventions to distinguish an undirected edge,
@@ -134,8 +136,8 @@ out.ordering            # (0, 1, 2)
 In a `digraph`, an `ARROW`/`ARROW` pair produces two `directed` rows, lower-to-higher node index
 first, then the reverse. Printed summaries count and list both directions.
 
-Nodes are numbered from 0 for an array. For a pandas DataFrame the column names become the
-structure's `labels`, and `oriented_edges()` returns names instead of indices:
+Nodes are numbered from 0 for an array. For a pandas DataFrame the column names, as text, become
+the structure's `labels`, and `oriented_edges()` returns names instead of indices:
 
 ```python
 import pandas as pd
@@ -146,7 +148,9 @@ andrey.direct_lingam(df).structure.oriented_edges()
 ```
 
 `andrey run` reads a CSV or TSV header row the same way. Its JSON result lists the names in
-`labels`, and each edge's `source` and `target` are indices into that list.
+`labels`, and each edge's `source` and `target` are indices into that list. A first row of numbers
+is data, not a header, so quote a name that is a number, as in `"1","0","2"`; a first row that
+mixes numbers with text is an error.
 
 | Call | Returns |
 |---|---|
@@ -157,9 +161,11 @@ andrey.direct_lingam(df).structure.oriented_edges()
 | `to_networkx()` | `networkx.DiGraph` or `networkx.MultiDiGraph` |
 | `endpoints(i, j)`, `neighbors(i)` | the marks on one edge; the adjacent nodes |
 
-`GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. Pass
-the graph's `kind`: when it is omitted, they infer it from the marks, and the marks alone do not
-always decide it. A `digraph` 2-cycle, for one, comes back as a `pag` with a bidirected edge.
+`GraphStructure.from_numpy`, `from_edges`, and `from_networkx` build a graph back from each. They
+take each label or NetworkX node as text, `str(label)`, and raise a `ValueError` when two are the
+same text, such as `1` and `"1"`. Pass the graph's `kind`: when it is omitted, they infer it from
+the marks, and the marks alone do not always decide it. A `digraph` 2-cycle, for one, comes back
+as a `pag` with a bidirected edge.
 
 `to_networkx()` returns a `DiGraph` for `dag`, `cpdag`, and `digraph`, and a `MultiDiGraph` for
 `pag` or `multigraph=True`. Every edge carries `endpoints=(mark_i, mark_j)`. For `dag`, `cpdag`,
@@ -194,23 +200,49 @@ def from_binary_dag(A):
     M = np.zeros(A.shape, dtype=np.int8)
     M[A], M[A.T] = TAIL, ARROW
     return GraphStructure.from_numpy(M, kind="dag")
+
+
+def from_pcalg_pag(amat, kind="pag"):
+    """pcalg `amat.pag` (0 none, 1 circle, 2 arrowhead, 3 tail); amat[i, j] is the mark at j."""
+    A = np.asarray(amat).T
+    if not np.isin(A, (0, 1, 2, 3)).all():
+        raise ValueError("amat.pag holds only the codes 0, 1, 2, 3")
+    M = np.zeros(A.shape, dtype=np.int8)
+    M[A == 1], M[A == 2], M[A == 3] = CIRCLE, ARROW, TAIL
+    return GraphStructure.from_numpy(M, kind=kind)
+
+
+def from_pcalg_cpdag(amat):
+    """pcalg `amat.cpdag`; i -> j is amat[j, i] = 1 and amat[i, j] = 0, i -- j is 1 both ways."""
+    A = np.asarray(amat)
+    if not np.isin(A, (0, 1)).all():
+        raise ValueError("amat.cpdag holds only the codes 0 and 1")
+    A = A != 0
+    M = np.zeros(A.shape, dtype=np.int8)
+    M[A.T] = TAIL
+    M[A & ~A.T] = ARROW
+    return GraphStructure.from_numpy(M, kind="cpdag")
 ```
 
 - **causal-learn** - `G.graph[i, j]` is also the mark at `i`, so `from_signed(G.graph, kind)`
   needs no transpose. Its wildcard and compound codes (3 and above) have no Andrey equivalent.
-- **gCastle DAG estimators** - `causal_matrix` sets `A[i, j] = 1` for `i -> j`; use
-  `from_binary_dag` for a directed acyclic result.
 - **lingam** - pass `adjacency_matrix_.T` to `from_binary_dag`. Some estimators write `NaN` for
   an unobserved common cause; decide how to encode those pairs first.
+- **pcalg** - `amat.pag` (`fit@amat` from `fci` or `rfci`) holds the mark at the column node, so
+  `from_pcalg_pag` transposes it and swaps pcalg's codes for circle (1) and tail (3). A MAG uses
+  the same coding. `amat.cpdag` (`as(fit, "amat")` from `pc`) writes `i -> j` at `[j, i]`, the
+  child's row, and an undirected edge as `1` in both cells, so `from_pcalg_cpdag` transposes it
+  too. To write a PAG for pcalg, transpose `to_numpy()` and swap the codes 1 and 3.
 
 ## References
 
 - [causal-learn graph implementation][signed-graph]: signed endpoint marks.
-- [gCastle NOTEARS implementation][notears]: binary directed adjacency and separate weights.
 - [LiNGAM model definition](https://lingam.readthedocs.io/en/latest/tutorial/lingam.html):
   the coefficient convention in $x = Bx + e$.
+- [pcalg `amatType`][pcalg-amat-type]: the `amat.cpdag` and `amat.pag` codes, and the row or
+  column the mark belongs to.
 
 [signed-graph]:
   https://github.com/py-why/causal-learn/blob/main/causallearn/graph/GeneralGraph.py
-[notears]:
-  https://gcastle.readthedocs.io/en/latest/_modules/castle/algorithms/gradient/notears/linear.html
+[pcalg-amat-type]:
+  https://search.r-project.org/CRAN/refmans/pcalg/html/amatType.html

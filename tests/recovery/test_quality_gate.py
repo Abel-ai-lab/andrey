@@ -18,10 +18,10 @@ from qa import quality_gate as qg
 
 def test_every_cell_has_a_baseline_and_every_method_a_tolerance() -> None:
     ledger = qg.recorded()
-    assert set(ledger["tolerances"]) == set(qg.SUPPORTED)
+    assert set(ledger["tolerances"]) == set(qg.CHECKS)
     assert all(t["median_shd"] >= 1 and t["reason"] for t in ledger["tolerances"].values())
-    assert {m: set(ledger["baselines"][m]) for m in qg.SUPPORTED} == {
-        m: set(qg.SUPPORTED[m].datasets) for m in qg.SUPPORTED
+    assert {m: set(ledger["baselines"][m]) for m in qg.CHECKS} == {
+        m: set(qg.CHECKS[m].datasets) for m in qg.CHECKS
     }
 
 
@@ -61,18 +61,18 @@ def shifted_series_truth(truth: object, target: qg.Target) -> object:
     return np.roll(truth, 1, axis=(1, 2))
 
 
-@pytest.mark.parametrize("method", sorted(qg.SUPPORTED))
+@pytest.mark.parametrize("method", sorted(qg.CHECKS))
 def test_gate_rejects_the_empty_graph(method: str) -> None:
-    target = qg.SUPPORTED[method].target
-    for dataset in qg.SUPPORTED[method].datasets:
+    target = qg.CHECKS[method].target
+    for dataset in qg.CHECKS[method].datasets:
         result = qg.evaluate(method, dataset, fit=lambda draw: empty_answer(draw, target))
         assert any("empty graph" in f for f in result.failures), f"{method} on {dataset}"
 
 
-@pytest.mark.parametrize("method", sorted(qg.SUPPORTED))
+@pytest.mark.parametrize("method", sorted(qg.CHECKS))
 def test_gate_rejects_a_broken_result(method: str) -> None:
-    target = qg.SUPPORTED[method].target
-    for dataset in qg.SUPPORTED[method].datasets:
+    target = qg.CHECKS[method].target
+    for dataset in qg.CHECKS[method].datasets:
         result = qg.evaluate(method, dataset, fit=lambda draw: shifted_truth(draw, target))
         assert not result.passed, f"{method} on {dataset} accepted SHD {result.shd}"
 

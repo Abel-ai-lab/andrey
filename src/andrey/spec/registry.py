@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from andrey.constraint.pc import COLLIDER_ORDERS
 from andrey.core.ci import SHIPPED_INDEP_TESTS
+from andrey.core.knowledge import KNOWLEDGE_PARTS, KnowledgePart
 from andrey.search.boss import PERMUTATION_SCORES
 from andrey.search.exact import EXACT_SCORES
 from andrey.search.ges import GES_SCORES
@@ -39,7 +40,12 @@ _INDEP_TEST = ParamSpec(
     "distribution, exact for Gaussian data at any sample size. For categorical data coded by whole "
     "numbers: chisq = Pearson's chi-square; gsq = G-square. For mixed data, with the categorical "
     "columns named by categorical: degen_gauss = degenerate Gaussian and "
-    "cond_gauss = conditional Gaussian likelihood ratio.",
+    "cond_gauss = conditional Gaussian likelihood ratio. For nonlinear effects in continuous "
+    "data, each far slower per test: kci = kernel test; rcot = its random-feature approximation; "
+    "cmiknn = nearest-neighbor conditional mutual information; "
+    "gpdc = Gaussian-process regression and distance correlation. These four rank the columns as "
+    "the searches do, so ANDREY_TIE_BREAK=position makes their p-values depend on the column "
+    "order.",
     choices=SHIPPED_INDEP_TESTS,  # single source of truth: the shipped CI-registry names
 )
 _CATEGORICAL = ParamSpec(
@@ -74,22 +80,25 @@ _COLLIDER_RULE = ParamSpec(
 _POSSIBLE_DSEP = ParamSpec(
     name="possible_dsep",
     type="str",
-    default="order_free",
+    default=None,
     choices=("order_free", "fast"),
     doc="The order of the possible-d-separation step, which removes edges one at a time: "
     "order_free = by a rank computed from each column's own data, so the result does not depend "
-    "on the column order unless two columns are identical; fast = column order. Both take about "
-    "the same time on the benchmark graphs.",
+    "on the column order unless two columns are identical; fast = column order. null follows "
+    "ANDREY_TIE_BREAK: order_free under rank, fast under position.",
+    nullable=True,
 )
 _COLLIDER_ORDER = ParamSpec(
     name="collider_order",
     type="str",
-    default="p_value",
+    default=None,
     choices=COLLIDER_ORDERS,
     doc="The order in which colliders are oriented, which decides between two that would orient "
     "one edge in opposite directions: p_value = the collider whose endpoints were separated with "
     "the largest p-value first, independent of the column order; column = in column order, the "
-    "first of two conflicting colliders kept.",
+    "first of two conflicting colliders kept. null follows ANDREY_TIE_BREAK: p_value under rank, "
+    "column under position.",
+    nullable=True,
 )
 _LAMBDA_VALUE = ParamSpec(
     name="lambda_value",
@@ -143,6 +152,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
+            '`collider_order="column"` orients colliders in column order.'
+        ),
         params=(_ALPHA, _INDEP_TEST, _COLLIDER_ORDER, _CATEGORICAL, _MAX_CATEGORIES),
         references=(
             "Spirtes & Glymour 1991",
@@ -168,6 +183,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires the orientation rules one at a time in column order, and '
+            'it or `possible_dsep="fast"` visits the possible-d-separation step in column order.'
+        ),
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -200,6 +221,13 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires the orientation rules one at a time in column order and '
+            'records the first separating subset found, and it or `possible_dsep="fast"` visits '
+            "the possible-d-separation step in column order."
+        ),
         params=(
             ParamSpec(
                 name="score_func",
@@ -257,6 +285,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            '`tie_break="position"` fires Meek\'s rules one at a time in column order, and it or '
+            '`collider_order="column"` orients colliders in column order.'
+        ),
         params=(
             _ALPHA,
             _INDEP_TEST,
@@ -284,9 +318,10 @@ _add(
         name="ges",
         family="score",
         summary="Greedy equivalence search: a score-based greedy search over CPDAGs. Fast and "
-        "accurate on linear-Gaussian data with the BIC; score_func=local_score_BDeu or "
-        "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
-        "local_score_cond_gauss for mixed data. The score is in metadata['score'].",
+        "accurate on linear-Gaussian data with the BIC; local_score_BDeu, the default when every "
+        "column is categorical, or local_score_BIC_categorical for categorical data, "
+        "local_score_cond_gauss, the default when some columns are, or local_score_degen_gauss for "
+        "mixed data. The score is in metadata['score'].",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
             structure_type="graph",
@@ -297,17 +332,25 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="score_func",
                 type="str",
-                default="local_score_BIC",
+                default=None,
                 doc="Local score objective: local_score_BIC = linear-Gaussian BIC; "
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
                 "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
-                "Gaussian BIC, for mixed data.",
+                "Gaussian BIC, for mixed data; "
+                "null picks local_score_BDeu when every column is categorical (a category, bool, "
+                "or text column, or at most max_categories distinct whole numbers, or a column "
+                "categorical lists) and "
+                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
+                "local_score_BIC.",
                 choices=GES_SCORES,
+                nullable=True,
             ),
             _LAMBDA_VALUE,
             _CATEGORICAL,
@@ -343,6 +386,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(_LAMBDA_VALUE,),
         references=("Hauser & Buhlmann 2012",),
     )
@@ -361,6 +406,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="score_func",
@@ -393,7 +440,8 @@ _add(
         name="hc",
         family="score",
         summary="Hill climbing over DAGs: adds, removes, or reverses one edge at a time while the "
-        "score improves; a simple greedy baseline. BIC by default; score_func=local_score_BDeu or "
+        "score improves; a simple greedy baseline. BIC by default, BDeu when every column is "
+        "categorical, conditional Gaussian when some are; score_func=local_score_BDeu or "
         "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
         "local_score_cond_gauss for mixed data. Stops at a local optimum, or after max_iter moves "
         "when set. Returns the CPDAG of the final DAG and its score.",
@@ -407,17 +455,25 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="score_func",
                 type="str",
-                default="local_score_BIC_from_cov",
+                default=None,
                 doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
                 "categorical data coded by whole numbers; "
                 "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional "
-                "Gaussian BIC, for mixed data.",
+                "Gaussian BIC, for mixed data; "
+                "null picks local_score_BDeu when every column is categorical (a category, bool, "
+                "or text column, or at most max_categories distinct whole numbers, or a column "
+                "categorical lists) and "
+                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
+                "local_score_BIC_from_cov.",
                 choices=HC_SCORES,
+                nullable=True,
             ),
             _LAMBDA_VALUE,
             ParamSpec(
@@ -440,8 +496,9 @@ _add(
         family="score",
         summary="Tabu search over DAGs: hill climbing that, at a local optimum, takes the best "
         "non-improving move, never returning to a recently visited DAG, and keeps the best DAG "
-        "seen. With the same settings its score is never worse than hc's. BIC by default; "
-        "score_func=local_score_BDeu or local_score_BIC_categorical for categorical data. Returns "
+        "seen. With the same settings its score is never worse than hc's. BIC by default, BDeu "
+        "when every column is categorical; score_func=local_score_BDeu or "
+        "local_score_BIC_categorical for categorical data. Returns "
         "the CPDAG of that DAG and its score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -450,15 +507,21 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="score_func",
                 type="str",
-                default="local_score_BIC_from_cov",
+                default=None,
                 doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
                 "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for "
-                "categorical data coded by whole numbers.",
+                "categorical data coded by whole numbers; "
+                "null picks local_score_BDeu, with a DataTypeWarning, when every column is "
+                "categorical (at most 10 distinct whole numbers), else local_score_BIC_from_cov, "
+                "mixed data included: tabu has no mixed-data score.",
                 choices=TABU_SCORES,
+                nullable=True,
             ),
             _LAMBDA_VALUE,
             ParamSpec(
@@ -494,7 +557,8 @@ _add(
         family="score",
         summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns one DAG from "
-        "the best-scoring equivalence class. BIC by default; score_func=local_score_BDeu or "
+        "the best-scoring equivalence class. BIC by default, BDeu when every column is "
+        "categorical, conditional Gaussian when some are; score_func=local_score_BDeu or "
         "local_score_BIC_categorical for categorical data, local_score_degen_gauss or "
         "local_score_cond_gauss for mixed data.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
@@ -506,6 +570,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="search_method",
@@ -517,12 +583,18 @@ _add(
             ParamSpec(
                 name="score_func",
                 type="str",
-                default="local_score_BIC",
+                default=None,
                 doc="Local score: local_score_BIC = linear-Gaussian BIC; local_score_BDeu = BDeu "
                 "and local_score_BIC_categorical = multinomial BIC, for categorical data coded by "
                 "whole numbers; local_score_degen_gauss and local_score_cond_gauss = degenerate "
-                "and conditional Gaussian BIC, for mixed data.",
+                "and conditional Gaussian BIC, for mixed data; "
+                "null picks local_score_BDeu when every column is categorical (a category, bool, "
+                "or text column, or at most max_categories distinct whole numbers, or a column "
+                "categorical lists) and "
+                "local_score_cond_gauss when some are, each with a DataTypeWarning, else "
+                "local_score_BIC.",
                 choices=EXACT_SCORES,
+                nullable=True,
             ),
             _CATEGORICAL,
             _MAX_CATEGORIES,
@@ -547,6 +619,12 @@ _add(
         determinism="stochastic",
         accel="torch",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            "Repeats on one machine with one torch version; on another platform the graph "
+            "can differ."
+        ),
         seeded=True,
         passthrough=True,
         params=(
@@ -568,41 +646,27 @@ _add(
 _BOSS_SCORE = ParamSpec(
     name="score_func",
     type="str",
-    default="local_score_BIC_from_cov",
+    default=None,
     doc="Local score objective: local_score_BIC_from_cov = covariance-based BIC; "
+    "local_score_BDeu = BDeu and local_score_BIC_categorical = multinomial BIC, for categorical "
+    "data coded by whole numbers; "
     "local_score_degen_gauss and local_score_cond_gauss = degenerate and conditional Gaussian BIC, "
-    "for mixed data (experimental).",
+    "for mixed data (experimental); "
+    "null picks local_score_BDeu when every column is categorical (a category, bool, or text "
+    "column, or at most max_categories distinct whole numbers, or a column categorical lists) "
+    "and local_score_cond_gauss when some are, each with a DataTypeWarning, else "
+    "local_score_BIC_from_cov.",
     choices=PERMUTATION_SCORES,
+    nullable=True,
 )
 _add(
     MethodSpec(
         name="boss",
         family="permutation",
         summary="Best-order score search: a permutation search over the linear-Gaussian BIC, fast "
-        "and accurate on linear-Gaussian data; score_func=local_score_degen_gauss or "
-        "local_score_cond_gauss for mixed data. Returns a CPDAG + score.",
-        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
-        output=OutputSpec(
-            structure_type="graph",
-            graph_kind="cpdag",
-            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
-            "a mixed-data setting read",
-        ),
-        determinism="stochastic",
-        accel="numpy",
-        status="supported",
-        seeded=True,
-        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
-        references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
-    )
-)
-_add(
-    MethodSpec(
-        name="grasp",
-        family="permutation",
-        summary="Greedy relaxation of the sparsest permutation: a permutation search over the "
-        "linear-Gaussian BIC, like BOSS with a different move (tucks); "
-        "score_func=local_score_degen_gauss or local_score_cond_gauss for mixed data. Returns a "
+        "and accurate on linear-Gaussian data; local_score_BDeu, the default when every column is "
+        "categorical, or local_score_BIC_categorical for categorical data, local_score_cond_gauss, "
+        "the default when some columns are, or local_score_degen_gauss for mixed data. Returns a "
         "CPDAG + score.",
         data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
         output=OutputSpec(
@@ -614,6 +678,34 @@ _add(
         determinism="stochastic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        seeded=True,
+        params=(_BOSS_SCORE, _LAMBDA_VALUE, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
+        references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
+    )
+)
+_add(
+    MethodSpec(
+        name="grasp",
+        family="permutation",
+        summary="Greedy relaxation of the sparsest permutation: a permutation search over the "
+        "linear-Gaussian BIC, like BOSS with a different move (tucks); local_score_BDeu, the "
+        "default when every column is categorical, or local_score_BIC_categorical for categorical "
+        "data, local_score_cond_gauss, the default when some columns are, or "
+        "local_score_degen_gauss for mixed data. Returns a CPDAG + score.",
+        data=DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+        output=OutputSpec(
+            structure_type="graph",
+            graph_kind="cpdag",
+            doc="score in metadata['score']; metadata['categorical'] lists the categorical columns "
+            "a mixed-data setting read",
+        ),
+        determinism="stochastic",
+        accel="numpy",
+        status="supported",
+        column_order="relabels",
+        tie_break=True,
         seeded=True,
         params=(
             _BOSS_SCORE,
@@ -648,6 +740,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             _RANDOM_STATE,
             ParamSpec(
@@ -677,6 +771,12 @@ _add(
         determinism="stochastic",
         accel="numpy",
         status="supported",
+        column_order="relabels_if_converged",
+        tie_break=True,
+        order_note=(
+            "At few rows per variable, FastICA can reach another solution under a new "
+            "column order or on another machine."
+        ),
         seeded=True,
         params=(
             ParamSpec(
@@ -724,6 +824,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(_RANDOM_STATE,),
         references=("Shimizu 2012",),
     )
@@ -754,6 +856,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note=(
+            "When the likelihood fit stops before it converges, the graph can change with "
+            "the numerical libraries' versions."
+        ),
         params=(
             ParamSpec(
                 name="order",
@@ -820,6 +928,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="n_lags",
@@ -863,6 +973,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="tau_max",
@@ -921,6 +1033,9 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
+        order_note='With `collider_rule="none"`, the orientations can follow the column order.',
         params=(
             ParamSpec(
                 name="tau_max",
@@ -982,6 +1097,8 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         params=(
             ParamSpec(
                 name="tau_max",
@@ -1039,6 +1156,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
         params=(
             ParamSpec(
                 name="maxlag",
@@ -1097,6 +1215,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
         references=("Hoyer et al. 2008", "Gretton et al. 2008", "Mooij et al. 2016"),
     )
 )
@@ -1137,6 +1256,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
         references=(
             "Zhang & Hyvarinen 2009",
             "Zhang & Hyvarinen 2010",
@@ -1165,6 +1285,12 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="can_change",
+        tie_break=True,
+        order_note=(
+            "Reordering whole clusters relabels the result; reordering the columns inside a "
+            "cluster can change the latents' order."
+        ),
         params=(
             ParamSpec(
                 name="alpha",
@@ -1178,7 +1304,8 @@ _add(
                 type="str_list",
                 default=None,
                 doc="Names for the observed variables, for example, labels=[x1,x2]. null uses the "
-                "data file's header, else X1..Xn; latents are named L1..Lm.",
+                "data file's header, else X1..Xn; latents are named L1, L2, ..., skipping a name "
+                "an observed variable has.",
                 nullable=True,
             ),
         ),
@@ -1234,6 +1361,7 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
         references=("Maeda & Shimizu 2020",),
     )
 )
@@ -1264,9 +1392,81 @@ _add(
         determinism="deterministic",
         accel="numpy",
         status="supported",
+        column_order="relabels",
+        tie_break=True,
         references=("Tashiro et al. 2014",),
     )
 )
+
+# --- background knowledge and the conditioning-set cap ------------------------------------------
+
+_SKELETON_RULE = (
+    "The adjacency search starts from the allowed pairs and never removes a required pair; the "
+    "tests can remove any other allowed pair. A pair the knowledge makes non-adjacent is tested "
+    "for a separating set, so colliders over it are oriented as usual; when the search finds none "
+    "within max_depth, no rule orients through its unshielded triples. "
+)
+_PAG_MARKS = (
+    "In the PAG, a forbidden a -> b on an adjacent pair puts an arrowhead at a and can leave a "
+    "circle at b, and a required one is a -> b. "
+)
+_CLASS_RULE = (
+    "The result directs every edge the knowledge decides, then Meek's rules direct the edges that "
+    "follow."
+)
+_MOVE_RULE = (
+    "No move adds a forbidden edge or removes a required one; the search starts from the required "
+    "edges. "
+)
+_PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
+_ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
+_KNOWLEDGE_HOW: dict[str, str] = {
+    "pc": _SKELETON_RULE + _CLASS_RULE,
+    "cdnod": _SKELETON_RULE + _CLASS_RULE + " The domain index is unconstrained.",
+    "fci": _SKELETON_RULE + _PAG_MARKS,
+    "gfci": "The GES phase moves as ges does; the test phase starts from the adjacencies GES found "
+    "and never removes a required pair. " + _PAG_MARKS,
+    "ges": _MOVE_RULE + _CLASS_RULE,
+    "gies": _MOVE_RULE + _CLASS_RULE,
+    "xges": _MOVE_RULE + _CLASS_RULE,
+    "hc": _MOVE_RULE + _CLASS_RULE,
+    "tabu": _MOVE_RULE + _CLASS_RULE,
+    "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
+    "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
+    "exact_search": _PARENT_RULE,
+    "direct_lingam": _ORDER_RULE + "The regression drops forbidden parents and does not penalize "
+    "required ones; every required edge is in the DAG.",
+}
+#: The Knowledge parts each method honors (every part, for every method that takes knowledge).
+_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
+    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
+)
+_MAX_DEPTH = ParamSpec(
+    name="max_depth",
+    type="int",
+    default=None,
+    doc="The maximum conditioning-set size of every conditional-independence test, at least 0: 0 "
+    "runs only unconditional tests, and null sets no limit. A smaller cap runs fewer tests and can "
+    "keep edges that a larger conditioning set would remove.",
+    nullable=True,
+)
+
+for _name, _how in _KNOWLEDGE_HOW.items():
+    _knowledge = ParamSpec(
+        name="knowledge",
+        type="knowledge",
+        default=None,
+        doc="Background knowledge: required and forbidden edges, the pairs allowed to be "
+        f"adjacent, and temporal tiers. Honors {', '.join(_KNOWLEDGE_PARTS[_name])}. {_how}",
+        nullable=True,
+    )
+    _depth = (_MAX_DEPTH,) if _name in ("pc", "cdnod", "fci", "gfci") else ()
+    REGISTRY[_name] = REGISTRY[_name].model_copy(
+        update={
+            "params": (*REGISTRY[_name].params, *_depth, _knowledge),
+            "knowledge": _KNOWLEDGE_PARTS[_name],
+        }
+    )
 
 
 def get_spec(name: str) -> MethodSpec:

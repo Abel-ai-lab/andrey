@@ -7,8 +7,10 @@ tau_max``:
    candidate parent. Round ``p = 0, 1, ...`` tests each candidate against ``X^j_t`` given the ``p``
    strongest other candidates, then drops the candidates whose p-value exceeds ``pc_alpha``. A
    candidate's strength is the smallest absolute test statistic it has had so far; the survivors
-   are re-sorted by it, strongest first, after each round. The rounds stop when no candidate has
-   ``p`` others left to condition on.
+   are re-sorted by it, strongest first, after each round. Strengths equal to ``_KEY_DP`` decimals
+   are ordered by :func:`~andrey.search.hc.tie_ranks` of their variables, then by lag, so the
+   order follows the variables when the columns are reordered. The rounds stop when no candidate
+   has ``p`` others left to condition on.
 2. **MCI.** Every link ``X^i_{t-tau} -> X^j_t`` is tested given the selected parents of ``X^j_t``
    (without ``X^i_{t-tau}``) and the selected parents of ``X^i_t`` shifted ``tau`` steps back. The
    link is significant when its p-value is at most ``alpha_level``.
@@ -38,6 +40,7 @@ eaau4996. https://doi.org/10.1126/sciadv.aau4996
 from __future__ import annotations
 
 import math
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -45,6 +48,9 @@ import numpy as np
 
 from andrey.core import backend
 from andrey.core.ci import FisherZ, PartialCorrelationTest, SingularCorrelationError, StudentT
+from andrey.core.score import copies_error
+from andrey.search._parallel import _KEY_DP
+from andrey.search.hc import tie_ranks
 
 # A lagged variable ``(i, lag)``: variable ``i`` at time ``t - lag``.
 Link = tuple[int, int]
@@ -129,12 +135,31 @@ class DesignTest:
 def design_test(indep_test: str, data: np.ndarray, tau_max: int) -> DesignTest:
     """The ``indep_test`` partial-correlation test over the lagged design of ``data``.
 
-    Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`.
+    Raises :class:`ValueError` when ``indep_test`` is not a key of :data:`INDEP_TESTS`, and
+    :class:`~andrey.core.score.CopiedColumnsError` when design columns repeat others up to scale
+    and shift: a variable that copies another, at the same step or some lags apart. A copy at one
+    step repeats at every lag of the design, so the error names each group that holds a lag-0
+    column, by :func:`design_column_name`.
     """
     if indep_test not in INDEP_TESTS:
         raise ValueError(f"indep_test must be one of {sorted(INDEP_TESTS)}, got {indep_test!r}")
     design = lagged_design(data, tau_max)
-    return DesignTest(INDEP_TESTS[indep_test](design), design)
+    test = INDEP_TESTS[indep_test](design)
+    n_vars = data.shape[1]
+    groups = [group for group in test.copies() if group[0] < n_vars]
+    if groups:
+        raise copies_error(groups, design_column_name(n_vars))
+    return DesignTest(test, design)
+
+
+def design_column_name(n_vars: int, name: Callable[[int], str] = str) -> Callable[[int], str]:
+    """Name design column ``lag * n_vars + i`` as ``name(i)``, with ``at lag {lag}`` from lag 1."""
+
+    def column(j: int) -> str:
+        lag, i = divmod(j, n_vars)
+        return name(i) if lag == 0 else f"{name(i)} at lag {lag}"
+
+    return column
 
 
 def lagged_design(data: np.ndarray, tau_max: int) -> np.ndarray:
@@ -163,18 +188,26 @@ def _strongest_others(columns: np.ndarray, p: int) -> np.ndarray:
 
 
 def pc1(
-    test: LinkTest, n_vars: int, target: int, tau_max: int, pc_alpha: float
+    test: LinkTest,
+    n_vars: int,
+    target: int,
+    tau_max: int,
+    pc_alpha: float,
+    ranks: Sequence[int],
 ) -> tuple[Link, ...]:
     """Select the lagged parents of variable ``target`` with the PC1 rounds; strongest first.
 
-    Candidates start in variable-major order, ``(0, 1), (0, 2), ..., (1, 1), ...``, and each round
-    re-sorts the survivors stably, so equal strengths keep their earlier order. Each round is one
-    ``test`` call over all remaining candidates.
+    Candidates start in variable-major order, ``(0, 1), (0, 2), ..., (1, 1), ...``. Each round
+    re-sorts the survivors by strength rounded to ``_KEY_DP`` decimals, strongest first, and equal
+    ones by ``ranks[i]``, then by lag, for the candidate ``(i, lag)``; ``ranks`` holds each
+    variable's :func:`~andrey.search.hc.tie_ranks`. Each round is one ``test`` call over all
+    remaining candidates.
     """
     columns = np.array(
         [_column((i, lag), n_vars) for i in range(n_vars) for lag in range(1, tau_max + 1)],
         dtype=np.intp,
     )
+    tie = np.asarray(ranks, dtype=np.intp)[columns % n_vars] * (tau_max + 1) + columns // n_vars
     strength = np.full(len(columns), math.inf)
     p = 0
     while len(columns) - 1 >= p:
@@ -183,8 +216,8 @@ def pc1(
         )
         strength = np.fmin(strength, np.abs(statistics))
         kept = np.flatnonzero(~(p_values > pc_alpha))
-        kept = kept[np.argsort(-strength[kept], kind="stable")]
-        columns, strength = columns[kept], strength[kept]
+        kept = kept[np.lexsort((tie[kept], -np.round(strength[kept], _KEY_DP)))]
+        columns, strength, tie = columns[kept], strength[kept], tie[kept]
         p += 1
     return tuple((int(c) % n_vars, int(c) // n_vars) for c in columns)
 
@@ -236,8 +269,9 @@ def pcmci(
     data = np.asarray(data, dtype=np.float64)
     n_vars = data.shape[1]
     test = design_test(indep_test, data, tau_max)
+    ranks = tie_ranks(data).tolist()
     with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
-        parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha) for j in range(n_vars))
+        parents = tuple(pc1(test, n_vars, j, tau_max, pc_alpha, ranks) for j in range(n_vars))
         statistics, p_values = mci(test, n_vars, parents, tau_max)
     return PCMCIResult(
         parents=parents, statistics=statistics, p_values=p_values, graph=p_values <= alpha_level

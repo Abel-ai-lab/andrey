@@ -25,14 +25,13 @@ from andrey_bench import datasets, memcap, rundir
 from andrey_bench.adapters.andrey_pc import AndreyPC
 from andrey_bench.adapters.baseline_empty import BaselineEmpty
 from andrey_bench.adapters.causal_learn_pc import CausalLearnPC
-from andrey_bench.adapters.gcastle_pc import GCastlePC
 from andrey_bench.datasets import DatasetKey
 from andrey_bench.integration import run_batch
 from andrey_bench.runner import available_cores
 
-#: The solutions: three PC implementations plus the empty graph, which runs as an ordinary solution
+#: The solutions: two PC implementations plus the empty graph, which runs as an ordinary solution
 #: so the correctness floor is measured on the same datasets. Every one runs on every dataset.
-SOLUTIONS = [AndreyPC(), CausalLearnPC(), GCastlePC(), BaselineEmpty()]
+SOLUTIONS = [AndreyPC(), CausalLearnPC(), BaselineEmpty()]
 
 #: The data every rung is generated on — the canonical sparse slice, spelled out
 #: (``datasets.REGIMES`` names the others, such as the non-Gaussian ``lingam_sf``). It travels on

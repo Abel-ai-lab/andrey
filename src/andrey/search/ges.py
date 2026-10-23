@@ -10,15 +10,27 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core import GraphStructure, backend
+from andrey.core import ARROW, TAIL, GraphStructure, backend
+from andrey.core.knowledge import Constraints, mpdag
+from andrey.core.mixed import column_mask
 from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
-from andrey.core.score import Score, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, Score, make_score
 from andrey.search import operators as ops
+from andrey.search.hc import tie_ranks
 
 
 def _reform_cpdag(adj: np.ndarray) -> np.ndarray:
     """Canonicalize a search PDAG to its CPDAG via a consistent DAG extension."""
     return _cpdag_of_pdag(adj)
+
+
+def required_dag(constraints: Constraints) -> np.ndarray:
+    """The DAG made of the required edges, as a mark matrix: where a search under knowledge starts,
+    once taken to its equivalence class."""
+    dag = np.zeros(constraints.required.shape, dtype=np.int8)
+    dag[constraints.required] = TAIL
+    dag[constraints.required.T] = ARROW
+    return dag
 
 
 def _reachable(adj: np.ndarray):
@@ -61,6 +73,7 @@ def ges(
     lambda_value: float = 1.0,
     maxP: float | None = None,
     categorical: np.ndarray | None = None,
+    constraints: Constraints | None = None,
     _full_scores: bool = False,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
@@ -92,6 +105,11 @@ def ges(
         the forward phase; ``None`` defaults to ``n_features / 2``. The backward phase is uncapped.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score; the other scores ignore it.
+    constraints : Constraints or None
+        Background knowledge. An Insert never adds a forbidden edge, a Delete never removes a
+        required one, the search starts from the class of the required edges, and a move whose
+        class holds no DAG that satisfies the knowledge is skipped for the next best one. The
+        result is that class narrowed by the knowledge (:func:`~andrey.core.knowledge.mpdag`).
     _full_scores : bool
         Private test lever: score every candidate by two full local scores (the pre-Schur reference)
         instead of the Schur delta. Tests compare the two scoring paths; this option is not part of
@@ -110,16 +128,31 @@ def ges(
     score = make_score(score_func, X, lambda_value=lambda_value, categorical=categorical)
 
     adj = np.zeros((n, n), dtype=np.int8)
+    if constraints is not None and constraints.required.any():
+        adj = _cpdag_of_pdag(required_dag(constraints))
     # Local import breaks the ges <-> _parallel_ges cycle.
     from andrey.search import _parallel_ges
 
     # Pin BLAS to one thread for the score-diff loops (the covariance above is already computed):
     # multi-thread BLAS reduction order is not bit-stable, so pinning makes the score host- and
     # thread-count-reproducible and equal to the (1-thread) parallel workers.
+    mask = np.full(n, score_func in DISCRETE_SCORES)
+    if score_func in MIXED_SCORES:
+        mask = column_mask(categorical, n)
+    ranks = tie_ranks(X, mask).tolist()
     with backend.one_blas_thread():
         workers = backend.worker_count() if n > 1 else 1
         adj = _parallel_ges.run_ges(
-            adj, score, n, max_parents, workers=workers, full_scores=_full_scores
+            adj,
+            score,
+            n,
+            max_parents,
+            workers=workers,
+            ranks=ranks,
+            full_scores=_full_scores,
+            constraints=constraints,
         )
         total = _recompute_objective(adj, score, n)
+    if constraints is not None:
+        adj = mpdag(adj, constraints)
     return to_structure(adj, kind="cpdag"), total

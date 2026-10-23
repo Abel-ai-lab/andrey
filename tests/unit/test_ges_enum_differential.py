@@ -20,6 +20,7 @@ from andrey.core.score import BICScore
 from andrey.search import _parallel_ges as pg
 from andrey.search import operators as ops
 from andrey.search.ges import ges
+from andrey.search.hc import tie_ranks
 
 
 @pytest.fixture
@@ -331,7 +332,7 @@ def test_kept_scan_honors_any_engine_bounds(
         with monkeypatch.context() as patch:
             patch.setattr(ops, "apply_insert", record_insert)
             patch.setattr(pg, "_FULL_RESCAN", full_rescan)
-            adj = pg._forward_inprocess(np.zeros((d, d), dtype=np.int8), engine, d, 3, 1)
+            adj = pg._forward_inprocess(np.zeros((d, d), dtype=np.int8), engine, d, 3, 1, range(d))
         return adj, moves
 
     kept_adj, kept_moves = forward(False)
@@ -371,7 +372,7 @@ def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None):
     """Full GES via the in-process N-chunk decomposition, mirroring ``ges()``'s serial setup.
 
     Drives the fast enumerator through ``forward_chunk_best`` / ``backward_chunk_best`` and the
-    ``(stable_key, x, y, index)`` reduce -- the path the subset pruning must leave bit-identical --
+    ``move_key`` reduce -- the path the subset pruning must leave bit-identical --
     then recomputes the objective from the final CPDAG as ``ges()`` does.
     """
     from andrey.core.score_delta import DeltaBICScore
@@ -384,8 +385,9 @@ def _ges_decomposed(x: np.ndarray, n_chunks: int, maxP: float | None):
     engine = DeltaBICScore(score)
     adj = np.zeros((n, n), dtype=np.int8)
     with threadpool_limits(limits=1):
-        adj = pg._forward_inprocess(adj, engine, n, max_parents, n_chunks)
-        adj = pg._backward_inprocess(adj, engine, n, n_chunks)
+        ranks = tie_ranks(X).tolist()
+        adj = pg._forward_inprocess(adj, engine, n, max_parents, n_chunks, ranks)
+        adj = pg._backward_inprocess(adj, engine, n, n_chunks, ranks)
         total = _recompute_objective(adj, score, n)
     return to_structure(adj, kind="cpdag").to_numpy(), total
 

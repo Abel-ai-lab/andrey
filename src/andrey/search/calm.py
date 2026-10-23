@@ -22,6 +22,8 @@ import numpy as np
 from andrey.core import ARROW, TAIL, GraphStructure, StructureOutput
 from andrey.core.ci import FisherZ
 from andrey.core.orient import dag2cpdag, to_structure
+from andrey.search._parallel import _KEY_DP
+from andrey.search.hc import tie_ranks
 
 
 def _require_torch():
@@ -59,22 +61,29 @@ class CalmResult:
 # --------------------------------------------------------------------------------------------
 
 
-def _markov_blanket(test: FisherZ, target: int, d: int, alpha: float) -> list[int]:
+def _markov_blanket(
+    test: FisherZ, target: int, d: int, alpha: float, ranks: list[int]
+) -> list[int]:
     """Estimate ``target``'s Markov blanket by the interleaved IAMB grow/shrink search.
 
     Grow: repeatedly add the candidate most dependent on ``target`` given the current blanket
-    (smallest p-value at or below ``alpha``) until none qualifies. Shrink: drop any member that has
-    become conditionally independent of ``target`` given the rest. Returns the surviving indices.
+    until none qualifies. A candidate qualifies at a p-value at or below ``alpha``; the most
+    dependent has the largest absolute partial correlation, which keeps its order where p-values
+    underflow to zero. Candidates whose absolute partial correlations agree to ``_KEY_DP`` decimals
+    are chosen by ``ranks``, from :func:`~andrey.search.hc.tie_ranks`. Shrink: drop any member that
+    has become conditionally independent of ``target`` given the rest. Returns the surviving
+    indices.
     """
     blanket: list[int] = []
     while True:
-        best_p, best_x = alpha, None
+        best_key, best_x = None, None
         for x in range(d):
             if x == target or x in blanket:
                 continue
-            p = test(target, x, blanket)
-            if p <= best_p:
-                best_p, best_x = p, x
+            r, p = test.statistic_pvalue(target, x, blanket)
+            key = (-round(abs(r), _KEY_DP), ranks[x])
+            if p <= alpha and (best_key is None or key < best_key):
+                best_key, best_x = key, x
         if best_x is None:
             break
         blanket.append(best_x)
@@ -94,9 +103,10 @@ def moral_graph(data: np.ndarray, *, alpha: float = 0.01) -> np.ndarray:
     arr = np.asarray(data, dtype=np.float64)
     d = arr.shape[1]
     test = FisherZ(arr)
+    ranks = tie_ranks(arr).tolist()
     raw = np.zeros((d, d), dtype=bool)
     for i in range(d):
-        for j in _markov_blanket(test, i, d, alpha):
+        for j in _markov_blanket(test, i, d, alpha, ranks):
             raw[i, j] = True
     mask = (raw & raw.T).astype(np.float64)
     np.fill_diagonal(mask, 0.0)
@@ -286,10 +296,15 @@ def calm(
     grows from ``rho_init`` by ``rho_mult`` until the acyclicity residual clears ``h_tol`` or
     ``rho`` reaches ``rho_max``. A gate is kept when its probability clears ``gate_threshold`` and
     its weight magnitude clears ``w_threshold``. Set ``standardize`` to z-score the columns first;
-    ``seed`` makes the run reproducible. Returns a :class:`CalmResult`.
+    ``seed`` makes the run reproducible. The fit runs on the columns in order of their
+    :func:`~andrey.search.hc.tie_ranks`, so each column keeps its initial weights and gate noise
+    when the columns are reordered. Returns a :class:`CalmResult`.
     """
     samples = np.asarray(data, dtype=np.float64)
     n, d = samples.shape
+    order = np.argsort(tie_ranks(samples))  # the fit's column k is the data's column order[k]
+    back = np.argsort(order)
+    samples = samples[:, order]
     centered = samples - samples.mean(axis=0, keepdims=True)
     if standardize:
         scale = centered.std(axis=0, keepdims=True)
@@ -321,12 +336,13 @@ def calm(
     support = ((gate_prob >= gate_threshold) & (np.abs(weight) >= w_threshold)).astype(np.int8)
     support = _break_cycles(weight, support)
     weighted = weight * support
+    resid_var = _residual_variances(weighted, cov)
+    support, weighted, mask = (m[np.ix_(back, back)] for m in (support, weighted, mask))
 
     marks = _endpoint_marks(support)
     dag = to_structure(marks, kind="dag", labels=labels)
     cpdag = to_structure(dag2cpdag(marks), kind="cpdag", labels=labels)
 
-    resid_var = _residual_variances(weighted, cov)
     objective = 0.5 * float(np.sum(np.log(np.clip(resid_var, 1e-12, None))))
     objective += lambda1 * float(support.sum())
     poly = np.linalg.matrix_power(np.eye(d) + support.astype(float) / d, d)

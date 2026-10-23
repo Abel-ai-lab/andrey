@@ -25,13 +25,16 @@ def head_tags(
     organization_url: str,
     organization_logo: str,
     software: dict,
+    organization_same_as: Sequence[str] = (),
+    site_alternate_name: str | None = None,
     language: str = "en",
     post: dict | None = None,
     parents: Sequence[dict] = (),
 ) -> str:
     """The page's Twitter card fields, its robots rule (``noindex`` when ``page["indexable"]`` is
-    false), a post's article tags, and one JSON-LD graph: the organization (its name, address, and
-    logo's address), the website, the
+    false), a post's article tags, and one JSON-LD graph: the organization (its name, address,
+    logo's address, and the profiles in ``organization_same_as``), the website (also named
+    ``site_alternate_name``), the
     software, the page (a ``BlogPosting`` too for a post), and its breadcrumbs. A post or a release
     card describes the software at its own version (``post["version"]`` or
     ``page["software_version"]``); every other page, at ``software["version"]``. No element is
@@ -71,12 +74,14 @@ def head_tags(
             "name": author,
             "url": organization_url,
             "logo": organization_logo,
+            **({"sameAs": list(organization_same_as)} if organization_same_as else {}),
         },
         {
             "@type": "WebSite",
             "@id": website_id,
             "url": site_url,
             "name": project,
+            **({"alternateName": site_alternate_name} if site_alternate_name else {}),
             "inLanguage": language,
             "publisher": {"@id": organization_id},
         },
@@ -170,6 +175,11 @@ def llms_index(
         "> " + " ".join(description.split()),
         "",
         f"Version: {version}.",
+        "",
+        "Install with `pip install andrey-core`. When output is piped, `andrey list` prints the",
+        "methods as JSON, and `andrey run <method> --data data.csv` prints the graph as JSON.",
+        "`andrey run <method> --help --json` returns a method's JSON contract, and",
+        "`andrey --skill` prints Andrey's agent skill.",
     ]
     listed = set()
     for heading, documents in sections:

@@ -80,3 +80,64 @@ class AndreyGRaSP:
         from andrey import GraphStructure
 
         return GraphStructure.from_numpy(native, kind=self.output_type)
+
+
+class AndreyGRaSPBDeu(AndreyGRaSP):
+    """Andrey GRaSP with the BDeu score, on category codes.
+
+    BDeu takes its default priors (equivalent sample size 1, one expected parent per variable) and
+    no penalty weight, so ``params`` names only the score, the depth, and the seed.
+    """
+
+    name: str = "andrey.grasp.bdeu"
+
+    def params(self) -> dict[str, Any]:
+        """The BDeu score at the default depth, on a fixed search seed."""
+        return {"score_func": "local_score_BDeu", "depth": _DEFAULT_DEPTH, "seed": SEARCH_SEED}
+
+
+class AndreyGRaSPCategoricalBIC(AndreyGRaSP):
+    """Andrey GRaSP with the multinomial BIC, on category codes, at the standard penalty."""
+
+    name: str = "andrey.grasp.bic_categorical"
+
+    def params(self) -> dict[str, Any]:
+        """The multinomial BIC at ``lambda_value=1`` and the default depth, on a fixed seed."""
+        return {
+            "score_func": "local_score_BIC_categorical",
+            "lambda_value": 1.0,
+            "depth": _DEFAULT_DEPTH,
+            "seed": SEARCH_SEED,
+        }
+
+
+class AndreyGRaSPDegenGauss(AndreyGRaSP):
+    """Andrey GRaSP with the degenerate Gaussian score at the standard penalty, every column named
+    categorical: the mixed-data score on category codes."""
+
+    name: str = "andrey.grasp.degen_gauss"
+
+    def params(self) -> dict[str, Any]:
+        """The degenerate Gaussian score at ``lambda_value=1`` and the default depth."""
+        return {
+            "score_func": "local_score_degen_gauss",
+            "lambda_value": 1.0,
+            "depth": _DEFAULT_DEPTH,
+            "seed": SEARCH_SEED,
+        }
+
+    def fit(self, data: np.ndarray, params: Mapping[str, Any]) -> np.ndarray:
+        """Run GRaSP with every column named categorical and return CPDAG endpoint marks."""
+        import andrey
+
+        X = np.asarray(data, dtype=np.float64)
+        with andrey.config(backend=self.backend, num_workers=1):
+            out = andrey.grasp(
+                X,
+                score_func=str(params["score_func"]),
+                lambda_value=float(params["lambda_value"]),
+                depth=int(params["depth"]),
+                seed=int(params["seed"]),
+                categorical=list(range(X.shape[1])),
+            )
+        return np.asarray(out.structure.to_numpy())

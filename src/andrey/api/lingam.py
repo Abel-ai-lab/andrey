@@ -28,6 +28,7 @@ from andrey.api._adapt import (
     shared_labels,
     structure_output,
 )
+from andrey.core.knowledge import Knowledge, resolve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -47,8 +48,31 @@ def _canonical_weights(B: npt.ArrayLike) -> np.ndarray:
     return np.ascontiguousarray(np.asarray(B, dtype=np.float64).T)
 
 
+def _pruning_rows(X: np.ndarray, name: str = "data") -> np.ndarray:
+    """Return ``X``, checked to have the rows the adaptive-Lasso pruning step needs.
+
+    The step regresses the last variable of the causal order on the other ``d - 1`` with a
+    BIC-tuned Lasso, whose noise variance comes from a least-squares fit with an intercept. That fit
+    needs more rows than its ``d`` coefficients, so ``X`` needs at least ``d + 1`` rows. Raises
+    ``ValueError``, naming ``name``, with fewer.
+    """
+    n, d = X.shape
+    if n <= d:
+        raise ValueError(
+            f"{name} needs at least {d + 1} rows (samples) over {d} variables, got {n}: the "
+            f"pruning step regresses the last variable of the causal order on the other {d - 1} "
+            "and estimates the noise variance from that least-squares fit, which needs more rows "
+            "than coefficients"
+        )
+    return X
+
+
 def direct_lingam(
-    data: npt.ArrayLike, *, random_state: int | None = None, measure: str = "pwling"
+    data: npt.ArrayLike,
+    *,
+    random_state: int | None = None,
+    measure: str = "pwling",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a fully oriented DAG with DirectLiNGAM (linear, non-Gaussian noise).
 
@@ -68,6 +92,13 @@ def direct_lingam(
     measure : {"pwling"}, default="pwling"
         How the order search picks the most exogenous remaining variable at each step. Only
         ``"pwling"``, the pairwise likelihood-ratio measure [2]_, is supported.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`: required and forbidden edges, the pairs
+        allowed to be adjacent, and temporal tiers, all honored. The causal order puts the cause of
+        each required edge, and each earlier tier, first; the regression on that order drops the
+        forbidden parents and does not penalize the required ones. A variable with a required parent
+        takes least-squares weights on the parents it keeps; the others keep the adaptive Lasso's.
+        Every required edge is in the DAG, even where its least-squares weight is ``0``.
 
     Returns
     -------
@@ -75,12 +106,21 @@ def direct_lingam(
         Wraps a ``dag`` :class:`~andrey.core.GraphStructure`; ``metadata["algorithm"]`` is
         ``"DirectLiNGAM"``. ``ordering`` is the causal order as a tuple of column indices, causes
         first. ``weighted_adjacency[i, j]`` is the coefficient of edge ``i -> j``, estimated by
-        adaptive Lasso; the DAG has an edge exactly where the coefficient is nonzero.
+        adaptive Lasso, or by least squares for a copy (see Notes) and for a variable with a
+        required parent; the DAG has an edge where the coefficient is nonzero and at every required
+        edge.
 
     Raises
     ------
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
+    TypeError
+        If ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`.
+    ValueError
+        If ``data`` is not a usable 2-D matrix: not numeric, holding ``NaN`` or ``inf``, or with a
+        constant column, named in the message. Also if it has fewer than ``n_variables + 1`` rows,
+        the fewest with which the pruning step can estimate the edge weights. Also if ``knowledge``
+        names a column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     See Also
     --------
@@ -101,6 +141,20 @@ def direct_lingam(
     **Cost.** Each step compares the remaining variables in pairs, so runtime grows quickly with the
     number of variables. With the ``torch`` extra and a CUDA GPU, entropy computations move to the
     GPU once they are large enough.
+
+    **Ties.** Two candidates that are interchangeable in the sample, such as two binary columns
+    with the same number of ones, have equal scores up to rounding, which differs between CPUs.
+    Each step treats candidates as tied when the square roots of their negated scores lie within
+    ``1e-10`` of the best one, and picks among them by a rank computed from each column's own data,
+    as :func:`~andrey.hc` does. The :doc:`column-order guide </docs/guides/column-order>` says what
+    the rank keeps under a new column order and on another machine.
+
+    **Copies.** Two columns are copies when one leaves at most ``1e-12`` of the other's variance
+    unexplained, as for a column and a rescaled or rank-reversed copy of it. Each step scores one
+    column per group of copies, the one that ranks first by the same rank, and when it is picked
+    the other copies follow it directly in the order. Each of them gets a single edge from it,
+    weighted by the scale between the two, and no edges to later columns, which take their edges
+    from the column it copies.
 
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, with ten rows per variable. From 20 to 200 variables its median errors (SHD)
@@ -130,12 +184,14 @@ def direct_lingam(
     """
     from andrey.lingam.direct import direct_lingam as _native
 
-    X = data_matrix(data)
+    X = _pruning_rows(data_matrix(data))
     labels = column_labels(data)
-    order, B = _native(X, measure=measure)
+    constraints = resolve(knowledge, X.shape[1], labels, method="direct_lingam")
+    order, B = _native(X, measure=measure, constraints=constraints)
     weighted = _canonical_weights(B)
+    edges = weighted != 0 if constraints is None else (weighted != 0) | constraints.required
     return structure_output(
-        dag_from_adjacency(weighted),
+        dag_from_adjacency(edges),
         labels=labels,
         ordering=order,
         weighted_adjacency=weighted,
@@ -180,8 +236,9 @@ def ica_lingam(
     TypeError
         If ``max_iter`` is not an int.
     ValueError
-        If ``max_iter`` is less than ``1``, or if ``random_state`` is outside ``0`` to
-        ``2**32 - 1``.
+        If ``max_iter`` is less than ``1``, if ``random_state`` is outside ``0`` to
+        ``2**32 - 1``, or if ``data`` has fewer than ``n_variables + 1`` rows, the fewest with which
+        the pruning step can estimate the edge weights.
 
     Warns
     -----
@@ -203,6 +260,11 @@ def ica_lingam(
     **Choosing random_state and max_iter.** Different values of ``random_state`` can give different
     orders; compare a few when the result matters. If FastICA reaches ``max_iter`` before
     converging, scikit-learn issues a ``ConvergenceWarning``; then raise ``max_iter``.
+
+    **Column order and machines.** When several variables can come next in the causal order, the one
+    whose column ranks first by its own values goes first. FastICA itself can reach another solution
+    under a new column order or on another machine when it converges slowly, at few rows per
+    variable; the :doc:`column-order guide </docs/guides/column-order>` gives the measured limit.
 
     **Limitations.** Measured on simulated data from scale-free graphs with linear effects and
     uniform noise, from 20 to 100 variables with ten rows per variable: its median errors (SHD)
@@ -229,7 +291,7 @@ def ica_lingam(
     """
     from andrey.lingam.ica import ica_lingam as _native
 
-    X = data_matrix(data)
+    X = _pruning_rows(data_matrix(data))
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
     order, B = _native(X, random_state=random_state, max_iter=max_iter)
@@ -275,11 +337,18 @@ def multi_group_direct_lingam(
     Raises
     ------
     ValueError
-        If fewer than two groups are given, or if the groups disagree on the variable count or on
-        their column names.
+        If fewer than two groups are given, if the groups disagree on the variable count or on
+        their column names, or if a group is not a usable 2-D matrix or has fewer than
+        ``n_variables + 1`` rows, the fewest with which the pruning step can estimate the edge
+        weights.
 
     Notes
     -----
+    **Ties.** Each step sums the groups' scores and breaks ties as :func:`~andrey.direct_lingam`
+    does, ranking each column by its data stacked over the groups. Columns that are copies in any
+    group are handled as copies are in :func:`~andrey.direct_lingam`; a copy gets its single edge
+    only in the groups where it is one.
+
     **Limitations.** Measured on three groups of 1,000 rows over the same variables, from one
     sparse random graph (mean degree 2) with linear effects, uniform noise, and weights drawn for
     each group, from 5 to 20 variables. Its median errors (SHD summed over the groups) were 0 at 5
@@ -310,7 +379,10 @@ def multi_group_direct_lingam(
     """
     from andrey.lingam.multi_group import multi_group_direct_lingam as _native
 
-    groups = [data_matrix(X, name=f"data_groups[{k}]") for k, X in enumerate(data_groups)]
+    groups = [
+        _pruning_rows(data_matrix(X, name=f"data_groups[{k}]"), name=f"data_groups[{k}]")
+        for k, X in enumerate(data_groups)
+    ]
     if len(groups) < 2:
         raise ValueError(f"data_groups must hold at least two datasets, got {len(groups)}")
     if len({X.shape[1] for X in groups}) > 1:

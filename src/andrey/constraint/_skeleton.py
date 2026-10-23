@@ -1,30 +1,38 @@
 """Batched conditional-independence scanning for the PC and FCI skeleton searches.
 
 :func:`scan_conditioning_sets` tests one adjacent pair against every size-``k`` subset of a
-candidate neighborhood. It uses the test's vectorized ``batched_call`` when there is one, one
-stacked ``np.linalg.inv`` per chunk in place of thousands of scalar calls, and the scalar loop
-otherwise, so a test that implements only :class:`~andrey.core.ci.CITest` still works.
-:meth:`~andrey.core.ci.PartialCorrelationTest.batched_call` returns the scalar p-values exactly, so
-the skeleton is the same either way. Subsets are consumed in fixed-size chunks, so the scan holds
+candidate neighborhood. It uses the test's vectorized ``batched_call`` when there is one (one
+stacked ``np.linalg.inv`` per chunk for the partial-correlation tests, one count of every chunk's
+contingency tables for the chi-square tests) in place of thousands of scalar calls, and the scalar
+loop otherwise, so a test that implements only :class:`~andrey.core.ci.CITest` still works. Every
+shipped ``batched_call`` returns the scalar p-values exactly, so the skeleton is the same either
+way. Subsets are consumed in fixed-size chunks, so the scan holds
 one chunk in memory however many subsets it visits.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from contextlib import nullcontext
+from functools import partial
 from itertools import combinations, islice
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from andrey.core.ci import CITest
+from andrey.core import backend
+from andrey.core.ci import CITest, pins_blas
+
+if TYPE_CHECKING:
+    from andrey.core.knowledge import Constraints
 
 #: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
 #: p-value is ``None`` when the scan does not record it.
 Removal = tuple[int, int, tuple[int, ...], float | None]
 
-# One batched_call inverts a stack of (k+2, k+2) correlation submatrices; cap how many subsets that
-# stack holds at once so a huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one
-# array. Each row's inverse is computed independently, so the chunk boundary never changes a result.
+# One batched_call evaluates a chunk of subsets together; cap how many subsets a chunk holds so a
+# huge C(|nbr|, k) neighborhood is consumed in bounded chunks, not one array. Each subset's p-value
+# is computed independently, so the chunk boundary never changes a result.
 _CHUNK = 4096
 
 
@@ -55,9 +63,10 @@ def scan_conditioning_sets(
 
     When ``test`` exposes ``batched_call(a, b, condition_sets)`` the subsets are evaluated in
     vectorized, size-bounded chunks; otherwise each is tested with a scalar ``test(a, b, subset)``
-    call. Both paths visit the same subsets in the same order and take the same ``p > alpha``
-    decisions, so the accumulated ``separating``, the largest p-value, and the return value are
-    identical.
+    call, or ``test._bounded_pvalue(a, b, subset, alpha, exact_above)`` where the test has one,
+    with ``exact_above`` true when ``largest`` is given. All paths visit
+    the same subsets in the same order and take the same ``p > alpha`` decisions, so the
+    accumulated ``separating``, the largest p-value, and the return value are identical.
 
     With ``trace`` given, one record per test is appended (see :func:`record_tests`); the check
     runs once per chunk.
@@ -65,8 +74,14 @@ def scan_conditioning_sets(
     subsets = combinations(candidates, size)
     if skip_within is not None and len(skip_within) >= size:
         subsets = (s for s in subsets if not skip_within.issuperset(s))
+    # CMIknn's _bounded_pvalue stops its shuffles once the side of alpha is certain; a p-value
+    # above alpha that `largest` records comes from every shuffle.
+    bounded = getattr(test, "_bounded_pvalue", None)
+    scalar = (
+        test if bounded is None else partial(bounded, alpha=alpha, exact_above=largest is not None)
+    )
     batched = getattr(test, "batched_call", None) or (
-        lambda a, b, chunk: [test(a, b, subset) for subset in chunk]
+        lambda a, b, chunk: [scalar(a, b, subset) for subset in chunk]
     )
     found = False
     top = 0.0
@@ -111,19 +126,20 @@ def record_tests(
 
 # ---- vectorized size-0/1 prescreen ---------------------------------------------------------------
 #
-# The marginal (|S| = 0) and first-order (|S| = 1) partial-correlation tests are closed forms over
-# the sample correlation matrix -- no inversion. A CI test that exposes those closed forms
-# vectorized (:meth:`PartialCorrelationTest.marginal_pvalues` and
-# :meth:`~PartialCorrelationTest.first_order_pvalues`) lets the size-0 pass run as a single
-# all-pairs matrix threshold and the size-1 pass as one vectorized read per surviving pair, in
-# place of the dense per-pair scalar loop. The decisions (p > alpha) and separating sets are
-# identical to the scalar scan (the p-values match exactly), so the recovered skeleton is
-# unchanged.
+# A CI test that exposes vectorized marginal (|S| = 0) and first-order (|S| = 1) p-values
+# (``marginal_pvalues`` and ``first_order_pvalues``: the partial-correlation closed forms over the
+# correlation matrix, the chi-square tables counted together, the conditional Gaussian sets fit
+# together) lets the size-0 pass run as a single all-pairs matrix threshold and the size-1 pass as
+# one vectorized read per surviving pair, in place of the dense per-pair scalar loop. The decisions
+# (p > alpha) and separating sets are identical to the scalar scan (the p-values match exactly), so
+# the recovered skeleton is unchanged.
 
 
 def prescreen_capable(test: CITest) -> bool:
-    """Whether ``test`` exposes the vectorized size-0/1 prescreen primitives (Fisher-Z and
-    Student-t do)."""
+    """Whether ``test`` exposes the vectorized size-0/1 prescreen primitives.
+
+    The partial-correlation, chi-square, and conditional Gaussian tests do.
+    """
     return callable(getattr(test, "marginal_pvalues", None)) and callable(
         getattr(test, "first_order_pvalues", None)
     )
@@ -138,8 +154,8 @@ def marginal_removals(
 ) -> list[tuple[int, int, float | None]]:
     """(size 0) The still-adjacent pairs the marginal test separates, as ``(x, y, p)``, ``x < y``.
 
-    ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized read
-    of the correlation matrix flags every pair with marginal ``p > alpha``; the return is those in
+    ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized
+    all-pairs evaluation flags every pair with marginal ``p > alpha``; the return is those in
     row-major order (matching the serial loop's visitation), each with its p-value, or ``None``
     when ``record_pvalues`` is false; each pair's separating set is empty. With ``trace`` given,
     every adjacent pair's test is recorded.
@@ -224,6 +240,74 @@ def scan_pairs(
         if found:
             removals.append((x, y, tuple(sorted(separating)), max(largest) if largest else None))
     return removals
+
+
+def separate_apart(
+    test: CITest,
+    adjacency: np.ndarray,
+    apart: np.ndarray,
+    alpha: float,
+    *,
+    max_depth: int | None = None,
+    trace: list[dict] | None = None,
+    record_pvalues: bool = True,
+) -> list[Removal]:
+    """Separating sets, over the final skeleton, for the pairs background knowledge makes
+    non-adjacent.
+
+    ``adjacency`` is the boolean skeleton the search ends with and ``apart`` the boolean pairs the
+    knowledge makes non-adjacent, which the search never tested. Every such pair that shares a
+    neighbor, and so forms an unshielded triple, is tested as the search tests a pair it removes:
+    against subsets of either endpoint's neighbors by increasing size, up to ``max_depth`` when one
+    is given, with :func:`scan_pairs`. Returns ``(x, y, separating, p)``, ``x < y``, for every pair
+    some size separates: the union of the separating subsets at the first size that separates it
+    and their largest p-value (``None`` when ``record_pvalues`` is false). A pair no tested subset
+    separates is left out: the subsets come from the final neighborhoods and stop at
+    ``max_depth``, so a separating set elsewhere is not found. With ``trace`` given, every test is
+    recorded as :func:`scan_pairs` records it.
+    """
+    common = adjacency.astype(np.float32) @ adjacency.astype(np.float32) > 0
+    pairs = adjacent_pairs(np.triu(apart & common, 1))
+    neighbors = [np.flatnonzero(row) for row in adjacency]
+    found: list[Removal] = []
+    size = 0
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        while pairs and (max_depth is None or size <= max_depth):
+            removals = scan_pairs(test, pairs, neighbors, size, alpha, trace, record_pvalues)
+            found.extend(removals)
+            separated = {(x, y) for x, y, _, _ in removals}
+            pairs = [
+                (x, y)
+                for x, y in pairs
+                if (x, y) not in separated and max(neighbors[x].size, neighbors[y].size) > size
+            ]
+            size += 1
+    return found
+
+
+def unseparated_triples(
+    adjacency: np.ndarray,
+    sepsets: Mapping[tuple[int, int], object],
+    constraints: Constraints | None,
+) -> frozenset[tuple[int, int, int]]:
+    """The unshielded triples ``(a, b, c)``, ``a < c``, over a non-adjacent pair with no
+    separating set.
+
+    ``adjacency`` is the boolean skeleton and ``sepsets`` the separating sets, keyed in either
+    order. A pair ``constraints`` make non-adjacent that ``sepsets`` leaves out has no separating
+    set the search found, so whether ``b`` is a collider is unknown: no rule reads the triple as a
+    collider or a non-collider. Without constraints the search tested every pair it left
+    non-adjacent, and there are none.
+    """
+    if constraints is None:
+        return frozenset()
+    apart = ~constraints.support()
+    triples = set()
+    for b, row in enumerate(adjacency):
+        for a, c in combinations(np.flatnonzero(row).tolist(), 2):
+            if apart[a, c] and (a, c) not in sepsets and (c, a) not in sepsets:
+                triples.add((a, b, c))
+    return frozenset(triples)
 
 
 def adjacent_pairs(adjacency: np.ndarray) -> list[tuple[int, int]]:
