@@ -30,6 +30,11 @@ change names its pull request.
   the others explain follows the causal order; it takes up to 1,000 variables.
   `andrey.data.generate` takes `scale`. For contributors, the benchmark harness has unitless
   variants of its four linear regimes. ([#411])
+- `GraphStructure.to_dag`, `to_mag`, and `to_pag` turn a CPDAG into one DAG of its class, asking
+  how to pick one when the class holds several, a DAG with hidden and selection variables into
+  its maximal ancestral graph, and a DAG or MAG into its PAG; the new `"mag"` kind holds a MAG,
+  which scores and draws as a PAG and reads and writes pcalg's `amat.pag`; and `to_dot()` writes
+  any graph as Graphviz DOT text, which the graph-representation guide hands to DoWhy. ([#418])
 
 ### Changed
 
@@ -42,6 +47,8 @@ change names its pull request.
   EPYC 7713 a fit on 10 variables and 1,000 rows took 6.5 minutes instead of 22, and the quality
   gate's CMIknn fits took half as long. On CPUs with AVX512_ICL, such as the EPYC 9534, the
   selection is unchanged and the same fits take about 10% less time. ([#391])
+- `andrey.data.latent.marginal(dag, "mag")` returns a graph of kind `"mag"` instead of `"pag"`,
+  with the same marks. ([#418])
 
 ### Removed
 
@@ -740,3 +747,4 @@ First alpha release.
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#396]: https://github.com/Abel-ai-lab/andrey/pull/396
 [#411]: https://github.com/Abel-ai-lab/andrey/pull/411
+[#418]: https://github.com/Abel-ai-lab/andrey/pull/418
