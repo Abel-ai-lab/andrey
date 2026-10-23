@@ -601,11 +601,14 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
     :func:`pdag2dag`, which raises. The input is not validated.
     """
     n = pdag.shape[0]
+    flipped = np.ascontiguousarray(pdag.T)  # one transposed copy keeps every mask below contiguous
     tail = pdag == TAIL
-    directed = tail & (pdag == ARROW).T  # (i, j): i -> j
-    lines = tail & tail.T
+    flipped_tail = flipped == TAIL
+    directed = tail & (flipped == ARROW)  # (i, j): i -> j
+    incoming = flipped_tail & (pdag == ARROW)  # (i, j): j -> i
+    lines = tail & flipped_tail
     children = row_masks(directed)
-    parents = row_masks(directed.T)
+    parents = row_masks(incoming)
     undirected = row_masks(lines)
     adjacent = row_masks(pdag != NULL)
     active = (1 << n) - 1
@@ -622,7 +625,7 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
             rest ^= low
         return True
 
-    ready = [x for x in range(n) if removable(x)]
+    ready = [x for x in range(n) if not children[x] and (not undirected[x] or removable(x))]
     queued = 0
     for x in ready:
         queued |= 1 << x
@@ -631,8 +634,11 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
         x = heapq.heappop(ready)
         active &= ~(1 << x)
         removed.append(x)
+        rest = adjacent[x] & active
+        if not rest:
+            continue
         parents[x] |= undirected[x] & active  # each remaining undirected edge points into x
-        rest = adjacent[x] & active & ~queued
+        rest &= ~queued
         while rest:
             low = rest & -rest
             v = low.bit_length() - 1
@@ -659,7 +665,7 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
         pa = parents[y]
         if not pa:
             continue
-        x = max(nodes(pa), key=pos.__getitem__)
+        x = max(nodes(pa), key=pos.__getitem__) if pa & (pa - 1) else pa.bit_length() - 1
         into_x = compelled[x]
         rest = compelled[y] = pa if into_x & ~pa or pa & ~parents[x] & ~(1 << x) else into_x
         while rest:
@@ -667,8 +673,7 @@ def _cpdag_of_pdag(pdag: np.ndarray) -> np.ndarray:
             heads.append(y)
             tails.append(low.bit_length() - 1)
             rest ^= low
-    out = np.zeros((n, n), dtype=np.int8)
-    out[directed | directed.T | lines] = TAIL
+    out = (directed | incoming | lines).astype(np.int8) * np.int8(TAIL)
     out[heads, tails] = ARROW
     return out
 

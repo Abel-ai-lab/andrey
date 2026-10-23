@@ -21,8 +21,15 @@ def bitmask(nodes: Iterable[int]) -> int:
     return m
 
 
+#: Above this many set bits, :func:`nodes` reads the mask's bytes with NumPy instead of looping.
+_UNPACK_BITS = 24
+
+
 def nodes(mask: int) -> list[int]:
     """The nodes whose bits are set in ``mask``, ascending: the inverse of :func:`bitmask`."""
+    if mask.bit_count() > _UNPACK_BITS:
+        raw = np.frombuffer(mask.to_bytes((mask.bit_length() + 7) // 8, "little"), dtype=np.uint8)
+        return np.flatnonzero(np.unpackbits(raw, bitorder="little")).tolist()
     out = []
     while mask:
         low = mask & -mask
@@ -34,14 +41,13 @@ def nodes(mask: int) -> list[int]:
 def row_masks(matrix: np.ndarray) -> list[int]:
     """Each row of a square boolean matrix as a Python int, bit ``j`` set iff ``matrix[i, j]``.
 
-    Each row is reversed and left-padded to whole bytes, so its packed big-endian bytes read as the
-    int with bit ``j`` at column ``j``.
+    Each row packs to bytes with column ``j`` at bit ``j % 8`` of byte ``j // 8``, so its bytes
+    read little-endian as the int with bit ``j`` at column ``j``.
     """
-    n = matrix.shape[0]
-    width = (n + 7) // 8
-    padded = np.zeros((n, 8 * width), dtype=bool)
-    padded[:, 8 * width - n :] = matrix[:, ::-1]
-    return list(map(int.from_bytes, np.packbits(padded, axis=1).view(f"V{width}").ravel().tolist()))
+    packed = np.packbits(np.ascontiguousarray(matrix), axis=1, bitorder="little")
+    rows = packed.view(f"V{packed.shape[1]}").ravel().tolist()
+    from_bytes = int.from_bytes
+    return [from_bytes(row, "little") for row in rows]
 
 
 def semidirected_reach_set(succ: list[int], start: int, barrier: int) -> int:
@@ -59,11 +65,8 @@ def semidirected_reach_set(succ: list[int], start: int, barrier: int) -> int:
     frontier = seen
     while frontier:
         nxt = 0
-        bits = frontier
-        while bits:
-            lsb = bits & (-bits)
-            nxt |= succ[lsb.bit_length() - 1]
-            bits ^= lsb
+        for u in nodes(frontier):
+            nxt |= succ[u]
         frontier = nxt & allowed & ~seen
         seen |= frontier
     return seen
