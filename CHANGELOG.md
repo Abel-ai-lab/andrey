@@ -16,7 +16,7 @@ change names its pull request.
   the identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
   scores change in their last bits, with the same output on those datasets. ([#251], [#265], [#267],
   [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353], [#364], [#365],
-  [#368])
+  [#368], [#369])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -78,7 +78,9 @@ change names its pull request.
   tuple of candidate parents instead of copying the list on every trace, and the order sweeps keep
   the set of allowed parents between traces instead of building it for each one. ([#267], [#368])
 - `exact_search` returns the same graphs in less time, because its linear-Gaussian BIC solves the
-  normal equations of a size's parent sets in stacks of up to 4,096. ([#273])
+  normal equations of a size's parent sets in stacks of up to 4,096, and it finds each variable's
+  best parent set within a candidate set from a table built once per fit instead of scanning its
+  sorted parent sets. ([#273], [#369])
 - `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
   built once and in blocks, and its HSIC tests run on a CUDA GPU, in float64, from the cutoff
   `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
@@ -670,4 +672,5 @@ First alpha release.
 [#364]: https://github.com/Abel-ai-lab/andrey/pull/364
 [#365]: https://github.com/Abel-ai-lab/andrey/pull/365
 [#368]: https://github.com/Abel-ai-lab/andrey/pull/368
+[#369]: https://github.com/Abel-ai-lab/andrey/pull/369
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
