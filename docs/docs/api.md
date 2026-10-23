@@ -153,7 +153,7 @@ its first call in a process.
 
 RFCI runs FCI's adjacency search and orientation rules without its possible-d-separation step,
 and tests each unshielded triple and discriminating path before it orients them. With exact tests
-its PAG is FCI's, or FCI's with extra edges that carry no tail.
+every mark it sets is sound, and it can keep edges FCI's PAG removes, which carry no tail.
 
 A method becomes supported once it has:
 
