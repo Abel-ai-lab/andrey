@@ -125,6 +125,8 @@ def _weakest(
     of one conditioning-set size in one call, else the negated p-value from ``batched_call`` or the
     scalar test.
     """
+    if not xs:
+        return []
     batch = getattr(test, "statistic_pvalues", None)
     if batch is None:
         batched = getattr(test, "batched_call", None)

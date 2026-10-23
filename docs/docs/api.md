@@ -175,7 +175,8 @@ A method becomes supported once it has:
 
 ### Conditional-independence tests
 
-PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_test`:
+PC, FCI, GFCI, CD-NOD, IAMB, Inter-IAMB, MMPC, MMHC, and RSMAX2 take their conditional-independence
+test as `indep_test`:
 
 | `indep_test` | Test | Status |
 |---|---|---|
