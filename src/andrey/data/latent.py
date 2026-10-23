@@ -10,6 +10,8 @@ the observed truth nodes.
 
 from __future__ import annotations
 
+from collections.abc import Collection, Iterable, Mapping, Sequence
+
 import numpy as np
 
 from andrey.core.structure import ARROW, LATENT, OBSERVED, TAIL, GraphStructure
@@ -146,14 +148,12 @@ def marginal(graph: GraphStructure, target: str = "mag", *, max_nodes: int = 500
         return graph  # the MAG of a causally-sufficient DAG is the DAG itself
     n_obs, dag, anc = _observed_dag(graph, max_nodes)
     if target == "mag":
-        return _mag_projection(n_obs, dag, anc)
-    return _pag_projection(n_obs, dag, anc)
+        return _mag_projection(dag, range(n_obs), anc)
+    return _pag_projection(dag, range(n_obs), anc)
 
 
 def _observed_dag(graph: GraphStructure, max_nodes: int):
     """Return the observed count, the full causal DiGraph, and each observed node's ancestors."""
-    import networkx as nx
-
     types = graph.node_types
     observed = np.arange(graph.n_nodes) if types is None else np.flatnonzero(types == OBSERVED)
     n_obs = int(observed.size)
@@ -167,8 +167,14 @@ def _observed_dag(graph: GraphStructure, max_nodes: int):
             f"marginal over {n_obs} observed nodes exceeds max_nodes={max_nodes} "
             f"(the all-pairs projection is O(n_obs^2 * (V+E))); pass max_nodes= to override"
         )
-    # Build the DiGraph from the typed edges (tail endpoint = parent) so ancestry follows the
-    # generative direction unambiguously.
+    dag = _causal_digraph(graph)
+    return n_obs, dag, _observed_ancestors(dag, range(n_obs))
+
+
+def _causal_digraph(graph: GraphStructure):
+    """Return the ``networkx.DiGraph`` of a DAG, each edge from its tail to its arrowhead."""
+    import networkx as nx
+
     typed = graph.to_edges()
     tail_is_i = typed["mark_i"] == TAIL
     parents = np.where(tail_is_i, typed["i"], typed["j"])
@@ -176,26 +182,47 @@ def _observed_dag(graph: GraphStructure, max_nodes: int):
     dag = nx.DiGraph()
     dag.add_nodes_from(range(graph.n_nodes))
     dag.add_edges_from(zip(parents.tolist(), children.tolist()))
-    obs_set = set(range(n_obs))
-    anc = {x: nx.ancestors(dag, x) & obs_set for x in range(n_obs)}  # observed ancestors only
-    return n_obs, dag, anc
+    return dag
 
 
-def _mag_projection(n_obs, dag, anc) -> GraphStructure:
-    """Build the MAG over observed nodes: ancestor-set m-separation adjacency, ancestral marks."""
+def _observed_ancestors(dag, observed: Iterable[int]) -> dict[int, set[int]]:
+    """Return each observed node's observed ancestors in ``dag``, the node itself excluded."""
     import networkx as nx
 
+    obs = list(observed)
+    obs_set = set(obs)
+    return {x: nx.ancestors(dag, x) & obs_set for x in obs}
+
+
+def _mag_projection(
+    dag,
+    observed: Sequence[int],
+    anc: Mapping[int, set[int]],
+    selection: Collection[int] = (),
+    anc_selection: Collection[int] = (),
+) -> GraphStructure:
+    """Build the MAG over ``observed``, node ``k`` being ``observed[k]``.
+
+    Observed ``a, b`` are adjacent iff ``dag`` does not d-separate them given ``selection`` and
+    their observed ancestors and those of ``selection`` (``anc_selection``). The mark at ``a`` is
+    a tail when ``a`` is an ancestor of ``b`` or of ``selection``, else an arrowhead.
+    """
+    import networkx as nx
+
+    given = set(selection)
+    up = set(anc_selection)
     rows, cols, marks = [], [], []
-    for a in range(n_obs):
-        for b in range(a + 1, n_obs):
-            sep = (anc[a] | anc[b]) - {a, b}
-            if not nx.is_d_separator(dag, {a}, {b}, sep):
-                mark_a = TAIL if a in anc[b] else ARROW
-                mark_b = TAIL if b in anc[a] else ARROW
-                rows += [a, b]
-                cols += [b, a]
+    for p, a in enumerate(observed):
+        for q in range(p + 1, len(observed)):
+            b = observed[q]
+            sep = (anc[a] | anc[b] | up) - {a, b}
+            if not nx.is_d_separator(dag, {a}, {b}, sep | given):
+                mark_a = TAIL if a in anc[b] or a in up else ARROW
+                mark_b = TAIL if b in anc[a] or b in up else ARROW
+                rows += [p, q]
+                cols += [q, p]
                 marks += [mark_a, mark_b]
-    return csr_from_endpoints(rows, cols, marks, n_obs, kind="pag")
+    return csr_from_endpoints(rows, cols, marks, len(observed), kind="pag")
 
 
 class DSepOracle:
@@ -203,11 +230,15 @@ class DSepOracle:
 
     Returns ``1.0`` when the query is d-separated (a "p-value" above any alpha -> independent) and
     ``0.0`` otherwise, so it drops into the FCI orientation rules in place of a data CI test; alpha
-    is therefore irrelevant. Queries are memoized (FCI re-asks pairs constantly).
+    is therefore irrelevant. Queries are memoized (FCI re-asks pairs constantly). Query index
+    ``k`` names the DAG node ``nodes[k]``, and every query also conditions on the DAG nodes
+    ``given``.
     """
 
-    def __init__(self, dag) -> None:
+    def __init__(self, dag, nodes: Sequence[int], given: Collection[int] = ()) -> None:
         self._dag = dag
+        self._nodes = nodes
+        self._given = frozenset(given)
         self._cache: dict = {}
 
     def __call__(self, x: int, y: int, condition_set=()) -> float:
@@ -217,26 +248,41 @@ class DSepOracle:
         if value is None:
             import networkx as nx
 
-            value = 1.0 if nx.is_d_separator(self._dag, {key[0]}, {key[1]}, set(key[2])) else 0.0
+            nodes = self._nodes
+            sep = {nodes[z] for z in key[2]} | self._given
+            value = (
+                1.0 if nx.is_d_separator(self._dag, {nodes[key[0]]}, {nodes[key[1]]}, sep) else 0.0
+            )
             self._cache[key] = value
         return value
 
 
-def _pag_projection(n_obs, dag, anc) -> GraphStructure:
-    """Build the true PAG via MAG-first orientation: skeleton + oracle sepsets -> FCI rules.
+def _pag_projection(
+    dag,
+    observed: Sequence[int],
+    anc: Mapping[int, set[int]],
+    selection: Collection[int] = (),
+    anc_selection: Collection[int] = (),
+) -> GraphStructure:
+    """Build the true PAG over ``observed`` via MAG-first orientation: oracle skeleton, FCI rules.
 
-    Skeleton and separating sets come from the oracle (no adjacency search); ``_orient_colliders``
-    fixes the unshielded colliders and ``_fci_orient`` runs Zhang's rules to a fixed point, its R4
-    discriminating-path collider answered by the same d-separation oracle.
+    The skeleton and separating sets are :func:`_mag_projection`'s; ``_orient_colliders`` fixes the
+    unshielded colliders and ``_fci_orient`` runs Zhang's rules to a fixed point, its R4
+    discriminating-path collider answered by the same d-separation oracle, which conditions on
+    ``selection`` in every query.
     """
     from andrey.constraint.fci import _circle_pag, _fci_orient, _orient_colliders
 
-    oracle = DSepOracle(dag)
+    oracle = DSepOracle(dag, observed, selection)
+    position = {v: k for k, v in enumerate(observed)}
+    up = set(anc_selection)
+    n_obs = len(observed)
     support = np.zeros((n_obs, n_obs), dtype=bool)
     sepsets: dict[tuple[int, int], tuple[int, ...]] = {}
     for a in range(n_obs):
         for c in range(a + 1, n_obs):
-            sep = tuple(sorted((anc[a] | anc[c]) - {a, c}))
+            near = (anc[observed[a]] | anc[observed[c]] | up) - {observed[a], observed[c]}
+            sep = tuple(sorted(position[v] for v in near))
             if (
                 oracle(a, c, sep) > 0.5
             ):  # d-separated -> non-adjacent; record the separator both ways
