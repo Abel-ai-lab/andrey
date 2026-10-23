@@ -1,0 +1,46 @@
+name: Tell search engines about a release
+
+# IndexNow (Bing, Yandex, Seznam, Naver, and the engines that share its list) learns of every page
+# in the sitemap as soon as a release is live, instead of on its next crawl. Google does not take
+# IndexNow; it reads the sitemap that robots.txt names. The key is public by design: the engines
+# check it against docs/_extra/<key>.txt on the site.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  indexnow:
+    if: github.repository == 'Abel-ai-lab/andrey'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Wait for the release on the live site, then submit every address in its sitemap
+        env:
+          SITE: andrey.abel.ai
+          KEY: f57e1cb079cc40b67a5dd117b8cd4dc4  # gitleaks:allow (public by design)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A tag is live once llms.txt names its version; a manual run submits what is live now.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version=${GITHUB_REF_NAME#v}
+            for _ in $(seq 100); do
+              if curl -fsS "https://$SITE/llms.txt" | grep -qx "Version: $version."; then
+                live=1
+                break
+              fi
+              sleep 30
+            done
+            : "${live:?The site did not show $version within 50 minutes}"
+          fi
+          curl -fsS "https://$SITE/sitemap.xml" | grep -o '<loc>[^<]*' | sed 's/<loc>//' \
+            | jq -R . | jq -s --arg host "$SITE" --arg key "$KEY" \
+              '{host: $host, key: $key, keyLocation: "https://\($host)/\($key).txt", urlList: .}' \
+            | curl -fsS -H 'Content-Type: application/json; charset=utf-8' --data @- \
+              https://api.indexnow.org/indexnow
+          echo "Submitted the sitemap's addresses to IndexNow." >> "$GITHUB_STEP_SUMMARY"
