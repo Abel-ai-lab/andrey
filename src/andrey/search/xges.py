@@ -38,7 +38,7 @@ import numpy as np
 from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, admits, mpdag
 from andrey.core.orient import to_structure
-from andrey.core.score import BICScore
+from andrey.core.score import LINEAR_SCORES, BICScore
 from andrey.core.score_delta import add_deltas
 from andrey.search._parallel import _EPS_IMPROVE, _KEY_DP
 from andrey.search.ges import _recompute_objective, _reform_cpdag, required_dag
@@ -1062,7 +1062,8 @@ def xges(
     data : ndarray, shape (n_samples, n_features)
         Rows are observations; columns are variables.
     score_func : str
-        Local score; ``"local_score_BIC"`` (linear-Gaussian BIC) is supported.
+        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the linear-Gaussian
+        BIC, the only score supported.
     lambda_value : float
         Weight on the BIC complexity term of the deviance the search minimizes.
     extended_search : bool
@@ -1078,8 +1079,10 @@ def xges(
     tuple[GraphStructure, float]
         The CPDAG (``kind="cpdag"``) and its total BIC score (lower is better).
     """
-    if score_func != "local_score_BIC":
-        raise NotImplementedError(f"unsupported score_func {score_func!r}; use 'local_score_BIC'")
+    if score_func not in LINEAR_SCORES:
+        raise NotImplementedError(
+            f"unsupported score_func {score_func!r}; use one of {LINEAR_SCORES}"
+        )
     X = np.asarray(data, dtype=np.float64)
     d = X.shape[1]
     score = BICScore(X, lambda_value=lambda_value)

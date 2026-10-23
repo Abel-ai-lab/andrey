@@ -14,7 +14,7 @@ from andrey.core import ARROW, TAIL, GraphStructure, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.mixed import column_mask
 from andrey.core.orient import _cpdag_of_pdag, pdag2dag, to_structure
-from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, Score, make_score
+from andrey.core.score import DISCRETE_SCORES, MIXED_SCORES, SCORES, Score, make_score
 from andrey.search import operators as ops
 from andrey.search.hc import tie_ranks
 
@@ -76,13 +76,7 @@ def _parent_limits(
 
 
 #: The local scores :func:`ges` accepts.
-GES_SCORES: tuple[str, ...] = (
-    "local_score_BIC",
-    "local_score_BDeu",
-    "local_score_BIC_categorical",
-    "local_score_degen_gauss",
-    "local_score_cond_gauss",
-)
+GES_SCORES: tuple[str, ...] = SCORES
 
 
 def ges(
@@ -112,8 +106,9 @@ def ges(
     data : ndarray, shape (n_samples, n_features)
         Data matrix; rows are observations, columns are variables.
     score_func : str
-        Local score: ``"local_score_BIC"`` (linear-Gaussian BIC), ``"local_score_BDeu"`` (BDeu on
-        category codes, :class:`~andrey.core.score.BDeuScore` with its default priors),
+        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"`` (linear-Gaussian BIC),
+        ``"local_score_BDeu"`` (BDeu on category codes,
+        :class:`~andrey.core.score.BDeuScore` with its default priors),
         ``"local_score_BIC_categorical"`` (the multinomial BIC on category codes,
         :class:`~andrey.core.score.CategoricalBICScore`), or a mixed-data BIC,
         ``"local_score_degen_gauss"`` (:class:`~andrey.core.score.DGScore`) or

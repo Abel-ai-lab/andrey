@@ -248,6 +248,26 @@ def cli_meta() -> dict:
             "run": "resolved params, seed, versions, elapsed, n_samples, n_variables, and the "
             "fit's warnings (category, message)",
         },
+        "bootstrap": {
+            "invocation": (
+                "andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] "
+                "[--threshold T] [--block-length ROWS] [key=value ...]"
+            ),
+            "what": (
+                "refits the method on bootstrap resamples of the rows (blocks of rows for a "
+                "time-series method on one series) and reports how often each edge appears; "
+                "takes the inputs, params, --config, -o, --json, and --full of `run`, and not "
+                "gin. The method's own seed= is the bootstrap's --seed. Workers follow "
+                "ANDREY_NUM_WORKERS and the result does not depend on their number."
+            ),
+            "envelope": (
+                "the result envelope of `run`, with `structure` the averaged graph, plus "
+                "bootstrap (n_boot, threshold, seed, block_length) and frequencies[] (source, "
+                "target, type, count, and frequency for each edge that appeared in a fit, most "
+                "frequent first, and lag for a time-series method); capped at 1000 "
+                "(frequencies_truncated)"
+            ),
+        },
         "error_envelope": {
             "error": {
                 "code": "machine-readable error code",
@@ -406,6 +426,22 @@ def render_skill() -> str:
     a(
         "A CPDAG's undirected edges are directions the data cannot settle, not missing work; "
         "report them as such."
+    )
+    a("")
+    a("## How stable an edge is")
+    a("")
+    a(
+        "`andrey bootstrap <method> --data <path|-> [--n-boot N] [--seed S] [--threshold T] "
+        "[key=value ...]` refits the method on resamples of the rows and answers how often each "
+        "edge appears. It takes the inputs and `key=value` params of `andrey run`, and not `gin`. "
+        "Its envelope is a run's, with `structure` the averaged graph: a pair is in it when it is "
+        "adjacent in at least `--threshold` of the fits (default 0.5), with the edge it has most "
+        "often. `bootstrap` gives `n_boot`, `threshold`, `seed`, and `block_length`, and "
+        "`frequencies` lists each edge that appeared in some fit, most frequent first, with its "
+        "`source`, `target`, `type`, `count`, and `frequency` (a time-series method adds `lag`). "
+        "Report an edge with its frequency: 0.95 is stable, 0.3 is not. A time-series method on "
+        "one series resamples blocks of `--block-length` rows. Set `--seed` when the result must "
+        "repeat; `ANDREY_NUM_WORKERS` spreads the fits over processes without changing it."
     )
     a("")
     a("## Data types")

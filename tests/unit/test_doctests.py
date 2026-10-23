@@ -2,8 +2,8 @@
 
 A targeted runner, not a global ``--doctest-modules``: it executes only the ``andrey.api`` facade
 examples (the runnable ``Examples`` the docstring standard guarantees) and those of the simulators
-the API reference lists, so collection stays bounded to the public surface and does not pull in
-every internal module's docstring.
+and the bootstrap the API reference lists, so collection stays bounded to the public surface and
+does not pull in every internal module's docstring.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ def _facade_modules() -> list[str]:
     ]
 
 
-# The simulator modules the API reference lists.
-SIMULATORS = ["andrey.data.discrete", "andrey.data.mixed"]
+# The other modules whose examples the API reference shows: the simulators and the bootstrap.
+SIMULATORS = ["andrey.data.discrete", "andrey.data.mixed", "andrey.resample"]
 
 
 @pytest.mark.parametrize("modname", _facade_modules() + SIMULATORS)

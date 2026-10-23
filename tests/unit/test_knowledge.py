@@ -593,10 +593,11 @@ def test_every_group_honors_the_knowledge(data):
 
 
 def test_direct_lingam_keeps_a_required_edge_whose_weight_is_zero():
-    # The two columns are uncorrelated, so least squares weighs the required 0 -> 1 at exactly 0.
+    # The two columns are uncorrelated, so least squares weighs the required 0 -> 1 at 0, up to the
+    # rounding of the platform's BLAS.
     X = np.array([[-1.0, -1.0], [-1.0, 1.0], [1.0, -1.0], [1.0, 1.0]])
     out = andrey.direct_lingam(X, knowledge=Knowledge(required=[(0, 1)]))
-    assert out.weighted_adjacency[0, 1] == 0.0
+    assert out.weighted_adjacency[0, 1] == pytest.approx(0.0, abs=1e-12)
     marks = from_structure(out.structure)
     assert marks[0, 1] == TAIL and marks[1, 0] == ARROW
 

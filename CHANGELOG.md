@@ -47,6 +47,12 @@ change names its pull request.
 - For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
   Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
   with the time of Tetrad's JVM reported apart from its search. ([#362])
+- `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
+  `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
+  `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
+  pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
+  time-series method on one series resamples blocks of rows; the result is the same at any
+  `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
 - `pcmci`, `pcmciplus`, `lpcmci`, `varma_lingam`, `longitudinal_lingam`, `ica_lingam`,
   `multi_group_direct_lingam`, `rcd`, and `bottom_up_parce_lingam` (every part but required edges)
   take `knowledge`, where a time-series method reads `(cause, effect, lag)` as the link from
@@ -116,6 +122,12 @@ change names its pull request.
   the last bits. A near-tie between two candidates for the next variable in the causal order can
   then resolve the other way; on the identity check's datasets every output is the same as 0.8.0's.
   ([#288])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="cmiknn"` return the same graphs and p-values
+  in less time on CPUs without AVX512_ICL, such as the AMD EPYC 7713, because CMIknn selects each
+  row's `k`-th neighbor distance in 32-bit integers, which NumPy sorts with SIMD on AVX2. On an
+  EPYC 7713 a fit on 10 variables and 1,000 rows took 6.5 minutes instead of 22, and the quality
+  gate's CMIknn fits took half as long. On CPUs with AVX512_ICL, such as the EPYC 9534, the
+  selection is unchanged and the same fits take about 10% less time. ([#391])
 - `help(andrey)` opens with a quick start and points to `andrey --skill` and
   `andrey --help --json`, and the package summary says the import name is `andrey`, so an agent
   that has only run `pip install andrey-core` finds the command line and its skill. ([#347])
@@ -129,6 +141,20 @@ change names its pull request.
   of `hsic_test` and `hsic_statistic_test`, which no caller passed. ([#371])
 - `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
   installed safetensors for them. Nothing in Andrey called them. ([#375])
+
+### Fixed
+
+- `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
+  `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
+  test or score; an empty list now reads as `None` there. ([#395])
+- Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
+  `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
+  `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
+  not change. ([#394])
+- For contributors, the benchmark harness's PCMCI, PCMCI+, and LPCMCI generators no longer fail at
+  large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
+  first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
+  unstable draw. Every draw that was stationary is unchanged. ([#393])
 
 ## [0.8.0] - 2026-10-23
 
@@ -688,4 +714,9 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
+[#391]: https://github.com/Abel-ai-lab/andrey/pull/391
+[#393]: https://github.com/Abel-ai-lab/andrey/pull/393
+[#394]: https://github.com/Abel-ai-lab/andrey/pull/394
+[#395]: https://github.com/Abel-ai-lab/andrey/pull/395
+[#396]: https://github.com/Abel-ai-lab/andrey/pull/396
 [#410]: https://github.com/Abel-ai-lab/andrey/pull/410
