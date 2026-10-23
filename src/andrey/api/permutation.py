@@ -56,9 +56,10 @@ def boss(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
-        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
-        multinomial BIC for categorical data coded by whole numbers, and
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, the
+        covariance-based linear-Gaussian BIC; ``"local_score_BDeu"`` and
+        ``"local_score_BIC_categorical"`` are the BDeu score and the multinomial BIC for
+        categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
         column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
@@ -78,8 +79,9 @@ def boss(
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
@@ -280,9 +282,10 @@ def grasp(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
-        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
-        multinomial BIC for categorical data coded by whole numbers, and
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, the
+        covariance-based linear-Gaussian BIC; ``"local_score_BDeu"`` and
+        ``"local_score_BIC_categorical"`` are the BDeu score and the multinomial BIC for
+        categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
         column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
@@ -307,8 +310,9 @@ def grasp(
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that

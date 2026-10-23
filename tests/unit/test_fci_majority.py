@@ -115,7 +115,9 @@ def test_majority_runs_after_possible_dsep_only(engine, monkeypatch):
             return result
 
         monkeypatch.setattr(module, name, wrap)
-    arr = data.sample_scm(graph="scale_free", d=6, n=500, seed=5, density=2.0, latents=1).data
+    arr = data.sample_scm(
+        graph="scale_free", d=6, n=500, seed=5, density=2.0, latents=1, scale="raw"
+    ).data
     fit = getattr(andrey, engine)
     fit(arr, collider_rule="majority")
     assert events == ["colliders", "possible_dsep", "majority", "colliders", "orient"]

@@ -58,8 +58,9 @@ from .core.warning_policy import (
     SampleSizeWarning,
     SearchLimitWarning,
 )
+from .resample import BootstrapOutput, bootstrap
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 __all__ = [
     "__version__",
@@ -70,6 +71,9 @@ __all__ = [
     "StructureOutput",
     # Background knowledge every search takes as knowledge=.
     "Knowledge",
+    # Refit a method on bootstrap resamples: edge frequencies and an averaged graph.
+    "bootstrap",
+    "BootstrapOutput",
     # Seeds random, NumPy's global generator, and torch for the caller's own draws.
     "seed_all",
     # Backend grammar: pick the backend + num_workers, layered selection (see ANDREY_BACKEND).

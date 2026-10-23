@@ -32,7 +32,9 @@ from andrey.core.mixed import column_mask
 from andrey.core.orient import dag2cpdag, pdag2dag, to_structure
 from andrey.core.score import (
     DISCRETE_SCORES,
+    LINEAR_SCORES,
     MIXED_SCORES,
+    SCORES,
     ZERO_RESIDUAL,
     Score,
     check_columns,
@@ -41,13 +43,7 @@ from andrey.core.score import (
 from andrey.search.hc import tie_ranks
 
 #: The local scores :func:`exact_search` accepts.
-EXACT_SCORES: tuple[str, ...] = (
-    "local_score_BIC",
-    "local_score_BDeu",
-    "local_score_BIC_categorical",
-    "local_score_degen_gauss",
-    "local_score_cond_gauss",
-)
+EXACT_SCORES: tuple[str, ...] = SCORES
 
 # One node of a variable's parent graph: its parent set, that set's local score, and the set as a
 # bitmask (bit ``v`` set iff ``v`` is a parent) for O(1) subset tests.
@@ -399,8 +395,8 @@ def exact_search(
     search_method : str
         ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
     score_func : str
-        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC, a categorical score, or
-        a mixed-data BIC.
+        Local score, one of :data:`EXACT_SCORES`: the linear-Gaussian BIC (``"local_score_BIC"``
+        or ``"local_score_BIC_from_cov"``), a categorical score, or a mixed-data BIC.
     categorical : ndarray of bool or None
         Marks the categorical columns for a mixed-data score.
     constraints : Constraints or None
@@ -425,7 +421,7 @@ def exact_search(
 
     score: Score = (
         _GramBICScore(X)
-        if score_func == "local_score_BIC"
+        if score_func in LINEAR_SCORES
         else make_score(score_func, X, categorical=categorical)
     )
     tables = (n_vars + 8) << n_vars <= _LOOKUP_BYTES

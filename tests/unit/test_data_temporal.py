@@ -7,6 +7,7 @@ import pytest
 
 import andrey.data as data
 from andrey.core.structure import TemporalStructure
+from andrey.data.sortability import standardize
 from andrey.data.temporal import MAX_TEMPORAL_D
 
 
@@ -19,7 +20,7 @@ def _var_scm(d=8, n_lags=1, noise="gaussian"):
 
 
 def test_var_valid_temporal_structure():
-    ds = _var_scm(d=8, n_lags=1).sample(n=500, seed=0)
+    ds = _var_scm(d=8, n_lags=1).sample(n=500, seed=0, scale="raw")
     assert ds.data.shape == (500, 8)
     assert np.all(np.isfinite(ds.data))
     assert isinstance(ds.graph, TemporalStructure)
@@ -31,7 +32,7 @@ def test_var_valid_temporal_structure():
 
 def test_var_stationary():
     """A sampled VAR has finite values and bounded spread."""
-    ds = _var_scm(d=10, n_lags=2).sample(n=2000, seed=1)
+    ds = _var_scm(d=10, n_lags=2).sample(n=2000, seed=1, scale="raw")
     assert np.all(np.isfinite(ds.data))
     assert ds.data.std() < 1e3  # a stable VAR does not blow up
 
@@ -42,7 +43,7 @@ def test_varma_has_ma_stack():
         functional=data.functional.varma(n_lags=1, ma_lags=1),
         noise=data.noise.gaussian(),
     )
-    ds = scm.sample(n=500, seed=0)
+    ds = scm.sample(n=500, seed=0, scale="raw")
     assert np.all(np.isfinite(ds.data))
     assert ds.graph.lag_weights_ma is not None
     assert ds.graph.lag_weights_ma.shape == (1, 6, 6)
@@ -50,7 +51,7 @@ def test_varma_has_ma_stack():
 
 def test_temporal_reproducible():
     scm = _var_scm(d=8, n_lags=1, noise="uniform")
-    a, b = scm.sample(n=300, seed=5), scm.sample(n=300, seed=5)
+    a, b = scm.sample(n=300, seed=5, scale="raw"), scm.sample(n=300, seed=5, scale="raw")
     assert np.array_equal(a.data, b.data)
     assert a.graph == b.graph
 
@@ -58,10 +59,11 @@ def test_temporal_reproducible():
 def test_temporal_size_gate_raises():
     scm = _var_scm(d=MAX_TEMPORAL_D + 1)
     with pytest.raises(ValueError, match="MAX_TEMPORAL_D"):
-        scm.sample(n=50, seed=0)
+        scm.sample(n=50, seed=0, scale="raw")
 
 
-def test_temporal_rejects_latents_and_scale():
+@pytest.mark.parametrize("scale", ["rescale", "unitless"])
+def test_temporal_rejects_latents_and_scale(scale):
     scm = data.SCM(
         graph=data.graphs.erdos_renyi(8, 2.0),
         functional=data.functional.var(),
@@ -69,9 +71,20 @@ def test_temporal_rejects_latents_and_scale():
         latents=2,
     )
     with pytest.raises(NotImplementedError, match="latent"):
-        scm.sample(n=100, seed=0)
-    with pytest.raises(ValueError, match="only scale='raw'"):
-        _var_scm().sample(n=100, seed=0, scale="standardize")
+        scm.sample(n=100, seed=0, scale="raw")
+    with pytest.raises(ValueError, match="temporal functionals take scale"):
+        _var_scm().sample(n=100, seed=0, scale=scale)
+
+
+@pytest.mark.parametrize("functional", ["var", "varma"])
+def test_temporal_standardize_z_scores_the_series(functional):
+    """The default z-scores each column of the raw series, with the same truth."""
+    kwargs = {"functional": functional, "d": 6, "n": 400, "seed": 4, "density": 2.0}
+    raw = data.sample_scm(**kwargs, scale="raw")
+    standardized = data.sample_scm(**kwargs)
+    assert standardized.provenance["config"]["scale"] == "standardize"
+    assert np.allclose(standardized.data, standardize(raw.data), rtol=0, atol=1e-12)
+    assert standardized.graph == raw.graph
 
 
 def test_stabilize_stationary_at_high_lag_order():
@@ -100,7 +113,7 @@ def test_lag_matrices_have_self_memory():
 @pytest.mark.parametrize("n_lags", [1, 2])
 def test_truth_weights_sit_on_the_truth_edges(n_lags):
     """``lag_weights[k, i, j]`` is the weight of ``i -> j``, the edge the lag's graph draws."""
-    truth = _var_scm(d=6, n_lags=n_lags).sample(n=50, seed=3).graph
+    truth = _var_scm(d=6, n_lags=n_lags).sample(n=50, seed=3, scale="raw").graph
     for position, lag in enumerate(truth.lags):
         weights = truth.lag_weights[position]
         support = {(int(i), int(j)) for i, j in zip(*np.nonzero(weights), strict=True)}
@@ -127,8 +140,8 @@ def test_truth_stores_the_process_matrices_transposed():
 def test_shuffle_relabels_every_lag(functional):
     """Shuffling permutes the series and every lag graph and weight block on both axes."""
     kwargs = {"functional": functional, "d": 7, "n": 300, "seed": 2, "density": 2.0}
-    plain = data.sample_scm(**kwargs, shuffle=False)
-    shuffled = data.sample_scm(**kwargs)
+    plain = data.sample_scm(**kwargs, shuffle=False, scale="raw")
+    shuffled = data.sample_scm(**kwargs, scale="raw")
     order = np.asarray(shuffled.provenance["column_order"])
     assert np.array_equal(np.sort(order), np.arange(7)) and not np.array_equal(order, np.arange(7))
     index = np.ix_(order, order)

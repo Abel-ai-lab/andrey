@@ -89,7 +89,7 @@ def test_pc_is_invariant_to_column_order():
 
 def conflicting_orientations() -> np.ndarray:
     """A seed on which Meek's rule R1 directs one edge both ways."""
-    return data.sample_scm(d=10, n=100, seed=9, density=4.0).data
+    return data.sample_scm(d=10, n=100, seed=9, density=4.0, scale="raw").data
 
 
 def test_pc_orientations_are_invariant_to_column_order():
