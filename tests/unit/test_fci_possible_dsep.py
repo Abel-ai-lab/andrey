@@ -1,16 +1,23 @@
 """FCI's ``possible_dsep``: both modes keep their recorded PAGs, and unknown values raise.
 
 ``test_fci_oracle`` and the recovery tests check that the default does not depend on the column
-order.
+order. The step reads the neighbor lists and semidirected reach of the marks once per version of
+the marks, and builds them again only after an edge is removed.
 """
 
 from __future__ import annotations
+
+import importlib
 
 import numpy as np
 import pytest
 
 import andrey
+from andrey.core import NULL
+from andrey.core.ci import make_indep_test
 from andrey.data import sample_scm
+
+fci = importlib.import_module("andrey.constraint.fci")
 
 # Recorded PAGs, the same for both modes on these draws. Row i holds ``to_numpy()``'s marks at
 # node i: 0 none, 1 tail, 2 arrowhead, 3 circle.
@@ -45,3 +52,57 @@ def test_unknown_possible_dsep_raises(method, value):
         getattr(andrey, method)(
             np.random.default_rng(0).standard_normal((50, 3)), possible_dsep=value
         )
+
+
+def _rebuilt_per_call(marks, test, alpha, sepsets):
+    """``_remove_in_node_order`` with the lists and reach built for every possible-d-sep call."""
+    n = marks.shape[0]
+    edges = [fci._edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
+    for na, nb in edges:
+        if not fci._adjacent(marks, na, nb):
+            continue
+        adj_a, adj_b = (set(np.flatnonzero(marks[v]).tolist()) for v in (na, nb))
+        for a, b in ((na, nb), (nb, na)):
+            dsep = fci._possible_dsep(
+                marks, a, b, fci._neighbor_lists(marks), fci._semidirected_reach(marks)
+            )
+            if fci._try_remove_by_dsep(marks, na, nb, dsep, adj_a, adj_b, test, alpha, sepsets):
+                break
+
+
+@pytest.mark.parametrize(
+    "draw",
+    [
+        {"d": 10, "n": 500, "density": 4.0, "latents": 1, "seed": 9},
+        {"d": 15, "n": 500, "density": 4.0, "latents": 2, "seed": 7},
+        {"d": 15, "n": 1000, "density": 3.0, "latents": 1, "seed": 3},
+    ],
+)
+def test_the_lists_are_built_once_per_version_of_the_marks(monkeypatch, draw):
+    alpha = 0.05
+    x = sample_scm(graph="erdos_renyi", scale="standardize", **draw).data
+    test = make_indep_test("fisherz", x)
+    support, sepsets = fci._fast_adjacency_search(x, test, alpha)
+    marks = fci._circle_pag(support)
+    fci._orient_colliders(marks, sepsets)
+
+    reference, reference_sepsets = marks.copy(), dict(sepsets)
+    _rebuilt_per_call(reference, test, alpha, reference_sepsets)
+    builds = {"lists": 0, "reach": 0}
+    for name, key in (("_neighbor_lists", "lists"), ("_semidirected_reach", "reach")):
+        monkeypatch.setattr(fci, name, _counting(getattr(fci, name), builds, key))
+    fci._remove_in_node_order(marks, test, alpha, sepsets, None, None)
+
+    removed = (np.count_nonzero(support) - np.count_nonzero(marks != NULL)) // 2
+    assert removed >= 2, "the draw must remove edges, so that a stale list would show"
+    np.testing.assert_array_equal(marks, reference)
+    assert sepsets == reference_sepsets
+    assert builds == {"lists": removed + 1, "reach": removed + 1}
+
+
+def _counting(function, builds, key):
+    def counted(*args):
+        builds[key] += 1
+        return function(*args)
+
+    return counted
