@@ -248,7 +248,9 @@ def order_figure() -> str:
 
 
 def generator_figure() -> str:
-    dataset = sample_scm(graph="scale_free", d=10, n=10, density=2.0, seed=1, shuffle=False)
+    dataset = sample_scm(
+        graph="scale_free", d=10, n=10, density=2.0, seed=1, shuffle=False, scale="raw"
+    )
     truth = dataset.graph.adjacency
     degree = (truth != 0).sum(axis=1)
     assert degree[0] == degree.max(), "the generator writes the biggest hub first"

@@ -34,7 +34,7 @@ class QAReport:
     faithfulness_accept_rate : float or None, default=None
         Accept rate of the optional faithfulness screen; ``None`` when no screen ran.
     scale : str or None, default=None
-        The scale/normalization mode used (``"raw"`` / ``"standardize"`` / ``"rescale"``).
+        The scale mode used (``"standardize"``, ``"unitless"``, ``"rescale"``, or ``"raw"``).
     """
 
     varsortability: float | None = None

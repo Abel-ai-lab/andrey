@@ -84,8 +84,9 @@ def pc(
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
@@ -363,8 +364,9 @@ def fci(
         The categorical columns of ``data``, for a mixed-data test: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other tests take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that
@@ -590,8 +592,9 @@ def gfci(
         become the structure's ``labels``.
     score_func : str, default="local_score_BIC"
         Local score driving the GES skeleton phase, as for :func:`~andrey.ges`:
-        ``"local_score_BIC"``, the linear-Gaussian BIC; ``"local_score_BDeu"`` or
-        ``"local_score_BIC_categorical"`` for categorical data, coded by whole numbers; or
+        ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the linear-Gaussian BIC;
+        ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"`` for categorical data, coded by
+        whole numbers; or
         ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or conditional
         Gaussian BIC for mixed data.
     lambda_value : float, default=1.0
@@ -620,8 +623,9 @@ def gfci(
         The categorical columns of ``data``, for the mixed-data score and test: DataFrame column
         names or 0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and
         text columns, and every column of at most ``max_categories`` distinct whole numbers, named
-        in a ``DataTypeWarning``. ``[]`` marks none. The other settings reject it. See *Data types*
-        in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        in a ``DataTypeWarning``. ``[]`` marks none. The other settings accept only ``None`` or
+        ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous setting, columns within it get a one-time ``DataTypeWarning`` that
@@ -844,8 +848,9 @@ def cdnod(
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
         ``DataTypeWarning``. ``[]`` marks none. The domain index is categorical too, so ``data`` may
-        have no categorical column. The other tests take no column types and reject it. See *Data
-        types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        have no categorical column. The other tests take no column types and accept only ``None``
+        or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous test, columns within it get a one-time ``DataTypeWarning`` that

@@ -8,6 +8,7 @@ are checked by running one, and skipped when that environment has not been built
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import importlib.util
 import sys
 from pathlib import Path
@@ -88,6 +89,73 @@ def test_the_varma_noise_is_super_gaussian_and_the_draw_repeats() -> None:
     centered = noise[100:] - noise[100:].mean(axis=0)
     kurtosis = (centered**4).mean(axis=0) / (centered**2).mean(axis=0) ** 2 - 3
     assert (kurtosis > 0.5).all()
+
+
+#: SHA-256 of the stacks, column orders, and series of the VARMA model over ``d`` in (5, 20, 60)
+#: and seeds 0 to 2, where a stable draw comes within ``MAX_DRAWS``. A change to any drawn value
+#: changes it, and with it the datasets a campaign has stored.
+VARMA_DRAWS = "9de53e12198817cb9cd6640a3f4a8fb4b907b16e42dfdbafb184eacba3268a0c"
+
+
+def _varma_digest() -> str:
+    digest = hashlib.sha256()
+    for d in (5, 20, 60):
+        for seed in range(3):
+            data, stack, columns = lingam_models.sample_varma("varma2010", d, n=200, seed=seed)
+            # The stack and the columns are random draws and exact; the series goes through BLAS,
+            # so it is rounded.
+            for part in (stack, columns, np.round(data, 5) + 0.0):
+                digest.update(np.ascontiguousarray(part).tobytes())
+    return digest.hexdigest()
+
+
+def test_a_varma_model_with_a_stable_draw_keeps_its_draws() -> None:
+    assert _varma_digest() == VARMA_DRAWS
+
+
+def test_a_varma_model_with_no_stable_draw_is_rescaled_to_be_stable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Strong coefficients make every draw unstable; the first of three is kept and rescaled."""
+    model = lingam_models.MODELS["varma2010"]
+    monkeypatch.setitem(
+        lingam_models.MODELS, "varma2010", dataclasses.replace(model, coefficient=(0.9, 1.0))
+    )
+    monkeypatch.setattr(lingam_models, "MAX_DRAWS", 3)
+    first = []
+    rescale = lingam_models._rescale
+
+    def record(inverse: np.ndarray, b1: np.ndarray, m1: np.ndarray):
+        first.append((inverse @ b1, m1))
+        return rescale(inverse, b1, m1)
+
+    monkeypatch.setattr(lingam_models, "_rescale", record)
+    d = 60
+    data, stack, columns = lingam_models.sample_varma("varma2010", d, n=300, seed=0, shuffle=False)
+    ((reduced, drawn_ma),) = first
+    assert lingam_models._radius(reduced) >= 1 and lingam_models._radius(drawn_ma) >= 1
+    b0, b1, m1 = stack
+    target = lingam_models.STATIONARY_TARGET
+    inverse = np.linalg.inv(np.eye(d) - b0)
+    assert lingam_models._radius(inverse @ b1) == pytest.approx(target)
+    assert lingam_models._radius(m1) == pytest.approx(target)
+    assert np.count_nonzero(b0) == round(0.8 * d)
+    assert np.count_nonzero(b1) == np.count_nonzero(m1) == 2 * d
+    assert np.isfinite(data).all()
+    again, stack_again, _ = lingam_models.sample_varma("varma2010", d, n=300, seed=0, shuffle=False)
+    np.testing.assert_array_equal(data, again)
+    np.testing.assert_array_equal(stack, stack_again)
+
+
+def test_the_rescale_changes_only_a_part_that_is_not_stable() -> None:
+    inverse = np.linalg.inv(np.eye(3) - np.tril(np.ones((3, 3)), k=-1) * 0.5)
+    stable = 0.5 * np.eye(3)
+    b1, m1 = lingam_models._rescale(inverse, 2.0 * np.eye(3), stable)
+    np.testing.assert_array_equal(m1, stable)
+    assert lingam_models._radius(inverse @ b1) == pytest.approx(lingam_models.STATIONARY_TARGET)
+    b1, m1 = lingam_models._rescale(inverse, stable, 3.0 * np.eye(3))
+    np.testing.assert_array_equal(b1, stable)
+    assert lingam_models._radius(m1) == pytest.approx(lingam_models.STATIONARY_TARGET)
 
 
 @pytest.mark.parametrize("d", [3, 10])

@@ -268,8 +268,8 @@ def checked_data(
     mixed. ``index_categorical`` passes to :func:`mixed_matrix`.
 
     Raises ``TypeError`` or ``ValueError`` when ``max_categories`` is not an int of at least 2, and
-    ``ValueError`` when two columns share a name (:func:`column_labels`) or ``categorical`` is given
-    for a setting that reads no column types.
+    ``ValueError`` when two columns share a name (:func:`column_labels`) or ``categorical`` lists a
+    column for a setting that reads no column types; ``None`` and ``[]`` list none.
     """
     column_labels(data)
     setting = f"{option}={value!r}"
@@ -283,11 +283,11 @@ def checked_data(
             max_categories=max_categories,
             index_categorical=index_categorical,
         )
-    if categorical is not None:
+    if _lists_columns(categorical):
         reads = "every column as categorical" if kind == "categorical" else "continuous data"
         raise ValueError(
             "categorical names the categorical columns for a mixed-data test or score, but "
-            f"{setting} reads {reads}; leave categorical as None"
+            f"{setting} reads {reads}; leave categorical as None or []"
         )
     if kind == "categorical":
         X = data_matrix(categories_as_numbers(data, setting))
@@ -309,6 +309,14 @@ def checked_data(
             DataTypeWarning,
         )
     return X, None
+
+
+def _lists_columns(categorical: object) -> bool:
+    """Whether ``categorical`` is anything but ``None`` or an empty list, tuple, or array."""
+    if categorical is None:
+        return False
+    empty = isinstance(categorical, (list, tuple, np.ndarray)) and len(categorical) == 0
+    return not (empty and np.ndim(categorical) == 1)
 
 
 def categories_as_numbers(

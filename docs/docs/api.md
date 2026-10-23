@@ -237,6 +237,38 @@ DoWhy for effect estimation.
    TemporalStructure
 ```
 
+## Bootstrap
+
+`andrey.bootstrap` refits a method on resamples of the rows and reports how often each edge appears,
+and the graph that keeps the pairs that are adjacent often enough. It takes a method's name, such
+as `"pc"`, or the method itself, and the method's own arguments. Each resample draws the rows
+with replacement from a generator that depends on `seed` and the resample's number alone, so a seed
+gives the same result at any `num_workers`, and a longer run begins with the shorter run's fits.
+A method that takes a row-aligned input (`cdnod`'s `domain_index`, `gies`'s `interventions`)
+resamples it with the rows; `multi_group_direct_lingam` resamples each dataset on its own and
+returns one result per dataset; `longitudinal_lingam` resamples the units, the same rows of every
+dataset. A time-series method on one series resamples blocks of `block_length` consecutive rows.
+`gin` is the one method it does not take, since its number of latent nodes differs from fit to fit.
+
+{py:class}`~andrey.BootstrapOutput` holds the counts. `frequency("->")` is an `(n, n)` array whose
+cell `[i, j]` is the share of fits with the edge `i -> j`, and the same for `"<-"`, `"--"`,
+`"<->"`, `"o->"`, `"<-o"`, `"o-o"`, `"-o"`, `"o-"`, and `"absent"`; `table()` lists every edge that
+appeared; `structure` is the averaged graph, and `average(threshold)` builds it at another
+threshold without refitting. A pair is in the averaged graph when it is adjacent in at least
+`threshold` of the fits, and it takes the edge it has most often; two edges that tie give `--`
+(`o-o` for a PAG). Because a resample repeats rows, a conditional-independence test sees more
+evidence than the resample holds, so read a frequency as a ranking of the edges, not as a
+probability. `andrey bootstrap` runs the same from the shell
+([Command-line interface](#command-line-interface)).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: api
+
+   bootstrap
+   BootstrapOutput
+```
+
 ## Utilities
 
 ```{eval-rst}
@@ -346,11 +378,14 @@ argument, else `ANDREY_DATA_DIR`, else `$XDG_CACHE_HOME/andrey` (`~/.cache/andre
 
 ### Simulators
 
-`andrey.data.sample_discrete` samples a discrete network, the data for the categorical tests and
-scores, and `andrey.data.sample_mixed` a network of categorical and continuous variables, the data
-for the mixed-data tests and scores. Each returns the data with the true graph. The columns come in
-an order shuffled from the seed, with the graph relabeled to match, so the order says nothing about
-the causal order; `shuffle=False` keeps the order in which the graph was drawn.
+`andrey.data.sample_scm` samples a structural causal model named by its graph, functional form,
+and noise, and `andrey.data.SCM` builds one from those parts; both take a linear, nonlinear, or
+time-series model. `andrey.data.sample_discrete` samples a discrete network, the data for the
+categorical tests and scores, and `andrey.data.sample_mixed` a network of categorical and
+continuous variables, the data for the mixed-data tests and scores. Each returns the data with the
+true graph. The columns come in an order shuffled from the seed, with the graph relabeled to match,
+so the order says nothing about the causal order; `shuffle=False` keeps the order in which the
+graph was drawn.
 
 ```{eval-rst}
 .. currentmodule:: andrey.data
@@ -359,9 +394,37 @@ the causal order; `shuffle=False` keeps the order in which the graph was drawn.
    :toctree: api
    :nosignatures:
 
+   sample_scm
+   SCM
    sample_discrete
    sample_mixed
 ```
+
+#### Scale
+
+In linear data drawn with the usual weights, a variable's variance grows down the causal order, so
+sorting the columns by variance recovers much of that order (var-sortability, Reisach et al., 2021).
+The share of a variable's variance that the others explain, its $R^2$, grows down the order too, and
+no rescaling of the columns changes it ($R^2$-sortability, Reisach et al., 2023). The `scale`
+argument of `sample_scm` and `SCM.sample` sets how the values are scaled; the graph is the same in
+every mode. Its default, `"standardize"`, z-scores every column, which works for every model at any
+size, so no method can win by the variances. Pass `scale="raw"` for the values as generated.
+
+| `scale` | Values | Var-sortability | $R^2$-sortability |
+|---|---|---|---|
+| `"standardize"` (default) | each column z-scored after generation | 0.5 | as in the raw data |
+| `"unitless"` | weights and noise drawn so every variable has variance 1 (Herman et al., 2025) | about 0.5 | about 0.5 |
+| `"rescale"` | each variable divided by its standard deviation as it is generated | 0.5 | about 0.5 on sparse graphs |
+| `"raw"` | as generated | high | high |
+
+`"unitless"` follows Algorithm 1 of Herman et al. (2025): a variable's weights and noise depend only
+on its number of parents, and the ratio of a parent's share of its variance to the noise's has no
+bound. It takes the linear functional, up to 1,000 variables, since it keeps their correlation
+matrix. A sample's `report` holds its var-sortability and, up to 100 variables, its
+$R^2$-sortability, and `andrey.data.sortability.varsortability` and `r2sortability` compute them
+for any data and graph. On 30 random graphs of 20 variables at mean degree 2, with 1,000 rows,
+$R^2$-sortability averages 0.74 raw or standardized, 0.52 with `"rescale"`, and 0.51 with
+`"unitless"`.
 
 ## Metrics
 
@@ -460,6 +523,7 @@ and `rc_params` return plain data and need no import.
 | `andrey list` | Available methods and their status |
 | `andrey run hc --help` | Readable inputs, parameters, defaults, and examples |
 | `andrey run hc --help --json` | One versioned method contract, without execution |
+| `andrey bootstrap hc --data data.csv` | Edge frequencies over bootstrap refits, and the averaged graph |
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
@@ -469,6 +533,11 @@ and `rc_params` return plain data and need no import.
 `--help` selects introspection and `--json` selects the representation: help reads no data or
 configuration file and never executes the method, while `andrey run hc --data data.csv --json` runs
 HC. Configuration reports list detected backends, not the backend an operation will use.
+
+`andrey bootstrap <method>` takes the inputs, parameters, and options of `andrey run`, and
+`--n-boot`, `--seed`, `--threshold`, and `--block-length`. Its result is a run's, with the averaged
+graph as `structure`, plus `bootstrap` (the settings) and `frequencies` (each edge that appeared in
+a fit, most frequent first); see [Bootstrap](#bootstrap).
 
 Structured help, configuration and calibration reports, and run results carry
 `schema_version: "2"`, which versions the command line's JSON separately from the `format_version`

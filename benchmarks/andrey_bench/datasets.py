@@ -81,6 +81,7 @@ STANDARDIZE_TO_SCALE = {
     "standardized": "standardize",
     "raw": "raw",
     "ancestral": "rescale",  # Andrey's "ancestral rescaling" scale (per SCM.sample docstring)
+    "unitless": "unitless",  # weights and noise that give each node unit variance (SCM.sample)
 }
 #: Selectable noise families.
 NOISES = {"gaussian", "uniform", "laplace", "exponential", "gumbel"}
@@ -101,6 +102,14 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # Linear with uniform noise and hidden confounders, where RCD and BottomUpParceLiNGAM are
     # identifiable.
     "latent_lingam_er": ("er", "linear", "uniform", "standardized"),
+    # The four linear regimes with unitless weights and noise (Herman et al. 2025): every variable
+    # has unit variance and R^2-sortability is close to chance, so neither the variances nor the
+    # share of each variable the others explain gives the causal order away. The generator keeps a
+    # dense correlation matrix and takes at most 1,000 variables.
+    "linear_gauss_er_unitless": ("er", "linear", "gaussian", "unitless"),
+    "lingam_sf_unitless": ("scale_free", "linear", "uniform", "unitless"),
+    "latent_gauss_er_unitless": ("er", "linear", "gaussian", "unitless"),
+    "latent_lingam_er_unitless": ("er", "linear", "uniform", "unitless"),
     # Cause-effect pairs: nonlinear additive noise on two nodes, where ANM is identifiable. At
     # ``d = 2`` and density 1.0 every pair has one edge, in a direction the seed draws.
     "anm_pair": ("er", "anm", "gaussian", "standardized"),
@@ -130,8 +139,7 @@ REGIMES: dict[str, tuple[str, str, str, str]] = {
     # GIN's data; the key's d counts latents and indicators, its density is indicators per latent.
     "latent_measurement": ("complete", "measurement", "uniform", "ancestral"),
     # A lagged linear-Gaussian series for PCMCI: andrey.data's VAR(1) on an empty instantaneous
-    # graph (the key sets density LAG_ONLY_DENSITY), so every true link has lag 1. Temporal
-    # generation takes raw scale only.
+    # graph (the key sets density LAG_ONLY_DENSITY), so every true link has lag 1, at raw scale.
     "var_lagged": ("er", "var", "gaussian", "raw"),
     # The simulations of the PCMCI, PCMCI+, and LPCMCI papers, which keep the expected number of
     # cross-links per variable fixed at every d; andrey_bench.temporal_models gives each setup and
@@ -204,7 +212,12 @@ ORDER_FREE = frozenset({*temporal_models.MODELS, "panel2013", "measurement"})
 #: child, so at least one hidden node has two observed children at every ``d``. A seed fails to
 #: generate when fewer nodes have two or more children than nodes to hide. That is about 3% of seeds
 #: at ``d = 10`` and ``d = 15``; seeds 0 to 28 all generate on that ladder.
-LATENT_REGIMES: dict[str, int] = {"latent_gauss_er": 10, "latent_lingam_er": 5}
+LATENT_REGIMES: dict[str, int] = {
+    "latent_gauss_er": 10,
+    "latent_lingam_er": 5,
+    "latent_gauss_er_unitless": 10,
+    "latent_lingam_er_unitless": 5,
+}
 
 DEFAULT_REGIME = "linear_gauss_er"
 
