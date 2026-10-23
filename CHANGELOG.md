@@ -67,6 +67,9 @@ change names its pull request.
   the last bits. A near-tie between two candidates for the next variable in the causal order can
   then resolve the other way; on the identity check's datasets every output is the same as 0.8.0's.
   ([#288])
+- `help(andrey)` opens with a quick start and points to `andrey --skill` and
+  `andrey --help --json`, and the package summary says the import name is `andrey`, so an agent
+  that has only run `pip install andrey-core` finds the command line and its skill. ([#347])
 
 ## [0.8.0] - 2026-10-23
 
@@ -609,4 +612,5 @@ First alpha release.
 [#311]: https://github.com/Abel-ai-lab/andrey/pull/311
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
+[#347]: https://github.com/Abel-ai-lab/andrey/pull/347
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
