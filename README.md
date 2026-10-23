@@ -18,14 +18,14 @@ banner links the website's homepage. -->
 
 ---
 
-## ⭐ What's new in 0.8.0
+## ⭐ What's new in 0.9.0
 
-PC, FCI, GFCI, and CD-NOD now detect nonlinear dependence, which partial correlation misses, with
-four new independence tests: KCI, RCoT, CMIknn, and GPDC. Each runs faster than the package we
-measured it against, at the same level of accuracy.
+Our biggest speed breakthrough: BOSS runs up to 8.1x faster than before, exact search 5.2x, and FCI
+and GFCI 3.1x, with exactly the same graphs. GES now runs up to 5.4x faster than pcalg's C++ GES,
+with the same or fewer errors.
 
-**[Read the post](https://andrey.abel.ai/blog/20261023-andrey-0-8-0.html)** ·
-**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.8.0.html)**
+**[Read the post](https://andrey.abel.ai/blog/20261023-andrey-0-9-0.html)** ·
+**[See the release card](https://andrey.abel.ai/docs/benchmarks/0.9.0.html)**
 
 ---
 
@@ -191,7 +191,7 @@ If you use Andrey in your work, please cite it, or use the
   author = {{Abel AI Lab}},
   title = {Andrey: Accelerated, accurate, agentic causal discovery},
   year = {2026},
-  version = {0.8.0},
+  version = {0.9.0},
   url = {https://andrey.abel.ai},
 }
 ```
