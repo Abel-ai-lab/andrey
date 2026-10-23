@@ -1054,7 +1054,6 @@ ul.ablog-archive {
 .sr svg {
   display: block;
   width: 100%;
-  max-width: 36rem;
   height: auto;
   overflow: visible;
 }

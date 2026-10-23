@@ -42,8 +42,8 @@ NAMES = {
 # a size's difference is within the run-to-run spread.
 FASTER = 1.1
 # The chart: a row's height, the method labels' width, and the bars' width; the axis's ticks.
-ROW, LABEL, PLOT = 22, 170, 400
-TICKS = (1, 2, 5, 10, 20, 50, 100, 200, 500, 1000)
+ROW, LABEL, PLOT = 24, 170, 580
+TICKS = (1, 1.5, 2, 3, 5, 7, 10, 15, 20, 30, 50, 70, 100)
 
 
 def floored(value: float) -> str:
@@ -81,7 +81,7 @@ def ranges_chart(summary: dict) -> str:
     """Each method's range of speedups as a bar on a log axis from 1x, grouped by family."""
     groups = ranges(summary)
     top = max(hi for _, methods in groups for _, _, hi, _ in methods)
-    end = next(t for t in TICKS if t >= top)
+    end = top * 1.12  # the axis ends just past the largest bar, with room for its label
     scale = PLOT / math.log10(end)
 
     def x(speed: float) -> float:
@@ -105,7 +105,7 @@ def ranges_chart(summary: dict) -> str:
         y += 6
     ticks = "".join(
         f'<line class="sr-grid" x1="{x(t):.1f}" x2="{x(t):.1f}" y1="0" y2="{y}"/>'
-        f'<text class="sr-tick" x="{x(t):.1f}" y="{y + 14}" text-anchor="middle">{t}x</text>'
+        f'<text class="sr-tick" x="{x(t):.1f}" y="{y + 14}" text-anchor="middle">{t:g}x</text>'
         for t in TICKS
         if t <= end
     )
