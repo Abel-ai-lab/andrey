@@ -643,6 +643,23 @@ def test_a_page_ablog_generates_has_a_catalog_or_collection_and_no_document(
     assert conf["_blog_collection"](context, doctree) is generated
 
 
+def test_the_theme_stylesheet_keeps_only_the_icons_a_page_names(conf, tmp_path):
+    styles = tmp_path / "_static" / "styles"
+    styles.mkdir(parents=True)
+    (styles / "pydata-sphinx-theme.css").write_text(
+        '.fa-lg{font-size:1.25em}.fa-house,.fa-home{--fa:"\\f015"}.fa-user{--fa:"\\f007"}'
+        '.fa-sun{--fa:"\\f185"}'
+    )
+    (tmp_path / "page.html").write_text('<i class="fa-solid fa-home"></i>')
+    (tmp_path / "theme.js").write_text('icon.className = "fa-solid fa-sun"')
+    # Font Awesome's own script names every icon, so it does not count.
+    (tmp_path / "fontawesome.js").write_text("fa-user")
+    app = types.SimpleNamespace(outdir=str(tmp_path), builder=types.SimpleNamespace(name="html"))
+    conf["_trim_icon_rules"](app, None)
+    css = (styles / "pydata-sphinx-theme.css").read_text()
+    assert css == '.fa-lg{font-size:1.25em}.fa-house,.fa-home{--fa:"\\f015"}.fa-sun{--fa:"\\f185"}'
+
+
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
 def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
