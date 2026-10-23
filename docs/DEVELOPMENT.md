@@ -251,7 +251,9 @@ the website, the package, the repository, and Abel's GitHub profile to one produ
 build, `_write_discovery` in `conf.py` writes `llms.txt` (the pages in `LLMS_SECTIONS`, then every
 release card and post) and `sitemap.xml` (every indexable page); `robots.txt` is a plain file
 (`_extra/robots.txt`). A page in `LLMS_SECTIONS` that is renamed or removed fails the build until
-the list follows it.
+the list is updated. Once a tagged release is live, `.github/workflows/indexnow.yml` submits every
+address in the sitemap to IndexNow for Bing and other participating engines. Its public key is
+served at `_extra/<key>.txt`. Google reads the sitemap directly.
 
 ## Validation
 

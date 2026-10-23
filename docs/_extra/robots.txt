@@ -1,4 +1,17 @@
 User-agent: *
 Allow: /
 
+# All crawlers may access every page, including the named search, AI, and agent crawlers.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+Allow: /
+
 Sitemap: https://andrey.abel.ai/sitemap.xml

@@ -208,7 +208,7 @@ def test_every_title_but_the_homepages_ends_with_the_product_and_its_subject(htm
     for page, text in _pages(html):
         title = unescape(re.search(r"<title>(.*?)</title>", text, re.S)[1])
         if page == html / "index.html":
-            assert title == "Andrey: accelerated, accurate, agentic causal discovery"
+            assert title == "Andrey: fast causal discovery in Python, built for AI agents"
         else:
             assert title.endswith(" Andrey causal discovery"), f"{page}: {title}"
 
@@ -502,9 +502,13 @@ def test_llms_txt_links_public_pages_by_section_with_their_preview_text(html):
 
 
 def test_the_sitemap_lists_each_indexable_page_once_and_robots_txt_names_it(html):
-    assert (html / "robots.txt").read_text() == (
-        "User-agent: *\nAllow: /\n\nSitemap: https://andrey.abel.ai/sitemap.xml\n"
-    )
+    robots = (html / "robots.txt").read_text()
+    # All crawlers may access every page; named AI crawlers are explicitly allowed.
+    assert robots.startswith("User-agent: *\nAllow: /\n")
+    assert "Disallow" not in robots
+    for agent in ("GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended"):
+        assert f"User-agent: {agent}\n" in robots
+    assert robots.endswith("\nSitemap: https://andrey.abel.ai/sitemap.xml\n")
     urls = re.findall(r"<loc>([^<]+)</loc>", (html / "sitemap.xml").read_text())
     assert len(urls) == len(set(urls)) > 50
     for url in urls:

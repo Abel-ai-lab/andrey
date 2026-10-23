@@ -550,11 +550,12 @@ def test_the_lede_names_every_registry_family_in_one_sentence(placeholder_page):
     assert lede in " ".join(placeholder_page.split())
 
 
-def test_the_page_title_is_the_one_line_description(placeholder_page):
-    # The description pyproject.toml and the README give, as the browser tab shows it.
-    assert (
-        "<title>Andrey: accelerated, accurate, agentic causal discovery</title>" in placeholder_page
-    )
+def test_the_page_title_names_what_people_search_for(placeholder_page):
+    # The title includes the product name and search terms within the length limit.
+    assert f"<title>{build.SEARCH_TITLE}</title>" in placeholder_page
+    assert len(build.SEARCH_TITLE) <= 60
+    for words in ("Andrey", "fast", "causal discovery", "Python", "agents"):
+        assert words in build.SEARCH_TITLE
 
 
 # The registry as it is, and without one method the description does not name: the count of "more"

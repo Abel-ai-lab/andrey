@@ -175,6 +175,11 @@ def llms_index(
         "> " + " ".join(description.split()),
         "",
         f"Version: {version}.",
+        "",
+        "Install with `pip install andrey-core`. When output is piped, `andrey list` prints the",
+        "methods as JSON, and `andrey run <method> --data data.csv` prints the graph as JSON.",
+        "`andrey run <method> --help --json` returns a method's JSON contract, and",
+        "`andrey --skill` prints Andrey's agent skill.",
     ]
     listed = set()
     for heading, documents in sections:

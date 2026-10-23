@@ -170,6 +170,9 @@ SHOWN_SETTINGS = {
 DEMO_URL: str | None = None  # the live demo; link it once its Space is public
 # The one-line description, as pyproject.toml and the README give it.
 DESCRIPTION = "Andrey: accelerated, accurate, agentic causal discovery."
+# The homepage's search and link-preview title includes "fast", "causal discovery", "Python",
+# and "agents" alongside the product name.
+SEARCH_TITLE = "Andrey: fast causal discovery in Python, built for AI agents"
 
 # Graph colors resolve through the page's tokens, so the drawing follows the light or dark theme.
 TOKEN_PALETTE = andrey.viz.Palette(
@@ -2618,8 +2621,8 @@ def page_description(summaries: list[dict]) -> str:
         raise ValueError(f"the description names unregistered methods: {', '.join(missing)}")
     named, more = ", ".join(DESCRIPTION_METHODS), len(registered) - len(DESCRIPTION_METHODS)
     return (
-        f"Causal discovery for Python. Learn causal graphs with {named} and {more} more methods. "
-        f"{CLAIM}"
+        f"Causal discovery for Python and AI agents. Learn causal graphs with {named} and "
+        f"{more} more methods, on CPU or GPU. {CLAIM}"
     )
 
 
@@ -2650,7 +2653,7 @@ def homepage_context(summary: dict, *, placeholder: bool = False) -> dict[str, s
         "documentation's benchmarks page. Not for release.</p>"
     )
     return {
-        "title": escape(DESCRIPTION.rstrip(".")),
+        "title": escape(SEARCH_TITLE),
         # Plain text: docs/conf.py escapes it into the page's description and link-preview tags.
         "description": page_description(summaries),
         "robots": '<meta name="robots" content="noindex">' if placeholder else "",
