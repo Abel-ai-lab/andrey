@@ -623,6 +623,26 @@ def test_a_page_without_a_description_takes_its_first_paragraph(
     assert conf["_description"](app, {"meta": meta}, None) == without
 
 
+# ABlog's All Posts, years, archive, tags, and authors have a catalog or a collection and no
+# document; a post or an index page has a document.
+@pytest.mark.parametrize(
+    ("context", "has_document", "generated"),
+    [
+        ({"catalog": []}, False, True),
+        ({"collection": []}, False, True),
+        ({"catalog": []}, True, False),
+        ({}, False, False),
+    ],
+)
+def test_a_page_ablog_generates_has_a_catalog_or_collection_and_no_document(
+    conf, context, has_document, generated
+):
+    from docutils.utils import new_document
+
+    doctree = new_document("page") if has_document else None
+    assert conf["_blog_collection"](context, doctree) is generated
+
+
 @pytest.mark.skipif(not build.SUMMARY.exists(), reason="the published summary is absent")
 def test_the_readme_chart_has_six_cards_each_a_published_ratio():
     summaries = build.release_summaries(build.load_summary(build.SUMMARY))
