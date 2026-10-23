@@ -15,7 +15,7 @@ uv venv benchmarks/.venv-bench --python 3.13 --clear
 # shellcheck disable=SC1091
 source benchmarks/.venv-bench/bin/activate
 uv pip install torch --torch-backend=auto
-uv pip install -e "$REPO" safetensors
+uv pip install -e "$REPO"
 # pytest is not optional here: the validation suite runs in this venv, against these package
 # versions, and it is what says the harness measures correctly before a benchmark is believed.
 # pygam 0.12 or later, which lingam imports: older pygam does not work with current SciPy.

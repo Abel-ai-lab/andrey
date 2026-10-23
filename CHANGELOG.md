@@ -121,6 +121,8 @@ change names its pull request.
   `andrey.temporal.LongitudinalLiNGAM.get_error_independence_p_values` and `residuals_`,
   `andrey.core.independence.hsic_gamma_test` and `measure_hsic_statistic`, and the bandwidth options
   of `hsic_test` and `hsic_statistic_test`, which no caller passed. ([#371])
+- `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
+  installed safetensors for them. Nothing in Andrey called them. ([#375])
 
 ## [0.8.0] - 2026-10-23
 
@@ -678,3 +680,4 @@ First alpha release.
 [#368]: https://github.com/Abel-ai-lab/andrey/pull/368
 [#369]: https://github.com/Abel-ai-lab/andrey/pull/369
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
+[#375]: https://github.com/Abel-ai-lab/andrey/pull/375

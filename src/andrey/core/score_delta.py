@@ -1299,8 +1299,8 @@ class FullScoreDelta:
 
     Every delta is ``score(v, S +/- u) - score(v, S)`` from two memoized full scores; the batched
     methods score all of a call's parent sets in one ``score_many`` call.
-    GES's reference arm uses it on BIC, and GES and hill climbing use it on scores with no Schur
-    update, such as :class:`~andrey.core.score.BDeuScore` and the mixed-data scores.
+    GES and hill climbing use it on scores with no Schur update, such as
+    :class:`~andrey.core.score.BDeuScore` and the mixed-data scores.
 
     Parameters
     ----------

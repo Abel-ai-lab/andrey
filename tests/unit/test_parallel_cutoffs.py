@@ -137,10 +137,10 @@ def test_a_fit_on_the_default_cutoff_runs_in_one_process(monkeypatch):
 
 def test_the_calibrator_states_the_cutoff_in_the_largest_pass_work():
     """A size's work is the largest pass of its pooled fit; the first pass is a lower bound."""
-    serial, pooled, work = cal.fit_timers("ges", workers=2, repeats=1)
+    serial, pooled, work = cal.fit_timers("ges", workers=2)
     pooled(12)
     assert work(12) >= 12 * 11
-    c = cal.bracket(lambda d: 2.0, lambda d: 1.0, grid=(16, 32), refine=0, work=lambda d: 7 * d)
+    c = cal.bracket(lambda d: 2.0, lambda d: 1.0, grid=(16, 32), work=lambda d: 7 * d)
     assert c.cutoff == 7 * cal._MIN_D and c.work(cal._MIN_D) == 7 * cal._MIN_D
 
 
@@ -364,7 +364,7 @@ def test_the_skeleton_timers_pool_only_the_pooled_arm_and_restore_the_cutoff(mon
         sk, "ProcessPoolExecutor", lambda *a, **k: created.append(k) or real(*a, **k)
     )
     monkeypatch.setenv(SKELETON_VARIABLE, "123")
-    serial, pooled, work = cal.skeleton_timers(workers=2, size=2, repeats=1)
+    serial, pooled, work = cal.skeleton_timers(workers=2, size=2)
     assert serial(8) > 0 and not created
     assert pooled(8) > 0 and created
     assert work(8) == 420

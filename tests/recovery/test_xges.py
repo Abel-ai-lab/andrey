@@ -4,7 +4,7 @@ Fixed cases have a CPDAG that can be checked by hand. Ground-truth cases are lin
 Erdos-Renyi graphs from ``andrey.data``, where the BIC score is consistent: on sparse graphs with
 many samples GES and XGES both return the true CPDAG, and on denser graphs with fewer samples XGES's
 extended search recovers graphs GES misses, as its paper reports. The queue-based search must
-return the graph the rescanning reference path in ``andrey.search.xges`` returns.
+return the graph the rescanning reference in ``tests/recovery/helpers/xges_rescan.py`` returns.
 """
 
 from __future__ import annotations
@@ -29,13 +29,12 @@ from andrey.search.xges import (
     _edge_key,
     _extension_parents,
     _Graph,
-    _marks_total,
     _Search,
-    _sets,
 )
 from andrey.search.xges import xges as xges_search
 from tests.recovery.helpers import datagen
 from tests.recovery.helpers.slice_fixture import assert_recorded_output
+from tests.recovery.helpers.xges_rescan import _marks_total, _sets, xges_rescan
 
 
 @pytest.fixture(autouse=True)
@@ -162,7 +161,7 @@ def test_queue_search_matches_the_rescanning_reference(seed, extended_search):
     """
     x = _dense(seed).data
     fast, fast_score = xges_search(x, extended_search=extended_search)
-    slow, slow_score = xges_search(x, extended_search=extended_search, _rescan=True)
+    slow, slow_score = xges_rescan(x, extended_search=extended_search)
     assert np.array_equal(from_structure(fast), from_structure(slow))
     assert fast_score == slow_score
 

@@ -75,7 +75,6 @@ def ges(
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
     workers: int | None = None,
-    _full_scores: bool = False,
 ) -> tuple[GraphStructure, float]:
     """Discover a CPDAG by Greedy Equivalence Search over a BIC, categorical, or mixed-data score.
 
@@ -114,10 +113,6 @@ def ges(
     workers : int or None
         Worker processes for the BIC passes above the work threshold; ``None`` reads
         ``andrey.config.num_workers``.
-    _full_scores : bool
-        Private test lever: score every candidate by two full local scores (the pre-Schur reference)
-        instead of the Schur delta. Tests compare the two scoring paths; this option is not part of
-        the public contract.
 
     Returns
     -------
@@ -153,7 +148,6 @@ def ges(
             max_parents,
             workers=workers,
             ranks=ranks,
-            full_scores=_full_scores,
             constraints=constraints,
         )
         total = _recompute_objective(adj, score, n)
