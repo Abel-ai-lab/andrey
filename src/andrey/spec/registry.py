@@ -1433,6 +1433,10 @@ _MOVE_RULE = (
 )
 _PARENT_RULE = "Each variable's parents exclude the forbidden ones and include the required ones. "
 _ORDER_RULE = "Causal orders put the cause of each required edge, and every earlier tier, first. "
+_REGRESSION_RULE = (
+    "The regression drops forbidden parents and does not penalize required ones; every required "
+    "edge is in the DAG."
+)
 _LINK_RULE = (
     "An edge [cause, effect, lag] is the link from cause at time t - lag to effect at time t; a "
     "forbidden [cause, effect] pair forbids it at every lag, and a required link names its lag. "
@@ -1452,8 +1456,11 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "boss": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "grasp": _PARENT_RULE + _ORDER_RULE + _CLASS_RULE,
     "exact_search": _PARENT_RULE,
-    "direct_lingam": _ORDER_RULE + "The regression drops forbidden parents and does not penalize "
-    "required ones; every required edge is in the DAG.",
+    "direct_lingam": _ORDER_RULE + _REGRESSION_RULE,
+    "ica_lingam": "The order search reads every forbidden edge's unmixing weight as 0. "
+    + _ORDER_RULE
+    + _REGRESSION_RULE,
+    "multi_group_direct_lingam": "It holds for every group. " + _ORDER_RULE + _REGRESSION_RULE,
     "pcmci": _LINK_RULE + "No test runs on a forbidden or a required link: a forbidden link is not "
     "in the graph, and a required one is.",
     "pcmciplus": _LINK_RULE + "The lagged and skeleton phases test no forbidden or required link: "

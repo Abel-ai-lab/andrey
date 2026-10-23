@@ -58,12 +58,12 @@ single column gives a one-node graph.
 ([Conditional-independence tests](#conditional-independence-tests)).
 
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
-`exact_search`, `direct_lingam`, `pcmci`, `pcmciplus`, and `lpcmci` take `knowledge`, a
-{py:class}`~andrey.Knowledge` of required and forbidden edges, the pairs allowed to be adjacent,
-and temporal tiers; each method's `knowledge` parameter says how it honors them. For the
-time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to
-`effect` at time `t`. `pc`, `fci`, `gfci`, and `cdnod` also take
-`max_depth`, the maximum conditioning-set size of their conditional-independence tests.
+`exact_search`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `pcmci`, `pcmciplus`,
+and `lpcmci` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and forbidden edges, the
+pairs allowed to be adjacent, and temporal tiers; each method's `knowledge` parameter says how it
+honors them. For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause`
+at time `t - lag` to `effect` at time `t`. `pc`, `fci`, `gfci`, and `cdnod` also take `max_depth`,
+the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 `ges` takes `max_parents`, a gate on its forward phase: a node whose parent count already exceeds it

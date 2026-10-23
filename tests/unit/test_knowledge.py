@@ -21,11 +21,11 @@ from andrey.core.structure import CIRCLE
 from andrey.search.gies import admits as gies_admits
 from andrey.spec import REGISTRY
 
-# The searches that take knowledge and return one graph over the columns of one table.
+# The searches that take knowledge and return a graph over the columns of a table.
 METHODS = [
     name
     for name, spec in REGISTRY.items()
-    if spec.knowledge and spec.output.structure_type == "graph" and not spec.output.multi
+    if spec.knowledge and spec.output.structure_type == "graph"
 ]
 # The time-series searches that take knowledge, over the links between lagged variables.
 TEMPORAL = [
@@ -69,6 +69,9 @@ def _fit(name: str, data: pd.DataFrame, **kwargs):
             return andrey.cdnod(data, np.repeat([0.0, 1.0], len(data) // 2), **kwargs)
         if name == "exact_search":
             return andrey.exact_search(data, **kwargs)
+        if REGISTRY[name].output.multi:  # the first of two groups, the halves of the rows
+            half = len(data) // 2
+            return getattr(andrey, name)([data[:half], data[half:]], **kwargs)[0]
         return getattr(andrey, name)(data, **kwargs)
 
 
@@ -513,6 +516,23 @@ def test_a_required_edge_keeps_its_direction_where_the_data_allow_both(name, edg
     marks, labels = _marks(_fit(name, data, knowledge=Knowledge(required=[edge])))
     cause, effect = (labels.index(v) for v in edge)
     assert marks[cause, effect] == TAIL and marks[effect, cause] == ARROW
+
+
+@pytest.mark.parametrize("name", [m for m in METHODS if REGISTRY[m].family == "lingam"])
+def test_lingam_knowledge_that_fits_the_truth_does_not_add_errors(name, data):
+    def errors(out) -> int:
+        found = {(a, b) for a, b, kind in out.structure.oriented_edges() if kind == "directed"}
+        return len(found ^ TRUTH)
+
+    knowledge = Knowledge(required=[("c", "d")], forbidden=[("e", "d")], tiers=[EARLY, LATE])
+    assert errors(_fit(name, data, knowledge=knowledge)) <= errors(_fit(name, data))
+
+
+def test_every_group_honors_the_knowledge(data):
+    half = len(data) // 2
+    outs = andrey.multi_group_direct_lingam([data[:half], data[half:]], knowledge=KNOWLEDGE)
+    for out in outs:
+        _assert_required_forbidden_and_tiers_hold("multi_group_direct_lingam", *_marks(out))
 
 
 def test_direct_lingam_keeps_a_required_edge_whose_weight_is_zero():
