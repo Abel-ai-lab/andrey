@@ -121,6 +121,12 @@ change names its pull request.
   the last bits. A near-tie between two candidates for the next variable in the causal order can
   then resolve the other way; on the identity check's datasets every output is the same as 0.8.0's.
   ([#288])
+- `pc`, `fci`, `gfci`, and `cdnod` with `indep_test="cmiknn"` return the same graphs and p-values
+  in less time on CPUs without AVX512_ICL, such as the AMD EPYC 7713, because CMIknn selects each
+  row's `k`-th neighbor distance in 32-bit integers, which NumPy sorts with SIMD on AVX2. On an
+  EPYC 7713 a fit on 10 variables and 1,000 rows took 6.5 minutes instead of 22, and the quality
+  gate's CMIknn fits took half as long. On CPUs with AVX512_ICL, such as the EPYC 9534, the
+  selection is unchanged and the same fits take about 10% less time. ([#391])
 - `help(andrey)` opens with a quick start and points to `andrey --skill` and
   `andrey --help --json`, and the package summary says the import name is `andrey`, so an agent
   that has only run `pip install andrey-core` finds the command line and its skill. ([#347])
@@ -707,6 +713,7 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
+[#391]: https://github.com/Abel-ai-lab/andrey/pull/391
 [#393]: https://github.com/Abel-ai-lab/andrey/pull/393
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
