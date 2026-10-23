@@ -247,10 +247,16 @@ On a remote machine, keep the server on `127.0.0.1` and forward the port:
 carries its Twitter card fields and one JSON-LD graph: the organization (Abel's logomark,
 `site/brand/abel-symbol-night.svg`, drawn as `_static/abel-symbol.png`), the website, the software
 (Andrey's icon) at the page's release, the page, a `BlogPosting` for a post, and the breadcrumbs.
-The search and 404 pages are `noindex` (`UNINDEXED`). After the build, `_write_discovery` in
-`conf.py` writes `llms.txt` (the pages in `LLMS_SECTIONS`, then every release card and post) and
-`sitemap.xml` (every indexable page); `robots.txt` is a plain file (`_extra/robots.txt`). A page in
-`LLMS_SECTIONS` that is renamed or removed fails the build until the list follows it.
+The search and 404 pages (`UNINDEXED`) and the blog's generated pages (All Posts, the years, the
+archive, the tags, and the authors; `_blog_collection`) are `noindex` and name no canonical
+address, so the sitemap leaves them out: they only list the posts again. Every title but the
+homepage's ends with `html_title`, "Andrey causal discovery", so a page matches what Andrey does and
+not only a name that is also a person's. In the structured data, `alternateName` and `sameAs` tie
+the website, the package, the repository, and Abel's GitHub profile to one product. After the
+build, `_write_discovery` in `conf.py` writes `llms.txt` (the pages in `LLMS_SECTIONS`, then every
+release card and post) and `sitemap.xml` (every indexable page); `robots.txt` is a plain file
+(`_extra/robots.txt`). A page in `LLMS_SECTIONS` that is renamed or removed fails the build until
+the list follows it.
 
 ## Validation
 
@@ -268,8 +274,9 @@ private symbol exposed); KaTeX-ready math; one description per page, the same as
 at most 160 characters; the navbar's links; the favicon and the link-preview cards; the blog's front
 page and each post's cover and byline; every site address in the README, the project URLs, and the
 citation; each page's structured data against its link preview and each post's front matter;
-`llms.txt`, `sitemap.xml`, and `robots.txt`; that only the search and 404 pages are `noindex`; and
-that the 404 page's links resolve from the site's root. External links: `uv run --group docs
+`llms.txt`, `sitemap.xml`, and `robots.txt`; that only the search page, the 404 page, and the blog's
+generated pages are `noindex`; each title's ending; and that the 404 page's links resolve from the
+site's root. External links: `uv run --group docs
 sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 
 ## How the site is wired
