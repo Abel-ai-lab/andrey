@@ -289,13 +289,8 @@ def _parents(marks: np.ndarray, b: int) -> set[int]:
     return {p for p in range(marks.shape[0]) if _is_parent_of(marks, p, b)}
 
 
-def _adjacent_nodes(marks: np.ndarray, b: int) -> list[int]:
-    """Ascending list of nodes sharing an edge with ``b``."""
-    return np.flatnonzero(marks[b] != NULL).tolist()
-
-
 def _neighbor_lists(marks: np.ndarray) -> list[list[int]]:
-    """Every node's :func:`_adjacent_nodes`, read from ``marks`` at once."""
+    """Each node's ascending list of the nodes sharing an edge with it, read from ``marks``."""
     return [np.flatnonzero(row).tolist() for row in marks != NULL]
 
 
@@ -482,8 +477,17 @@ def _exists_possible_parent_path(
     return False
 
 
-def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
+def _possible_dsep(
+    marks: np.ndarray,
+    x: int,
+    y: int,
+    neighbors: list[list[int]],
+    reach: Callable[[int], int],
+) -> list[int]:
     """Possible-d-separating nodes for the pair ``(x, y)`` (descending), from a reachability BFS.
+
+    ``neighbors`` and ``reach`` are the :func:`_neighbor_lists` and :func:`_semidirected_reach` of
+    ``marks``.
 
     Grows a frontier of node pairs from ``x``, extending through definite colliders and adjacent
     triples, and collects every intermediate node reachable by a possible-parent path. The frontier
@@ -492,8 +496,6 @@ def _possible_dsep(marks: np.ndarray, x: int, y: int) -> list[int]:
     reasons for keeping it. A node's possible-parent check runs when the frontier reaches it, over
     the predecessors recorded so far, so the set depends on the order of the node indices.
     """
-    neighbors = _neighbor_lists(marks)
-    reach = _semidirected_reach(marks)
     dsep: set[int] = set()
     queue: deque[tuple[int, int]] = deque()
     visited: set[tuple[int, int]] = set()
@@ -565,10 +567,9 @@ def _outside(values: tuple[int, ...], adj_a: set[int], adj_b: set[int]) -> bool:
 
 def _try_remove_by_dsep(
     marks: np.ndarray,
-    a: int,
-    b: int,
     x: int,
     y: int,
+    dsep: list[int],
     adj_a: set[int],
     adj_b: set[int],
     test: CITest,
@@ -576,9 +577,8 @@ def _try_remove_by_dsep(
     sepsets: dict[tuple[int, int], tuple[int, ...]],
     max_depth: int | None = None,
 ) -> bool:
-    """Remove edge ``x-y`` if some possible-d-sep subset, of at most ``max_depth`` members when one
-    is given, makes ``x`` and ``y`` independent."""
-    dsep = _possible_dsep(marks, a, b)
+    """Remove edge ``x-y`` if some subset of ``dsep``, of at most ``max_depth`` members when one is
+    given, makes ``x`` and ``y`` independent."""
     for cond in _iter_dsep_choices(dsep, adj_a, adj_b, max_depth):
         if test(x, y, cond) > alpha:
             marks[x, y] = NULL
@@ -661,16 +661,19 @@ def _remove_in_node_order(
     """:func:`_remove_by_possible_dsep` in the order of the node indices."""
     n = marks.shape[0]
     edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
+    # The lists and the reach read the marks, which only a removal changes.
+    neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
     for na, nb in edges:
         if not _adjacent(marks, na, nb) or (keep is not None and keep[na, nb]):
             continue
-        adj_a = set(_adjacent_nodes(marks, na))
-        adj_b = set(_adjacent_nodes(marks, nb))
-        _try_remove_by_dsep(marks, na, nb, na, nb, adj_a, adj_b, test, alpha, sepsets, max_depth)
-        if _adjacent(marks, na, nb):
-            _try_remove_by_dsep(
-                marks, nb, na, na, nb, adj_a, adj_b, test, alpha, sepsets, max_depth
-            )
+        adj_a, adj_b = set(neighbors[na]), set(neighbors[nb])
+        for a, b in ((na, nb), (nb, na)):
+            dsep = _possible_dsep(marks, a, b, neighbors, reach)
+            if _try_remove_by_dsep(
+                marks, na, nb, dsep, adj_a, adj_b, test, alpha, sepsets, max_depth
+            ):
+                neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
+                break
 
 
 # ---- FCI orientation rules ----------------------------------------------------------------------
@@ -1256,13 +1259,12 @@ def _rule_r8(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | No
 
 
 def _pd_reaches_target(
-    marks: np.ndarray, target: int, a: int, neighbors: list[list[int]] | None = None
+    marks: np.ndarray, target: int, a: int, neighbors: list[list[int]]
 ) -> set[int]:
     """Nodes with a possibly-directed walk to ``target`` that avoids ``a``.
 
-    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``.
     """
-    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
     reachable = {target}
     queue = deque([target])
     while queue:
@@ -1284,8 +1286,8 @@ def _exists_uncovered_pd_path(
     a: int,
     first: int,
     target: int,
+    neighbors: list[list[int]],
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
-    neighbors: list[list[int]] | None = None,
 ) -> bool:
     """True when an uncovered possibly-directed simple path ``a, first, ..., target`` exists.
 
@@ -1293,11 +1295,10 @@ def _exists_uncovered_pd_path(
     to each path: reaching a node through one predecessor must not block a different route.
     Reverse reachability prunes branches with no p.d. walk to the target avoiding ``a``.
     Ambiguity checks cover interior triples of the open path, with no wraparound at its target.
-    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``.
     """
     if marks[a, first] not in (TAIL, CIRCLE) or marks[first, a] == TAIL:
         return False
-    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
     reachable = _pd_reaches_target(marks, target, a, neighbors)
     if first not in reachable:
         return False
@@ -1345,7 +1346,7 @@ def _rule_r9(
             for b in candidates:
                 if _adjacent(marks, b, c):
                     continue
-                if _exists_uncovered_pd_path(marks, a, b, c, ambiguous, neighbors):
+                if _exists_uncovered_pd_path(marks, a, b, c, neighbors, ambiguous):
                     out[a, c] = TAIL
                     out[c, a] = ARROW
                     change = True
@@ -1390,7 +1391,7 @@ def _rule_r10(
                     b, d = into_arrows[i], into_arrows[k]
                     if marks[b, c] != TAIL or marks[d, c] != TAIL:  # need b -> c <- d
                         continue
-                    if _r10_connects(marks, children, b, d, a, ambiguous, neighbors):
+                    if _r10_connects(marks, children, b, d, a, neighbors, ambiguous):
                         out[a, c] = TAIL
                         out[c, a] = ARROW
                         change = True
@@ -1403,21 +1404,20 @@ def _r10_connects(
     b: int,
     d: int,
     a: int,
+    neighbors: list[list[int]],
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
-    neighbors: list[list[int]] | None = None,
 ) -> bool:
     """True when uncovered p.d. paths from ``a`` reach ``b``/``d`` via non-adjacent children.
 
     Either child of a pair may lead to either tail. Each child is searched at most once per tail.
-    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``, read from them when not given.
+    ``neighbors`` holds the :func:`_neighbor_lists` of ``marks``.
     """
-    neighbors = _neighbor_lists(marks) if neighbors is None else neighbors
     reaches: dict[tuple[int, int], bool] = {}
 
     def reach(child: int, target: int) -> bool:
         if (child, target) not in reaches:
             reaches[child, target] = _exists_uncovered_pd_path(
-                marks, a, child, target, ambiguous, neighbors
+                marks, a, child, target, neighbors, ambiguous
             )
         return reaches[child, target]
 

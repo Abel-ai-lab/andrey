@@ -15,7 +15,7 @@ change names its pull request.
   ICA-LiNGAM, ANM, and PNL return the same output as 0.8.0, bit for bit, on every dataset of the
   identity check, with one and four workers and in five column orders. DirectLiNGAM's internal
   scores change in their last bits, with the same output on those datasets. ([#251], [#265],
-  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328])
+  [#267], [#273], [#275], [#280], [#288], [#292], [#294], [#311], [#312], [#328], [#353])
 - Worker processes for the constraint searches: with more than one worker, `pc`, `fci`, `gfci`, and
   `cdnod` run the larger passes of their skeleton search in worker processes and return the same
   graphs as with one, and `andrey calibrate` measures when a pass is large enough on your machine.
@@ -46,8 +46,9 @@ change names its pull request.
   conditioners first, which took about 4 GB of list pointers on a complete graph of 1,000
   variables. ([#346])
 - `fci` and `gfci` return the same PAGs in less time: the possible-d-separation step computes one
-  reach set per variable, and GFCI reads each node's neighbors from lists built once and tests its
-  separating sets in stacks. ([#265], [#312])
+  reach set per variable and builds its neighbor lists and reach sets once for each version of the
+  graph, and GFCI reads each node's neighbors from lists built once and tests its separating sets
+  in stacks, those of size 0 for every pair in one. ([#265], [#312], [#353])
 - `ges` and `gfci` return the same graphs in less time, because GES keeps each reach set while a
   move cannot change it and rebuilds the CPDAG after each move faster. ([#328])
 - `xges` returns the same graphs in less time, because each branch of its extended search copies
@@ -611,3 +612,4 @@ First alpha release.
 [#312]: https://github.com/Abel-ai-lab/andrey/pull/312
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
 [#346]: https://github.com/Abel-ai-lab/andrey/pull/346
+[#353]: https://github.com/Abel-ai-lab/andrey/pull/353
