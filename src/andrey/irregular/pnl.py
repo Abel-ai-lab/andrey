@@ -34,6 +34,7 @@ from scipy.stats import norm, rankdata
 
 from andrey.core import backend, env
 from andrey.core.independence import _empirical_bandwidth, _standardize
+from andrey.core.warning_policy import PerformanceWarning, warn_once
 
 _N_FEATURES = 10
 _RIDGE = 1e-8
@@ -54,6 +55,11 @@ _PNL_GPU_THRESHOLDS: dict[str, int | None] = {"cuda": 26_278, "mps": None}
 
 # Device memory one batch of disturbance kernels uses.
 _DEVICE_BATCH_BYTES = 2**30
+
+# Host memory the worker threads' kernel buffers may hold together (three n x n float64 matrices
+# each); the CPU path runs fewer threads than asked for when they would hold more. It allows seven
+# threads at 5,000 rows.
+_THREAD_BYTES = 4 * 2**30
 
 
 def _gaussianize(values: np.ndarray) -> np.ndarray:
@@ -353,22 +359,43 @@ def _device_tests(
     return [_gamma_test(st, tx, sx, ty, sy, n) for st, tx, sx, ty, sy in values]
 
 
+def _thread_count(n: int, requested: int) -> int:
+    """Return ``requested`` worker threads, fewer when their buffers would pass ``_THREAD_BYTES``.
+
+    Each thread holds the three ``n x n`` float64 matrices of :class:`_Buffers`; at least one runs.
+    A lowered count warns.
+    """
+    per_thread = 3 * 8 * max(n, 1) ** 2
+    threads = max(1, min(requested, _THREAD_BYTES // per_thread))
+    if threads < requested:
+        warn_once(
+            f"PNL on {n} rows holds {per_thread / 2**20:,.0f} MiB per worker thread, so it runs "
+            f"{threads} of the {requested} worker threads asked for to stay within "
+            f"{_THREAD_BYTES / 2**30:g} GiB.",
+            PerformanceWarning,
+        )
+    return threads
+
+
 def _ordered_tests(
     columns: dict[int, _Column], tasks: list[tuple[int, int]], workers: int, dev: str = "numpy"
 ) -> dict[tuple[int, int], tuple[float, float]]:
     """Return ``{(cause, effect): (statistic, p_value)}`` for the distinct ``tasks``.
 
     On ``numpy`` the tasks, sorted by cause, are cut into ``workers`` contiguous runs, one per
-    worker thread, each on one BLAS thread. A task's result does not depend on the number of
-    workers, except that the fits' last digits can: a lone worker's fits run on every BLAS thread.
-    On a torch device, :func:`_device_tests` runs them.
+    worker thread (:func:`_thread_count` lowers the number of threads to fit a memory budget), each
+    on one BLAS thread. A task's result does not depend on the number of workers, except that the
+    fits' last digits can: a lone worker's fits run on every BLAS thread. On a torch device,
+    :func:`_device_tests` runs them.
     """
     ordered = sorted(dict.fromkeys(tasks))
     if dev != "numpy":
         return dict(zip(ordered, _device_tests(columns, ordered, workers, dev), strict=True))
+    n = next(iter(columns.values())).standardized.shape[0]
+    threads = _thread_count(n, min(workers, len(ordered)))
     runs = [
         [ordered[k] for k in part]
-        for part in np.array_split(np.arange(len(ordered)), max(1, workers))
+        for part in np.array_split(np.arange(len(ordered)), max(1, threads))
         if part.size
     ]
     if len(runs) <= 1:
@@ -427,7 +454,9 @@ def pnl_pairs(
     a device sums a batch of a cause's pairs in another order than a single pair. ``pairs``
     defaults to every ``i < j`` in lexicographic order. ``num_workers`` worker threads share the
     ordered pairs (``None`` reads ``andrey.config`` and ``ANDREY_NUM_WORKERS``, ``-1`` uses every
-    usable core); each holds three ``n x n`` float64 matrices.
+    usable core); each holds three ``n x n`` float64 matrices, so a count whose matrices would
+    pass 4 GiB is lowered, with a warning. With one worker the BLAS threads are not limited, so
+    its last digits can differ from the several-worker rows'.
     """
     arr = np.asarray(data, dtype=np.float64)
     if arr.ndim != 2:

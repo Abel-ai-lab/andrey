@@ -74,6 +74,11 @@ change names its pull request.
 - `pnl` returns the same p-values and statistics in less time, because each variable's kernel is
   built once and in blocks, and its HSIC tests run on a CUDA GPU, in float64, from the cutoff
   `ANDREY_PNL_GPU_THRESHOLD`. ([#251])
+- `pnl` runs fewer worker threads than asked for when their kernel matrices (three n x n float64
+  matrices per thread) would hold more than 4 GiB, with a `PerformanceWarning`; `num_workers=-1`
+  at 5,000 rows on 64 cores had asked for about 38 GB. With one worker the BLAS threads stay
+  unlimited, so on a machine with several cores its p-values and statistics can differ in the last
+  digits from those of several workers. ([#359])
 - `anm` returns the same results with less memory, because it builds its kernel's distance matrix
   directly. ([#294])
 - `ica_lingam` returns the same results in less time, because its causal-order search drops each
@@ -634,4 +639,5 @@ First alpha release.
 [#351]: https://github.com/Abel-ai-lab/andrey/pull/351
 [#353]: https://github.com/Abel-ai-lab/andrey/pull/353
 [#365]: https://github.com/Abel-ai-lab/andrey/pull/365
+[#359]: https://github.com/Abel-ai-lab/andrey/pull/359
 [#361]: https://github.com/Abel-ai-lab/andrey/pull/361

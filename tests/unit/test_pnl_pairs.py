@@ -6,13 +6,14 @@ from __future__ import annotations
 import functools
 import importlib
 import math
+import warnings
 from unittest import mock
 
 import numpy as np
 import pytest
 
 import andrey
-from andrey.core import backend
+from andrey.core import backend, warning_policy
 from andrey.core.independence import hsic_statistic_test
 
 _pnl = importlib.import_module("andrey.irregular.pnl")
@@ -45,6 +46,39 @@ def test_pair_rows_equal_single_calls():
         rows = _pnl.pnl_pairs(X, pairs)
         assert [tuple(row) for row in rows] == [_pnl.pnl(X[:, i], X[:, j]) for i, j in pairs]
         assert np.array_equal(_pnl.pnl_pairs(X, pairs, num_workers=3), rows)
+
+
+def test_worker_threads_are_capped_by_a_byte_budget(monkeypatch):
+    """Each thread holds three n x n matrices: a budget below the asked-for threads lowers them."""
+    n = 120
+    X = _table(n)
+    per_thread = 3 * 8 * n * n
+    runs = []
+    run_tasks = _pnl._run_tasks
+    monkeypatch.setattr(
+        _pnl,
+        "_run_tasks",
+        lambda columns, tasks: runs.append(len(tasks)) or run_tasks(columns, tasks),
+    )
+    with andrey.config(backend="numpy"), warnings.catch_warnings():
+        warnings.simplefilter("error")  # the default budget holds four threads at 120 rows
+        full = _pnl.pnl_pairs(X, num_workers=4)
+        assert len(runs) == 4
+        for budget, threads in ((2 * per_thread, 2), (per_thread // 2, 1)):
+            runs.clear()
+            warning_policy.reset()
+            monkeypatch.setattr(_pnl, "_THREAD_BYTES", budget)
+            with pytest.warns(andrey.PerformanceWarning, match=f"runs {threads} of the 4 worker"):
+                capped = _pnl.pnl_pairs(X, num_workers=4)
+            assert len(runs) == threads
+            if threads > 1:  # every task's result is the same on any number of limited threads
+                assert np.array_equal(capped, full)
+        # `pnl` fits two directions, so 64 workers ask for two threads, which this budget holds.
+        monkeypatch.setattr(_pnl, "_THREAD_BYTES", 2 * per_thread)
+        runs.clear()
+        with andrey.config(num_workers=64):
+            _pnl.pnl(X[:, 0], X[:, 1])
+        assert len(runs) == 2
 
 
 def test_pairs_default_to_every_column_pair_and_are_checked():
