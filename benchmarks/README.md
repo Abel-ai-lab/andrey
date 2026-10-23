@@ -582,6 +582,20 @@ $ANDREY_BENCH_PYTHON benchmarks/calm_cpu.py --out outputs/calm-andrey --ladder 1
     --solutions andrey.calm.torch-cpu,baseline.empty
 ```
 
+### GES parent limit
+
+`andrey.ges(max_parents=k)` caps the parents a node has in any DAG of the returned CPDAG's class.
+The limit of the reference packages is a gate: causal-learn's `maxP` stops a node that already
+holds more than `maxP` directed parents from gaining new ones, and one move can still leave a node
+above it. The Andrey GES adapter therefore reads `max_parents` through a private keyword of
+`andrey.search.ges.ges`, `_parent_rule`, whose `"gate"` applies the limit as that gate and whose
+default, `"cap"`, is the public behavior. A lane sets `parent_rule="gate"` on its Andrey arms only
+when it limits the reference's parents too, so both packages apply one rule: `ges_cpu.py`,
+`xges_ges.py`, `public_datasets.py`, and the BDeu pair of `discrete_cpu.py` run causal-learn with
+the same limit. A lane that limits only Andrey, such as the R lane (pcalg has no parent limit),
+keeps the cap, and an arm with `max_parents=None` has no limit under either rule. `params` records
+the rule next to the limit.
+
 ### XGES
 
 `xges_cpu.py` compares Andrey's `xges` with the xges package, each with and without the extended
@@ -987,7 +1001,9 @@ dataset is one series, stored with `d = N` and `n = T`.
 
 Each method runs on the simulation of its own paper, drawn by `andrey_bench/temporal_models.py`,
 which keeps the expected number of cross-links per variable fixed as N grows. Every variable
-depends on its own previous step, and a model whose process is not stationary is drawn again:
+depends on its own previous step, and a model whose process is not stationary is drawn again. If
+none of 1000 draws is stationary, as for PCMCI+ at N = 240 and seed 1, the first draw is kept and
+its lagged coefficients are scaled together until the spectral radius is 0.95:
 
 | regime | method | source | cross-links per variable | same-step share | lags |
 |---|---|---|---|---|---|

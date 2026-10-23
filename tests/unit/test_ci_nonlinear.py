@@ -698,7 +698,11 @@ def test_every_constraint_method_takes_the_nonlinear_tests(method, kind):
 
 
 def _blas_threads() -> int:
-    return max(info["num_threads"] for info in threadpool_info() if info["user_api"] == "blas")
+    """The most threads a BLAS library runs, as threadpoolctl reports; 0 where it lists none, as on
+    macOS, whose Accelerate library it does not control."""
+    return max(
+        (info["num_threads"] for info in threadpool_info() if info["user_api"] == "blas"), default=0
+    )
 
 
 @pytest.mark.parametrize("method", ["pc", "fci"])
@@ -722,7 +726,7 @@ def test_skeleton_pins_blas_as_the_test_sets(method, pin_blas, monkeypatch):
     monkeypatch.setitem(ci._CI_REGISTRY, "recording", Recording)
     with threadpool_limits(limits=2, user_api="blas"):
         if _blas_threads() < 2:
-            pytest.skip("the BLAS library runs one thread")
+            pytest.skip("threadpoolctl finds no BLAS library that runs more than one thread")
         getattr(andrey, method)(_common_cause(seed=0, n=60, n_cond=2), indep_test="recording")
     assert seen and set(seen) == {1 if pin_blas else 2}
 

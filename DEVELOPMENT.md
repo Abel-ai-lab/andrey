@@ -226,10 +226,12 @@ On each dataset the method passes when its median SHD is below the empty graph's
 tolerance of the recorded baseline in either direction. The gate runs once per release, on the
 release pull request into `main`, which `main` requires to pass; the publish reuses that run when
 the tagged commit has the same tree and runs the gate itself otherwise.
-[`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. The gate also fails
-any published benchmark row where Andrey makes more errors than the reference package (from
-0.8.0, when the paired bootstrap 95% interval of the difference over at least 10 datasets lies
-above 0), unless `benchmarks/published/parity-allowlist.json` cites the cause
+[`qa/README.md`](qa/README.md#quality-gate) lists the datasets and tolerances. Reference parity is a
+soft gate: the quality gate also flags any published benchmark row where Andrey makes more errors
+than the reference package (from 0.8.0, when the paired bootstrap 95% interval of the difference
+over at least 10 datasets lies above 0), unless `benchmarks/published/parity-allowlist.json` cites
+the cause, but does not fail on it. `uv run python -m qa.reference_parity` runs the same check
+offline and exits 1 on a flag; the release checklist reviews every flag
 ([reference parity](qa/README.md#reference-parity)).
 
 ### 5. Benchmark campaign

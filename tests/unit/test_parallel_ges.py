@@ -13,6 +13,7 @@ from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search import _parallel as par
 from andrey.search import _parallel_ges as pg
+from andrey.search import operators as ops
 from andrey.search.ges import ges
 from tests.unit.ges_chunks import backward_inprocess, forward_inprocess, ges_inprocess
 
@@ -183,10 +184,10 @@ def _force_pool():
             os.environ["ANDREY_GES_PARALLEL_MIN_WORK"] = prev
 
 
-def _parallel(x: np.ndarray, workers: int, maxP: float | None = None):
+def _parallel(x: np.ndarray, workers: int, max_parents: float | None = None):
     """Run ``ges`` on the pool-backed path (gate forced open) via the ``num_workers`` axis."""
     with _force_pool(), backend.config(num_workers=workers):
-        return ges(x, maxP=maxP)
+        return ges(x, max_parents=max_parents)
 
 
 # Exhaustive exactness across the sweep is the in-process tests' job (cheap); the pool tests only
@@ -201,6 +202,17 @@ def test_pool_parallel_bit_identical_to_serial(seed, workers):
     assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy()), (
         f"CPDAG differs at seed={seed}, workers={workers}"
     )
+    assert serial_score == par_score
+
+
+def test_pool_parallel_matches_serial_under_a_cap():
+    """Workers test the cap on their own candidates and return serial's CPDAG where it binds."""
+    x = _gaussian_sem(0, 400, 30, 0.2)
+    serial_struct, serial_score = ges(x, max_parents=2)
+    par_struct, par_score = _parallel(x, 4, 2)
+    assert ops.max_parents_in_class(ges(x)[0].to_numpy()).max() > 2, "the cap does not bind"
+    assert not ops.exceeds_parent_cap(par_struct.to_numpy(), 2)
+    assert np.array_equal(serial_struct.to_numpy(), par_struct.to_numpy())
     assert serial_score == par_score
 
 

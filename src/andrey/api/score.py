@@ -62,9 +62,10 @@ def ges(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC"``, the linear-Gaussian BIC, for continuous data.
-        ``"local_score_BDeu"`` is the BDeu score [3]_ and ``"local_score_BIC_categorical"`` the
-        multinomial BIC [7]_, for categorical data coded by whole numbers.
+        Local score objective: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the
+        linear-Gaussian BIC, for continuous data. ``"local_score_BDeu"`` is the BDeu score [3]_ and
+        ``"local_score_BIC_categorical"`` the multinomial BIC [7]_, for categorical data coded by
+        whole numbers.
         ``"local_score_degen_gauss"`` (degenerate Gaussian) [4]_ and ``"local_score_cond_gauss"``
         (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous and categorical
         columns. ``None`` reads the column types from ``categorical``, or infers them, and picks
@@ -77,19 +78,18 @@ def ges(
         be finite and non-negative. BDeu ignores it; for the multinomial BIC it weighs ``log(n)``
         per free parameter of a variable's conditional probability table.
     max_parents : int or None, default=None
-        A gate on the forward phase, at least ``0``: a node whose parent count already exceeds
-        ``max_parents`` gains no new parents in it. It does not cap the finished graph: one move
-        can give a node several parents at once, so a node can end with more than ``max_parents``.
-        ``None`` keeps the default gate of ``n_variables / 2``, and a larger integer lifts it. A
-        lower value makes the search faster on large graphs and can lower the errors, but it can
-        stop the search short of the lowest-scoring graph, which GES otherwise finds. The
-        backward phase has no gate.
+        A cap on every node's parents, at least ``0``: no DAG the returned CPDAG represents gives a
+        node more than ``max_parents`` parents, and some DAG reaches each node's count. A move whose
+        CPDAG would break the cap, in either phase, is skipped for the next best move. A cap can
+        stop the search short of the lowest-scoring graph, which GES otherwise finds. ``None`` sets
+        no cap; the forward phase then keeps its gate of ``n_variables / 2``. See Notes.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
@@ -123,7 +123,8 @@ def ges(
         an int. Also if ``knowledge`` is neither ``None`` nor a :class:`~andrey.Knowledge`, or a
         given ``max_parents`` is not an int.
     ValueError
-        If ``lambda_value`` is negative or non-finite, if a given ``max_parents`` is negative, if
+        If ``lambda_value`` is negative or non-finite, if a given ``max_parents`` is negative or
+        below the parents some graph of the required edges of ``knowledge`` gives a node, if
         ``max_categories`` is less than ``2``, with a categorical score, if ``data`` holds a number
         that is not whole, or, with a mixed-data score, if ``categorical`` names a column ``data``
         lacks, or if a categorical column holds a number that is not whole or a missing value. Also
@@ -164,9 +165,16 @@ def ges(
     on the published benchmarks. FGES, a fast GES, multiplied the BIC penalty by 4 when searching
     continuous data on graphs of up to a million variables [2]_.
 
-    **How it works.** In the forward phase, a variable whose parent count already exceeds
-    ``max_parents`` (``n_variables / 2`` for ``None``) gains no new parents. The backward phase has
-    no such gate. Moves whose score changes are equal after rounding are chosen by each column's
+    **How it works.** Without ``max_parents``, a variable that already has more than
+    ``n_variables / 2`` parents gains no new parents in the forward phase; the backward phase has
+    no such gate. With ``max_parents``, that gate gives way to the cap. One move can add several
+    parents to a variable at once, and rebuilding the CPDAG after a move can direct or undirect
+    other edges, so the search tests the CPDAG after each move and takes the best move whose CPDAG
+    keeps every variable within the cap. A variable's count is its directed parents plus the
+    largest set of its undirected neighbors that are adjacent to one another: a graph of the class
+    directs such a set into it and no larger one, since two neighbors that are not adjacent would
+    add a collider. A cap of ``1`` therefore allows a chain or a tree of undirected edges but not
+    a collider. Moves whose score changes are equal after rounding are chosen by each column's
     rank, as in :func:`~andrey.hc`; the :doc:`column-order guide </docs/guides/column-order>` says
     what the rank keeps under a new column order and on another machine.
 
@@ -200,15 +208,16 @@ def ges(
     constant per variable, so it finds the same graph. Moves are scored in this process.
 
     **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 200 variables with ten rows per variable and ``max_parents=4`` rather
-    than ``n_variables / 2``. At ``lambda_value=1.0`` its median errors (SHD) stayed
-    below the empty graph's up to 150 variables (141 against 150) and passed it at 200 (206 against
-    200), where ``lambda_value=2.0`` brought them to 43. The median fit took 0.15 s at 20 variables
-    and 40 s at 150, on 128 cores. On the 223-variable ANDES network with 1,000 simulated rows and
-    the default limit, its median errors passed the empty graph's (612 against 338). With
-    fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or more
-    variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. On simulated
+    degree 2), from 20 to 200 variables with ten rows per variable and a forward-phase gate of 4
+    parents rather than ``n_variables / 2``; the cap ``max_parents`` sets is not benchmarked yet.
+    At ``lambda_value=1.0`` its median errors (SHD) stayed below the empty graph's up to 150
+    variables (141 against 150) and passed it at 200 (206 against 200), where ``lambda_value=2.0``
+    brought them to 43. The median fit took 0.15 s at 20 variables and 40 s at 150, on 128 cores.
+    On the 223-variable ANDES network with 1,000 simulated rows and the default limit, its median
+    errors passed the empty graph's (612 against 338). With fewer rows than columns the BIC score
+    is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child exactly, so
+    the search never selects one, nor any parent set that leaves its child a residual variance of
+    at most ``1e-12`` times its variance. On simulated
     mixed data (conditional linear Gaussian networks on sparse random graphs, the first half of the
     variables categorical with 2 to 5 categories), from 10 to 40 variables with 2,000 rows, its
     median errors at 40 variables were 8 with ``"local_score_degen_gauss"`` and 6.5 with
@@ -284,7 +293,7 @@ def ges(
             X,
             score_func=score_func,
             lambda_value=lambda_value,
-            maxP=max_parents,
+            max_parents=max_parents,
             categorical=mask,
             constraints=constraints,
         )
@@ -442,8 +451,8 @@ def xges(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    score_func : {"local_score_BIC"}, default="local_score_BIC"
-        Only the Gaussian BIC score is supported.
+    score_func : {"local_score_BIC", "local_score_BIC_from_cov"}, default="local_score_BIC"
+        Two names of the Gaussian BIC, the only score XGES supports.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parent. Larger values give
         sparser graphs; ``1.0`` is the standard BIC. Must be finite and non-negative.
@@ -576,14 +585,15 @@ def hc(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
-        continuous data; ``"local_score_BDeu"``, the BDeu score, or
-        ``"local_score_BIC_categorical"``, the multinomial BIC, for categorical data coded by whole
-        numbers; or ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"``, the degenerate
-        and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
-        column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
-        every column is categorical or ``"local_score_cond_gauss"`` when some are, each with a
-        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC_from_cov"``. Pass
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, a
+        covariance-based Gaussian BIC for continuous data; ``"local_score_BDeu"``, the BDeu score,
+        or ``"local_score_BIC_categorical"``, the multinomial BIC, for categorical data coded by
+        whole numbers; or ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"``, the
+        degenerate and conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`.
+        ``None`` reads the column types from ``categorical``, or infers them, and picks
+        ``"local_score_BDeu"`` when every column is categorical or ``"local_score_cond_gauss"``
+        when some are, each with a ``DataTypeWarning``; otherwise it picks
+        ``"local_score_BIC_from_cov"``. Pass
         ``"local_score_BIC_from_cov"`` to read whole numbers, such as counts, as numbers.
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
@@ -597,8 +607,9 @@ def hc(
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that
@@ -748,8 +759,9 @@ def tabu(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, a covariance-based Gaussian BIC for
-        continuous data, or ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, the BDeu
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, a
+        covariance-based Gaussian BIC for continuous data, or ``"local_score_BDeu"`` or
+        ``"local_score_BIC_categorical"``, the BDeu
         score or the multinomial BIC for categorical data coded by whole numbers, as for
         :func:`~andrey.ges`. ``None`` picks ``"local_score_BDeu"`` when every column is categorical
         (a DataFrame's ``category``, ``bool``, or text column, or a column of at most 10 distinct
@@ -911,21 +923,23 @@ def exact_search(
     search_method : {"astar", "dp"}, default="astar"
         Exact search strategy: A* search or dynamic programming.
     score_func : str or None, default=None
-        Local score: ``"local_score_BIC"``, the linear-Gaussian BIC; ``"local_score_BDeu"`` or
-        ``"local_score_BIC_categorical"``, the BDeu score or the multinomial BIC for categorical
-        data coded by whole numbers; or ``"local_score_degen_gauss"`` or
-        ``"local_score_cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed data, as
-        for :func:`~andrey.ges`. Each BIC uses the standard penalty, ``lambda_value=1``. ``None``
-        reads the column types from ``categorical``, or infers them, and picks
-        ``"local_score_BDeu"`` when every column is categorical or ``"local_score_cond_gauss"`` when
-        some are, each with a ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
+        Local score: ``"local_score_BIC"`` or ``"local_score_BIC_from_cov"``, the linear-Gaussian
+        BIC; ``"local_score_BDeu"`` or ``"local_score_BIC_categorical"``, the BDeu score or the
+        multinomial BIC for categorical data coded by whole numbers; or
+        ``"local_score_degen_gauss"`` or ``"local_score_cond_gauss"``, the degenerate or
+        conditional Gaussian BIC for mixed data, as for :func:`~andrey.ges`. Each BIC uses the
+        standard penalty, ``lambda_value=1``. ``None`` reads the column types from
+        ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when every column is
+        categorical or ``"local_score_cond_gauss"`` when some are, each with a
+        ``DataTypeWarning``; otherwise it picks ``"local_score_BIC"``. Pass
         ``"local_score_BIC"`` to read whole numbers, such as counts, as numbers.
     categorical : sequence of str or int, optional
         The categorical columns of ``data``, for a mixed-data score: column labels (strings) or
         0-based positions. ``None`` infers them: a DataFrame's ``category``, ``bool``, and text
         columns, and every column of at most ``max_categories`` distinct whole numbers, named in a
-        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and reject it.
-        See *Data types* in the :doc:`getting-started guide </docs/guides/getting-started>`.
+        ``DataTypeWarning``. ``[]`` marks none. The other scores take no column types and accept
+        only ``None`` or ``[]``. See *Data types* in the
+        :doc:`getting-started guide </docs/guides/getting-started>`.
     max_categories : int, default=10
         The most distinct whole numbers a column may hold to be inferred as categorical, at least
         ``2``. With a continuous score, columns within it get a one-time ``DataTypeWarning`` that

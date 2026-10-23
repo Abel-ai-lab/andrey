@@ -36,10 +36,11 @@ change names its pull request.
 - For contributors, `qa/identity.py` hashes every supported method's full output, so a speed change
   can show that it returns the same bits at any worker count and column order, and
   `qa/profiler.py` shows where a fit spends its time. ([#262], [#269], [#277], [#284], [#286])
-- `ges` takes `max_parents`, a gate on its forward phase: a node whose parent count already
-  exceeds it gains no new parents. `None`, the default, keeps the gate of `n_variables / 2` and
-  every result. A lower value makes GES faster on large graphs and can lower its errors, but it
-  can stop short of the lowest-scoring graph. ([#350])
+- `ges` takes `max_parents`, a cap on a node's parents: no graph the returned CPDAG represents
+  gives a node more than that many parents, and some graph reaches each node's count. A move that
+  would break the cap, in either phase, is skipped for the next best move, and
+  a cap can stop GES short of the lowest-scoring graph. `None`, the default, sets no cap and keeps
+  the forward gate of `n_variables / 2` and every result. ([#350], [#380])
 - `GraphStructure.to_pcalg()` and `GraphStructure.from_pcalg(amat, kind)` convert to and from the
   adjacency matrix of R's pcalg, `amat.pag` for a PAG and `amat.cpdag` for a CPDAG or DAG, so
   exchanging a graph with R needs no transpose or code swap of your own. ([#351])
@@ -129,6 +130,20 @@ change names its pull request.
   of `hsic_test` and `hsic_statistic_test`, which no caller passed. ([#371])
 - `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
   installed safetensors for them. Nothing in Andrey called them. ([#375])
+
+### Fixed
+
+- `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
+  `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
+  test or score; an empty list now reads as `None` there. ([#395])
+- Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
+  `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
+  `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
+  not change. ([#394])
+- For contributors, the benchmark harness's PCMCI, PCMCI+, and LPCMCI generators no longer fail at
+  large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
+  first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
+  unstable draw. Every draw that was stationary is unchanged. ([#393])
 
 ## [0.8.0] - 2026-10-23
 
@@ -687,4 +702,8 @@ First alpha release.
 [#369]: https://github.com/Abel-ai-lab/andrey/pull/369
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
+[#380]: https://github.com/Abel-ai-lab/andrey/pull/380
 [#391]: https://github.com/Abel-ai-lab/andrey/pull/391
+[#393]: https://github.com/Abel-ai-lab/andrey/pull/393
+[#394]: https://github.com/Abel-ai-lab/andrey/pull/394
+[#395]: https://github.com/Abel-ai-lab/andrey/pull/395

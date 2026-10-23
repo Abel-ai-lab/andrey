@@ -15,6 +15,12 @@ The forward phase keeps each target's Insert candidates between passes and enume
 only for the targets a move touches (:class:`_ForwardScan`); it selects the move a full scan of
 every target selects.
 
+A parent cap (``cap``) holds on the CPDAG after every move of either phase: no DAG of its class
+gives a node more than ``cap`` parents (:func:`~andrey.search.operators.max_parents_in_class`). A
+scan never selects a move whose rebuilt CPDAG breaks it (:func:`_breaks_cap`), so the move it
+returns is the best of those that keep it; an Insert whose scored family alone exceeds it is left
+out before scoring (:func:`_over_cap`).
+
 ``ges()`` uses :func:`run_ges`; ``workers=1`` scans all targets in-process. The objective is
 recomputed from the final CPDAG by :func:`andrey.search.ges._recompute_objective`.
 """
@@ -23,7 +29,7 @@ from __future__ import annotations
 
 import heapq
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Protocol
 
 import numpy as np
@@ -123,6 +129,30 @@ def _rows(mask: np.ndarray) -> list[np.ndarray]:
     return np.split(cols, np.searchsorted(rows, np.arange(1, mask.shape[0])))
 
 
+def _over_cap(cap: float | None, parents: int) -> bool:
+    """Whether ``parents`` parents exceed ``cap``; never when ``cap`` is ``None``.
+
+    An Insert scored off ``base`` gives its target a DAG of the new class in which the target's
+    parents are ``base`` and the source, so the class's most parents for the target is at least
+    ``len(base) + 1``. An Insert whose ``len(base) + 1`` exceeds the cap is never allowed, whatever
+    the rebuild does.
+    """
+    return cap is not None and parents > cap
+
+
+def _breaks_cap(
+    adj: np.ndarray, rebuilt: Callable[..., np.ndarray], move: tuple, cap: float | None
+):
+    """Whether some DAG of the class of the CPDAG after ``rebuilt(adj.copy(), *move)`` gives a node
+    more than ``cap`` parents.
+
+    ``rebuilt`` is :func:`~andrey.search.operators.insert_cpdag` or ``delete_cpdag``, ``move`` its
+    ``(x, y, subset)``. The rebuild can direct or undirect edges far from the move, so the CPDAG
+    after it is the one checked.
+    """
+    return cap is not None and ops.exceeds_parent_cap(rebuilt(adj.copy(), *move), cap)
+
+
 def backward_chunk_best(
     targets: Sequence[int],
     adj: np.ndarray,
@@ -133,6 +163,7 @@ def backward_chunk_best(
     kept: dict[tuple[int, tuple[int, ...], int], float] | None = None,
     constraints: Constraints | None = None,
     excluded: Excluded = None,
+    cap: float | None = None,
 ) -> BackwardResult:
     """The best-improving Delete whose target is in ``targets``, by :func:`move_key`.
 
@@ -144,7 +175,8 @@ def backward_chunk_best(
 
     With ``constraints``, a required pair is never deleted, and ``H`` holds no ``h`` whose
     orientation ``y -> h`` or ``x -> h`` is forbidden: such an ``h`` stays in the residual, which
-    must still be a clique. A move in ``excluded`` is never selected.
+    must still be a clique. A move in ``excluded`` is never selected, nor, under ``cap``, one whose
+    CPDAG breaks it (:func:`_breaks_cap`).
     """
     adj_sets, par_of, nbr = state
     best: BackwardResult = None
@@ -180,6 +212,8 @@ def backward_chunk_best(
                     key = move_key(delta, n, x, y, H, ranks)
                     if best_key is None or key < best_key:
                         if excluded and key[1:] in excluded:
+                            continue
+                        if _breaks_cap(adj, ops.delete_cpdag, (x, y, H), cap):
                             continue
                         best_key = key
                         best = (key, x, y, H)
@@ -270,7 +304,9 @@ class _ForwardScan:
 
     :meth:`best` returns the best-improving Insert into the targets on the graph, by
     :func:`move_key`; a move in ``excluded`` is never selected. With ``forbidden`` (``[i, j]``: no
-    edge ``i -> j``), neither a source nor a member of ``T`` is forbidden into the target.
+    edge ``i -> j``), neither a source nor a member of ``T`` is forbidden into the target. Under
+    ``cap``, an Insert whose family exceeds it is left out before scoring and one whose CPDAG breaks
+    it is never selected.
     """
 
     def __init__(
@@ -281,11 +317,13 @@ class _ForwardScan:
         max_parents: float | None,
         ranks: Sequence[int],
         forbidden: np.ndarray | None = None,
+        cap: float | None = None,
     ) -> None:
         self.targets = list(targets)
         self.delta_engine = delta_engine
         self.n = n
         self.max_parents = max_parents
+        self.cap = cap
         self.ranks = ranks
         self.everyone = (1 << n) - 1
         self.forbidden = forbidden
@@ -328,6 +366,8 @@ class _ForwardScan:
             if best is None or key < best[0]:
                 if excluded and key[1:] in excluded:
                     continue
+                if _breaks_cap(adj, ops.insert_cpdag, (x, y, T), self.cap):
+                    continue
                 best = (key, x, y, T)
                 # A delta that can still win rounds to this key or below, so it lies within half a
                 # quantization step of it; the limit allows two steps as slack against rounding.
@@ -368,6 +408,8 @@ class _ForwardScan:
         parents = np.flatnonzero(adj[y] == ops.ARROW).tolist()
         if self.max_parents is not None and len(parents) > self.max_parents:
             return  # y already carries the maximum admissible parent count.
+        if _over_cap(self.cap, len(parents) + 1):
+            return  # every family of y holds its parents and one source more.
         pa_set = set(parents)
         nbrs = lines[y]
         nonadjacent = self.everyone & ~adjacent[y] & ~(1 << y)
@@ -386,8 +428,12 @@ class _ForwardScan:
         members: dict[tuple[int, ...], tuple[list[tuple[int, int, tuple[int, ...]]], int]] = {}
         for na_mask, (xs, xs_mask) in by_na.items():
             na = _bitset.nodes(na_mask)
+            if _over_cap(self.cap, len(pa_set.union(na)) + 1):
+                continue  # every base of these sources holds the parents and NA.
             for t_index, T in ops.clique_extensions(adj, na, _bitset.nodes(free & ~na_mask)):
                 base = tuple(sorted(pa_set.union(na, T)))
+                if _over_cap(self.cap, len(base) + 1):
+                    continue
                 cands, mask = members.get(base, ([], 0))
                 cands.extend((x, t_index, T) for x in xs)
                 members[base] = (cands, mask | xs_mask)
@@ -502,6 +548,7 @@ def _forward_task(
     run_token: object,
     constraints: Constraints | None = None,
     excluded: Excluded = None,
+    cap: float | None = None,
 ) -> ForwardResult:
     """Worker side of one forward chunk: refresh the kept candidates, scan, return the best."""
     global _WORKER_SCAN
@@ -512,7 +559,7 @@ def _forward_task(
     if _WORKER_SCAN is None or _WORKER_SCAN.targets != list(targets):
         forbidden = None if constraints is None else constraints.forbidden
         _WORKER_SCAN = _ForwardScan(
-            targets, _WORKER_DELTA, n, max_parents, _WORKER_RANKS, forbidden
+            targets, _WORKER_DELTA, n, max_parents, _WORKER_RANKS, forbidden, cap
         )
     return _WORKER_SCAN.best(adj, excluded)
 
@@ -523,6 +570,7 @@ def _backward_task(
     run_token: object,
     constraints: Constraints | None = None,
     excluded: Excluded = None,
+    cap: float | None = None,
 ) -> BackwardResult:
     """Worker side of one backward chunk."""
     global _WORKER_SCAN
@@ -541,6 +589,7 @@ def _backward_task(
         _WORKER_RANKS,
         constraints=constraints,
         excluded=excluded,
+        cap=cap,
     )
 
 
@@ -574,7 +623,9 @@ def _min_work() -> int:
     return par.min_work(env.GES_PARALLEL_MIN_WORK, _DEFAULT_MIN_WORK)
 
 
-def forward_work_per_target(n: int, state: NeighborState, max_parents: float | None) -> list[int]:
+def forward_work_per_target(
+    n: int, state: NeighborState, max_parents: float | None, cap: float | None = None
+) -> list[int]:
     """Estimated candidate evaluations for each forward target ``y`` (0 for a parent-capped target).
 
     ``n_nonadj(y) * 2^min(deg(y), CAP)``: ``n_nonadj(y)`` non-adjacent sources enumerate at most
@@ -585,7 +636,9 @@ def forward_work_per_target(n: int, state: NeighborState, max_parents: float | N
     work = []
     for y in range(n):
         n_nonadj = n - 1 - len(adj_sets[y])
-        capped = max_parents is not None and len(par_of[y]) > max_parents
+        capped = (max_parents is not None and len(par_of[y]) > max_parents) or _over_cap(
+            cap, len(par_of[y]) + 1
+        )
         if n_nonadj <= 0 or capped:
             work.append(0)
         else:
@@ -684,6 +737,7 @@ def run_ges(
     workers: int,
     ranks: list[int],
     constraints: Constraints | None = None,
+    cap: float | None = None,
 ) -> np.ndarray:
     """Both GES phases with per-pass parallelism: a pass fans out only above the fixed work gate.
 
@@ -700,6 +754,10 @@ def run_ges(
     ``constraints`` filters the candidates (:class:`_ForwardScan`, :func:`backward_chunk_best`) and
     rejects a selected move whose class holds no DAG that satisfies them; the pass then runs
     again on the same graph without that move. Serial and pooled passes see the same rejections.
+
+    ``max_parents`` is the forward phase's gate on a node's directed parents and ``cap`` the cap on
+    the most parents any DAG of the class gives a node, which ``adj`` must already satisfy: no pass
+    selects a move whose CPDAG breaks it, so each applied move keeps it.
     """
     global largest_pass_work
     workers = max(1, min(workers, n))
@@ -716,7 +774,7 @@ def run_ges(
     # Warn once a pass comes near the default cutoff (only a pass that can fan out).
     warn = workers > 1 and lazy is not None and calibrate.cutoff_is_default("ges")
     forbidden = None if constraints is None else constraints.forbidden
-    scan = _ForwardScan(range(n), engine, n, max_parents, ranks, forbidden)
+    scan = _ForwardScan(range(n), engine, n, max_parents, ranks, forbidden, cap)
     kept: dict[tuple[int, tuple[int, ...], int], float] = {}  # the in-process backward deltas
     excluded: set[tuple[int, int, tuple[int, ...]]] = (
         set()
@@ -728,7 +786,7 @@ def run_ges(
                 # The in-process scan enumerates again every target touched since the graph it
                 # kept, which after pooled passes is an older one (none before its first pass).
                 touched = _touched(scan.adj, adj)
-                per_target = forward_work_per_target(n, neighborhood_state(adj), max_parents)
+                per_target = forward_work_per_target(n, neighborhood_state(adj), max_parents, cap)
                 work = [w for w, redo in zip(per_target, touched, strict=True) if redo]
             largest = max(largest, sum(work))
             if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
@@ -741,7 +799,7 @@ def run_ges(
                 wset = lazy.get()
                 best = reduce_best(
                     wset.dispatch(
-                        _forward_task, adj, max_parents, lazy.token, constraints, excluded
+                        _forward_task, adj, max_parents, lazy.token, constraints, excluded, cap
                     )
                 )
             else:
@@ -765,11 +823,11 @@ def run_ges(
             if lazy is not None and workers > 1 and sum(work) > w_min:  # full scores stay serial
                 wset = lazy.get()
                 best = reduce_best(
-                    wset.dispatch(_backward_task, adj, lazy.token, constraints, excluded)
+                    wset.dispatch(_backward_task, adj, lazy.token, constraints, excluded, cap)
                 )
             else:
                 best = backward_chunk_best(
-                    range(n), adj, engine, n, state, ranks, kept, constraints, excluded
+                    range(n), adj, engine, n, state, ranks, kept, constraints, excluded, cap
                 )
             if best is None:
                 break

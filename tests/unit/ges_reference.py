@@ -60,6 +60,7 @@ def forward_chunk_best(
     ranks: Sequence[int],
     forbidden: np.ndarray | None = None,
     excluded: pg.Excluded = None,
+    cap: float | None = None,
 ) -> pg.ForwardResult:
     """The best-improving Insert whose target is in ``targets``, by ``move_key``.
 
@@ -71,7 +72,8 @@ def forward_chunk_best(
     cannot change the result. Grouping is per target, and a target lives wholly in one
     chunk, so the batch shape (hence each delta) is identical however the targets are partitioned.
     ``forbidden`` filters the candidates as in :func:`insert_candidates`; a move in ``excluded``
-    is never selected.
+    is never selected. Under ``cap``, an Insert whose family exceeds it is left out before scoring
+    and one whose CPDAG breaks it is never selected.
     """
     par_of = state[1]
     best: pg.ForwardResult = None
@@ -80,6 +82,8 @@ def forward_chunk_best(
         paj = par_of[y]
         if max_parents is not None and len(paj) > max_parents:
             continue  # y already carries the maximum admissible parent count.
+        if pg._over_cap(cap, len(paj) + 1):
+            continue  # every family of y holds its parents and one source more.
         pa_set = set(int(p) for p in paj)
         # Group valid candidates by their base parent set; each base scores its adds in one batch.
         groups: dict[tuple[int, ...], list[tuple[int, tuple[int, ...]]]] = {}
@@ -87,6 +91,8 @@ def forward_chunk_best(
             if reachable(y, x, clique):
                 continue  # some semi-directed y ~> x path misses the clique: invalid Insert.
             base = tuple(sorted(pa_set | clique))
+            if pg._over_cap(cap, len(base) + 1):
+                continue
             groups.setdefault(base, []).append((x, T))
         for base, cands in groups.items():
             moves = [("add", x) for x, _ in cands]
@@ -97,6 +103,8 @@ def forward_chunk_best(
                     key = pg.move_key(delta, n, x, y, T, ranks)
                     if best_key is None or key < best_key:
                         if excluded and key[1:] in excluded:
+                            continue
+                        if pg._breaks_cap(adj, ops.insert_cpdag, (x, y, T), cap):
                             continue
                         best_key = key
                         best = (key, x, y, T)
@@ -144,6 +152,7 @@ def full_rescan_best(
         self.ranks,
         self.forbidden,
         excluded,
+        self.cap,
     )
 
 
