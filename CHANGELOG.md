@@ -47,6 +47,12 @@ change names its pull request.
 - For contributors, the benchmark harness compares Andrey's PC, GES, BOSS, GRaSP, and FCI with
   Tetrad 7.6.10's on continuous data (`benchmarks/tetrad_cpu.py`, `benchmarks/tetrad_fci_latent.py`),
   with the time of Tetrad's JVM reported apart from its search. ([#362])
+- `andrey.bootstrap(method, data)` refits a method on bootstrap resamples of the rows and returns a
+  `BootstrapOutput`: the share of fits in which each pair has each edge (`->`, `<-`, `--`, `<->`,
+  `o->`, and the rest), a table of every edge that appeared, and an averaged graph that keeps the
+  pairs adjacent in at least `threshold` of the fits. It takes every method but `gin`; a
+  time-series method on one series resamples blocks of rows; the result is the same at any
+  `num_workers`. `andrey bootstrap <method>` does the same from the command line. ([#396])
 
 ### Changed
 
@@ -700,3 +706,4 @@ First alpha release.
 [#393]: https://github.com/Abel-ai-lab/andrey/pull/393
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
+[#396]: https://github.com/Abel-ai-lab/andrey/pull/396

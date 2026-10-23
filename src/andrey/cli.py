@@ -13,6 +13,7 @@ result. Failures print a structured JSON error on stderr and exit non-zero.
 
 from __future__ import annotations
 
+import contextlib
 import importlib.metadata
 import io
 import json
@@ -22,7 +23,7 @@ import re
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Annotated, Optional
 
 import typer
 
@@ -42,10 +43,11 @@ from andrey.spec.generate import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Generator, Sequence
 
     import numpy as np
 
+    from andrey import BootstrapOutput
     from andrey.core import StructureOutput
     from andrey.spec.models import InputSpec, MethodSpec, ParamSpec
 
@@ -271,12 +273,12 @@ def temporal_view(struct) -> dict:
     return view
 
 
+def structure_view(struct, weighted: np.ndarray | None = None) -> dict:
+    return temporal_view(struct) if struct.type == "temporal" else graph_view(struct, weighted)
+
+
 def result_view(out) -> dict:
-    struct = out.structure
-    if struct.type == "temporal":
-        view = temporal_view(struct)
-    else:
-        view = graph_view(struct, out.weighted_adjacency)
+    view = structure_view(out.structure, out.weighted_adjacency)
     if out.ordering is not None:
         view["ordering"] = list(out.ordering)
     return {"structure": view, "metadata": dict(out.metadata)}
@@ -291,6 +293,35 @@ def envelope(spec: MethodSpec, out, run: dict) -> dict:
         result = result_view(out)
         env["structure"] = result["structure"]
         env["metadata"] = result["metadata"]
+    env["run"] = run
+    return env
+
+
+def bootstrap_envelope(
+    spec: MethodSpec, out: BootstrapOutput | list[BootstrapOutput], run: dict
+) -> dict:
+    """The result envelope of ``andrey bootstrap``: ``run``'s, with each graph's edge frequencies.
+
+    ``structure`` is the averaged graph; ``frequencies`` lists every edge that appeared in a fit,
+    most frequent first, as ``run``'s ``edges`` do plus ``count`` and ``frequency``.
+    """
+    outs = out if isinstance(out, list) else [out]
+    first = outs[0]
+    env: dict = {"schema_version": SCHEMA_VERSION, "method": spec.name, "status": spec.status}
+    env["bootstrap"] = {
+        "n_boot": first.n_boot,
+        "threshold": first.threshold,
+        "seed": first.metadata["seed"],
+        "block_length": first.metadata["block_length"],
+    }
+    views = [
+        {"structure": structure_view(o.structure), "frequencies": o.table(index=True)} for o in outs
+    ]
+    if isinstance(out, list):  # multi-output (multi_group_direct_lingam)
+        env["multi"] = True
+        env["results"] = views
+    else:
+        env.update(views[0])
     env["run"] = run
     return env
 
@@ -350,10 +381,17 @@ def _apply_output_cap(env: dict, limit: int) -> None:
     """Cap inline edges and dense weight stacks across a single- or multi-output envelope.
 
     Counts and shape summaries always survive -- only bulk arrays are cut, so a large result never
-    floods stdout. A note tells the caller how to get the whole thing back.
+    floods stdout. A bootstrap's frequency table keeps its most frequent edges. A note tells the
+    caller how to get the whole thing back.
     """
-    structs = [r["structure"] for r in env["results"]] if env.get("multi") else [env["structure"]]
-    if any([_truncate_output(s, limit) for s in structs]):  # list, not genexpr: cap every struct
+    results = env["results"] if env.get("multi") else [env]
+    cut = [_truncate_output(r["structure"], limit) for r in results]
+    for r in results:
+        if len(r.get("frequencies", ())) > limit:  # a bootstrap's edge table: its most frequent
+            r["frequencies"] = r["frequencies"][:limit]
+            r["frequencies_truncated"] = True
+            cut.append(True)
+    if any(cut):
         env["note"] = (
             f"inline edges / dense weight stacks capped at {limit}; counts and shapes stay "
             "complete. Re-run with --full or -o <file> for the entire result."
@@ -393,6 +431,24 @@ def render_human(
         lines += ["", f"  group {k}  {graph.kind}  |  {graph._edge_count_text()}"]
         edges = graph._edge_lines(weights=weights, limit=limit, more=_MORE_HINT)
         lines += ["    " + line for line in edges]
+    return "\n".join(lines) + _run_footer(run)
+
+
+def render_bootstrap_human(
+    spec: MethodSpec, out: BootstrapOutput | list[BootstrapOutput], run: dict, *, full: bool = False
+) -> str:
+    """Render a terminal summary of a bootstrap: each averaged graph and its most frequent edges.
+
+    ``full`` lists every edge; otherwise each graph lists at most ``SUMMARY_EDGES`` of them.
+    """
+    limit = None if full else SUMMARY_EDGES
+    if not isinstance(out, list):
+        return "\n".join(out._summary(name=spec.name, limit=limit, more=_MORE_HINT)) + _run_footer(
+            run
+        )
+    lines = [f"{spec.name}  |  {len(out)} groups"]
+    for k, o in enumerate(out):
+        lines += ["", *o._summary(name=f"group {k}", limit=limit, more=_MORE_HINT)]
     return "\n".join(lines) + _run_footer(run)
 
 
@@ -762,24 +818,21 @@ def column_positions(
     return positions
 
 
-def execute_run(
+def _prepare_call(
     spec: MethodSpec,
     positional: list,
     fkwargs: dict,
     resolved: dict,
-    *,
-    labels: tuple[str, ...] | None = None,
-    output: str | None,
-    as_json: bool,
-    full: bool,
-) -> None:
-    """Call the facade on the loaded inputs + coerced params, then emit the result (shell-aware).
+    labels: tuple[str, ...] | None,
+) -> tuple[list, dict, dict, tuple[str, ...] | None]:
+    """Shape the loaded inputs and coerced params into what the facade takes.
 
-    ``labels`` (the data's header) name the result's nodes. A method with its own ``labels`` param
-    (GIN, whose graph adds latent nodes) takes them there, unless ``labels=`` was given.
+    A method with its own ``labels`` param (GIN, whose graph adds latent nodes) takes the data's
+    header there, unless ``labels=`` was given. ``categorical=`` names become positions and
+    ``knowledge=`` becomes an ``andrey.Knowledge``. A method that reads column types or knowledge
+    gets the data as a DataFrame, so its warnings name the header's columns. Returns the inputs,
+    params, resolved params, and the labels still to apply to the result.
     """
-    import time
-
     if labels is not None and any(p.name == "labels" for p in spec.params):
         if fkwargs["labels"] is None:
             fkwargs = {**fkwargs, "labels": labels}
@@ -798,14 +851,14 @@ def execute_run(
         import pandas as pd
 
         positional = [pd.DataFrame(positional[0], columns=list(labels)), *positional[1:]]
+    return positional, fkwargs, resolved, labels
 
-    fn = getattr(andrey, spec.name)
-    start = time.perf_counter()
+
+@contextlib.contextmanager
+def _fit_errors() -> Generator[None]:
+    """Turn what a fit raises into the ``CliError`` that names its exit code."""
     try:
-        # The fit's warnings travel in the envelope: stderr carries only a failure's JSON.
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            out = fn(*positional, **fkwargs)
+        yield
     except ImportError as exc:
         raise CliError(
             "missing_backend", str(exc), EXIT_USAGE, next=["uv pip install 'andrey-core[torch]'"]
@@ -820,12 +873,15 @@ def execute_run(
         raise CliError("data_error", f"{type(exc).__name__}: {exc}", EXIT_DATA) from exc
     except RuntimeError as exc:  # non-convergence / numerical breakdown -> retry or adjust
         raise CliError("algorithm_failure", str(exc), EXIT_ALGORITHM) from exc
-    elapsed = time.perf_counter() - start
-    if isinstance(out, list):
-        out = [with_labels(o, labels) for o in out]
-    else:
-        out = with_labels(out, labels)
 
+
+def _run_info(
+    positional: list,
+    resolved: dict,
+    elapsed: float,
+    caught: list[warnings.WarningMessage],
+) -> dict:
+    """The envelope's ``run`` block: params, timing, sizes, versions, and the fit's warnings."""
     head = positional[0]
     first = head[0] if isinstance(head, list) else head
     run = {
@@ -836,12 +892,11 @@ def execute_run(
         "versions": versions(),
         "warnings": _warning_views(caught),
     }
-    if spec.seeded:  # report the *effective* seed (resolve_seed applies the ANDREY_SEED fallback)
-        from andrey.core.seeding import resolve_seed
+    return run
 
-        run["seed"] = resolve_seed(resolved.get("seed", resolved.get("random_state")))
 
-    env = envelope(spec, out, run)
+def _emit(env: dict, human: Callable[[], str], *, output: str | None, as_json: bool, full: bool):
+    """Write the envelope to ``output``, or print it: capped JSON, or ``human()`` on a terminal."""
     if output:  # a file is not context-bounded -> always the complete envelope
         _atomic_write(output, json.dumps(env, indent=2))
         return
@@ -851,9 +906,143 @@ def execute_run(
         typer.echo(json.dumps(env, indent=2))
         return
     try:  # an interactive terminal -> a human summary (never fail to produce output)
-        typer.echo(render_human(spec, out, run, full=full))
+        typer.echo(human())
     except Exception:
         typer.echo(json.dumps(env, indent=2))
+
+
+def execute_run(
+    spec: MethodSpec,
+    positional: list,
+    fkwargs: dict,
+    resolved: dict,
+    *,
+    labels: tuple[str, ...] | None = None,
+    output: str | None,
+    as_json: bool,
+    full: bool,
+) -> None:
+    """Call the facade on the loaded inputs + coerced params, then emit the result (shell-aware).
+
+    ``labels`` (the data's header) name the result's nodes. A method with its own ``labels`` param
+    (GIN, whose graph adds latent nodes) takes them there, unless ``labels=`` was given.
+    """
+    import time
+
+    positional, fkwargs, resolved, labels = _prepare_call(
+        spec, positional, fkwargs, resolved, labels
+    )
+    fn = getattr(andrey, spec.name)
+    start = time.perf_counter()
+    with _fit_errors():
+        # The fit's warnings travel in the envelope: stderr carries only a failure's JSON.
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            out = fn(*positional, **fkwargs)
+    elapsed = time.perf_counter() - start
+    if isinstance(out, list):
+        out = [with_labels(o, labels) for o in out]
+    else:
+        out = with_labels(out, labels)
+
+    run = _run_info(positional, resolved, elapsed, caught)
+    if spec.seeded:  # report the *effective* seed (resolve_seed applies the ANDREY_SEED fallback)
+        from andrey.core.seeding import resolve_seed
+
+        run["seed"] = resolve_seed(resolved.get("seed", resolved.get("random_state")))
+    env = envelope(spec, out, run)
+    _emit(
+        env,
+        lambda: render_human(spec, out, run, full=full),
+        output=output,
+        as_json=as_json,
+        full=full,
+    )
+
+
+def _table(data: object, labels: tuple[str, ...] | None) -> object:
+    """Return ``data`` (an array, or a list of them) as tables with columns named ``labels``."""
+    if labels is None or hasattr(data, "iloc"):
+        return data
+    import pandas as pd
+
+    if isinstance(data, list):
+        return [pd.DataFrame(x, columns=list(labels)) for x in data]
+    return pd.DataFrame(data, columns=list(labels))
+
+
+def execute_bootstrap(
+    spec: MethodSpec,
+    positional: list,
+    fkwargs: dict,
+    resolved: dict,
+    *,
+    labels: tuple[str, ...] | None = None,
+    n_boot: int,
+    seed: int | None,
+    threshold: float,
+    block_length: int | None,
+    output: str | None,
+    as_json: bool,
+    full: bool,
+) -> None:
+    """Refit the method on bootstrap resamples, then emit the edge frequencies (shell-aware).
+
+    The bootstrap seeds a seeded method itself, so ``seed=`` is the bootstrap's ``--seed``.
+    """
+    import time
+
+    if fkwargs.get("seed") is not None:
+        raise CliError(
+            "bad_value", "the bootstrap seeds each fit itself; set --seed, not seed=", EXIT_USAGE
+        )
+    panel = spec.data.inputs[0].kind == "panel"
+    bad = [
+        message
+        for ok, message in (
+            (n_boot >= 1, f"--n-boot must be at least 1, got {n_boot}"),
+            (0 < threshold <= 1, f"--threshold must lie in (0, 1], got {threshold}"),
+            (seed is None or seed >= 0, f"--seed must not be negative, got {seed}"),
+            (block_length is None or block_length >= 1, "--block-length must be at least 1"),
+            (
+                block_length is None or (spec.family == "temporal" and not panel),
+                f"--block-length is for a time-series method on one series, not {spec.name}",
+            ),
+        )
+        if not ok
+    ]
+    if bad:
+        raise CliError("bad_value", "; ".join(bad), EXIT_USAGE)
+    fkwargs = {k: v for k, v in fkwargs.items() if k != "seed"}
+    resolved = {k: v for k, v in resolved.items() if k != "seed"}
+    positional, fkwargs, resolved, labels = _prepare_call(
+        spec, positional, fkwargs, resolved, labels
+    )
+    positional = [_table(positional[0], labels), *positional[1:]]
+    aligned = {inp.name: x for inp, x in zip(spec.data.inputs[1:], positional[1:])}
+    start = time.perf_counter()
+    with _fit_errors():
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            out = andrey.bootstrap(
+                spec.name,
+                positional[0],
+                n_boot=n_boot,
+                seed=seed,
+                threshold=threshold,
+                block_length=block_length,
+                **aligned,
+                **fkwargs,
+            )
+    run = _run_info(positional, resolved, time.perf_counter() - start, caught)
+    env = bootstrap_envelope(spec, out, run)
+    _emit(
+        env,
+        lambda: render_bootstrap_human(spec, out, run, full=full),
+        output=output,
+        as_json=as_json,
+        full=full,
+    )
 
 
 def _warning_views(caught: list[warnings.WarningMessage]) -> list[dict]:
@@ -862,9 +1051,9 @@ def _warning_views(caught: list[warnings.WarningMessage]) -> list[dict]:
     return list({(v["category"], v["message"]): v for v in views}.values())
 
 
-def _example(spec: MethodSpec) -> str:
+def _example(spec: MethodSpec, command: str = "run") -> str:
     """A runnable, copy-paste example for a method (list values quoted for zsh)."""
-    parts = ["andrey", "run", spec.name]
+    parts = ["andrey", command, spec.name]
     for inp in spec.data.inputs:
         if inp.kind == "panel":
             parts += [inp.flag, "a.csv", inp.flag, "b.csv"]
@@ -879,9 +1068,13 @@ def _example(spec: MethodSpec) -> str:
     return " ".join(parts)
 
 
-def render_method_help(spec: MethodSpec) -> str:
-    """Per-method help rendered from the registry -- what `andrey run <method> --help` prints."""
-    lines = [f"andrey run {spec.name} -- {spec.summary}", ""]
+def render_method_help(spec: MethodSpec, *, command: str = "run") -> str:
+    """Per-method help rendered from the registry -- what `andrey run <method> --help` prints.
+
+    ``command="bootstrap"`` gives `andrey bootstrap <method> --help`: the same inputs and params,
+    with the bootstrap flags.
+    """
+    lines = [f"andrey {command} {spec.name} -- {spec.summary}", ""]
     if spec.status == "experimental":
         lines += [
             "Experimental: no published benchmark; the API may change without deprecation.",
@@ -903,14 +1096,23 @@ def render_method_help(spec: MethodSpec) -> str:
             lines.append(f"  {p.name}={grammar_default(p)}{choices}   {p.doc}")
     if spec.passthrough:
         lines += ["", "  <key>=<value>   extra optimizer knobs (passthrough)"]
+    flags = "--config <file> (YAML/JSON base), -o <file>, --json, --full"
+    if command == "bootstrap":
+        lines += [
+            "",
+            "Bootstrap flags: --n-boot <n> (default 100), --seed <int>, --threshold <share> "
+            "(default 0.5),",
+            "  --block-length <rows> (time-series methods on one series). Workers follow "
+            "ANDREY_NUM_WORKERS.",
+        ]
     lines += [
         "",
-        "Run flags: --config <file> (YAML/JSON base), -o <file>, --json, --full",
+        f"Run flags: {flags}",
         "",
         "Example:",
-        f"  {_example(spec)}",
+        f"  {_example(spec, command)}",
         "",
-        f"Full schema: andrey run {spec.name} --help --json",
+        f"Full schema: andrey {command} {spec.name} --help --json",
     ]
     return "\n".join(lines)
 
@@ -1333,76 +1535,11 @@ def render_calibration(report: dict) -> str:
     return "\n".join(lines)
 
 
-@app.command("run", add_help_option=False)
-def cmd_run(
-    ctx: typer.Context,
-    method: str | None = typer.Argument(
-        None, metavar="METHOD", help="Method to run (see: andrey list)."
-    ),
-    overrides: Optional[list[str]] = typer.Argument(
-        None, metavar="[KEY=VALUE ...]", help="Hyperparameter overrides, for example 'alpha=0.05'."
-    ),
-    data: Optional[list[str]] = typer.Option(
-        None,
-        "--data",
-        metavar="PATH|-",
-        help="Data file, one row per sample: CSV, TSV, or whitespace-separated text (a header row "
-        "names the nodes), or .npy. - reads text from stdin.",
-    ),
-    domain_index: Optional[list[str]] = typer.Option(
-        None,
-        "--domain-index",
-        metavar="PATH",
-        help="cdnod only: the domain index, one value per row of --data.",
-    ),
-    interventions: Optional[list[str]] = typer.Option(
-        None,
-        "--interventions",
-        metavar="PATH",
-        help="gies only: a 0/1 matrix shaped like --data, 1 where the row's value of the variable "
-        "was set by an intervention.",
-    ),
-    data_groups: Optional[list[str]] = typer.Option(
-        None,
-        "--data-groups",
-        metavar="PATH",
-        help="multi_group_direct_lingam only: one data file per group; repeat the flag.",
-    ),
-    data_list: Optional[list[str]] = typer.Option(
-        None,
-        "--data-list",
-        metavar="PATH",
-        help="longitudinal_lingam only: one data file per time point; repeat the flag.",
-    ),
-    config: Optional[str] = typer.Option(
-        None,
-        "--config",
-        metavar="PATH",
-        help="YAML or JSON file of parameters; key=value arguments override it.",
-    ),
-    output: Optional[str] = typer.Option(
-        None,
-        "-o",
-        "--output",
-        metavar="PATH",
-        help="Write the complete result as JSON to PATH instead of printing it.",
-    ),
-    as_json: bool = typer.Option(False, "--json", help="Use JSON even on a terminal."),
-    full: bool = typer.Option(
-        False,
-        "--full",
-        help=f"Print every edge and weight. Without it, a terminal shows the first {SUMMARY_EDGES} "
-        f"edges, and JSON output at most {EDGE_LIMIT}.",
-    ),
-    show_help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show the method's inputs, parameters, and an example; add --json for the same as "
-        "JSON.",
-    ),
-) -> None:
-    r"""Run a method on a data file: andrey run <method> --data <path|-> \[key=value ...]."""
+def _method_or_help(
+    ctx: typer.Context, method: str | None, show_help: bool, as_json: bool
+) -> MethodSpec | None:
+    """Return the method's spec, or ``None`` after printing its help (or the command's)."""
+    command = ctx.command.name or "run"
     if method is None:
         if show_help:
             if as_json:
@@ -1413,7 +1550,7 @@ def cmd_run(
                     next=["andrey --help --json"],
                 )
             typer.echo(ctx.get_help())
-            return
+            return None
         raise CliError(
             "missing_method",
             "Choose a method (see: andrey list).",
@@ -1430,9 +1567,112 @@ def cmd_run(
         )
     spec = get_spec(method)
     if show_help:
-        typer.echo(
-            json.dumps(help_schema(method), indent=2) if as_json else render_method_help(spec)
-        )
+        text = render_method_help(spec, command=command)
+        typer.echo(json.dumps(help_schema(method), indent=2) if as_json else text)
+        return None
+    return spec
+
+
+# The options `run` and `bootstrap` share.
+_DataOption = Annotated[
+    Optional[list[str]],
+    typer.Option(
+        "--data",
+        metavar="PATH|-",
+        help="Data file, one row per sample: CSV, TSV, or whitespace-separated text (a header row "
+        "names the nodes), or .npy. - reads text from stdin.",
+    ),
+]
+_DomainIndexOption = Annotated[
+    Optional[list[str]],
+    typer.Option(
+        "--domain-index",
+        metavar="PATH",
+        help="cdnod only: the domain index, one value per row of --data.",
+    ),
+]
+_InterventionsOption = Annotated[
+    Optional[list[str]],
+    typer.Option(
+        "--interventions",
+        metavar="PATH",
+        help="gies only: a 0/1 matrix shaped like --data, 1 where the row's value of the variable "
+        "was set by an intervention.",
+    ),
+]
+_DataGroupsOption = Annotated[
+    Optional[list[str]],
+    typer.Option(
+        "--data-groups",
+        metavar="PATH",
+        help="multi_group_direct_lingam only: one data file per group; repeat the flag.",
+    ),
+]
+_DataListOption = Annotated[
+    Optional[list[str]],
+    typer.Option(
+        "--data-list",
+        metavar="PATH",
+        help="longitudinal_lingam only: one data file per time point; repeat the flag.",
+    ),
+]
+_ConfigOption = Annotated[
+    Optional[str],
+    typer.Option(
+        "--config",
+        metavar="PATH",
+        help="YAML or JSON file of parameters; key=value arguments override it.",
+    ),
+]
+_OutputOption = Annotated[
+    Optional[str],
+    typer.Option(
+        "-o",
+        "--output",
+        metavar="PATH",
+        help="Write the complete result as JSON to PATH instead of printing it.",
+    ),
+]
+_JsonOption = Annotated[bool, typer.Option("--json", help="Use JSON even on a terminal.")]
+_HelpOption = Annotated[
+    bool,
+    typer.Option(
+        "--help",
+        "-h",
+        help="Show the method's inputs, parameters, and an example; add --json for the same as "
+        "JSON.",
+    ),
+]
+
+
+@app.command("run", add_help_option=False)
+def cmd_run(
+    ctx: typer.Context,
+    method: str | None = typer.Argument(
+        None, metavar="METHOD", help="Method to run (see: andrey list)."
+    ),
+    overrides: Optional[list[str]] = typer.Argument(
+        None, metavar="[KEY=VALUE ...]", help="Hyperparameter overrides, for example 'alpha=0.05'."
+    ),
+    data: _DataOption = None,
+    domain_index: _DomainIndexOption = None,
+    interventions: _InterventionsOption = None,
+    data_groups: _DataGroupsOption = None,
+    data_list: _DataListOption = None,
+    config: _ConfigOption = None,
+    output: _OutputOption = None,
+    as_json: _JsonOption = False,
+    full: bool = typer.Option(
+        False,
+        "--full",
+        help=f"Print every edge and weight. Without it, a terminal shows the first {SUMMARY_EDGES} "
+        f"edges, and JSON output at most {EDGE_LIMIT}.",
+    ),
+    show_help: _HelpOption = False,
+) -> None:
+    r"""Run a method on a data file: andrey run <method> --data <path|-> \[key=value ...]."""
+    spec = _method_or_help(ctx, method, show_help, as_json)
+    if spec is None:
         return
     provided = {
         "data": data,
@@ -1451,6 +1691,79 @@ def cmd_run(
         fkwargs,
         resolved,
         labels=labels,
+        output=output,
+        as_json=as_json,
+        full=full,
+    )
+
+
+@app.command("bootstrap", add_help_option=False)
+def cmd_bootstrap(
+    ctx: typer.Context,
+    method: str | None = typer.Argument(
+        None, metavar="METHOD", help="Method to refit (see: andrey list)."
+    ),
+    overrides: Optional[list[str]] = typer.Argument(
+        None, metavar="[KEY=VALUE ...]", help="Hyperparameter overrides, for example 'alpha=0.05'."
+    ),
+    data: _DataOption = None,
+    domain_index: _DomainIndexOption = None,
+    interventions: _InterventionsOption = None,
+    data_groups: _DataGroupsOption = None,
+    data_list: _DataListOption = None,
+    n_boot: int = typer.Option(100, "--n-boot", metavar="N", help="Number of resamples and fits."),
+    seed: Optional[int] = typer.Option(
+        None,
+        "--seed",
+        help="Seed of the resamples. Without it, ANDREY_SEED, else 0.",
+    ),
+    threshold: float = typer.Option(
+        0.5,
+        "--threshold",
+        help="Share of fits in which a pair must be adjacent to be in the averaged graph (0, 1].",
+    ),
+    block_length: Optional[int] = typer.Option(
+        None,
+        "--block-length",
+        metavar="ROWS",
+        help="Time-series methods on one series: rows per block. Default ceil(rows ** (1/3)).",
+    ),
+    config: _ConfigOption = None,
+    output: _OutputOption = None,
+    as_json: _JsonOption = False,
+    full: bool = typer.Option(
+        False,
+        "--full",
+        help=f"Print every edge and frequency. Without it, a terminal shows the first "
+        f"{SUMMARY_EDGES} edges, and JSON output at most {EDGE_LIMIT} of each list.",
+    ),
+    show_help: _HelpOption = False,
+) -> None:
+    r"""Refit a method on resamples: andrey bootstrap <method> --data <path|-> \[key=value ...]."""
+    spec = _method_or_help(ctx, method, show_help, as_json)
+    if spec is None:
+        return
+    provided = {
+        "data": data,
+        "domain_index": domain_index,
+        "interventions": interventions,
+        "data_groups": data_groups,
+        "data_list": data_list,
+    }
+    check_environment()
+    cfg = _load_config(config) if config else {}
+    fkwargs, resolved = _resolve_params(spec, cfg, overrides or [])  # validate before any I/O
+    positional, labels = _load_method_inputs(spec, provided)
+    execute_bootstrap(
+        spec,
+        positional,
+        fkwargs,
+        resolved,
+        labels=labels,
+        n_boot=n_boot,
+        seed=seed,
+        threshold=threshold,
+        block_length=block_length,
         output=output,
         as_json=as_json,
         full=full,
