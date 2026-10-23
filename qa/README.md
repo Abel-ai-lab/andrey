@@ -17,8 +17,8 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 
 ## Identity
 
-A speed change must return the same answers. `identity.py` fits every supported method on the
-first two draws of each of its quality-gate datasets and of one larger dataset, on the numpy
+A speed change must return the same answers. `identity.py` fits every supported method, and RFCI,
+on the first two draws of each of its quality-gate datasets and of one larger dataset, on the numpy
 backend with one worker and one BLAS thread, and hashes each fit's full output: the graph, the edge
 weights, the causal order, and every metadata value, such as a score or a p-value. Floats enter as
 their bytes, so equal hashes mean equal bits; a second hash covers only the graphs' endpoint marks.
@@ -46,8 +46,8 @@ whose answer differs from the first fit, with the parts that differ, exiting 1 i
 
 - `--shuffle K` refits on `K` seeded column orders and maps each answer back to the original
   columns. The metadata lists of node indices, such as RCD's confounded pairs, are left out.
-- `--workers N` refits PC, FCI, GFCI, CD-NOD, GES, and Granger on `N` workers, with every GES pass
-  and every skeleton pass of conditioning size two or more sent to the worker pool.
+- `--workers N` refits PC, FCI, RFCI, GFCI, CD-NOD, GES, and Granger on `N` workers, with every
+  GES pass and every skeleton pass of conditioning size two or more sent to the worker pool.
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
 sets the draws per dataset.

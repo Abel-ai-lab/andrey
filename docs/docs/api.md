@@ -45,22 +45,22 @@ needs whole numbers. Methods that score with BIC also reject a column that repea
 scale and shift or, given more rows than columns, is a linear function of other columns. Copies of
 one variable cannot be told apart, so one `ValueError` names every group of copies, such as `x2`
 and `x7` repeating `x1`, and asks you to keep one column per group and read its edges as the
-group's; no option drops or merges the copies for you. `pc`, `fci`, `gfci`, and `cdnod` with a
-partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the same way before any test
-runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series that repeats another up
-to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. Other
-data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
-single column gives a one-node graph.
+group's; no option drops or merges the copies for you. `pc`, `fci`, `rfci`, `gfci`, and `cdnod`
+with a partial-correlation test, `"fisherz"` or `"student_t"`, reject copies the same way before
+any test runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series that repeats
+another up to `2 * tau_max` steps back and name its lagged value, such as
+`'a' at lag 1 repeats 'd'`. Other data raises a `ValueError` that names the argument and, for a bad
+cell, its row and column. A single column gives a one-node graph.
 
-`pc`, `fci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the default, and
-`"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data, `"degen_gauss"` and
-`"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
-([Conditional-independence tests](#conditional-independence-tests)).
+`pc`, `fci`, `rfci`, `gfci`, and `cdnod` take the same `indep_test` choices: `"fisherz"`, the
+default, and `"student_t"` for continuous data, `"chisq"` and `"gsq"` for categorical data,
+`"degen_gauss"` and `"cond_gauss"` for mixed data, and the nonlinear tests `"kci"`, `"rcot"`,
+`"cmiknn"`, and `"gpdc"` ([Conditional-independence tests](#conditional-independence-tests)).
 
-`pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
+`pc`, `fci`, `rfci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `boss`, `grasp`,
 `exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
-`knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
+`knowledge` parameter says how it honors them. `pc`, `fci`, `rfci`, `gfci`, and `cdnod` also take
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
@@ -137,10 +137,25 @@ default under `andrey.config(tie_break="position")`.
 
 ### Experimental methods
 
-Every method is supported. A new method ships as experimental: it passes recovery tests but has no
-published benchmark, its API may change without deprecation, and it warns with
-{py:class}`~andrey.ExperimentalWarning` on its first call in a process. It becomes supported once it
-has:
+A new method ships as experimental: it passes recovery tests but has no published benchmark, its
+API may change without deprecation, and it warns with {py:class}`~andrey.ExperimentalWarning` on
+its first call in a process.
+
+```{eval-rst}
+.. currentmodule:: andrey
+
+.. autosummary::
+   :toctree: api
+   :nosignatures:
+
+   rfci
+```
+
+RFCI runs FCI's adjacency search and orientation rules without its possible-d-separation step,
+and tests each unshielded triple and discriminating path before it orients them. With exact tests
+its PAG is FCI's, or FCI's with extra edges that carry no tail.
+
+A method becomes supported once it has:
 
 - a benchmark campaign compared with another package, in a published summary and with a section
   in its release's [release card](benchmarks.md);
@@ -152,7 +167,7 @@ has:
 
 ### Conditional-independence tests
 
-PC, FCI, GFCI, and CD-NOD take their conditional-independence test as `indep_test`:
+PC, FCI, RFCI, GFCI, and CD-NOD take their conditional-independence test as `indep_test`:
 
 | `indep_test` | Test | Status |
 |---|---|---|

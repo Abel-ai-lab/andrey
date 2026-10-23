@@ -1,12 +1,13 @@
 """Check that a change returns the same answers, bit for bit, by hashing each method's full output.
 
-Every supported method of the quality gate (:mod:`qa.quality_gate`) is fitted on the first draws
-of its gate datasets and of one larger dataset (:data:`LARGER`), on the numpy backend with one
-worker and one BLAS thread. A fit's hash covers its whole output: the graph, the edge weights, the
-causal order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats
-enter as their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so
-equal hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, so a
-difference reads as a changed graph or as changed bits under the same graph.
+Every supported method of the quality gate (:mod:`qa.quality_gate`), and each experimental method of
+:data:`EXPERIMENTAL_DATASETS`, is fitted on the first draws of its gate datasets and of one larger
+dataset (:data:`LARGER`), on the numpy backend with one worker and one BLAS thread. A fit's hash
+covers its whole output: the graph, the edge weights, the causal order, and every metadata value,
+such as a score, a p-value, or a list of nodes. Floats enter as their bytes, never as printed text,
+NaN as one bit pattern, and mappings in key order, so equal hashes mean equal bits. A second hash
+covers only the endpoint marks of the graphs, so a difference reads as a changed graph or as changed
+bits under the same graph.
 
 The manifest holds one row per fit, keyed by method, dataset, seed, permutation, and worker count,
 under a header naming the commit, the imported Andrey package's directory and commit, the Python,
@@ -98,6 +99,7 @@ def _domains(x: np.ndarray) -> Any:
 FITS: dict[str, Fit] = {
     "PC": Fit(functools.partial(andrey.pc, alpha=ALPHA), alpha=ALPHA),
     "FCI": Fit(functools.partial(andrey.fci, alpha=ALPHA), alpha=ALPHA),
+    "RFCI": Fit(functools.partial(andrey.rfci, alpha=ALPHA), alpha=ALPHA),
     "GFCI": Fit(functools.partial(andrey.gfci, alpha=ALPHA), alpha=ALPHA),
     "CDNOD": Fit(_domains, alpha=_CDNOD["alpha"]),
     "GES": Fit(andrey.ges),
@@ -137,9 +139,12 @@ FITS: dict[str, Fit] = {
 }
 
 #: The methods that run on ``andrey.config(num_workers=...)``: GES, GFCI's GES phase, and the
-#: skeleton searches of PC, FCI, GFCI, and CD-NOD in worker processes, Granger's regressions and
-#: PNL's two directions on threads.
-WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "GES", "Granger", "PNL")
+#: skeleton searches of PC, FCI, RFCI, GFCI, and CD-NOD in worker processes, Granger's regressions
+#: and PNL's two directions on threads.
+WORKER_METHODS = ("PC", "FCI", "RFCI", "GFCI", "CDNOD", "GES", "Granger", "PNL")
+
+#: The gate datasets of the experimental methods, which the quality gate does not fit.
+EXPERIMENTAL_DATASETS: dict[str, tuple[str, ...]] = {"RFCI": qg.PAG_DATA}
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -172,7 +177,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
 }
 LARGER: dict[str, str] = {
     **dict.fromkeys(("PC", "GES", "XGES", "HC", "Tabu", "BOSS", "GRaSP"), "linear_gauss_er_d100"),
-    **dict.fromkeys(("FCI", "GFCI"), "latent_gauss_er_d100"),
+    **dict.fromkeys(("FCI", "RFCI", "GFCI"), "latent_gauss_er_d100"),
     **dict.fromkeys(("DirectLiNGAM", "ICA-LiNGAM"), "lingam_sf_d70"),
     **dict.fromkeys(("RCD", "BottomUpParceLiNGAM"), "latent_lingam_er_d17"),
     "ExactSearch": "linear_gauss_er_d16",
@@ -201,7 +206,8 @@ def draws(dataset: str) -> tuple[qg.Draw, ...]:
 def corpus(methods: Iterable[str], seeds: int) -> Iterator[tuple[str, str, int, np.ndarray]]:
     """Yield ``(method, dataset, seed, data)`` for the first ``seeds`` draws of each dataset."""
     for method in methods:
-        for dataset in (*qg.SUPPORTED[method].datasets, LARGER[method]):
+        gate = EXPERIMENTAL_DATASETS.get(method) or qg.SUPPORTED[method].datasets
+        for dataset in (*gate, LARGER[method]):
             for seed, draw in enumerate(draws(dataset)[:seeds]):
                 yield method, dataset, seed, np.ascontiguousarray(draw.data)
 
