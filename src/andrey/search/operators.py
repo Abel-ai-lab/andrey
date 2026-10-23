@@ -38,6 +38,72 @@ def parents(adj: np.ndarray, node: int) -> np.ndarray:
     return np.nonzero(adj[node] == ARROW)[0]
 
 
+def _largest_clique(masks: list[int], stop: int) -> int:
+    """The size of the largest clique of a graph given as neighbor bitmasks, or ``stop`` if larger.
+
+    ``masks[i]`` holds the neighbors of node ``i``. The search adds the lowest remaining candidate
+    to the clique in turn and drops a branch that cannot beat the best clique found, so the answer
+    does not depend on the order; it stops once a clique of ``stop`` nodes is found.
+    """
+    best = 0
+
+    def grow(size: int, candidates: int) -> None:
+        nonlocal best
+        best = max(best, size)
+        while candidates and best < stop and size + candidates.bit_count() > best:
+            low = candidates & -candidates
+            candidates ^= low
+            grow(size + 1, candidates & masks[low.bit_length() - 1])
+
+    grow(0, (1 << len(masks)) - 1)
+    return best
+
+
+def _undirected_clique(lines: np.ndarray, node: int, stop: int) -> int:
+    """The largest clique among the undirected neighbors of ``node`` (``lines`` marks the
+    undirected edges), or ``stop`` if larger; 0 for a node with none."""
+    neighbors = np.flatnonzero(lines[node])
+    if neighbors.size == 0:
+        return 0
+    among = lines[np.ix_(neighbors, neighbors)]
+    masks = [sum(1 << j for j in np.flatnonzero(row).tolist()) for row in among]
+    return _largest_clique(masks, stop)
+
+
+def max_parents_in_class(adj: np.ndarray) -> np.ndarray:
+    """The most parents each node has in any DAG of the class of the CPDAG ``adj``.
+
+    A DAG of the class gives a node its parents in ``adj`` and a subset of its undirected neighbors;
+    two of those neighbors that are not adjacent would add a v-structure, so the subset is a clique,
+    and some DAG of the class directs the largest clique into the node. A node's most parents are
+    so its directed parents plus the size of the largest clique among its undirected neighbors.
+    """
+    out = (adj == ARROW).sum(axis=1)
+    lines = (adj == TAIL) & (adj.T == TAIL)
+    for node in np.flatnonzero(lines.any(axis=1)).tolist():
+        out[node] += _undirected_clique(lines, node, adj.shape[0])
+    return out
+
+
+def exceeds_parent_cap(adj: np.ndarray, cap: float) -> bool:
+    """Whether some DAG of the class of the CPDAG ``adj`` gives a node more than ``cap`` parents.
+
+    The same test as ``max_parents_in_class(adj).max() > cap``, in less work: a node's most parents
+    lie between its directed parents plus one, when it has an undirected neighbor, and its directed
+    parents plus all its undirected neighbors, so only a node between the two needs a clique.
+    """
+    parents = (adj == ARROW).sum(axis=1)
+    lines = (adj == TAIL) & (adj.T == TAIL)
+    neighbors = lines.sum(axis=1)
+    if (parents + (neighbors > 0) > cap).any():
+        return True
+    for node in np.flatnonzero(parents + neighbors > cap).tolist():
+        room = cap - int(parents[node])
+        if _undirected_clique(lines, node, int(room) + 1) > room:
+            return True
+    return False
+
+
 def subsets(elements: Sequence[int]) -> Iterable[tuple[int, ...]]:
     """Every subset of ``elements`` as a tuple, empty set first."""
     return chain.from_iterable(combinations(elements, r) for r in range(len(elements) + 1))
