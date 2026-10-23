@@ -9,6 +9,8 @@ return the graph the rescanning reference path in ``andrey.search.xges`` returns
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 from threadpoolctl import threadpool_limits
@@ -26,6 +28,7 @@ from andrey.search.xges import (
     _UNDIRECTED,
     _edge_key,
     _extension_parents,
+    _Graph,
     _marks_total,
     _Search,
     _sets,
@@ -222,6 +225,36 @@ def test_the_extended_search_scores_the_graph_it_returns(seed):
     assert total < base_total
     assert total == _marks_total(marks, score)
     assert np.array_equal(dag2cpdag(_extension_dag(marks)), marks)
+
+
+def test_a_stale_snapshot_cannot_seed_a_branch():
+    """A branch shares its snapshot's sets, so it needs a snapshot of the graph as it is now."""
+    g = _Graph(4)
+    g.set_state(0, 1, _UNDIRECTED)
+    snapshot = g.copy()
+    branch = g.branch(snapshot)
+    branch.set_state(1, 2, _UNDIRECTED)  # copies node 1 and 2 from `g`; the snapshot is unchanged
+    assert snapshot.ne[1] == {0} and g.ne[1] == {0}
+    g.set_state(2, 3, _UNDIRECTED)
+    with pytest.raises(RuntimeError, match="no longer matches"):
+        g.branch(snapshot)
+    stale = g.copy()
+    stale.set_state(0, 3, _UNDIRECTED)
+    with pytest.raises(RuntimeError, match="no longer matches"):
+        g.branch(stale)
+
+
+@pytest.mark.parametrize("extended_search", [True, False])
+def test_singular_parent_sets_raise_no_floating_point_warning(extended_search):
+    """With fewer rows than columns some parent sets fit their child exactly and are singular;
+    the search scores them without a numpy warning, as the whole run, including the extended
+    search's trials, ignores divisions by zero."""
+    x = np.random.default_rng(0).standard_normal((8, 12))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        graph, total = xges_search(x, extended_search=extended_search)
+        assert np.isfinite(_marks_total(from_structure(graph), BICScore(x)))
+    assert np.isfinite(total)
 
 
 def _colliding_pairs(pairs: int) -> list[int]:
