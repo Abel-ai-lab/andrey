@@ -125,6 +125,13 @@ change names its pull request.
 - `andrey.data.storage` (`save` and `load`) and the `data` extra, `andrey-core[data]`, which
   installed safetensors for them. Nothing in Andrey called them. ([#375])
 
+### Fixed
+
+- Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
+  `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
+  `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
+  not change. ([#394])
+
 ## [0.8.0] - 2026-10-23
 
 ### Highlights
@@ -683,3 +690,4 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
+[#394]: https://github.com/Abel-ai-lab/andrey/pull/394
