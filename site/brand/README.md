@@ -31,6 +31,8 @@
     order, each card a row of data columns. One card is amber.
   - `art-harmonograph.jpg`: 0.8.0, a harmonograph in engraved lines, its pendulum-driven pen
     tracing a figure of cosine curves that spiral inward on its table. One curve is amber.
+  - `art-rocket.jpg`: 0.9.0, a rocket in engraved lines, climbing steeply out of a bank of clouds.
+    Its engine flare and trail are amber.
   - `art-methods.jpg`: the homepage's All-in-one, the prism of `bento/methods.jpg`, one beam
     fanning into many rays, the level ray out of the prism drawn amber. It is scaled from that
     crop to the cover's size, so it is softer than the others until the art is drawn again at
