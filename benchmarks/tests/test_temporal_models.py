@@ -171,8 +171,8 @@ def test_a_model_with_a_stationary_draw_keeps_its_draws(name: str) -> None:
 def test_a_model_with_no_stationary_draw_is_rescaled_to_be_stationary(
     name: str, seed: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """At d = 240 no set of 1000 draws is stationary for PCMCI+ at seed 1, and a minute of
-    eigenvalues shows it; the first three draws stand in for them."""
+    """At d = 240 none of the 1000 draws of PCMCI+ at seed 1 is stationary, and checking them takes
+    a minute; the first three draws stand in for them."""
     monkeypatch.setattr(temporal_models, "MAX_DRAWS", 3)
     first = []
     rescale = temporal_models._rescale
