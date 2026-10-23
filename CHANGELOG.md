@@ -130,6 +130,14 @@ change names its pull request.
 - `categorical=[]` is accepted by every test and score. `pc`, `fci`, `gfci`, `cdnod`, `ges`, `hc`,
   `exact_search`, `boss`, and `grasp` raised a `ValueError` for it with a continuous or categorical
   test or score; an empty list now reads as `None` there. ([#395])
+- Every score search takes both names of the linear-Gaussian BIC, `"local_score_BIC"` and
+  `"local_score_BIC_from_cov"`, which build the same score. `ges`, `gfci`, `exact_search`, and
+  `xges` rejected the second name, and `hc`, `tabu`, `boss`, and `grasp` the first; the defaults do
+  not change. ([#394])
+- For contributors, the benchmark harness's PCMCI, PCMCI+, and LPCMCI generators no longer fail at
+  large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
+  first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
+  unstable draw. Every draw that was stationary is unchanged. ([#393])
 
 ## [0.8.0] - 2026-10-23
 
@@ -689,4 +697,6 @@ First alpha release.
 [#371]: https://github.com/Abel-ai-lab/andrey/pull/371
 [#375]: https://github.com/Abel-ai-lab/andrey/pull/375
 [#380]: https://github.com/Abel-ai-lab/andrey/pull/380
+[#393]: https://github.com/Abel-ai-lab/andrey/pull/393
+[#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395

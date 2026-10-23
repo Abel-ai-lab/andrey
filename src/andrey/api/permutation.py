@@ -56,9 +56,10 @@ def boss(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
-        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
-        multinomial BIC for categorical data coded by whole numbers, and
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, the
+        covariance-based linear-Gaussian BIC; ``"local_score_BDeu"`` and
+        ``"local_score_BIC_categorical"`` are the BDeu score and the multinomial BIC for
+        categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
         column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when
@@ -281,9 +282,10 @@ def grasp(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"local_score_BIC_from_cov"``, the covariance-based linear-Gaussian
-        BIC; ``"local_score_BDeu"`` and ``"local_score_BIC_categorical"`` are the BDeu score and the
-        multinomial BIC for categorical data coded by whole numbers, and
+        Local score objective: ``"local_score_BIC_from_cov"`` or ``"local_score_BIC"``, the
+        covariance-based linear-Gaussian BIC; ``"local_score_BDeu"`` and
+        ``"local_score_BIC_categorical"`` are the BDeu score and the multinomial BIC for
+        categorical data coded by whole numbers, and
         ``"local_score_degen_gauss"`` and ``"local_score_cond_gauss"`` are the degenerate and
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. ``None`` reads the
         column types from ``categorical``, or infers them, and picks ``"local_score_BDeu"`` when

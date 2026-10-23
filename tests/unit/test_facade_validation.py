@@ -16,6 +16,7 @@ import pytest
 
 import andrey
 from andrey.core.orient import dag2cpdag, from_structure, pdag2dag
+from andrey.core.score import LINEAR_SCORES
 from andrey.data import sample_scm
 
 
@@ -862,6 +863,18 @@ def _mixed_frame():
 
 #: The score searches with a mixed-data score, so a default that switches on mixed data.
 MIXED_DEFAULTS = [name for name in SCORE_SEARCHES if name != "tabu"]
+
+
+@pytest.mark.parametrize("name", [*SCORE_SEARCHES, "xges", "gfci"])
+def test_every_score_search_takes_both_names_of_the_linear_gaussian_bic(name):
+    fit = getattr(andrey, name)
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal(300)
+    b = a + rng.standard_normal(300)
+    x = np.column_stack([a, b, b + rng.standard_normal(300), rng.standard_normal(300)])
+    fits = [fit(x, score_func=score_func) for score_func in LINEAR_SCORES]
+    assert fits[0].structure.to_numpy().any()
+    assert _same_fit(*fits)
 
 
 @pytest.mark.parametrize("data", [_categorical_data, _categorical_frame], ids=["codes", "frame"])
