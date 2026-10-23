@@ -14,9 +14,10 @@ variable, ``0.8 N`` and ``2 N``, so the graph does not grow denser with ``N``. V
 fits a moving-average part, which the paper's VAR model does not have: the series adds one
 moving-average matrix ``M1`` on the noise, drawn as ``B1`` is,
 ``x_t = B0 x_t + B1 x_{t-1} + e_t + M1 e_{t-1}``. A draw whose autoregressive or moving-average
-part is not stable is drawn again. Its columns are then listed in an order drawn from a stream of
-their own, with the stack permuted the same way, so the column order does not follow ``B0``'s causal
-order.
+part is not stable is drawn again; if none of the :data:`MAX_DRAWS` is stable, the first draw is kept
+and each part that is not stable is scaled until it is (:func:`_rescale`). Its columns are then
+listed in an order drawn from a stream of their own, with the stack permuted the same way, so the
+column order does not follow ``B0``'s causal order.
 
 ``panel2013`` follows Kadowaki, Shimizu, and Washio's longitudinal LiNGAM experiments as their JSAI
 2013 paper describes them (Sect. 6.1; the MLSP 2013 paper is not openly available): ``M`` units
@@ -39,10 +40,12 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
+from andrey_bench.temporal_models import STATIONARY_TARGET
+
 #: Time steps simulated and discarded before a series starts.
 BURN_IN = 500
 
-#: Draws of a model before giving up on a stable one.
+#: Draws of a model before rescaling the first one to stability.
 MAX_DRAWS = 1000
 
 #: The last seed coordinate of the column-order stream, which no other draw uses.
@@ -116,6 +119,22 @@ def _radius(matrix: np.ndarray) -> float:
     return float(np.max(np.abs(np.linalg.eigvals(matrix))))
 
 
+def _rescale(inverse: np.ndarray, b1: np.ndarray, m1: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Scale ``B1`` and ``M1`` each down to the stationary target, if it is not stable.
+
+    ``inverse`` is ``(I - B0)^-1``. Scaling a single-lag matrix by ``s`` scales its eigenvalues by
+    ``s``, so one ``s`` lands the radius of ``inverse @ B1``, or of ``M1``, on the target exactly; it
+    is the rescale of ``andrey.data.temporal.stabilize`` at one lag. A positive scale leaves every
+    link where it was, and a part that is stable stays as drawn.
+    """
+    ar, ma = _radius(inverse @ b1), _radius(m1)
+    if ar >= 1.0:
+        b1 = b1 * (STATIONARY_TARGET / ar)
+    if ma >= 1.0:
+        m1 = m1 * (STATIONARY_TARGET / ma)
+    return b1, m1
+
+
 def sample_varma(
     name: str, d: int, n: int, seed: int, *, shuffle: bool = True
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -131,6 +150,7 @@ def sample_varma(
     rng = _rng(name, d, seed)
     lower = np.tril(np.ones((d, d), dtype=bool), k=-1)
     everywhere = np.ones((d, d), dtype=bool)
+    first = None
     for _ in range(MAX_DRAWS):
         b0 = _sparse(rng, lower, round(model.instantaneous_per_variable * d), model.coefficient)
         b1 = _sparse(rng, everywhere, round(model.lagged_per_variable * d), model.coefficient)
@@ -138,8 +158,12 @@ def sample_varma(
         inverse = np.linalg.inv(np.eye(d) - b0)
         if _radius(inverse @ b1) < 1.0 and _radius(m1) < 1.0:
             break
+        if first is None:
+            first = (b0, b1, m1)
     else:
-        raise RuntimeError(f"no stable draw in {MAX_DRAWS} tries for d={d}, seed={seed}")
+        b0, b1, m1 = first
+        inverse = np.linalg.inv(np.eye(d) - b0)
+        b1, m1 = _rescale(inverse, b1, m1)
     exponent = rng.uniform(*model.exponent, size=d)
     z = rng.standard_normal((n + BURN_IN, d))
     noise = np.sign(z) * np.abs(z) ** exponent

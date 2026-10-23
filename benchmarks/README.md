@@ -1001,7 +1001,9 @@ dataset is one series, stored with `d = N` and `n = T`.
 
 Each method runs on the simulation of its own paper, drawn by `andrey_bench/temporal_models.py`,
 which keeps the expected number of cross-links per variable fixed as N grows. Every variable
-depends on its own previous step, and a model whose process is not stationary is drawn again:
+depends on its own previous step, and a model whose process is not stationary is drawn again. If
+none of 1000 draws is stationary, as for PCMCI+ at N = 240 and seed 1, the first draw is kept and
+its lagged coefficients are scaled together until the spectral radius is 0.95:
 
 | regime | method | source | cross-links per variable | same-step share | lags |
 |---|---|---|---|---|---|

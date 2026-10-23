@@ -4,13 +4,16 @@ Each test checks a property of the drawn model against the paper's setup as
 ``andrey_bench.temporal_models`` records it: the number of cross-links per variable, the share
 within a time step, the lag range, one autodependency per variable, an acyclic same-step graph, a
 stationary series, and the unobserved share. The stored truth and the key's identity are checked
-through the dataset store, as a campaign reads them.
+through the dataset store, as a campaign reads them. A model none of whose draws is stationary is
+rescaled to be, and a model whose draws are keeps them exactly.
 """
 
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import math
+import zlib
 
 import numpy as np
 import pytest
@@ -128,3 +131,82 @@ def test_each_paper_key_stores_the_truth_its_method_is_scored_against(tmp_path) 
     assert isinstance(window, WindowGraph) and window.latents == 0 and window.tau_max == 5
     hidden = _truth(lp[1], datasets.WINDOW_KIND, keys[2].latents)
     assert hidden.latents == 3 and lp[0].shape == (300, 7) and hidden.n_nodes == 10
+
+
+#: SHA-256 of each model's coefficient stacks, marks, and series over ``d`` in (10, 40, 160) and
+#: seeds 0 to 2, where a stationary draw comes within ``MAX_DRAWS``. A change to any drawn value
+#: changes it, and with it the datasets a campaign has stored.
+DRAWS = {
+    "lpcmci2020": "2657a1f494ca4e84481baf473f6ba0f97265b529db52489ad2a14c2aa8b6c140",
+    "pcmci2019": "646386ff9ec1116131205bd28b2c7c253f0f97d3cee52851bf450edc4517fd72",
+    "pcmciplus2020": "b55800c6691f0917f60201fadb712df0dc7e6b57391f7004e0e9396f35e3e1f6",
+}
+
+
+def _stack(name: str, d: int, seed: int) -> np.ndarray:
+    """The coefficient stack ``sample`` draws, from the stream ``sample`` seeds."""
+    rng = np.random.default_rng([zlib.crc32(name.encode()), d, seed])
+    return temporal_models._draw_model(temporal_models.MODELS[name], d, seed, rng)
+
+
+def _digest(name: str) -> str:
+    digest = hashlib.sha256()
+    for d in (10, 40, 160):
+        for seed in range(3):
+            data, marks = temporal_models.sample(name, d, n=200, seed=seed)
+            # The stack is random draws and exact; the series goes through BLAS, so it is rounded.
+            for part in (_stack(name, d, seed), np.round(data, 5) + 0.0, marks):
+                digest.update(np.ascontiguousarray(part).tobytes())
+    return digest.hexdigest()
+
+
+@pytest.mark.parametrize("name", MODELS)
+def test_a_model_with_a_stationary_draw_keeps_its_draws(name: str) -> None:
+    assert _digest(name) == DRAWS[name]
+
+
+@pytest.mark.parametrize(
+    ("name", "seed"), [("pcmci2019", 1), ("pcmciplus2020", 1), ("lpcmci2020", 2)]
+)
+def test_a_model_with_no_stationary_draw_is_rescaled_to_be_stationary(
+    name: str, seed: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """At d = 240 no set of 1000 draws is stationary for PCMCI+ at seed 1, and a minute of
+    eigenvalues shows it; the first three draws stand in for them."""
+    monkeypatch.setattr(temporal_models, "MAX_DRAWS", 3)
+    first = []
+    rescale = temporal_models._rescale
+
+    def record(stack: np.ndarray) -> np.ndarray:
+        first.append(stack)
+        return rescale(stack)
+
+    monkeypatch.setattr(temporal_models, "_rescale", record)
+    d = 240
+    stack = _stack(name, d, seed)
+    (drawn,) = first
+    assert temporal_models._spectral_radius(drawn[0], drawn[1:]) >= 1
+    radius = temporal_models._spectral_radius(stack[0], stack[1:])
+    assert radius == pytest.approx(temporal_models.STATIONARY_TARGET) and radius < 1
+    # Only the lagged coefficients change: the same-step part and every link stay as drawn.
+    np.testing.assert_array_equal(stack[0], drawn[0])
+    np.testing.assert_array_equal(stack != 0, drawn != 0)
+    assert not np.linalg.matrix_power((stack[0] != 0).astype(float), d).any()  # still a DAG
+    model = temporal_models.MODELS[name]
+    n_links = math.floor(model.cross_degree * d)
+    assert np.count_nonzero(stack[0]) == round(model.same_step * n_links)
+    assert np.count_nonzero(stack) - np.count_nonzero(np.diagonal(stack[1])) == n_links
+    np.testing.assert_array_equal(stack, _stack(name, d, seed))  # the same for the same seed
+
+
+def test_a_rescaled_series_is_stationary_and_the_same_for_the_same_seed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(temporal_models, "MAX_DRAWS", 3)
+    data, marks = temporal_models.sample("pcmciplus2020", 240, n=2000, seed=1)
+    again, marks_again = temporal_models.sample("pcmciplus2020", 240, n=2000, seed=1)
+    np.testing.assert_array_equal(data, again)
+    np.testing.assert_array_equal(marks, marks_again)
+    assert np.isfinite(data).all()
+    first, second = data[:1000].std(axis=0), data[1000:].std(axis=0)
+    assert (second < 3 * first).all() and (first < 3 * second).all()
