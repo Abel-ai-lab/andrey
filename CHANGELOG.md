@@ -53,6 +53,10 @@ change names its pull request.
   move cannot change it and rebuilds the CPDAG after each move faster. ([#328])
 - `xges` returns the same graphs in less time, because each branch of its extended search copies
   only the parts of the graph it changes. ([#311])
+- `xges` enters numpy's floating-point error state once per run instead of once per scored trial,
+  and raises `RuntimeError` instead of building a different graph if a branch of its extended
+  search starts from a snapshot that no longer matches the graph; `ges` starts its reach cache from
+  the empty graph's successor masks. The returned graphs are unchanged. ([#361])
 - `boss` and `grasp` return the same graphs in less time, because each grow-shrink tree keeps one
   tuple of candidate parents instead of copying the list on every trace. ([#267])
 - `exact_search` returns the same graphs in less time, because its linear-Gaussian BIC solves the
@@ -613,3 +617,4 @@ First alpha release.
 [#328]: https://github.com/Abel-ai-lab/andrey/pull/328
 [#346]: https://github.com/Abel-ai-lab/andrey/pull/346
 [#353]: https://github.com/Abel-ai-lab/andrey/pull/353
+[#361]: https://github.com/Abel-ai-lab/andrey/pull/361
