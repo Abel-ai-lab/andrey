@@ -156,12 +156,12 @@ its first call in a process.
    rsmax2
 ```
 
-IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given
-as `target`; without one, they return every variable's set as undirected edges, joining a pair
-when each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then runs hill climbing that
-joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase keeps the pairs of MMPC's
-skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and its maximize phase runs
-hill climbing or tabu search among them.
+IAMB and Inter-IAMB learn a variable's Markov blanket, and MMPC its parents and children, given as
+`target`; without one, they return every variable's set as undirected edges, joining a pair when
+each is in the other's set. MMHC learns a skeleton with MMPC's conditional-independence tests, then
+runs hill climbing that joins only the skeleton's pairs. RSMAX2 generalizes it: its restrict phase
+keeps the pairs of MMPC's skeleton, of IAMB's or Inter-IAMB's moral graph, or of PC's skeleton, and
+its maximize phase runs hill climbing or tabu search among them.
 
 A method becomes supported once it has:
 
