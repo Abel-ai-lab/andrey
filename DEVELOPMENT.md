@@ -43,6 +43,12 @@ line per method), the `ANDREY_*` variables, and the exit codes. `render_skill` b
 specs, so a new method or variable reaches it without an edit. To install it for an agent:
 `andrey --skill > ~/.claude/skills/andrey/SKILL.md`.
 
+An agent that has only run `pip install andrey-core` finds it from `help(andrey)`, whose docstring
+(`src/andrey/__init__.py`) holds a quick start and names `andrey --skill` and
+`andrey --help --json`, and from the PyPI summary (`pip show andrey-core`), which gives the import
+name. `tests/unit/test_cli.py` runs the quick start and every `andrey ...` command the docstring
+names.
+
 `tests/unit/test_spec_generate.py` checks that it lists every method and variable, opens with the
 front matter, and explains exactly the edge types a result can carry; `tests/unit/test_cli.py`
 checks that `andrey --skill` prints it. Before a release that changes it, give a coding agent a
