@@ -119,6 +119,12 @@ html[data-theme="dark"] .release-cover {
     var(--andrey-ground-navy);
 }
 
+.bd-content .sd-card:is(.release-cover, .release-tile).release-art-0-8-0 {
+  background:
+    url("release-cards/0.8.0.jpg") center 62% / cover no-repeat,
+    var(--andrey-ground-navy);
+}
+
 .bd-content .sd-card.release-cover .sd-card-body {
   padding: 1.2rem 1.7rem 1.9rem 2.05rem;
 }

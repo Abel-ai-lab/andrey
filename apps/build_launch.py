@@ -88,14 +88,14 @@ def methods_block():
         if not members:
             continue
         names = ", ".join(
-            f"[`{s.name}`]({SITE_URL}/docs/code/generated/andrey.{s.name}.html)"
+            f"[`{s.name}`]({SITE_URL}/docs/api/andrey.{s.name}.html)"
             + ("\\*" if s.status == "experimental" else "")
             for s in members
         )
         returns = ", ".join(dict.fromkeys(builder.returns_text(s) for s in members))
         rows.append(f"| {label} | {names} | {returns} |")
     footnote = [
-        "\\* [Experimental](" + SITE_URL + "/docs/code/index.html#experimental-methods):",
+        "\\* [Experimental](" + SITE_URL + "/docs/api.html#experimental-methods):",
         "no published benchmark yet, and the API may change.",
         "",
     ]

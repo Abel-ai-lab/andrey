@@ -48,10 +48,10 @@ sections follow the headline's words, then All-in-one (`ACTS` in `site/build.py`
 art at full bleed with its title and its claim (`act_covers()`), then shows its evidence: tiles,
 each with a figure of its own, and a note in plain type where the evidence is a list (`bento-note`).
 The hero and Accelerated share the fast lanes (`HERO_ART`, `.run` in `site.css`), which stay on the
-screen while Accelerated's title comes up over them, until the tiles rise over the art.
+screen as Accelerated's title appears, until the speed panel rises over the art.
 
-- Accelerated: the ideas behind the speed as a carousel, one card playing at a time, then a tile per
-  method family.
+- Accelerated: the speed panel with a tab per method family, followed by a link to the post "Why
+  Andrey is fast".
 - Accurate: where Andrey has fewer errors, as a chart, and beside it a note: every release is
   tested against true graphs, and its release card gives every method's errors.
 - Agentic: an agent's run of the command line, and the contract it reads first.
@@ -67,17 +67,12 @@ with a published comparison (`family_tiles()`) shows the family's largest ratio 
 digit ("up to 900x faster"), and none where Andrey is not at least twice as fast; a new family gets
 its tile with no change to the page.
 
-The ideas are four animated scenes from [`site/why_fast.py`](../site/why_fast.py), which the post
-`docs/blog/20261008-why-andrey-is-fast.md` shows too; each compares Andrey with a lane labeled
-Others and names no package. Under Accelerated's title they are a carousel (`belt()`): a card per
-scene, with its title, narration, a link to its part of the post, and its stage, in a row that
-scrolls sideways across the screen and snaps each card to the center. `why-fast.js` plays the
-current card while its dot fills, rests on its last frame, and moves on to the next, looping; it
-waits while the pointer or focus is on the carousel or it is off the screen, and the dots, arrow
-keys, a swipe, or a drag pick a card. Without script the cards are a row to scroll by hand, and
-under reduced motion no card plays or moves on by itself; both show the final counts. The scenes
-play with Motion, vendored unmodified as `site/assets/motion.js` under its MIT license and pinned
-in `tests/unit/test_why_fast.py`; `conf.py` loads both scripts only on those two pages.
+The post `docs/blog/20261008-why-andrey-is-fast.md` explains the speed through four animated scenes
+from [`site/why_fast.py`](../site/why_fast.py). Each compares Andrey with a lane labeled Others and
+names no package. `why-fast.js` plays each scene once when it scrolls into view, then offers a
+replay. Without JavaScript or under reduced motion, each scene shows its final counts. Motion
+plays the scenes; it is vendored unmodified as `site/assets/motion.js` under its MIT license and
+pinned in `tests/unit/test_why_fast.py`. `conf.py` loads both scripts only on that post.
 
 The page moves with the scroll, never under reduced motion: the stylesheet drives it from scroll and
 view timelines where the browser has them, and only opacity and transforms move; elsewhere the page
@@ -247,10 +242,18 @@ On a remote machine, keep the server on `127.0.0.1` and forward the port:
 carries its Twitter card fields and one JSON-LD graph: the organization (Abel's logomark,
 `site/brand/abel-symbol-night.svg`, drawn as `_static/abel-symbol.png`), the website, the software
 (Andrey's icon) at the page's release, the page, a `BlogPosting` for a post, and the breadcrumbs.
-The search and 404 pages are `noindex` (`UNINDEXED`). After the build, `_write_discovery` in
-`conf.py` writes `llms.txt` (the pages in `LLMS_SECTIONS`, then every release card and post) and
-`sitemap.xml` (every indexable page); `robots.txt` is a plain file (`_extra/robots.txt`). A page in
-`LLMS_SECTIONS` that is renamed or removed fails the build until the list follows it.
+The search and 404 pages (`UNINDEXED`) and the blog's generated pages (All Posts, the years, the
+archive, the tags, and the authors; `_blog_collection`) are `noindex` and name no canonical
+address, so the sitemap leaves them out: they only list the posts again. Every title but the
+homepage's ends with `html_title`, "Andrey causal discovery", so a page matches what Andrey does and
+not only a name that is also a person's. In the structured data, `alternateName` and `sameAs` tie
+the website, the package, the repository, and Abel's GitHub profile to one product. After the
+build, `_write_discovery` in `conf.py` writes `llms.txt` (the pages in `LLMS_SECTIONS`, then every
+release card and post) and `sitemap.xml` (every indexable page); `robots.txt` is a plain file
+(`_extra/robots.txt`). A page in `LLMS_SECTIONS` that is renamed or removed fails the build until
+the list is updated. Once a tagged release is live, `.github/workflows/indexnow.yml` submits every
+address in the sitemap to IndexNow for Bing and other participating engines. Its public key is
+served at `_extra/<key>.txt`. Google reads the sitemap directly.
 
 ## Validation
 
@@ -268,8 +271,9 @@ private symbol exposed); KaTeX-ready math; one description per page, the same as
 at most 160 characters; the navbar's links; the favicon and the link-preview cards; the blog's front
 page and each post's cover and byline; every site address in the README, the project URLs, and the
 citation; each page's structured data against its link preview and each post's front matter;
-`llms.txt`, `sitemap.xml`, and `robots.txt`; that only the search and 404 pages are `noindex`; and
-that the 404 page's links resolve from the site's root. External links: `uv run --group docs
+`llms.txt`, `sitemap.xml`, and `robots.txt`; that only the search page, the 404 page, and the blog's
+generated pages are `noindex`; each title's ending; and that the 404 page's links resolve from the
+site's root. External links: `uv run --group docs
 sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 
 ## How the site is wired
@@ -280,7 +284,7 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Homepage template, stylesheet, and content generators | `site/homepage.html`, `site/assets/site.css`, `site/build.py` |
 | Timing comparison and speed charts | `site/assets/figures.css`, `site/assets/figures.js` |
 | Segmented control: every choice, in the figures, the demos, and the graph guide | `site/assets/segmented.css` |
-| "Why Andrey is fast" scenes: homepage carousel, blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
+| "Why Andrey is fast" scenes in the blog post | `site/why_fast.py`, `site/assets/why-fast.css`, `site/assets/why-fast.js`, `site/assets/motion.js` |
 | Navbar: wordmark and sections | `docs/_templates/site-logo.html`, `docs/_templates/site-nav.html` |
 | Documentation footer: a navy card, three columns of links, the license, Abel's mark | `docs/_templates/docs-footer.html`, `docs/_static/andrey.css` |
 | Brand kit page: the downloads (`brand_kit` and `social_svg` in `site/cards.py`, written to `_static/brand/`) and the colors (`BRAND_COLORS` in `conf.py`) | `docs/docs/brand.md`, `docs/_static/andrey.css` |
@@ -289,7 +293,7 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Blog posts and the front page that lists them | `docs/blog/`, `docs/_static/blog.css` |
 | Release cards and the page that lists them | `docs/docs/benchmarks/`, `docs/docs/benchmarks.md`, `docs/_static/benchmarks.css` |
 | Docs landing page and section index | `docs/docs/index.md` |
-| API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/code/index.md` |
+| API reference (autodoc from `andrey.__all__`, the Typer CLI) | `docs/docs/api.md` |
 | Guides | `docs/docs/guides/` |
 | Examples and demos galleries and pages | `docs/docs/examples/`, `docs/docs/demos/` |
 | Notebook sources | `examples/*.ipynb` -> staged into `docs/docs/examples/` |
@@ -297,4 +301,5 @@ sphinx-build -b linkcheck docs docs/_build/linkcheck`.
 | Docs chrome over the palette tokens | `docs/_static/andrey.css` |
 | Docs tables: a framed header band over a card of rows, a fade where a wide table scrolls, short values and labels on one line (`_short_cells` in `conf.py`); the API reference's summary tables get a Name and Description header (`_summary_headers`) and stack on a phone | `docs/_static/andrey.css`, `docs/conf.py` |
 | The old demo address, redirected to the gallery | `docs/_templates/demo-redirect.html` |
+| The API reference's old addresses under `docs/code/`, redirected | `docs/_templates/moved-redirect.html` |
 | The retired benchmark explorer's address, redirected to the release cards | `docs/_templates/benchmark-explorer-redirect.html` |

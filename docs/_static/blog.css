@@ -916,3 +916,126 @@ ul.ablog-archive {
   font-size: 0.85rem;
   line-height: 1.45;
 }
+
+/* The 0.8.0 post's figures (docs/blog/0.8.0/): three relationships, each with the p-values
+   partial correlation and KCI give it, and the example's graphs, one card per test. */
+.dp,
+.gf {
+  margin: 2rem 0;
+  padding: 1rem 1.1rem 0.9rem;
+  border: 1px solid var(--andrey-line);
+  border-radius: var(--andrey-radius-lg);
+  background: var(--andrey-surface);
+}
+
+.gf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem 1.2rem;
+}
+
+.gf-name {
+  margin: 0;
+  color: var(--andrey-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.gf svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.dp-dots circle {
+  fill: var(--andrey-accent);
+  fill-opacity: 0.45;
+}
+
+/* The relationships' table: each row its points, then whether each test finds the dependence. */
+.dp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.dp-table thead th {
+  padding: 0 0.75rem 0.5rem;
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.dp-table tbody tr + tr > * {
+  border-top: 1px solid var(--andrey-line);
+}
+
+.dp-table tbody th {
+  width: 30%;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  font-weight: 400;
+  text-align: left;
+}
+
+.dp-table tbody th svg {
+  display: block;
+  width: 100%;
+  max-width: 14rem;
+  height: auto;
+}
+
+.dp-name {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--andrey-ink);
+  font-weight: 600;
+}
+
+.dp-table td {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+}
+
+.dp-table td b {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.dp-table thead th,
+.dp-table td {
+  text-align: center;
+}
+
+.dp-table tbody th svg {
+  min-width: 7rem;
+}
+
+.dp-table td small {
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+}
+
+.dp-table .dp-seen b {
+  color: var(--andrey-accent);
+}
+
+.dp-table .dp-missed b {
+  color: var(--andrey-muted);
+}
+
+.gf-count {
+  margin: 0;
+  color: var(--andrey-muted);
+  font-size: 0.8rem;
+}
+
+.dp figcaption,
+.gf figcaption {
+  margin-top: 0.8rem;
+  color: var(--andrey-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}

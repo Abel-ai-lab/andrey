@@ -43,10 +43,10 @@ step.
 ```{include} ../../_generated/column-order.md
 ```
 
-The experimental CI tests `kci`, `rcot`, `cmiknn`, and `gpdc` are not methods, so the table leaves
-them out. They seed their random draws and order their variables by the same rank, so a p-value
-depends on neither the argument order nor the column order, and `tie_break="position"` ranks their
-columns by position instead. `pc`, `fci`, `gfci`, and `cdnod` follow the setting through them when
+The CI tests `kci`, `rcot`, `cmiknn`, and `gpdc` are not methods, so the table leaves them out.
+They seed their random draws and order their variables by the same rank, so a p-value depends on
+neither the argument order nor the column order, and `tie_break="position"` ranks their columns by
+position instead. `pc`, `fci`, `gfci`, and `cdnod` follow the setting through them when
 `indep_test` names one.
 
 Identical columns are the exception for every method: they rank the same, so position decides which
@@ -143,3 +143,11 @@ step by the rank, and `"fast"` under `position`, which visits it in column order
 in the call overrides the setting.
 
 The methods in the "No" rows have no rank to replace, and the setting does not change them.
+
+## Comparisons with other packages
+
+At the settings the benchmarks use, causal-learn's PC, FCI, BOSS, and GRaSP, pcalg's PC, and
+tigramite's PC give results that depend on the column order. The benchmark tables compare such a
+package with Andrey's order-free default. Where a benchmark also runs Andrey in its column-order
+mode on the same datasets (for `pc` and `fci`, the search steps that `tie_break="position"` puts in
+column order), the table shows that comparison beside the default, as context.

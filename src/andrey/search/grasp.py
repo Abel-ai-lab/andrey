@@ -33,6 +33,31 @@ from andrey.search.boss import (
 _SCORE_EPS = 1e-6
 
 
+_EPS = float(np.finfo(np.float64).eps)
+
+
+def _open_gap(a: float, a_bound: float, b: float, b_bound: float) -> float:
+    """The largest gap between ``a`` and ``b`` whose sign their error bounds could flip, or -1.
+
+    ``a`` and ``b`` are within ``a_bound`` and ``b_bound`` of their full scores; a few units in the
+    last place cover the difference the comparison computes. With both bounds 0 the values are full
+    scores and no gap is open.
+    """
+    bound = a_bound + b_bound
+    if bound == 0.0:
+        return -1.0
+    return bound + 8 * _EPS * (abs(a) + abs(b))
+
+
+def _tightened(tree: _GST, base: Sequence[int], u: int | None, bound: float) -> float:
+    """``bound``, or the componentwise bound of the batched add of ``u`` to ``base`` that gave
+    the score (:meth:`~andrey.core.score_delta.DeltaBICScore.move_bound`) when it is smaller. No
+    score is computed; a full score (bound 0) stays as it is."""
+    if bound == 0.0 or u is None:
+        return bound
+    return min(bound, tree.delta.move_bound(tree.vertex, base, "add", u))
+
+
 class _GSTNode:
     """One node of a grow-shrink tree: a grow step and its cached higher-is-better local score.
 
@@ -40,17 +65,20 @@ class _GSTNode:
     first); ``shrink`` records the removals that improve the score once no addition helps.
     Both are computed lazily on first visit and cached, so a later trace reaching this node reuses
     them. ``score`` is the local score after this node's grow step, in the search's higher-is-better
-    convention.
+    convention, and ``bound`` bounds its distance from the full local score (0 for a full score).
     """
 
-    __slots__ = ("tree", "add", "grow_score", "shrink_score", "branches", "remove")
+    __slots__ = ("tree", "add", "grow_score", "grow_bound", "shrink_score", "branches", "remove")
 
-    def __init__(self, tree: _GST, add: int | None = None, score: float | None = None) -> None:
+    def __init__(
+        self, tree: _GST, add: int | None = None, score: float | None = None, bound: float = 0.0
+    ) -> None:
         if score is None:
             score = tree.empty_score
         self.tree = tree
         self.add = add
         self.grow_score = score
+        self.grow_bound = bound
         self.shrink_score = score
         self.branches: list[_GSTNode] | None = None
         self.remove: list[int] | None = None
@@ -63,34 +91,78 @@ class _GSTNode:
 
         Scores the single-variable additions in one batch against the shared ``parents`` base.
         Rechecks near-tied candidates and the base with full BIC scores before the strict
-        improvement comparison, and rechecks near-tied siblings before ordering them.
-        ``parents`` is left unchanged.
+        improvement comparison, and rechecks near-tied siblings before ordering them. A candidate
+        or a pair of siblings whose comparison the batch's error bounds leave open gets tighter
+        bounds and, if those leave it open too, is rechecked, so the branches and their order are
+        the ones full scores give. ``parents`` is left unchanged.
         """
         self.branches = []
-        vertex = self.tree.vertex
+        tree = self.tree
+        vertex = tree.vertex
         deltas = [("add", add) for add in available]
-        values = self.tree.delta.score_many_with_base(vertex, parents, deltas)
-        base_rechecked = False
-        for add, value in zip(available, values):
+        bounds: list[float] = []
+        values = tree.delta.score_many_with_base(vertex, parents, deltas, bounds=bounds)
+        base_rechecked = base_tightened = False
+        for add, value, bound in zip(available, values, bounds):
             candidate_score = -value
-            if abs(candidate_score - self.grow_score) <= _SCORE_EPS:
+            gap = abs(candidate_score - self.grow_score)
+            if (
+                _SCORE_EPS
+                < gap
+                <= _open_gap(candidate_score, bound, self.grow_score, self.grow_bound)
+            ):
+                # Tighten the bounds before scoring in full: the candidate's, and the node's own,
+                # from the move of its parent's batch.
+                bound = _tightened(tree, parents, add, bound)
+                if not base_tightened:
+                    own_base = [p for p in parents if p != self.add]
+                    self.grow_bound = _tightened(tree, own_base, self.add, self.grow_bound)
+                    base_tightened = True
+            if gap <= _SCORE_EPS or gap <= _open_gap(
+                candidate_score, bound, self.grow_score, self.grow_bound
+            ):
                 if not base_rechecked:
-                    self.grow_score = -self.tree.score.score(vertex, parents)
+                    self.grow_score = -tree.score.score(vertex, parents)
+                    self.grow_bound = 0.0
                     # Grow precedes shrink, so both cached base scores must agree.
                     self.shrink_score = self.grow_score
                     base_rechecked = True
-                candidate_score = -self.tree.score.score(vertex, [*parents, add])
+                candidate_score = -tree.score.score(vertex, [*parents, add])
+                bound = 0.0
             if candidate_score > self.grow_score:
-                self.branches.append(_GSTNode(self.tree, add, candidate_score))
+                self.branches.append(_GSTNode(tree, add, candidate_score, bound))
         ranked = sorted(self.branches, reverse=True)
-        recheck: set[_GSTNode] = set()
-        for left, right in zip(ranked, ranked[1:]):
-            if left.grow_score - right.grow_score <= _SCORE_EPS:
-                recheck.update((left, right))
-        for branch in recheck:
-            assert branch.add is not None
-            branch.grow_score = -self.tree.score.score(vertex, [*parents, branch.add])
-            branch.shrink_score = branch.grow_score
+        recheck = {
+            branch
+            for left, right in zip(ranked, ranked[1:])
+            if left.grow_score - right.grow_score <= _SCORE_EPS
+            for branch in (left, right)
+        }
+        tightened: set[_GSTNode] = set()
+        while True:
+            for branch in recheck:
+                assert branch.add is not None
+                branch.grow_score = -tree.score.score(vertex, [*parents, branch.add])
+                branch.grow_bound = 0.0
+                branch.shrink_score = branch.grow_score
+            # A pair whose order the bounds leave open gets tighter bounds, then full scores.
+            ranked = sorted(self.branches, reverse=True)
+            unsure = {
+                branch
+                for left, right in zip(ranked, ranked[1:])
+                if left.grow_score - right.grow_score
+                <= _open_gap(left.grow_score, left.grow_bound, right.grow_score, right.grow_bound)
+                for branch in (left, right)
+                if branch.grow_bound > 0.0
+            }
+            if not unsure:
+                break
+            recheck = set()
+            if unsure <= tightened:
+                recheck = unsure
+            for branch in unsure - tightened:
+                branch.grow_bound = _tightened(tree, parents, branch.add, branch.grow_bound)
+            tightened |= unsure
         # `trace` takes the first branch allowed by the prefix, so branch order determines the
         # search path. Sort the original candidate order so exact ties retain that order.
         self.branches.sort(reverse=True)

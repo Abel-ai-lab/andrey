@@ -1,0 +1,240 @@
+"""The 0.8.0 post's figures, saved as HTML beside this script for inclusion in the post.
+
+- ``dependence.html``: three relationships, linear, cosine, and square, with p-values from partial
+  correlation and each nonlinear test.
+- ``graphs.html``: the post's example, the true graph beside the graph PC finds with partial
+  correlation and with each nonlinear test.
+- ``comparison.html``: PC and FCI with each test against each reference package: the speedup.
+
+The table's numbers come from the 0.8.0 release card's summary (``SUMMARY``). The other two figures
+use fits computed here with fixed seeds. Every color is an ``--andrey-*`` token. The script runs
+with ``uv run python docs/blog/0.8.0/figures.py [summary.json]``.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import json
+import sys
+from html import escape
+from pathlib import Path
+
+import numpy as np
+
+import andrey
+from andrey import GraphStructure
+from andrey.core.ci import make_indep_test
+from andrey.data import sample_scm
+from andrey.viz import LIGHT, Palette, draw
+
+HERE = Path(__file__).parent
+SUMMARY = HERE.parents[2] / "benchmarks" / "published" / "0.8.0" / "summary.json"
+# The four tests in the post's order, by the indep_test name in each row's solution.
+TESTS = {"kci": "KCI", "rcot": "RCoT", "cmiknn": "CMIknn", "gpdc": "GPDC"}
+PALETTE = Palette(
+    **{
+        field.name: (
+            getattr(LIGHT, field.name)
+            if isinstance(getattr(LIGHT, field.name), tuple)
+            else f"var(--andrey-{field.name.replace('_', '-')})"
+        )
+        for field in dataclasses.fields(LIGHT)
+    }
+)
+
+
+def listed(names: list[str]) -> str:
+    """Names joined in a list: A, B, and C."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + f", and {names[-1]}"
+
+
+def p_text(p: float) -> str:
+    """A p-value formatted for display in the figures."""
+    if p < 0.001:
+        return "p < 0.001"
+    return f"p = {p:.3f}" if p < 0.01 else f"p = {p:.2f}"
+
+
+def dependence_figure() -> str:
+    # 400 draws of x, with linear, cosine, and square functions of x sharing the same noise.
+    # Each row shows the points on the left and each test's result on the right.
+    rng = np.random.default_rng(0)
+    x = rng.uniform(-3, 3, 400)
+    noise = rng.normal(0, 0.3, 400)
+    shapes = (
+        ("y = x", 0.5 * x),
+        ("y = cos(x)", np.cos(x)),
+        ("y = x²", x**2 / 3 - 1),
+    )
+    tests = (("fisherz", "Partial correlation"), *TESTS.items())
+    w, h, pad = 180, 110, 8
+    rows, results = [], []
+    for name, signal in shapes:
+        y = signal + noise
+        data = np.column_stack([x, y])
+        found = {test: make_indep_test(test, data)(0, 1, ()) for test in dict(tests)}
+        results.append(found)
+        sx = lambda v: pad + (v + 3) / 6 * (w - 2 * pad)  # noqa: E731
+        lo, hi = float(y.min()), float(y.max())
+        sy = lambda v: h - pad - (v - lo) / (hi - lo) * (h - 2 * pad)  # noqa: E731
+        dots = "".join(
+            f'<circle cx="{sx(a):.1f}" cy="{sy(b):.1f}" r="1.6"/>'
+            for a, b in zip(x, y, strict=True)
+        )
+        cells = "".join(
+            f'<td class="{"dp-seen" if found[t] < 0.05 else "dp-missed"}">'
+            f'<b aria-label="{"finds it" if found[t] < 0.05 else "misses it"}">'
+            f"{'✓' if found[t] < 0.05 else '✗'}</b>"
+            f"<small>{escape(p_text(found[t]))}</small></td>"
+            for t in dict(tests)
+        )
+        rows.append(
+            f'<tr><th scope="row"><svg viewBox="0 0 {w} {h}" role="img" '
+            f'aria-label="{escape(name)}: 400 points"><g class="dp-dots">{dots}</g></svg>'
+            f'<span class="dp-name">{escape(name)}</span></th>{cells}</tr>'
+        )
+    head = "".join(f'<th scope="col">{label}</th>' for _, label in tests)
+    every = [label for t, label in tests[1:] if all(r[t] < 0.05 for r in results)]
+    return (
+        '<figure class="dp"><table class="dp-table"><thead><tr><td></td>'
+        f"{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+        "<figcaption>Three ways y depends on x, each with the same noise; ✓ finds the dependence "
+        "at alpha 0.05. Partial correlation measures only a straight-line trend, so it misses "
+        f"the cos and the square; {listed(every)} find all three.</figcaption></figure>\n"
+    )
+
+
+def graphs_figure() -> str:
+    # The post's example: 500 rows of 8 variables, each a weighted sum of cosines plus noise.
+    dataset = sample_scm(
+        d=8, n=500, functional="nonmonotone", density=2.0, scale="standardize", seed=0
+    )
+    labels = tuple("ABCDEFGH")
+    truth = dataset.graph.adjacency
+    true_graph = GraphStructure.from_numpy(truth, kind="dag", labels=labels)
+    # Nodes lie on a circle so no edge passes through another node at this size.
+    angles = np.linspace(np.pi / 2, np.pi / 2 - 2 * np.pi, len(labels), endpoint=False)
+    positions = {
+        i: (0.5 + 0.42 * float(np.cos(a)), 0.5 - 0.42 * float(np.sin(a)))
+        for i, a in enumerate(angles)
+    }
+    edges = truth != 0
+    edges |= edges.T
+
+    def picture(graph: GraphStructure) -> str:
+        drawn = draw(graph, palette=PALETTE, positions=positions, background=False,
+                     width=200, height=200)  # fmt: skip
+        return str(drawn).split("?>", 1)[-1].strip()
+
+    cells = [("True graph", "8 links", picture(true_graph))]
+    for test, label in (("fisherz", "Partial correlation"), *TESTS.items()):
+        fit = andrey.pc(dataset.data, alpha=0.05, indep_test=test).structure
+        found = fit.adjacency != 0
+        found |= found.T
+        hits, extra = (found & edges).sum() // 2, (found & ~edges).sum() // 2
+        graph = GraphStructure.from_numpy(fit.adjacency, kind="cpdag", labels=labels)
+        cells.append((label, f"{hits} of 8 found, {extra} extra", picture(graph)))
+    body = "".join(
+        f'<div class="gf-cell"><p class="gf-name">{escape(name)}</p>{svg}'
+        f'<p class="gf-count">{escape(count)}</p></div>'
+        for name, count, svg in cells
+    )
+    return (
+        f'<figure class="gf"><div class="gf-grid">{body}</div><figcaption>The example\'s true '
+        "graph, and the graph PC finds on its 500 rows with each test.</figcaption></figure>\n"
+    )
+
+
+def table(title: str, columns: tuple[str, ...], groups: tuple, rank=None, note: str = "") -> str:
+    """A comparison table with vertical group labels and Andrey's column first and tinted.
+
+    The best cells are bold when the row has different ranks.
+
+    ``groups`` holds ``(label, rows)`` pairs. Each row is ``(name, detail, cells)``, with one cell
+    per column: a number, a word, or None for no measurement. ``rank`` orders cells from best to
+    worst and defaults to the cell's value. A cell ranked None is never best.
+    """
+    rank = rank or (lambda cell: cell)
+    ours = ' class="ct-ours"'
+    head = "".join(
+        f'<th scope="col"{ours if k == 0 else ""}>{escape(c)}</th>' for k, c in enumerate(columns)
+    )
+
+    def row(name: str, detail: str, cells: tuple) -> str:
+        ranks = [rank(c) for c in cells if c is not None and rank(c) is not None]
+        best = min(ranks) if ranks else None
+        tds = []
+        for k, c in enumerate(cells):
+            cls = ["ct-ours"] if k == 0 else []
+            if c is None:
+                tds.append(f'<td class="{" ".join([*cls, "ct-na"])}">-</td>')
+                continue
+            if rank(c) is not None and rank(c) == best and len(set(ranks)) > 1:
+                cls.append("ct-best")
+            text = f"{c:,}" if isinstance(c, int) else escape(str(c))
+            tds.append(f'<td class="{" ".join(cls)}">{text}</td>')
+        small = f"<small>{escape(detail)}</small>" if detail else ""
+        return f'<th scope="row">{escape(name)}{small}</th>{"".join(tds)}'
+
+    body = "".join(
+        "".join(
+            "<tr>"
+            + (
+                f'<th class="ct-group" rowspan="{len(rows)}"><span>{escape(label)}</span></th>'
+                if i == 0
+                else ""
+            )
+            + row(*r)
+            + "</tr>"
+            for i, r in enumerate(rows)
+        )
+        for label, rows in groups
+    )
+    caption = f"<figcaption>{escape(note)}</figcaption>" if note else ""
+    return (
+        f'<figure class="ct"><p class="ct-title">{escape(title)}</p><div class="ct-scroll">'
+        f'<table class="ct-table"><thead><tr><td colspan="2"></td>{head}</tr></thead>'
+        f"<tbody>{body}</tbody></table></div>{caption}</figure>\n"
+    )
+
+
+def floored(value: float) -> str:
+    """``value`` rounded down to two significant figures to avoid overstating a speedup."""
+    digits = 1 - int(np.floor(np.log10(value)))
+    return f"{np.floor(value * 10**digits) / 10**digits:g}"
+
+
+def comparison_table(summary: dict) -> str:
+    # One row per test and reference package across all measured sizes of PC and FCI:
+    # the range of median fit-time ratios, with the minimum rounded down and maximum rounded.
+    ratios: dict[tuple[str, str], list[float]] = {}
+    for method in summary["methods"]:
+        test = method["solution"].split(".")[2]
+        if method["lane"] == "nonlinear" and test in TESTS:
+            ratios.setdefault((TESTS[test], method["comparator"]), []).extend(
+                row["ratio"] for row in method["rows"] if row.get("ratio")
+            )
+    rows = tuple(
+        (name, f"vs {reference}", (f"{floored(min(speeds))}-{max(speeds):.2g}x",))
+        for (name, reference), speeds in ratios.items()
+    )
+    return table(
+        "Each test against its reference package",
+        ("Faster by",),
+        (("PC and FCI", rows),),
+        rank=lambda cell: None,
+        note="The range over sizes of the reference's median fit time over Andrey's.",
+    )
+
+
+def main() -> None:
+    (HERE / "dependence.html").write_text(dependence_figure(), encoding="utf-8")
+    (HERE / "graphs.html").write_text(graphs_figure(), encoding="utf-8")
+    path = Path(sys.argv[1]) if len(sys.argv) > 1 else SUMMARY
+    if path.exists():  # the comparison requires the release card's summary
+        summary = json.loads(path.read_text(encoding="utf-8"))
+        (HERE / "comparison.html").write_text(comparison_table(summary), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

@@ -61,7 +61,7 @@ gitleaks, to this checkout, so they run on every commit; `prek run --all-files` 
   `main` from any other branch, and the release pull request runs the quality gate
   (`qa/README.md`), also required, once for the whole release.
 - When the public API changes, update its docstrings and the API reference
-  (`docs/docs/code/index.md`) in the same pull request.
+  (`docs/docs/api.md`) in the same pull request.
 - Everything in `andrey.__all__` is public and documented. Names that start with `_` are internal
   and may change without notice; do not import them from outside the package.
 - Code, data, and assets copied from another project keep their license notice, as
