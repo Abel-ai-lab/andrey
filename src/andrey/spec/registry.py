@@ -1466,14 +1466,28 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "pcmciplus": _LINK_RULE + "The lagged and skeleton phases test no forbidden or required link: "
     "a forbidden link is never linked, and a required one stays. Same-step links the knowledge "
     "decides are directed before the colliders, which never reverse them; rules R1-R3 follow.",
+    "varma_lingam": _LINK_RULE + "Lags run over the autoregressive part, 0 to order[0]. At lag 0 "
+    "the innovations' DirectLiNGAM honors the knowledge as direct_lingam does. With prune=true "
+    "each regression drops forbidden lagged regressors and keeps required ones unpenalized; with "
+    "prune=false every lagged weight stays, so a forbidden lagged link raises.",
+    "longitudinal_lingam": _LINK_RULE + "At lag 0 each time point's DirectLiNGAM honors the "
+    "knowledge as direct_lingam does. A forbidden lagged link is left out of the least-squares "
+    "fit of its effect's lagged weights; every other lagged weight stays.",
+    "rcd": "The ancestor search runs as without knowledge; the parent sets then drop forbidden "
+    "parents and gain required ones, and a pair forbidden both ways is never marked <->.",
+    "bottom_up_parce_lingam": "A sink is taken only when no remaining variable is in a later "
+    "tier, and each regression drops forbidden parents. In the unordered block, a pair forbidden "
+    "both ways is not adjacent and a pair forbidden one way has an arrowhead at the cause. "
+    "Required edges raise.",
     "lpcmci": _LINK_RULE + "A forbidden lagged link, and a same-step pair forbidden both ways, is "
     "never linked; a same-step link forbidden one way has an arrowhead at its cause. A required "
     "link is -->, and no test or rule removes it. No rule changes a mark the knowledge sets.",
 }
-#: The Knowledge parts each method honors (every part, for every method that takes knowledge).
-_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = dict.fromkeys(
-    _KNOWLEDGE_HOW, KNOWLEDGE_PARTS
-)
+#: The Knowledge parts each method honors: every part, but for BottomUpParceLiNGAM.
+_KNOWLEDGE_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
+    **dict.fromkeys(_KNOWLEDGE_HOW, KNOWLEDGE_PARTS),
+    "bottom_up_parce_lingam": ("forbidden", "allowed", "tiers"),
+}
 _MAX_DEPTH = ParamSpec(
     name="max_depth",
     type="int",

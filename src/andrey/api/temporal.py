@@ -50,6 +50,7 @@ def varma_lingam(
     prune: bool = False,
     structural_ma: bool = False,
     max_iter: int = 100,
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a temporal causal structure from one multivariate time series with VARMA-LiNGAM.
 
@@ -81,6 +82,22 @@ def varma_lingam(
     max_iter : int, default=100
         Most iterations of the likelihood fit, at least ``1``. With ``criterion`` set, every fit
         in the grid gets this limit.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables over the autoregressive lags ``0`` to ``order[0]``: required and forbidden
+        links, the pairs allowed to be linked, and temporal tiers, all honored. A link
+        ``(cause, effect, lag)`` is the link from ``cause`` at time ``t - lag`` to ``effect`` at
+        time ``t``, lag ``0`` being the same step; a forbidden ``(cause, effect)`` pair forbids it
+        at every lag, and a required link names its lag. At lag ``0``, DirectLiNGAM on the
+        innovations honors the knowledge as :func:`~andrey.direct_lingam` does: the causal order
+        puts the cause of each required link, and each earlier tier, first, and the regression
+        drops forbidden parents and keeps required ones unpenalized. With ``prune=True``, each
+        variable's regression also drops its forbidden lagged regressors and keeps its required
+        ones unpenalized. With ``prune=False`` every lagged weight stays, so a required lagged
+        link is in the graph, and a forbidden lagged link raises. Tiers forbid every link from a
+        later tier into an earlier one, and a pair left out of ``allowed`` has no link at any
+        lag; a variable's links to its own past stay allowed. The moving-average weights are not
+        constrained.
 
     Returns
     -------
@@ -95,11 +112,14 @@ def varma_lingam(
     Raises
     ------
     TypeError
-        If ``order`` is not a pair of ints, or ``max_iter`` is not an int.
+        If ``order`` is not a pair of ints, ``max_iter`` is not an int, or ``knowledge`` is
+        neither ``None`` nor a :class:`~andrey.Knowledge`.
     ValueError
         If ``criterion`` is not one of ``"aic"``, ``"bic"``, ``"hqic"``, or ``None``, if ``order``
         holds a negative count or is ``(0, 0)``, if ``max_iter`` is below 1, or if ``data`` has
-        fewer than 2 columns.
+        fewer than 2 columns. Also if ``knowledge`` names a column ``data`` lacks, contradicts
+        itself, requires a link without a lag or beyond ``order[0]``, forbids a lagged link while
+        ``prune=False``, or requires a link at a lag beyond the ``p`` that ``criterion`` selected.
 
     Notes
     -----
@@ -162,6 +182,7 @@ def varma_lingam(
         raise ValueError("order must have p or q above 0, got (0, 0)")
     max_iter = int_in_range(max_iter, "max_iter", 1)
     labels = column_labels(data)
+    constraints = resolve_lagged(knowledge, X.shape[1], labels, order[0], method="varma_lingam")
     causal_order, psis, omegas = _native(
         X,
         order=order,
@@ -169,13 +190,19 @@ def varma_lingam(
         prune=prune,
         structural_ma=structural_ma,
         max_iter=max_iter,
+        constraints=constraints,
+        name=column_namer(labels),
     )
     model = SimpleNamespace(adjacency_matrices_=(psis, omegas), causal_order_=causal_order)
     return with_labels(_adapt_varma_lingam(model), labels)
 
 
 def longitudinal_lingam(
-    data_list: Sequence[npt.ArrayLike], *, n_lags: int = 1, measure: str = "pwling"
+    data_list: Sequence[npt.ArrayLike],
+    *,
+    n_lags: int = 1,
+    measure: str = "pwling",
+    knowledge: Knowledge | None = None,
 ) -> StructureOutput:
     """Learn a temporal causal structure from panel data with Longitudinal LiNGAM.
 
@@ -195,6 +222,21 @@ def longitudinal_lingam(
         number of time points minus one.
     measure : {"pwling"}, default="pwling"
         DirectLiNGAM pairwise independence measure for the instantaneous fit.
+    knowledge : Knowledge or None, default=None
+        Background knowledge, a :class:`~andrey.Knowledge`, read as links between lagged
+        variables over lags ``0`` to ``n_lags``, the same at every time point: required and
+        forbidden links, the pairs allowed to be linked, and temporal tiers, all honored. A link
+        ``(cause, effect, lag)`` is the link from ``cause`` at time point ``t - lag`` to
+        ``effect`` at time point ``t``, lag ``0`` being the same time point; a forbidden
+        ``(cause, effect)`` pair forbids it at every lag, and a required link names its lag. At
+        lag ``0``, each time point's DirectLiNGAM honors the knowledge as
+        :func:`~andrey.direct_lingam` does: the causal order puts the cause of each required
+        link, and each earlier tier, first, and the regression drops forbidden parents and keeps
+        required ones unpenalized. A forbidden lagged link is left out of the least-squares fit
+        of its effect's lagged weights, so its weight is ``0``; every other lagged weight stays,
+        so a required lagged link is in the graph. Tiers forbid every link from a later tier into
+        an earlier one, and a pair left out of ``allowed`` has no link at any lag; a variable's
+        links to its own past stay allowed.
 
     Returns
     -------
@@ -214,10 +256,13 @@ def longitudinal_lingam(
     NotImplementedError
         If ``measure`` is not ``"pwling"``.
     TypeError
-        If ``n_lags`` is not an int.
+        If ``n_lags`` is not an int, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
         If ``data_list`` has fewer than two time points, if ``n_lags`` is outside its range, if
-        the per-time arrays differ in shape, or if the DataFrames' column names differ.
+        the per-time arrays differ in shape, or if the DataFrames' column names differ. Also if
+        ``knowledge`` names a column the data lacks, contradicts itself, or requires a link
+        without a lag or beyond ``n_lags``.
 
     Notes
     -----
@@ -262,7 +307,10 @@ def longitudinal_lingam(
         raise ValueError(f"data_list must hold at least two time points, got {len(panel)}")
     n_lags = int_in_range(n_lags, "n_lags", 1, len(panel) - 1)
     labels = shared_labels(column_labels(X) for X in data_list)
-    model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure).fit(panel)
+    constraints = resolve_lagged(
+        knowledge, panel[0].shape[1], labels, n_lags, method="longitudinal_lingam"
+    )
+    model = LongitudinalLiNGAM(n_lags=n_lags, measure=measure, constraints=constraints).fit(panel)
     return with_labels(_adapt_longitudinal_lingam(model), labels)
 
 

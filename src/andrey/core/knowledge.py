@@ -163,14 +163,16 @@ class Knowledge:
         If an edge is a self-loop at lag ``0`` or a node is in two tiers. A method raises
         ``ValueError`` when the knowledge names a column the data lacks, or contradicts itself: a
         required edge that is forbidden, directly, by the tiers, or by ``allowed``, or required
-        edges forming a cycle. ``boss``, ``grasp``, ``direct_lingam``, ``ica_lingam``, and
-        ``multi_group_direct_lingam`` also raise it when the required edges and the tiers admit no
-        causal order, through a column in no tier. ``pc``,
+        edges forming a cycle. ``boss``, ``grasp``, and the LiNGAM methods that search a causal
+        order also raise it when the required edges and the tiers admit no causal order, through a
+        column in no tier. ``pc``,
         ``cdnod``, and ``pcmciplus`` raise it when the edges the knowledge orients form a directed
         cycle over the adjacencies the search kept; ``fci`` when a directed path of required edges
         leads from ``a`` to ``b`` while ``forbidden`` or ``tiers`` put an arrowhead at ``a`` on the
-        edge between them. A time-series search raises it for a required link without a lag, or at
-        a lag the search does not learn.
+        edge between them. ``rcd`` raises it when the required edges close a directed cycle with
+        the parents it found. A time-series search raises it for a required link without a lag, or
+        at a lag the search does not learn; ``varma_lingam`` also for a forbidden lagged link with
+        ``prune=False``.
     NotImplementedError
         A method that learns no time lags raises it for an edge with a lag.
 
@@ -196,9 +198,9 @@ class Knowledge:
     ``a -> b`` says that ``a`` is an ancestor of ``b``, not necessarily its direct cause. A
     forbidden ``a -> b`` on an adjacent pair puts an arrowhead at ``a`` and can leave a circle at
     ``b``, and a required ``a -> b`` is ``a -> b``. The methods that search over causal orders
-    (``boss``, ``grasp``, ``direct_lingam``, ``ica_lingam``, ``multi_group_direct_lingam``) also
-    keep each variable of a tier after those of earlier tiers; with every variable in a tier, this
-    is the same as forbidding the edges.
+    (``boss``, ``grasp``, and the LiNGAM methods but ``rcd``) also keep each variable of a tier
+    after those of earlier tiers; with every variable in a tier, this is the same as forbidding the
+    edges.
 
     The time-series searches read the knowledge per lag. Tiers and ``allowed`` hold at every lag:
     no link runs from a later tier into an earlier one, and a pair outside ``allowed`` has no link
@@ -496,6 +498,21 @@ class LaggedConstraints:
     def contemporaneous(self) -> Constraints:
         """The lag-0 constraints, as :class:`Constraints` over the ``d`` series."""
         return Constraints(self.forbidden[0], self.required[0], self.tier)
+
+    def permuted(self, order: npt.ArrayLike) -> LaggedConstraints:
+        """These constraints with series ``order[k]`` as series ``k``."""
+        idx = np.asarray(order, dtype=np.intp)
+        return LaggedConstraints(
+            self.forbidden[:, idx][:, :, idx], self.required[:, idx][:, :, idx], self.tier[idx]
+        )
+
+    def lagged_forbidden(self) -> tuple[int, int, int] | None:
+        """The first ``(cause, effect, lag)`` link forbidden at a lag of ``1`` or more, if any."""
+        found = np.argwhere(self.forbidden[1:])
+        if not len(found):
+            return None
+        lag, i, j = found[0].tolist()
+        return i, j, lag + 1
 
 
 def resolve_lagged(

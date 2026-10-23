@@ -33,7 +33,7 @@ TEMPORAL = [
     for name, spec in REGISTRY.items()
     if spec.knowledge and spec.output.structure_type == "temporal"
 ]
-PAGS = {"fci", "gfci"}
+PAGS = {name for name, spec in REGISTRY.items() if spec.output.graph_kind == "pag"}
 DEPTH = ["pc", "fci", "gfci", "cdnod"]
 LABELS = list("abcdef")
 # a -> c <- b, c -> d -> e, a -> f.
@@ -86,7 +86,7 @@ def _assert_required_forbidden_and_tiers_hold(name: str, marks: np.ndarray, labe
     def directed(x, y):
         return marks[at(x), at(y)] == TAIL and marks[at(y), at(x)] == ARROW
 
-    assert directed("b", "f"), marks
+    assert directed("b", "f") or "required" not in REGISTRY[name].knowledge, marks
     assert not directed("c", "d") and not directed("e", "d")
     for early in EARLY:
         for late in LATE:
@@ -100,9 +100,17 @@ def _assert_required_forbidden_and_tiers_hold(name: str, marks: np.ndarray, labe
         assert directed("d", "c")
 
 
+def _honored(name: str, knowledge: Knowledge) -> Knowledge:
+    """``knowledge`` without the parts method ``name`` does not honor."""
+    parts = REGISTRY[name].knowledge
+    return Knowledge(
+        **{part: getattr(knowledge, part) for part in knowledge.parts() if part in parts}
+    )
+
+
 @pytest.mark.parametrize("name", METHODS)
 def test_required_forbidden_and_tiers_hold(name, data):
-    marks, labels = _marks(_fit(name, data, knowledge=KNOWLEDGE))
+    marks, labels = _marks(_fit(name, data, knowledge=_honored(name, KNOWLEDGE)))
     _assert_required_forbidden_and_tiers_hold(name, marks, labels)
 
 
@@ -176,7 +184,14 @@ def test_allowed_pairs_hold(name, data):
 @pytest.mark.parametrize("name", METHODS)
 def test_reordered_columns_relabel_the_result(name, data):
     def edges(frame):
-        return sorted(_fit(name, frame, knowledge=KNOWLEDGE).structure.oriented_edges())
+        found = _fit(name, frame, knowledge=_honored(name, KNOWLEDGE)).structure.oriented_edges()
+        # An edge with the same mark at both ends lists its ends in column order.
+        return sorted(
+            (*sorted((a, b)), kind)
+            if kind in ("undirected", "bidirected", "circle")
+            else (a, b, kind)
+            for a, b, kind in found
+        )
 
     assert edges(data[LABELS[::-1]]) == edges(data)
 
@@ -328,6 +343,11 @@ def test_resolve_rejects_contradictions(knowledge, message):
 def test_names_need_column_labels():
     with pytest.raises(ValueError, match="no column names"):
         resolve(Knowledge(required=[("a", "b")]), 3, None, method="pc")
+
+
+def test_bottom_up_parce_lingam_rejects_required_edges(data):
+    with pytest.raises(NotImplementedError, match="required"):
+        andrey.bottom_up_parce_lingam(data, knowledge=Knowledge(required=[("a", "c")]))
 
 
 def test_a_part_a_method_does_not_honor_raises():
@@ -506,7 +526,7 @@ def test_no_rule_orients_through_a_kept_apart_pair_the_data_join(name):
     assert marks[y, z] == TAIL and marks[z, y] == TAIL
 
 
-@pytest.mark.parametrize("name", METHODS)
+@pytest.mark.parametrize("name", [m for m in METHODS if "required" in REGISTRY[m].knowledge])
 @pytest.mark.parametrize("edge", [("a", "b"), ("b", "a")])
 def test_a_required_edge_keeps_its_direction_where_the_data_allow_both(name, edge):
     # Two dependent variables: either direction fits the data equally well.
@@ -518,14 +538,51 @@ def test_a_required_edge_keeps_its_direction_where_the_data_allow_both(name, edg
     assert marks[cause, effect] == TAIL and marks[effect, cause] == ARROW
 
 
-@pytest.mark.parametrize("name", [m for m in METHODS if REGISTRY[m].family == "lingam"])
+@pytest.mark.parametrize(
+    "name", [m for m in METHODS if REGISTRY[m].family in ("lingam", "latent") and m != "gin"]
+)
 def test_lingam_knowledge_that_fits_the_truth_does_not_add_errors(name, data):
     def errors(out) -> int:
         found = {(a, b) for a, b, kind in out.structure.oriented_edges() if kind == "directed"}
         return len(found ^ TRUTH)
 
     knowledge = Knowledge(required=[("c", "d")], forbidden=[("e", "d")], tiers=[EARLY, LATE])
+    knowledge = _honored(name, knowledge)
     assert errors(_fit(name, data, knowledge=knowledge)) <= errors(_fit(name, data))
+
+
+def _confounded(seed: int = 0, n: int = 2000) -> np.ndarray:
+    # A hidden h drives x0 and x1; x2 and x3 are their children.
+    rng = np.random.default_rng(seed)
+    h, e0, e1, e2, e3 = rng.uniform(-1.0, 1.0, (5, n))
+    x0, x1 = 1.5 * h + e0, 1.5 * h + e1
+    return np.column_stack([x0, x1, x1 + e2, x0 + e3])
+
+
+def test_rcd_never_marks_a_pair_kept_apart_as_confounded():
+    data = _confounded()
+    assert andrey.rcd(data).metadata["confounded_pairs"] == [[0, 1]]
+    out = andrey.rcd(data, knowledge=Knowledge(forbidden=[(0, 1), (1, 0)]))
+    assert out.metadata["confounded_pairs"] == [] and from_structure(out.structure)[0, 1] == NULL
+
+
+def test_rcd_raises_on_required_edges_that_close_a_cycle():
+    data = _confounded()  # RCD finds 1 -> 2 and 0 -> 3
+    with pytest.raises(KnowledgeError, match="cycle"):
+        andrey.rcd(data, knowledge=Knowledge(required=[(2, 0), (3, 1), (0, 1)]))
+
+
+@pytest.mark.parametrize("forbidden", [[(0, 1)], [(0, 1), (1, 0)]], ids=["one way", "both ways"])
+def test_bottom_up_parce_lingam_reads_the_knowledge_in_the_unordered_block(forbidden):
+    data = _confounded()
+    plain = andrey.bottom_up_parce_lingam(data, alpha=0.01)
+    assert plain.metadata["causal_order"] == [[0, 1], 2, 3]
+    out = andrey.bottom_up_parce_lingam(data, alpha=0.01, knowledge=Knowledge(forbidden=forbidden))
+    marks = from_structure(out.structure)
+    if len(forbidden) == 2:
+        assert marks[0, 1] == NULL and marks[1, 0] == NULL
+    else:  # an arrowhead at the cause of the forbidden edge, a circle at its effect
+        assert marks[0, 1] == ARROW and marks[1, 0] == CIRCLE
 
 
 def test_every_group_honors_the_knowledge(data):
@@ -587,22 +644,59 @@ def test_fci_reads_a_cycle_of_arrowheads_as_a_pag():
 SERIES = ["x", "y", "z"]
 # x -> x and y -> y at lag 1, x -> y at lags 1 and 2, y -> z at lag 0.
 SERIES_TRUTH = {("x", "x", 1), ("y", "y", 1), ("x", "y", 1), ("x", "y", 2), ("y", "z", 0)}
+SERIES_EFFECTS = {
+    ("x", "x", 1): 0.5,
+    ("y", "y", 1): 0.3,
+    ("x", "y", 1): 0.5,
+    ("x", "y", 2): 0.4,
+    ("y", "z", 0): 0.7,
+}
 
 
-def _series(seed: int = 0, n: int = 1000) -> pd.DataFrame:
+def _simulate(effects: dict, columns: list[str], *, panel: bool, seed: int = 0):
+    """A linear series with the ``{(cause, effect, lag): weight}`` effects and uniform noise.
+
+    One series of 1,000 steps, or with ``panel`` a list of 6 time points of 1,000 units each.
+    The columns are listed in an order that puts the cause of every same-step effect first.
+    """
     rng = np.random.default_rng(seed)
-    e = rng.standard_normal((n, 3))
-    x, y, z = np.zeros(n), np.zeros(n), np.zeros(n)
-    for t in range(2, n):
-        x[t] = 0.5 * x[t - 1] + e[t, 0]
-        y[t] = 0.5 * x[t - 1] + 0.4 * x[t - 2] + 0.3 * y[t - 1] + e[t, 1]
-        z[t] = 0.7 * y[t] + e[t, 2]
-    return pd.DataFrame({"x": x, "y": y, "z": z})
+    steps, units = (6, 1000) if panel else (1000, 1)
+    X = np.zeros((steps, units, len(columns)))
+    for t in range(steps):
+        X[t] = rng.uniform(-1.0, 1.0, (units, len(columns)))
+        for j, effect in enumerate(columns):
+            for (cause, target, lag), weight in effects.items():
+                if target == effect and t >= lag:
+                    X[t, :, j] += weight * X[t - lag, :, columns.index(cause)]
+    if panel:
+        return [pd.DataFrame(X[t], columns=columns) for t in range(steps)]
+    return pd.DataFrame(X[:, 0], columns=columns)
+
+
+def _panel_method(name: str) -> bool:
+    return REGISTRY[name].data.inputs[0].kind == "panel"
+
+
+def _input(name: str, effects: dict = SERIES_EFFECTS, columns: list[str] = SERIES):
+    return _simulate(effects, columns, panel=_panel_method(name))
+
+
+def _fit_series(name: str, data, lags: int = 2, **kwargs):
+    """Fit ``name`` over lags ``0`` to ``lags``; VARMA-LiNGAM as a pruned VAR."""
+    if name == "varma_lingam":
+        return andrey.varma_lingam(data, order=(lags, 0), prune=True, **kwargs)
+    if name == "longitudinal_lingam":
+        return andrey.longitudinal_lingam(data, n_lags=lags, **kwargs)
+    return getattr(andrey, name)(data, tau_max=lags, **kwargs)
+
+
+def _reorder(data, columns: list[str]):
+    return [frame[columns] for frame in data] if isinstance(data, list) else data[columns]
 
 
 @pytest.fixture(scope="module")
 def series() -> pd.DataFrame:
-    return _series()
+    return _simulate(SERIES_EFFECTS, SERIES, panel=False)
 
 
 def _links(out) -> dict[tuple[str, str, int], str]:
@@ -639,54 +733,52 @@ def _may_cause(links: dict, a: str, b: str, lag: int) -> bool:
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
-def test_a_forbidden_lagged_link_is_absent_at_its_lag_only(name, series):
-    plain = _links(_fit(name, series, tau_max=2))
+def test_a_forbidden_lagged_link_is_absent_at_its_lag_only(name):
+    data = _input(name)
+    plain = _links(_fit_series(name, data))
     assert ("x", "y", 1) in plain and ("x", "y", 2) in plain
-    links = _links(_fit(name, series, tau_max=2, knowledge=Knowledge(forbidden=[("x", "y", 1)])))
+    links = _links(_fit_series(name, data, knowledge=Knowledge(forbidden=[("x", "y", 1)])))
     assert ("x", "y", 1) not in links
     assert ("x", "y", 2) in links
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
-def test_a_forbidden_pair_is_no_cause_at_any_lag(name, series):
-    links = _links(_fit(name, series, tau_max=2, knowledge=Knowledge(forbidden=[("y", "z")])))
+def test_a_forbidden_pair_is_no_cause_at_any_lag(name):
+    links = _links(_fit_series(name, _input(name), knowledge=Knowledge(forbidden=[("y", "z")])))
     assert not any(_may_cause(links, "y", "z", lag) for lag in (0, 1, 2))
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
-def test_a_required_lagged_link_is_a_cause(name, series):
+def test_a_required_lagged_link_is_a_cause(name):
     # z does not drive x; the required link holds anyway.
     knowledge = Knowledge(required=[("z", "x", 2)])
-    assert _cause(_links(_fit(name, series, tau_max=2, knowledge=knowledge)), "z", "x", 2)
+    assert _cause(_links(_fit_series(name, _input(name), knowledge=knowledge)), "z", "x", 2)
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
 @pytest.mark.parametrize("edge", [("a", "b"), ("b", "a")])
 def test_a_required_same_step_link_keeps_its_direction(name, edge):
-    # Two series that depend on each other within a step: either direction fits the data.
-    rng = np.random.default_rng(0)
-    a = rng.standard_normal(1000)
-    data = pd.DataFrame({"a": a, "b": 0.8 * a + rng.standard_normal(1000)})
+    # Two variables that depend on each other within a step: the data favor a -> b.
+    data = _input(name, {("a", "b", 0): 0.8}, ["a", "b"])
     knowledge = Knowledge(required=[(*edge, 0)])
-    if 0 not in _fit(name, data).structure.lags:
+    if 0 not in _fit_series(name, data, lags=1).structure.lags:
         with pytest.raises(KnowledgeError, match="lags 1 to"):
-            _fit(name, data, knowledge=knowledge)
+            _fit_series(name, data, lags=1, knowledge=knowledge)
         return
-    assert _cause(_links(_fit(name, data, knowledge=knowledge)), *edge, 0)
+    assert _cause(_links(_fit_series(name, data, lags=1, knowledge=knowledge)), *edge, 0)
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
-def test_tiers_hold_at_every_lag(name, series):
+def test_tiers_hold_at_every_lag(name):
     # z first: no link runs into z from x or y, at any lag; the true y -> z at lag 0 included.
-    out = _fit(name, series, tau_max=2, knowledge=Knowledge(tiers=[["z"], ["x", "y"]]))
+    out = _fit_series(name, _input(name), knowledge=Knowledge(tiers=[["z"], ["x", "y"]]))
     links = _links(out)
-    assert ("y", "z", 0) in links or 0 not in out.structure.lags
     for later in ("x", "y"):
         assert not any(_may_cause(links, later, "z", lag) for lag in (0, 1, 2)), links
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
-def test_knowledge_that_fits_the_truth_does_not_add_errors(name, series):
+def test_knowledge_that_fits_the_truth_does_not_add_errors(name):
     def errors(out) -> int:
         lags = out.structure.lags
         truth = {(a, b, lag, "-->") for a, b, lag in SERIES_TRUTH if lag in lags}
@@ -697,24 +789,35 @@ def test_knowledge_that_fits_the_truth_does_not_add_errors(name, series):
     knowledge = Knowledge(
         tiers=[["x"], ["y"], ["z"]], required=[("x", "y", 2)], forbidden=[("z", "z", 1)]
     )
-    plain = errors(_fit(name, series, tau_max=2))
-    assert errors(_fit(name, series, tau_max=2, knowledge=knowledge)) <= plain
+    data = _input(name)
+    plain = errors(_fit_series(name, data))
+    assert errors(_fit_series(name, data, knowledge=knowledge)) <= plain
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
-def test_reordered_series_relabel_the_result_with_knowledge(name, series):
+def test_reordered_series_relabel_the_result_with_knowledge(name):
     knowledge = Knowledge(forbidden=[("x", "y", 1)], required=[("z", "x", 2)], tiers=[["x"]])
+    data = _input(name)
 
     def links(frame):
-        return _links(_fit(name, frame, tau_max=2, knowledge=knowledge))
+        return _links(_fit_series(name, frame, knowledge=knowledge))
 
-    assert links(series[["z", "x", "y"]]) == links(series)
+    assert links(_reorder(data, ["z", "x", "y"])) == links(data)
 
 
 @pytest.mark.parametrize("name", TEMPORAL)
-def test_empty_knowledge_is_no_knowledge_for_a_series(name, series):
-    kept = _fit(name, series, tau_max=2, knowledge=Knowledge())
-    assert _links(kept) == _links(_fit(name, series, tau_max=2))
+def test_empty_knowledge_is_no_knowledge_for_a_series(name):
+    data = _input(name)
+    kept = _fit_series(name, data, knowledge=Knowledge())
+    assert _links(kept) == _links(_fit_series(name, data))
+
+
+def test_varma_lingam_without_pruning_rejects_a_forbidden_lagged_link(series):
+    with pytest.raises(KnowledgeError, match="prune=True"):
+        andrey.varma_lingam(series, order=(1, 0), knowledge=Knowledge(forbidden=[("x", "y", 1)]))
+    # A required lagged link holds: every lagged weight stays.
+    out = andrey.varma_lingam(series, order=(1, 0), knowledge=Knowledge(required=[("z", "x", 1)]))
+    assert _cause(_links(out), "z", "x", 1)
 
 
 @pytest.mark.parametrize(
