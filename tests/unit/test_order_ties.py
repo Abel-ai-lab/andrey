@@ -27,6 +27,7 @@ from andrey.search.ges import ges
 from andrey.search.gies import gies
 from andrey.search.xges import xges
 from andrey.temporal.pcmci import design_test
+from tests.recovery.helpers.xges_rescan import xges_rescan
 
 
 def _swap_symmetric(seed: int, n: int = 200) -> np.ndarray:
@@ -121,11 +122,8 @@ def test_ges_ties() -> None:
 def test_xges_ties() -> None:
     """XGES meets the tie GES meets: column 2's edges to 0 and to 1."""
     x = _swap_symmetric(0)
-    for rescan in (False, True):
-        _assert_order_free(
-            lambda data: xges(data, _rescan=rescan)[0].to_numpy(),
-            x,
-        )
+    for search in (xges, xges_rescan):
+        _assert_order_free(lambda data: search(data)[0].to_numpy(), x)
 
 
 def test_calm_moral_graph_ties() -> None:
