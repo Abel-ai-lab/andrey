@@ -353,6 +353,18 @@ _add(
                 nullable=True,
             ),
             _LAMBDA_VALUE,
+            ParamSpec(
+                name="max_parents",
+                type="int",
+                default=None,
+                doc="Limits the forward phase, at least 0: a variable that already has more than "
+                "max_parents parents gets no new edges. null keeps the limit of n_variables / 2, "
+                "and a larger integer lifts it. A lower limit makes the search faster on large "
+                "graphs and can lower the errors, but it can stop the search short of the "
+                "lowest-scoring graph, which GES otherwise finds. One move can give a variable "
+                "several parents at once, so a variable can finish with more than max_parents.",
+                nullable=True,
+            ),
             _CATEGORICAL,
             _MAX_CATEGORIES,
         ),

@@ -64,6 +64,9 @@ and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each 
 `max_depth`, the maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
+`ges` takes `max_parents`, the parent count above which a variable gets no new edges in the
+forward phase.
+
 ```{eval-rst}
 .. currentmodule:: andrey
 
