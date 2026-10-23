@@ -1135,6 +1135,58 @@ def test_a_setting_that_reads_no_column_types_rejects_categorical(fit):
         fit(np.round(_mixed_data()))
 
 
+def _normal_data(n=300):
+    """Four continuous columns: a cause, its effect, a further effect, and an independent one."""
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal(n)
+    b = a + rng.standard_normal(n)
+    return np.column_stack([a, b, b + rng.standard_normal(n), rng.standard_normal(n)])
+
+
+def _cdnod(x, **kwargs):
+    return andrey.cdnod(x, np.repeat([0.0, 1.0], len(x) // 2), **kwargs)
+
+
+@pytest.mark.parametrize("empty", [[], (), np.array([], dtype=int)], ids=["list", "tuple", "array"])
+@pytest.mark.parametrize(
+    ("fit", "data"),
+    [
+        (partial(andrey.pc, indep_test="fisherz"), _normal_data),
+        (partial(andrey.pc, indep_test="chisq"), _categorical_data),
+        (partial(andrey.fci, indep_test="fisherz"), _normal_data),
+        (partial(andrey.fci, indep_test="gsq"), _categorical_data),
+        (partial(_cdnod, indep_test="fisherz"), _normal_data),
+        (partial(andrey.gfci, score_func="local_score_BIC", indep_test="fisherz"), _normal_data),
+        (
+            partial(andrey.gfci, score_func="local_score_BDeu", indep_test="chisq"),
+            _categorical_data,
+        ),
+        (partial(andrey.ges, score_func="local_score_BIC"), _normal_data),
+        (partial(andrey.ges, score_func="local_score_BDeu"), _categorical_data),
+        (partial(andrey.hc, score_func="local_score_BIC_from_cov"), _normal_data),
+        (partial(andrey.hc, score_func="local_score_BIC_categorical"), _categorical_data),
+        (partial(andrey.exact_search, score_func="local_score_BIC"), _normal_data),
+        (partial(andrey.exact_search, score_func="local_score_BDeu"), _categorical_data),
+        (partial(andrey.boss, score_func="local_score_BIC_from_cov", seed=0), _normal_data),
+        (partial(andrey.boss, score_func="local_score_BDeu", seed=0), _categorical_data),
+        (partial(andrey.grasp, score_func="local_score_BIC_from_cov", seed=0), _normal_data),
+        (partial(andrey.grasp, score_func="local_score_BDeu", seed=0), _categorical_data),
+    ],
+    ids=lambda value: value.func.__name__ if isinstance(value, partial) else None,
+)
+def test_an_empty_categorical_reads_as_none_where_no_column_types_are_read(fit, data, empty):
+    x = data()
+    assert _same_fit(fit(x, categorical=empty), fit(x))
+
+
+@pytest.mark.parametrize(
+    "categorical", ["", "a", 0, [[]]], ids=["empty text", "text", "int", "nested"]
+)
+def test_a_categorical_that_is_not_an_empty_list_is_still_rejected(categorical):
+    with pytest.raises(ValueError, match="leave categorical as None or"):
+        andrey.pc(_normal_data(), indep_test="fisherz", categorical=categorical)
+
+
 def test_a_column_that_does_not_hold_numbers_must_be_categorical():
     pd = pytest.importorskip("pandas")
     x = _mixed_data()

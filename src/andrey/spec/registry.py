@@ -56,7 +56,7 @@ _CATEGORICAL = ParamSpec(
     "file's header or 0-based positions, for example, categorical=[smoker,region]; [] marks none. "
     "null infers them: every column of at most max_categories distinct whole numbers, named in a "
     "DataTypeWarning; with none, the setting runs as its linear-Gaussian form and warns. Other "
-    "tests and scores reject it.",
+    "tests and scores take only null or [].",
     nullable=True,
 )
 _MAX_CATEGORIES = ParamSpec(
