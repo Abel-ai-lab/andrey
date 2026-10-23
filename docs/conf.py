@@ -184,7 +184,10 @@ katex_prerender = True
 
 # ---- HTML theme ------------------------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"
-html_title = "Andrey"
+# Every page's title ends with the product's name beside what it does, so a page matches the subject
+# and not only a name that is also a person's.
+html_title = f"{project} causal discovery"
+html_short_title = project
 # site/brand/ holds the wordmark; site/assets/ the homepage's and the figures' styles and script,
 # and the segmented control every choice on the site uses.
 html_static_path = ["_static", "_generated/static", "../site/brand", "../site/assets"]
@@ -205,13 +208,15 @@ REPO_URL = "https://github.com/Abel-ai-lab/andrey"
 PYPI_URL = "https://pypi.org/project/andrey-core/"
 SITE_URL = "https://andrey.abel.ai/"
 ABEL_URL = "https://abel.ai/"
+ABEL_GITHUB = "https://github.com/Abel-ai-lab"
 # Abel's logomark in Night Teal, for light backgrounds, from Abel's brand kit: the structured
 # data's organization logo, drawn at the build as a PNG wide enough for search results.
 ABEL_SYMBOL = ROOT / "site" / "brand" / "abel-symbol-night.svg"
 ABEL_LOGO = "_static/abel-symbol.png"
 ABEL_LOGO_WIDTH = 600
 # Pages a search engine should not list: the search page, and the page the server shows for a
-# missing address (404.md).
+# missing address (404.md). The blog's generated pages (All Posts, the years, the archive, the tags,
+# and the authors) only list the posts again, so they are not listed either (`_blog_collection`).
 UNINDEXED = {"search", "404"}
 # The pages llms.txt lists, by section; each release card and published post follows its section's
 # pages, newest first.
@@ -491,22 +496,22 @@ def _first_paragraph(doctree: nodes.document) -> str:
     return ""
 
 
+def _blog_collection(context: dict, doctree: nodes.document | None) -> bool:
+    """Whether the page is one ABlog generates (All Posts, a year, the archive, a tag, or an
+    author): a list of posts with no document of its own."""
+    return doctree is None and ("catalog" in context or "collection" in context)
+
+
 def _description(app, context: dict, doctree: nodes.document | None) -> str:  # noqa: ANN001
     """The page's description: the homepage's sentence, the front matter's ``description``, or the
-    first paragraph cut at a word to ``DESCRIPTION_LENGTH``. A generated blog collection describes
-    its title; other pages with neither, such as search, take the homepage's."""
+    first paragraph cut at a word to ``DESCRIPTION_LENGTH``. A page with neither, such as search or
+    the blog archive, takes the homepage's."""
     if home := context.get("home"):
         return home["description"]
     meta = context.get("meta") or {}
     if (meta.get("description") or "").strip():  # an empty value counts as none
         return meta["description"].strip()
-    if doctree is not None:
-        paragraph = _first_paragraph(doctree)
-    elif "catalog" in context or "collection" in context:
-        title = " ".join(html.unescape(re.sub(r"<[^>]+>", "", context.get("title") or "")).split())
-        paragraph = f"{app.config.project} blog: {title}." if title else ""
-    else:
-        paragraph = ""
+    paragraph = _first_paragraph(doctree) if doctree is not None else ""
     if paragraph:
         return textwrap.shorten(
             paragraph, DESCRIPTION_LENGTH, placeholder="…", break_on_hyphens=False
@@ -518,9 +523,10 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
     """The page's description, its Open Graph and Twitter card tags (title, summary, address, and
     image), its canonical address, and its structured data (``discovery.head_tags``): the
     organization, the website, the software at the release the page belongs to, the page or post,
-    and its breadcrumbs. The pages in ``UNINDEXED`` are ``noindex`` and name no canonical address.
-    The description and ``og:description`` are one value, as are ``og:url`` and the canonical
-    address."""
+    and its breadcrumbs. The pages in ``UNINDEXED`` and the blog's generated pages are ``noindex``
+    and name no canonical address. The description and ``og:description`` are one value, as are
+    ``og:url`` and the canonical address."""
+    unindexed = pagename in UNINDEXED or _blog_collection(context, doctree)
     home = context.get("home")
     heading = re.sub(r"<[^>]+>", "", context.get("title") or app.config.project)
     title = home["title"] if home else html.unescape(heading)
@@ -550,10 +556,10 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         f'content="{html.escape(value, quote=True)}">\n'
         for key, value in tags.items()
     )
-    if pagename not in UNINDEXED:
+    if not unindexed:
         preview += f'<link rel="canonical" href="{html.escape(url, quote=True)}">\n'
     page = {"title": title, "description": description, "url": url, "image": image}
-    if pagename in UNINDEXED:
+    if unindexed:
         page["indexable"] = False
     if match := re.fullmatch(r"docs/benchmarks/(\d+\.\d+\.\d+)", pagename):
         page["software_version"] = match[1]
@@ -592,7 +598,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         "codeRepository": PACKAGE["urls"]["Source"],
         # Andrey's own icon, the favicon; the organization's node carries Abel's logo.
         "image": SITE_URL + "_static/favicon.svg",
-        "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/"],
+        "alternateName": PACKAGE["name"],
+        "sameAs": [f"https://pypi.org/project/{PACKAGE['name']}/", PACKAGE["urls"]["Source"]],
     }
     return preview + discovery.head_tags(
         page,
@@ -601,6 +608,8 @@ def _preview_tags(app, pagename: str, context: dict, doctree) -> str:  # noqa: A
         author=app.config.author,
         organization_url=ABEL_URL,
         organization_logo=SITE_URL + ABEL_LOGO,
+        organization_same_as=[ABEL_GITHUB],
+        site_alternate_name=app.config.html_title,
         software=software,
         language=app.config.language or "en",
         post=post,
