@@ -226,9 +226,15 @@ tail. Writing it needs no other package; Graphviz renders it.
 
 | Call | Returns |
 |---|---|
-| `to_dag(cpdag)` | a DAG of the CPDAG's equivalence class, or a `ValueError` when it has none |
+| `to_dag(cpdag, tie_break="label")` or `to_dag(cpdag, seed=0)` | a DAG of the CPDAG's equivalence class |
 | `to_mag(dag, latent=..., selection=...)` | the MAG over the other nodes, a `pag` without circles |
 | `to_pag(graph, latent=..., selection=...)` | the PAG of a DAG or of a MAG over the other nodes |
+
+A CPDAG with an undirected edge holds more than one DAG, so `to_dag` raises a `ValueError` that
+names those edges unless you say how to pick one: `tie_break="label"` takes the DAG the node labels
+decide, the same whatever the column order, and `seed` takes a reproducible random DAG of the
+class, though not every DAG is equally likely. A CPDAG without an undirected edge, or a DAG, needs
+neither.
 
 `latent` and `selection` name nodes by label or 0-based position; `latent` defaults to the nodes
 that `node_types` flags. A hidden common cause becomes `<->` in the MAG, and two ancestors of a
@@ -246,8 +252,8 @@ import andrey
 from andrey.graph import to_dag
 from dowhy import CausalModel
 
-out = andrey.pc(df)  # a CPDAG over the columns of df
-dag = to_dag(out)    # one DAG of its equivalence class
+out = andrey.pc(df)                     # a CPDAG over the columns of df
+dag = to_dag(out, tie_break="label")    # the DAG of its class that the labels decide
 model = CausalModel(data=df, treatment="x", outcome="y", graph=dag.to_dot())
 estimand = model.identify_effect()
 estimate = model.estimate_effect(estimand, method_name="backdoor.linear_regression")
@@ -255,10 +261,12 @@ estimate.value
 ```
 
 DoWhy reads DOT text through pydot or pygraphviz, so install one of them with DoWhy. It reads every
-edge as directed, so pass a DAG: `to_dag` picks one DAG of a CPDAG's class, and when an undirected
-edge near the treatment or the outcome can point either way, the estimate depends on that choice.
-Settle such an edge with `knowledge` before you estimate, or compare the estimates across the DAGs
-of the class. A PAG has no single DAG to hand over.
+edge as directed, so pass a DAG. The DAGs of one CPDAG's class can disagree on the direction of an
+edge near the treatment, and the estimate follows that direction: a common cause of the treatment
+and the outcome in one DAG can be a step between them in another, which changes what DoWhy adjusts
+for. That is why `to_dag` asks you to pick, with `tie_break="label"` or `seed`. Settle such an
+edge with `knowledge` before you estimate, or compare the estimates over several seeds. A PAG has
+no single DAG to hand over.
 
 ## References
 
