@@ -1335,8 +1335,11 @@ def test_the_first_section_shows_why_it_is_fast_as_a_carousel(placeholder_page):
     # Under the first section's title, on the shared art, a card per scene in order with its title
     # and narration, played by the carousel: no tile, no opener, no dialog of its own.
     section = placeholder_page[placeholder_page.index('id="accelerated"') :]
-    section = section[: section.index('<div class="run-sheet">')]
-    assert section.index('id="accelerated-title"') < section.index('<div class="wf wf-belt"')
+    section = section[: section.index("</section>")]
+    # The speed panel comes first, then the carousel under it.
+    assert section.index('id="accelerated-title"') < section.index('<div class="run-sheet">')
+    assert section.index('<div class="run-sheet">') < section.index('<div class="wf wf-belt"')
+    section = section[section.index('<div class="wf wf-belt"') :]
     scenes = build._why_fast["SCENES"]
     assert re.findall(r'data-scene="(\w+)" data-play="belt"', section) == [s["key"] for s in scenes]
     titles = re.findall(r'<div class="wf-words"><h3>([^<]+)</h3>', section)
@@ -1345,6 +1348,38 @@ def test_the_first_section_shows_why_it_is_fast_as_a_carousel(placeholder_page):
     assert "data-wf-open" not in placeholder_page and "wf-dialog" not in placeholder_page
     assert '<li class="tile' not in section and "wf-plus" not in section
     assert "wf-pin" not in placeholder_page and "wf-story" not in placeholder_page
+
+
+def _timed_row(d: int, n: int, ratio: float, hardware: str | None = None) -> dict:
+    return {"d": d, "n": n, "ratio": ratio, "hardware": hardware}
+
+
+def test_a_grid_comparison_shows_its_smallest_sample_size_and_its_slowest_cpu():
+    rows = [
+        _timed_row(5, 500, 10.0, "Intel Xeon Gold 6542Y, 4 cores"),
+        _timed_row(5, 1000, 9.0, "Intel Xeon Gold 6542Y, 4 cores"),
+        _timed_row(10, 500, 2.4, "AMD EPYC 7713, 4 cores"),
+        _timed_row(10, 1000, 2.5, "AMD EPYC 7713, 4 cores"),
+        _timed_row(20, 500, None),
+    ]
+    grid = {"lane": "nonlinear", "rows": rows}
+    assert [(r["d"], r["n"]) for r in build.shown_rows(grid)] == [(10, 500), (20, 500)]
+    # Another lane's rows are every size it measured, whatever the sample size.
+    sweep = [_timed_row(5, 100, 3.0), _timed_row(5, 200, 4.0)]
+    assert build.shown_rows({"lane": "other", "rows": sweep}) == sweep
+
+
+def test_a_second_machines_timings_and_an_unshown_regime_are_not_counted(tmp_path):
+    summary = json.loads(build.SUMMARY.read_text(encoding="utf-8"))
+    base = summary["methods"][0]
+    extra = [
+        {**base, "comparison": "second-machine timing"},
+        {**base, "lane": "nonlinear", "regime": "anm_er"},
+    ]
+    written = tmp_path / "summary.json"
+    written.write_text(json.dumps({**summary, "methods": [*summary["methods"], *extra]}))
+    loaded = build.load_summary(written, placeholder=True)
+    assert len(loaded["methods"]) == len(summary["methods"])
 
 
 def test_a_list_is_a_note_in_plain_type_not_a_card(placeholder_page):

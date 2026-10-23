@@ -60,6 +60,7 @@ RELEASES = (
     "0.5.0",
     "0.6.0",
     "0.7.0",
+    "0.8.0",
 )
 SUMMARY = PUBLISHED / RELEASES[0] / "summary.json"
 
@@ -104,6 +105,9 @@ REGIMES = {
     "varma_lingam_paper": "linear non-Gaussian time series with a moving average",
     "longitudinal_lingam_paper": "linear non-Gaussian longitudinal data",
     "var2_lagged": "lagged linear-Gaussian time series",
+    "anm_er": "additive-noise data from Erdos-Renyi graphs",
+    "nonmonotone_er": "nonmonotone data from Erdos-Renyi graphs",
+    "diabetes": "categorical data from the diabetes network",
     "mixed_er": "mixed continuous and categorical data from Erdos-Renyi graphs",
     "discrete_er": "categorical data from Erdos-Renyi graphs",
     "interventional_gauss_er": "linear-Gaussian data from Erdos-Renyi graphs with interventions",
@@ -145,6 +149,22 @@ ERRORS = {
 # gives the panel, the charts, and the counts its rows at mean degree 2, the density of the other
 # summaries' Erdos-Renyi graphs.
 MEAN_DEGREE = 2.0
+# Comparisons no page counts, by the summary's ``comparison``: Andrey against an earlier build, and
+# a second machine's timings of a comparison the first machine's rows already give.
+NOT_COUNTED = {"earlier-build", "second-machine timing"}
+# Regimes the homepage leaves out, as (lane, regime): the additive data of the nonlinear tests,
+# whose effects are near-monotone and which partial correlation still sees, and the diabetes
+# network, a single size with only a lower bound.
+NOT_SHOWN = {("nonlinear", "anm_er"), ("boss-grasp", "diabetes")}
+# The summary lanes that measure each graph size at several sample sizes.
+GRID_LANES = {"nonlinear"}
+# A method's line is its default comparison, the shortest name. These settings show instead: BOSS
+# and GRaSP with the BDeu score on categorical data, the comparison the 0.8.0 release measured,
+# each under the method's own name.
+SHOWN_SETTINGS = {
+    "BOSS on discrete data, BDeu score": "BOSS",
+    "GRaSP on discrete data, BDeu score": "GRaSP",
+}
 DEMO_URL: str | None = None  # the live demo; link it once its Space is public
 # The one-line description, as pyproject.toml and the README give it.
 DESCRIPTION = "Andrey: accelerated, accurate, agentic causal discovery."
@@ -165,8 +185,7 @@ TOKEN_PALETTE = andrey.viz.Palette(
 # ---- the summaries ---------------------------------------------------------------------------
 def load_summary(path: Path, *, placeholder: bool = False) -> dict:
     """Read a release's benchmark summary and check its layout; refuse unpublished files for
-    release. A comparison with an earlier Andrey build (``"comparison": "earlier-build"``) is left
-    out."""
+    release. A comparison in ``NOT_COUNTED`` and a regime in ``NOT_SHOWN`` are left out."""
     if not placeholder and not path.resolve().is_relative_to(PUBLISHED):
         raise ValueError(
             f"{path} is not under benchmarks/published/; preview it with -D andrey_placeholder=1"
@@ -181,6 +200,19 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
     missing = {"generated", "methods"} - summary.keys()
     if missing:
         raise ValueError(f"summary lacks {sorted(missing)}")
+    # A comparison with an earlier Andrey build measures Andrey's own progress, not another
+    # package, and one timed on a second machine repeats a comparison timed on the first, so no
+    # page counts them; the release card gives them. Neither does the homepage show a regime in
+    # ``NOT_SHOWN``.
+    summary = {
+        **summary,
+        "methods": [
+            m
+            for m in summary["methods"]
+            if m.get("comparison") not in NOT_COUNTED
+            and (m.get("lane"), m.get("regime")) not in NOT_SHOWN
+        ],
+    }
     for method in summary["methods"]:
         name = method.get("method", "?")
         if METHOD_KEYS - method.keys():
@@ -202,12 +234,7 @@ def load_summary(path: Path, *, placeholder: bool = False) -> dict:
                 )
             if row.get("ratio_is_lower_bound") and row.get("ratio_lower_bound") is None:
                 raise ValueError(f"{name} d={row['d']}: a lower bound is flagged, but not given")
-    # A comparison with an earlier Andrey build measures Andrey's own progress, not another
-    # package, so no page counts it; its release card gives it.
-    return {
-        **summary,
-        "methods": [m for m in summary["methods"] if m.get("comparison") != "earlier-build"],
-    }
+    return summary
 
 
 def release_summaries(summary: dict) -> list[dict]:
@@ -309,6 +336,37 @@ def claimed_ratio(row: dict) -> tuple[float | None, bool]:
     return row["ratio"], False
 
 
+def cpu_type(row: dict) -> str | None:
+    """The CPU a row's times ran on, as its ``hardware`` names it before the core count."""
+    return (row.get("hardware") or "").split(",")[0] or None
+
+
+def shown_rows(method: dict) -> list[dict]:
+    """The rows of a comparison the homepage shows: one line of sizes, each true wherever we
+    measured it.
+
+    - Rows at a mean degree other than ``MEAN_DEGREE`` are left out.
+    - A comparison of a lane in ``GRID_LANES`` measures every graph size at several sample sizes,
+      and keeps the smallest sample size that has a speedup, so its line runs along the graph
+      sizes.
+    - A comparison timed on more than one CPU type keeps the CPU type whose smallest speedup is the
+      smallest, so no number shown is above what another CPU gave.
+    """
+    rows = [r for r in method["rows"] if r.get("mean_degree", MEAN_DEGREE) == MEAN_DEGREE]
+    timed = [r for r in rows if claimed_ratio(r)[0] is not None]
+    if method.get("lane") in GRID_LANES and timed:
+        smallest = min(r["n"] for r in timed)
+        rows = [r for r in rows if r["n"] == smallest]
+        timed = [r for r in timed if r["n"] == smallest]
+    cpus = {cpu_type(r) for r in timed} - {None}
+    if len(cpus) > 1:
+        slowest = min(
+            cpus, key=lambda c: min(claimed_ratio(r)[0] for r in timed if cpu_type(r) == c)
+        )
+        rows = [r for r in rows if cpu_type(r) in (slowest, None)]
+    return rows
+
+
 def comparisons(summary: dict) -> list[dict]:
     """A summary's comparisons in one layout, whatever kind of summary it is.
 
@@ -322,8 +380,8 @@ def comparisons(summary: dict) -> list[dict]:
     - ``ratio`` and ``at_least``: the speedup, from :func:`claimed_ratio`;
     - ``andrey_errors`` and ``comparator_errors``: each graph's errors, from :func:`error_kind`.
 
-    Rows at a mean degree other than ``MEAN_DEGREE`` are left out. So are the summary's ``reach``
-    rows, the sizes the other package did not finish or did not run: they have no paired time.
+    Rows are those :func:`shown_rows` keeps. So are the summary's ``reach`` rows, the sizes the
+    other package did not finish or did not run: they have no paired time.
     """
     specs = {s.name: s for s in list_specs()}
     out = []
@@ -333,9 +391,7 @@ def comparisons(summary: dict) -> list[dict]:
         ours, theirs, empty = ERRORS[kind][0]
         pairs = spec.family == "pairwise"
         rows = []
-        for row in method["rows"]:
-            if row.get("mean_degree", MEAN_DEGREE) != MEAN_DEGREE:
-                continue
+        for row in shown_rows(method):
             ratio, at_least = claimed_ratio(row)
             rows.append(
                 {
@@ -2033,10 +2089,15 @@ def frontier_points(summaries: list[dict]) -> dict[str, list[dict]]:
         if not all(faster(m) for m in methods):
             continue
         shown = default.get(methods[0]["spec"])
-        if shown is None or len(name) < len(shown[0]):
+        if (
+            name in SHOWN_SETTINGS
+            or (shown is not None and shown[0] not in SHOWN_SETTINGS and len(name) < len(shown[0]))
+            or shown is None
+        ):
             default[methods[0]["spec"]] = (name, methods)
     out: dict[str, list[dict]] = {}
     for name, methods in default.values():
+        name = SHOWN_SETTINGS.get(name, name)
         by_size = [{r["d"]: r for r in m["rows"]} for m in methods]
         f1 = methods[0]["family"] in F1_FAMILIES
 

@@ -911,6 +911,27 @@
   border: 0;
 }
 
+/* Wide enough, the number sits at the panel's top right, beside the methods and the legend, so the
+   figure starts at the top and takes the room the number's row used. A panel without a method bar
+   keeps the legend's row as tall as the number. */
+@media (min-width: 72rem) {
+  .andrey-home .seg-panel {
+    position: relative;
+  }
+
+  .andrey-home .seg-head {
+    position: absolute;
+    top: clamp(1rem, 3vw, 1.75rem);
+    right: clamp(1rem, 3vw, 1.75rem);
+    z-index: 1;
+    margin: 0;
+  }
+
+  .andrey-home .seg-head + .pf-chart .tc-legend {
+    min-height: 3.25rem;
+  }
+}
+
 .andrey-home .seg-foot {
   margin: 0.75rem 0 0;
   color: var(--andrey-muted);
