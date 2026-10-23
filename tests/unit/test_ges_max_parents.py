@@ -12,6 +12,8 @@ import itertools
 import numpy as np
 import pytest
 
+import andrey
+from andrey import Knowledge
 from andrey.core import ARROW, TAIL
 from andrey.core.orient import dag2cpdag, pdag2dag
 from andrey.core.score import BICScore
@@ -110,6 +112,19 @@ def test_the_prefilter_leaves_out_nothing_the_cap_allows(
     tested, tested_score = ges(x, max_parents=k)
     assert np.array_equal(filtered.to_numpy(), tested.to_numpy())
     assert filtered_score == tested_score
+
+
+@pytest.mark.parametrize("k", [1, 2, 3])
+def test_the_cap_holds_under_background_knowledge(k: int) -> None:
+    """Required and forbidden edges and tiers leave the cap intact, including their orientation."""
+    x = _sem(4, 500, 10, 0.5)
+    knowledge = Knowledge(
+        required=[(0, 5)], forbidden=[(1, 2), (3, 4)], tiers=[[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    )
+    cpdag = andrey.ges(x, max_parents=k, knowledge=knowledge).structure.to_numpy()
+    assert ops.parent_counts(ges(x)[0].to_numpy()).max() > k, "the cap does not bind"
+    assert (ops.parent_counts(cpdag) <= k).all()
+    assert cpdag[0, 5] != 0, "the required edge is missing"
 
 
 def _star_with_a_collider() -> np.ndarray:
