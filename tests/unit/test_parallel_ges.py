@@ -166,7 +166,7 @@ def test_ties_are_exercised_by_the_sweep():
     from andrey.search.ges import _reachable
 
     adj = np.zeros((n, n), dtype=np.int8)
-    state = pg.neighborhood_state(adj, n)
+    state = pg.neighborhood_state(adj)
     reachable = _reachable(adj)
     deltas: list[float] = []
     for y in range(n):
@@ -393,8 +393,8 @@ def test_forward_work_estimate_is_density_aware():
     for i in range(8):  # an undirected clique among the first 8 nodes
         for j in range(i + 1, 8):
             dense[i, j] = dense[j, i] = TAIL
-    w_sparse = pg.estimate_forward_work(n, pg.neighborhood_state(sparse, n), None)
-    w_dense = pg.estimate_forward_work(n, pg.neighborhood_state(dense, n), None)
+    w_sparse = pg.estimate_forward_work(n, pg.neighborhood_state(sparse), None)
+    w_dense = pg.estimate_forward_work(n, pg.neighborhood_state(dense), None)
     assert w_dense > 10 * w_sparse  # 2^7 per clique candidate dwarfs the sparse all-singleton scan
 
 
@@ -403,7 +403,7 @@ def test_work_estimate_never_overflows_at_high_degree():
     n = 60
     adj = np.ones((n, n), dtype=np.int8)  # every off-diagonal TAIL -> undirected near-clique
     np.fill_diagonal(adj, 0)
-    state = pg.neighborhood_state(adj, n)
+    state = pg.neighborhood_state(adj)
     assert isinstance(pg.estimate_forward_work(n, state, None), int)
     assert isinstance(pg.estimate_backward_work(n, state), int)
 
@@ -454,6 +454,17 @@ def test_forward_scan_rescores_group_with_mixed_bounds():
     assert passing == 0b0110
     expected = engine.delta_many_with_base(0, (), [("add", 1), ("add", 2)])
     assert [deltas[1], deltas[2]] == expected
+
+
+def test_forward_scan_refreshes_a_reach_map_before_the_first_graph():
+    """The successor masks start as the empty graph's, one per node, so a reach set kept before
+    the first pass meets masks of the same length."""
+    x = _gaussian_sem(0, 200, 4, 0.5)
+    scan = pg._ForwardScan([0], DeltaBICScore(BICScore(x, lambda_value=1.0)), 4, None, range(4))
+    assert scan.succ == [0] * 4
+    scan.reach[(0, 0)] = 0b1001
+    scan._refresh(np.zeros((4, 4), dtype=np.int8))
+    assert scan.reach == {(0, 0): 0b1001}
 
 
 def test_pool_created_once_spans_passes(monkeypatch):

@@ -13,7 +13,8 @@ under a header naming the commit, the imported Andrey package's directory and co
 NumPy, and SciPy versions, the loaded BLAS, the CPU, and the thread settings. ``--compare`` counts
 the rows of two manifests that differ. A fit that
 queries a CI test or a local score also records two deterministic counts (:class:`Counts`), and a
-compare names every row where one rose.
+compare names every row where one changed and fails on any change, a fall as well as a rise, unless
+``--allow-fewer-queries`` accepts a fall.
 
 ``--shuffle K`` refits each draw on ``K`` seeded column orders and maps each answer back to the
 original columns before hashing it; ``--workers N`` refits the methods that run worker processes
@@ -33,6 +34,7 @@ import argparse
 import dataclasses
 import functools
 import hashlib
+import importlib
 import json
 import os
 import platform
@@ -135,9 +137,9 @@ FITS: dict[str, Fit] = {
 }
 
 #: The methods that run on ``andrey.config(num_workers=...)``: GES, GFCI's GES phase, and the
-#: skeleton searches of PC, FCI, GFCI, and CD-NOD in worker processes, Granger's regressions on
-#: threads.
-WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "GES", "Granger")
+#: skeleton searches of PC, FCI, GFCI, and CD-NOD in worker processes, Granger's regressions and
+#: PNL's two directions on threads.
+WORKER_METHODS = ("PC", "FCI", "GFCI", "CDNOD", "GES", "Granger", "PNL")
 
 #: The factor on the longitudinal LiNGAM panel's coefficients at ``d = 10``. At the published
 #: ranges the panel grows several-fold per time point; at this factor the spectral radius of every
@@ -472,6 +474,7 @@ SCORE_QUERIES: dict[str, Callable[..., Iterable[Iterable[int]]]] = {
     ),
 }
 SCORE_CLASSES = (
+    importlib.import_module("andrey.search.exact")._GramBICScore,
     score.BICScore,
     score.BDeuScore,
     score.CategoricalBICScore,
@@ -738,9 +741,10 @@ def _counters(r: dict) -> dict[str, int]:
     return out
 
 
-def compare(before: dict, after: dict) -> int:
+def compare(before: dict, after: dict, *, allow_fewer: bool = False) -> int:
     """Print how manifest ``after`` differs from ``before``; return 1 if a row's hash differs, a row
-    is in one only, or a count rose, else 0."""
+    is in one only, or a count rose or fell, else 0. A count that fell passes with ``allow_fewer``:
+    it is either a real algorithmic change or a query the counting no longer sees."""
     for key in sorted(before["header"].keys() | after["header"].keys()):
         if before["header"].get(key) != after["header"].get(key):
             print(f"header {key}: {before['header'].get(key)} -> {after['header'].get(key)}")
@@ -776,7 +780,7 @@ def compare(before: dict, after: dict) -> int:
         f"{len(bits)} with only different bits; {len(only)} in one only; "
         f"{len(raised)} counts rose, {len(lowered)} fell."
     )
-    return 1 if graph or bits or only or raised else 0
+    return 1 if graph or bits or only or raised or (lowered and not allow_fewer) else 0
 
 
 # ==================================================================================================
@@ -792,11 +796,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--shuffle", type=int, default=0, metavar="K", help="refit on K column orders")
     ap.add_argument("--workers", type=int, default=1, metavar="N", help="refit on N workers")
     ap.add_argument("--compare", nargs=2, type=Path, metavar=("BEFORE", "AFTER"))
+    ap.add_argument(
+        "--allow-fewer-queries", action="store_true", help="with --compare, pass when a count fell"
+    )
     args = ap.parse_args(argv)
 
     if args.compare:
         before, after = (json.loads(path.read_text()) for path in args.compare)
-        return compare(before, after)
+        return compare(before, after, allow_fewer=args.allow_fewer_queries)
     unknown = sorted(set(args.methods) - set(FITS))
     if unknown:
         ap.error(f"unknown methods {unknown}; known: {list(FITS)}")
