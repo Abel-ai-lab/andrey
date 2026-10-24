@@ -108,6 +108,10 @@ change names its pull request.
   p-values in less time, because their skeleton search hands the degenerate Gaussian test its
   queries in stacks, which it runs grouped by shape, with each conditioning set's regression
   computed once. ([#459])
+- `fci` and `gfci` return the same graphs and p-values in less time, because their
+  possible-d-separation step asks the test for each pair's conditioning sets in runs of 1, 2, 4, and
+  up to 256 sets, cut at the first that separates the pair, when the test is `"fisherz"`,
+  `"student_t"`, `"chisq"`, `"gsq"`, `"degen_gauss"`, or `"cond_gauss"`. ([#461])
 
 
 ## [0.10.0] - 2026-10-27
@@ -877,5 +881,6 @@ First alpha release.
 [#455]: https://github.com/Abel-ai-lab/andrey/pull/455
 [#457]: https://github.com/Abel-ai-lab/andrey/pull/457
 [#459]: https://github.com/Abel-ai-lab/andrey/pull/459
+[#461]: https://github.com/Abel-ai-lab/andrey/pull/461
 [#467]: https://github.com/Abel-ai-lab/andrey/pull/467
 [#469]: https://github.com/Abel-ai-lab/andrey/pull/469
