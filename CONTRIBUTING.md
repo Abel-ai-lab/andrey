@@ -55,13 +55,14 @@ gitleaks, to this checkout, so they run on every commit; `prek run --all-files` 
 ## Pull requests
 
 - One change per pull request, with the tests that show it works.
-- A pull request targets the branch of the release it ships in, `release/<x.y.z>`, not `main`.
-  The release pull request, from that branch to `main`, is the only one that merges to `main`;
-  the release's tag follows it. A required check, `release-branch`, fails a pull request into
-  `main` from any other branch, and the release pull request runs the quality gate
-  (`qa/README.md`), also required, once for the whole release. Dependabot's version updates
-  target the active release branch (`target-branch` in `.github/dependabot.yml`), which each
-  release moves to the next one.
+- A pull request targets the branch of the release it ships in, `release/<x.y.z>`, not `main`. The
+  release pull request, from that branch to `main`, is the only one that merges to `main`; the
+  release's tag follows it. A required check, `release-branch`, fails a pull request into `main`
+  from any other branch, or from a release branch whose `pyproject.toml` version is not the
+  branch's, since the tag and the site take the package's version; the release pull request runs
+  the quality gate (`qa/README.md`), also required, once for the whole release. Dependabot's
+  version updates target the active release branch (`target-branch` in `.github/dependabot.yml`),
+  which each release moves to the next one.
 - When the public API changes, update its docstrings and the API reference
   (`docs/docs/api.md`) in the same pull request.
 - Everything in `andrey.__all__` is public and documented. Names that start with `_` are internal
