@@ -9,6 +9,7 @@ on simulated data where the independence holds, a category of two rows included.
 from __future__ import annotations
 
 import math
+from itertools import combinations
 
 import numpy as np
 import pytest
@@ -474,3 +475,31 @@ def test_cg_rejects_a_constant_continuous_column():
     x[:, 1] = 2.0
     with pytest.raises(ValueError, match="continuous column 1 is constant"):
         ConditionalGaussian(x, mask)
+
+
+@pytest.mark.parametrize("data", [_mixed, _determined], ids=["mixed", "determined columns"])
+def test_dg_stacked_queries_return_the_scalar_p_values(data):
+    """Queries stacked by shape, over random conditioning sets of sizes 0-3 with sets shared across
+    pairs, in two orders, equal fresh scalar calls bit for bit; so does each pair's batched call."""
+    x, mask = data()
+    rng = np.random.default_rng(0)
+    x = np.column_stack([x, rng.integers(0, 4, len(x)), rng.standard_normal(len(x))])
+    mask = np.append(mask, [True, False])
+    d = x.shape[1]
+    queries = []
+    for size in range(4):
+        for given in combinations(range(d), size):
+            others = [v for v in range(d) if v not in given]
+            for a, b in combinations(others, 2):
+                queries.append((a, b, given))
+    want = np.array([DGTest(x, mask)(a, b, given) for a, b, given in queries])
+    for order in (np.arange(len(queries)), rng.permutation(len(queries))):
+        xs, ys, sets = zip(*(queries[i] for i in order))
+        got = DGTest(x, mask)._stacked_pvalues(list(xs), list(ys), list(sets))
+        assert got.view(np.int64).tolist() == want[order].view(np.int64).tolist()
+    for a, b in [(0, 3), (1, 2), (4, 5)]:
+        sets = [given[::-1] for x_, y_, given in queries if (x_, y_) == (a, b)]
+        got = np.array(DGTest(x, mask).batched_call(b, a, sets))
+        assert got.view(np.int64).tolist() == [
+            np.float64(DGTest(x, mask)(a, b, s)).view(np.int64) for s in sets
+        ]

@@ -8,9 +8,10 @@ calls, and the scalar loop otherwise, so a test that implements only
 :class:`~andrey.core.ci.CITest` still works. Every shipped vectorized path returns the scalar
 p-values exactly, so the skeleton is the same either way. Subsets are consumed in fixed-size
 chunks, so the scan holds one chunk in memory however many subsets it visits. :func:`scan_pairs`
-scans every pair of one conditioning size; for FisherZ, StudentT, and RCoT it stacks the chunks of
-consecutive pairs into one evaluation, up to ``_STACK_BYTES`` of submatrices; RCoT evaluates a
-stack one conditioning set at a time.
+scans every pair of one conditioning size; for FisherZ, StudentT, RCoT, and the degenerate
+Gaussian test it stacks the chunks of consecutive pairs into one evaluation, up to
+``_STACK_BYTES`` of submatrices; RCoT evaluates a stack one conditioning set at a time, and the
+degenerate Gaussian test regresses on each conditioning set once.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from andrey.core import backend
-from andrey.core.ci import CITest, FisherZ, StudentT, pins_blas
+from andrey.core.ci import CITest, DGTest, FisherZ, StudentT, pins_blas
 
 if TYPE_CHECKING:
     from andrey.core.knowledge import Constraints
@@ -137,16 +138,20 @@ def canonical_capable(test: CITest) -> bool:
 
 
 def _canonical_route(test: CITest) -> Callable[..., np.ndarray] | None:
-    """A :func:`canonical_capable` test's ``_canonical_pvalues``, which the canonical query arrays
-    take, else ``None``."""
-    if canonical_capable(test):
+    """The ``_canonical_pvalues``, which the canonical query arrays take, of a
+    :func:`canonical_capable` test or a degenerate Gaussian test, exactly, else ``None``.
+
+    A subclass of the degenerate Gaussian test may change what a query returns, so it keeps its
+    scalar calls.
+    """
+    if canonical_capable(test) or type(test) is DGTest:
         return test._canonical_pvalues  # ty: ignore[unresolved-attribute]  # gated by the type
     return None
 
 
 def _stacked_route(test: CITest) -> Callable[..., np.ndarray] | None:
-    """The ``_canonical_pvalues`` that :func:`scan_pairs` stacks the chunks of many pairs into: a
-    :func:`canonical_capable` test's, or an RCoT test's, exactly, which evaluates a stack one
+    """The ``_canonical_pvalues`` that :func:`scan_pairs` stacks the chunks of many pairs into:
+    :func:`_canonical_route`'s, or an RCoT test's, exactly, which evaluates a stack one
     conditioning set at a time; else ``None``."""
     canonical = _canonical_route(test)
     if canonical is not None:
@@ -193,9 +198,10 @@ def marginal_separated(
 ) -> np.ndarray | None:
     """Whether the marginal test separates each pair ``(xs[i], ys[i])``, ``xs[i] < ys[i]``.
 
-    A FisherZ or StudentT test answers every pair in one canonical query array, with the p-values
-    of the scalar calls. Another test returns ``None``: its scalar calls keep their order. So does
-    a call with no pair, whose query array a one-column test cannot index.
+    A FisherZ, StudentT, or degenerate Gaussian test answers every pair in one canonical query
+    array, with the p-values of the scalar calls. Another test returns ``None``: its scalar calls
+    keep their order. So does a call with no pair, whose query array a one-column test cannot
+    index.
     """
     canonical = _canonical_route(test)
     if canonical is None or not len(xs):
@@ -213,10 +219,10 @@ def separating_subsets(
 ) -> list[tuple[int, ...]]:
     """The ``subsets`` (sorted, distinct, of ``size`` members) whose test separates ``x < y``.
 
-    A FisherZ or StudentT test evaluates the subsets in chunks of ``_CHUNK`` canonical queries, in
-    order. A chunk whose evaluation raises is tested again subset by subset with scalar ``test``
-    calls, so the error is the one the scalar loop raises, after the same queries. Another test
-    makes one scalar call per subset.
+    A FisherZ, StudentT, or degenerate Gaussian test evaluates the subsets in chunks of ``_CHUNK``
+    canonical queries, in order. A chunk whose evaluation raises is tested again subset by subset
+    with scalar ``test`` calls, so the error is the one the scalar loop raises, after the same
+    queries. Another test makes one scalar call per subset.
     """
     canonical = _canonical_route(test)
     if canonical is None:
@@ -392,10 +398,11 @@ def scan_pairs(
     removals do not depend on column order; a subset both endpoints offer is tested once, from the
     first.
     This is the general ``|S| >= 2`` scan the vectorized prescreen does not cover; the serial loop
-    and the parallel workers share it, so they stay identical. A FisherZ, StudentT, or RCoT test
-    evaluates the chunks of consecutive pairs in one stack (:func:`_stacked_scan`); another test
-    scans each pair with :func:`scan_conditioning_sets`. Both test the same subsets in the same
-    order. With ``trace`` given, every test is recorded in the order it runs.
+    and the parallel workers share it, so they stay identical. A FisherZ, StudentT, RCoT, or
+    degenerate Gaussian test evaluates the chunks of consecutive pairs in one stack
+    (:func:`_stacked_scan`); another test scans each pair with :func:`scan_conditioning_sets`. Both
+    test the same subsets in the same order. With ``trace`` given, every test is recorded in the
+    order it runs.
     """
     stacked = _stacked_route(test)
     if stacked is not None:
