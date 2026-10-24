@@ -1,7 +1,8 @@
-"""GRaSP's depth-first search tucks the edges of the current DAG.
+"""GRaSP's depth-first search tucks the edges of the current DAG and follows each chain of ties.
 
 Each level of the search tries a tuck on every edge ``x -> y`` of the DAG it starts from: any edge
-at the first level, covered edges below it.
+at the first level, covered edges below it. A tuck that leaves the score unchanged starts a level
+below it, on a DAG the chain of tucks has not visited.
 """
 
 from __future__ import annotations
@@ -66,3 +67,53 @@ def test_every_tuck_is_on_an_edge_and_the_last_pass_tries_every_edge(
     edges = sorted((x, y) for y in order.order for x in order.get_parents(y))
     assert len(edges) > 5
     assert sorted(passes[-1]) == edges
+
+
+def _dag(order: grasp_mod._Order) -> frozenset[tuple[int, int]]:
+    return frozenset((x, y) for y in order.order for x in order.get_parents(y))
+
+
+def test_a_tie_extends_the_chain_to_each_new_dag_and_never_to_one_in_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A tuck that leaves the score unchanged, with depth left, leads one level deeper unless its
+    DAG is already in the chain of tucks that reached it, so no chain visits a DAG twice."""
+    chain: list[frozenset[tuple[int, int]]] = []
+    depths: list[int] = []
+    unexplored = [False]
+    extended = [0]
+    original_dfs, original_update, original_restore = (
+        grasp_mod._dfs,
+        grasp_mod._update,
+        grasp_mod._restore,
+    )
+
+    def dfs(depth, *args, **kwargs):
+        order = next(arg for arg in args if isinstance(arg, grasp_mod._Order))
+        assert _dag(order) not in chain, "a chain revisits a DAG"
+        extended[0] += bool(chain)
+        unexplored[0] = False
+        chain.append(_dag(order))
+        depths.append(depth)
+        try:
+            return original_dfs(depth, *args, **kwargs)
+        finally:
+            chain.pop()
+            depths.pop()
+
+    def update(i: int, j: int, order: grasp_mod._Order, gsts):
+        edge_bump, score_bump = original_update(i, j, order, gsts)
+        tie = -grasp_mod._SCORE_EPS < score_bump <= grasp_mod._SCORE_EPS
+        unexplored[0] = depths[-1] > 0 and tie and _dag(order) not in chain
+        return edge_bump, score_bump
+
+    def restore(order: grasp_mod._Order, start: int, snapshot: tuple) -> None:
+        assert not unexplored[0], "a tie to a new DAG is rolled back unexplored"
+        original_restore(order, start, snapshot)
+
+    monkeypatch.setattr(grasp_mod, "_dfs", dfs)
+    monkeypatch.setattr(grasp_mod, "_update", update)
+    monkeypatch.setattr(grasp_mod, "_restore", restore)
+    grasp_mod.grasp(_sample(), lambda_value=1.0, random_state=0)
+
+    assert extended[0] > 5
