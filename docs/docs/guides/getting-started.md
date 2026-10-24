@@ -354,6 +354,24 @@ in any column order. A label is the column name as text: name a column called `1
 the integer `1` is the second column. On the command line, give a JSON object inline or as a file:
 `andrey run pc --data data.csv knowledge=knowledge.json`.
 
+PCMCI, PCMCI+, LPCMCI, VARMA-LiNGAM, and Longitudinal LiNGAM read the knowledge as links between
+lagged variables. A third entry
+gives an edge its lag: `("x", "y", 1)` is the link from `x` at time `t - 1` to `y` at time `t`,
+and lag `0` is the same step. A forbidden pair without a lag holds at every lag, and a required
+link names its lag. Tiers and `allowed` hold at every lag, and a variable's links to its own past
+stay allowed:
+
+```python
+from andrey import Knowledge, pcmciplus
+
+knowledge = Knowledge(
+    forbidden=[("y", "x", 1)],     # no link from y at t - 1 to x at t
+    required=[("x", "y", 0)],      # x drives y within a step
+    tiers=[["temperature"], ["x", "y"]],
+)
+result = pcmciplus(series, tau_max=2, knowledge=knowledge)
+```
+
 ## Data types
 
 Each test and score reads the columns as one kind of data:

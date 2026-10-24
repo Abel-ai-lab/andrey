@@ -59,10 +59,14 @@ nonlinear tests `"kci"`, `"rcot"`, `"cmiknn"`, and `"gpdc"`
 ([Conditional-independence tests](#conditional-independence-tests)).
 
 `pc`, `fci`, `gfci`, `cdnod`, `ges`, `gies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`,
-`grasp`, `exact_search`, and `direct_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of
-required and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's
-`knowledge` parameter says how it honors them. `pc`, `fci`, `gfci`, and `cdnod` also take
-`max_depth`, the maximum conditioning-set size of their conditional-independence tests.
+`grasp`, `exact_search`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`,
+`varma_lingam`, `longitudinal_lingam`, `pcmci`, `pcmciplus`, `lpcmci`, `rcd`, and
+`bottom_up_parce_lingam` take `knowledge`, a {py:class}`~andrey.Knowledge` of required and
+forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
+parameter says how it honors them. `bottom_up_parce_lingam` honors every part but required edges.
+For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause` at time
+`t - lag` to `effect` at time `t`. `pc`, `fci`, `gfci`, and `cdnod` also take `max_depth`, the
+maximum conditioning-set size of their conditional-independence tests.
 [Background knowledge](guides/getting-started.md#background-knowledge) shows them in use.
 
 `ges` takes `max_parents`, a cap on every node's parents: no graph the returned CPDAG represents

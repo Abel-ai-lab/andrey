@@ -18,7 +18,7 @@ from typing import Any
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure, StructureOutput
+from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput
 
 from ._adapt import structure_output
 from ._marks import marks_from_signed
@@ -198,7 +198,7 @@ def _adapt_rcd(model: Any) -> StructureOutput:
 # ---- BottomUpParceLiNGAM (order-unknown adjacency) ----------------------------------------------
 
 
-def _adapt_bottom_up_parce(model: Any) -> StructureOutput:
+def _adapt_bottom_up_parce(model: Any, arrowheads: np.ndarray | None = None) -> StructureOutput:
     """BottomUpParceLiNGAM adjacency -> directed edges + circle ``o-o`` at ``NaN`` cells.
 
     A symmetric ``NaN`` block is an order-unknown pair and becomes a circle ``pag`` edge. The
@@ -207,9 +207,13 @@ def _adapt_bottom_up_parce(model: Any) -> StructureOutput:
     ``weighted_adjacency`` is the canonical ``B.T`` with ``NaN`` replaced by ``0.0``. The unordered
     variables form one block, which also holds the confounded variables' observed ancestors, so an
     ``o-o`` pair need not share a hidden cause, and no ``confounded_pairs`` are listed.
+    ``arrowheads[i, j]``, from background knowledge, puts an arrowhead at ``i`` on an ``o-o``
+    pair ``i - j``.
     """
     B = _adjacency(model)
     M = marks_from_signed(B, nan_mark="circle")
+    if arrowheads is not None:
+        M[arrowheads & (M == CIRCLE)] = ARROW
     structure = GraphStructure.from_numpy(M, kind="pag")
     metadata: dict[str, Any] = {"algorithm": "BottomUpParceLiNGAM"}
     order = getattr(model, "causal_order_", None)
