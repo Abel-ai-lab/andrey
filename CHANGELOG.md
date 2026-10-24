@@ -38,6 +38,9 @@ change names its pull request.
   large sizes: when none of 1000 draws is stationary, as for PCMCI+ at 240 variables, they scale the
   first draw's lagged coefficients until it is, and the VARMA-LiNGAM generator does the same for an
   unstable draw. Every draw that was stationary is unchanged. ([#393])
+- For contributors, a release pull request into `main` fails its required `release-branch` check
+  when `pyproject.toml`'s version is not the release branch's, since the tag and the site take the
+  package's version. ([#439])
 
 ## [0.9.0] - 2026-10-23
 
@@ -715,3 +718,4 @@ First alpha release.
 [#394]: https://github.com/Abel-ai-lab/andrey/pull/394
 [#395]: https://github.com/Abel-ai-lab/andrey/pull/395
 [#415]: https://github.com/Abel-ai-lab/andrey/pull/415
+[#439]: https://github.com/Abel-ai-lab/andrey/pull/439
