@@ -3,7 +3,8 @@ name: release-flow
 # Only a release branch merges to main (CONTRIBUTING.md, Pull requests): a pull request into main
 # from any other branch fails this check, which the main ruleset requires, and so does a release
 # branch whose package version is not the branch's <x.y.z>: the tag and the site take it. A post
-# release, release/<x.y.z>.post<n>, fixes the site or the docs and keeps the package's <x.y.z>.
+# release, release/<x.y.z>.post<n>, fixes the site or the docs of the release on main: it keeps
+# main's <x.y.z> and changes nothing under src/, so no package code ships under an old version.
 # `edited` reruns it when a pull request is retargeted to main.
 on:
   pull_request:
@@ -18,12 +19,13 @@ jobs:
     timeout-minutes: 2
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - name: The pull request comes from release/<x.y.z> or release/<x.y.z>.post<n>
         env:
           HEAD: ${{ github.head_ref }}
         run: |
-          if [[ ! "$HEAD" =~ ^release/[0-9]+\.[0-9]+\.[0-9]+(\.post[0-9]+)?$ ]]; then
+          if [[ ! "$HEAD" =~ ^release/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\.post[1-9][0-9]*)?$ ]]; then
             echo "::error::Only release/<x.y.z> merges to main, and this pull request comes from $HEAD. Target the release's branch instead."
             exit 1
           fi
@@ -33,14 +35,32 @@ jobs:
           sparse-checkout: pyproject.toml
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: The package version is the release branch's <x.y.z>
+      - name: The package version is the release branch's <x.y.z>; a post release leaves src/ alone
         env:
           HEAD: ${{ github.head_ref }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          set -euo pipefail
+          read_version() { python3 -c 'import sys, tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])'; }
+          version=$(read_version < pyproject.toml)
           release=${HEAD#release/}
           release=${release%%.post*}
           if [[ "$version" != "$release" ]]; then
             echo "::error::$HEAD releases $release, but pyproject.toml says $version. Commit the version first: the tag and the site's llms.txt take it from the package."
             exit 1
+          fi
+          if [[ "$HEAD" == *.post* ]]; then
+            base=$(gh api "repos/$GITHUB_REPOSITORY/contents/pyproject.toml?ref=$BASE_SHA" --jq .content | base64 -d | read_version)
+            if [[ "$base" != "$release" ]]; then
+              echo "::error::$HEAD fixes $release, but main is at $base. A post release fixes the release on main."
+              exit 1
+            fi
+            files=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename')
+            code=$(grep '^src/' <<< "$files" || true)
+            if [[ -n "$code" ]]; then
+              echo "::error::A post release changes no package code, and $HEAD changes: $(tr '\n' ' ' <<< "$code")"
+              exit 1
+            fi
           fi

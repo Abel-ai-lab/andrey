@@ -60,9 +60,10 @@ gitleaks, to this checkout, so they run on every commit; `prek run --all-files` 
   release's tag follows it. A required check, `release-branch`, fails a pull request into `main`
   from any other branch, or from a release branch whose `pyproject.toml` version is not the
   branch's `<x.y.z>`, since the tag and the site take the package's version (a post release,
-  `release/<x.y.z>.post<n>`, fixes the site or the docs and keeps the package at `<x.y.z>`); the
-  release pull request runs the quality gate (`qa/README.md`), also required, once for the whole
-  release. Dependabot's version updates target the active release branch (`target-branch` in
+  `release/<x.y.z>.post<n>`, fixes the site or the docs of the release on `main`: the check also
+  fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`); the release
+  pull request runs the quality gate (`qa/README.md`), also required, once for the whole release.
+  Dependabot's version updates target the active release branch (`target-branch` in
   `.github/dependabot.yml`), which each release moves to the next one.
 - When the public API changes, update its docstrings and the API reference
   (`docs/docs/api.md`) in the same pull request.
