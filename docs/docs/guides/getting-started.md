@@ -442,6 +442,45 @@ From the command line, the same settings are `key=value` arguments, such as
 JSON result lists the categorical columns under `metadata.categorical` and the warnings under
 `run.warnings`.
 
+## Missing values
+
+Mark a missing value with `NaN`, or, for `andrey run`, leave its field empty in the data file. PC,
+FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, and LPCMCI accept missing values: each
+conditional-independence test reads only the rows where all of its variables are observed
+(test-wise deletion), so it keeps the rows that deleting every incomplete row first would drop.
+Here a tenth of the Sachs measurements go missing at random:
+
+```{code-cell} ipython3
+gappy = sachs.data.mask(np.random.default_rng(0).random(sachs.data.shape) < 0.1)
+out = andrey.pc(gappy)
+out.metadata["rows_tested"]
+```
+
+`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read; a fit on
+complete data has no such entry. A time series keeps every step: each row of the lagged design that
+reads a missing value holds it, and each test of PCMCI, PCMCI+, or LPCMCI reads the design rows
+where all of its lagged variables are observed.
+
+Deleting rows per test is sound when values are missing completely at random: the rows a test keeps
+are then a random sample of all rows. When whether a value is missing depends on the variables, as
+when high incomes go unreported, the rows a test keeps are a selected sample. PC's tests can then
+find dependence where the population has none and keep extra edges ([Tu et al., 2019][tu]); FCI
+allows for selection and stays sound when no missingness mechanism causally affects another
+([Strobl, Visweswaran, and Spirtes, 2018][strobl]).
+
+A test needs enough rows where its variables are observed: `|S| + 3` for `fisherz` and `student_t`,
+with `|S|` the size of its conditioning set, and 2 for the other tests. A test with fewer raises a
+`ValueError` that says so; drop the columns that miss the most values, or cap the conditioning sets
+with `max_depth` in PC, FCI, and CD-NOD. A column with no observed value, or with one value
+throughout, raises before the fit, and so does infinity, which is not a missing value. CD-NOD needs
+a complete domain index.
+
+Every other method raises a `ValueError` that names it: its score or loss reads every variable over
+the same rows, so it cannot delete rows per test. Drop the incomplete rows yourself, with
+`data.dropna()` for a DataFrame, which suits values missing completely at random, or use one of the
+methods above. A time series cannot lose a step without joining the steps around it, so for
+VARMA-LiNGAM and Granger, fill in the missing steps first.
+
 ## Backends and parallelism
 
 Andrey reads its numeric backend and its worker count from `andrey.config`, or from the
@@ -492,6 +531,10 @@ data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#kno
   rules with background knowledge.
 - [Perkovic, Kalisch, and Maathuis (2017), Interpreting and Using CPDAGs with Background
   Knowledge][mpdag]: the MPDAG.
+- [Strobl, Visweswaran, and Spirtes (2018), Fast Causal Inference with Non-Random Missingness by
+  Test-Wise Deletion][strobl]: FCI with test-wise deletion.
+- [Tu et al. (2019), Causal Discovery in the Presence of Missing Data][tu]: PC with test-wise
+  deletion.
 
 [sachs]: https://doi.org/10.1126/science.1105809
 [pc]: https://doi.org/10.7551/mitpress/1754.001.0001
@@ -499,3 +542,5 @@ data and sizes it was measured on. See [Known limits](../benchmarks/0.1.0.md#kno
 [lingam]: https://www.jmlr.org/papers/v7/shimizu06a.html
 [meek]: https://arxiv.org/abs/1302.4972
 [mpdag]: https://arxiv.org/abs/1707.02171
+[strobl]: https://doi.org/10.1007/s41060-017-0094-6
+[tu]: https://proceedings.mlr.press/v89/tu19a.html

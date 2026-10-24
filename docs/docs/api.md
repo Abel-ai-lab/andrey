@@ -21,8 +21,9 @@ a list of datasets and returns one result per dataset. Each method is either sup
 experimental; `andrey list` prints the status.
 
 Every method checks its data before the fit: a numeric `(n_samples, n_variables)` matrix with at
-least 2 rows, no `NaN` or infinity, no constant column, and, for a DataFrame, column names that
-differ as text. Each column name becomes its node's label as text, `str(name)`, so columns named
+least 2 rows, no infinity, no constant column, and, for a DataFrame, column names that differ as
+text. A `NaN` is a missing value, which only the methods that delete rows per test accept (see
+below). Each column name becomes its node's label as text, `str(name)`, so columns named
 `1` and `"1"` would share the label `"1"`, and the `ValueError` names it with both positions.
 Where an argument names columns, as `Knowledge` and `categorical` do, a string is a label and an
 integer is a 0-based position: the column named `1` is `"1"`, and `1` is the second column.
@@ -51,6 +52,16 @@ runs. So do `pcmci`, `pcmciplus`, and `lpcmci`, which also reject a series that 
 to `2 * tau_max` steps back and name its lagged value, such as `'a' at lag 1 repeats 'd'`. Other
 data raises a `ValueError` that names the argument and, for a bad cell, its row and column. A
 single column gives a one-node graph.
+
+`pc`, `fci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `pcmci`, `pcmciplus`, and `lpcmci` accept
+missing values, a `NaN` cell or an empty field of a CSV file: each conditional-independence test
+reads only the rows where all of its variables are observed (test-wise deletion), and
+`metadata["rows_tested"]` gives the fewest (`min`) and the median rows a test read. A column with no
+observed value, or a constant one over its observed values, raises a `ValueError` before the fit,
+and a test with fewer rows than it needs, `|S| + 3` for `"fisherz"` and `"student_t"` and 2 for
+the other tests, raises one during it. `cdnod` needs a complete `domain_index`. Every other method
+raises a `ValueError` that names it and says what to do instead, as
+[Missing values](guides/getting-started.md#missing-values) describes; each method's Notes say why.
 
 `pc`, `fci`, `gfci`, `cdnod`, `iamb`, `inter_iamb`, `mmpc`, `mmhc`, and `rsmax2` take the same
 `indep_test` choices: `"fisherz"`, the default, and `"student_t"` for continuous data, `"chisq"`
@@ -238,6 +249,11 @@ andrey.pc(data, indep_test="cmiknn_k5")
 {py:meth}`CMIknn.statistic <andrey.core.ci_cmiknn.CMIknn.statistic>` returns the conditional
 mutual information estimate the test's p-value is built on, a dependence measure of its own.
 
+On data with a `NaN`, {py:func}`~andrey.core.ci.make_indep_test` returns a
+{py:class}`~andrey.core.ci_missing.TestwiseDeletion` of the test: each query builds the test on the
+rows observed in all of its columns, those columns in data order, so its p-value is the one the test
+gives on that block. A registered test works the same way, built anew for each query.
+
 ```{eval-rst}
 .. currentmodule:: andrey.core
 
@@ -252,6 +268,7 @@ mutual information estimate the test's p-value is built on, a dependence measure
    ci_cmiknn.CMIknn
    ci_gpdc.GPDC
    ci.CITest
+   ci_missing.TestwiseDeletion
    ci.register_indep_test
    ci.available_indep_tests
    ci.make_indep_test
