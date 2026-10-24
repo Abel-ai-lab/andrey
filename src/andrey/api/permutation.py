@@ -463,12 +463,12 @@ def grasp(
     n_parents)`` [5]_, which grows with the number of variables; :func:`~andrey.ges` describes the
     choice. ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the standard BIC. On simulated
     linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, at ``seed=0``, the default
-    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average in 64 of 65 settings
-    of graph, variables, and rows, and about as many in the last: 23.4 against 22.8 with 50
-    variables, mean degree 4, and 1,000 rows, where single datasets moved by up to 48 either way.
-    With 200 variables and 2,000 rows it made 6 errors against 191 (200 true edges). Its mean errors
-    stayed below the empty graph's in each of the 65 settings, where the standard BIC's exceeded it
-    in 22.
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average in 63 of 65 settings
+    of graph, variables, and rows, and more in two: 5.4 against 5.0 with 20 variables, mean degree
+    4, and 1,000 rows, and 33.4 against 26.0 with 50 variables, mean degree 4, and 1,000 rows, where
+    the five datasets changed by -50 to +113 errors. With 200 variables and 2,000 rows it made 8
+    errors against 179 (200 true edges). Its mean errors stayed below the empty graph's in each of
+    the 65 settings, where the standard BIC's exceeded it in 21.
 
     **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
     simulated linear-Gaussian data from sparse random graphs (mean degree 2), from 20 to 400
