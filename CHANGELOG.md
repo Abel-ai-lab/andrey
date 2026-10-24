@@ -41,7 +41,7 @@ change names its pull request.
 - For contributors, a release pull request into `main` fails its required `release-branch` check
   when `pyproject.toml`'s version is not the release branch's `<x.y.z>`; a post release keeps the
   package at `<x.y.z>`. A post release's tag also submits the site to search engines again: the
-  job waited for the site to name the post release's version, which it never does. ([#439])
+  job waited for the site to name `<x.y.z>.post<n>`, which it never does. ([#439])
 
 ## [0.9.0] - 2026-10-23
 

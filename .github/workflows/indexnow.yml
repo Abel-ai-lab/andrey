@@ -27,14 +27,10 @@ jobs:
         run: |
           set -euo pipefail
           # A tagged release is live when llms.txt names its version; manual runs submit the live site.
-          # A post release (v<x.y.z>.post<n>) fixes the site and keeps the package's <x.y.z>, which
-          # llms.txt already names, so it waits 10 minutes for the deploy instead (a release takes 8).
+          # A post release (v<x.y.z>.post<n>) keeps the package's <x.y.z>, which llms.txt names.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version=${GITHUB_REF_NAME#v}
-            if [[ "$version" == *.post* ]]; then
-              version=${version%%.post*}
-              sleep 600
-            fi
+            version=${version%%.post*}
             for _ in $(seq 100); do
               if curl -fsS "https://$SITE/llms.txt" | grep -qx "Version: $version."; then
                 live=1
