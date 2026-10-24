@@ -103,9 +103,11 @@ class TestwiseDeletion:
     test, whose state grows with its queries, is built anew for each query.
 
     A query raises ``ValueError`` when its block has fewer rows than its test needs: 2, or
-    ``|S| + 3`` for ``"fisherz"`` and ``"student_t"``, the rows their degrees of freedom need; and
-    when a continuous column is constant on the block, as a constant column of the data is rejected
-    before a fit. A categorical column with one category on the block is left to the test.
+    ``|S| + 3`` for ``"fisherz"`` and ``"student_t"``, the rows their degrees of freedom need; when
+    a continuous column is constant on the block, as a constant column of the data is rejected
+    before a fit; and when the test fails on the block or gives a p-value that is not a number, as
+    a mixed-data test can on a block with fewer rows than columns. A categorical column with one
+    category on the block is left to the test.
 
     Parameters
     ----------
@@ -163,8 +165,10 @@ class TestwiseDeletion:
         """Return ``ask(test, a, b, s)`` for the canonical query ``x``, ``y``, ``cond``.
 
         ``test`` is the test over the query's block, and ``a``, ``b``, and ``s`` the query's
-        columns as indices of that block. The query's row count enters the running
-        :func:`rows_tested` counter once it is answered; a copies error names the data's columns.
+        columns as indices of that block; the answer's last entry is the p-value. The query's row
+        count enters the running :func:`rows_tested` counter once it is answered. A copies error
+        names the data's columns, and another error of the test on its block, or a p-value that is
+        not a number, raises ``ValueError`` saying how many rows the block holds.
         """
         test, columns, rows = self._block_test(x, y, cond)
         at = {c: i for i, c in enumerate(columns)}
@@ -172,10 +176,23 @@ class TestwiseDeletion:
             out = ask(test, at[x], at[y], [at[c] for c in cond])
         except SingularCorrelationError as error:
             raise _in_data_columns(error, columns) from error
+        except (ValueError, ArithmeticError) as error:
+            raise self._failed(rows, f": {error}") from error
+        p = np.asarray(out[-1] if isinstance(out, tuple) else out, dtype=np.float64)
+        if not np.isfinite(p).all():
+            raise self._failed(rows, " gives no p-value")
         counter = _ROWS.get()
         if counter is not None:
             counter[rows] += 1
         return out
+
+    def _failed(self, rows: int, what: str) -> ValueError:
+        """The error of a test that fails on a block of ``rows`` rows, ``what`` saying how."""
+        return ValueError(
+            f"indep_test={self._name!r} on the {rows} rows where all the columns of one of its "
+            f"tests are observed{what}; drop the columns with the most missing values, or cap the "
+            "conditioning sets with max_depth where the method has it"
+        )
 
     def _block_test(self, x: int, y: int, cond: list[int]) -> tuple[CITest, list[int], int]:
         """The test over the block of the canonical query, the block's columns, and its rows."""
@@ -237,7 +254,8 @@ class TestwiseDeletion:
         return self._most[columns]
 
     def _new_test(self, block: np.ndarray, columns: list[int]) -> CITest:
-        """Build the registered test over ``block``; a copies error names the data's columns."""
+        """Build the registered test over ``block``; a copies error names the data's columns, and
+        another error of the build raises as :meth:`_query` says."""
         try:
             test = self._build(block, columns)
             if self._check_copies:
@@ -246,6 +264,8 @@ class TestwiseDeletion:
                     raise copies_error(groups)
         except (CopiedColumnsError, SingularCorrelationError) as error:
             raise _in_data_columns(error, columns) from error
+        except (ValueError, ArithmeticError) as error:
+            raise self._failed(block.shape[0], f": {error}") from error
         return test
 
 
@@ -423,9 +443,10 @@ def _shipped_class(factory: Callable[..., CITest]) -> type | None:
 
 def _pins_blas(test_class: type | None, n: int) -> bool:
     """Whether the skeleton scans pin BLAS to one thread, as :func:`~andrey.core.ci.pins_blas`
-    decides for the test over all ``n`` rows."""
+    decides for the test over all ``n`` rows; a registered test, which may wrap a pinned one, is
+    pinned, which changes no result."""
     if test_class is None:
-        return False
+        return True
     pin = getattr(test_class, "pin_blas", None)
     if isinstance(pin, property):  # KCI: unpinned from a row count on
         from .ci_kernel import _KCI_BLAS_THREADS_FROM

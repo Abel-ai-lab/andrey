@@ -186,6 +186,30 @@ def test_a_test_with_too_few_rows_raises_naming_its_minimum(name, size, least):
     assert 0.0 <= make_indep_test(name, x)(0, 1, list(range(2, 2 + size))) <= 1.0
 
 
+@pytest.mark.parametrize("name", list(TESTS))
+def test_a_small_block_gives_a_p_value_or_raises(name):
+    make, mask = TESTS[name]
+    for rows in (2, 3, 4, 5):
+        x = make()[:40]
+        x[rows:, 1] = np.nan
+        test = make_indep_test(name, x, categorical=mask)
+        for size in (0, 1, 2):
+            try:
+                p = test(0, 1, list(range(2, 2 + size)))
+            except ValueError as error:
+                assert f"the {rows} rows where all" in str(error)
+            else:
+                assert 0.0 <= p <= 1.0
+
+
+def test_a_registered_test_runs_on_one_blas_thread():
+    register_indep_test("pinned", lambda block: FisherZ(block))
+    try:
+        assert make_indep_test("pinned", _gaps(_continuous(), 0.1)).pin_blas
+    finally:
+        ci._CI_REGISTRY.pop("pinned")
+
+
 def test_a_column_constant_on_a_test_rows_raises_for_a_continuous_test():
     x = _continuous(60)
     x[:30, 1] = 2.0
@@ -248,6 +272,15 @@ def test_a_missing_category_is_a_missing_value(indep_test):
     assert out.metadata["rows_tested"]["min"] < len(pd_frame)
     rows = pd_frame.notna().all(axis=1).to_numpy()
     assert out.metadata["rows_tested"]["min"] >= rows.sum()
+
+
+def test_pandas_na_is_a_missing_value():
+    x = _gaps(_continuous(), 0.1)
+    frame = pd.DataFrame(x, columns=list("abcde")).astype("Float64")
+    assert pd.isna(frame.iloc[:, 0]).any() and frame.iloc[:, 0].dtype == "Float64"
+    assert andrey.pc(frame) == andrey.pc(pd.DataFrame(x, columns=list("abcde")))
+    with pytest.raises(ValueError, match="^ges does not accept missing values"):
+        andrey.ges(frame)
 
 
 def test_categories_are_inferred_from_the_observed_values():

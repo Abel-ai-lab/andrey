@@ -63,17 +63,21 @@ def data_matrix(
     ``inf``, or a column is constant: no method can estimate a variance or a dependence from such
     data. The message names every constant column.
 
-    ``NaN`` marks a missing value. With ``missing``, for a method whose tests delete rows per test,
-    the matrix keeps them, as one bit pattern, in a copy; a column constant on its observed values,
-    or with none, raises. Without it, ``NaN`` raises, naming ``method`` when it is given, and
-    ``fix``, the way on: :data:`DROP_ROWS` by default, :data:`FILL_STEPS` for one time series, or
-    :data:`DROP_UNITS` for a panel.
+    ``NaN``, or pandas' ``NA``, marks a missing value. With ``missing``, for a method whose tests
+    delete rows per test, the matrix keeps them, as one bit pattern ``NaN``, in a copy; a column
+    constant on its observed values, or with none, raises. Without it, a missing value raises,
+    naming ``method`` when it is given, and ``fix``, the way on: :data:`DROP_ROWS` by default,
+    :data:`FILL_STEPS` for one time series, or :data:`DROP_UNITS` for a panel.
     """
     column_labels(data)
     try:
         X = np.asarray(data, dtype=np.float64)
     except (TypeError, ValueError) as error:
-        raise ValueError(f"{name} must hold numbers: {error}") from error
+        try:  # a pandas column of a nullable type marks a missing value with NA
+            to_numpy = data.to_numpy  # ty: ignore[unresolved-attribute]  # caught when absent
+            X = np.asarray(to_numpy(dtype=np.float64, na_value=np.nan))
+        except (AttributeError, TypeError, ValueError):
+            raise ValueError(f"{name} must hold numbers: {error}") from error
     if X.ndim != 2:
         hint = "; for one variable, reshape it with .reshape(-1, 1)" if X.ndim == 1 else ""
         raise ValueError(

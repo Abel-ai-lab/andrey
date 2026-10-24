@@ -444,11 +444,11 @@ JSON result lists the categorical columns under `metadata.categorical` and the w
 
 ## Missing values
 
-Mark a missing value with `NaN`, or, for `andrey run`, leave its field empty in the data file. PC,
-FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, and LPCMCI accept missing values: each
-conditional-independence test reads only the rows where all of its variables are observed
-(test-wise deletion), so it keeps the rows that deleting every incomplete row first would drop.
-Here a tenth of the Sachs measurements go missing at random:
+Mark a missing value with `NaN` or pandas' `NA`, or, for `andrey run`, leave its field empty in the
+data file. PC, FCI, CD-NOD, IAMB, Inter-IAMB, MMPC, PCMCI, PCMCI+, and LPCMCI accept missing values:
+each conditional-independence test reads only the rows where all of its variables are observed
+(test-wise deletion), so it keeps the rows that deleting every incomplete row first would drop. Here
+a tenth of the Sachs measurements go missing at random:
 
 ```{code-cell} ipython3
 gappy = sachs.data.mask(np.random.default_rng(0).random(sachs.data.shape) < 0.1)
