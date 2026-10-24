@@ -84,7 +84,7 @@ def ges(
     *,
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
-    ebic_gamma: float = 0.0,
+    ebic_gamma: float = 1.0,
     max_parents: float | None = None,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,

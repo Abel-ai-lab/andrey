@@ -498,7 +498,7 @@ def grasp(
     data: np.ndarray,
     *,
     lambda_value: float = 1.0,
-    ebic_gamma: float = 0.0,
+    ebic_gamma: float = 1.0,
     depth: int = 3,
     random_state: int = 0,
     score_func: str = "local_score_BIC_from_cov",

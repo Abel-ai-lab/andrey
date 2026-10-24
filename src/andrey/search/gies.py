@@ -703,7 +703,7 @@ def gies(
     mask: np.ndarray | None = None,
     *,
     lambda_value: float = 1.0,
-    ebic_gamma: float = 0.0,
+    ebic_gamma: float = 1.0,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
     """Discover an interventional essential graph by greedy interventional equivalence search.

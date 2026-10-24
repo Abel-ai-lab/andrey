@@ -153,7 +153,7 @@ def rsmax2(
     indep_test: str = "fisherz",
     score_func: str = "local_score_BIC_from_cov",
     lambda_value: float = 1.0,
-    ebic_gamma: float = 0.0,
+    ebic_gamma: float = 1.0,
     max_iter: int | None = None,
     tabu_length: int = 10,
     max_tabu: int | None = None,

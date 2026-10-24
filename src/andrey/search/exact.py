@@ -381,7 +381,7 @@ def exact_search(
     *,
     search_method: str = "astar",
     score_func: str = "local_score_BIC",
-    ebic_gamma: float = 0.0,
+    ebic_gamma: float = 1.0,
     categorical: np.ndarray | None = None,
     constraints: Constraints | None = None,
 ) -> GraphStructure:

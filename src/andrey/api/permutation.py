@@ -270,7 +270,7 @@ def grasp(
     *,
     score_func: str | None = None,
     lambda_value: float = 1.0,
-    ebic_gamma: float = 0.0,
+    ebic_gamma: float = 1.0,
     depth: int = 3,
     seed: int | None = None,
     categorical: Sequence[str | int] | None = None,
@@ -303,13 +303,13 @@ def grasp(
     lambda_value : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC, per free parameter of the conditional probability table for the
-        multinomial BIC. Larger values give sparser graphs; ``1.0`` is the standard BIC. Must be
-        finite and non-negative. BDeu ignores it.
-    ebic_gamma : float, default=0.0
+        multinomial BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
+        standard BIC. Must be finite and non-negative. BDeu ignores it.
+    ebic_gamma : float, default=1.0
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it.
+        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
     depth : int, default=3
         Maximum number of tucks in one chain of moves, at least ``1``. The depth-first search
         follows a chain of tucks that leave the score unchanged until one improves it or the chain
@@ -439,22 +439,34 @@ def grasp(
     categorical columns as :func:`~andrey.pc` does. Each candidate parent set is scored by full
     local scores, without the Schur update the BIC search uses.
 
-    **Limitations.** Measured on simulated linear-Gaussian data from sparse random graphs (mean
-    degree 2), from 20 to 400 variables with ten rows per variable, at ``lambda_value=4.0``: its
-    median errors (SHD) stayed below the empty graph's at every size, 0 against 400 at 400
-    variables. The median fit took 0.037 s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16
-    cores; larger graphs were not measured. On the 223-variable ANDES network with 1,000 simulated
-    rows, at ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338).
-    With fewer rows than columns the BIC score is unreliable. A parent set of ``n_samples - 1`` or
-    more variables fits its child exactly, so the search never selects one, nor any parent set that
-    leaves its child a residual variance of at most ``1e-12`` times its variance. Against
-    :func:`~andrey.exact_search` on small simulated categorical networks, with BDeu or the
-    multinomial BIC, GRaSP stopped at a DAG that scores worse than the optimum on some draws;
-    comparing a few seeds shows whether a result depends on the seed. Neither categorical score is
-    benchmarked with GRaSP yet. The
-    mixed-data scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables
-    with 3,000 rows. The numbers are a reference, not a hard limit: they change with the data
-    generator, the density, the method's settings, and the machine.
+    **Choosing the penalty.** The linear-Gaussian BIC charges a variable ``lambda_value *
+    log(n_samples)`` per parent plus the extended-BIC term ``2 * ebic_gamma * log C(n_variables -
+    1, n_parents)`` [5]_, which grows with the number of variables; :func:`~andrey.ges` describes
+    the choice. ``ebic_gamma=0.0`` with ``lambda_value=1.0`` is the standard BIC. On simulated
+    linear-Gaussian data with 20 to 400 variables and 200 to 4,000 rows, at ``seed=0``, the default
+    ``ebic_gamma=1.0`` made fewer errors (SHD) than the standard BIC on average in 64 of 65
+    settings of graph, variables, and rows, and about as many in the last: 23.4 against 22.8 with
+    50 variables, mean degree 4, and 1,000 rows, where single draws moved by up to 48 either way.
+    With 200 variables and 2,000 rows it made 6 errors against 191 (200 true edges). Its mean
+    errors stayed below the empty graph's in each of the 65 settings, where the standard BIC's
+    exceeded it in 22.
+
+    **Limitations.** The benchmark numbers in this paragraph are for ``ebic_gamma=0.0``. Measured on
+    simulated linear-Gaussian data from sparse random graphs (mean degree 2), from 20 to 400
+    variables with ten rows per variable, at ``lambda_value=4.0``: its median errors (SHD) stayed
+    below the empty graph's at every size, 0 against 400 at 400 variables. The median fit took 0.037
+    s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16 cores; larger graphs were not
+    measured. On the 223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``,
+    its median errors passed the empty graph's (471 against 338). With fewer rows than columns the
+    standard BIC is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child
+    exactly, so the search never selects one, nor any parent set that leaves its child a residual
+    variance of at most ``1e-12`` times its variance. Against :func:`~andrey.exact_search` on small
+    simulated categorical networks, with BDeu or the multinomial BIC, GRaSP stopped at a DAG that
+    scores worse than the optimum on some draws; comparing a few seeds shows whether a result
+    depends on the seed. Neither categorical score is benchmarked with GRaSP yet. The mixed-data
+    scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables with 3,000
+    rows. The numbers are a reference, not a hard limit: they change with the data generator, the
+    density, the method's settings, and the machine.
 
     References
     ----------
@@ -467,6 +479,8 @@ def grasp(
        acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
     .. [4] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
+    .. [5] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+       selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
     --------

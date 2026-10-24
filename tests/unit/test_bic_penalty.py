@@ -170,6 +170,9 @@ def test_parallel_arm_tracks_the_penalty(monkeypatch):
     monkeypatch.setenv("ANDREY_GES_PARALLEL_MIN_WORK", "0")
     created = _spy_pool(monkeypatch)
     with backend.config(num_workers=_GES_WORKERS):
-        marks = {lam: _marks(ges(_GES_PARALLEL_SEM, lambda_value=lam)[0]) for lam in _PARALLEL_GRID}
+        marks = {
+            lam: _marks(ges(_GES_PARALLEL_SEM, lambda_value=lam, ebic_gamma=0.0)[0])
+            for lam in _PARALLEL_GRID
+        }
     assert sum(created) == len(_PARALLEL_GRID), "a run stayed in-process instead of fanning out"
     assert len(set(marks.values())) == len(_PARALLEL_GRID), f"ges: pooled answers {marks}"

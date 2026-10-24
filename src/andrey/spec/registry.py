@@ -110,9 +110,17 @@ _LAMBDA_VALUE = ParamSpec(
     type="float",
     default=1.0,
     doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values give sparser "
-    "graphs; 1.0 is the standard BIC.",
+    "graphs; 1.0 with ebic_gamma=0.0 is the standard BIC.",
 )
 _EBIC_GAMMA = ParamSpec(
+    name="ebic_gamma",
+    type="float",
+    default=1.0,
+    doc="Weight on the extended-BIC term 2 * ebic_gamma * log C(n_variables - 1, n_parents) that "
+    "the linear-Gaussian BIC adds per variable; it grows with the number of variables. Larger "
+    "values give sparser graphs; 0.0 is the standard BIC. Other scores ignore it.",
+)
+_EBIC_GAMMA_STANDARD = ParamSpec(
     name="ebic_gamma",
     type="float",
     default=0.0,
@@ -271,7 +279,7 @@ _add(
                 choices=GES_SCORES,
             ),
             _LAMBDA_VALUE,
-            _EBIC_GAMMA,
+            _EBIC_GAMMA_STANDARD,
             _INDEP_TEST,
             _ALPHA,
             _COLLIDER_RULE,
@@ -531,7 +539,7 @@ _add(
                 type="float",
                 default=1.0,
                 doc="Multiplier on the BIC penalty of log(n_samples) per parent. Larger values "
-                "give sparser graphs; 1.0 is the standard BIC.",
+                "give sparser graphs; 1.0 with ebic_gamma=0.0 is the standard BIC.",
             ),
             _EBIC_GAMMA,
             ParamSpec(
@@ -1096,7 +1104,14 @@ _add(
         column_order="relabels",
         tie_break=True,
         seeded=True,
-        params=(_BOSS_SCORE, _LAMBDA_VALUE, _EBIC_GAMMA, _SEED, _CATEGORICAL, _MAX_CATEGORIES),
+        params=(
+            _BOSS_SCORE,
+            _LAMBDA_VALUE,
+            _EBIC_GAMMA_STANDARD,
+            _SEED,
+            _CATEGORICAL,
+            _MAX_CATEGORIES,
+        ),
         references=("Andrews, Ramsey, Sanchez Romero, Camchong & Kummerfeld 2023",),
     )
 )

@@ -1052,7 +1052,7 @@ def xges(
     *,
     score_func: str = "local_score_BIC",
     lambda_value: float = 1.0,
-    ebic_gamma: float = 0.0,
+    ebic_gamma: float = 1.0,
     extended_search: bool = True,
     constraints: Constraints | None = None,
 ) -> tuple[GraphStructure, float]:
