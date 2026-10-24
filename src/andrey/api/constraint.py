@@ -810,7 +810,7 @@ def gfci(
     ``possible_dsep`` selects, and its separating sets; the Notes of :func:`~andrey.fci` describe
     both and the reasons for keeping them.
 
-    **Choosing ebic_gamma.** The GES phase scores a variable with the linear-Gaussian BIC, which
+    **Choosing the penalty.** The GES phase scores a variable with the linear-Gaussian BIC, which
     charges ``lambda_value * log(n_samples)`` per parent, plus the extended-BIC term ``2 *
     ebic_gamma * log C(n_variables - 1, n_parents)`` [6]_, where ``C(n_variables - 1, n_parents)``
     counts the parent sets of that size. The term grows with the number of variables, so a larger
