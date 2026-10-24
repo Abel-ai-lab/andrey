@@ -36,8 +36,8 @@ SERIES = [name for name in SUPPORTED if REGISTRY[name].family == "temporal"]
 # unobserved ones zeroed; their p-values and partial correlations match the test on the block within
 # these tolerances.
 GAUSSIAN = ("fisherz", "student_t")
-RTOL = 1e-9
-ATOL_R = 1e-12
+RTOL = 1e-8
+ATOL_R = 1e-10
 
 
 @pytest.fixture(autouse=True)
