@@ -408,9 +408,13 @@ def grasp(
     [1]_. Each variable uses a grow-shrink tree [2]_ to cache its best parent set for any set of
     variables allowed to precede it. The search starts from a shuffled order and changes it with
     tucks. A tuck on an edge ``x -> y`` moves ``y`` just before ``x``, along with its ancestors that
-    sit between ``x`` and ``y``. A depth-first search keeps the first chain of up to ``depth`` tucks
-    that improves the total score. It repeats until no chain improves it. The final parent sets form
-    a DAG, which is reduced to its CPDAG.
+    sit between ``x`` and ``y``. A depth-first search tries a tuck on every edge of the current DAG,
+    in random order. A tuck that leaves the score unchanged starts a chain, which goes on with tucks
+    on covered edges, those where ``y``'s parents are ``x`` and ``x``'s parents, to DAGs the chain
+    has not visited, up to ``depth`` tucks. The search keeps the first tuck or chain that improves
+    the total score and repeats until none does. This is the paper's GRaSP2 at the depths of its
+    simulations [1]_; the paper runs its lower tiers, GRaSP0 and GRaSP1, first, and GRaSP does
+    not. The final parent sets form a DAG, which is reduced to its CPDAG.
 
     Tucks must improve the score by more than ``1e-6``, the fixed absolute tolerance used by
     :func:`~andrey.boss`. A tuck within this tolerance counts as leaving the score unchanged. Under
@@ -456,17 +460,19 @@ def grasp(
     variables with ten rows per variable, at ``lambda_value=4.0``: its median errors (SHD) stayed
     below the empty graph's at every size, 0 against 400 at 400 variables. The median fit took 0.037
     s at 20 variables, 40 s at 200, and 1,040 s at 400, on 16 cores; larger graphs were not
-    measured. On the 223-variable ANDES network with 1,000 simulated rows, at ``lambda_value=1.0``,
-    its median errors passed the empty graph's (471 against 338). With fewer rows than columns the
-    standard BIC is unreliable. A parent set of ``n_samples - 1`` or more variables fits its child
-    exactly, so the search never selects one, nor any parent set that leaves its child a residual
-    variance of at most ``1e-12`` times its variance. Against :func:`~andrey.exact_search` on small
-    simulated categorical networks, with BDeu or the multinomial BIC, GRaSP stopped at a DAG that
-    scores worse than the optimum on some draws; comparing a few seeds shows whether a result
-    depends on the seed. Neither categorical score is benchmarked with GRaSP yet. The mixed-data
-    scores are experimental and not benchmarked yet; their tests run GRaSP on 5 variables with 3,000
-    rows. The numbers are a reference, not a hard limit: they change with the data generator, the
-    density, the method's settings, and the machine.
+    measured. At ``lambda_value=1.0`` on denser graphs (mean degree 4) of 50 to 200 variables, it
+    stopped at a DAG that scores worse than the true DAG in 26 of 60 fits, one that no chain of up
+    to ``depth`` tucks improves. On the 223-variable ANDES network with 1,000 simulated rows, at
+    ``lambda_value=1.0``, its median errors passed the empty graph's (471 against 338). With fewer
+    rows than columns the standard BIC is unreliable. A parent set of ``n_samples - 1`` or more
+    variables fits its child exactly, so the search never selects one, nor any parent set that
+    leaves its child a residual variance of at most ``1e-12`` times its variance. Against
+    :func:`~andrey.exact_search` on small simulated categorical networks, with BDeu or the
+    multinomial BIC, GRaSP stopped at a DAG that scores worse than the optimum on some draws;
+    comparing a few seeds shows whether a result depends on the seed. Neither categorical score is
+    benchmarked with GRaSP yet. The mixed-data scores are experimental and not benchmarked yet;
+    their tests run GRaSP on 5 variables with 3,000 rows. The numbers are a reference, not a hard
+    limit: they change with the data generator, the density, the method's settings, and the machine.
 
     References
     ----------

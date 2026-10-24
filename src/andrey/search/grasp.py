@@ -404,11 +404,6 @@ def _is_covered(x: int, y_parent_set: set[int], order: _Order) -> bool:
     return x_parent_set == y_parent_set
 
 
-def _flipped_pairs(x: int, i: int, order: _Order) -> set[tuple[int, int]]:
-    """Sorted pairs ``(x, z)`` for parents ``z`` of ``x`` that precede position ``i``."""
-    return {(x, z) if x <= z else (z, x) for z in order.get_parents(x) if order.index(z) < i}
-
-
 def _snapshot(order: _Order, start: int, stop: int) -> tuple:
     """Snapshot the order span ``[start, stop]`` -- variables, parent sets, scores, edge total."""
     vertices: list[int] = []
@@ -433,27 +428,28 @@ def _restore(order: _Order, start: int, snapshot: tuple) -> None:
     order._positions_dirty = True
 
 
+def _dag_key(order: _Order) -> frozenset[tuple[int, int]]:
+    """The DAG the order induces, as its set of ``(parent, child)`` edges."""
+    return frozenset((x, y) for y, parents in order.parents.items() for x in parents)
+
+
 def _dfs(
     depth: int,
-    flipped: set[tuple[int, int]],
-    history: list[set[tuple[int, int]]],
+    chain: set[frozenset[tuple[int, int]]],
     order: _Order,
     gsts: list[_GST],
     rng: random.Random,
-    history_keys: set[frozenset[tuple[int, int]]] | None = None,
     before: np.ndarray | None = None,
 ) -> bool:
-    """Search covered tucks for a score-improving move; return ``True`` when one is applied.
+    """Search tucks for a score-improving chain; return ``True`` when one is applied.
 
-    Visits variables and their parents in shuffled order. Each covered tuck is applied and the span
-    re-scored: a strictly-improving move is kept (returns ``True``); a score-preserving move is
-    recursed through (bounded by ``depth``, de-duplicated by the set of flipped edge pairs) before
-    the tuck is rolled back. A tuck that puts ``b`` before ``a`` where ``before[a, b]`` is rolled
-    back unscored. Returns ``False`` when no move improves the score.
+    ``chain`` holds the DAGs of the chain of tucks that led to this order, its own DAG included.
+    Visits variables and their parents in shuffled order: any edge at the first level, covered
+    edges below. A strictly improving tuck is kept (returns ``True``); a score-preserving tuck to a
+    DAG not yet in the chain is recursed through (bounded by ``depth``) before it is rolled back.
+    A tuck that puts ``b`` before ``a`` where ``before[a, b]`` is rolled back unscored. Returns
+    ``False`` when no chain improves the score.
     """
-    if history_keys is None:
-        history_keys = {frozenset(item) for item in history}
-
     indices = list(range(order.len()))
     rng.shuffle(indices)
     for i in indices:
@@ -461,9 +457,9 @@ def _dfs(
         y_parents = order.get_parents(y)
         rng.shuffle(y_parents)
         y_parent_set = set(y_parents)
-        for x in y_parents:
-            covered = _is_covered(x, y_parent_set, order)
-            if len(history) > 0 and not covered:
+        # A copy: re-scoring a tuck refills y's stored parent list.
+        for x in list(y_parents):
+            if len(chain) > 1 and not _is_covered(x, y_parent_set, order):
                 continue
             j = order.index(x)
             cache = _snapshot(order, j, i)
@@ -477,19 +473,13 @@ def _dfs(
             if score_bump > _SCORE_EPS:
                 order.bump_edges(edge_bump)
                 return True
-            if score_bump > -_SCORE_EPS:
-                flipped = flipped ^ _flipped_pairs(x, i, order)
-                if len(flipped) > 0:
-                    flipped_key = frozenset(flipped)
-                    if flipped_key not in history_keys:
-                        history.append(flipped)
-                        history_keys.add(flipped_key)
-                        if depth > 0 and _dfs(
-                            depth - 1, flipped, history, order, gsts, rng, history_keys, before
-                        ):
-                            return True
-                        del history[-1]
-                        history_keys.remove(flipped_key)
+            if depth > 0 and score_bump > -_SCORE_EPS:
+                key = _dag_key(order)
+                if key not in chain:
+                    chain.add(key)
+                    if _dfs(depth - 1, chain, order, gsts, rng, before):
+                        return True
+                    chain.remove(key)
             _restore(order, j, cache)
     return False
 
@@ -582,7 +572,7 @@ def grasp(
         order.bump_edges(len(y_parents))
         prefix.add(y)
 
-    while _dfs(depth - 1, set(), [], order, gsts, rng, before=before):
+    while _dfs(depth - 1, {_dag_key(order)}, order, gsts, rng, before):
         pass
 
     adj = np.zeros((n_features, n_features), dtype=np.int8)
