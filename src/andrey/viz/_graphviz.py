@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from andrey.core.structure import ARROW, CIRCLE, TAIL, GraphStructure
+from andrey.core.structure import GraphStructure
 
 from . import _svg
 
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 
 ENGINES = ("dot", "neato", "fdp", "sfdp", "circo", "twopi", "osage", "patchwork")
 INSTALL = 'Graphviz layouts need pygraphviz: pip install "andrey-core[viz]".'
-_ARROWS = {ARROW: "normal", CIRCLE: "odot"}  # a tail draws no mark
 
 
 def available() -> bool:
@@ -71,23 +70,8 @@ def to_graphviz(
     graph.node_attr["shape"] = "circle"
     for k in range(n):
         graph.add_node(str(k), label=labels[k])
-    for row in structure.to_edges():
-        i, j = int(row["i"]), int(row["j"])
-        mark_i, mark_j = int(row["mark_i"]), int(row["mark_j"])
-        if i == j:  # a self-loop is one directed edge
-            graph.add_edge(str(i), str(i))
-        elif (mark_i, mark_j) == (TAIL, ARROW):
-            graph.add_edge(str(i), str(j))
-        elif (mark_i, mark_j) == (ARROW, TAIL):
-            graph.add_edge(str(j), str(i))
-        elif (mark_i, mark_j) == (TAIL, TAIL):
-            graph.add_edge(str(i), str(j), dir="none")
-        elif structure.kind == "digraph":  # arrowheads at both ends: a 2-cycle
-            graph.add_edge(str(i), str(j))
-            graph.add_edge(str(j), str(i))
-        else:
-            head, tail = _ARROWS.get(mark_j, "none"), _ARROWS.get(mark_i, "none")
-            graph.add_edge(str(i), str(j), dir="both", arrowhead=head, arrowtail=tail)
+    for i, j, attrs in structure._dot_edges():
+        graph.add_edge(str(i), str(j), **attrs)
     return graph
 
 

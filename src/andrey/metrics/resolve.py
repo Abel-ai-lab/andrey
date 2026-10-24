@@ -8,7 +8,14 @@ emitted it. The keys it returns are listed on :func:`score`.
 from __future__ import annotations
 
 from andrey.core.output import StructureOutput
-from andrey.core.structure import LATENT, GraphStructure, Kind, Structure, TemporalStructure
+from andrey.core.structure import (
+    LATENT,
+    GraphStructure,
+    Kind,
+    Structure,
+    TemporalStructure,
+    is_ancestral_kind,
+)
 
 from ._common import two_marks
 from .graph import (
@@ -46,10 +53,10 @@ def score(output: object, truth: object) -> dict[str, object]:
         - ``dag`` adds ``mec_shd`` and ``mec_arrowhead_f1``, scored through the CPDAGs for methods
           identified only up to their equivalence class, and ``order_*`` and
           ``coefficient_mae`` when an ordering or weights are present.
-        - ``pag`` adds ``shd_endpoint`` and ``confounder_precision``, ``confounder_recall``, and
-          ``confounder_f1``.
+        - ``pag``, when either graph is a ``pag`` or a ``mag``, adds ``shd_endpoint`` and
+          ``confounder_precision``, ``confounder_recall``, and ``confounder_f1``.
         - ``digraph`` keeps the base metrics only: it has no CPDAG, and a 2-cycle claims no latent
-          confounder. Comparing a ``digraph`` with a ``pag`` raises.
+          confounder. Comparing a ``digraph`` with a ``pag`` or a ``mag`` raises.
         - ``latent``: ``latent_cluster_ari``, ``n_latents_estimated``, and ``n_latents_true``.
         - ``temporal``: ``per_lag``, ``contemporaneous``, ``lagged``, and ``summary``, each
           nested, plus ``coefficient_mae_per_lag``.
@@ -103,14 +110,14 @@ def _has_latent(x: object) -> bool:
 
 
 def _graph_family(k_est: Kind, k_true: Kind) -> str:
-    """Family by kind precedence: any digraph -> digraph, any PAG -> pag, any CPDAG -> cpdag,
+    """Family by kind precedence: any digraph -> digraph, any PAG or MAG -> pag, any CPDAG -> cpdag,
     else dag. A ``digraph`` (directed, cyclic) has no essential graph and makes no confounder
     claim, so it scores on the base skeleton / arrowhead / SHD trio alone. A digraph paired with a
     PAG is rejected -- their shared ARROW/ARROW mark means a 2-cycle versus a latent confounder."""
     reject_digraph_pag(k_est, k_true)
     if k_est == "digraph" or k_true == "digraph":
         return "digraph"
-    if k_est == "pag" or k_true == "pag":
+    if is_ancestral_kind(k_est) or is_ancestral_kind(k_true):
         return "pag"
     if k_est == "cpdag" or k_true == "cpdag":
         return "cpdag"

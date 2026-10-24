@@ -32,6 +32,7 @@ from andrey.core.structure import (
     Kind,
     Structure,
     TemporalStructure,
+    is_ancestral_kind,
 )
 from andrey.search._parallel import pick_context
 
@@ -141,7 +142,8 @@ class BootstrapOutput:
             often, or, when two edges tie for most often, the least committal one: ``--``, or
             ``o-o`` for a ``pag``. A ``digraph`` lag graph takes each directed edge that appears
             in at least ``threshold`` of the fits. The graph's kind is the widest kind among the
-            fits (``dag``, ``cpdag``, ``pag``), widened to ``cpdag`` by a ``--``.
+            fits (``dag``, ``cpdag``, ``pag``, with a ``mag`` read as a ``pag``), widened to
+            ``cpdag`` by a ``--``.
 
         Raises
         ------
@@ -467,7 +469,11 @@ def _check_threshold(threshold: float) -> float:
 
 
 def _widest(kinds: set[Kind]) -> Kind:
-    """Return the widest of ``kinds``: ``dag`` < ``cpdag`` < ``pag``, or ``digraph`` alone."""
+    """Return the widest of ``kinds``: ``dag`` < ``cpdag`` < ``pag``, or ``digraph`` alone.
+
+    A ``mag`` counts as a ``pag``: an averaged MAG can hold a tie, which leaves a circle.
+    """
+    kinds = {"pag" if is_ancestral_kind(kind) else kind for kind in kinds}
     if "digraph" in kinds:
         if len(kinds) > 1:
             raise ValueError(
